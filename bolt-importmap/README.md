@@ -12,6 +12,13 @@ Contributions are welcome!
 
 You'll need to do four things to use django-importmap.
 
+The TL;DR is:
+
+- Add "importmap" to `INSTALLED_APPS`
+- Create an `importmap.toml`
+- Run `python manage.py importmap_generate`
+- Use `{% importmap_scripts %}` in your template
+
 ### 1. Install it
 
 Do the equivalent of `pip install django-importmap` and add it to your `INSTALLED_APPS` list in your `settings.py` file.
@@ -20,16 +27,16 @@ Do the equivalent of `pip install django-importmap` and add it to your `INSTALLE
 # settings.py
 INSTALLED_APPS = [
     ...
-    'importmap',
+    "importmap",
 ]
 ```
 
-### 2. Create a `importmap.toml` file
+### 2. Create an `importmap.toml` file
 
 This should live next to your `manage.py` file.
 Here you'll add a list of "packages" you want to use.
 
-The "name" can be anything, but should probably be the same as what it would be if you did `npm install`.
+The "name" can be anything, but should probably be the same as what it you would import from in typical bundling setups (i.e. `import React from "react"`).
 
 The "source" will get passed on to the [jspm.org generator](https://jspm.org/docs/api#install), but is basically the `<npm package>@<version>` you want to use.
 
@@ -130,7 +137,6 @@ When it renders you should be something like this:
 </body>
 </html>
 ```
-
 
 ## Project status
 
