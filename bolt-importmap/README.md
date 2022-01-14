@@ -115,14 +115,14 @@ When it renders you should be something like this:
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.3.6/dist/es-module-shims.js"></script>
     <script type="importmap">
     {
-    "imports": {
-        "react": "https://ga.jspm.io/npm:react@17.0.2/dev.index.js"
-    },
-    "scopes": {
-        "https://ga.jspm.io/": {
-        "object-assign": "https://ga.jspm.io/npm:object-assign@4.1.1/index.js"
+        "imports": {
+            "react": "https://ga.jspm.io/npm:react@17.0.2/dev.index.js"
+        },
+        "scopes": {
+            "https://ga.jspm.io/": {
+            "object-assign": "https://ga.jspm.io/npm:object-assign@4.1.1/index.js"
+            }
         }
-    }
     }
     </script>
 
