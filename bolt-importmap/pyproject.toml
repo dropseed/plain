@@ -28,9 +28,9 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
-tomli = "^2.0.0"
+tomli = "*"
 marshmallow = "^3.14.1"
-requests = "^2.27.1"
+requests = "*"
 
 [tool.poetry.dev-dependencies]
 black = "^21.6b0"
