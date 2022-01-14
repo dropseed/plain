@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django-importmap"
-version = "0.1.1"
+version = "0.1.2"
 description = "JavaScript import maps for Django"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
