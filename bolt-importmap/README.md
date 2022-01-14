@@ -82,7 +82,7 @@ You don't need to look at this file yourself, but here is an example of what it 
 
 ### 4. Add the scripts to your template
 
-The import map itself gets added by using `{% load importmap %}` and then `{% importmap_scripts %}` in the head of your HTML. This will include the [es-module-shim](https://github.com/guybedford/es-module-shims) for older browsers.
+The import map itself gets added by using `{% load importmap %}` and then `{% importmap_scripts %}` in the head of your HTML. This will include the [es-module-shim](https://github.com/guybedford/es-module-shims).
 
 After that, you can include your own JavaScript!
 This could be inline or from `static`.
