@@ -33,7 +33,7 @@ class LockfileSchema(Schema):
 
 
 def hash_for_data(data):
-    return hashlib.md5(json.dumps(data).encode("utf-8")).hexdigest()
+    return hashlib.md5(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 class Importmap:
@@ -102,7 +102,7 @@ class Importmap:
 
     def save_lockfile(self, lockfile):
         with open(self.lock_filename, "w+") as f:
-            json.dump(lockfile, f, indent=2)
+            json.dump(lockfile, f, indent=2, sort_keys=True)
 
     def delete_lockfile(self):
         if os.path.exists(self.lock_filename):

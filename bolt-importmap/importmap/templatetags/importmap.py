@@ -14,6 +14,6 @@ def importmap_scripts():
     importmap.load()
 
     if settings.DEBUG:
-        return {"importmap": json.dumps(importmap.map_dev, indent=2)}
+        return {"importmap": json.dumps(importmap.map_dev, indent=2, sort_keys=True)}
     else:
-        return {"importmap": json.dumps(importmap.map)}
+        return {"importmap": json.dumps(importmap.map, sort_keys=True)}
