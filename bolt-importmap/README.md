@@ -106,7 +106,7 @@ Just be sure to use `type="module"` and the "name" you provided when doing your 
 </html>
 ```
 
-When it renders you should be something like this:
+When it renders you should get something like this:
 
 ```html
 <!DOCTYPE html>
@@ -120,7 +120,7 @@ When it renders you should be something like this:
         },
         "scopes": {
             "https://ga.jspm.io/": {
-            "object-assign": "https://ga.jspm.io/npm:object-assign@4.1.1/index.js"
+                "object-assign": "https://ga.jspm.io/npm:object-assign@4.1.1/index.js"
             }
         }
     }
