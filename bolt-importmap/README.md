@@ -1,6 +1,37 @@
 # django-importmap
 
-## Input
+Heavily inspired by [rails/importmap-rails](https://github.com/rails/importmap-rails),
+this app adds a simple process for integrating [import maps](https://github.com/WICG/import-maps) into Django.
+
+This is a new project and it hasn't been used in production yet.
+But if you're looking to use import maps with Django, give it a try.
+The structure (and code) is pretty simple.
+Contributions are welcome!
+
+## How to use it
+
+You'll need to do four things to use django-importmap.
+
+### 1. Install it
+
+Do the equivalent of `pip install django-importmap` and add it to your `INSTALLED_APPS` list in your `settings.py` file.
+
+```python
+# settings.py
+INSTALLED_APPS = [
+    ...
+    'importmap',
+]
+```
+
+### 2. Create a `importmap.toml` file
+
+This should live next to your `manage.py` file.
+Here you'll add a list of "packages" you want to use.
+
+The "name" can be anything, but should probably be the same as what it would be if you did `npm install`.
+
+The "source" will get passed on to the [jspm.org generator](https://jspm.org/docs/api#install), but is basically the `<npm package>@<version>` you want to use.
 
 ```toml
 [[packages]]
@@ -8,31 +39,13 @@ name = "react"
 source = "react@17.0.2"
 ```
 
-```html
-{% load static importmap %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% importmap_scripts %}
-    <script type="module" src="{% static 'app.js' %}"></script>
-</head>
-<body>
+### 3. Run `importmap_generate`
 
-</body>
-</html>
-```
+To resolve the import map, you'll need to run `python manage.py importmap_generate`.
 
-```js
-import React from "react"
+This will create `importmap.lock` (which you should save and commit to your repo) that contains the actual import map JSON (both for development and production).
 
-console.log(React);
-```
-
-## Output
-
-```sh
-python manage.py importmap_generate
-```
+You don't need to look at this file yourself, but here is an example of what it will contain:
 
 ```json
 {
@@ -60,6 +73,34 @@ python manage.py importmap_generate
 }
 ```
 
+### 4. Add the scripts to your template
+
+The import map itself gets added by using `{% load importmap %}` and then `{% importmap_scripts %}` in the head of your HTML. This will include the [es-module-shim](https://github.com/guybedford/es-module-shims) for older browsers.
+
+After that, you can include your own JavaScript!
+This could be inline or from `static`.
+Just be sure to use `type="module"` and the "name" you provided when doing your JS imports (i.e. "react").
+
+```html
+{% load importmap %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% importmap_scripts %}
+    <script type="module">
+        import React from "react"
+
+        console.log(React);
+    </script>
+</head>
+<body>
+
+</body>
+</html>
+```
+
+When it renders you should be something like this:
+
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -78,13 +119,18 @@ python manage.py importmap_generate
     }
     </script>
 
-    <script type="module" src="/static/app.js"></script>
+    <script type="module">
+        import React from "react"
+
+        console.log(React);
+    </script>
 </head>
 <body>
 
 </body>
 </html>
 ```
+
 
 ## Project status
 
