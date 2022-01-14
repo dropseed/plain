@@ -1,0 +1,5 @@
+#!/bin/sh -e
+./.venv/bin/black importmap "$@"
+./.venv/bin/black test_project "$@"
+./.venv/bin/isort --profile=black importmap "$@"
+./.venv/bin/isort --profile=black test_project "$@"

@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "django-importmap"
+version = "0.1.0"
+description = "JavaScript import maps for Django"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/dropseed/django-importmap"
+documentation = "https://github.com/dropseed/django-importmap"
+repository = "https://github.com/dropseed/django-importmap"
+keywords = ["django", "javascript", "import", "map", "import-maps"]
+packages = [
+    { include = "importmap" },
+]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+tomli = "^2.0.0"
+marshmallow = "^3.14.1"
+requests = "^2.27.1"
+
+[tool.poetry.dev-dependencies]
+black = "^21.6b0"
+Django = "^3.2.5"
+ipdb = "^0.13.9"
+isort = "^5.10.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
