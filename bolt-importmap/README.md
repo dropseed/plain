@@ -4,7 +4,7 @@ Heavily inspired by [rails/importmap-rails](https://github.com/rails/importmap-r
 this app adds a simple process for integrating [import maps](https://github.com/WICG/import-maps) into Django.
 
 This is a new project and it hasn't been used in production yet.
-But if you're looking to use import maps with Django, give it a try.
+But if you're looking to use import maps with Django, give it a try and tell us how it goes.
 The structure (and code) is pretty simple.
 Contributions are welcome!
 
@@ -140,12 +140,15 @@ When it renders you should be something like this:
 
 ## Project status
 
-To do:
+This is partly an experiment,
+but honestly it's so simple that I don't think there can be much wrong with how it works currently.
+
+Here's a list of things that would be nice to do (PRs welcome):
 
 - Automatically rebuild importmap.lock during runserver / on config modification
 - Django check for comparing lock and config (at deploy time, etc.)
-- Use deps to update shim version
+- Use [deps](https://www.dependencies.io/) to update shim version
 - Preload option
-- Vendoring option
+- Vendoring option (including shim)
 - Command to add new importmap dependency? (use `^` version automatically?)
-- More complete error handling
+- More complete error handling (custom exceptions, etc.)
