@@ -20,21 +20,20 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 tomli = "*"
 marshmallow = "^3.14.1"
 requests = "*"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
-Django = "^3.2.5"
+Django = "^4.0.0"
 ipdb = "^0.13.9"
 isort = "^5.10.1"
 
