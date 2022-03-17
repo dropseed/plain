@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django-oauth-login"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
