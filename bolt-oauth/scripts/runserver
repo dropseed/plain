@@ -1,0 +1,4 @@
+#!/bin/sh -e
+rm -f tests/db.sqlite3
+./.venv/bin/python tests/manage.py migrate
+./.venv/bin/python tests/manage.py runserver
