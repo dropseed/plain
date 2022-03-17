@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.checks import Error
 from django.db import models
-from django.db.utils import IntegrityError, OperationalError
+from django.db.utils import IntegrityError, OperationalError, ProgrammingError
 from django.utils import timezone
 
 from .exceptions import OAuthUserAlreadyExistsError
@@ -161,7 +161,7 @@ class OAuthConnection(models.Model):
                     .values_list("provider_key", flat=True)
                     .distinct()
                 )
-            except OperationalError:
+            except (OperationalError, ProgrammingError):
                 # Check runs on manage.py migrate, and the table may not exist yet
                 # or it may not be installed on the particular database intentionally
                 continue
