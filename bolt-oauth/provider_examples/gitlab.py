@@ -22,7 +22,6 @@ class GitLabOAuthProvider(OAuthProvider):
         )
         response.raise_for_status()
         data = response.json()
-        print(data)
         return OAuthToken(
             access_token=data["access_token"],
             refresh_token=data["refresh_token"],
