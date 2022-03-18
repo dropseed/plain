@@ -60,6 +60,7 @@ class OAuthConnection(models.Model):
             oauth_token=oauth_token
         )
         self.set_token_fields(refreshed_oauth_token)
+        self.save()
 
     def set_token_fields(self, oauth_token: "OAuthToken"):
         self.access_token = oauth_token.access_token
