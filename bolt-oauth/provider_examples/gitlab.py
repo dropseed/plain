@@ -1,7 +1,4 @@
-import datetime
-
 import requests
-from django.utils import timezone
 
 from oauthlogin.providers import OAuthProvider, OAuthToken, OAuthUser
 
@@ -12,7 +9,6 @@ class GitLabOAuthProvider(OAuthProvider):
     def _get_token(self, request_data):
         request_data["client_id"] = self.get_client_id()
         request_data["client_secret"] = self.get_client_secret()
-        request_data["redirect_uri"]
         response = requests.post(
             "https://gitlab.com/oauth/token",
             headers={
@@ -25,8 +21,7 @@ class GitLabOAuthProvider(OAuthProvider):
         return OAuthToken(
             access_token=data["access_token"],
             refresh_token=data["refresh_token"],
-            access_token_expires_at=timezone.now()
-            + datetime.timedelta(seconds=data["expires_in"]),
+            # expires_in is missing in response?
         )
 
     def get_oauth_token(self, *, code, request):
@@ -34,6 +29,7 @@ class GitLabOAuthProvider(OAuthProvider):
             {
                 "grant_type": "authorization_code",
                 "code": code,
+                "redirect_uri": self.get_callback_url(request=request),
             }
         )
 
@@ -47,30 +43,15 @@ class GitLabOAuthProvider(OAuthProvider):
 
     def get_oauth_user(self, *, oauth_token):
         response = requests.get(
-            "https://api.bitbucket.org/2.0/user",
+            "https://gitlab.com/api/v4/user",
             headers={
                 "Authorization": "Bearer {}".format(oauth_token.access_token),
             },
         )
         response.raise_for_status()
-        user_id = response.json()["uuid"]
-        username = response.json()["username"]
-
-        response = requests.get(
-            "https://api.bitbucket.org/2.0/user/emails",
-            headers={
-                "Authorization": "Bearer {}".format(oauth_token.access_token),
-            },
-        )
-        response.raise_for_status()
-        confirmed_primary_email = [
-            x["email"]
-            for x in response.json()["values"]
-            if x["is_primary"] and x["is_confirmed"]
-        ][0]
-
+        data = response.json()
         return OAuthUser(
-            id=user_id,
-            email=confirmed_primary_email,
-            username=username,
+            id=data["id"],
+            email=data["email"],
+            username=data["username"],
         )
