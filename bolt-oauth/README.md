@@ -2,6 +2,8 @@
 
 **Add OAuth login support to your Django project.**
 
+[Watch on YouTube (3 mins) →](https://youtu.be/UxbxBa6AFsU)
+
 This library is intentionally minimal.
 It has no dependencies and a single database model.
 If you simply want users to log in with GitHub, Google, Twitter, etc. (and maybe use that access token for API calls),
