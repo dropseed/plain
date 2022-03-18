@@ -38,6 +38,9 @@ class OAuthUser:
         self.username = username
         self.email = email
 
+    def __str__(self):
+        return self.email
+
 
 class OAuthProvider:
     authorization_url = ""
