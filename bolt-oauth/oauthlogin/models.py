@@ -33,7 +33,7 @@ class OAuthConnection(models.Model):
     provider_user_id = models.CharField(max_length=100, db_index=True)
 
     # Token data
-    access_token = models.CharField(max_length=100, blank=True)
+    access_token = models.CharField(max_length=100)
     refresh_token = models.CharField(max_length=100, blank=True)
     access_token_expires_at = models.DateTimeField(blank=True, null=True)
     refresh_token_expires_at = models.DateTimeField(blank=True, null=True)
@@ -41,6 +41,7 @@ class OAuthConnection(models.Model):
     class Meta:
         unique_together = ("provider_key", "provider_user_id")
         ordering = ("provider_key",)
+        verbose_name = "OAuth Connection"
 
     def __str__(self):
         return f"{self.provider_key}[{self.user}:{self.provider_user_id}]"
