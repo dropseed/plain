@@ -174,7 +174,53 @@ You can customize this by copying `oauthlogin/error.html` to one of your own tem
 {% endblock %}
 ```
 
+![Django OAuth duplicate email address error](https://user-images.githubusercontent.com/649496/159065848-b4ee6e63-9aa0-47b5-94e8-7bee9b509e60.png)
+
 ### Connecting and disconnecting OAuth accounts
+
+To connect and disconnect OAuth accounts,
+you can add a series of forms to a user/profile settings page.
+Here's an very basic example:
+
+```html
+{% extends "base.html" %}
+
+{% block content %}
+Hello {{ request.user }}!
+
+<h2>Existing connections</h2>
+<ul>
+    {% for connection in request.user.oauth_connections.all %}
+    <li>
+        {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
+        {% if connection.can_be_disconnected %}
+        <form action="{% url 'oauthlogin:disconnect' connection.provider_key %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
+            <button type="submit">Disconnect</button>
+        </form>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+
+<h2>Add a connection</h2>
+<ul>
+    {% for provider_key in oauth_provider_keys %}
+    <li>
+        {{ provider_key}}
+        <form action="{% url 'oauthlogin:connect' provider_key %}" method="post">
+            {% csrf_token %}
+            <button type="submit">Connect</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+
+{% endblock %}
+```
+
+![Connecting and disconnecting Django OAuth accounts](https://user-images.githubusercontent.com/649496/159065096-30239a1f-62f6-4ee2-a944-45140f45af6f.png)
 
 ### Using a saved access token
 
