@@ -40,6 +40,12 @@ urlpatterns = [
 ]
 ```
 
+Then run migrations:
+
+```sh
+python manage.py migrate oauthlogin
+```
+
 Create a new OAuth provider ([or copy one from our examples](provider_examples)):
 
 ```python
