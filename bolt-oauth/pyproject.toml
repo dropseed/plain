@@ -10,7 +10,7 @@ documentation = "https://github.com/dropseed/django-oauth-login"
 repository = "https://github.com/dropseed/django-oauth-login"
 keywords = []
 packages = [
-    { include = "oauth_login" },
+    { include = "oauthlogin" },
 ]
 classifiers = [
     "Environment :: Web Environment",

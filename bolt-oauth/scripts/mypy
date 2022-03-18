@@ -1,2 +1,2 @@
 #!/bin/sh -e
-./.venv/bin/mypy oauth_login --ignore-missing-imports "$@"
+./.venv/bin/mypy oauthlogin --ignore-missing-imports "$@"

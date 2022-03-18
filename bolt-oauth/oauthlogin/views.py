@@ -31,7 +31,7 @@ class OAuthCallbackView(View):
         except OAuthUserAlreadyExistsError:
             return render(
                 request,
-                "oauth_login/error.html",
+                "oauthlogin/error.html",
                 {
                     "oauth_error": "A user already exists with this email address. Please log in first and then connect this OAuth provider to the existing account."
                 },
@@ -40,7 +40,7 @@ class OAuthCallbackView(View):
         except OAuthStateMismatchError:
             return render(
                 request,
-                "oauth_login/error.html",
+                "oauthlogin/error.html",
                 {"oauth_error": "The state parameter did not match. Please try again."},
                 status=400,
             )
@@ -60,7 +60,7 @@ class OAuthDisconnectView(LoginRequiredMixin, View):
         except OAuthCannotDisconnectError:
             return render(
                 request,
-                "oauth_login/error.html",
+                "oauthlogin/error.html",
                 {
                     "oauth_error": "This connection can't be removed. You must have a usable password or at least one active connection."
                 },

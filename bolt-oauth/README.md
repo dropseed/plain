@@ -22,20 +22,20 @@ Install the package from PyPi:
 pip install django-oauth-login
 ```
 
-Add `oauth_login` to your `INSTALLED_APPS` in `settings.py`:
+Add `oauthlogin` to your `INSTALLED_APPS` in `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     ...
-    "oauth_login",
+    "oauthlogin",
 ]
 ```
 
-In your `urls.py`, include `oauth_login.urls`:
+In your `urls.py`, include `oauthlogin.urls`:
 
 ```python
 urlpatterns = [
-    path("oauth/", include("oauth_login.urls")),
+    path("oauth/", include("oauthlogin.urls")),
     ...
 ]
 ```
@@ -46,7 +46,7 @@ Create a new OAuth provider ([or copy one from our examples](provider_examples))
 # yourapp/oauth.py
 import requests
 
-from oauth_login.providers import OAuthProvider, OAuthToken, OAuthUser
+from oauthlogin.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class ExampleOAuthProvider(OAuthProvider):
@@ -114,7 +114,7 @@ Then add a login button (which is a form using POST rather than a basic link, fo
 
 ```html
 <h1>Login</h1>
-<form action="{% url 'oauth_login:login' 'github' %}" method="post">
+<form action="{% url 'oauthlogin:login' 'github' %}" method="post">
     {% csrf_token %}
     <button type="submit">Login with GitHub</button>
 </form>
@@ -163,7 +163,7 @@ the required flow here is that the user actually logs in with another method (ho
 
 For this error (and a couple others),
 there is an error template that is rendered.
-You can customize this by copying `oauth_login/error.html` to one of your own template directories:
+You can customize this by copying `oauthlogin/error.html` to one of your own template directories:
 
 ```html
 {% extends "base.html" %}

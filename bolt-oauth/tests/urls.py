@@ -3,7 +3,7 @@ from django.contrib.auth.views import LogoutView
 from django.urls import include, path
 from django.views.generic import TemplateView
 
-from oauth_login.providers import get_provider_keys
+from oauthlogin.providers import get_provider_keys
 
 
 class LoggedInView(LoginRequiredMixin, TemplateView):
@@ -20,7 +20,7 @@ class LoginView(TemplateView):
 
 
 urlpatterns = [
-    path("oauth/", include("oauth_login.urls")),
+    path("oauth/", include("oauthlogin.urls")),
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("", LoggedInView.as_view()),

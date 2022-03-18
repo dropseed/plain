@@ -174,7 +174,7 @@ class OAuthConnection(models.Model):
                         "The following OAuth providers are in the database but not in the settings: {}".format(
                             ", ".join(keys_in_db - keys_in_settings)
                         ),
-                        id="oauth_login.E001",
+                        id="oauthlogin.E001",
                     )
                 )
 

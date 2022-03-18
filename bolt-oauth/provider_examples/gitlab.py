@@ -3,7 +3,7 @@ import datetime
 import requests
 from django.utils import timezone
 
-from oauth_login.providers import OAuthProvider, OAuthToken, OAuthUser
+from oauthlogin.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class GitLabOAuthProvider(OAuthProvider):

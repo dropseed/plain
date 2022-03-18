@@ -4,7 +4,7 @@ import requests
 from django.core.exceptions import BadRequest
 from django.utils import timezone
 
-from oauth_login.providers import OAuthProvider, OAuthToken, OAuthUser
+from oauthlogin.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class GitHubOAuthProvider(OAuthProvider):

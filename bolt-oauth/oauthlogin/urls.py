@@ -2,7 +2,7 @@ from django.urls import include, path
 
 from . import views
 
-app_name = "oauth_login"
+app_name = "oauthlogin"
 
 urlpatterns = [
     path(
