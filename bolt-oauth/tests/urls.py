@@ -1,3 +1,4 @@
+from django.contrib import admin
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LogoutView
 from django.urls import include, path
@@ -20,6 +21,7 @@ class LoginView(TemplateView):
 
 
 urlpatterns = [
+    path("admin", admin.site.urls),
     path("oauth/", include("oauthlogin.urls")),
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
