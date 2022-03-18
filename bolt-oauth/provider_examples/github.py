@@ -1,9 +1,9 @@
 import datetime
 
 import requests
-from django.core.exceptions import BadRequest
 from django.utils import timezone
 
+from oauthlogin.exceptions import OAuthError
 from oauthlogin.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
@@ -92,7 +92,7 @@ class GitHubOAuthProvider(OAuthProvider):
                 x["email"] for x in response.json() if x["primary"] and x["verified"]
             ][0]
         except IndexError:
-            raise BadRequest("A verified primary email address is required on GitHub")
+            raise OAuthError("A verified primary email address is required on GitHub")
 
         return OAuthUser(
             id=user_id,
