@@ -242,6 +242,11 @@ response = requests.get(...)
 ### Using the Django system check
 
 This library comes with a Django system check to ensure you don't *remove* a provider from `settings.py` that is still in use in your database.
+You do need to specify the `--database` for this to run when using the check command by itself:
+
+```sh
+python manage.py check --database default
+```
 
 ## FAQs
 
