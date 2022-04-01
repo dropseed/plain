@@ -44,7 +44,7 @@ ipdb = "^0.13.9"
 requests = "^2.27.1"
 mypy = "^0.941"
 isort = "^5.10.1"
-python-dotenv = "^0.19.2"
+python-dotenv = "^0.20.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
