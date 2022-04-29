@@ -145,10 +145,9 @@ but honestly it's so simple that I don't think there can be much wrong with how 
 
 Here's a list of things that would be nice to do (PRs welcome):
 
-- Automatically rebuild importmap.lock during runserver / on config modification
+- Command to add new importmap dependency (use `^` version automatically?)
 - Django check for comparing lock and config (at deploy time, etc.)
 - Use [deps](https://www.dependencies.io/) to update shim version
 - Preload option
 - Vendoring option (including shim)
-- Command to add new importmap dependency? (use `^` version automatically?)
 - More complete error handling (custom exceptions, etc.)
