@@ -42,7 +42,7 @@ pytest = "^7.1.0"
 pytest-django = "^4.5.2"
 ipdb = "^0.13.9"
 requests = "^2.27.1"
-mypy = "^0.941"
+mypy = "*"
 isort = "^5.10.1"
 python-dotenv = "^0.20.0"
 
