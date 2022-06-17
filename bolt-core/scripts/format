@@ -1,0 +1,3 @@
+#!/bin/sh -e
+poetry run black forgecore "$@"
+poetry run isort forgecore --profile=black "$@"

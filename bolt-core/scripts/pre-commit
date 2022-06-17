@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+BOLD="\033[1m"
+NORMAL="\033[0m"
+
+echo "${BOLD}Checking formatting${NORMAL}"
+./scripts/format --check
+
+echo ""
+echo "${BOLD}Running tests${NORMAL}"
+./scripts/test
