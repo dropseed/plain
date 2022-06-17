@@ -18,6 +18,6 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: poetry
     - name: Install dependencies
-      run: ./scripts/install
+      run: poetry install
     - name: Test
       run: ./scripts/test
