@@ -181,7 +181,9 @@ def shell():
 def serve():
     """Run a production server using gunicorn (Heroku)"""
     forge = Forge()
-    wsgi = "wsgi" if forge.user_file_exists("wsgi.py") else "forge.default_files.wsgi"
+    wsgi = (
+        "wsgi" if forge.user_file_exists("wsgi.py") else "forgecore.default_files.wsgi"
+    )
     result = forge.venv_cmd(
         "gunicorn",
         f"{wsgi}:application",
