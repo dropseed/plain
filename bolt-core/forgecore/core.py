@@ -16,12 +16,12 @@ def find_django_project_dir(target_path):
 
     # Check the current directory
     if os.path.exists(os.path.join(target_path, "manage.py")):
-        return os.path.join(target_path, "manage.py")
+        return target_path
 
     # Check the first level of subdirectories
     for subdir in os.listdir(target_path):
         if os.path.exists(os.path.join(target_path, subdir, "manage.py")):
-            return os.path.join(target_path, subdir, "manage.py")
+            return os.path.join(target_path, subdir)
 
     # Otherwise, assume we're in the Django project root
     return target_path
