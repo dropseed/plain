@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 import click
 from forgecore import Forge
@@ -14,31 +13,51 @@ def cli():
 
 
 @cli.command()
+def init():
+    forge = Forge()
+    tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
+
+    if not tailwind.is_installed():
+        click.secho("Installing Tailwind standalone...", bold=True, nl=False)
+        version = tailwind.install()
+        click.secho(f"Tailwind {version} installed", fg="green")
+
+    if not tailwind.config_exists():
+        click.secho("Creating Tailwind config...", bold=True)
+        tailwind.create_config()
+
+    if not tailwind.src_css_exists():
+        click.secho("Creating Tailwind source CSS...", bold=True)
+        tailwind.create_src_css()
+
+
+@cli.command()
 @click.option("--watch", is_flag=True)
 @click.option("--minify", is_flag=True)
 def compile(watch, minify):
     forge = Forge()
-    tailwind = Tailwind(forge.forge_tmp_dir)
+    tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
 
     if not tailwind.is_installed() or tailwind.needs_update():
         version_to_install = tailwind.get_version_from_config()
         if version_to_install:
             click.secho(
-                f"Installing Tailwind standalone {version_to_install}...", bold=True
+                f"Installing Tailwind standalone {version_to_install}...",
+                bold=True,
+                nl=False,
             )
             version = tailwind.install(version_to_install)
         else:
-            click.secho("Installing Tailwind standalone...", bold=True)
+            click.secho("Installing Tailwind standalone...", bold=True, nl=False)
             version = tailwind.install()
         click.secho(f"Tailwind {version} installed", fg="green")
 
-    args = [tailwind.standalone_path]
-
+    args = []
     args.append("-i")
-    args.append(os.path.join(forge.project_dir, "static", "src", "tailwind.css"))
+    args.append(tailwind.src_css_path)
 
     args.append("-o")
-    args.append(os.path.join(forge.project_dir, "static", "dist", "tailwind.css"))
+    args.append(tailwind.dist_css_path)
 
     # These paths should actually work on Windows too
     # https://github.com/mrmlnc/fast-glob#how-to-write-patterns-on-windows
@@ -46,6 +65,7 @@ def compile(watch, minify):
     args.append(
         ",".join(
             [
+                # TODO shouldn't necessarily be "app"
                 "./app/**/*.{html,js}",
                 "./{.venv,.heroku/python}/lib/python*/site-packages/forge*/**/*.{html,js}",
             ]
@@ -58,14 +78,14 @@ def compile(watch, minify):
     if minify:
         args.append("--minify")
 
-    subprocess.check_call(args, cwd=os.path.dirname(forge.project_dir))
+    tailwind.invoke(*args, cwd=os.path.dirname(forge.project_dir))
 
 
 @cli.command()
 def update():
     forge = Forge()
-    tailwind = Tailwind(forge.forge_tmp_dir)
-    click.secho("Installing Tailwind standalone...", bold=True)
+    tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
+    click.secho("Installing Tailwind standalone...", bold=True, nl=True)
     version = tailwind.install()
     click.secho(f"Tailwind {version} installed", fg="green")
 
