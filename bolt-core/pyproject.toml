@@ -5,7 +5,7 @@ packages = [
     { include = "forgecore" },
 ]
 
-version = "0.3.0"
+version = "0.3.1"
 description = "Core library for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
