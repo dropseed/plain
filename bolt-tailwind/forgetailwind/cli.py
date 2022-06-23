@@ -17,14 +17,15 @@ def init():
     forge = Forge()
     tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
 
+    # Config needs to exist first so we can save the version here
+    if not tailwind.config_exists():
+        click.secho("Creating Tailwind config...", bold=True)
+        tailwind.create_config()
+
     if not tailwind.is_installed():
         click.secho("Installing Tailwind standalone...", bold=True, nl=False)
         version = tailwind.install()
         click.secho(f"Tailwind {version} installed", fg="green")
-
-    if not tailwind.config_exists():
-        click.secho("Creating Tailwind config...", bold=True)
-        tailwind.create_config()
 
     if not tailwind.src_css_exists():
         click.secho("Creating Tailwind source CSS...", bold=True)
