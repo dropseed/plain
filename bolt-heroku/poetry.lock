@@ -149,7 +149,7 @@ python-versions = "*"
 
 [[package]]
 name = "forge-core"
-version = "0.1.1"
+version = "0.3.1"
 description = "Core library for Forge"
 category = "main"
 optional = false
@@ -625,8 +625,8 @@ executing = [
     {file = "executing-0.8.3.tar.gz", hash = "sha256:c6554e21c6b060590a6d3be4b82fb78f8f0194d809de5ea7df1c093763311501"},
 ]
 forge-core = [
-    {file = "forge-core-0.1.1.tar.gz", hash = "sha256:06b936bec786284be602bf581400a5d7f6b01c24767b901352e9bd329de9b1d0"},
-    {file = "forge_core-0.1.1-py3-none-any.whl", hash = "sha256:dde898facfa3e17872785253208edab2e531a25b945731c52eb2dd93a8455803"},
+    {file = "forge-core-0.3.1.tar.gz", hash = "sha256:cc5a7d1d1aefb45fe71989f320ed4b480128d69ba084e07e645629c694ae28ed"},
+    {file = "forge_core-0.3.1-py3-none-any.whl", hash = "sha256:882d1ba952b0d5fe87d7571de8fcd4da1fb0a294800397e8f88946e97157d51e"},
 ]
 gunicorn = [
     {file = "gunicorn-20.1.0-py3-none-any.whl", hash = "sha256:9dcc4547dbb1cb284accfb15ab5667a0e5d1881cc443e0677b4882a4067a807e"},
