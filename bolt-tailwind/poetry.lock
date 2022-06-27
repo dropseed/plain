@@ -168,7 +168,7 @@ python-versions = "*"
 
 [[package]]
 name = "forge-core"
-version = "0.3.0"
+version = "0.3.1"
 description = "Core library for Forge"
 category = "main"
 optional = false
@@ -669,8 +669,8 @@ executing = [
     {file = "executing-0.8.3.tar.gz", hash = "sha256:c6554e21c6b060590a6d3be4b82fb78f8f0194d809de5ea7df1c093763311501"},
 ]
 forge-core = [
-    {file = "forge-core-0.3.0.tar.gz", hash = "sha256:48862b39013ce0ef63b453708f1a3a2444fa779d90cc320b3a5885ada5fe6859"},
-    {file = "forge_core-0.3.0-py3-none-any.whl", hash = "sha256:36807116f68d68780d8160d90a4f7d8e0b32b705d91a1a514a2226c4b084457a"},
+    {file = "forge-core-0.3.1.tar.gz", hash = "sha256:cc5a7d1d1aefb45fe71989f320ed4b480128d69ba084e07e645629c694ae28ed"},
+    {file = "forge_core-0.3.1-py3-none-any.whl", hash = "sha256:882d1ba952b0d5fe87d7571de8fcd4da1fb0a294800397e8f88946e97157d51e"},
 ]
 idna = [
     {file = "idna-3.3-py3-none-any.whl", hash = "sha256:84d9dd047ffa80596e0f246e2eab0b391788b0503584e8945f2368256d2735ff"},
