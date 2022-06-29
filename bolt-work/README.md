@@ -18,7 +18,7 @@ The following processes will run simultaneously (some will only run if they are 
 
 ### Forge installation
 
-The `forge-work` package is a dependency of [`forge`](https://github.com/forgepackages/forge).
+The `forge-work` package is a dependency of [`forge`](https://github.com/forgepackages/forge) and is available as `forge work`.
 
 If you use the [Forge quickstart](https://www.forgepackages.com/docs/quickstart/),
 everything you need will already be set up.
