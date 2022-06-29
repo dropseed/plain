@@ -1,4 +1,5 @@
 import os
+import sys
 
 import click
 from forgecore import Forge
@@ -63,12 +64,23 @@ def compile(watch, minify):
     # These paths should actually work on Windows too
     # https://github.com/mrmlnc/fast-glob#how-to-write-patterns-on-windows
     args.append("--content")
+    python_prefix = os.path.relpath(sys.exec_prefix)
+    venvs = [".venv", ".heroku/python"]
+    if python_prefix not in venvs:
+        venvs.append(python_prefix)
     args.append(
         ",".join(
             [
-                # TODO shouldn't necessarily be "app"
-                "./app/**/*.{html,js}",
-                "./{.venv,.heroku/python}/lib/python*/site-packages/forge*/**/*.{html,js}",
+                os.path.join(os.path.relpath(forge.project_dir), "**", "*.{html,js}"),
+                os.path.join(
+                    "{" + ",".join(venvs) + "}",
+                    "lib",
+                    "python*",
+                    "site-packages",
+                    "forge*",
+                    "**",
+                    "*.{html,js}",
+                ),
             ]
         )
     )
