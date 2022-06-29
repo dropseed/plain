@@ -2,6 +2,8 @@
 
 A single command to run everything you need for Django development at once.
 
+![Forge work command example](https://user-images.githubusercontent.com/649496/176533533-cfd44dc5-afe5-42af-8b5d-33a9fa23f8d9.gif)
+
 The following processes will run simultaneously (some will only run if they are detected as available):
 
 - [`manage.py runserver` (and migrations)](#runserver)
