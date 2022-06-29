@@ -27,15 +27,17 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-click = "^8.1.0"
+forge-core = ">=0.4.0,<1.0.0"
+click = ">=8.0.0"
 python-dotenv = "^0.20.0"
-forge-core = "<1.0.0"
 honcho = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 Django = "^4.0.5"
+isort = "^5.10.1"
+black = "^22.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
