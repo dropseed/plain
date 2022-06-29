@@ -8,7 +8,7 @@ Made possible by the [Tailwind standalone CLI](https://tailwindcss.com/blog/stan
 
 ### Forge installation
 
-The `forge-tailwind` package is a dependency of [`forge`](https://github.com/forgepackages/forge).
+The `forge-tailwind` package is a dependency of [`forge`](https://github.com/forgepackages/forge) and is available as `forge tailwind`.
 
 If you use the [Forge quickstart](https://www.forgepackages.com/docs/quickstart/),
 everything you need will already be set up.
