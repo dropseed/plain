@@ -27,11 +27,11 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-click = "^8.1.0"
+forge-core = ">=0.4.0,<1.0.0"
+click = ">=8.0.0"
 python-dotenv = "^0.20.0"
-black = "^22.3.0"
-isort = "^5.10.1"
-forge-core = "<1.0.0"
+black = ">=22.0.0"
+isort = ">=5.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
