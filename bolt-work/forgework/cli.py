@@ -6,6 +6,7 @@ import sys
 import click
 from dotenv import set_key as dotenv_set_key
 from forgecore import Forge
+from forgecore.packages import forgepackage_installed
 from honcho.manager import Manager as HonchoManager
 
 
@@ -65,11 +66,8 @@ def cli():
             f"stripe listen --forward-to localhost:{runserver_port}{os.environ['STRIPE_WEBHOOK_PATH']}",
         )
 
-    # So this can work in development too...
-    forge_executable = os.path.join(os.path.dirname(sys.executable), "forge")
-
-    # TODO if forgedb installed
-    manager.add_process("postgres", f"{forge_executable} db start --logs")
+    if forgepackage_installed("db"):
+        manager.add_process("postgres", f"forge-db start --logs")
 
     manager.add_process(
         "django",
@@ -80,7 +78,8 @@ def cli():
         },
     )
 
-    manager.add_process("tailwind", f"{forge_executable} tailwind compile --watch")
+    if forgepackage_installed("tailwind"):
+        manager.add_process("tailwind", f"forge-tailwind compile --watch")
 
     if "NGROK_SUBDOMAIN" in os.environ:
         manager.add_process(
