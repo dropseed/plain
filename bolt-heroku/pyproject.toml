@@ -27,8 +27,10 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-click = "^8.1.0"
 forge-core = "<1.0.0"
+click = ">=2.0.0"
+
+# For Heroku environment
 gunicorn = "^20.1.0"
 psycopg2-binary = "^2.9.3"
 

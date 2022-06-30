@@ -4,10 +4,9 @@ import subprocess
 import sys
 
 import click
-
-# TODO don't need to depend on this really
-from django.core.management.utils import get_random_secret_key
 from forgecore import Forge
+
+from .utils import generate_secret_key
 
 FORGE_BUILDPACK = "forgepackages/forge"
 
@@ -59,7 +58,7 @@ def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
 
     click.secho("Setting PYTHON_RUNTIME_VERSION, SECRET_KEY, and BASE_URL", bold=True)
     python_version = platform.python_version()
-    secret_key = get_random_secret_key()
+    secret_key = generate_secret_key()
     # TODO --domain option?
     base_url = f"https://{heroku_app_name}.herokuapp.com"
     subprocess.check_call(
