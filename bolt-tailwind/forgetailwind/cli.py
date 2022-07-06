@@ -71,16 +71,8 @@ def compile(watch, minify):
     args.append(
         ",".join(
             [
-                os.path.join(os.path.relpath(forge.project_dir), "**", "*.{html,js}"),
-                os.path.join(
-                    "{" + ",".join(venvs) + "}",
-                    "lib",
-                    "python*",
-                    "site-packages",
-                    "forge*",
-                    "**",
-                    "*.{html,js}",
-                ),
+                "./" + os.path.relpath(forge.project_dir) + "/**/*.{html,js}",
+                "./" + "{" + ",".join(venvs) + "}" + "/lib/python*/site-packages/forge*/**/*.{html,js}",
             ]
         )
     )
