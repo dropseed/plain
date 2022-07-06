@@ -56,9 +56,11 @@ def compile(watch, minify):
 
     args = []
     args.append("-i")
+    print(f"Input: {tailwind.src_css_path}")
     args.append(tailwind.src_css_path)
 
     args.append("-o")
+    print(f"Output: {tailwind.dist_css_path}")
     args.append(tailwind.dist_css_path)
 
     # These paths should actually work on Windows too
@@ -68,14 +70,15 @@ def compile(watch, minify):
     venvs = [".venv", ".heroku/python"]
     if python_prefix not in venvs:
         venvs.append(python_prefix)
-    args.append(
-        ",".join(
-            [
-                "./" + os.path.relpath(forge.project_dir) + "/**/*.{html,js}",
-                "./" + "{" + ",".join(venvs) + "}" + "/lib/python*/site-packages/forge*/**/*.{html,js}",
-            ]
-        )
+
+    content = ",".join(
+        [
+            "./" + os.path.relpath(forge.project_dir) + "/**/*.{html,js}",
+            "./" + "{" + ",".join(venvs) + "}" + "/lib/python*/site-packages/forge*/**/*.{html,js}",
+        ]
     )
+    print(f"Content: {content}")
+    args.append(content)
 
     if watch:
         args.append("--watch")
