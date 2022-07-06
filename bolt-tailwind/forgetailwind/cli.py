@@ -66,15 +66,10 @@ def compile(watch, minify):
     # These paths should actually work on Windows too
     # https://github.com/mrmlnc/fast-glob#how-to-write-patterns-on-windows
     args.append("--content")
-    python_prefix = os.path.relpath(sys.exec_prefix)
-    venvs = [".venv", ".heroku/python"]
-    if python_prefix not in venvs:
-        venvs.append(python_prefix)
-
     content = ",".join(
         [
-            "./" + os.path.relpath(forge.project_dir) + "/**/*.{html,js}",
-            "./" + "{" + ",".join(venvs) + "}" + "/lib/python*/site-packages/forge*/**/*.{html,js}",
+            os.path.relpath(forge.project_dir) + "/**/*.{html,js}",
+            sys.exec_prefix + "/lib/python*/site-packages/forge*/**/*.{html,js}",
         ]
     )
     print(f"Content: {content}")
