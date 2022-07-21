@@ -22,6 +22,25 @@
             {% endif %}
         </div>
         <div class="flex items-center space-x-4">
+
+            <div class="relative group">
+                <code class="text-xs text-mono cursor-help">{{ stafftoolbar.release }}</code>
+                <div class="absolute group-hover:block hidden top-0 left-0 -translate-x-3/4 pt-6">
+                    <div class="bg-zinc-900 border border-zinc-700 text-xs p-2 rounded shadow-md">
+                        <table>
+                            <tbody>
+                            {% for k, v in stafftoolbar.release.metadata %}
+                            <tr>
+                                <td class="font-medium whitespace-nowrap pr-2">{{ k }}</td>
+                                <td class="whitespace-nowrap">{{ v }}</td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             {% if querystats_enabled %}{% include "querystats/stafftoolbar.html" %}{% endif %}
 
             {% if requestlog_enabled %}{% include "requestlog/stafftoolbar.html" %}{% endif %}
