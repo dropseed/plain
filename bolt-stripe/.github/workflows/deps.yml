@@ -1,0 +1,30 @@
+name: deps
+
+on:
+  schedule:
+  - cron: 0 0 1 * Mon
+  workflow_dispatch: {}
+
+jobs:
+  deps:
+    runs-on: ubuntu-latest
+    steps:
+    - id: generate_token
+      uses: tibdex/github-app-token@v1
+      with:
+        app_id: ${{ secrets.DEPS_GITHUB_APP_ID }}
+        private_key: ${{ secrets.DEPS_GITHUB_APP_KEY }}
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ steps.generate_token.outputs.token }}
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+    - run: |
+        pip install -U pip poetry
+        ./scripts/install
+    - run: curl https://deps.app/install.sh | bash -s -- -b $HOME/bin
+    - run: $HOME/bin/deps ci
+      env:
+        DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}
+        DEPS_GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
