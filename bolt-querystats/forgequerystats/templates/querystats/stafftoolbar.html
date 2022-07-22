@@ -1,0 +1,31 @@
+<form action="." method="get">
+    <input type="hidden" name="querystats" value="store">
+    <button type="submit" class="px-2 py-px text-xs rounded-full bg-zinc-700" data-querystats-summary style="display:none;">
+    <script async defer>
+    // Catch errors since some browsers throw when using the new `type` option.
+    // https://bugs.webkit.org/show_bug.cgi?id=209216
+    try {
+        // Create the performance observer.
+        const po = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+                if (!entry.serverTiming) {
+                    console.warn("Server timing not available for querystats.")
+                    return;
+                }
+                for (const timing of entry.serverTiming) {
+                    if (timing.name === "querystats") {
+                        const el = document.querySelector('[data-querystats-summary]');
+                        el.innerText = timing.description;
+                        el.style.display = "inline";
+                    }
+                }
+            }
+        });
+        // Start listening for `navigation` entries to be dispatched.
+        po.observe({type: 'navigation', buffered: true});
+    } catch (e) {
+        // Do nothing if the browser doesn't support this API.
+    }
+    </script>
+    </button>
+</form>
