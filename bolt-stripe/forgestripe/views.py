@@ -50,7 +50,7 @@ class StripeWebhookView(View):
             event = stripe.Webhook.construct_event(
                 request.body,
                 request.META["HTTP_STRIPE_SIGNATURE"],
-                settings.STRIPE_WEBHOOK_SECRET,
+                settings.STRIPE_WEBHOOK_SECRET(),
             )
         except ValueError as e:
             # Invalid payload

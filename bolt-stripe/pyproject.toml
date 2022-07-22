@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "forge-stafftoolbar"
+name = "forge-stripe"
 packages = [
     { include = "forgestripe" },
 ]
 
-version = "0.1.0"
-description = "Staff toolbar for Forge"
+version = "0.0.0"
+description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
 [tool.poetry.dependencies]
