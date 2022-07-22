@@ -1,0 +1,6 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+{% include "impersonate/change_form_object_tools.html" %}
+{{ block.super }}
+{% endblock %}
