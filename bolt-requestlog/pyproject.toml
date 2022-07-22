@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "forge-requestlog"
+packages = [
+    { include = "forgerequestlog" },
+]
+
+version = "0.0.0"
+description = ""
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "^2.0.0"
+forge-core = "^0.4.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+Django = "^4.0.5"
+isort = "^5.10.1"
+black = "^22.6.0"
+pytest-django = "^4.5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
