@@ -1,0 +1,10 @@
+{% if googleanalytics_measurement_id %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ googleanalytics_measurement_id }}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '{{ googleanalytics_measurement_id }}'{% if googleanalytics_user_id %},{'user_id': '{{ googleanalytics_user_id }}'}{% endif %});
+</script>
+{% endif %}
