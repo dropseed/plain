@@ -5,6 +5,8 @@ from collections import Counter
 
 from django.utils.functional import cached_property
 
+from .sql import pretty_print_sql
+
 IGNORE_STACK_FILES = [
     "threading",
     "socketserver",
@@ -128,15 +130,7 @@ class QueryStats:
         for query in self.queries:
             # Add some useful display info
             query["duration_display"] = self.get_time_display(query["duration"])
-            query["sql_display"] = (
-                query["sql"]
-                .replace("FROM", "\n  FROM")
-                .replace("\n  FROM", "\nFROM", 1)  # Unindent the first occurence
-                .replace("WHERE", "\n  WHERE")
-                .replace("\n  WHERE", "\nWHERE", 1)  # Unindent the first occurence
-                .replace("ORDER BY", "\nORDER BY")
-                .replace("LIMIT", "\nLIMIT")
-            )
+            query["sql_display"] = pretty_print_sql(query["sql"])
             duplicates = self.duplicate_queries.get(query["sql"], 0)
             if duplicates:
                 query["duplicate_count"] = duplicates
