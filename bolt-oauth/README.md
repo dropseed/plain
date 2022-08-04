@@ -128,6 +128,9 @@ Then add a login button (which is a form using POST rather than a basic link, fo
 </form>
 ```
 
+Depending on your URL and provider names,
+your OAuth callback will be something like `https://example.com/oauth/{provider}/callback/`.
+
 That's pretty much it!
 
 ## Advanced usage
@@ -299,3 +302,14 @@ If something breaks with a provider, you can fix it immediately!
 You don't need to try to run changes through us or wait for an upstream update.
 You're welcome to contribute an example to this repo,
 and there won't be an expectation that it "works perfectly for every use case until the end of time".
+
+### Redirect/callback URL mismatch in local development?
+
+If you're doing local development through a proxy/tunnel like [ngrok](https://ngrok.com/),
+then the callback URL might be automatically built as `http` instead of `https`.
+
+This is the Django setting you're probably looking for:
+
+```python
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+```
