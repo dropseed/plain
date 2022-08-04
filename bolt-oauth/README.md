@@ -246,7 +246,7 @@ if connection.access_token_expired():
     connection.refresh_access_token()
 
 # Use the token in an API call
-token = connection.oauth_token
+token = connection.access_token
 response = requests.get(...)
 ```
 
