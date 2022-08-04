@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("oauthlogin", "0001_initial"),
+        ("forgeoauth", "0001_initial"),
     ]
 
     operations = [

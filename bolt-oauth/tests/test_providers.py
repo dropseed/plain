@@ -3,8 +3,8 @@ import datetime
 import pytest
 from django.contrib.auth import get_user_model
 
-from oauthlogin.models import OAuthConnection
-from oauthlogin.providers import OAuthProvider, OAuthToken, OAuthUser
+from forgeoauth.models import OAuthConnection
+from forgeoauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class DummyProvider(OAuthProvider):
@@ -227,7 +227,7 @@ def test_dummy_login_without_connection(client, settings):
     # Provider redirects to the callback url
     response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
     assert response.status_code == 400
-    assert response.templates[0].name == "oauthlogin/error.html"
+    assert response.templates[0].name == "oauth/error.html"
 
 
 @pytest.mark.django_db
@@ -447,7 +447,7 @@ def test_dummy_disconnect_last(client, settings):
         "/oauth/dummy/disconnect/", data={"provider_user_id": "dummy_id"}
     )
     assert response.status_code == 400
-    assert response.templates[0].name == "oauthlogin/error.html"
+    assert response.templates[0].name == "oauth/error.html"
 
     assert get_user_model().objects.count() == 1
     assert OAuthConnection.objects.count() == 1

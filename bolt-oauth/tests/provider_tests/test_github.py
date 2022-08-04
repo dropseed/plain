@@ -1,6 +1,6 @@
 import pytest
 
-from oauthlogin.providers import OAuthToken, OAuthUser
+from forgeoauth.providers import OAuthToken, OAuthUser
 from tests.providers.github import GitHubOAuthProvider
 
 

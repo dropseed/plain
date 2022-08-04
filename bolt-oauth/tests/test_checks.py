@@ -1,7 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from oauthlogin.models import OAuthConnection
+from forgeoauth.models import OAuthConnection
 
 
 @pytest.mark.django_db

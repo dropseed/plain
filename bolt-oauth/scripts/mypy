@@ -1,2 +1,2 @@
 #!/bin/sh -e
-./.venv/bin/mypy oauthlogin --ignore-missing-imports "$@"
+./.venv/bin/mypy forgeoauth --ignore-missing-imports "$@"

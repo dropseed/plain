@@ -1,7 +1,7 @@
 import pytest
 
-from oauthlogin.models import OAuthConnection
-from oauthlogin.providers import OAuthToken, OAuthUser
+from forgeoauth.models import OAuthConnection
+from forgeoauth.providers import OAuthToken, OAuthUser
 
 
 @pytest.mark.django_db

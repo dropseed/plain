@@ -1,4 +1,4 @@
-# django-oauth-login
+# forge-oauth
 
 **Add OAuth login support to your Django project.**
 
@@ -21,23 +21,23 @@ There are three OAuth flows that it makes possible:
 Install the package from PyPi:
 
 ```sh
-pip install django-oauth-login
+pip install forge-oauth
 ```
 
-Add `oauthlogin` to your `INSTALLED_APPS` in `settings.py`:
+Add `forgeoauth` to your `INSTALLED_APPS` in `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     ...
-    "oauthlogin",
+    "forgeoauth",
 ]
 ```
 
-In your `urls.py`, include `oauthlogin.urls`:
+In your `urls.py`, include `forgeoauth.urls`:
 
 ```python
 urlpatterns = [
-    path("oauth/", include("oauthlogin.urls")),
+    path("oauth/", include("forgeoauth.urls")),
     ...
 ]
 ```
@@ -45,7 +45,7 @@ urlpatterns = [
 Then run migrations:
 
 ```sh
-python manage.py migrate oauthlogin
+python manage.py migrate forgeoauth
 ```
 
 Create a new OAuth provider ([or copy one from our examples](provider_examples)):
@@ -54,7 +54,7 @@ Create a new OAuth provider ([or copy one from our examples](provider_examples))
 # yourapp/oauth.py
 import requests
 
-from oauthlogin.providers import OAuthProvider, OAuthToken, OAuthUser
+from forgeoauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class ExampleOAuthProvider(OAuthProvider):
@@ -122,7 +122,7 @@ Then add a login button (which is a form using POST rather than a basic link, fo
 
 ```html
 <h1>Login</h1>
-<form action="{% url 'oauthlogin:login' 'github' %}" method="post">
+<form action="{% url 'forgeoauth:login' 'github' %}" method="post">
     {% csrf_token %}
     <button type="submit">Login with GitHub</button>
 </form>
@@ -171,7 +171,7 @@ the required flow here is that the user actually logs in with another method (ho
 
 For this error (and a couple others),
 there is an error template that is rendered.
-You can customize this by copying `oauthlogin/error.html` to one of your own template directories:
+You can customize this by copying `oauth/error.html` to one of your own template directories:
 
 ```html
 {% extends "base.html" %}
@@ -202,7 +202,7 @@ Hello {{ request.user }}!
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         {% if connection.can_be_disconnected %}
-        <form action="{% url 'oauthlogin:disconnect' connection.provider_key %}" method="post">
+        <form action="{% url 'forgeoauth:disconnect' connection.provider_key %}" method="post">
             {% csrf_token %}
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
@@ -217,7 +217,7 @@ Hello {{ request.user }}!
     {% for provider_key in oauth_provider_keys %}
     <li>
         {{ provider_key}}
-        <form action="{% url 'oauthlogin:connect' provider_key %}" method="post">
+        <form action="{% url 'forgeoauth:connect' provider_key %}" method="post">
             {% csrf_token %}
             <button type="submit">Connect</button>
         </form>

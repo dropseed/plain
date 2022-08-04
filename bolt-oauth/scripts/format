@@ -1,5 +1,5 @@
 #!/bin/sh -e
-./.venv/bin/black oauthlogin "$@"
-./.venv/bin/isort --profile black oauthlogin "$@"
+./.venv/bin/black forgeoauth "$@"
+./.venv/bin/isort --profile black forgeoauth "$@"
 ./.venv/bin/black tests "$@"
 ./.venv/bin/isort --profile black tests "$@"

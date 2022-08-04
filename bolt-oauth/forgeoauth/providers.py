@@ -13,8 +13,8 @@ from django.utils.module_loading import import_string
 from .exceptions import OAuthCannotDisconnectError, OAuthStateMismatchError
 from .models import OAuthConnection
 
-SESSION_STATE_KEY = "oauthlogin_state"
-SESSION_NEXT_KEY = "oauthlogin_next"
+SESSION_STATE_KEY = "forgeoauth_state"
+SESSION_NEXT_KEY = "forgeoauth_next"
 
 
 class OAuthToken:
@@ -95,7 +95,7 @@ class OAuthProvider:
         return self.scope
 
     def get_callback_url(self, *, request: HttpRequest) -> str:
-        url = reverse("oauthlogin:callback", kwargs={"provider": self.provider_key})
+        url = reverse("forgeoauth:callback", kwargs={"provider": self.provider_key})
         return request.build_absolute_uri(url)
 
     def generate_state(self) -> str:

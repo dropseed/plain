@@ -4,7 +4,7 @@ from django.contrib.auth.views import LogoutView
 from django.urls import include, path
 from django.views.generic import TemplateView
 
-from oauthlogin.providers import get_provider_keys
+from forgeoauth.providers import get_provider_keys
 
 
 class LoggedInView(LoginRequiredMixin, TemplateView):
@@ -22,7 +22,7 @@ class LoginView(TemplateView):
 
 urlpatterns = [
     path("admin", admin.site.urls),
-    path("oauth/", include("oauthlogin.urls")),
+    path("oauth/", include("forgeoauth.urls")),
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("", LoggedInView.as_view()),

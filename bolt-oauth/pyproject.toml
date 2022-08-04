@@ -1,16 +1,16 @@
 [tool.poetry]
-name = "django-oauth-login"
+name = "forge-oauth"
 version = "0.2.2"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/dropseed/django-oauth-login"
-documentation = "https://github.com/dropseed/django-oauth-login"
-repository = "https://github.com/dropseed/django-oauth-login"
+homepage = "https://github.com/forgepackages/forge-oauth"
+documentation = "https://github.com/forgepackages/forge-oauth"
+repository = "https://github.com/forgepackages/forge-oauth"
 keywords = []
 packages = [
-    { include = "oauthlogin" },
+    { include = "forgeoauth" },
 ]
 classifiers = [
     "Environment :: Web Environment",
