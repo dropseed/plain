@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.checks import Error
-from django.db import models
+from django.db import models, transaction
 from django.db.utils import IntegrityError, OperationalError, ProgrammingError
 from django.utils import timezone
 
@@ -101,22 +101,23 @@ class OAuthConnection(models.Model):
             connection.save()
             return connection
         except cls.DoesNotExist:
-            # If email needs to be unique, then we expect
-            # that to be taken care of on the user model itself
-            try:
-                user = get_user_model().objects.create_user(
-                    username=oauth_user.username,
-                    email=oauth_user.email,
-                )
-            except IntegrityError:
-                raise OAuthUserAlreadyExistsError()
+            with transaction.atomic():
+                # If email needs to be unique, then we expect
+                # that to be taken care of on the user model itself
+                try:
+                    user = get_user_model().objects.create_user(
+                        username=oauth_user.username,
+                        email=oauth_user.email,
+                    )
+                except IntegrityError:
+                    raise OAuthUserAlreadyExistsError()
 
-            return cls.connect(
-                user=user,
-                provider_key=provider_key,
-                oauth_token=oauth_token,
-                oauth_user=oauth_user,
-            )
+                return cls.connect(
+                    user=user,
+                    provider_key=provider_key,
+                    oauth_token=oauth_token,
+                    oauth_user=oauth_user,
+                )
 
     @classmethod
     def connect(
