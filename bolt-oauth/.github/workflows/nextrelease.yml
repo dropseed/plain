@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: dropseed/nextrelease@v2
-      env:
-        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.DROPSEED_PYPI_TOKEN }}
       with:
         prepare_cmd: |
           sed -i -e "s/version = \"[^\"]*\"$/version = \"$VERSION\"/g" pyproject.toml
         publish_cmd: |
-          pip3 install -U pip poetry && poetry publish --build --no-interaction
+          pip3 install -U pip poetry
+          poetry build
+          gh release upload $TAG dist/*
         github_token: ${{ secrets.GITHUB_TOKEN }}
