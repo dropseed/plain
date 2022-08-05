@@ -131,14 +131,25 @@ class OAuthConnection(models.Model):
         """
         Connect will either create a new connection or update an existing connection
         """
-        connection, _ = cls.objects.get_or_create(
-            user=user,
-            provider_key=provider_key,
-            provider_user_id=oauth_user.id,
-        )
+        try:
+            connection = cls.objects.get(
+                user=user,
+                provider_key=provider_key,
+                provider_user_id=oauth_user.id,
+            )
+        except cls.DoesNotExist:
+            # Create our own instance (not using get_or_create)
+            # so that any created signals contain the token fields too
+            connection = cls(
+                user=user,
+                provider_key=provider_key,
+                provider_user_id=oauth_user.id,
+            )
+
         connection.set_user_fields(oauth_user)
         connection.set_token_fields(oauth_token)
         connection.save()
+
         return connection
 
     @classmethod
