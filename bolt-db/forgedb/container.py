@@ -70,6 +70,8 @@ class DBContainer:
                 "docker",
                 "logs",
                 "--follow",
+                "--tail",
+                "5",
                 self.name,
             ],
         )
