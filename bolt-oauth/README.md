@@ -231,6 +231,20 @@ Hello {{ request.user }}!
 {% endblock %}
 ```
 
+The `get_provider_keys` function can help populate the list of options:
+
+```python
+from forgeoauth.providers import get_provider_keys
+
+class ExampleView(TemplateView):
+    template_name = "index.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["oauth_provider_keys"] = get_provider_keys()
+        return context
+```
+
 ![Connecting and disconnecting Django OAuth accounts](https://user-images.githubusercontent.com/649496/159065096-30239a1f-62f6-4ee2-a944-45140f45af6f.png)
 
 ### Using a saved access token
