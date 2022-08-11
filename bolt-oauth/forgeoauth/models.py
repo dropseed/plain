@@ -33,8 +33,8 @@ class OAuthConnection(models.Model):
     provider_user_id = models.CharField(max_length=100, db_index=True)
 
     # Token data
-    access_token = models.CharField(max_length=100)
-    refresh_token = models.CharField(max_length=100, blank=True)
+    access_token = models.CharField(max_length=300)
+    refresh_token = models.CharField(max_length=300, blank=True)
     access_token_expires_at = models.DateTimeField(blank=True, null=True)
     refresh_token_expires_at = models.DateTimeField(blank=True, null=True)
 
