@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "forge-oauth"
-version = "0.4.0"
+version = "0.4.1"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
