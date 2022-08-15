@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "forge-importmap"
-version = "0.1.2"
+version = "0.2.0"
 description = "JavaScript import maps for Django"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
