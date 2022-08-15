@@ -1,4 +1,4 @@
-# django-importmap
+# forge-importmap
 
 Heavily inspired by [rails/importmap-rails](https://github.com/rails/importmap-rails),
 this app adds a simple process for integrating [import maps](https://github.com/WICG/import-maps) into Django.
@@ -10,7 +10,7 @@ Contributions are welcome!
 
 ## How to use it
 
-You'll need to do four things to use django-importmap.
+You'll need to do four things to use forge-importmap.
 
 The TL;DR is:
 
@@ -21,7 +21,7 @@ The TL;DR is:
 
 ### 1. Install it
 
-Do the equivalent of `pip install django-importmap` and add it to your `INSTALLED_APPS` list in your `settings.py` file.
+Do the equivalent of `pip install forge-importmap` and add it to your `INSTALLED_APPS` list in your `settings.py` file.
 
 ```python
 # settings.py

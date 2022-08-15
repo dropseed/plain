@@ -1,16 +1,16 @@
 [tool.poetry]
-name = "django-importmap"
+name = "forge-importmap"
 version = "0.1.2"
 description = "JavaScript import maps for Django"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/dropseed/django-importmap"
-documentation = "https://github.com/dropseed/django-importmap"
-repository = "https://github.com/dropseed/django-importmap"
+homepage = "https://github.com/forgepackages/forge-importmap"
+documentation = "https://github.com/forgepackages/forge-importmap"
+repository = "https://github.com/forgepackages/forge-importmap"
 keywords = ["django", "javascript", "import", "map", "import-maps"]
 packages = [
-    { include = "importmap" },
+    { include = "forgeimportmap" },
 ]
 classifiers = [
     "Environment :: Web Environment",
@@ -30,6 +30,7 @@ python = "^3.8"
 tomli = "*"
 marshmallow = "^3.14.1"
 requests = "*"
+click = "*"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
