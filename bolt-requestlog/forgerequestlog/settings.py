@@ -6,8 +6,8 @@ def REQUESTLOG_IGNORE_URL_PATHS():
         settings,
         "REQUESTLOG_IGNORE_URL_PATHS",
         [
-            "/sw.js",
             "/favicon.ico",
+            "/favicon.ico/",
             "/admin/jsi18n/",
         ],
     )
