@@ -40,7 +40,7 @@ class Release:
             self.metadata["Dyno"] = os.environ["DYNO"]
 
         if "HEROKU_SLUG_DESCRIPTION" in os.environ:
-            self.metadata["Heroku Slug"] = os.environ["HEROKU_SLUG_DESCRIPTION"]
+            self.metadata["Heroku slug"] = os.environ["HEROKU_SLUG_DESCRIPTION"]
 
         if "HEROKU_SLUG_COMMIT" in os.environ:
             self.metadata["Commit SHA"] = os.environ["HEROKU_SLUG_COMMIT"]
