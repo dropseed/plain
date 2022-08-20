@@ -19,6 +19,13 @@ def SENTRY_ENVIRONMENT():
         return getattr(settings, "SENTRY_ENVIRONMENT", "production")
 
 
+def SENTRY_TRACES_SAMPLE_RATE():
+    if "SENTRY_TRACES_SAMPLE_RATE" in environ:
+        return float(environ["SENTRY_TRACES_SAMPLE_RATE"])
+    else:
+        return getattr(settings, "SENTRY_TRACES_SAMPLE_RATE", 0.0)
+
+
 def SENTRY_PII_ENABLED():
     if "SENTRY_PII_ENABLED" in environ:
         return environ["SENTRY_PII_ENABLED"].lower() in ("true", "1", "yes")
