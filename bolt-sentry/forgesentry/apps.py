@@ -18,4 +18,5 @@ class ForgesentryConfig(AppConfig):
                 send_default_pii=settings.SENTRY_PII_ENABLED(),
                 traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE(),
                 integrations=[DjangoIntegration()],
+                **settings.SENTRY_INIT_KWARGS(),
             )

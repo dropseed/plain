@@ -45,3 +45,8 @@ def SENTRY_DSN():
         return environ["SENTRY_DSN"]
     else:
         return getattr(settings, "SENTRY_DSN", None)
+
+
+def SENTRY_INIT_KWARGS():
+    # Not available as an env variable
+    return getattr(settings, "SENTRY_INIT_KWARGS", {})
