@@ -10,7 +10,7 @@ urlpatterns = [
         include(
             [
                 # Login and Signup are both handled here, because the intent is the same
-                path("login/", views.forgeoauthView.as_view(), name="login"),
+                path("login/", views.OAuthLoginView.as_view(), name="login"),
                 path("connect/", views.OAuthConnectView.as_view(), name="connect"),
                 path(
                     "disconnect/",

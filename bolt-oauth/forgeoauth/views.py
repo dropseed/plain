@@ -10,7 +10,7 @@ from .exceptions import (
 from .providers import get_oauth_provider_instance
 
 
-class forgeoauthView(View):
+class OAuthLoginView(View):
     def post(self, request, provider):
         if request.user.is_authenticated:
             return redirect("/")
