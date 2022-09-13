@@ -152,6 +152,6 @@ class DBContainer:
         # Connect to template1 (which should exist as "maintenance db") so we can rename the others
         self.execute(
             f"psql -U {self.postgres_user} {maintenance_db} -c",
-            f"ALTER DATABASE {import_db} RENAME TO {self.postgres_user}",
+            f"ALTER DATABASE {import_db} RENAME TO {self.postgres_db}",
             stdout=subprocess.DEVNULL,
         )
