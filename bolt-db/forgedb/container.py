@@ -32,6 +32,8 @@ class DBContainer:
                     self.name,
                     "--rm",
                     "-e",
+                    f"POSTGRES_DB={self.postgres_db}",
+                    "-e",
                     f"POSTGRES_USER={self.postgres_user}",
                     "-e",
                     f"POSTGRES_PASSWORD={self.postgres_password}",
