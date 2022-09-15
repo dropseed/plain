@@ -1,9 +1,45 @@
-<form action="." method="get">
+<form data-querystats action="." method="get" class="relative group" style="display: none;">
     <input type="hidden" name="querystats" value="store">
-    <button type="submit" class="px-2 py-px text-xs rounded-full bg-zinc-700" data-querystats-summary style="display:none;">
+    <button type="submit" class="px-2 py-px text-xs rounded-full bg-zinc-700" data-querystats-summary></button>
+    <div data-querystats-list style="display: none;" class="absolute right-0 z-50 hidden translate-y-full -bottom-1 group-hover:block">
+        <div class="p-2 text-xs border rounded shadow-md bg-zinc-900 border-zinc-700"><table><tbody></tbody></table></div>
+    </div>
     <script async defer>
     // Catch errors since some browsers throw when using the new `type` option.
     // https://bugs.webkit.org/show_bug.cgi?id=209216
+    var querystatsTimings = [];
+    function renderQuerystats() {
+        // Render the most recent timing call
+        const latestTiming = querystatsTimings[querystatsTimings.length - 1];
+        let summary = latestTiming.description;
+        if (querystatsTimings.length > 1) {
+            summary += ` *`;
+        }
+        document.querySelector('[data-querystats-summary]').innerText = summary;
+
+        // Make sure the elements are visible
+        document.querySelector('[data-querystats]').style.display = 'inline';
+
+        // Render the table rows for all timings
+        const list = document.querySelector('[data-querystats-list]');
+        if (querystatsTimings.length > 1) {
+            const tableRows = querystatsTimings.map(timing => {
+                let url = timing.url;
+                if (url.startsWith(window.location.origin)) {
+                    // Make the url relative if possible (usually is)
+                    url = url.slice(window.location.origin.length);
+                }
+                return `<tr>
+                    <td class="pr-2 font-medium whitespace-nowrap">${url}</td>
+                    <td class="whitespace-nowrap">${timing.description}</td>
+                </tr>`;
+            }).join('');
+            list.querySelector("tbody").innerHTML = tableRows;
+            list.style.display = '';
+        } else {
+            list.style.display = 'none';
+        }
+    }
     try {
         // Create the performance observer.
         const po = new PerformanceObserver((list) => {
@@ -13,19 +49,25 @@
                     return;
                 }
                 for (const timing of entry.serverTiming) {
+                    if (querystatsTimings.length > 0) {
+                        if (querystatsTimings[querystatsTimings.length - 1] === timing) {
+                            // Skip duplicate timings (happens on initial load...)
+                            continue;
+                        }
+                    }
                     if (timing.name === "querystats") {
-                        const el = document.querySelector('[data-querystats-summary]');
-                        el.innerText = timing.description;
-                        el.style.display = "inline";
+                        console.log("Querystats timing", entry)
+                        timing.url = entry.name;  // Store this for reference later
+                        querystatsTimings.push(timing);
+                        renderQuerystats();
                     }
                 }
             }
         });
-        // Start listening for `navigation` entries to be dispatched.
-        po.observe({type: 'navigation', buffered: true});
+        po.observe({type: 'navigation', buffered: true});  // Catch the regular page loads
+        po.observe({type: 'resource', buffered: true});  // Catch future ajax requests
     } catch (e) {
         // Do nothing if the browser doesn't support this API.
     }
     </script>
-    </button>
 </form>
