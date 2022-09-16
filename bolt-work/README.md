@@ -1,6 +1,4 @@
-# forge-work
-
-A single command to run everything you need for Django development at once.
+A single command to run everything you need for local Django development.
 
 ![Forge work command example](https://user-images.githubusercontent.com/649496/176533533-cfd44dc5-afe5-42af-8b5d-33a9fa23f8d9.gif)
 
@@ -16,19 +14,12 @@ The following processes will run simultaneously (some will only run if they are 
 
 ## Installation
 
-### Forge installation
+### Django + Forge Quickstart
 
-The `forge-work` package is a dependency of [`forge`](https://github.com/forgepackages/forge) and is available as `forge work`.
+If you use the [Forge Quickstart](https://www.forgepackages.com/docs/forge/quickstart/),
+everything you need will be ready and available as `forge work`.
 
-If you use the [Forge quickstart](https://www.forgepackages.com/docs/quickstart/),
-everything you need will already be set up.
-
-The [standard Django installation](#standard-django-installation) can give you an idea of the steps involved.
-
-
-### Standard Django installation
-
-This package can be used without `forge` by installing it as a regular Django app.
+### Install for existing Django projects
 
 First, install `forge-work` from [PyPI](https://pypi.org/project/forge-work/):
 
@@ -51,7 +42,7 @@ Now instead of using the basic `manage.py runserver` (and a bunch of commands be
 python manage.py work
 ```
 
-## Processes
+## Development processes
 
 ### Runserver
 
@@ -60,15 +51,11 @@ But, before that runs, it will also wait for the database to be available and ru
 
 ### forge-db
 
-The [`forge-db` package](https://github.com/forgepackages/forge-db) uses Docker to run a local Postgres database.
-
-If `forge-db` is installed, it will automatically start and show the logs of the running database container.
+If [`forge-db`](https://github.com/forgepackages/forge-db) is installed, it will automatically start and show the logs of the running database container.
 
 ### forge-tailwind
 
-The [`forge-tailwind` package](https://github.com/forgepackages/forge-tailwind) compiles Tailwind CSS using the Tailwind standalone CLI.
-
-If `forge-tailwind` is installed, it will automatically run the Tailwind `compile --watch` process.
+If [`forge-tailwind`](https://github.com/forgepackages/forge-tailwind) is installed, it will automatically run the Tailwind `compile --watch` process.
 
 ### package.json
 
@@ -83,3 +70,4 @@ If a `STRIPE_WEBHOOK_PATH` env variable is set then this will add a `STRIPE_WEBH
 ### Ngrok
 
 If an `NGROK_SUBDOMAIN` env variable is set then this will run `ngrok http <runserver_port> --subdomain <subdomain>`.
+Note that [ngrok](https://ngrok.com/download) will need to be installed on your system already (however you prefer to do that).
