@@ -1,24 +1,15 @@
-# forge-tailwind
-
-Use [Tailwind CSS](https://tailwindcss.com/) with [Django](https://www.djangoproject.com/) *without* requiring npm.
+Use [Tailwind CSS](https://tailwindcss.com/) with [Django](https://www.djangoproject.com/) *without* requiring JavaScript or npm.
 
 Made possible by the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli).
 
 ## Installation
 
-### Forge installation
+### Django + Forge Quickstart
 
-The `forge-tailwind` package is a dependency of [`forge`](https://github.com/forgepackages/forge) and is available as `forge tailwind`.
+If you use the [Forge Quickstart](https://www.forgepackages.com/docs/forge/quickstart/),
+everything you need will be ready and available as `forge tailwind`.
 
-If you use the [Forge quickstart](https://www.forgepackages.com/docs/quickstart/),
-everything you need will already be set up.
-
-The [standard Django installation](#standard-django-installation) can give you an idea of the steps involved.
-
-
-### Standard Django installation
-
-This package can be used without `forge` by installing it as a regular Django app.
+### Install for existing Django projects
 
 First, install `forge-tailwind` from [PyPI](https://pypi.org/project/forge-tailwind/):
 
@@ -69,6 +60,20 @@ You should add `.forge` to your `.gitignore` file.
 ## Updating Tailwind
 
 This package manages the Tailwind versioning by comparing `.forge/tailwind.version` to the `FORGE_TAILWIND_VERSION` variable that is injected into your `tailwind.config.js` file.
+
+```js
+const FORGE_TAILWIND_VERSION = "3.0.24"
+
+module.exports = {
+  theme: {
+    extend: {},
+  },
+  plugins: [
+    require("@tailwindcss/forms"),
+  ],
+}
+```
+
 When you run `tailwind compile`,
 it will automatically check whether your local installation needs to be updated and will update it if necessary.
 
@@ -77,6 +82,33 @@ You can use the `update` command to update your project to the latest version of
 ```sh
 tailwind update
 ```
+
+## Adding custom CSS
+
+If you need to actually write some CSS,
+it should be done in `app/static/src/tailwind.css`.
+
+```css
+@tailwind base;
+
+
+@tailwind components;
+
+/* Add your own "components" here */
+.btn {
+    @apply bg-blue-500 hover:bg-blue-700 text-white;
+}
+
+@tailwind utilities;
+
+/* Add your own "utilities" here */
+.bg-pattern-stars {
+    background-image: url("/static/images/stars.png");
+}
+
+```
+
+[Read the Tailwind docs for more about using custom styles →](https://tailwindcss.com/docs/adding-custom-styles)
 
 ## Deployment
 
