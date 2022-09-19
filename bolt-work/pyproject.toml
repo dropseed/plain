@@ -5,7 +5,7 @@ packages = [
     { include = "forgework" },
 ]
 
-version = "0.4.0"
+version = "0.5.0"
 description = "Work library for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
