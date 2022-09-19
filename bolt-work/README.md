@@ -10,6 +10,7 @@ The following processes will run simultaneously (some will only run if they are 
 - [`npm run watch`](#package-json)
 - [`stripe listen --forward-to`](#stripe)
 - [`ngrok http --subdomain`](#ngrok)
+- [`celery worker`](#celery)
 
 It also comes with [debugging](#debugging) tools to make local debugging easier with VS Code.
 
@@ -72,6 +73,10 @@ If a `STRIPE_WEBHOOK_PATH` env variable is set then this will add a `STRIPE_WEBH
 
 If an `NGROK_SUBDOMAIN` env variable is set then this will run `ngrok http <runserver_port> --subdomain <subdomain>`.
 Note that [ngrok](https://ngrok.com/download) will need to be installed on your system already (however you prefer to do that).
+
+### Celery
+
+If a `CELERY_APP` env variable is set, then an autoreloading celery worker will be started automatically.
 
 ## Debugging
 
