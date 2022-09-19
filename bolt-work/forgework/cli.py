@@ -92,7 +92,7 @@ def cli():
     if "CELERY_APP" in os.environ:
         manager.add_process(
             "celery",
-            f"celery --app {os.environ['CELERY_APP']} worker --loglevel info",
+            f"hupper -w .env -m celery --app {os.environ['CELERY_APP']} worker --loglevel info",
             env={
                 **os.environ,
                 **django_env,
