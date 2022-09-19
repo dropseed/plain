@@ -29,7 +29,7 @@ classifiers = [
 python = "^3.8"
 forge-core = ">=0.4.0,<1.0.0"
 click = ">=8.0.0"
-python-dotenv = "^0.20.0"
+python-dotenv = "*"  # forge-core also uses dotenv, which is <1.0 so this is easier to manage
 black = ">=22.0.0"
 isort = ">=5.0.0"
 
