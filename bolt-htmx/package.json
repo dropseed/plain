@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "copy-static": "cp node_modules/htmx.org/dist/htmx.min.js forgehtmx/static/htmx/htmx.min.js"
+  },
+  "dependencies": {
+    "htmx.org": "^1.8.0"
+  }
+}

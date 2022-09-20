@@ -1,0 +1,18 @@
+{% load static %}<script src="{% static 'htmx/htmx.min.js' %}" async defer></script>
+<script>
+window.addEventListener("load", function() {
+  document.body.addEventListener("htmx:configRequest", function(event) {
+    var actionElt = htmx.closest(event.detail.elt, "[fhx-action]");
+    if (actionElt) {
+      event.detail.headers["FHX-Action"] = actionElt.getAttribute("fhx-action");
+    }
+
+    var fragmentElt = htmx.closest(event.detail.elt, "[fhx-fragment]");
+    if (fragmentElt) {
+      event.detail.headers["FHX-Fragment"] = fragmentElt.getAttribute("fhx-fragment");
+    }
+
+    event.detail.headers["X-CSRFToken"] = "{{ csrf_token }}";
+  });
+});
+</script>
