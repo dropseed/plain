@@ -5,7 +5,7 @@ packages = [
     { include = "forgehtmx" },
 ]
 
-version = "0.0.0"
+version = "0.1.0"
 description = "HTMX integration for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
