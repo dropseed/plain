@@ -80,6 +80,8 @@ If a `CELERY_APP` env variable is set, then an autoreloading celery worker will 
 
 ## Debugging
 
+[View on YouTube →](https://www.youtube.com/watch?v=pG0KaJSVyBw)
+
 Since `forge work` runs multiple processes at once, the regular [pdb](https://docs.python.org/3/library/pdb.html) debuggers can be hard to use.
 Instead, we include [microsoft/debugpy](https://github.com/microsoft/debugpy) and an `attach` function to make it even easier to use VS Code's debugger.
 
