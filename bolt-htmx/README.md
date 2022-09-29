@@ -328,3 +328,26 @@ You can then prefix any class with `htmx-request:` to decide what it looks like 
 
 We configure CSRF tokens for you with the HTMX JS API.
 You don't have to put `hx-headers` on the `<body>` tag, for example.
+
+## Error classes
+
+This app also includes an HTMX extension for adding error classes for failed requests.
+
+- `htmx-error-response` for `htmx:responseError`
+- `htmx-error-response-{{ status_code }}` for `htmx:responseError`
+- `htmx-error-send` for `htmx:sendError`
+
+To enable them, use `hx-ext="error-classes"`.
+
+You can add the ones you want as Tailwind variants and use them to show error messages.
+
+```js
+const plugin = require('tailwindcss/plugin')
+
+module.exports = {
+  plugins: [
+    // Add variants for htmx-request class for loading states
+    plugin(({addVariant}) => addVariant('htmx-error-response-429', ['&.htmx-error-response-429', '.htmx-error-response-429 &']))
+  ],
+}
+```
