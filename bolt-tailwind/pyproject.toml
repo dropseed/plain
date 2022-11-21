@@ -5,7 +5,7 @@ packages = [
     { include = "forgetailwind" },
 ]
 
-version = "0.3.3"
+version = "0.3.4"
 description = "Work library for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
