@@ -18,12 +18,19 @@ def init():
     forge = Forge()
     tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
 
+    tailwind_installed = tailwind.is_installed()
+
+    if not tailwind_installed:
+        # Need to do an initial download to run init
+        tailwind.download()
+
     # Config needs to exist first so we can save the version here
     if not tailwind.config_exists():
         click.secho("Creating Tailwind config...", bold=True)
         tailwind.create_config()
 
-    if not tailwind.is_installed():
+    if not tailwind_installed:
+        # Mostly need to save the version to config...
         click.secho("Installing Tailwind standalone...", bold=True, nl=False)
         version = tailwind.install()
         click.secho(f"Tailwind {version} installed", fg="green")

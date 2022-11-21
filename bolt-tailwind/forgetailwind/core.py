@@ -105,7 +105,7 @@ class Tailwind:
         with open(self.config_path, "w") as f:
             f.write(config_contents)
 
-    def install(self, version="") -> str:
+    def download(self, version="") -> str:
         if version:
             if not version.startswith("v"):
                 version = f"v{version}"
@@ -128,8 +128,9 @@ class Tailwind:
         with open(self.version_lockfile_path, "w") as f:
             f.write(version)
 
+    def install(self, version="") -> str:
+        self.download(version)
         self.set_version_in_config(version)
-
         return version
 
     @staticmethod
