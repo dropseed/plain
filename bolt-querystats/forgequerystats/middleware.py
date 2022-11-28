@@ -82,7 +82,7 @@ class QueryStatsMiddleware:
     def process_template_response(self, request, response):
         # Template hasn't been rendered yet, so we can't include querystats themselves
         # unless we're pulling the previous page stats from the session storage
-        if hasattr(_local, "querystats") and self.is_staff_request(request):
+        if response.context_data is not None and hasattr(_local, "querystats") and self.is_staff_request(request):
             response.context_data["querystats_enabled"] = True
 
             # Load the previous querystats from the session and display them
