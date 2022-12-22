@@ -37,6 +37,23 @@ you can use the `{% htmx_js %}` template tag:
 </body>
 ```
 
+## Installation
+
+You can install `forge-htmx` with any Django project:
+
+```sh
+pip install forge-htmx
+```
+
+Then add `forgehtmx` to `settings.py`:
+
+```python
+INSTALLED_APPS = [
+    # ...
+    "forgehtmx",
+]
+```
+
 ## Template Fragments
 
 An `{% htmxfragment %}` can be used to render a specific part of your template in HTMX responses.
