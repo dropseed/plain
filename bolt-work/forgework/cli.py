@@ -47,13 +47,21 @@ def cli():
         )
         os.environ["STRIPE_WEBHOOK_SECRET"] = stripe_webhook_secret
 
+    runserver_port = os.environ.get("RUNSERVER_PORT", "8000")
+
+    if "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ:
+        codespace_base_url = f"https://{os.environ['CODESPACE_NAME']}-{runserver_port}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
+        click.secho(
+            f"Automatically using Codespace BASE_URL={click.style(codespace_base_url, underline=True)}",
+            bold=True,
+        )
+        django_env["BASE_URL"] = codespace_base_url
+
     if forge.manage_cmd("check", env=django_env).returncode:
         click.secho("Django check failed!", fg="red")
         sys.exit(1)
 
     managepy = forge.user_or_forge_path("manage.py")
-
-    runserver_port = os.environ.get("RUNSERVER_PORT", "8000")
 
     manage_cmd = f"python {managepy}"
 
