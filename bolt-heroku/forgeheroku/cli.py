@@ -149,7 +149,9 @@ def set_buildpacks(confirm):
         buildpacks.append("heroku/nodejs")
 
     if os.path.exists(os.path.join(forge.repo_root, "poetry.lock")):
-        buildpacks.append("https://github.com/moneymeets/python-poetry-buildpack.git")
+        buildpacks.append(
+            "https://github.com/forgepackages/heroku-buildpack-poetry.git"
+        )
 
     buildpacks.append("heroku/python")
 
