@@ -4,7 +4,7 @@ packages = [
     { include = "forgestafftoolbar" },
 ]
 
-version = "0.3.0"
+version = "0.3.1"
 description = "Staff toolbar for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
