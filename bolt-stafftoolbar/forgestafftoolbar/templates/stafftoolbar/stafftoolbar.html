@@ -1,5 +1,5 @@
 {% if request.user.is_staff or request.impersonator.is_staff %}
-<div id="stafftoolbar" class="py-2 text-sm text-zinc-200 bg-zinc-900">
+<div id="stafftoolbar" class="{{ stafftoolbar_container_class|default:'py-2 text-sm text-zinc-200 bg-zinc-900' }}">
     <div class="{{ stafftoolbar.container_class }} flex justify-between">
         <div class="flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-1 bi bi-person-badge" viewBox="0 0 16 16">
@@ -25,13 +25,13 @@
 
             <div class="relative group">
                 <code class="text-xs text-mono cursor-help">{{ stafftoolbar.release }}</code>
-                <div class="absolute group-hover:block hidden top-0 left-0 -translate-x-3/4 pt-6">
-                    <div class="bg-zinc-900 border border-zinc-700 text-xs p-2 rounded shadow-md">
+                <div class="absolute top-0 left-0 hidden pt-6 group-hover:block -translate-x-3/4">
+                    <div class="p-2 text-xs border rounded shadow-md bg-zinc-900 border-zinc-700">
                         <table>
                             <tbody>
                             {% for k, v in stafftoolbar.release.metadata %}
                             <tr>
-                                <td class="font-medium whitespace-nowrap pr-2">{{ k }}</td>
+                                <td class="pr-2 font-medium whitespace-nowrap">{{ k }}</td>
                                 <td class="whitespace-nowrap">{{ v }}</td>
                             </tr>
                             {% endfor %}
