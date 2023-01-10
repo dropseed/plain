@@ -1,6 +1,6 @@
 {% if request.user.is_staff or request.impersonator.is_staff %}
 <div id="stafftoolbar" class="{{ stafftoolbar_outer_class|default:'py-2 text-sm text-zinc-200 bg-zinc-900' }}">
-    <div class="{{ stafftoolbar_inner_class|default:'container px-4 mx-auto flex justify-between' }}">
+    <div class="{{ stafftoolbar_inner_class|default:'container px-4 space-x-8 mx-auto flex justify-between' }}">
         <div class="flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-1 bi bi-person-badge" viewBox="0 0 16 16">
                 <path d="M6.5 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3zM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
