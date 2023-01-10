@@ -58,4 +58,16 @@ class Release:
         if "HEROKU_RELEASE_CREATED_AT" in os.environ:
             self.metadata["Created at"] = os.environ["HEROKU_RELEASE_CREATED_AT"]
 
+        if "HEROKU_APP_NAME" in os.environ:
+            self.metadata["App name"] = os.environ["HEROKU_APP_NAME"]
+
+        # Review apps - https://devcenter.heroku.com/articles/github-integration-review-apps#injected-environment-variables
+        if "HEROKU_PR_NUMBER" in os.environ:
+            self.metadata["PR"] = "#" + os.environ["HEROKU_PR_NUMBER"]
+            self.summary = "PR #" + os.environ["HEROKU_PR_NUMBER"] + " " + self.summary
+
+        if "HEROKU_BRANCH" in os.environ:
+            self.metadata["Branch"] = os.environ["HEROKU_BRANCH"]
+            self.summary = os.environ["HEROKU_BRANCH"] + " " + self.summary
+
         self.metadata = sorted(self.metadata.items())
