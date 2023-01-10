@@ -11,7 +11,3 @@ def STAFFTOOLBAR_LINKS():
             StaffToolbarLink(text="Admin", url="admin:index"),
         ],
     )
-
-
-def STAFFTOOLBAR_CONTAINER_CLASS():
-    return getattr(settings, "STAFFTOOLBAR_CONTAINER_CLASS", "container px-4 mx-auto")

@@ -12,8 +12,6 @@ class StaffToolbar:
         if callable(self.links):
             self.links = self.links(request)
 
-        self.container_class = settings.STAFFTOOLBAR_CONTAINER_CLASS()
-
         self.release = Release()
         self.release.load()
 
