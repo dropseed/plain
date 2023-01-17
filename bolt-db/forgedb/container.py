@@ -50,6 +50,7 @@ class DBContainer:
             )
         except subprocess.CalledProcessError as e:
             if "already in use" not in e.stderr.decode():
+                print(e.stderr.decode())
                 raise
 
     def stop(self):
@@ -64,6 +65,7 @@ class DBContainer:
             )
         except subprocess.CalledProcessError as e:
             if "No such container" not in e.stderr.decode():
+                print(e.stderr.decode())
                 raise
 
     def logs(self):
@@ -102,6 +104,7 @@ class DBContainer:
             )
         except subprocess.CalledProcessError as e:
             if "does not exist" not in e.stdout.decode():
+                print(e.stderr.decode())
                 raise
 
         if create:
