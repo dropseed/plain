@@ -15,7 +15,10 @@ from forgecore import Forge
 def cli(pytest_args):
     """Run tests with pytest"""
     forge = Forge()
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+
+    if forge.user_file_exists("settings.py"):
+        # This is the somewhat non-standard Forge path for settings, which Pytest won't autodetect
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
     coverage_file = os.path.join(forge.forge_tmp_dir, ".coverage")
 
