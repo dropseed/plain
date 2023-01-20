@@ -22,10 +22,13 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[tool.poetry.scripts]
+forge = "forgecore.cli:cli"
+
 [tool.poetry.dependencies]
 python = "^3.8"
-click = "^8.1.0"
-python-dotenv = "^0.21.0"
+click = "*"
+python-dotenv = "*"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3.0"
