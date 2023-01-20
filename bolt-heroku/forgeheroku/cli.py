@@ -1,5 +1,4 @@
 import os
-import platform
 import subprocess
 import sys
 
@@ -13,7 +12,7 @@ FORGE_BUILDPACK = "forgepackages/forge"
 
 @click.group("heroku")
 def cli():
-    """Shortcuts for common Heroku operations"""
+    """Commands for deploying and managing Heroku apps"""
     pass
 
 
@@ -24,6 +23,7 @@ def cli():
 @click.argument("heroku_app_name")
 @click.pass_context
 def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
+    """Create a new Heroku app with Postgres and Redis"""
     if (
         subprocess.call(
             ["git", "remote", "show", "heroku"],
@@ -56,8 +56,7 @@ def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
     subprocess.check_call(["heroku", "addons:create", f"heroku-redis:{redis_tier}"])
     click.echo()
 
-    click.secho("Setting PYTHON_RUNTIME_VERSION, SECRET_KEY, and BASE_URL", bold=True)
-    python_version = platform.python_version()
+    click.secho("Setting SECRET_KEY and BASE_URL", bold=True)
     secret_key = generate_secret_key()
     # TODO --domain option?
     base_url = f"https://{heroku_app_name}.herokuapp.com"
@@ -65,7 +64,6 @@ def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
         [
             "heroku",
             "config:set",
-            f"PYTHON_RUNTIME_VERSION={python_version}",
             f"SECRET_KEY={secret_key}",
             f"BASE_URL={base_url}",
         ]
@@ -125,9 +123,7 @@ def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
 
     click.echo()
     click.secho(f"Running `createsuperuser` on the production app", bold=True)
-    subprocess.check_call(
-        ["heroku", "run", "python", "app/manage.py", "createsuperuser"]
-    )
+    subprocess.check_call(["heroku", "run", "forge", "django", "createsuperuser"])
 
     click.echo()
     click.secho(
@@ -139,6 +135,7 @@ def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
 @cli.command()
 @click.option("--confirm", is_flag=True, default=False)
 def set_buildpacks(confirm):
+    """Automatically determine and set buildpacks"""
     buildpacks = [
         FORGE_BUILDPACK,
     ]
@@ -174,13 +171,13 @@ def set_buildpacks(confirm):
 
 @cli.command()
 def shell():
-    """Open a Python/Django shell"""
-    subprocess.run(["heroku", "run", "python app/manage.py shell"])
+    """Open a remote Django shell"""
+    subprocess.run(["heroku", "run", "forge shell"])
 
 
 @cli.command()
 def serve():
-    """Run a production server using gunicorn (Heroku)"""
+    """Run a production server using gunicorn"""
     forge = Forge()
     wsgi = (
         "wsgi" if forge.user_file_exists("wsgi.py") else "forgecore.default_files.wsgi"
@@ -209,9 +206,9 @@ def pre_deploy():
 
     click.secho("Running Django migrations", bold=True)
     forge.manage_cmd("migrate", check=True)
-    
+
     click.echo()
-    
+
     click.secho("Clearing expired sessions", bold=True)
     forge.manage_cmd("clearsessions", check=True)
 
