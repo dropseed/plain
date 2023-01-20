@@ -226,6 +226,22 @@ files = [
 tests = ["asttokens", "littleutils", "pytest", "rich"]
 
 [[package]]
+name = "forge-core"
+version = "1.0.0"
+description = "Core library for Forge"
+category = "main"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "forge_core-1.0.0-py3-none-any.whl", hash = "sha256:7b3c523ea03e353fe9e3697f26fae0c7f5e2ae95d76c76a09e4d9eb4524b939f"},
+    {file = "forge_core-1.0.0.tar.gz", hash = "sha256:26cc9e89712d0a471da1a176e29aba20661bd0c323c10f32d166224959d62070"},
+]
+
+[package.dependencies]
+click = "*"
+python-dotenv = "*"
+
+[[package]]
 name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -520,6 +536,21 @@ files = [
 plugins = ["importlib-metadata"]
 
 [[package]]
+name = "python-dotenv"
+version = "0.21.0"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "python-dotenv-0.21.0.tar.gz", hash = "sha256:b77d08274639e3d34145dfa6c7008e66df0f04b7be7a75fd0d5292c191d79045"},
+    {file = "python_dotenv-0.21.0-py3-none-any.whl", hash = "sha256:1684eb44636dd462b66c3ee016599815514527ad99965de77f43e0944634a7e5"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[[package]]
 name = "requests"
 version = "2.28.1"
 description = "Python HTTP for Humans."
@@ -669,4 +700,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "b6671724b2d927b7a4b768a5301c5c3e4c49b10b599cbf292049925ec74a52da"
+content-hash = "ebfb879703f64dfa665f41c602982d5599049ba6993db6f3b814d3ab9c4b7a64"

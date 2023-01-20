@@ -25,12 +25,16 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 
+[tool.poetry.scripts]
+"forge-importmap" = "forgeimportmap:cli"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 tomli = "*"
 marshmallow = "^3.14.1"
 requests = "*"
 click = "*"
+forge-core = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
