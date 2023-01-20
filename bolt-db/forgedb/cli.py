@@ -32,6 +32,11 @@ def stop():
 
 
 @cli.command()
+def wait():
+    DBContainer().wait()
+
+
+@cli.command()
 def reset():
     DBContainer().reset(create=True)
     click.secho("Local development database reset", fg="green")

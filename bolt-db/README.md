@@ -1,14 +1,9 @@
+# forge-db
+
 Use Postgres for local Django development via Docker.
 
 
 ## Installation
-
-### Django + Forge Quickstart
-
-If you use the [Forge Quickstart](https://www.forgepackages.com/docs/forge/quickstart/),
-everything you need will be ready and available as `forge db`.
-
-### Install for existing Django projects
 
 First, install `forge-db` from [PyPI](https://pypi.org/project/forge-db/):
 
@@ -16,19 +11,10 @@ First, install `forge-db` from [PyPI](https://pypi.org/project/forge-db/):
 pip install forge-db
 ```
 
-Then add it to your `INSTALLED_APPS` in `settings.py`:
-
-```python
-INSTALLED_APPS = [
-    ...
-    "forgedb",
-]
-```
-
 Now you will have access to the `db` command:
 
 ```sh
-python manage.py db
+forge db
 ```
 
 You will need to have a `DATABASE_URL` environment variable,

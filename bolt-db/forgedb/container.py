@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import time
 
 import dj_database_url
 from forgecore import Forge
@@ -67,6 +68,28 @@ class DBContainer:
             if "No such container" not in e.stderr.decode():
                 print(e.stderr.decode())
                 raise
+
+    def wait(self):
+        print("Waiting for database...")
+        attempts = 1
+
+        while True:
+            if self.is_connected():
+                print("Database connected")
+                break
+            else:
+                print(f"Database unavailable, waiting 1 second... (attempt {attempts})")
+                time.sleep(1)
+                attempts += 1
+
+    def is_connected(self):
+        result = Forge().manage_cmd(
+            "showmigrations",
+            "--skip-checks",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return result.returncode == 0
 
     def logs(self):
         subprocess.check_call(
