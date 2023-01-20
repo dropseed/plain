@@ -9,12 +9,13 @@ from .core import Tailwind
 
 @click.group("tailwind")
 def cli():
-    """Built-in Tailwind CSS commands"""
+    """Tailwind CSS"""
     pass
 
 
 @cli.command()
 def init():
+    """Install Tailwind, create a tailwind.config.js and app/static/src/tailwind.css"""
     forge = Forge()
     tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
 
@@ -44,6 +45,7 @@ def init():
 @click.option("--watch", is_flag=True)
 @click.option("--minify", is_flag=True)
 def compile(watch, minify):
+    """Compile a Tailwind CSS file"""
     forge = Forge()
     tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
 
@@ -93,6 +95,7 @@ def compile(watch, minify):
 
 @cli.command()
 def update():
+    """Update the Tailwind CSS version"""
     forge = Forge()
     tailwind = Tailwind(forge.forge_tmp_dir, django_directory=forge.project_dir)
     click.secho("Installing Tailwind standalone...", bold=True, nl=True)
