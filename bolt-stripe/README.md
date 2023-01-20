@@ -35,7 +35,7 @@ INSTALLED_APPS = INSTALLED_APPS + [
 The `StripeModel` class is simple,
 but useful.
 With it you will get a `stripe_id` field,
-where you will typically store a Stripe customer ID (like on a [Team](/docs/forge/models/#teams)),
+where you will typically store a Stripe customer ID (like on a Team),
 or something more specific like a Stripe subscription or charge ID.
 
 ```python
