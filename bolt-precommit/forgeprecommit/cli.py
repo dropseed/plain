@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 
 import click
 from forgecore import Forge
@@ -17,6 +18,10 @@ def cli(ctx, install):
     if install:
         install_git_hook()
         return
+
+    if forge.repo_root and is_using_poetry(forge.repo_root):
+        click.secho("Checking poetry.lock", bold=True)
+        forge.venv_cmd("poetry", "lock", "--check", check=True)
 
     if forgepackage_installed("format"):
         forge.venv_cmd("forge", "format", "--check", check=True)
@@ -54,3 +59,7 @@ def django_db_connected():
         stderr=subprocess.DEVNULL,
     )
     return result.returncode == 0
+
+
+def is_using_poetry(target_path):
+    return (Path(target_path) / "poetry.lock").exists()
