@@ -48,7 +48,7 @@ Then run migrations:
 python manage.py migrate forgeoauth
 ```
 
-Create a new OAuth provider ([or copy one from our examples](provider_examples)):
+Create a new OAuth provider ([or copy one from our examples](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples)):
 
 ```python
 # yourapp/oauth.py
@@ -161,7 +161,7 @@ You'll also notice that there are no "email confirmation" or "email verification
 This is also intentional.
 You can implement something like that yourself if you need to,
 but the easier solution in our opinion is to use an OAuth provider you *trust to have done that already*.
-If you look at our [provider examples](provider_examples) you'll notice how we often use provider APIs to get the email address which is "primary" and "verified" already.
+If you look at our [provider examples](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples) you'll notice how we often use provider APIs to get the email address which is "primary" and "verified" already.
 If they've already done that work,
 then we can just use that information.
 
@@ -303,9 +303,9 @@ and writing two class methods that do the actual work of getting the user's data
 
 We've written examples for the following providers:
 
-- [GitHub](provider_examples/github.py)
-- [GitLab](provider_examples/gitlab.py)
-- [Bitbucket](provider_examples/bitbucket.py)
+- [GitHub](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples/github.py)
+- [GitLab](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples/gitlab.py)
+- [Bitbucket](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples/bitbucket.py)
 
 Just copy that code and paste it in your project.
 Tweak as necessary!
