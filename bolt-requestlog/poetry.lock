@@ -261,19 +261,19 @@ tests = ["asttokens", "littleutils", "pytest", "rich"]
 
 [[package]]
 name = "forge-core"
-version = "0.5.1"
+version = "1.0.0"
 description = "Core library for Forge"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "forge-core-0.5.1.tar.gz", hash = "sha256:09d8256a6614cbcfd6354e89e9a7da5e1f28ede2f813f1eae18c0863e440e8d7"},
-    {file = "forge_core-0.5.1-py3-none-any.whl", hash = "sha256:813fa8710c9e0234ef4d25344a5df2dc9090012e4ead44a55eafb64bba100c9d"},
+    {file = "forge_core-1.0.0-py3-none-any.whl", hash = "sha256:7b3c523ea03e353fe9e3697f26fae0c7f5e2ae95d76c76a09e4d9eb4524b939f"},
+    {file = "forge_core-1.0.0.tar.gz", hash = "sha256:26cc9e89712d0a471da1a176e29aba20661bd0c323c10f32d166224959d62070"},
 ]
 
 [package.dependencies]
-click = ">=8.1.0,<9.0.0"
-python-dotenv = ">=0.21.0,<0.22.0"
+click = "*"
+python-dotenv = "*"
 
 [[package]]
 name = "idna"
@@ -784,4 +784,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "badbcb70a100d0bb60696c8e124f055dcd260d4c940c62a12803dec216dbf474"
+content-hash = "b02d5a73e89f487d6440ac303617211d338d422c2f449a29dd54f91b1f691871"
