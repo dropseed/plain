@@ -2,7 +2,7 @@
 
 The staff toolbar is enabled for every user who `is_staff`.
 
-![Forge staff toolbar]([[/docs/img/stafftoolbar.png](https://user-images.githubusercontent.com/649496/213781915-a2094f54-99b8-4a05-a36e-dee107405229.png)](https://user-images.githubusercontent.com/649496/213781915-a2094f54-99b8-4a05-a36e-dee107405229.png))
+![Forge staff toolbar](https://user-images.githubusercontent.com/649496/213781915-a2094f54-99b8-4a05-a36e-dee107405229.png)
 
 ## Installation
 
