@@ -13,7 +13,7 @@ and more.
 
 Requests can be re-submitted by clicking the "replay" button.
 
-[![Django request log](/docs/img/requestlog.png)](/docs/img/requestlog.png)
+[![Django request log](https://user-images.githubusercontent.com/649496/213781414-417ad043-de67-4836-9ef1-2b91404336c3.png)](https://user-images.githubusercontent.com/649496/213781414-417ad043-de67-4836-9ef1-2b91404336c3.png)
 
 ## Installation
 
