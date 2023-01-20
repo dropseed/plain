@@ -262,23 +262,19 @@ tests = ["asttokens", "littleutils", "pytest", "rich"]
 
 [[package]]
 name = "forge-core"
-version = "0.5.1"
+version = "1.0.0"
 description = "Core library for Forge"
 category = "main"
 optional = false
-python-versions = "^3.8"
-files = []
-develop = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "forge_core-1.0.0-py3-none-any.whl", hash = "sha256:7b3c523ea03e353fe9e3697f26fae0c7f5e2ae95d76c76a09e4d9eb4524b939f"},
+    {file = "forge_core-1.0.0.tar.gz", hash = "sha256:26cc9e89712d0a471da1a176e29aba20661bd0c323c10f32d166224959d62070"},
+]
 
 [package.dependencies]
-click = ">=7.0.0"
-python-dotenv = "<1.0.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/forgepackages/forge-core"
-reference = "next"
-resolved_reference = "7c7bcfa19ea9013fdfa1d914bacfab9b658c12aa"
+click = "*"
+python-dotenv = "*"
 
 [[package]]
 name = "iniconfig"
@@ -668,4 +664,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "06fb6e87e746038aa49d198558af072cd7c173b82da84c5af7a04943110bf51b"
+content-hash = "375b31020bd01067dd12f45713c41507be48cdc3889b1878fe675ee56d3fdd35"

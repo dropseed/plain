@@ -27,7 +27,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-forge-core = {git = "https://github.com/forgepackages/forge-core", rev = "next"}
+forge-core = "^1.0.0"
 click = ">=8.0.0"
 pytest = "^7.0.0"
 pytest-django = "^4.5.2"
