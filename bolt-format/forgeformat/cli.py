@@ -5,42 +5,51 @@ from forgecore import Forge
 
 
 @click.command("format")  # format is a keyword
-@click.option("--check", is_flag=True)
-@click.option("--black", is_flag=True, default=True)
-@click.option("--isort", is_flag=True, default=True)
-def cli(check, black, isort):
-    """Format Python code with black and isort"""
+@click.option("--check", is_flag=True, help="Check formatting instead of fixing")
+@click.argument("files", nargs=-1)
+def cli(check, files):
+    """Format Python code with black and ruff"""
+    if not files:
+        # Make relative for nicer output
+        files = [os.path.relpath(Forge().project_dir)]
+
+    if check:
+        fmt_check(files)
+    else:
+        fmt(files)
+
+
+def fmt(files):
     forge = Forge()
 
-    # Make relative for nicer output
-    target = os.path.relpath(forge.project_dir)
+    # If we're fixing, we do ruff first so black can re-format any ruff fixes
+    click.secho(f"Fixing {', '.join(files)} with ruff", bold=True)
 
-    if black:
-        click.secho("Formatting with black", bold=True)
-        black_args = ["--extend-exclude", "migrations"]
-        if check:
-            black_args.append("--check")
-        black_args.append(target)
-        forge.venv_cmd(
-            "black",
-            *black_args,
-            check=True,
-        )
+    forge.venv_cmd(
+        "ruff",
+        "--fix-only",
+        *files,
+        check=True,
+    )
 
-    if black and isort:
-        click.echo()
+    click.echo()
 
-    if isort:
-        click.secho("Formatting with isort", bold=True)
-        isort_config_root = os.path.join(os.path.dirname(__file__), "forge_isort.cfg")
+    click.secho(f"Formatting {', '.join(files)} with black", bold=True)
 
-        # Include --src so internal imports are recognized correctly
-        isort_args = ["--settings-file", isort_config_root, "--src", target]
-        if check:
-            isort_args.append("--check")
-        isort_args.append(target)
-        forge.venv_cmd("isort", *isort_args, check=True)
+    forge.venv_cmd(
+        "black",
+        *files,
+        check=True,
+    )
 
 
-if __name__ == "__main__":
-    cli()
+def fmt_check(files):
+    forge = Forge()
+
+    click.secho(f"Checking {', '.join(files)} with black", bold=True)
+    forge.venv_cmd("black", "--check", *files, check=True)
+    click.echo()
+
+    click.secho(f"Checking {', '.join(files)} with ruff", bold=True)
+    forge.venv_cmd("ruff", *files, check=True)
+    click.echo()
