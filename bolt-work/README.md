@@ -1,3 +1,5 @@
+# forge-work
+
 A single command to run everything you need for local Django development.
 
 ![Forge work command example](https://user-images.githubusercontent.com/649496/176533533-cfd44dc5-afe5-42af-8b5d-33a9fa23f8d9.gif)
@@ -29,19 +31,10 @@ First, install `forge-work` from [PyPI](https://pypi.org/project/forge-work/):
 pip install forge-work
 ```
 
-Then add it to your `INSTALLED_APPS` in `settings.py`:
-
-```python
-INSTALLED_APPS = [
-    ...
-    "forgework",
-]
-```
-
 Now instead of using the basic `manage.py runserver` (and a bunch of commands before and during that process), you can simply do:
 
 ```sh
-python manage.py work
+forge work
 ```
 
 ## Development processes
