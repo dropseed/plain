@@ -2,7 +2,7 @@
 
 **Add OAuth login support to your Django project.**
 
-[Watch on YouTube (3 mins) →](https://youtu.be/UxbxBa6AFsU)
+[Watch on YouTube (3 mins) →](https://www.youtube.com/watch?v=UxbxBa6AFsU)
 
 This library is intentionally minimal.
 It has no dependencies and a single database model.
