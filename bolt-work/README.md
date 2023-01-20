@@ -18,13 +18,6 @@ It also comes with [debugging](#debugging) tools to make local debugging easier 
 
 ## Installation
 
-### Django + Forge Quickstart
-
-If you use the [Forge Quickstart](https://www.forgepackages.com/docs/forge/quickstart/),
-everything you need will be ready and available as `forge work`.
-
-### Install for existing Django projects
-
 First, install `forge-work` from [PyPI](https://pypi.org/project/forge-work/):
 
 ```sh
