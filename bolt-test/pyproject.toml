@@ -5,7 +5,7 @@ packages = [
     { include = "forgetest" },
 ]
 
-version = "0.0.0"
+version = "1.0.0"
 description = "Testing for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
