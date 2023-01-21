@@ -46,7 +46,9 @@ class Release:
         else:
             try:
                 commit_sha = (
-                    subprocess.check_output(["git", "rev-parse", "HEAD"])
+                    subprocess.check_output(
+                        ["git", "rev-parse", "HEAD"], stderr=subprocess.PIPE
+                    )
                     .decode("utf-8")
                     .strip()
                 )
