@@ -18,13 +18,35 @@ which can typically be removed by using `select_related`,
 
 ```python
 # settings.py
-INSTALLED_APPS += [
+INSTALLED_APPS = [
+    # ...
     "forgequerystats",
 ]
 
-MIDDLEWARE = MIDDLEWARE + [
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
     "forgequerystats.QueryStatsMiddleware",
-    # Put QueryStats above additional middleware
+    # Put additional middleware below querystats
     # ...
 ]
 ```
+
+We strongly recommend using the forge-stafftoolbar along with this,
+but if you aren't,
+you can add the querystats to your frontend templates with this include:
+
+```html
+{% include "querystats/button.html" %}
+```
+
+*Note that you will likely want to surround this with an if `DEBUG` or `is_staff` check.*
+
+To view querystats you need to send a POST request (i.e. via a `<form>`),
+and the template include is the easiest way to do that.
