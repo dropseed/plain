@@ -48,5 +48,26 @@ you can add the querystats to your frontend templates with this include:
 
 *Note that you will likely want to surround this with an if `DEBUG` or `is_staff` check.*
 
-To view querystats you need to send a POST request (i.e. via a `<form>`),
+To view querystats you need to send a POST request to `?querystats=store` (i.e. via a `<form>`),
 and the template include is the easiest way to do that.
+
+## Tailwind CSS
+
+This package is styled with [Tailwind CSS](https://tailwindcss.com/),
+and pairs well with [`forge-tailwind`](https://github.com/forgepackages/forge-tailwind).
+
+If you are using your own Tailwind implementation,
+you can modify the "content" in your Tailwind config to include any Forge packages:
+
+```js
+// tailwind.config.js
+module.exports = {
+  content: [
+    // ...
+    ".venv/lib/python*/site-packages/forge*/**/*.{html,js}",
+  ],
+  // ...
+}
+```
+
+If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
