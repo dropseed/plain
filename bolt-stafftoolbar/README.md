@@ -57,3 +57,24 @@ you can change the classes via the template tag:
 <!-- base.html -->
 {% stafftoolbar outer_class="fixed bottom-0 w-full" inner_class="max-w-4xl mx-auto" %}
 ```
+
+## Tailwind CSS
+
+This package is styled with [Tailwind CSS](https://tailwindcss.com/),
+and pairs well with [`forge-tailwind`](https://github.com/forgepackages/forge-tailwind).
+
+If you are using your own Tailwind implementation,
+you can modify the "content" in your Tailwind config to include any Forge packages:
+
+```js
+// tailwind.config.js
+module.exports = {
+  content: [
+    // ...
+    ".venv/lib/python*/site-packages/forge*/**/*.{html,js}",
+  ],
+  // ...
+}
+```
+
+If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
