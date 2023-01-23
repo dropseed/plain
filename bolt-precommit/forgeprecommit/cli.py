@@ -32,12 +32,12 @@ def cli(ctx, install):
         forge.manage_cmd("check", "--database", "default", check=True)
 
         click.echo()
-        click.secho("Checking Django migrations", bold=True)
-        forge.manage_cmd("migrate", "--check", check=True)
-
-        click.echo()
         click.secho("Checking for Django models missing migrations", bold=True)
         forge.manage_cmd("makemigrations", "--dry-run", "--check", check=True)
+        
+        click.echo()
+        click.secho("Checking Django migrations", bold=True)
+        forge.manage_cmd("migrate", "--check", check=True)
     else:
         click.echo()
         click.secho("Running Django checks (without database)", bold=True)
