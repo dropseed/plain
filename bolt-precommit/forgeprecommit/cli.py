@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from pathlib import Path
 
 import click
@@ -20,34 +21,39 @@ def cli(ctx, install):
         return
 
     if forge.repo_root and is_using_poetry(forge.repo_root):
-        click.secho("Checking poetry.lock", bold=True)
-        forge.venv_cmd("poetry", "lock", "--check", check=True)
+        check_short("Checking poetry.lock", forge.venv_cmd, "poetry", "lock", "--check")
 
     if forgepackage_installed("format"):
-        forge.venv_cmd("forge", "format", "--check", check=True)
+        check_short(
+            "Checking code formatting", forge.venv_cmd, "forge", "format", "--check"
+        )
 
     if django_db_connected():
-        click.echo()
-        click.secho("Running Django checks", bold=True)
-        forge.manage_cmd("check", "--database", "default", check=True)
-
-        click.echo()
-        click.secho("Checking for Django models missing migrations", bold=True)
-        forge.manage_cmd("makemigrations", "--dry-run", "--check", check=True)
-        
-        click.echo()
-        click.secho("Checking Django migrations", bold=True)
-        forge.manage_cmd("migrate", "--check", check=True)
+        check_short(
+            "Running Django system checks",
+            forge.manage_cmd,
+            "check",
+            "--database",
+            "default",
+        )
+        check_short(
+            "Checking Django migrations", forge.manage_cmd, "migrate", "--check"
+        )
+        check_short(
+            "Checking for Django models missing migrations",
+            forge.manage_cmd,
+            "makemigrations",
+            "--dry-run",
+            "--check",
+        )
     else:
-        click.echo()
-        click.secho("Running Django checks (without database)", bold=True)
-        forge.manage_cmd("check", check=True)
-
-        click.secho("Skipping migration checks", bold=True, fg="yellow")
+        check_short(
+            "Running Django checks (without database)", forge.manage_cmd, "check"
+        )
+        click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
     if forgepackage_installed("test"):
-        click.echo()
-        click.secho("Running tests", bold=True)
+        print_event("Running tests")
         forge.venv_cmd("forge", "test", check=True)
 
 
@@ -63,3 +69,21 @@ def django_db_connected():
 
 def is_using_poetry(target_path):
     return (Path(target_path) / "poetry.lock").exists()
+
+
+def print_event(msg, newline=True):
+    arrow = click.style("-->", fg=214, bold=True)
+    if not newline:
+        message += " "
+    click.secho(f"{arrow} {msg}", nl=newline)
+
+
+def check_short(message, func, *args):
+    print_event(message, newline=False)
+    result = func(*args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if result.returncode != 0:
+        click.secho("✘", fg="red")
+        click.secho(result.stdout.decode("utf-8"))
+        sys.exit(1)
+    else:
+        click.secho("✔", fg="green")
