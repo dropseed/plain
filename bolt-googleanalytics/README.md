@@ -97,7 +97,7 @@ class ExampleModel(models.Model):
 
 ### Associating users
 
-A user can be tied to an event by either passing the `request` paramater to `send`:
+A user can be tied to an event by either passing the `request` parameter to `send`:
 
 ```python
 # (Python)
