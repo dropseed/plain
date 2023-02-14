@@ -16,7 +16,7 @@ htmx.on("htmx:configRequest", function (event) {
   }
 
   // Add the CSRF token to all non-GET requests automatically
-  if (event.detail.method !== "GET") {
+  if (event.detail.method !== "GET" && event.detail.verb !== "get") {
     event.detail.headers["X-CSRFToken"] = csrfToken;
   }
 });
