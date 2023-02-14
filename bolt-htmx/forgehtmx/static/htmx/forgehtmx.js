@@ -46,3 +46,7 @@ htmx.defineExtension("error-classes", {
     }
   },
 });
+
+// Our own load event, to support lazy loading
+// *after* our fragment extension is added
+htmx.trigger(document.body, "fhxLoad");

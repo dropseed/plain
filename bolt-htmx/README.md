@@ -86,6 +86,44 @@ Here's an example:
 
 Everything inside `{% htmxfragment %}` will automatically update when "Refresh" is clicked.
 
+### Lazy template fragments
+
+If you want to render a fragment lazily,
+you can add the `lazy` attribute to the `{% htmxfragment %}` tag.
+
+```html
+{% htmxfragment main lazy %}
+<!-- This content will be fetched with hx-get -->
+{% endhtmxfragment %}
+```
+
+This pairs nicely with passing a callable function or method as a context variable,
+which will only get invoked when the fragment actually gets rendered on the lazy load.
+
+```python
+def fetch_items():
+    import time
+    time.sleep(2)
+    return ["foo", "bar", "baz"]
+
+
+class HomeView(HTMXViewMixin, TemplateView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["items"] = fetch_items  # Missing () are on purpose!
+        return context
+```
+
+```html
+{% htmxfragment main lazy %}
+<ul>
+  {% for item in items %}
+    <li>{{ item }}</li>
+  {% endfor %}
+</ul>
+{% endhtmxfragment %}
+```
+
 ### How does it work?
 
 When you use the `{% htmxfragment %}` tag,

@@ -18,8 +18,9 @@ def htmx_js(context):
 
 
 class HTMXFragmentNode(template.Node):
-    def __init__(self, fragment_name, nodelist, *args, **kwargs):
+    def __init__(self, fragment_name, nodelist, lazy, *args, **kwargs):
         self.fragment_name = fragment_name
+        self.lazy = lazy
         self.nodelist = template.NodeList(
             [
                 TextNode(
@@ -31,20 +32,42 @@ class HTMXFragmentNode(template.Node):
         )
         super().__init__(*args, **kwargs)
 
-    def render(self, context):
+    def render(self, context, allow_lazy=True):
+        if allow_lazy and self.lazy:
+            return template.NodeList(
+                [
+                    TextNode(
+                        f'<div hx-get hx-trigger="fhxLoad from:body" fhx-fragment="{self.fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
+                    ),
+                ]
+            ).render(context)
+
         return self.nodelist.render(context)
 
 
 @register.tag
 def htmxfragment(parser, token):
     tokens = token.split_contents()
-    if len(tokens) != 2:
-        raise template.TemplateSyntaxError(
-            f"{tokens[0]} tag requires a single argument"
-        )
+    num_tokens = len(tokens)
 
-    # This is a static string, not an expression
-    fragment_name = tokens[1].strip("\"'")
+    if num_tokens == 2:
+        # This is a static string, not an expression
+        fragment_name = tokens[1].strip("\"'")
+        fragment_lazy = False
+    elif num_tokens == 3:
+        lazy_token = tokens[2]
+        if lazy_token != "lazy":
+            # Could support an expression later...
+            raise template.TemplateSyntaxError(
+                f"The second argument to {tokens[0]} tag must be 'lazy' or removed"
+            )
+
+        fragment_name = tokens[1].strip("\"'")
+        fragment_lazy = True
+    else:
+        raise template.TemplateSyntaxError(
+            f"{tokens[0]} tag requires a fragment name as single argument, or a fragment name and a lazy attribute"
+        )
 
     nodelist = parser.parse(("endhtmxfragment",))
     parser.delete_first_token()
@@ -56,4 +79,5 @@ def htmxfragment(parser, token):
         fragment_name=fragment_name,
         # fragment_id=fragment_id_expression,
         nodelist=nodelist,
+        lazy=fragment_lazy,
     )

@@ -38,7 +38,10 @@ class HTMXTemplateFragmentResponse(TemplateResponse):
                 context = make_context(context, self._request)
                 with context.bind_template(template_base):
                     context.template_name = template_base.name
-                    return node.render(context)
+                    return node.render(
+                        context,
+                        allow_lazy=False,  # We're rendeirng a single fragment, so lazy is not allowed at this point
+                    )
 
         raise ValueError(
             f"HTMX fragment {target_fragment_name} not found in template {template_base.name}"
