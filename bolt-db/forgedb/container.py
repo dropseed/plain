@@ -1,10 +1,13 @@
 import os
 import re
+import shlex
 import subprocess
 import time
 
 import dj_database_url
 from forgecore import Forge
+
+SNAPSHOT_DB_PREFIX = "forgedb_snapshot_"
 
 
 class DBContainer:
@@ -111,7 +114,7 @@ class DBContainer:
                 "exec",
                 docker_flags,
                 self.name,
-                *command.split(),
+                *shlex.split(command),
             ]
             + list(args),
             check=True,
@@ -180,4 +183,64 @@ class DBContainer:
             f"psql -U {self.postgres_user} {maintenance_db} -c",
             f"ALTER DATABASE {import_db} RENAME TO {self.postgres_db}",
             stdout=subprocess.DEVNULL,
+        )
+
+    def terminate_connections(self):
+        self.execute(
+            f"psql -U {self.postgres_user} {self.postgres_db} -c",
+            f"SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '{self.postgres_db}' AND pid <> pg_backend_pid();",
+            stdout=subprocess.DEVNULL,
+        )
+
+    def create_snapshot(self, name):
+        snapshot_name = f"{SNAPSHOT_DB_PREFIX}{name}"
+        current_git_branch = (
+            subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+            .decode()
+            .strip()
+        )
+        description = f"branch={current_git_branch}"
+
+        self.terminate_connections()
+        try:
+            self.execute(
+                f"createdb {snapshot_name} '{description}' -U {self.postgres_user} -T {self.postgres_db}",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as e:
+            if "already exists" in e.stdout.decode():
+                return False
+            else:
+                raise
+
+        return True
+
+    def list_snapshots(self):
+        self.execute(
+            f"psql -U {self.postgres_user} {self.postgres_db} -c",
+            f"SELECT REPLACE(datname, '{SNAPSHOT_DB_PREFIX}', '') as name, pg_size_pretty(pg_database_size(datname)) as size, pg_catalog.shobj_description(oid, 'pg_database') AS description, (pg_stat_file('base/'||oid ||'/PG_VERSION')).modification as created FROM pg_catalog.pg_database WHERE datname LIKE '{SNAPSHOT_DB_PREFIX}%' ORDER BY created;",
+        )
+
+    def delete_snapshot(self, name):
+        snapshot_name = f"{SNAPSHOT_DB_PREFIX}{name}"
+        try:
+            self.execute(
+                f"dropdb {snapshot_name} -U {self.postgres_user}",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as e:
+            if "does not exist" in e.stdout.decode():
+                return False
+            else:
+                raise
+
+        return True
+
+    def restore_snapshot(self, name):
+        snapshot_name = f"{SNAPSHOT_DB_PREFIX}{name}"
+        self.reset(create=False)
+        self.execute(
+            f"createdb {self.postgres_db} -U {self.postgres_user} -T {snapshot_name}",
         )
