@@ -61,3 +61,10 @@ But it has a few commands that come in handy.
 
 In the end, the database container is like any other Docker container.
 You can use the standard Docker commands and tools to interact with it when needed.
+
+## Snapshots
+
+The `forge db snapshot` command manages local copies of your development database.
+This is useful for testing migrations or switching between git branches that have different db states.
+
+Snapshots are simply additional Postgres databases that are created and dropped as needed (`createdb {snapshot_name} -T postgres`).
