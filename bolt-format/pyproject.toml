@@ -30,7 +30,7 @@ python = "^3.8"
 forge-core = "^1.0.0"
 click = ">=8.0.0"
 black = ">=22.0.0"
-ruff = "^0.0.239"
+ruff = "^0.0.253"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

@@ -23,19 +23,16 @@ def fmt(files):
     forge = Forge()
 
     # If we're fixing, we do ruff first so black can re-format any ruff fixes
-    click.secho(f"Fixing {', '.join(files)} with ruff", bold=True)
-
+    print_event(f"Fixing {', '.join(files)} with ruff")
     forge.venv_cmd(
         "ruff",
         "--fix-only",
+        "--exit-zero",
         *files,
         check=True,
     )
 
-    click.echo()
-
-    click.secho(f"Formatting {', '.join(files)} with black", bold=True)
-
+    print_event(f"Formatting {', '.join(files)} with black")
     forge.venv_cmd(
         "black",
         *files,
@@ -46,10 +43,15 @@ def fmt(files):
 def fmt_check(files):
     forge = Forge()
 
-    click.secho(f"Checking {', '.join(files)} with black", bold=True)
+    print_event(f"Checking {', '.join(files)} with black")
     forge.venv_cmd("black", "--check", *files, check=True)
-    click.echo()
 
-    click.secho(f"Checking {', '.join(files)} with ruff", bold=True)
+    print_event(f"Checking {', '.join(files)} with ruff")
     forge.venv_cmd("ruff", *files, check=True)
-    click.echo()
+
+
+def print_event(msg, newline=True):
+    arrow = click.style("-->", fg=214, bold=True)
+    if not newline:
+        message += " "
+    click.secho(f"{arrow} {msg}", nl=newline)
