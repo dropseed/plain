@@ -8,8 +8,8 @@ from . import settings
 
 
 class StripePortalView(View):
-    def post(self, request, *args, **kwargs):
-        return self.get_redirect_response(request)
+    def post(self, *args, **kwargs):
+        return self.get_redirect_response(self.request)
 
     def get_redirect_response(self, request):
         session = self.create_portal_session(request)
@@ -26,8 +26,8 @@ class StripePortalView(View):
 
 
 class StripeCheckoutView(View):
-    def post(self, request, *args, **kwargs):
-        return self.get_redirect_response(request)
+    def post(self, *args, **kwargs):
+        return self.get_redirect_response(self.request)
 
     def get_redirect_response(self, request):
         session = self.create_checkout_session(request)
@@ -45,11 +45,11 @@ class StripeCheckoutView(View):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class StripeWebhookView(View):
-    def post(self, request, *args, **kwargs):
+    def post(self, *args, **kwargs):
         try:
             event = stripe.Webhook.construct_event(
-                request.body,
-                request.META["HTTP_STRIPE_SIGNATURE"],
+                self.request.body,
+                self.request.META["HTTP_STRIPE_SIGNATURE"],
                 settings.STRIPE_WEBHOOK_SECRET(),
             )
         except ValueError as e:
