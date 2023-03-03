@@ -5,6 +5,7 @@ import subprocess
 import time
 
 import dj_database_url
+from dotenv import dotenv_values
 from forgecore import Forge
 
 SNAPSHOT_DB_PREFIX = "forgedb_snapshot_"
@@ -16,10 +17,20 @@ class DBContainer:
         name = os.path.basename(forge.repo_root) + "-postgres"
         tmp_dir = forge.forge_tmp_dir
 
+        if "DATABASE_URL" in os.environ:
+            postgres_version = os.environ.get("POSTGRES_VERSION")
+            parsed_db_url = dj_database_url.parse(os.environ.get("DATABASE_URL"))
+        else:
+            # Read from a .env file if we don't see the DATABASE_URL
+            values = dotenv_values()
+            postgres_version = values.get(
+                "POSTGRES_VERSION", os.environ.get("POSTGRES_VERSION")
+            )
+            parsed_db_url = dj_database_url.parse(values.get("DATABASE_URL"))
+
         self.name = name
         self.tmp_dir = os.path.abspath(tmp_dir)
-        self.postgres_version = os.environ.get("POSTGRES_VERSION", "13")
-        parsed_db_url = dj_database_url.parse(os.environ.get("DATABASE_URL"))
+        self.postgres_version = postgres_version or "13"
         self.postgres_port = parsed_db_url.get("PORT", "5432")
         self.postgres_db = parsed_db_url.get("NAME", "postgres")
         self.postgres_user = parsed_db_url.get("USER", "postgres")
