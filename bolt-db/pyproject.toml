@@ -5,7 +5,7 @@ packages = [
     { include = "forgedb" },
 ]
 
-version = "1.1.0"
+version = "1.2.0"
 description = "Work library for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
