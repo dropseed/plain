@@ -4,6 +4,7 @@ import subprocess
 import sys
 
 import click
+from dotenv import load_dotenv
 from dotenv import set_key as dotenv_set_key
 from forgecore import Forge
 from forgecore.packages import forgepackage_installed
@@ -22,12 +23,15 @@ def cli():
         click.secho("Not in a git repository", fg="red")
         sys.exit(1)
 
-    dotenv_path = os.path.join(repo_root, ".env")
-
     django_env = {
+        **os.environ,  # Make a copy before load_dotenv, since Django will do it's own version of that
         "PYTHONPATH": forge.project_dir,
         "PYTHONUNBUFFERED": "true",
     }
+
+    dotenv_path = os.path.join(repo_root, ".env")
+    load_dotenv(dotenv_path)
+
     if (
         "STRIPE_WEBHOOK_PATH" in os.environ
         and "STRIPE_WEBHOOK_SECRET" not in os.environ
@@ -80,14 +84,7 @@ def cli():
         manager.add_process("postgres", f"forge db start --logs")
         runserver_cmd = f"forge db wait && " + runserver_cmd
 
-    manager.add_process(
-        "django",
-        runserver_cmd,
-        env={
-            **os.environ,
-            **django_env,
-        },
-    )
+    manager.add_process("django", runserver_cmd, env=django_env)
 
     if "REDIS_URL" in os.environ:
         redis_url = os.environ["REDIS_URL"]
@@ -104,10 +101,7 @@ def cli():
         manager.add_process(
             "celery",
             f"hupper -w .env -m celery --app {os.environ['CELERY_APP']} worker --loglevel info",
-            env={
-                **os.environ,
-                **django_env,
-            },
+            env=django_env,
         )
 
     if forgepackage_installed("tailwind"):
