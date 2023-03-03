@@ -1,8 +1,6 @@
 import os
 import subprocess
 
-from dotenv import load_dotenv
-
 
 def find_django_project_dir(target_path):
     """
@@ -47,10 +45,6 @@ class Forge:
             # On Heroku, there won't be a repo, so we can't require that necessarily
             # (helps with some other scenarios too)
             self.repo_root = None
-
-        # Load a .env if one exists in the repo root
-        if self.repo_root and os.path.exists(os.path.join(self.repo_root, ".env")):
-            load_dotenv(os.path.join(self.repo_root, ".env"))
 
         self.project_dir = find_django_project_dir(target_path)
 
