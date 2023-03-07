@@ -77,9 +77,9 @@ class HTMXViewMixin:
 
             handler = getattr(self, method, None)
             if handler:
-                return handler(self.request, *args, **kwargs)
+                return handler(*args, **kwargs)
 
-        return super().dispatch(self.request, *args, **kwargs)
+        return super().dispatch(*args, **kwargs)
 
     def get_template_names(self):
         # TODO is this part necessary anymore?? can I replace those with fragments now?
