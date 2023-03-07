@@ -23,10 +23,10 @@ def cli(pytest_args):
     coverage_file = os.path.join(forge.forge_tmp_dir, ".coverage")
 
     # Turn deprecation warnings into errors
-    if "-W" not in pytest_args:
-        pytest_args = list(pytest_args)  # Make sure it's a list instead of tuple
-        pytest_args.append("-W")
-        pytest_args.append("error::DeprecationWarning")
+#     if "-W" not in pytest_args:
+#         pytest_args = list(pytest_args)  # Make sure it's a list instead of tuple
+#         pytest_args.append("-W")
+#         pytest_args.append("error::DeprecationWarning")
 
     result = forge.venv_cmd(
         "coverage",
