@@ -2,6 +2,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 import click
 from forgecore import Forge
 from forgecore.packages import forgepackage_installed
@@ -19,6 +24,16 @@ def cli(ctx, install):
     if install:
         install_git_hook()
         return
+
+    if forge.repo_root and has_pyproject_toml(forge.repo_root):
+        with open(Path(forge.repo_root, "pyproject.toml"), "rb") as f:
+            pyproject = tomllib.load(f)
+        for cmd in pyproject.get("tool", {}).get("forge-precommit", {}).get("run", []):
+            print_event("Running custom pre-commit check")
+            print(cmd)
+            result = subprocess.run(cmd, shell=True)
+            if result.returncode != 0:
+                sys.exit(result.returncode)
 
     if forge.repo_root and is_using_poetry(forge.repo_root):
         check_short("Checking poetry.lock", forge.venv_cmd, "poetry", "lock", "--check")
@@ -69,6 +84,10 @@ def django_db_connected():
 
 def is_using_poetry(target_path):
     return (Path(target_path) / "poetry.lock").exists()
+
+
+def has_pyproject_toml(target_path):
+    return (Path(target_path) / "pyproject.toml").exists()
 
 
 def print_event(msg, newline=True):

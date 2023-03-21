@@ -624,7 +624,7 @@ tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -687,4 +687,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "0527ce2ef3403a98664cae691e5bea27289e645d0a545a52364b5fb2e8fa7d69"
+content-hash = "f3b38e7307e59a7e0dcbb8cb6eabac4e9868fc96fe9bf8eac66a6562f28efe19"
