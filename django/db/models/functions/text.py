@@ -52,14 +52,6 @@ class Chr(Transform):
             **extra_context,
         )
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        return super().as_sql(
-            compiler,
-            connection,
-            template="%(function)s(%(expressions)s USING NCHAR_CS)",
-            **extra_context,
-        )
-
     def as_sqlite(self, compiler, connection, **extra_context):
         return super().as_sql(compiler, connection, function="CHAR", **extra_context)
 
@@ -161,9 +153,6 @@ class Left(Func):
     def get_substr(self):
         return Substr(self.source_expressions[0], Value(1), self.source_expressions[1])
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        return self.get_substr().as_oracle(compiler, connection, **extra_context)
-
     def as_sqlite(self, compiler, connection, **extra_context):
         return self.get_substr().as_sqlite(compiler, connection, **extra_context)
 
@@ -205,7 +194,7 @@ class LTrim(Transform):
     lookup_name = "ltrim"
 
 
-class MD5(OracleHashMixin, Transform):
+class MD5(Transform):
     function = "MD5"
     lookup_name = "md5"
 
@@ -235,12 +224,6 @@ class Repeat(Func):
             raise ValueError("'number' must be greater or equal to 0.")
         super().__init__(expression, number, **extra)
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        expression, number = self.source_expressions
-        length = None if number is None else Length(expression) * number
-        rpad = RPad(expression, length, expression)
-        return rpad.as_sql(compiler, connection, **extra_context)
-
 
 class Replace(Func):
     function = "REPLACE"
@@ -252,21 +235,6 @@ class Replace(Func):
 class Reverse(Transform):
     function = "REVERSE"
     lookup_name = "reverse"
-
-    def as_oracle(self, compiler, connection, **extra_context):
-        # REVERSE in Oracle is undocumented and doesn't support multi-byte
-        # strings. Use a special subquery instead.
-        return super().as_sql(
-            compiler,
-            connection,
-            template=(
-                "(SELECT LISTAGG(s) WITHIN GROUP (ORDER BY n DESC) FROM "
-                "(SELECT LEVEL n, SUBSTR(%(expressions)s, LEVEL, 1) s "
-                "FROM DUAL CONNECT BY LEVEL <= LENGTH(%(expressions)s)) "
-                "GROUP BY %(expressions)s)"
-            ),
-            **extra_context,
-        )
 
 
 class Right(Left):
@@ -287,7 +255,7 @@ class RTrim(Transform):
     lookup_name = "rtrim"
 
 
-class SHA1(OracleHashMixin, PostgreSQLSHAMixin, Transform):
+class SHA1(PostgreSQLSHAMixin, Transform):
     function = "SHA1"
     lookup_name = "sha1"
 
@@ -296,21 +264,18 @@ class SHA224(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
     function = "SHA224"
     lookup_name = "sha224"
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        raise NotSupportedError("SHA224 is not supported on Oracle.")
 
-
-class SHA256(MySQLSHA2Mixin, OracleHashMixin, PostgreSQLSHAMixin, Transform):
+class SHA256(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
     function = "SHA256"
     lookup_name = "sha256"
 
 
-class SHA384(MySQLSHA2Mixin, OracleHashMixin, PostgreSQLSHAMixin, Transform):
+class SHA384(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
     function = "SHA384"
     lookup_name = "sha384"
 
 
-class SHA512(MySQLSHA2Mixin, OracleHashMixin, PostgreSQLSHAMixin, Transform):
+class SHA512(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
     function = "SHA512"
     lookup_name = "sha512"
 
@@ -349,9 +314,6 @@ class Substr(Func):
         super().__init__(*expressions, **extra)
 
     def as_sqlite(self, compiler, connection, **extra_context):
-        return super().as_sql(compiler, connection, function="SUBSTR", **extra_context)
-
-    def as_oracle(self, compiler, connection, **extra_context):
         return super().as_sql(compiler, connection, function="SUBSTR", **extra_context)
 
 

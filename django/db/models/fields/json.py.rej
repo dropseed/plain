@@ -1,0 +1,57 @@
+diff a/django/db/models/fields/json.py b/django/db/models/fields/json.py	(rejected hunks)
+@@ -426,14 +396,7 @@ class KeyTransformIn(lookups.In):
+             not hasattr(param, "as_sql")
+             and not connection.features.has_native_json_field
+         ):
+-            if connection.vendor == "oracle":
+-                value = json.loads(param)
+-                sql = "%s(JSON_OBJECT('value' VALUE %%s FORMAT JSON), '$.value')"
+-                if isinstance(value, (list, dict)):
+-                    sql = sql % "JSON_QUERY"
+-                else:
+-                    sql = sql % "JSON_VALUE"
+-            elif connection.vendor == "mysql" or (
++            if connection.vendor == "mysql" or (
+                 connection.vendor == "sqlite"
+                 and params[0] not in connection.ops.jsonfield_datatype_values
+             ):
+@@ -448,17 +411,7 @@ class KeyTransformExact(JSONExact):
+         if isinstance(self.rhs, KeyTransform):
+             return super(lookups.Exact, self).process_rhs(compiler, connection)
+         rhs, rhs_params = super().process_rhs(compiler, connection)
+-        if connection.vendor == "oracle":
+-            func = []
+-            sql = "%s(JSON_OBJECT('value' VALUE %%s FORMAT JSON), '$.value')"
+-            for value in rhs_params:
+-                value = json.loads(value)
+-                if isinstance(value, (list, dict)):
+-                    func.append(sql % "JSON_QUERY")
+-                else:
+-                    func.append(sql % "JSON_VALUE")
+-            rhs = rhs % tuple(func)
+-        elif connection.vendor == "sqlite":
++        if connection.vendor == "sqlite":
+             func = []
+             for value in rhs_params:
+                 if value in connection.ops.jsonfield_datatype_values:
+@@ -468,20 +421,6 @@ class KeyTransformExact(JSONExact):
+             rhs = rhs % tuple(func)
+         return rhs, rhs_params
+ 
+-    def as_oracle(self, compiler, connection):
+-        rhs, rhs_params = super().process_rhs(compiler, connection)
+-        if rhs_params == ["null"]:
+-            # Field has key and it's NULL.
+-            has_key_expr = HasKeyOrArrayIndex(self.lhs.lhs, self.lhs.key_name)
+-            has_key_sql, has_key_params = has_key_expr.as_oracle(compiler, connection)
+-            is_null_expr = self.lhs.get_lookup("isnull")(self.lhs, True)
+-            is_null_sql, is_null_params = is_null_expr.as_sql(compiler, connection)
+-            return (
+-                "%s AND %s" % (has_key_sql, is_null_sql),
+-                tuple(has_key_params) + tuple(is_null_params),
+-            )
+-        return super().as_sql(compiler, connection)
+-
+ 
+ class KeyTransformIExact(
+     CaseInsensitiveMixin, KeyTransformTextLookupMixin, lookups.IExact

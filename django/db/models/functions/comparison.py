@@ -59,15 +59,6 @@ class Cast(Func):
             **extra_context,
         )
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        if self.output_field.get_internal_type() == "JSONField":
-            # Oracle doesn't support explicit cast to JSON.
-            template = "JSON_QUERY(%(expressions)s, '$')"
-            return super().as_sql(
-                compiler, connection, template=template, **extra_context
-            )
-        return self.as_sql(compiler, connection, **extra_context)
-
 
 class Coalesce(Func):
     """Return, from left to right, the first non-null expression."""
@@ -86,20 +77,6 @@ class Coalesce(Func):
             if result is NotImplemented or result is not None:
                 return result
         return None
-
-    def as_oracle(self, compiler, connection, **extra_context):
-        # Oracle prohibits mixing TextField (NCLOB) and CharField (NVARCHAR2),
-        # so convert all fields to NCLOB when that type is expected.
-        if self.output_field.get_internal_type() == "TextField":
-            clone = self.copy()
-            clone.set_source_expressions(
-                [
-                    Func(expression, function="TO_NCLOB")
-                    for expression in self.get_source_expressions()
-                ]
-            )
-            return super(Coalesce, clone).as_sql(compiler, connection, **extra_context)
-        return self.as_sql(compiler, connection, **extra_context)
 
 
 class Collate(Func):
@@ -173,20 +150,6 @@ class JSONObject(Func):
             **extra_context,
         )
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        class ArgJoiner:
-            def join(self, args):
-                args = [" VALUE ".join(arg) for arg in zip(args[::2], args[1::2])]
-                return ", ".join(args)
-
-        return self.as_sql(
-            compiler,
-            connection,
-            arg_joiner=ArgJoiner(),
-            template="%(function)s(%(expressions)s RETURNING CLOB)",
-            **extra_context,
-        )
-
 
 class Least(Func):
     """
@@ -212,9 +175,3 @@ class Least(Func):
 class NullIf(Func):
     function = "NULLIF"
     arity = 2
-
-    def as_oracle(self, compiler, connection, **extra_context):
-        expression1 = self.get_source_expressions()[0]
-        if isinstance(expression1, Value) and expression1.value is None:
-            raise ValueError("Oracle does not allow Value(None) for expression1.")
-        return super().as_sql(compiler, connection, **extra_context)
