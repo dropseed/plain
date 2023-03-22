@@ -22,7 +22,6 @@ class AdminSeleniumTestCase(SeleniumTestCase, StaticLiveServerTestCase):
         "django.contrib.auth",
         "django.contrib.contenttypes",
         "django.contrib.sessions",
-        "django.contrib.sites",
     ]
 
     def wait_until(self, callback, timeout=10):
