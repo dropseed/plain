@@ -1,7 +1,20 @@
-[build-system]
-requires = ['setuptools>=40.8.0']
-build-backend = 'setuptools.build_meta'
+[tool.poetry]
+name = "dx"
+version = "0.0.0"
+description = ""
+authors = ["Dave Gaeddert <dave.gaeddert@gmail.com>", "Past authors of Django"]
+readme = "README.md"
 
-[tool.black]
-target-version = ['py38']
-force-exclude = 'tests/test_runner_apps/tagged/tests_syntax_error.py'
+packages = [
+    { include = "django" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+asgiref = ">=3.6.0"
+sqlparse = ">=0.3.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
