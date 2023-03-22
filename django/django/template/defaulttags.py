@@ -10,7 +10,6 @@ from itertools import groupby
 from django.conf import settings
 from django.utils import timezone
 from django.utils.html import conditional_escape, escape, format_html
-from django.utils.lorem_ipsum import paragraphs, words
 from django.utils.safestring import mark_safe
 
 from .base import (
@@ -321,24 +320,6 @@ class IfNode(Node):
                 return nodelist.render(context)
 
         return ""
-
-
-class LoremNode(Node):
-    def __init__(self, count, method, common):
-        self.count, self.method, self.common = count, method, common
-
-    def render(self, context):
-        try:
-            count = int(self.count.resolve(context))
-        except (ValueError, TypeError):
-            count = 1
-        if self.method == "w":
-            return words(count, common=self.common)
-        else:
-            paras = paragraphs(count, common=self.common)
-        if self.method == "p":
-            paras = ["<p>%s</p>" % p for p in paras]
-        return "\n\n".join(paras)
 
 
 GroupedResult = namedtuple("GroupedResult", ["grouper", "list"])
@@ -1088,53 +1069,6 @@ def load(parser, token):
             lib = find_library(parser, name)
             parser.add_library(lib)
     return LoadNode()
-
-
-@register.tag
-def lorem(parser, token):
-    """
-    Create random Latin text useful for providing test data in templates.
-
-    Usage format::
-
-        {% lorem [count] [method] [random] %}
-
-    ``count`` is a number (or variable) containing the number of paragraphs or
-    words to generate (default is 1).
-
-    ``method`` is either ``w`` for words, ``p`` for HTML paragraphs, ``b`` for
-    plain-text paragraph blocks (default is ``b``).
-
-    ``random`` is the word ``random``, which if given, does not use the common
-    paragraph (starting "Lorem ipsum dolor sit amet, consectetuer...").
-
-    Examples:
-
-    * ``{% lorem %}`` outputs the common "lorem ipsum" paragraph
-    * ``{% lorem 3 p %}`` outputs the common "lorem ipsum" paragraph
-      and two random paragraphs each wrapped in HTML ``<p>`` tags
-    * ``{% lorem 2 w random %}`` outputs two random latin words
-    """
-    bits = list(token.split_contents())
-    tagname = bits[0]
-    # Random bit
-    common = bits[-1] != "random"
-    if not common:
-        bits.pop()
-    # Method bit
-    if bits[-1] in ("w", "p", "b"):
-        method = bits.pop()
-    else:
-        method = "b"
-    # Count bit
-    if len(bits) > 1:
-        count = bits.pop()
-    else:
-        count = "1"
-    count = parser.compile_filter(count)
-    if len(bits) != 1:
-        raise TemplateSyntaxError("Incorrect format for %r tag" % tagname)
-    return LoremNode(count, method, common)
 
 
 @register.tag
