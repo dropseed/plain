@@ -15,7 +15,6 @@ from django.contrib.auth.forms import (
     SetPasswordForm,
 )
 from django.contrib.auth.tokens import default_token_generator
-from django.contrib.sites.shortcuts import get_current_site
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.http import HttpResponseRedirect, QueryDict
 from django.shortcuts import resolve_url
@@ -109,12 +108,9 @@ class LoginView(RedirectURLMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        current_site = get_current_site(self.request)
         context.update(
             {
                 self.redirect_field_name: self.get_redirect_url(),
-                "site": current_site,
-                "site_name": current_site.name,
                 **(self.extra_context or {}),
             }
         )
@@ -233,7 +229,6 @@ class PasswordResetView(PasswordContextMixin, FormView):
             "from_email": self.from_email,
             "email_template_name": self.email_template_name,
             "subject_template_name": self.subject_template_name,
-            "request": self.request,
             "html_email_template_name": self.html_email_template_name,
             "extra_email_context": self.extra_email_context,
         }
