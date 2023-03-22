@@ -3,7 +3,7 @@ name = "dx"
 version = "0.0.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@gmail.com>", "Past authors of Django"]
-readme = "README.md"
+# readme = "README.md"
 
 packages = [
     { include = "django" },

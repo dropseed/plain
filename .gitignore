@@ -1,4 +1,4 @@
-/.venv
+.venv
 *.egg-info
 *.pot
 *.py[co]
