@@ -5,7 +5,7 @@ packages = [
     { include = "forgeformat" },
 ]
 
-version = "1.0.1"
+version = "1.1.0"
 description = "Formatting library for Forge"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
