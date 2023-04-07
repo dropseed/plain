@@ -137,12 +137,6 @@ def load_backend(backend_name):
 
 class ConnectionHandler(BaseConnectionHandler):
     settings_name = "DATABASES"
-    # Connections needs to still be an actual thread local, as it's truly
-    # thread-critical. Database backends should use @async_unsafe to protect
-    # their code from async contexts, but this will give those contexts
-    # separate connections in case it's needed as well. There's no cleanup
-    # after async contexts, though, so we don't allow that if we can help it.
-    thread_critical = True
 
     def configure_settings(self, databases):
         databases = super().configure_settings(databases)

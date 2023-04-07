@@ -34,11 +34,10 @@ class ConnectionDoesNotExist(Exception):
 class BaseConnectionHandler:
     settings_name = None
     exception_class = ConnectionDoesNotExist
-    thread_critical = False
 
     def __init__(self, settings=None):
         self._settings = settings
-        self._connections = local(self.thread_critical)
+        self._connections = local()
 
     @cached_property
     def settings(self):
