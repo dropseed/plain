@@ -21,10 +21,6 @@ DEBUG = False
 # on a live site.
 DEBUG_PROPAGATE_EXCEPTIONS = False
 
-# People who get code error notifications. In the format
-# [('Full Name', 'email@example.com'), ('Full Name', 'anotheremail@example.com')]
-ADMINS = []
-
 # List of IP addresses, as strings, that:
 #   * See debug comments, when DEBUG is true
 #   * Receive x-headers
@@ -166,10 +162,6 @@ LANGUAGE_COOKIE_SECURE = False
 LANGUAGE_COOKIE_HTTPONLY = False
 LANGUAGE_COOKIE_SAMESITE = None
 
-# Not-necessarily-technical managers of the site. They get broken link
-# notifications and other various emails.
-MANAGERS = ADMINS
-
 # Default charset to use for all HttpResponse objects, if a MIME type isn't
 # manually specified. It's used to construct the Content-Type header.
 DEFAULT_CHARSET = "utf-8"
@@ -245,18 +237,6 @@ FORCE_SCRIPT_NAME = None
 DISALLOWED_USER_AGENTS = []
 
 ABSOLUTE_URL_OVERRIDES = {}
-
-# List of compiled regular expression objects representing URLs that need not
-# be reported by BrokenLinkEmailsMiddleware. Here are a few examples:
-#    import re
-#    IGNORABLE_404_URLS = [
-#        re.compile(r'^/apple-touch-icon.*\.png$'),
-#        re.compile(r'^/favicon.ico$'),
-#        re.compile(r'^/robots.txt$'),
-#        re.compile(r'^/phpmyadmin/'),
-#        re.compile(r'\.(cgi|php|pl)$'),
-#    ]
-IGNORABLE_404_URLS = []
 
 # A secret key for this particular Django installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Django will complain
