@@ -7,7 +7,7 @@ import zoneinfo
 from contextlib import ContextDecorator
 from datetime import datetime, timedelta, timezone, tzinfo
 
-from asgiref.local import Local
+from threading import local
 
 from django.conf import settings
 
@@ -58,7 +58,7 @@ def get_default_timezone_name():
     return _get_timezone_name(get_default_timezone())
 
 
-_active = Local()
+_active = local()
 
 
 def get_current_timezone():

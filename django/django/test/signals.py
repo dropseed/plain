@@ -2,8 +2,6 @@ import os
 import time
 import warnings
 
-from asgiref.local import Local
-
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import setting_changed
@@ -31,7 +29,7 @@ def clear_cache_handlers(*, setting, **kwargs):
 
         close_caches()
         caches._settings = caches.settings = caches.configure_settings(None)
-        caches._connections = Local()
+        caches._connections = local()
 
 
 @receiver(setting_changed)
@@ -147,7 +145,7 @@ def language_changed(*, setting, **kwargs):
         from django.utils.translation import trans_real
 
         trans_real._default = None
-        trans_real._active = Local()
+        trans_real._active = local()
     if setting in {"LANGUAGES", "LOCALE_PATHS"}:
         from django.utils.translation import trans_real
 

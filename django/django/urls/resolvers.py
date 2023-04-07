@@ -13,7 +13,7 @@ from importlib import import_module
 from pickle import PicklingError
 from urllib.parse import quote
 
-from asgiref.local import Local
+from threading import local
 
 from django.conf import settings
 from django.core.checks import Error, Warning
@@ -439,7 +439,7 @@ class URLResolver:
         # urlpatterns
         self._callback_strs = set()
         self._populated = False
-        self._local = Local()
+        self._local = local()
 
     def __repr__(self):
         if isinstance(self.urlconf_name, list) and self.urlconf_name:

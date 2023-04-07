@@ -1,4 +1,4 @@
-from asgiref.local import Local
+from threading import local
 
 from django.conf import settings as django_settings
 from django.utils.functional import cached_property
@@ -38,7 +38,7 @@ class BaseConnectionHandler:
 
     def __init__(self, settings=None):
         self._settings = settings
-        self._connections = Local(self.thread_critical)
+        self._connections = local(self.thread_critical)
 
     @cached_property
     def settings(self):

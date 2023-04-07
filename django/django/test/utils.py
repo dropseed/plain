@@ -13,8 +13,6 @@ from types import SimpleNamespace
 from unittest import TestCase, skipIf, skipUnless
 from xml.dom.minidom import Node, parseString
 
-from asgiref.sync import iscoroutinefunction
-
 from django.apps import apps
 from django.apps.registry import Apps
 from django.conf import UserSettingsHolder, settings
