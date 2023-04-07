@@ -20,7 +20,6 @@ from django.utils.translation import gettext_lazy
 from django.views.decorators.cache import never_cache
 from django.views.decorators.common import no_append_slash
 from django.views.decorators.csrf import csrf_protect
-from django.views.i18n import JavaScriptCatalog
 
 all_sites = WeakSet()
 
@@ -278,7 +277,6 @@ class AdminSite:
                 name="password_change_done",
             ),
             path("autocomplete/", wrap(self.autocomplete_view), name="autocomplete"),
-            path("jsi18n/", wrap(self.i18n_javascript, cacheable=True), name="jsi18n"),
             path(
                 "r/<int:content_type_id>/<path:object_id>/",
                 wrap(contenttype_views.shortcut),
@@ -370,15 +368,6 @@ class AdminSite:
             defaults["template_name"] = self.password_change_done_template
         request.current_app = self.name
         return PasswordChangeDoneView.as_view(**defaults)(request)
-
-    def i18n_javascript(self, request, extra_context=None):
-        """
-        Display the i18n JavaScript that the Django admin requires.
-
-        `extra_context` is unused but present for consistency with the other
-        admin views.
-        """
-        return JavaScriptCatalog.as_view(packages=["django.contrib.admin"])(request)
 
     def logout(self, request, extra_context=None):
         """

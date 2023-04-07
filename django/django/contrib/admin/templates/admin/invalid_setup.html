@@ -1,13 +1,12 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+<a href="{% url 'admin:index' %}">Home</a>
 &rsaquo; {{ title }}
 </div>
 {% endblock %}
 
 {% block content %}
-<p>{% translate 'Something’s wrong with your database installation. Make sure the appropriate database tables have been created, and make sure the database is readable by the appropriate user.' %}</p>
+<p>Something’s wrong with your database installation. Make sure the appropriate database tables have been created, and make sure the database is readable by the appropriate user.</p>
 {% endblock %}

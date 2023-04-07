@@ -1,13 +1,13 @@
 {% extends "admin/base_site.html" %}
-{% load i18n admin_urls %}
+{% load admin_urls %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+<a href="{% url 'admin:index' %}">Home</a>
 &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
 &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ module_name }}</a>
 &rsaquo; <a href="{% url opts|admin_urlname:'change' object.pk|admin_urlquote %}">{{ object|truncatewords:"18" }}</a>
-&rsaquo; {% translate 'History' %}
+&rsaquo; History
 </div>
 {% endblock %}
 
@@ -19,9 +19,9 @@
     <table>
         <thead>
         <tr>
-            <th scope="col">{% translate 'Date/time' %}</th>
-            <th scope="col">{% translate 'User' %}</th>
-            <th scope="col">{% translate 'Action' %}</th>
+            <th scope="col">Date/time</th>
+            <th scope="col">User</th>
+            <th scope="col">Action</th>
         </tr>
         </thead>
         <tbody>
@@ -46,10 +46,10 @@
           {% endif %}
         {% endfor %}
       {% endif %}
-      {{ action_list.paginator.count }} {% blocktranslate count counter=action_list.paginator.count %}entry{% plural %}entries{% endblocktranslate %}
+      {{ action_list.paginator.count }} entr{{ action_list.paginator.count|pluralize:"y,ies" }}
     </p>
 {% else %}
-    <p>{% translate 'This object doesn’t have a change history. It probably wasn’t added via this admin site.' %}</p>
+    <p>This object doesn’t have a change history. It probably wasn’t added via this admin site.</p>
 {% endif %}
 </div>
 </div>

@@ -24,7 +24,7 @@ from django.utils.version import PY311, get_docs_version
 # works even if the template loader is broken.
 DEBUG_ENGINE = Engine(
     debug=True,
-    libraries={"i18n": "django.templatetags.i18n"},
+    libraries={},
 )
 
 
