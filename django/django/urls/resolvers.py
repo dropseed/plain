@@ -338,40 +338,6 @@ class RoutePattern(CheckURLMixin):
         return str(self._route)
 
 
-class LocalePrefixPattern:
-    def __init__(self, prefix_default_language=True):
-        self.prefix_default_language = prefix_default_language
-        self.converters = {}
-
-    @property
-    def regex(self):
-        # This is only used by reverse() and cached in _reverse_dict.
-        return re.compile(re.escape(self.language_prefix))
-
-    @property
-    def language_prefix(self):
-        language_code = get_language() or settings.LANGUAGE_CODE
-        if language_code == settings.LANGUAGE_CODE and not self.prefix_default_language:
-            return ""
-        else:
-            return "%s/" % language_code
-
-    def match(self, path):
-        language_prefix = self.language_prefix
-        if path.startswith(language_prefix):
-            return path.removeprefix(language_prefix), (), {}
-        return None
-
-    def check(self):
-        return []
-
-    def describe(self):
-        return "'{}'".format(self)
-
-    def __str__(self):
-        return self.language_prefix
-
-
 class URLPattern:
     def __init__(self, pattern, callback, default_args=None, name=None):
         self.pattern = pattern

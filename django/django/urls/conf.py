@@ -5,7 +5,6 @@ from importlib import import_module
 from django.core.exceptions import ImproperlyConfigured
 
 from .resolvers import (
-    LocalePrefixPattern,
     RegexPattern,
     RoutePattern,
     URLPattern,
@@ -51,10 +50,6 @@ def include(arg, namespace=None):
     if isinstance(patterns, (list, tuple)):
         for url_pattern in patterns:
             pattern = getattr(url_pattern, "pattern", None)
-            if isinstance(pattern, LocalePrefixPattern):
-                raise ImproperlyConfigured(
-                    "Using i18n_patterns in an included URLconf is not allowed."
-                )
     return (urlconf_module, app_name, namespace)
 
 

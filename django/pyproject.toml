@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "dx"
-version = "0.0.0"
+name = "django"
+version = "50.0.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@gmail.com>", "Past authors of Django"]
 # readme = "README.md"

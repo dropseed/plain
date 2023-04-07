@@ -126,7 +126,6 @@ class BaseDatabaseCreation:
                 if (
                     app_config.models_module is not None
                     and app_config.label in loader.migrated_apps
-                    and app_config.name not in settings.TEST_NON_SERIALIZED_APPS
                 ):
                     for model in app_config.get_models():
                         if model._meta.can_migrate(
