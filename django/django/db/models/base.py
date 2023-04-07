@@ -4,8 +4,6 @@ import warnings
 from functools import partialmethod
 from itertools import chain
 
-from asgiref.sync import sync_to_async
-
 import django
 from django.apps import apps
 from django.conf import settings
@@ -744,9 +742,6 @@ class Model(AltersData, metaclass=ModelBase):
 
         self._state.db = db_instance._state.db
 
-    async def arefresh_from_db(self, using=None, fields=None):
-        return await sync_to_async(self.refresh_from_db)(using=using, fields=fields)
-
     def serializable_value(self, field_name):
         """
         Return the value of the field name for this instance. If the field is
@@ -819,18 +814,6 @@ class Model(AltersData, metaclass=ModelBase):
         )
 
     save.alters_data = True
-
-    async def asave(
-        self, force_insert=False, force_update=False, using=None, update_fields=None
-    ):
-        return await sync_to_async(self.save)(
-            force_insert=force_insert,
-            force_update=force_update,
-            using=using,
-            update_fields=update_fields,
-        )
-
-    asave.alters_data = True
 
     def save_base(
         self,
@@ -1132,14 +1115,6 @@ class Model(AltersData, metaclass=ModelBase):
         return collector.delete()
 
     delete.alters_data = True
-
-    async def adelete(self, using=None, keep_parents=False):
-        return await sync_to_async(self.delete)(
-            using=using,
-            keep_parents=keep_parents,
-        )
-
-    adelete.alters_data = True
 
     def _get_FIELD_display(self, field):
         value = getattr(self, field.attname)

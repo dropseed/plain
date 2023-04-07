@@ -4,7 +4,6 @@ PostgreSQL database backend for Django.
 Requires psycopg2 >= 2.8.4 or psycopg >= 3.1.8
 """
 
-import asyncio
 import threading
 import warnings
 from contextlib import contextmanager
@@ -15,7 +14,6 @@ from django.db import DatabaseError as WrappedDatabaseError
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
-from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.safestring import SafeString
 from django.utils.version import get_version_tuple
@@ -243,7 +241,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             )
         return conn_params
 
-    @async_unsafe
     def get_new_connection(self, conn_params):
         # self.isolation_level must be set:
         # - after connecting to the database in order to obtain the database's
@@ -319,7 +316,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         if (commit_role or commit_tz) and not self.get_autocommit():
             self.connection.commit()
 
-    @async_unsafe
     def create_cursor(self, name=None):
         if name:
             # In autocommit mode, the cursor will be used outside of a
@@ -343,7 +339,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def tzinfo_factory(self, offset):
         return self.timezone
 
-    @async_unsafe
     def chunked_cursor(self):
         self._named_cursor_idx += 1
         # Get the current async task
@@ -351,15 +346,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         # unreachable, but in future we'll start loosening this restriction.
         # For now, it's here so that every use of "threading" is
         # also async-compatible.
-        try:
-            current_task = asyncio.current_task()
-        except RuntimeError:
-            current_task = None
-        # Current task can be none even if the current_task call didn't error
-        if current_task:
-            task_ident = str(id(current_task))
-        else:
-            task_ident = "sync"
+        task_ident = "sync"
         # Use that and the thread ident to get a unique name
         return self._cursor(
             name="_django_curs_%d_%s_%d"

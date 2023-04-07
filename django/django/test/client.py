@@ -9,10 +9,7 @@ from importlib import import_module
 from io import BytesIO, IOBase
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
-from asgiref.sync import sync_to_async
-
 from django.conf import settings
-from django.core.handlers.asgi import ASGIRequest
 from django.core.handlers.base import BaseHandler
 from django.core.handlers.wsgi import LimitedStream, WSGIRequest
 from django.core.serializers.json import DjangoJSONEncoder
@@ -29,8 +26,6 @@ from django.utils.itercompat import is_iterable
 from django.utils.regex_helper import _lazy_re_compile
 
 __all__ = (
-    "AsyncClient",
-    "AsyncRequestFactory",
     "Client",
     "RedirectCycleError",
     "RequestFactory",
@@ -116,16 +111,6 @@ def closing_iterator_wrapper(iterable, close):
         request_finished.connect(close_old_connections)
 
 
-async def aclosing_iterator_wrapper(iterable, close):
-    try:
-        async for chunk in iterable:
-            yield chunk
-    finally:
-        request_finished.disconnect(close_old_connections)
-        close()  # will fire request_finished
-        request_finished.connect(close_old_connections)
-
-
 def conditional_content_removal(request, response):
     """
     Simulate the behavior of most web servers by removing the content of
@@ -184,71 +169,14 @@ class ClientHandler(BaseHandler):
 
         # Emulate a WSGI server by calling the close method on completion.
         if response.streaming:
-            if response.is_async:
-                response.streaming_content = aclosing_iterator_wrapper(
-                    response.streaming_content, response.close
-                )
-            else:
-                response.streaming_content = closing_iterator_wrapper(
-                    response.streaming_content, response.close
-                )
+            response.streaming_content = closing_iterator_wrapper(
+                response.streaming_content, response.close
+            )
         else:
             request_finished.disconnect(close_old_connections)
             response.close()  # will fire request_finished
             request_finished.connect(close_old_connections)
 
-        return response
-
-
-class AsyncClientHandler(BaseHandler):
-    """An async version of ClientHandler."""
-
-    def __init__(self, enforce_csrf_checks=True, *args, **kwargs):
-        self.enforce_csrf_checks = enforce_csrf_checks
-        super().__init__(*args, **kwargs)
-
-    async def __call__(self, scope):
-        # Set up middleware if needed. We couldn't do this earlier, because
-        # settings weren't available.
-        if self._middleware_chain is None:
-            self.load_middleware(is_async=True)
-        # Extract body file from the scope, if provided.
-        if "_body_file" in scope:
-            body_file = scope.pop("_body_file")
-        else:
-            body_file = FakePayload("")
-
-        request_started.disconnect(close_old_connections)
-        await request_started.asend(sender=self.__class__, scope=scope)
-        request_started.connect(close_old_connections)
-        # Wrap FakePayload body_file to allow large read() in test environment.
-        request = ASGIRequest(scope, LimitedStream(body_file, len(body_file)))
-        # Sneaky little hack so that we can easily get round
-        # CsrfViewMiddleware. This makes life easier, and is probably required
-        # for backwards compatibility with external tests against admin views.
-        request._dont_enforce_csrf_checks = not self.enforce_csrf_checks
-        # Request goes through middleware.
-        response = await self.get_response_async(request)
-        # Simulate behaviors of most web servers.
-        conditional_content_removal(request, response)
-        # Attach the originating ASGI request to the response so that it could
-        # be later retrieved.
-        response.asgi_request = request
-        # Emulate a server by calling the close method on completion.
-        if response.streaming:
-            if response.is_async:
-                response.streaming_content = aclosing_iterator_wrapper(
-                    response.streaming_content, response.close
-                )
-            else:
-                response.streaming_content = closing_iterator_wrapper(
-                    response.streaming_content, response.close
-                )
-        else:
-            request_finished.disconnect(close_old_connections)
-            # Will fire request_finished.
-            await sync_to_async(response.close, thread_sensitive=False)()
-            request_finished.connect(close_old_connections)
         return response
 
 
@@ -605,112 +533,6 @@ class RequestFactory:
             query_string = parsed[4].encode().decode("iso-8859-1")
             r["QUERY_STRING"] = query_string
         return self.request(**r)
-
-
-class AsyncRequestFactory(RequestFactory):
-    """
-    Class that lets you create mock ASGI-like Request objects for use in
-    testing. Usage:
-
-    rf = AsyncRequestFactory()
-    get_request = await rf.get('/hello/')
-    post_request = await rf.post('/submit/', {'foo': 'bar'})
-
-    Once you have a request object you can pass it to any view function,
-    including synchronous ones. The reason we have a separate class here is:
-    a) this makes ASGIRequest subclasses, and
-    b) AsyncTestClient can subclass it.
-    """
-
-    def _base_scope(self, **request):
-        """The base scope for a request."""
-        # This is a minimal valid ASGI scope, plus:
-        # - headers['cookie'] for cookie support,
-        # - 'client' often useful, see #8551.
-        scope = {
-            "asgi": {"version": "3.0"},
-            "type": "http",
-            "http_version": "1.1",
-            "client": ["127.0.0.1", 0],
-            "server": ("testserver", "80"),
-            "scheme": "http",
-            "method": "GET",
-            "headers": [],
-            **self.defaults,
-            **request,
-        }
-        scope["headers"].append(
-            (
-                b"cookie",
-                b"; ".join(
-                    sorted(
-                        ("%s=%s" % (morsel.key, morsel.coded_value)).encode("ascii")
-                        for morsel in self.cookies.values()
-                    )
-                ),
-            )
-        )
-        return scope
-
-    def request(self, **request):
-        """Construct a generic request object."""
-        # This is synchronous, which means all methods on this class are.
-        # AsyncClient, however, has an async request function, which makes all
-        # its methods async.
-        if "_body_file" in request:
-            body_file = request.pop("_body_file")
-        else:
-            body_file = FakePayload("")
-        # Wrap FakePayload body_file to allow large read() in test environment.
-        return ASGIRequest(
-            self._base_scope(**request), LimitedStream(body_file, len(body_file))
-        )
-
-    def generic(
-        self,
-        method,
-        path,
-        data="",
-        content_type="application/octet-stream",
-        secure=False,
-        *,
-        headers=None,
-        **extra,
-    ):
-        """Construct an arbitrary HTTP request."""
-        parsed = urlparse(str(path))  # path can be lazy.
-        data = force_bytes(data, settings.DEFAULT_CHARSET)
-        s = {
-            "method": method,
-            "path": self._get_path(parsed),
-            "server": ("127.0.0.1", "443" if secure else "80"),
-            "scheme": "https" if secure else "http",
-            "headers": [(b"host", b"testserver")],
-        }
-        if data:
-            s["headers"].extend(
-                [
-                    (b"content-length", str(len(data)).encode("ascii")),
-                    (b"content-type", content_type.encode("ascii")),
-                ]
-            )
-            s["_body_file"] = FakePayload(data)
-        follow = extra.pop("follow", None)
-        if follow is not None:
-            s["follow"] = follow
-        if query_string := extra.pop("QUERY_STRING", None):
-            s["query_string"] = query_string
-        if headers:
-            extra.update(HttpHeaders.to_asgi_names(headers))
-        s["headers"] += [
-            (key.lower().encode("ascii"), value.encode("latin1"))
-            for key, value in extra.items()
-        ]
-        # If QUERY_STRING is absent or empty, we want to extract it from the
-        # URL.
-        if not s.get("query_string"):
-            s["query_string"] = parsed[4]
-        return self.request(**s)
 
 
 class ClientMixin:
@@ -1190,78 +1012,4 @@ class Client(ClientMixin, RequestFactory):
                 # 20 is the value of "network.http.redirection-limit" from Firefox.
                 raise RedirectCycleError("Too many redirects.", last_response=response)
 
-        return response
-
-
-class AsyncClient(ClientMixin, AsyncRequestFactory):
-    """
-    An async version of Client that creates ASGIRequests and calls through an
-    async request path.
-
-    Does not currently support "follow" on its methods.
-    """
-
-    def __init__(
-        self,
-        enforce_csrf_checks=False,
-        raise_request_exception=True,
-        *,
-        headers=None,
-        **defaults,
-    ):
-        super().__init__(headers=headers, **defaults)
-        self.handler = AsyncClientHandler(enforce_csrf_checks)
-        self.raise_request_exception = raise_request_exception
-        self.exc_info = None
-        self.extra = None
-        self.headers = None
-
-    async def request(self, **request):
-        """
-        Make a generic request. Compose the scope dictionary and pass to the
-        handler, return the result of the handler. Assume defaults for the
-        query environment, which can be overridden using the arguments to the
-        request.
-        """
-        if "follow" in request:
-            raise NotImplementedError(
-                "AsyncClient request methods do not accept the follow parameter."
-            )
-        scope = self._base_scope(**request)
-        # Curry a data dictionary into an instance of the template renderer
-        # callback function.
-        data = {}
-        on_template_render = partial(store_rendered_templates, data)
-        signal_uid = "template-render-%s" % id(request)
-        signals.template_rendered.connect(on_template_render, dispatch_uid=signal_uid)
-        # Capture exceptions created by the handler.
-        exception_uid = "request-exception-%s" % id(request)
-        got_request_exception.connect(self.store_exc_info, dispatch_uid=exception_uid)
-        try:
-            response = await self.handler(scope)
-        finally:
-            signals.template_rendered.disconnect(dispatch_uid=signal_uid)
-            got_request_exception.disconnect(dispatch_uid=exception_uid)
-        # Check for signaled exceptions.
-        self.check_exception(response)
-        # Save the client and request that stimulated the response.
-        response.client = self
-        response.request = request
-        # Add any rendered template detail to the response.
-        response.templates = data.get("templates", [])
-        response.context = data.get("context")
-        response.json = partial(self._parse_json, response)
-        # Attach the ResolverMatch instance to the response.
-        urlconf = getattr(response.asgi_request, "urlconf", None)
-        response.resolver_match = SimpleLazyObject(
-            lambda: resolve(request["path"], urlconf=urlconf),
-        )
-        # Flatten a single context. Not really necessary anymore thanks to the
-        # __getattr__ flattening in ContextList, but has some edge case
-        # backwards compatibility implications.
-        if response.context and len(response.context) == 1:
-            response.context = response.context[0]
-        # Update persistent cookie data.
-        if response.cookies:
-            self.cookies.update(response.cookies)
         return response
