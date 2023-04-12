@@ -15,7 +15,6 @@ from .conf import include, path, re_path
 from .converters import register_converter
 from .exceptions import NoReverseMatch, Resolver404
 from .resolvers import (
-    LocalePrefixPattern,
     ResolverMatch,
     URLPattern,
     URLResolver,
@@ -25,7 +24,6 @@ from .resolvers import (
 from .utils import get_callable, get_mod_func
 
 __all__ = [
-    "LocalePrefixPattern",
     "NoReverseMatch",
     "URLPattern",
     "URLResolver",

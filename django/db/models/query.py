@@ -7,8 +7,6 @@ import operator
 import warnings
 from itertools import chain, islice
 
-from asgiref.sync import sync_to_async
-
 import django
 from django.conf import settings
 from django.core import exceptions
@@ -49,33 +47,6 @@ class BaseIterable:
         self.queryset = queryset
         self.chunked_fetch = chunked_fetch
         self.chunk_size = chunk_size
-
-    async def _async_generator(self):
-        # Generators don't actually start running until the first time you call
-        # next() on them, so make the generator object in the async thread and
-        # then repeatedly dispatch to it in a sync thread.
-        sync_generator = self.__iter__()
-
-        def next_slice(gen):
-            return list(islice(gen, self.chunk_size))
-
-        while True:
-            chunk = await sync_to_async(next_slice)(sync_generator)
-            for item in chunk:
-                yield item
-            if len(chunk) < self.chunk_size:
-                break
-
-    # __aiter__() is a *synchronous* method that has to then return an
-    # *asynchronous* iterator/generator. Thus, nest an async generator inside
-    # it.
-    # This is a generic iterable converter for now, and is going to suffer a
-    # performance penalty on large sets of items due to the cost of crossing
-    # over the sync barrier for each chunk. Custom __aiter__() methods should
-    # be added to each Iterable subclass, but that needs some work in the
-    # Compiler first.
-    def __aiter__(self):
-        return self._async_generator()
 
 
 class ModelIterable(BaseIterable):
@@ -397,16 +368,6 @@ class QuerySet(AltersData):
         self._fetch_all()
         return iter(self._result_cache)
 
-    def __aiter__(self):
-        # Remember, __aiter__ itself is synchronous, it's the thing it returns
-        # that is async!
-        async def generator():
-            await sync_to_async(self._fetch_all)()
-            for item in self._result_cache:
-                yield item
-
-        return generator()
-
     def __bool__(self):
         self._fetch_all()
         return bool(self._result_cache)
@@ -539,25 +500,6 @@ class QuerySet(AltersData):
         )
         return self._iterator(use_chunked_fetch, chunk_size)
 
-    async def aiterator(self, chunk_size=2000):
-        """
-        An asynchronous iterator over the results from applying this QuerySet
-        to the database.
-        """
-        if self._prefetch_related_lookups:
-            raise NotSupportedError(
-                "Using QuerySet.aiterator() after prefetch_related() is not supported."
-            )
-        if chunk_size <= 0:
-            raise ValueError("Chunk size must be strictly positive.")
-        use_chunked_fetch = not connections[self.db].settings_dict.get(
-            "DISABLE_SERVER_SIDE_CURSORS"
-        )
-        async for item in self._iterable_class(
-            self, chunked_fetch=use_chunked_fetch, chunk_size=chunk_size
-        ):
-            yield item
-
     def aggregate(self, *args, **kwargs):
         """
         Return a dictionary containing the calculations (aggregation)
@@ -583,9 +525,6 @@ class QuerySet(AltersData):
 
         return self.query.chain().get_aggregation(self.db, kwargs)
 
-    async def aaggregate(self, *args, **kwargs):
-        return await sync_to_async(self.aggregate)(*args, **kwargs)
-
     def count(self):
         """
         Perform a SELECT COUNT() and return the number of records as an
@@ -598,9 +537,6 @@ class QuerySet(AltersData):
             return len(self._result_cache)
 
         return self.query.get_count(using=self.db)
-
-    async def acount(self):
-        return await sync_to_async(self.count)()
 
     def get(self, *args, **kwargs):
         """
@@ -637,9 +573,6 @@ class QuerySet(AltersData):
             )
         )
 
-    async def aget(self, *args, **kwargs):
-        return await sync_to_async(self.get)(*args, **kwargs)
-
     def create(self, **kwargs):
         """
         Create a new object with the given kwargs, saving it to the database
@@ -649,9 +582,6 @@ class QuerySet(AltersData):
         self._for_write = True
         obj.save(force_insert=True, using=self.db)
         return obj
-
-    async def acreate(self, **kwargs):
-        return await sync_to_async(self.create)(**kwargs)
 
     def _prepare_for_bulk_create(self, objs):
         for obj in objs:
@@ -814,24 +744,6 @@ class QuerySet(AltersData):
 
         return objs
 
-    async def abulk_create(
-        self,
-        objs,
-        batch_size=None,
-        ignore_conflicts=False,
-        update_conflicts=False,
-        update_fields=None,
-        unique_fields=None,
-    ):
-        return await sync_to_async(self.bulk_create)(
-            objs=objs,
-            batch_size=batch_size,
-            ignore_conflicts=ignore_conflicts,
-            update_conflicts=update_conflicts,
-            update_fields=update_fields,
-            unique_fields=unique_fields,
-        )
-
     def bulk_update(self, objs, fields, batch_size=None):
         """
         Update the given fields in each of the given objects in the database.
@@ -886,15 +798,6 @@ class QuerySet(AltersData):
 
     bulk_update.alters_data = True
 
-    async def abulk_update(self, objs, fields, batch_size=None):
-        return await sync_to_async(self.bulk_update)(
-            objs=objs,
-            fields=fields,
-            batch_size=batch_size,
-        )
-
-    abulk_update.alters_data = True
-
     def get_or_create(self, defaults=None, **kwargs):
         """
         Look up an object with the given kwargs, creating one if necessary.
@@ -919,12 +822,6 @@ class QuerySet(AltersData):
                 except self.model.DoesNotExist:
                     pass
                 raise
-
-    async def aget_or_create(self, defaults=None, **kwargs):
-        return await sync_to_async(self.get_or_create)(
-            defaults=defaults,
-            **kwargs,
-        )
 
     def update_or_create(self, defaults=None, create_defaults=None, **kwargs):
         """
@@ -970,13 +867,6 @@ class QuerySet(AltersData):
             else:
                 obj.save(using=self.db)
         return obj, False
-
-    async def aupdate_or_create(self, defaults=None, create_defaults=None, **kwargs):
-        return await sync_to_async(self.update_or_create)(
-            defaults=defaults,
-            create_defaults=create_defaults,
-            **kwargs,
-        )
 
     def _extract_model_params(self, defaults, **kwargs):
         """
@@ -1032,9 +922,6 @@ class QuerySet(AltersData):
             raise TypeError("Cannot change a query once a slice has been taken.")
         return self._earliest(*fields)
 
-    async def aearliest(self, *fields):
-        return await sync_to_async(self.earliest)(*fields)
-
     def latest(self, *fields):
         """
         Return the latest object according to fields (if given) or by the
@@ -1043,9 +930,6 @@ class QuerySet(AltersData):
         if self.query.is_sliced:
             raise TypeError("Cannot change a query once a slice has been taken.")
         return self.reverse()._earliest(*fields)
-
-    async def alatest(self, *fields):
-        return await sync_to_async(self.latest)(*fields)
 
     def first(self):
         """Return the first object of a query or None if no match is found."""
@@ -1057,9 +941,6 @@ class QuerySet(AltersData):
         for obj in queryset[:1]:
             return obj
 
-    async def afirst(self):
-        return await sync_to_async(self.first)()
-
     def last(self):
         """Return the last object of a query or None if no match is found."""
         if self.ordered:
@@ -1069,9 +950,6 @@ class QuerySet(AltersData):
             queryset = self.order_by("-pk")
         for obj in queryset[:1]:
             return obj
-
-    async def alast(self):
-        return await sync_to_async(self.last)()
 
     def in_bulk(self, id_list=None, *, field_name="pk"):
         """
@@ -1115,12 +993,6 @@ class QuerySet(AltersData):
             qs = self._chain()
         return {getattr(obj, field_name): obj for obj in qs}
 
-    async def ain_bulk(self, id_list=None, *, field_name="pk"):
-        return await sync_to_async(self.in_bulk)(
-            id_list=id_list,
-            field_name=field_name,
-        )
-
     def delete(self):
         """Delete the records in the current QuerySet."""
         self._not_support_combined_queries("delete")
@@ -1153,12 +1025,6 @@ class QuerySet(AltersData):
 
     delete.alters_data = True
     delete.queryset_only = True
-
-    async def adelete(self):
-        return await sync_to_async(self.delete)()
-
-    adelete.alters_data = True
-    adelete.queryset_only = True
 
     def _raw_delete(self, using):
         """
@@ -1216,11 +1082,6 @@ class QuerySet(AltersData):
 
     update.alters_data = True
 
-    async def aupdate(self, **kwargs):
-        return await sync_to_async(self.update)(**kwargs)
-
-    aupdate.alters_data = True
-
     def _update(self, values):
         """
         A version of update() that accepts field objects instead of field names.
@@ -1248,9 +1109,6 @@ class QuerySet(AltersData):
             return self.query.has_results(using=self.db)
         return bool(self._result_cache)
 
-    async def aexists(self):
-        return await sync_to_async(self.exists)()
-
     def contains(self, obj):
         """
         Return True if the QuerySet contains the provided obj,
@@ -1272,9 +1130,6 @@ class QuerySet(AltersData):
             return obj in self._result_cache
         return self.filter(pk=obj.pk).exists()
 
-    async def acontains(self, obj):
-        return await sync_to_async(self.contains)(obj=obj)
-
     def _prefetch_related_objects(self):
         # This method can only be called once the result cache has been filled.
         prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
@@ -1286,9 +1141,6 @@ class QuerySet(AltersData):
         returns the results.
         """
         return self.query.explain(using=self.db, format=format, **options)
-
-    async def aexplain(self, *, format=None, **options):
-        return await sync_to_async(self.explain)(format=format, **options)
 
     ##################################################
     # PUBLIC METHODS THAT RETURN A QUERYSET SUBCLASS #
@@ -2081,16 +1933,6 @@ class RawQuerySet:
     def __iter__(self):
         self._fetch_all()
         return iter(self._result_cache)
-
-    def __aiter__(self):
-        # Remember, __aiter__ itself is synchronous, it's the thing it returns
-        # that is async!
-        async def generator():
-            await sync_to_async(self._fetch_all)()
-            for item in self._result_cache:
-                yield item
-
-        return generator()
 
     def iterator(self):
         yield from RawModelIterable(self)

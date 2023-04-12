@@ -2,8 +2,6 @@ import functools
 import itertools
 from collections import defaultdict
 
-from asgiref.sync import sync_to_async
-
 from django.contrib.contenttypes.models import ContentType
 from django.core import checks
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -689,11 +687,6 @@ def create_generic_related_manager(superclass, rel):
 
         add.alters_data = True
 
-        async def aadd(self, *objs, bulk=True):
-            return await sync_to_async(self.add)(*objs, bulk=bulk)
-
-        aadd.alters_data = True
-
         def remove(self, *objs, bulk=True):
             if not objs:
                 return
@@ -701,20 +694,10 @@ def create_generic_related_manager(superclass, rel):
 
         remove.alters_data = True
 
-        async def aremove(self, *objs, bulk=True):
-            return await sync_to_async(self.remove)(*objs, bulk=bulk)
-
-        aremove.alters_data = True
-
         def clear(self, *, bulk=True):
             self._clear(self, bulk)
 
         clear.alters_data = True
-
-        async def aclear(self, *, bulk=True):
-            return await sync_to_async(self.clear)(bulk=bulk)
-
-        aclear.alters_data = True
 
         def _clear(self, queryset, bulk):
             self._remove_prefetched_objects()
@@ -755,11 +738,6 @@ def create_generic_related_manager(superclass, rel):
 
         set.alters_data = True
 
-        async def aset(self, objs, *, bulk=True, clear=False):
-            return await sync_to_async(self.set)(objs, bulk=bulk, clear=clear)
-
-        aset.alters_data = True
-
         def create(self, **kwargs):
             self._remove_prefetched_objects()
             kwargs[self.content_type_field_name] = self.content_type
@@ -769,11 +747,6 @@ def create_generic_related_manager(superclass, rel):
 
         create.alters_data = True
 
-        async def acreate(self, **kwargs):
-            return await sync_to_async(self.create)(**kwargs)
-
-        acreate.alters_data = True
-
         def get_or_create(self, **kwargs):
             kwargs[self.content_type_field_name] = self.content_type
             kwargs[self.object_id_field_name] = self.pk_val
@@ -782,11 +755,6 @@ def create_generic_related_manager(superclass, rel):
 
         get_or_create.alters_data = True
 
-        async def aget_or_create(self, **kwargs):
-            return await sync_to_async(self.get_or_create)(**kwargs)
-
-        aget_or_create.alters_data = True
-
         def update_or_create(self, **kwargs):
             kwargs[self.content_type_field_name] = self.content_type
             kwargs[self.object_id_field_name] = self.pk_val
@@ -794,10 +762,5 @@ def create_generic_related_manager(superclass, rel):
             return super().using(db).update_or_create(**kwargs)
 
         update_or_create.alters_data = True
-
-        async def aupdate_or_create(self, **kwargs):
-            return await sync_to_async(self.update_or_create)(**kwargs)
-
-        aupdate_or_create.alters_data = True
 
     return GenericRelatedObjectManager

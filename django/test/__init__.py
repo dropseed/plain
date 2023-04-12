@@ -1,6 +1,6 @@
 """Django Unit Test framework."""
 
-from django.test.client import AsyncClient, AsyncRequestFactory, Client, RequestFactory
+from django.test.client import Client, RequestFactory
 from django.test.testcases import (
     LiveServerTestCase,
     SimpleTestCase,
@@ -19,8 +19,6 @@ from django.test.utils import (
 )
 
 __all__ = [
-    "AsyncClient",
-    "AsyncRequestFactory",
     "Client",
     "RequestFactory",
     "TestCase",

@@ -31,24 +31,10 @@ class GZipMiddleware(MiddlewareMixin):
             return response
 
         if response.streaming:
-            if response.is_async:
-                # pull to lexical scope to capture fixed reference in case
-                # streaming_content is set again later.
-                orignal_iterator = response.streaming_content
-
-                async def gzip_wrapper():
-                    async for chunk in orignal_iterator:
-                        yield compress_string(
-                            chunk,
-                            max_random_bytes=self.max_random_bytes,
-                        )
-
-                response.streaming_content = gzip_wrapper()
-            else:
-                response.streaming_content = compress_sequence(
-                    response.streaming_content,
-                    max_random_bytes=self.max_random_bytes,
-                )
+            response.streaming_content = compress_sequence(
+                response.streaming_content,
+                max_random_bytes=self.max_random_bytes,
+            )
             # Delete the `Content-Length` header for streaming content, because
             # we won't know the compressed size until we stream it.
             del response.headers["Content-Length"]

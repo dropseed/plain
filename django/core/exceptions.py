@@ -246,9 +246,3 @@ class FullResultSet(Exception):
     """A database query predicate is matches everything."""
 
     pass
-
-
-class SynchronousOnlyOperation(Exception):
-    """The user tried to call a sync-only function from an async context."""
-
-    pass

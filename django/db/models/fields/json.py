@@ -249,14 +249,6 @@ class HasKeyLookup(PostgresOperatorLookup):
             compiler, connection, template="JSON_CONTAINS_PATH(%s, 'one', %%s)"
         )
 
-    def as_oracle(self, compiler, connection):
-        sql, params = self.as_sql(
-            compiler, connection, template="JSON_EXISTS(%s, '%%s')"
-        )
-        # Add paths directly into SQL because path expressions cannot be passed
-        # as bind variables on Oracle.
-        return sql % tuple(params), []
-
     def as_postgresql(self, compiler, connection):
         if isinstance(self.rhs, KeyTransform):
             *_, rhs_key_transforms = self.rhs.preprocess_lhs(compiler, connection)
@@ -360,23 +352,12 @@ class KeyTransform(Transform):
             key_transforms.insert(0, previous.key_name)
             previous = previous.lhs
         lhs, params = compiler.compile(previous)
-        if connection.vendor == "oracle":
-            # Escape string-formatting.
-            key_transforms = [key.replace("%", "%%") for key in key_transforms]
         return lhs, params, key_transforms
 
     def as_mysql(self, compiler, connection):
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
         json_path = compile_json_path(key_transforms)
         return "JSON_EXTRACT(%s, %%s)" % lhs, tuple(params) + (json_path,)
-
-    def as_oracle(self, compiler, connection):
-        lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
-        json_path = compile_json_path(key_transforms)
-        return (
-            "COALESCE(JSON_QUERY(%s, '%s'), JSON_VALUE(%s, '%s'))"
-            % ((lhs, json_path) * 2)
-        ), tuple(params) * 2
 
     def as_postgresql(self, compiler, connection):
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
@@ -453,17 +434,6 @@ class KeyTransformTextLookupMixin:
 
 class KeyTransformIsNull(lookups.IsNull):
     # key__isnull=False is the same as has_key='key'
-    def as_oracle(self, compiler, connection):
-        sql, params = HasKeyOrArrayIndex(
-            self.lhs.lhs,
-            self.lhs.key_name,
-        ).as_oracle(compiler, connection)
-        if not self.rhs:
-            return sql, params
-        # Column doesn't have a key or IS NULL.
-        lhs, lhs_params, _ = self.lhs.preprocess_lhs(compiler, connection)
-        return "(NOT %s OR %s IS NULL)" % (sql, lhs), tuple(params) + tuple(lhs_params)
-
     def as_sqlite(self, compiler, connection):
         template = "JSON_TYPE(%s, %%s) IS NULL"
         if not self.rhs:
@@ -487,14 +457,7 @@ class KeyTransformIn(lookups.In):
             not hasattr(param, "as_sql")
             and not connection.features.has_native_json_field
         ):
-            if connection.vendor == "oracle":
-                value = json.loads(param)
-                sql = "%s(JSON_OBJECT('value' VALUE %%s FORMAT JSON), '$.value')"
-                if isinstance(value, (list, dict)):
-                    sql %= "JSON_QUERY"
-                else:
-                    sql %= "JSON_VALUE"
-            elif connection.vendor == "mysql" or (
+            if connection.vendor == "mysql" or (
                 connection.vendor == "sqlite"
                 and params[0] not in connection.ops.jsonfield_datatype_values
             ):
@@ -509,17 +472,7 @@ class KeyTransformExact(JSONExact):
         if isinstance(self.rhs, KeyTransform):
             return super(lookups.Exact, self).process_rhs(compiler, connection)
         rhs, rhs_params = super().process_rhs(compiler, connection)
-        if connection.vendor == "oracle":
-            func = []
-            sql = "%s(JSON_OBJECT('value' VALUE %%s FORMAT JSON), '$.value')"
-            for value in rhs_params:
-                value = json.loads(value)
-                if isinstance(value, (list, dict)):
-                    func.append(sql % "JSON_QUERY")
-                else:
-                    func.append(sql % "JSON_VALUE")
-            rhs %= tuple(func)
-        elif connection.vendor == "sqlite":
+        if connection.vendor == "sqlite":
             func = []
             for value in rhs_params:
                 if value in connection.ops.jsonfield_datatype_values:
@@ -528,20 +481,6 @@ class KeyTransformExact(JSONExact):
                     func.append("JSON_EXTRACT(%s, '$')")
             rhs %= tuple(func)
         return rhs, rhs_params
-
-    def as_oracle(self, compiler, connection):
-        rhs, rhs_params = super().process_rhs(compiler, connection)
-        if rhs_params == ["null"]:
-            # Field has key and it's NULL.
-            has_key_expr = HasKeyOrArrayIndex(self.lhs.lhs, self.lhs.key_name)
-            has_key_sql, has_key_params = has_key_expr.as_oracle(compiler, connection)
-            is_null_expr = self.lhs.get_lookup("isnull")(self.lhs, True)
-            is_null_sql, is_null_params = is_null_expr.as_sql(compiler, connection)
-            return (
-                "%s AND %s" % (has_key_sql, is_null_sql),
-                tuple(has_key_params) + tuple(is_null_params),
-            )
-        return super().as_sql(compiler, connection)
 
 
 class KeyTransformIExact(

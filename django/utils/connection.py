@@ -1,4 +1,4 @@
-from asgiref.local import Local
+from threading import local
 
 from django.conf import settings as django_settings
 from django.utils.functional import cached_property
@@ -34,11 +34,10 @@ class ConnectionDoesNotExist(Exception):
 class BaseConnectionHandler:
     settings_name = None
     exception_class = ConnectionDoesNotExist
-    thread_critical = False
 
     def __init__(self, settings=None):
         self._settings = settings
-        self._connections = Local(self.thread_critical)
+        self._connections = local()
 
     @cached_property
     def settings(self):

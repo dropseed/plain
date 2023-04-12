@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from asgiref.local import Local
+from threading import local
 
 from django.apps import apps
 from django.utils.autoreload import is_django_module
@@ -32,5 +32,5 @@ def translation_file_changed(sender, file_path, **kwargs):
         gettext._translations = {}
         trans_real._translations = {}
         trans_real._default = None
-        trans_real._active = Local()
+        trans_real._active = local()
         return True

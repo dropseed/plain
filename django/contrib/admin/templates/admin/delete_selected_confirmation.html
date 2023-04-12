@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n l10n admin_urls static %}
+{% load l10n admin_urls static %}
 
 {% block extrahead %}
     {{ block.super }}
@@ -11,24 +11,24 @@
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+<a href="{% url 'admin:index' %}">Home</a>
 &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
 &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
-&rsaquo; {% translate 'Delete multiple objects' %}
+&rsaquo; Delete multiple objects
 </div>
 {% endblock %}
 
 {% block content %}
 {% if perms_lacking %}
-    <p>{% blocktranslate %}Deleting the selected {{ objects_name }} would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:{% endblocktranslate %}</p>
+    <p>Deleting the selected {{ objects_name }} would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:</p>
     <ul>{{ perms_lacking|unordered_list }}</ul>
 {% elif protected %}
-    <p>{% blocktranslate %}Deleting the selected {{ objects_name }} would require deleting the following protected related objects:{% endblocktranslate %}</p>
+    <p>Deleting the selected {{ objects_name }} would require deleting the following protected related objects:</p>
     <ul>{{ protected|unordered_list }}</ul>
 {% else %}
-    <p>{% blocktranslate %}Are you sure you want to delete the selected {{ objects_name }}? All of the following objects and their related items will be deleted:{% endblocktranslate %}</p>
+    <p>Are you sure you want to delete the selected {{ objects_name }}? All of the following objects and their related items will be deleted:</p>
     {% include "admin/includes/object_delete_summary.html" %}
-    <h2>{% translate "Objects" %}</h2>
+    <h2>Objects</h2>
     {% for deletable_object in deletable_objects %}
         <ul>{{ deletable_object|unordered_list }}</ul>
     {% endfor %}
@@ -39,8 +39,8 @@
     {% endfor %}
     <input type="hidden" name="action" value="delete_selected">
     <input type="hidden" name="post" value="yes">
-    <input type="submit" value="{% translate 'Yes, I’m sure' %}">
-    <a href="#" class="button cancel-link">{% translate "No, take me back" %}</a>
+    <input type="submit" value="Yes, I’m sure">
+    <a href="#" class="button cancel-link">No, take me back</a>
     </div>
     </form>
 {% endif %}

@@ -13,8 +13,6 @@ from types import SimpleNamespace
 from unittest import TestCase, skipIf, skipUnless
 from xml.dom.minidom import Node, parseString
 
-from asgiref.sync import iscoroutinefunction
-
 from django.apps import apps
 from django.apps.registry import Apps
 from django.conf import UserSettingsHolder, settings
@@ -38,7 +36,6 @@ __all__ = (
     "Approximate",
     "ContextList",
     "isolate_lru_cache",
-    "get_runner",
     "CaptureQueriesContext",
     "ignore_warnings",
     "isolate_apps",
@@ -366,18 +363,6 @@ def teardown_databases(old_config, verbosity, parallel=0, keepdb=False):
             connection.creation.destroy_test_db(old_name, verbosity, keepdb)
 
 
-def get_runner(settings, test_runner_class=None):
-    test_runner_class = test_runner_class or settings.TEST_RUNNER
-    test_path = test_runner_class.split(".")
-    # Allow for relative paths
-    if len(test_path) > 1:
-        test_module_name = ".".join(test_path[:-1])
-    else:
-        test_module_name = "."
-    test_module = __import__(test_module_name, {}, {}, test_path[-1])
-    return getattr(test_module, test_path[-1])
-
-
 class TestContextDecorator:
     """
     A base class that can either be used as a context manager during tests
@@ -423,24 +408,13 @@ class TestContextDecorator:
         raise TypeError("Can only decorate subclasses of unittest.TestCase")
 
     def decorate_callable(self, func):
-        if iscoroutinefunction(func):
-            # If the inner function is an async function, we must execute async
-            # as well so that the `with` statement executes at the right time.
-            @wraps(func)
-            async def inner(*args, **kwargs):
-                with self as context:
-                    if self.kwarg_name:
-                        kwargs[self.kwarg_name] = context
-                    return await func(*args, **kwargs)
 
-        else:
-
-            @wraps(func)
-            def inner(*args, **kwargs):
-                with self as context:
-                    if self.kwarg_name:
-                        kwargs[self.kwarg_name] = context
-                    return func(*args, **kwargs)
+        @wraps(func)
+        def inner(*args, **kwargs):
+            with self as context:
+                if self.kwarg_name:
+                    kwargs[self.kwarg_name] = context
+                return func(*args, **kwargs)
 
         return inner
 
@@ -524,17 +498,6 @@ class override_settings(TestContextDecorator):
                 **test_func._overridden_settings,
                 **self.options,
             }
-
-    def decorate_class(self, cls):
-        from django.test import SimpleTestCase
-
-        if not issubclass(cls, SimpleTestCase):
-            raise ValueError(
-                "Only subclasses of Django SimpleTestCase can be decorated "
-                "with override_settings"
-            )
-        self.save_options(cls)
-        return cls
 
 
 class modify_settings(override_settings):

@@ -10,7 +10,6 @@ class Tags:
     """
 
     admin = "admin"
-    async_support = "async_support"
     caches = "caches"
     compatibility = "compatibility"
     database = "database"

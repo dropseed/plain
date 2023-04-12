@@ -77,7 +77,7 @@ def directory_index(path, fullpath):
         )
     except TemplateDoesNotExist:
         with builtin_template_path("directory_index.html").open(encoding="utf-8") as fh:
-            t = Engine(libraries={"i18n": "django.templatetags.i18n"}).from_string(
+            t = Engine(libraries={}).from_string(
                 fh.read()
             )
         c = Context()

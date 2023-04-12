@@ -7,7 +7,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends import utils as backend_utils
 from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.regex_helper import _lazy_re_compile
 
@@ -242,7 +241,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         kwargs.update(options)
         return kwargs
 
-    @async_unsafe
     def get_new_connection(self, conn_params):
         connection = Database.connect(**conn_params)
         # bytes encoder in mysqlclient doesn't work and was added only to
@@ -273,7 +271,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             with self.cursor() as cursor:
                 cursor.execute("; ".join(assignments))
 
-    @async_unsafe
     def create_cursor(self, name=None):
         cursor = self.connection.cursor()
         return CursorWrapper(cursor)

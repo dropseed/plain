@@ -5,14 +5,10 @@ import datetime
 from functools import wraps
 
 from django.http import HttpResponseNotAllowed
-from django.middleware.http import ConditionalGetMiddleware
 from django.utils import timezone
 from django.utils.cache import get_conditional_response
-from django.utils.decorators import decorator_from_middleware
 from django.utils.http import http_date, quote_etag
 from django.utils.log import log_response
-
-conditional_page = decorator_from_middleware(ConditionalGetMiddleware)
 
 
 def require_http_methods(request_method_list):

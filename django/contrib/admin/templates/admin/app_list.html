@@ -1,11 +1,10 @@
-{% load i18n %}
 
 {% if app_list %}
   {% for app in app_list %}
     <div class="app-{{ app.app_label }} module{% if app.app_url in request.path|urlencode %} current-app{% endif %}">
       <table>
         <caption>
-          <a href="{{ app.app_url }}" class="section" title="{% blocktranslate with name=app.name %}Models in the {{ name }} application{% endblocktranslate %}">{{ app.name }}</a>
+          <a href="{{ app.app_url }}" class="section" title="Models in the {{ app.name }} application">{{ app.name }}</a>
         </caption>
         {% for model in app.models %}
           <tr class="model-{{ model.object_name|lower }}{% if model.admin_url in request.path|urlencode %} current-model{% endif %}">
@@ -16,16 +15,16 @@
             {% endif %}
 
             {% if model.add_url %}
-              <td><a href="{{ model.add_url }}" class="addlink">{% translate 'Add' %}</a></td>
+              <td><a href="{{ model.add_url }}" class="addlink">Add</a></td>
             {% else %}
               <td></td>
             {% endif %}
 
             {% if model.admin_url and show_changelinks %}
               {% if model.view_only %}
-                <td><a href="{{ model.admin_url }}" class="viewlink">{% translate 'View' %}</a></td>
+                <td><a href="{{ model.admin_url }}" class="viewlink">View</a></td>
               {% else %}
-                <td><a href="{{ model.admin_url }}" class="changelink">{% translate 'Change' %}</a></td>
+                <td><a href="{{ model.admin_url }}" class="changelink">Change</a></td>
               {% endif %}
             {% elif show_changelinks %}
               <td></td>
@@ -36,5 +35,5 @@
     </div>
   {% endfor %}
 {% else %}
-  <p>{% translate 'You don’t have permission to view or edit anything.' %}</p>
+  <p>You don’t have permission to view or edit anything.</p>
 {% endif %}

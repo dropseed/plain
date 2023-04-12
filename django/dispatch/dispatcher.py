@@ -1,9 +1,6 @@
-import asyncio
 import logging
 import threading
 import weakref
-
-from asgiref.sync import async_to_sync, iscoroutinefunction, sync_to_async
 
 from django.utils.inspect import func_accepts_kwargs
 
@@ -98,8 +95,6 @@ class Signal:
         else:
             lookup_key = (_make_id(receiver), _make_id(sender))
 
-        is_async = iscoroutinefunction(receiver)
-
         if weak:
             ref = weakref.ref
             receiver_object = receiver
@@ -112,8 +107,8 @@ class Signal:
 
         with self.lock:
             self._clear_dead_receivers()
-            if not any(r_key == lookup_key for r_key, _, _ in self.receivers):
-                self.receivers.append((lookup_key, receiver, is_async))
+            if not any(r_key == lookup_key for r_key, _, in self.receivers):
+                self.receivers.append((lookup_key, receiver))
             self.sender_receivers_cache.clear()
 
     def disconnect(self, receiver=None, sender=None, dispatch_uid=None):
@@ -153,8 +148,8 @@ class Signal:
         return disconnected
 
     def has_listeners(self, sender=None):
-        sync_receivers, async_receivers = self._live_receivers(sender)
-        return bool(sync_receivers) or bool(async_receivers)
+        sync_receivers = self._live_receivers(sender)
+        return bool(sync_receivers)
 
     def send(self, sender, **named):
         """
@@ -184,78 +179,10 @@ class Signal:
         ):
             return []
         responses = []
-        sync_receivers, async_receivers = self._live_receivers(sender)
+        sync_receivers = self._live_receivers(sender)
         for receiver in sync_receivers:
             response = receiver(signal=self, sender=sender, **named)
             responses.append((receiver, response))
-        if async_receivers:
-
-            async def asend():
-                async_responses = await asyncio.gather(
-                    *(
-                        receiver(signal=self, sender=sender, **named)
-                        for receiver in async_receivers
-                    )
-                )
-                return zip(async_receivers, async_responses)
-
-            responses.extend(async_to_sync(asend)())
-        return responses
-
-    async def asend(self, sender, **named):
-        """
-        Send signal from sender to all connected receivers in async mode.
-
-        All sync receivers will be wrapped by sync_to_async()
-        If any receiver raises an error, the error propagates back through
-        send, terminating the dispatch loop. So it's possible that all
-        receivers won't be called if an error is raised.
-
-        If any receivers are synchronous, they are grouped and called behind a
-        sync_to_async() adaption before executing any asynchronous receivers.
-
-        If any receivers are asynchronous, they are grouped and executed
-        concurrently with asyncio.gather().
-
-        Arguments:
-
-            sender
-                The sender of the signal. Either a specific object or None.
-
-            named
-                Named arguments which will be passed to receivers.
-
-        Return a list of tuple pairs [(receiver, response), ...].
-        """
-        if (
-            not self.receivers
-            or self.sender_receivers_cache.get(sender) is NO_RECEIVERS
-        ):
-            return []
-        sync_receivers, async_receivers = self._live_receivers(sender)
-        if sync_receivers:
-
-            @sync_to_async
-            def sync_send():
-                responses = []
-                for receiver in sync_receivers:
-                    response = receiver(signal=self, sender=sender, **named)
-                    responses.append((receiver, response))
-                return responses
-
-        else:
-            sync_send = list
-
-        responses, async_responses = await asyncio.gather(
-            sync_send(),
-            asyncio.gather(
-                *(
-                    receiver(signal=self, sender=sender, **named)
-                    for receiver in async_receivers
-                )
-            ),
-        )
-        responses.extend(zip(async_receivers, async_responses))
         return responses
 
     def _log_robust_failure(self, receiver, err):
@@ -298,7 +225,7 @@ class Signal:
         # Call each receiver with whatever arguments it can accept.
         # Return a list of tuple pairs [(receiver, response), ... ].
         responses = []
-        sync_receivers, async_receivers = self._live_receivers(sender)
+        sync_receivers = self._live_receivers(sender)
         for receiver in sync_receivers:
             try:
                 response = receiver(signal=self, sender=sender, **named)
@@ -307,96 +234,6 @@ class Signal:
                 responses.append((receiver, err))
             else:
                 responses.append((receiver, response))
-        if async_receivers:
-
-            async def asend_and_wrap_exception(receiver):
-                try:
-                    response = await receiver(signal=self, sender=sender, **named)
-                except Exception as err:
-                    self._log_robust_failure(receiver, err)
-                    return err
-                return response
-
-            async def asend():
-                async_responses = await asyncio.gather(
-                    *(
-                        asend_and_wrap_exception(receiver)
-                        for receiver in async_receivers
-                    )
-                )
-                return zip(async_receivers, async_responses)
-
-            responses.extend(async_to_sync(asend)())
-        return responses
-
-    async def asend_robust(self, sender, **named):
-        """
-        Send signal from sender to all connected receivers catching errors.
-
-        If any receivers are synchronous, they are grouped and called behind a
-        sync_to_async() adaption before executing any asynchronous receivers.
-
-        If any receivers are asynchronous, they are grouped and executed
-        concurrently with asyncio.gather.
-
-        Arguments:
-
-            sender
-                The sender of the signal. Can be any Python object (normally one
-                registered with a connect if you actually want something to
-                occur).
-
-            named
-                Named arguments which will be passed to receivers.
-
-        Return a list of tuple pairs [(receiver, response), ... ].
-
-        If any receiver raises an error (specifically any subclass of
-        Exception), return the error instance as the result for that receiver.
-        """
-        if (
-            not self.receivers
-            or self.sender_receivers_cache.get(sender) is NO_RECEIVERS
-        ):
-            return []
-
-        # Call each receiver with whatever arguments it can accept.
-        # Return a list of tuple pairs [(receiver, response), ... ].
-        sync_receivers, async_receivers = self._live_receivers(sender)
-
-        if sync_receivers:
-
-            @sync_to_async
-            def sync_send():
-                responses = []
-                for receiver in sync_receivers:
-                    try:
-                        response = receiver(signal=self, sender=sender, **named)
-                    except Exception as err:
-                        self._log_robust_failure(receiver, err)
-                        responses.append((receiver, err))
-                    else:
-                        responses.append((receiver, response))
-                return responses
-
-        else:
-            sync_send = list
-
-        async def asend_and_wrap_exception(receiver):
-            try:
-                response = await receiver(signal=self, sender=sender, **named)
-            except Exception as err:
-                self._log_robust_failure(receiver, err)
-                return err
-            return response
-
-        responses, async_responses = await asyncio.gather(
-            sync_send(),
-            asyncio.gather(
-                *(asend_and_wrap_exception(receiver) for receiver in async_receivers),
-            ),
-        )
-        responses.extend(zip(async_receivers, async_responses))
         return responses
 
     def _clear_dead_receivers(self):
@@ -428,9 +265,9 @@ class Signal:
                 self._clear_dead_receivers()
                 senderkey = _make_id(sender)
                 receivers = []
-                for (_receiverkey, r_senderkey), receiver, is_async in self.receivers:
+                for (_receiverkey, r_senderkey), receiver in self.receivers:
                     if r_senderkey == NONE_ID or r_senderkey == senderkey:
-                        receivers.append((receiver, is_async))
+                        receivers.append(receiver)
                 if self.use_caching:
                     if not receivers:
                         self.sender_receivers_cache[sender] = NO_RECEIVERS
@@ -438,22 +275,15 @@ class Signal:
                         # Note, we must cache the weakref versions.
                         self.sender_receivers_cache[sender] = receivers
         non_weak_sync_receivers = []
-        non_weak_async_receivers = []
-        for receiver, is_async in receivers:
+        for receiver in receivers:
             if isinstance(receiver, weakref.ReferenceType):
                 # Dereference the weak reference.
                 receiver = receiver()
                 if receiver is not None:
-                    if is_async:
-                        non_weak_async_receivers.append(receiver)
-                    else:
-                        non_weak_sync_receivers.append(receiver)
-            else:
-                if is_async:
-                    non_weak_async_receivers.append(receiver)
-                else:
                     non_weak_sync_receivers.append(receiver)
-        return non_weak_sync_receivers, non_weak_async_receivers
+            else:
+                non_weak_sync_receivers.append(receiver)
+        return non_weak_sync_receivers
 
     def _remove_receiver(self, receiver=None):
         # Mark that the self.receivers list has dead weakrefs. If so, we will

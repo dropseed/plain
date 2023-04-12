@@ -11,7 +11,6 @@ from sqlite3 import dbapi2 as Database
 from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils.asyncio import async_unsafe
 from django.utils.dateparse import parse_date, parse_datetime, parse_time
 from django.utils.regex_helper import _lazy_re_compile
 
@@ -175,7 +174,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def get_database_version(self):
         return self.Database.sqlite_version_info
 
-    @async_unsafe
     def get_new_connection(self, conn_params):
         conn = Database.connect(**conn_params)
         register_functions(conn)
@@ -189,7 +187,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def create_cursor(self, name=None):
         return self.connection.cursor(factory=SQLiteCursorWrapper)
 
-    @async_unsafe
     def close(self):
         self.validate_thread_sharing()
         # If database is in memory, closing the connection destroys the

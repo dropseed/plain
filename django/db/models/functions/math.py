@@ -60,10 +60,6 @@ class Ceil(Transform):
     function = "CEILING"
     lookup_name = "ceil"
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        return super().as_sql(compiler, connection, function="CEIL", **extra_context)
-
-
 class Cos(NumericOutputFieldMixin, Transform):
     function = "COS"
     lookup_name = "cos"
@@ -73,23 +69,10 @@ class Cot(NumericOutputFieldMixin, Transform):
     function = "COT"
     lookup_name = "cot"
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        return super().as_sql(
-            compiler, connection, template="(1 / TAN(%(expressions)s))", **extra_context
-        )
-
 
 class Degrees(NumericOutputFieldMixin, Transform):
     function = "DEGREES"
     lookup_name = "degrees"
-
-    def as_oracle(self, compiler, connection, **extra_context):
-        return super().as_sql(
-            compiler,
-            connection,
-            template="((%%(expressions)s) * 180 / %s)" % math.pi,
-            **extra_context,
-        )
 
 
 class Exp(NumericOutputFieldMixin, Transform):
@@ -130,12 +113,6 @@ class Pi(NumericOutputFieldMixin, Func):
     function = "PI"
     arity = 0
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        return super().as_sql(
-            compiler, connection, template=str(math.pi), **extra_context
-        )
-
-
 class Power(NumericOutputFieldMixin, Func):
     function = "POWER"
     arity = 2
@@ -145,14 +122,6 @@ class Radians(NumericOutputFieldMixin, Transform):
     function = "RADIANS"
     lookup_name = "radians"
 
-    def as_oracle(self, compiler, connection, **extra_context):
-        return super().as_sql(
-            compiler,
-            connection,
-            template="((%%(expressions)s) * %s / 180)" % math.pi,
-            **extra_context,
-        )
-
 
 class Random(NumericOutputFieldMixin, Func):
     function = "RANDOM"
@@ -160,11 +129,6 @@ class Random(NumericOutputFieldMixin, Func):
 
     def as_mysql(self, compiler, connection, **extra_context):
         return super().as_sql(compiler, connection, function="RAND", **extra_context)
-
-    def as_oracle(self, compiler, connection, **extra_context):
-        return super().as_sql(
-            compiler, connection, function="DBMS_RANDOM.VALUE", **extra_context
-        )
 
     def as_sqlite(self, compiler, connection, **extra_context):
         return super().as_sql(compiler, connection, function="RAND", **extra_context)

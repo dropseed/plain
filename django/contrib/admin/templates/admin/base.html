@@ -1,6 +1,5 @@
-{% load i18n static %}<!DOCTYPE html>
-{% get_current_language as LANGUAGE_CODE %}{% get_current_language_bidi as LANGUAGE_BIDI %}
-<html lang="{{ LANGUAGE_CODE|default:"en-us" }}" dir="{{ LANGUAGE_BIDI|yesno:'rtl,ltr,auto' }}">
+{% load static %}<!DOCTYPE html>
+<html lang="en-us">
 <head>
 <title>{% block title %}{% endblock %}</title>
 <link rel="stylesheet" href="{% block stylesheet %}{% static "admin/css/base.css" %}{% endblock %}">
@@ -25,7 +24,7 @@
 
 <body class="{% if is_popup %}popup {% endif %}{% block bodyclass %}{% endblock %}"
   data-admin-utc-offset="{% now "Z" %}">
-<a href="#content-start" class="skip-to-content-link">{% translate 'Skip to main content' %}</a>
+<a href="#content-start" class="skip-to-content-link">Skip to main content</a>
 <!-- Container -->
 <div id="container">
 
@@ -40,25 +39,19 @@
         {% if has_permission %}
         <div id="user-tools">
             {% block welcome-msg %}
-                {% translate 'Welcome,' %}
+                Welcome,
                 <strong>{% firstof user.get_short_name user.get_username %}</strong>.
             {% endblock %}
             {% block userlinks %}
                 {% if site_url %}
-                    <a href="{{ site_url }}">{% translate 'View site' %}</a> /
-                {% endif %}
-                {% if user.is_active and user.is_staff %}
-                    {% url 'django-admindocs-docroot' as docsroot %}
-                    {% if docsroot %}
-                        <a href="{{ docsroot }}">{% translate 'Documentation' %}</a> /
-                    {% endif %}
+                    <a href="{{ site_url }}">View site</a> /
                 {% endif %}
                 {% if user.has_usable_password %}
-                <a href="{% url 'admin:password_change' %}">{% translate 'Change password' %}</a> /
+                <a href="{% url 'admin:password_change' %}">Change password</a> /
                 {% endif %}
                 <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
                     {% csrf_token %}
-                    <button type="submit">{% translate 'Log out' %}</button>
+                    <button type="submit">Log out</button>
                 </form>
                 {% include "admin/color_theme_toggle.html" %}
             {% endblock %}
@@ -70,10 +63,10 @@
     {% endblock %}
     <!-- END Header -->
     {% block nav-breadcrumbs %}
-      <nav aria-label="{% translate 'Breadcrumbs' %}">
+      <nav aria-label="Breadcrumbs">
         {% block breadcrumbs %}
           <div class="breadcrumbs">
-            <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+            <a href="{% url 'admin:index' %}">Home</a>
             {% if title %} &rsaquo; {{ title }}{% endif %}
           </div>
         {% endblock %}
