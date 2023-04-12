@@ -1,6 +1,0 @@
-#!/bin/sh -e
-for d in */poetry.lock; do
-    echo "Installing $d"
-    cd $(dirname $d)
-    poetry install
-done
