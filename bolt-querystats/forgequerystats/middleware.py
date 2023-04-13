@@ -10,8 +10,24 @@ from django.template.loader import select_template
 
 from .core import QueryStats
 
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+
 logger = logging.getLogger(__name__)
 _local = threading.local()
+
+
+class QueryStatsJSONEncoder(DjangoJSONEncoder):
+    def default(self, obj):
+        try:
+            return super().default(obj)
+        except TypeError:
+            if psycopg2 and isinstance(obj, psycopg2._json.Json):
+                return obj.adapted
+            else:
+                raise
 
 
 class QueryStatsMiddleware:
@@ -50,7 +66,7 @@ class QueryStatsMiddleware:
 
             if request.GET.get("querystats") == "store":
                 request.session["querystats"] = json.dumps(
-                    _local.querystats.as_context_dict(), cls=DjangoJSONEncoder
+                    _local.querystats.as_context_dict(), cls=QueryStatsJSONEncoder
                 )
                 return HttpResponseRedirect(
                     request.get_full_path().replace(
