@@ -26,9 +26,19 @@
             and template {{ querystats_template_name }}
         </div>
 
-        <div class="mt-5 space-y-4 text-sm">
+        <div class="flex w-full mt-5 overflow-auto rounded-sm">
             {% for query in querystats.queries %}
-            <div class="p-2 rounded bg-zinc-800">
+            <a href="#query-{{ forloop.counter }}"
+                {% cycle 'class="h-4 bg-amber-400"' 'class="h-4 bg-amber-500"' 'class="h-4 bg-amber-600"' %}
+                title="[{{ query.duration_display }}] {{ query.sql_display }}"
+                style="width: {% widthratio query.duration querystats.total_time 2500 %}px">
+            </a>
+            {% endfor %}
+        </div>
+
+        <div class="mt-4 space-y-4 text-sm">
+            {% for query in querystats.queries %}
+            <div id="query-{{ forloop.counter }}" class="p-2 rounded bg-zinc-800">
                 <div class="float-right px-2 py-px mb-px ml-2 text-xs rounded-full bg-zinc-700">
                     <span>{{ query.duration_display }}</span>
                     {% if query.duplicate_count %}
