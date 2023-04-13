@@ -259,7 +259,7 @@ class Signal:
             # We could end up here with NO_RECEIVERS even if we do check this case in
             # .send() prior to calling _live_receivers() due to concurrent .send() call.
             if receivers is NO_RECEIVERS:
-                return [], []
+                return []
         if receivers is None:
             with self.lock:
                 self._clear_dead_receivers()
