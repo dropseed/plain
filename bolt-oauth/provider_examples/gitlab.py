@@ -1,6 +1,6 @@
 import requests
 
-from forgeoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class GitLabOAuthProvider(OAuthProvider):

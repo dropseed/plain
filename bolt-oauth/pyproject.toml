@@ -1,16 +1,16 @@
 [tool.poetry]
-name = "forge-oauth"
+name = "bolt-oauth"
 version = "0.4.1"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/forgepackages/forge-oauth"
-documentation = "https://github.com/forgepackages/forge-oauth"
-repository = "https://github.com/forgepackages/forge-oauth"
+homepage = "https://github.com/forgepackages/bolt-oauth"
+documentation = "https://github.com/forgepackages/bolt-oauth"
+repository = "https://github.com/forgepackages/bolt-oauth"
 keywords = []
 packages = [
-    { include = "forgeoauth" },
+    { include = "boltoauth" },
 ]
 classifiers = [
     "Environment :: Web Environment",

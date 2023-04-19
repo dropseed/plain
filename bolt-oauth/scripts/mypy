@@ -1,2 +1,2 @@
 #!/bin/sh -e
-./.venv/bin/mypy forgeoauth --ignore-missing-imports "$@"
+./.venv/bin/mypy boltoauth --ignore-missing-imports "$@"

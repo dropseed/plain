@@ -1,7 +1,7 @@
 import pytest
 from django.contrib.auth.models import AnonymousUser
 
-from forgeoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class DummyProvider(OAuthProvider):

@@ -3,8 +3,8 @@ import datetime
 import requests
 from django.utils import timezone
 
-from forgeoauth.exceptions import OAuthError
-from forgeoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from boltoauth.exceptions import OAuthError
+from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class GitHubOAuthProvider(OAuthProvider):

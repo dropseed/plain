@@ -1,4 +1,4 @@
-# forge-oauth
+# bolt-oauth
 
 **Add OAuth login support to your Django project.**
 
@@ -21,23 +21,23 @@ There are three OAuth flows that it makes possible:
 Install the package from PyPi:
 
 ```sh
-pip install forge-oauth
+pip install bolt-oauth
 ```
 
-Add `forgeoauth` to your `INSTALLED_APPS` in `settings.py`:
+Add `boltoauth` to your `INSTALLED_APPS` in `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     ...
-    "forgeoauth",
+    "boltoauth",
 ]
 ```
 
-In your `urls.py`, include `forgeoauth.urls`:
+In your `urls.py`, include `boltoauth.urls`:
 
 ```python
 urlpatterns = [
-    path("oauth/", include("forgeoauth.urls")),
+    path("oauth/", include("boltoauth.urls")),
     ...
 ]
 ```
@@ -45,16 +45,16 @@ urlpatterns = [
 Then run migrations:
 
 ```sh
-python manage.py migrate forgeoauth
+python manage.py migrate boltoauth
 ```
 
-Create a new OAuth provider ([or copy one from our examples](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples)):
+Create a new OAuth provider ([or copy one from our examples](https://github.com/forgepackages/bolt-oauth/tree/master/provider_examples)):
 
 ```python
 # yourapp/oauth.py
 import requests
 
-from forgeoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class ExampleOAuthProvider(OAuthProvider):
@@ -122,7 +122,7 @@ Then add a login button (which is a form using POST rather than a basic link, fo
 
 ```html
 <h1>Login</h1>
-<form action="{% url 'forgeoauth:login' 'github' %}" method="post">
+<form action="{% url 'boltoauth:login' 'github' %}" method="post">
     {% csrf_token %}
     <button type="submit">Login with GitHub</button>
 </form>
@@ -161,7 +161,7 @@ You'll also notice that there are no "email confirmation" or "email verification
 This is also intentional.
 You can implement something like that yourself if you need to,
 but the easier solution in our opinion is to use an OAuth provider you *trust to have done that already*.
-If you look at our [provider examples](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples) you'll notice how we often use provider APIs to get the email address which is "primary" and "verified" already.
+If you look at our [provider examples](https://github.com/forgepackages/bolt-oauth/tree/master/provider_examples) you'll notice how we often use provider APIs to get the email address which is "primary" and "verified" already.
 If they've already done that work,
 then we can just use that information.
 
@@ -205,7 +205,7 @@ Hello {{ request.user }}!
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         {% if connection.can_be_disconnected %}
-        <form action="{% url 'forgeoauth:disconnect' connection.provider_key %}" method="post">
+        <form action="{% url 'boltoauth:disconnect' connection.provider_key %}" method="post">
             {% csrf_token %}
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
@@ -220,7 +220,7 @@ Hello {{ request.user }}!
     {% for provider_key in oauth_provider_keys %}
     <li>
         {{ provider_key}}
-        <form action="{% url 'forgeoauth:connect' provider_key %}" method="post">
+        <form action="{% url 'boltoauth:connect' provider_key %}" method="post">
             {% csrf_token %}
             <button type="submit">Connect</button>
         </form>
@@ -234,7 +234,7 @@ Hello {{ request.user }}!
 The `get_provider_keys` function can help populate the list of options:
 
 ```python
-from forgeoauth.providers import get_provider_keys
+from boltoauth.providers import get_provider_keys
 
 class ExampleView(TemplateView):
     template_name = "index.html"
@@ -303,9 +303,9 @@ and writing two class methods that do the actual work of getting the user's data
 
 We've written examples for the following providers:
 
-- [GitHub](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples/github.py)
-- [GitLab](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples/gitlab.py)
-- [Bitbucket](https://github.com/forgepackages/forge-oauth/tree/master/provider_examples/bitbucket.py)
+- [GitHub](https://github.com/forgepackages/bolt-oauth/tree/master/provider_examples/github.py)
+- [GitLab](https://github.com/forgepackages/bolt-oauth/tree/master/provider_examples/gitlab.py)
+- [Bitbucket](https://github.com/forgepackages/bolt-oauth/tree/master/provider_examples/bitbucket.py)
 
 Just copy that code and paste it in your project.
 Tweak as necessary!

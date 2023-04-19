@@ -3,7 +3,7 @@ import datetime
 import requests
 from django.utils import timezone
 
-from forgeoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class BitbucketOAuthProvider(OAuthProvider):

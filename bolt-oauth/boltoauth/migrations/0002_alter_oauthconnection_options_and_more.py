@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("forgeoauth", "0001_initial"),
+        ("boltoauth", "0001_initial"),
     ]
 
     operations = [

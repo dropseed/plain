@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "users",
-    "forgeoauth",
+    "boltoauth",
 ]
 
 MIDDLEWARE = [
