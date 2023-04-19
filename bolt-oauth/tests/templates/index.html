@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+Hello {{ request.user }}!
+
+<h2>Existing connections</h2>
+<ul>
+    {% for connection in request.user.oauth_connections.all %}
+    <li>
+        {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
+        {% if connection.can_be_disconnected %}
+        <form action="{% url 'forgeoauth:disconnect' connection.provider_key %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
+            <button type="submit">Disconnect</button>
+        </form>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+
+<h2>Add a connection</h2>
+<ul>
+    {% for provider_key in oauth_provider_keys %}
+    <li>
+        {{ provider_key}}
+        <form action="{% url 'forgeoauth:connect' provider_key %}" method="post">
+            {% csrf_token %}
+            <button type="submit">Connect</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Login</h1>
+<form action="{% url 'forgeoauth:login' 'github' %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Login with GitHub</button>
+</form>
+<form action="{% url 'forgeoauth:login' 'gitlab' %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Login with GitLab</button>
+</form>
+<form action="{% url 'forgeoauth:login' 'bitbucket' %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Login with Bitbucket</button>
+</form>
+{% endblock %}

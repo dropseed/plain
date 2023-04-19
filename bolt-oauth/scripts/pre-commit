@@ -1,0 +1,4 @@
+#!/bin/sh -e
+./scripts/format --check
+./scripts/mypy
+./scripts/test

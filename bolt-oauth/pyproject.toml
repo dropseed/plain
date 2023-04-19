@@ -1,0 +1,51 @@
+[tool.poetry]
+name = "forge-oauth"
+version = "0.4.1"
+description = ""
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/forgepackages/forge-oauth"
+documentation = "https://github.com/forgepackages/forge-oauth"
+repository = "https://github.com/forgepackages/forge-oauth"
+keywords = []
+packages = [
+    { include = "forgeoauth" },
+]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 3",
+    "Framework :: Django :: 4",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+
+[tool.pytest.ini_options]
+python_files = "tests.py test_*.py *_tests.py"
+DJANGO_SETTINGS_MODULE = "tests.settings"
+FAIL_INVALID_TEMPLATE_VARS = true
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+black = "^22.1.0"
+Django = "^4.0.0"
+pytest = "^7.1.0"
+pytest-django = "^4.5.2"
+ipdb = "^0.13.9"
+requests = "^2.27.1"
+mypy = "*"
+isort = "^5.10.1"
+python-dotenv = "^0.20.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

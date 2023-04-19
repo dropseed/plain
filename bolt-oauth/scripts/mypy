@@ -1,0 +1,2 @@
+#!/bin/sh -e
+./.venv/bin/mypy forgeoauth --ignore-missing-imports "$@"
