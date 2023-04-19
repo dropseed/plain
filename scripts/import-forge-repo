@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Modified from
+# http://choly.ca/post/git-merge-to-monorepo/
+
+set -e
+
+# make sure no on master branch?
+
+if [ -z "$1" ]
+then
+    echo "Usage:"
+    echo "  $0 <forge-package>"
+    exit
+fi
+
+PKG="$1"
+FORGE_REPO="forge-$PKG"
+BOLT_SUBDIR="bolt-$PKG"
+
+REPO_REMOTE="https://github.com/forgepackages/$FORGE_REPO.git"
+REPO_NAME="$BOLT_SUBDIR"
+
+REPO_DIR_TMP="$(mktemp -d -t "${REPO_NAME##*/}.XXXX")"
+
+echo "REPO REMOTE: $REPO_REMOTE"
+echo "REPO NAME: $REPO_NAME"
+echo "REPO TMP DIR: $REPO_DIR_TMP"
+echo
+read -p "Press <Enter> to continue"
+
+# clone other repo
+git clone "$REPO_REMOTE" "$REPO_DIR_TMP"
+
+# rewrite the entire history into sub-directory
+export REPO_NAME
+(
+    cd $REPO_DIR_TMP &&
+    git filter-branch -f --prune-empty --tree-filter '
+        mkdir -p "${REPO_NAME}_tmp"
+        git ls-tree --name-only $GIT_COMMIT | xargs -I{} mv {} "${REPO_NAME}_tmp"
+        mv "${REPO_NAME}_tmp" "$REPO_NAME"
+    '
+)
+
+# merge the rewritten repo
+git remote add "$REPO_NAME" "$REPO_DIR_TMP"
+git fetch "$REPO_NAME"
+# if you're running an older version of git, remove --allow-unrelated-histories
+git merge --allow-unrelated-histories "$REPO_NAME/master"
+
+# delete the rewritten repo
+rm -rf "$REPO_DIR_TMP"
+git remote rm "$REPO_NAME"
+
+echo "Make sure to replace instances of 'forge' with 'bolt'!"
