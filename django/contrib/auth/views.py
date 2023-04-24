@@ -164,14 +164,6 @@ class LogoutView(RedirectURLMixin, TemplateView):
         return context
 
 
-def logout_then_login(request, login_url=None):
-    """
-    Log out the user if they are logged in. Then redirect to the login page.
-    """
-    login_url = resolve_url(login_url or settings.LOGIN_URL)
-    return LogoutView.as_view(next_page=login_url)(request)
-
-
 def redirect_to_login(next, login_url=None, redirect_field_name=REDIRECT_FIELD_NAME):
     """
     Redirect the user to the login page, passing the given 'next' page.
