@@ -1,0 +1,6 @@
+#!/bin/sh -e
+poetry run black forgehtmx "$@"
+poetry run isort forgehtmx --profile=black "$@"
+
+poetry run black tests "$@"
+poetry run isort tests --profile=black "$@"
