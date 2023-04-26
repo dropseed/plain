@@ -1,0 +1,6 @@
+#!/bin/sh -e
+poetry run black forgeheroku "$@"
+poetry run isort forgeheroku --profile=black "$@"
+
+poetry run black tests "$@"
+poetry run isort tests --profile=black "$@"
