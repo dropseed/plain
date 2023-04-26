@@ -184,6 +184,10 @@ class Settings:
 
         mod = importlib.import_module(self.SETTINGS_MODULE)
 
+        # Keep a reference to the settings.py module path
+        # so we can find files next to it (assume it's at the app root)
+        self.path = Path(mod.__file__).resolve()
+
         tuple_settings = (
             "ALLOWED_HOSTS",
             "INSTALLED_APPS",

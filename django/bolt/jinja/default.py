@@ -1,0 +1,74 @@
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from jinja2.utils import htmlsafe_json_dumps
+from django.conf import settings
+from pathlib import Path
+import functools
+from django.apps import apps
+from django.templatetags.static import static
+from django.urls import reverse
+from django.utils.html import format_html
+
+
+def json_script(value, id):
+    return format_html(
+        '<script type="application/json" id="{}">{}</script>',
+        id,
+        htmlsafe_json_dumps(value),
+    )
+
+
+def url(viewname, *args, **kwargs):
+    # A modified reverse that lets you pass args directly, excluding urlconf
+    return reverse(viewname, args=args, kwargs=kwargs)
+
+
+def get_default_environment_globals():
+    return {
+        "static": static,
+        "url": url,
+    }
+
+
+def get_default_environment_filters():
+    return {
+        "json_script": json_script,
+    }
+
+
+@functools.lru_cache
+def get_app_template_dirs():
+    """
+    Return an iterable of paths of directories to load app templates from.
+
+    dirname is the name of the subdirectory containing templates inside
+    installed applications.
+    """
+    dirname = "templates"
+    template_dirs = [
+        Path(app_config.path) / dirname
+        for app_config in apps.get_app_configs()
+        if app_config.path and (Path(app_config.path) / dirname).is_dir()
+    ]
+    # Immutable return value because it will be cached and shared by callers.
+    return tuple(template_dirs)
+
+
+def get_default_environment_kwargs():
+    template_dirs = (settings.path.parent / "templates",) + get_app_template_dirs()
+    return {
+        "loader": FileSystemLoader(template_dirs),
+        "autoescape": True,
+        "auto_reload": settings.DEBUG,
+        "undefined": StrictUndefined,
+    }
+
+
+def get_default_environment(extra_kwargs={}):
+    kwargs = get_default_environment_kwargs()
+    kwargs.update(extra_kwargs)
+
+    env = Environment(**kwargs)
+
+    env.globals.update(get_default_environment_globals())
+    env.filters.update(get_default_environment_filters())
+    return env
