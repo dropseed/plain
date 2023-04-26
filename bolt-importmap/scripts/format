@@ -1,0 +1,5 @@
+#!/bin/sh -e
+./.venv/bin/black forgeimportmap "$@"
+./.venv/bin/black test_project "$@"
+./.venv/bin/isort --profile=black forgeimportmap "$@"
+./.venv/bin/isort --profile=black test_project "$@"

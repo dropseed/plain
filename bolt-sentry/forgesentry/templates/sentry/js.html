@@ -1,0 +1,13 @@
+{% if sentry_js_enabled %}
+<script src="https://js.sentry-cdn.com/{{ sentry_public_key }}.min.js" crossorigin="anonymous"></script>
+{{ sentry_init|json_script:"sentry_init" }}
+<script>
+var sentryInit = JSON.parse(document.getElementById("sentry_init").textContent);
+Sentry.onLoad(function() {
+    Sentry.init(sentryInit);
+});
+{% if sentry_dialog_event_id %}
+Sentry.showReportDialog({ eventId: "{{ sentry_dialog_event_id }}" });
+{% endif %}
+</script>
+{% endif %}

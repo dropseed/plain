@@ -1,0 +1,3 @@
+#!/bin/sh -e
+./scripts/format --check
+./scripts/test

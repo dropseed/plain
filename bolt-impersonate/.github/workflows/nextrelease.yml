@@ -1,0 +1,22 @@
+name: nextrelease
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+    types: [labeled, unlabeled, edited, synchronize]
+
+jobs:
+  sync:
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' && github.head_ref == 'nextrelease' }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: dropseed/nextrelease@v2
+      with:
+        prepare_cmd: |
+          sed -i -e "s/version = \"[^\"]*\"$/version = \"$VERSION\"/g" pyproject.toml
+        publish_cmd: |
+          pip3 install -U pip poetry
+          poetry build
+          gh release upload $TAG dist/*
+        github_token: ${{ secrets.GITHUB_TOKEN }}

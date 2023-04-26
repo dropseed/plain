@@ -1,0 +1,43 @@
+[tool.poetry]
+
+name = "forge-tailwind"
+packages = [
+    { include = "forgetailwind" },
+]
+
+version = "1.0.0"
+description = "Work library for Forge"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://www.forgepackages.com/"
+documentation = "https://www.forgepackages.com/docs/"
+repository = "https://github.com/forgepackages/forge-tailwind"
+keywords = ["django", "saas", "forge", "framework"]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+]
+
+[tool.poetry.scripts]
+"forge-tailwind" = "forgetailwind:cli"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+forge-core = "^1.0.0"
+click = ">=8.0.0"
+requests = ">=2.0.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+Django = "^4.0.5"
+isort = "^5.10.1"
+black = "^22.3.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

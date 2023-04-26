@@ -1,0 +1,5 @@
+#!/bin/sh -e
+cd test_project
+../.venv/bin/python manage.py test "$@"
+poetry run forge importmap --help
+poetry run forge-importmap --help
