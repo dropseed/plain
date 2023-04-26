@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}Request log{% endblock %}
+
+{% block content %}
+{{ block.super }}
+<div class="fixed inset-0 z-50 flex px-10 overflow-scroll py-14 bg-black/70" data-requestlog-bg>
+    <div class="flex flex-col w-full h-full overflow-auto rounded-md shadow-lg text-zinc-200 bg-zinc-900">
+
+        <div class="flex items-center justify-between px-4 pt-6 pb-4 ">
+            <h2 class="text-xl font-medium">Request log</h2>
+            <a href="{{ requestlog_exit_url }}" class="text-zinc-300 hover:text-white" title="Exit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-7 h-7 bi bi-x" viewBox="0 0 16 16">
+                    <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                </svg>
+            </a>
+        </div>
+
+        <div class="flex-grow overflow-auto border-t sm:flex border-zinc-700">
+            <div class="overflow-auto border-r sm:w-1/2 md:2/5 border-zinc-700">
+                <table>
+                    <tbody>
+                        {% for log in requestlogs %}
+                        <tr data-click-form class="hover:bg-zinc-800 cursor-pointer text-zinc-400 {% if log.name == requestlog.name %}bg-zinc-700{% endif %}">
+                            <td class="whitespace-nowrap px-2 py-2 border-b border-zinc-700 border-l-4 {% if log.name == requestlog.name %}border-l-orange-600{% else %}border-l-transparent{% endif %}">
+                                {% if log.response.status_code >= 400 %}
+                                <span class="px-1.5 py-0.5 text-xs text-white bg-red-600 rounded-sm">{{ log.response.status_code }}</span>
+                                {% elif log.response.status_code >= 300 %}
+                                <span class="px-1.5 py-0.5 text-xs text-white bg-zinc-600 rounded-sm">{{ log.response.status_code }}</span>
+                                {% else %}
+                                <span class="px-1.5 py-0.5 text-xs text-zinc-700 bg-zinc-300 rounded-sm">{{ log.response.status_code }}</span>
+                                {% endif %}
+
+                                <form class="hidden">
+                                    <input type="hidden" name="log" value="{{ log.name }}">
+                                </form>
+                            </td>
+                            <td class="px-1 py-2 border-b whitespace-nowrap border-zinc-700">
+                                <span class="font-mono text-sm text-zinc-400">{{ log.request.method }}</span>
+                            </td>
+                            <td class="w-full px-2 py-2 overflow-hidden border-b whitespace-nowrap border-zinc-700 text-ellipsis" style="max-width: 1px;">
+                                <span class="font-mono text-sm text-zinc-300">{{ log.request.full_path }}</span>
+                            </td>
+                            <td class="px-2 py-2 text-right border-b whitespace-nowrap border-zinc-700">
+                                <span title="{{ log.timestamp }}" class="text-xs tabular-nums whitespace-nowrap">{{ log.timestamp|time:"g:i:s A" }}</span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td class="px-4 py-2 text-center">
+                                <span class="text-zinc-500">No logs yet!</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if requestlogs %}
+                        <tr>
+                            <td colspan="4" class="px-1 py-3">
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="clear">
+                                    <button type="submit" class="flex items-center mx-auto text-xs text-red-500/75 hover:text-red-500">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-trash3" viewBox="0 0 16 16">
+                                            <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5ZM11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H2.506a.58.58 0 0 0-.01 0H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1h-.995a.59.59 0 0 0-.01 0H11Zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5h9.916Zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47ZM8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5Z"/>
+                                        </svg>
+                                        Clear all
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% if requestlog %}
+            <div class="px-8 py-6 overflow-auto sm:w-1/2 md:w-3/5">
+                {% with request=requestlog.request %}
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-medium">
+                        {{ request.method }} <a href="{{ request.absolute_uri }}" class="font-mono hover:underline">{{ request.full_path }}</a>
+                    </h3>
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="log" value="{{ requestlog.name }}">
+                        <button type="submit" class="flex items-center px-3 py-2 ml-4 text-sm rounded-full bg-zinc-600 hover:bg-zinc-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            replay
+                        </button>
+                    </form>
+                </div>
+
+                {% if request.querydict %}
+                <dl class="px-2 pt-1 pb-2 mt-4 rounded bg-zinc-800">
+                {% for key, value in request.querydict.items %}
+                    <dt class="mt-2 text-xs text-zinc-400">{{ key }}</dt>
+                    <dd class="text-xs break-all text-zinc-300"><code>{{ value|default:"(Empty)" }}</code></dd>
+                {% endfor %}
+                </dl>
+                {% endif %}
+
+                <dl class="mt-4">
+                {% for key, value in request.headers.items %}
+                    <dt class="mt-2 text-xs text-zinc-400">{{ key }}</dt>
+                    <dd class="text-xs break-all text-zinc-300"><code>{{ value|default:"(Empty)" }}</code></dd>
+                {% endfor %}
+                </dl>
+                <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ request.body|default:"(Empty)" }}</code></pre>
+                {% endwith %}
+
+                {% with response=requestlog.response %}
+                <h3 class="mt-10 text-lg font-medium">HTTP <span class="font-mono">{{ response.status_code }}</span></h3>
+                <dl class="mt-4">
+                {% for key, value in response.headers.items %}
+                    <dt class="mt-2 text-xs text-zinc-400">{{ key }}</dt>
+                    <dd class="text-xs break-all text-zinc-300"><code>{{ value|default:"(Empty)" }}</code></dd>
+                {% endfor %}
+                </dl>
+                <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ response.content|default:"(Empty)" }}</code></pre>
+                {% endwith %}
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+<script>
+window.addEventListener("load", function () {
+    document.querySelectorAll("[data-click-form]").forEach(function (el) {
+        el.addEventListener("click", function (e) {
+            e.preventDefault();
+            this.querySelector("form").submit();
+        });
+    });
+    document.querySelector('[data-requestlog-bg]').addEventListener('click', function(e) {
+        if (e.target.matches('[data-requestlog-bg]')) {
+            window.location = "/";
+        }
+    });
+});
+</script>
+{% endblock %}

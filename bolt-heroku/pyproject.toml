@@ -1,0 +1,46 @@
+[tool.poetry]
+
+name = "forge-heroku"
+packages = [
+    { include = "forgeheroku" },
+]
+
+version = "1.0.0"
+description = "Work library for Forge"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://www.forgepackages.com/"
+documentation = "https://www.forgepackages.com/docs/"
+repository = "https://github.com/forgepackages/forge-heroku"
+keywords = ["django", "saas", "forge", "framework"]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+]
+
+[tool.poetry.scripts]
+"forge-heroku" = "forgeheroku:cli"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+forge-core = "^1.0.0"
+click = ">=2.0.0"
+
+# For Heroku environment
+gunicorn = "^20.1.0"
+psycopg2-binary = "^2.9.3"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+Django = "^4.0.5"
+black = "^22.3.0"
+isort = "^5.10.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

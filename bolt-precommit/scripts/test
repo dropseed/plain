@@ -1,0 +1,4 @@
+#!/bin/sh -e
+poetry run pytest tests
+poetry run forge pre-commit --help
+poetry run forge-pre-commit --help

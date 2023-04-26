@@ -1,0 +1,8 @@
+version: 3
+dependencies:
+- type: js
+  path: .
+  settings:
+    before_commit: npm run copy-static
+- type: python
+  path: poetry.lock

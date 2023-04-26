@@ -1,0 +1,3 @@
+#!/bin/sh -e
+poetry run black forgeformat "$@"
+poetry run black tests "$@"

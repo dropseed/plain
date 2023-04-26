@@ -1,0 +1,40 @@
+[tool.poetry]
+
+name = "forge-core"
+packages = [
+    { include = "forgecore" },
+]
+
+version = "1.1.0"
+description = "Core library for Forge"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://www.forgepackages.com/"
+documentation = "https://www.forgepackages.com/docs/"
+repository = "https://github.com/forgepackages/forge-core"
+keywords = ["django", "saas", "forge", "framework"]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+]
+
+[tool.poetry.scripts]
+forge = "forgecore.cli:cli"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+click = "*"
+
+[tool.poetry.dev-dependencies]
+black = "^22.3.0"
+isort = "^5.10.1"
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
