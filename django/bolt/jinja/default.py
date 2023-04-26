@@ -7,7 +7,10 @@ from django.apps import apps
 from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.html import format_html
-
+from django.core.paginator import Paginator
+from django.utils.formats import date_format, time_format
+from django.conf import settings
+from itertools import islice
 
 def json_script(value, id):
     return format_html(
@@ -26,12 +29,17 @@ def get_default_environment_globals():
     return {
         "static": static,
         "url": url,
+        "Paginator": Paginator,
     }
 
 
 def get_default_environment_filters():
+    # Filters have more/easier access to context?
     return {
         "json_script": json_script,
+        "date": date_format,
+        "time": time_format,
+        "islice": islice,  # slice for dict.items()
     }
 
 
