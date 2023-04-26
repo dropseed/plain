@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django.views import View
 
-from forgehtmx.views import HTMXViewMixin
+from bolthtmx.views import HTMXViewMixin
 
 
 class V(HTMXViewMixin, View):
@@ -16,15 +16,15 @@ def test_is_htmx_request(rf):
     assert view.is_htmx_request
 
 
-def test_fhx_fragment(rf):
-    request = rf.get("/", HTTP_FHX_FRAGMENT="main")
+def test_bhx_fragment(rf):
+    request = rf.get("/", HTTP_BHX_FRAGMENT="main")
     view = V()
     view.setup(request)
     assert view.htmx_fragment_name == "main"
 
 
-def test_fhx_action(rf):
-    request = rf.get("/", HTTP_FHX_ACTION="create")
+def test_bhx_action(rf):
+    request = rf.get("/", HTTP_BHX_ACTION="create")
     view = V()
     view.setup(request)
     assert view.htmx_action_name == "create"

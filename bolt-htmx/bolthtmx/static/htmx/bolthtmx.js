@@ -2,17 +2,17 @@
 var csrfToken = document.currentScript.dataset.csrftoken;
 
 htmx.on("htmx:configRequest", function (event) {
-  // Custom header for FHX-Action
-  var actionElt = htmx.closest(event.detail.elt, "[fhx-action]");
+  // Custom header for BHX-Action
+  var actionElt = htmx.closest(event.detail.elt, "[bhx-action]");
   if (actionElt) {
-    event.detail.headers["FHX-Action"] = actionElt.getAttribute("fhx-action");
+    event.detail.headers["BHX-Action"] = actionElt.getAttribute("bhx-action");
   }
 
-  // Custom header for FHX-Fragment
-  var fragmentElt = htmx.closest(event.detail.elt, "[fhx-fragment]");
+  // Custom header for BHX-Fragment
+  var fragmentElt = htmx.closest(event.detail.elt, "[bhx-fragment]");
   if (fragmentElt) {
-    event.detail.headers["FHX-Fragment"] =
-      fragmentElt.getAttribute("fhx-fragment");
+    event.detail.headers["BHX-Fragment"] =
+      fragmentElt.getAttribute("bhx-fragment");
   }
 
   // Add the CSRF token to all non-GET requests automatically
@@ -49,4 +49,4 @@ htmx.defineExtension("error-classes", {
 
 // Our own load event, to support lazy loading
 // *after* our fragment extension is added
-htmx.trigger(document.body, "fhxLoad");
+htmx.trigger(document.body, "bhxLoad");

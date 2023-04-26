@@ -1,20 +1,7 @@
-import json
-
 from django import template
 from django.template.base import TextNode
 
 register = template.Library()
-
-
-@register.inclusion_tag("htmx/js.html", takes_context=True)
-def htmx_js(context):
-    if "request" not in context:
-        # Should usually be available, but not always
-        return {}
-
-    return {
-        "csrf_token": context["csrf_token"],
-    }
 
 
 class HTMXFragmentNode(template.Node):
@@ -24,7 +11,7 @@ class HTMXFragmentNode(template.Node):
         self.nodelist = template.NodeList(
             [
                 TextNode(
-                    f'<div fhx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this">'
+                    f'<div bhx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this">'
                 )
             ]
             + nodelist
@@ -37,7 +24,7 @@ class HTMXFragmentNode(template.Node):
             return template.NodeList(
                 [
                     TextNode(
-                        f'<div hx-get hx-trigger="fhxLoad from:body" fhx-fragment="{self.fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
+                        f'<div hx-get hx-trigger="bhxLoad from:body" bhx-fragment="{self.fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
                     ),
                 ]
             ).render(context)

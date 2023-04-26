@@ -1,5 +1,5 @@
 INSTALLED_APPS = [
-    "forgehtmx",
+    "bolthtmx",
 ]
 
 USE_TZ = True
