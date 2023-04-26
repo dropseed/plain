@@ -1,0 +1,47 @@
+[tool.poetry]
+name = "forge-importmap"
+version = "1.0.0"
+description = "JavaScript import maps for Django"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/forgepackages/forge-importmap"
+documentation = "https://github.com/forgepackages/forge-importmap"
+repository = "https://github.com/forgepackages/forge-importmap"
+keywords = ["django", "javascript", "import", "map", "import-maps"]
+packages = [
+    { include = "forgeimportmap" },
+]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+
+[tool.poetry.scripts]
+"forge-importmap" = "forgeimportmap:cli"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+tomli = "*"
+marshmallow = "^3.14.1"
+requests = "*"
+click = "*"
+forge-core = "^1.0.0"
+
+[tool.poetry.dev-dependencies]
+black = "^22.1.0"
+Django = "^4.0.0"
+ipdb = "^0.13.9"
+isort = "^5.10.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

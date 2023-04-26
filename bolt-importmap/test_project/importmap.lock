@@ -1,0 +1,23 @@
+{
+  "importmap_dev": {
+    "imports": {
+      "react": "https://ga.jspm.io/npm:react@17.0.2/dev.index.js"
+    },
+    "scopes": {
+      "https://ga.jspm.io/": {
+        "object-assign": "https://ga.jspm.io/npm:object-assign@4.1.1/index.js"
+      }
+    }
+  },
+  "importmap": {
+    "imports": {
+      "react": "https://ga.jspm.io/npm:react@17.0.2/index.js"
+    },
+    "scopes": {
+      "https://ga.jspm.io/": {
+        "object-assign": "https://ga.jspm.io/npm:object-assign@4.1.1/index.js"
+      }
+    }
+  },
+  "config_hash": "09d6237cdd891aad07de60f54689d130"
+}

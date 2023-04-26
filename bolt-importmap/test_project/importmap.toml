@@ -1,0 +1,3 @@
+[[packages]]
+name = "react"
+source = "react@17.0.2"
