@@ -1,0 +1,4 @@
+#!/bin/sh -e
+poetry run pytest tests
+poetry run forge work --help
+poetry run forge-work --help
