@@ -1,5 +1,6 @@
 from .settings import JINJA_ENVIRONMENT
 from django.utils.module_loading import import_string
+from .default import create_default_environment
 
 
 env = (
@@ -9,4 +10,4 @@ env = (
 )
 
 
-__all__ = ["env"]
+__all__ = ["env", "create_default_environment"]

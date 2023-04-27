@@ -12,7 +12,7 @@ from django.utils.formats import date_format, time_format
 from django.conf import settings
 from itertools import islice
 from django.utils.timesince import timeuntil, timesince
-from django.utils.module_loading import import_string, module_has_submodule
+from django.utils.module_loading import module_has_submodule
 from importlib import import_module
 
 def json_script(value, id):
@@ -115,7 +115,7 @@ def get_app_filters():
     return filters
 
 
-def get_default_environment(extra_kwargs={}):
+def create_default_environment(extra_kwargs={}):
     kwargs = get_default_environment_kwargs()
     kwargs.update(extra_kwargs)
 
