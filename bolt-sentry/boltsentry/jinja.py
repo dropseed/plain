@@ -1,5 +1,5 @@
 from django.bolt.jinja.extensions import InclusionTagExtension
-from django.conf import settings
+from . import settings
 
 class SentryJSExtension(InclusionTagExtension):
     tags = {"sentry_js"}
