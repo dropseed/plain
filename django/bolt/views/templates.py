@@ -42,7 +42,7 @@ class TemplateView(View):
 
     def get_template(self) -> jinja2.Template:
         template_names = self.get_template_names()
-        return jinja.env.get_or_select_template(template_names)
+        return jinja.environment.get_or_select_template(template_names)
 
     def get_context_data(self) -> dict:
         return {
