@@ -3,9 +3,9 @@ from jinja2.ext import Extension
 from django.bolt.jinja.extensions import InclusionTagExtension
 
 
-class HTMXJSExtension(InclusionTagExtension):
-    tags = {"htmx_js"}
-    template_name = "htmx/js.html"
+class HTMXScriptsExtension(InclusionTagExtension):
+    tags = {"htmx_scripts"}
+    template_name = "htmx/scripts.html"
 
     def get_context(self, context, *args, **kwargs):
         return {
