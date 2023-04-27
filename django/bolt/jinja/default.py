@@ -11,6 +11,7 @@ from django.core.paginator import Paginator
 from django.utils.formats import date_format, time_format
 from django.conf import settings
 from itertools import islice
+from django.utils.timesince import timeuntil, timesince
 
 def json_script(value, id):
     return format_html(
@@ -39,6 +40,8 @@ def get_default_environment_filters():
         "json_script": json_script,
         "date": date_format,
         "time": time_format,
+        "timeuntil": timeuntil,
+        "timesince": timesince,
         "islice": islice,  # slice for dict.items()
     }
 
