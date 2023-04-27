@@ -8,7 +8,9 @@ class HTMXJSExtension(InclusionTagExtension):
     template_name = "htmx/js.html"
 
     def get_context(self, context, *args, **kwargs):
-        return {}
+        return {
+            "csrf_token": context["csrf_token"]
+        }
 
 class HTMXFragmentExtension(Extension):
     tags = {"htmxfragment"}
