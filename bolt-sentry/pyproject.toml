@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "forge-sentry"
+name = "bolt-sentry"
 packages = [
-    { include = "forgesentry" },
+    { include = "boltsentry" },
 ]
 
 version = "0.3.0"

@@ -1,4 +1,4 @@
-# forge-sentry
+# bolt-sentry
 
 [Sentry](https://sentry.io/) is an error monitoring service that we think has a great Django integration.
 It allows you to debug production errors and also has some performance monitoring features that can be enabled.
@@ -10,12 +10,12 @@ It allows you to debug production errors and also has some performance monitorin
 ```python
 # settings.py
 INSTALLED_APPS = INSTALLED_APPS + [
-  "forgesentry",
+  "boltsentry",
 ]
 
 # Enable the error page feedback widget
 MIDDLEWARE = MIDDLEWARE + [
-  "forgesentry.SentryFeedbackMiddleware",
+  "boltsentry.SentryFeedbackMiddleware",
 ]
 ```
 

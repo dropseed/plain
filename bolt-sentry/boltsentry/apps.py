@@ -7,7 +7,7 @@ from . import settings
 
 class ForgesentryConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "forgesentry"
+    name = "boltsentry"
 
     def ready(self):
         if settings.SENTRY_DSN():

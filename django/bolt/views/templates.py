@@ -20,6 +20,8 @@ class TemplateView(View):
     content_type: str | None = None
 
     def render_template_response(self, extra_context={}) -> HttpResponse:
+        # TODO change arg to context=None and use get_context by default
+        # so you can pass a more specific context excluding the default?
         template = self.get_template()
         context = self.get_context_data()
         context.update(extra_context)
@@ -40,14 +42,7 @@ class TemplateView(View):
 
     def get_template(self) -> jinja2.Template:
         template_names = self.get_template_names()
-
-        for template_name in template_names:
-            try:
-                return jinja.env.get_template(template_name)
-            except jinja2.TemplateNotFound:
-                pass
-
-        raise TemplateDoesNotExist(f"Template {template_names} does not exist.")
+        return jinja.env.get_or_select_template(template_names)
 
     def get_context_data(self) -> dict:
         return {
