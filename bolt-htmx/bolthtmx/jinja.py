@@ -62,3 +62,9 @@ class HTMXFragmentExtension(Extension):
     def render_template_fragment(*, template, fragment_name, context):
         template = HTMXFragmentExtension.find_template_fragment(template, fragment_name)
         return template.render(context)
+
+
+extensions = [
+    HTMXScriptsExtension,
+    HTMXFragmentExtension,
+]

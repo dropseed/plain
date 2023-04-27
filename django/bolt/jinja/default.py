@@ -12,6 +12,8 @@ from django.utils.formats import date_format, time_format
 from django.conf import settings
 from itertools import islice
 from django.utils.timesince import timeuntil, timesince
+from django.utils.module_loading import import_string, module_has_submodule
+from importlib import import_module
 
 def json_script(value, id):
     return format_html(
@@ -74,12 +76,60 @@ def get_default_environment_kwargs():
     }
 
 
+def _get_app_jinja_attribute(app_config, attribute_name):
+    if module_has_submodule(app_config.module, "jinja"):
+        mod = import_module(f"{app_config.name}.jinja")
+        return getattr(mod, attribute_name, None)
+
+
+def get_app_extensions():
+    """Automatically load {app}.jinja.extensions from INSTALLED_APPS"""
+    extensions = []
+
+    for app_config in apps.get_app_configs():
+        if app_extensions := _get_app_jinja_attribute(app_config, "extensions"):
+            extensions.extend(app_extensions)
+
+    return extensions
+
+
+def get_app_globals():
+    """Automatically load {app}.jinja.globals from INSTALLED_APPS"""
+    globals = {}
+
+    for app_config in apps.get_app_configs():
+        if app_globals := _get_app_jinja_attribute(app_config, "globals"):
+            globals.update(app_globals)
+
+    return globals
+
+
+def get_app_filters():
+    """Automatically load {app}.jinja.filters from INSTALLED_APPS"""
+    filters = {}
+
+    for app_config in apps.get_app_configs():
+        if app_filters := _get_app_jinja_attribute(app_config, "filters"):
+            filters.update(app_filters)
+
+    return filters
+
+
 def get_default_environment(extra_kwargs={}):
     kwargs = get_default_environment_kwargs()
     kwargs.update(extra_kwargs)
 
     env = Environment(**kwargs)
 
+    # Load the top-level defaults
     env.globals.update(get_default_environment_globals())
     env.filters.update(get_default_environment_filters())
+
+    # Load from installed apps
+    for extension in get_app_extensions():
+        env.add_extension(extension)
+
+    env.globals.update(get_app_globals())
+    env.filters.update(get_app_filters())
+
     return env

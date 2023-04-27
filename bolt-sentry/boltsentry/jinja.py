@@ -41,3 +41,8 @@ class SentryScriptsExtension(InclusionTagExtension):
             }
 
         return sentry_context
+
+
+extensions = [
+    SentryScriptsExtension,
+]
