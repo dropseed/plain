@@ -1,0 +1,11 @@
+<details data-filter-title="{{ title }}" open>
+  <summary>
+     By {{ title }}
+  </summary>
+  <ul>
+  {% for choice in choices %}
+    <li{% if choice.selected %} class="selected"{% endif %}>
+    <a href="{{ choice.query_string|iriencode }}">{{ choice.display }}</a></li>
+  {% endfor %}
+  </ul>
+</details>

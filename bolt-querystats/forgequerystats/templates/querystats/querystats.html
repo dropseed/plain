@@ -1,0 +1,84 @@
+{% extends querystats_extend_template %}
+
+{% block content %}
+{{ block.super }}
+<div class="fixed inset-0 z-50 px-10 overflow-scroll py-14 bg-black/70" data-querystats-bg>
+    <div class="px-4 py-6 rounded-md shadow-lg text-zinc-200 bg-zinc-900">
+
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-medium">Query stats for {{ request.path }}</h2>
+            <div class="flex items-center">
+                <div class="pt-1">
+                    {{ querystats.summary }}
+                </div>
+
+                <form action="." method="get">
+                    <input type="hidden" name="querystats" value="store">
+                    <button type="submit" class="flex items-center px-3 py-2 ml-4 text-sm rounded-full bg-zinc-600 hover:bg-zinc-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        reload
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="mt-2 font-mono text-xs">
+            {{ querystats_resolver_match }}
+            and template {{ querystats_template_name }}
+        </div>
+
+        <div class="flex w-full mt-5 overflow-auto rounded-sm">
+            {% for query in querystats.queries %}
+            <a href="#query-{{ forloop.counter }}"
+                {% cycle 'class="h-4 bg-amber-400"' 'class="h-4 bg-amber-500"' 'class="h-4 bg-amber-600"' %}
+                title="[{{ query.duration_display }}] {{ query.sql_display }}"
+                style="width: {% widthratio query.duration querystats.total_time 2500 %}px">
+            </a>
+            {% endfor %}
+        </div>
+
+        <div class="mt-4 space-y-4 text-sm">
+            {% for query in querystats.queries %}
+            <div id="query-{{ forloop.counter }}" class="p-2 rounded bg-zinc-800">
+                <div class="float-right px-2 py-px mb-px ml-2 text-xs rounded-full bg-zinc-700">
+                    <span>{{ query.duration_display }}</span>
+                    {% if query.duplicate_count %}
+                    <span class="text-red-500">&nbsp; duplicated {{ query.duplicate_count }} times</span>
+                    {% endif %}
+
+                    {% comment %}
+                    <div>many {{ query.many }}</div>
+                    <div>result {{ query.result }}</div>
+                    {% endcomment %}
+                </div>
+                <div>
+                    <pre><code class="font-mono whitespace-pre-wrap text-zinc-100">{{ query.sql_display }}</code></pre>
+                </div>
+                <div class="mt-3 text-zinc-400">
+                    <span class="font-medium">Parameters</span>
+                    <pre><code class="font-mono">{{ query.params|pprint }}</code></pre>
+                </div>
+                <details class="mt-3">
+                    <summary>Traceback</summary>
+                    <pre><code class="block overflow-x-scroll font-mono text-xs">{{ query.tb }}</code></pre>
+                </details>
+            </div>
+            {% empty %}
+            <div>No queries...</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script async defer>
+window.addEventListener('load', function() {
+    document.querySelector('[data-querystats-bg]').addEventListener('click', function(e) {
+        if (e.target.matches('[data-querystats-bg]')) {
+            e.target.remove();
+
+            var url = new URL(window.location.href);
+            url.searchParams.delete('querystats');
+            window.location = url.toString();
+        }
+    });
+});
+</script>
+{% endblock %}
