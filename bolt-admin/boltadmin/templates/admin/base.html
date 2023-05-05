@@ -50,7 +50,7 @@
                 <a href="{% url 'admin:password_change' %}">Change password</a> /
                 {% endif %}
                 <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
-                    {% csrf_token %}
+                    {{ csrf_input }}
                     <button type="submit">Log out</button>
                 </form>
                 {% include "admin/color_theme_toggle.html" %}

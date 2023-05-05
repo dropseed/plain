@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "forge-querystats"
+name = "bolt-querystats"
 packages = [
-    { include = "forgequerystats" },
+    { include = "boltquerystats" },
 ]
 
 version = "0.3.0"

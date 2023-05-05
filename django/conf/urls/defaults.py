@@ -9,6 +9,7 @@ from django.http import (
 # from django.views.decorators.csrf import requires_csrf_token
 from django.bolt import jinja
 from jinja2.exceptions import TemplateNotFound
+from django.bolt.views import TemplateView
 
 ERROR_404_TEMPLATE_NAME = "404.html"
 ERROR_403_TEMPLATE_NAME = "403.html"
@@ -97,7 +98,7 @@ def server_error(request, template_name=ERROR_500_TEMPLATE_NAME):
         return HttpResponseServerError(
             ERROR_PAGE_TEMPLATE % {"title": "Server Error (500)", "details": ""},
         )
-    return HttpResponseServerError(template.render())
+    return HttpResponseServerError(template.render({}))
 
 
 # @requires_csrf_token
@@ -119,7 +120,7 @@ def bad_request(request, exception, template_name=ERROR_400_TEMPLATE_NAME):
         )
     # No exception content is passed to the template, to not disclose any
     # sensitive information.
-    return HttpResponseBadRequest(template.render())
+    return HttpResponseBadRequest(template.render({}))
 
 
 # @requires_csrf_token
@@ -146,5 +147,5 @@ def permission_denied(request, exception, template_name=ERROR_403_TEMPLATE_NAME)
             ERROR_PAGE_TEMPLATE % {"title": "403 Forbidden", "details": ""},
         )
     return HttpResponseForbidden(
-        template.render(request=request, context={"exception": str(exception)})
+        template.render(context={"exception": str(exception), "request": request})
     )

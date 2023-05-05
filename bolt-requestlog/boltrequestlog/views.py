@@ -1,4 +1,4 @@
-from django.views.generic import TemplateView
+from django.bolt.views import TemplateView
 
 from . import settings
 from .core import RequestLog
@@ -7,8 +7,8 @@ from .core import RequestLog
 class RequestLogView(TemplateView):
     template_name = "requestlog/requestlog.html"
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
+    def get_context_data(self):
+        ctx = super().get_context_data()
         requestlogs = RequestLog.load_json_logs()
 
         if self.request.GET.get("log"):

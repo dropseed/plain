@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "forge-requestlog"
+name = "bolt-requestlog"
 packages = [
-    { include = "forgerequestlog" },
+    { include = "boltrequestlog" },
 ]
 
 version = "0.2.0"
@@ -11,7 +11,6 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 requests = ">=2.0.0"
-forge-core = "*"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

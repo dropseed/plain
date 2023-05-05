@@ -3,15 +3,15 @@
 {% block content %}
 <h1>Login</h1>
 <form action="{% url 'boltoauth:login' 'github' %}" method="post">
-    {% csrf_token %}
+    {{ csrf_input }}
     <button type="submit">Login with GitHub</button>
 </form>
 <form action="{% url 'boltoauth:login' 'gitlab' %}" method="post">
-    {% csrf_token %}
+    {{ csrf_input }}
     <button type="submit">Login with GitLab</button>
 </form>
 <form action="{% url 'boltoauth:login' 'bitbucket' %}" method="post">
-    {% csrf_token %}
+    {{ csrf_input }}
     <button type="submit">Login with Bitbucket</button>
 </form>
 {% endblock %}

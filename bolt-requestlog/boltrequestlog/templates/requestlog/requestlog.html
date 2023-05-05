@@ -58,7 +58,7 @@
                         <tr>
                             <td colspan="4" class="px-1 py-3">
                                 <form method="post">
-                                    {% csrf_token %}
+                                    {{ csrf_input }}
                                     <input type="hidden" name="action" value="clear">
                                     <button type="submit" class="flex items-center mx-auto text-xs text-red-500/75 hover:text-red-500">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-trash3" viewBox="0 0 16 16">
@@ -81,7 +81,7 @@
                         {{ request.method }} <a href="{{ request.absolute_uri }}" class="font-mono hover:underline">{{ request.full_path }}</a>
                     </h3>
                     <form method="POST">
-                        {% csrf_token %}
+                        {{ csrf_input }}
                         <input type="hidden" name="log" value="{{ requestlog.name }}">
                         <button type="submit" class="flex items-center px-3 py-2 ml-4 text-sm rounded-full bg-zinc-600 hover:bg-zinc-500">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>

@@ -21,7 +21,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import request_started, setting_changed
 from django.db import DEFAULT_DB_ALIAS, connections, reset_queries
 from django.db.models.options import Options
-from django.template import Template
+from jinja2 import Template
 from django.test.signals import template_rendered
 from django.urls import get_script_prefix, set_script_prefix
 from django.utils.translation import deactivate
@@ -105,7 +105,7 @@ def instrumented_test_render(self, context):
     intercepted by the test Client.
     """
     template_rendered.send(sender=self, template=self, context=context)
-    return self.nodelist.render(context)
+    return self._original_render(context)
 
 
 class _TestState:
@@ -140,8 +140,9 @@ def setup_test_environment(debug=None):
     saved_data.email_backend = settings.EMAIL_BACKEND
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
-    saved_data.template_render = Template._render
-    Template._render = instrumented_test_render
+    saved_data.template_render = Template.render
+    Template._original_render = Template.render
+    Template.render = instrumented_test_render
 
     mail.outbox = []
 

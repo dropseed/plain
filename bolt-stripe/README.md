@@ -1,7 +1,7 @@
-# forge-stripe
+# bolt-stripe
 
 When it's time to implement billing,
-Forge comes with a few things to make it even easier to integrate [Stripe](https://stripe.com/).
+Bolt comes with a few things to make it even easier to integrate [Stripe](https://stripe.com/).
 
 You can build your own checkout flows if you want,
 but these days Stripe provides a nice [hosted checkout page for starting new subscriptions](https://stripe.com/docs/billing/subscriptions/build-subscriptions?ui=checkout),
@@ -9,16 +9,16 @@ and a [customer portal for letting people upgrade, cancel, or update payment met
 You need a couple of server-side views to redirect people to these pages,
 but you don't need to build and design these things yourself.
 
-Forge makes this even easier by providing classes you can extend.
+Bolt makes this even easier by providing classes you can extend.
 
 ## Installation
 
-Add `forgestripe` to the `INSTALLED_APPS`:
+Add `boltstripe` to the `INSTALLED_APPS`:
 
 ```python
 # settings.py
 INSTALLED_APPS = INSTALLED_APPS + [
-    "forgestripe",
+    "boltstripe",
 ]
 ```
 
@@ -28,7 +28,7 @@ INSTALLED_APPS = INSTALLED_APPS + [
 | ---- | ------- | ----------- | ----------- |
 | `STRIPE_SECRET_KEY` | | Any | [Stripe API key](https://stripe.com/docs/keys) |
 | `STRIPE_WEBHOOK_SECRET` | | Any | Enables [webhook signature verification](https://stripe.com/docs/webhooks/signatures) |
-| `STRIPE_WEBHOOK_PATH` | | Local | Enables `stripe listen` in `forge work` and sets `STRIPE_WEBHOOK_SECRET` |
+| `STRIPE_WEBHOOK_PATH` | | Local | Enables `stripe listen` in `bolt work` and sets `STRIPE_WEBHOOK_SECRET` |
 
 ## Models
 
@@ -40,7 +40,7 @@ or something more specific like a Stripe subscription or charge ID.
 
 ```python
 from django.db import models
-from forgestripe.models import StripeModel
+from boltstripe.models import StripeModel
 
 
 class Project(StripeModel):
@@ -48,7 +48,7 @@ class Project(StripeModel):
     name = models.CharField(max_length=255)
 ```
 
-You will then get a `stripe_object` [cached property](https://docs.djangoproject.com/en/4.1/ref/utils/#django.utils.functional.cached_property) to make it easy to fetch the rest of the data from the Stripe API (the API key will be set for you by Forge).
+You will then get a `stripe_object` [cached property](https://docs.djangoproject.com/en/4.1/ref/utils/#django.utils.functional.cached_property) to make it easy to fetch the rest of the data from the Stripe API (the API key will be set for you by Bolt).
 
 You can use this in Python code:
 
@@ -73,7 +73,7 @@ Especially if you take advantage of the hosted Stripe checkout and customer port
 
 ## Views and URLs
 
-There are three Stripe-related views mixins in Forge:
+There are three Stripe-related views mixins in Bolt:
 
 - `StripeCheckoutView` - to create a checkout session and redirect to it (usually to start a new subscription)
 - `StripePortalView` - to create a customer portal and redirect to it
@@ -104,7 +104,7 @@ use a simple form so that it generates a POST request:
 
 ```html
 <form method="post" action="{% url 'projects:checkout' project.uuid %}">
-    {% csrf_token %}
+    {{ csrf_input }}
     <button type="submit">Start project subscription</button>
 </form>
 ```
@@ -113,7 +113,7 @@ The view is where you will put your custom logic and decide which plans/products
 You can use any info from the request itself, your settings, or database:
 
 ```python
-from forgestripe.views import StripeCheckoutView
+from boltstripe.views import StripeCheckoutView
 
 
 class ProjectCheckoutView(ProjectDetailMixin, StripeCheckoutView, generic.DetailView):
@@ -171,7 +171,7 @@ but you do need to have an existing customer ID to use the `StripePortalView`.
 
 
 ```python
-from forgestripe.views import StripePortalView
+from boltstripe.views import StripePortalView
 
 
 class TeamPortalView(
@@ -200,7 +200,7 @@ urlpatterns = [
 In this example we are going to save a specific Stripe subscription ID to a project:
 
 ```python
-from forgestripe.views import StripeWebhookView
+from boltstripe.views import StripeWebhookView
 
 
 class StripeWebhook(StripeWebhookView):
@@ -246,6 +246,6 @@ stripe login
 ```
 
 Then in your `.env` file, you can add a `STRIPE_WEBHOOK_PATH` (ex. STRIPE_WEBHOOK_PATH=/webhooks/stripe/)
-which will be detected by `forge work` and automatically start a `stripe listen` process when you run `forge work`:
+which will be detected by `bolt work` and automatically start a `stripe listen` process when you run `bolt work`:
 
 Alternatively, you can use [Stripe for VSCode](https://stripe.com/docs/stripe-vscode) or a more generic tunneling tool like [Ngrok](https://ngrok.com/).

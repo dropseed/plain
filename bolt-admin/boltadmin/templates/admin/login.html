@@ -41,7 +41,7 @@ Please correct the error{{ form.errors.items|length|pluralize:",s"}} below.
 </p>
 {% endif %}
 
-<form action="{{ app_path }}" method="post" id="login-form">{% csrf_token %}
+<form action="{{ app_path }}" method="post" id="login-form">{{ csrf_input }}
   <div class="form-row">
     {{ form.username.errors }}
     {{ form.username.label_tag }} {{ form.username }}
