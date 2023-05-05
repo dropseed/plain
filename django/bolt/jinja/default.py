@@ -4,8 +4,6 @@ from django.conf import settings
 from pathlib import Path
 import functools
 from django.apps import apps
-from django.templatetags.static import static
-from django.urls import reverse
 from django.utils.html import format_html
 from django.core.paginator import Paginator
 from django.utils.formats import date_format, time_format
@@ -14,6 +12,7 @@ from itertools import islice
 from django.utils.timesince import timeuntil, timesince
 from django.utils.module_loading import module_has_submodule
 from importlib import import_module
+from django.contrib.staticfiles.storage import staticfiles_storage
 
 def json_script(value, id):
     return format_html(
@@ -25,7 +24,12 @@ def json_script(value, id):
 
 def url(viewname, *args, **kwargs):
     # A modified reverse that lets you pass args directly, excluding urlconf
+    from django.urls import reverse
     return reverse(viewname, args=args, kwargs=kwargs)
+
+
+def static(path):
+    return staticfiles_storage.url(path)
 
 
 def get_default_environment_globals():
@@ -115,7 +119,7 @@ def get_app_filters():
     return filters
 
 
-def create_default_environment(extra_kwargs={}):
+def create_default_environment(extra_kwargs={}, include_apps=True):
     kwargs = get_default_environment_kwargs()
     kwargs.update(extra_kwargs)
 
@@ -125,11 +129,11 @@ def create_default_environment(extra_kwargs={}):
     env.globals.update(get_default_environment_globals())
     env.filters.update(get_default_environment_filters())
 
-    # Load from installed apps
-    for extension in get_app_extensions():
-        env.add_extension(extension)
+    if include_apps:
+        for extension in get_app_extensions():
+            env.add_extension(extension)
 
-    env.globals.update(get_app_globals())
-    env.filters.update(get_app_filters())
+        env.globals.update(get_app_globals())
+        env.filters.update(get_app_filters())
 
     return env

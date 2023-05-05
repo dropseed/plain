@@ -10,7 +10,8 @@ from graphlib import CycleError, TopologicalSorter
 from itertools import chain
 
 from django.forms.utils import to_current_timezone
-from django.templatetags.static import static
+from django.bolt.jinja.default import static
+from django.bolt import jinja
 from django.utils import formats
 from django.utils.dates import MONTHS
 from django.utils.formats import get_format
@@ -18,8 +19,6 @@ from django.utils.html import format_html, html_safe
 from django.utils.regex_helper import _lazy_re_compile
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-
-from .renderers import get_default_renderer
 
 __all__ = (
     "Media",
@@ -268,15 +267,14 @@ class Widget(metaclass=MediaDefiningClass):
             },
         }
 
-    def render(self, name, value, attrs=None, renderer=None):
+    def render(self, name, value, attrs=None):
         """Render the widget as an HTML string."""
         context = self.get_context(name, value, attrs)
-        return self._render(self.template_name, context, renderer)
+        return self._render(self.template_name, context)
 
-    def _render(self, template_name, context, renderer=None):
-        if renderer is None:
-            renderer = get_default_renderer()
-        return mark_safe(renderer.render(template_name, context))
+    def _render(self, template_name, context):
+        template = jinja.environment.get_or_select_template(template_name)
+        return mark_safe(template.render(context))
 
     def build_attrs(self, base_attrs, extra_attrs=None):
         """Build an attribute dictionary."""

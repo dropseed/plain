@@ -9,8 +9,8 @@
   </tr>
 {% endif %}
 {% for field, errors in fields %}
-  <tr{% with classes=field.css_classes %}{% if classes %} class="{{ classes }}"{% endif %}{% endwith %}>
-    <th>{% if field.label %}{{ field.label_tag }}{% endif %}</th>
+  <tr{% set classes = field.css_classes() %}{% if classes %} class="{{ classes }}"{% endif %}>
+    <th>{% if field.label %}{{ field.label_tag() }}{% endif %}</th>
     <td>
       {{ errors }}
       {{ field }}
@@ -18,7 +18,7 @@
         <br>
         <span class="helptext">{{ field.help_text|safe }}</span>
       {% endif %}
-      {% if forloop.last %}
+      {% if loop.last %}
         {% for field in hidden_fields %}{{ field }}{% endfor %}
       {% endif %}
     </td>

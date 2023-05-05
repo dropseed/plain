@@ -1,5 +1,5 @@
 import sentry_sdk
-from django.template import Context, Template
+from django.bolt import jinja
 
 
 class SentryFeedbackMiddleware:
@@ -13,13 +13,12 @@ class SentryFeedbackMiddleware:
             # Render the sentry_js tag manually, and insert it before the </head> tag
             # (this will work with any 500.html and uses minimal context)
             try:
-                sentry_html = Template("{% load sentry %}{% sentry_js %}").render(
-                    Context(
-                        {
-                            "sentry_dialog_event_id": sentry_sdk.last_event_id(),
-                            "user": getattr(request, "user", None),
-                        }
-                    )
+                template = jinja.environment.from_string("{% sentry_js %}")
+                sentry_html = template.render(
+                    {
+                        "sentry_dialog_event_id": sentry_sdk.last_event_id(),
+                        "user": getattr(request, "user", None),
+                    }
                 )
 
                 response.content = response.content.replace(

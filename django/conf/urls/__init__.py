@@ -1,5 +1,5 @@
 from django.urls import include
-from django.views import defaults
+from . import defaults
 
 __all__ = ["handler400", "handler403", "handler404", "handler500", "include"]
 

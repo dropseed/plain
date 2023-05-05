@@ -1,6 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, render
-from django.views import View
+from django.bolt.views import View
 
 from .exceptions import (
     OAuthCannotDisconnectError,
@@ -11,7 +11,9 @@ from .providers import get_oauth_provider_instance
 
 
 class OAuthLoginView(View):
-    def post(self, request, provider):
+    def post(self):
+        request = self.request
+        provider = self.url_kwargs["provider"]
         if request.user.is_authenticated:
             return redirect("/")
 
@@ -24,7 +26,9 @@ class OAuthCallbackView(View):
     The callback view is used for signup, login, and connect.
     """
 
-    def get(self, request, provider):
+    def get(self):
+        request = self.request
+        provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         try:
             return provider_instance.handle_callback_request(request=request)
@@ -47,13 +51,17 @@ class OAuthCallbackView(View):
 
 
 class OAuthConnectView(LoginRequiredMixin, View):
-    def post(self, request, provider):
+    def post(self):
+        request = self.request
+        provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         return provider_instance.handle_connect_request(request=request)
 
 
 class OAuthDisconnectView(LoginRequiredMixin, View):
-    def post(self, request, provider):
+    def post(self):
+        request = self.request
+        provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         try:
             return provider_instance.handle_disconnect_request(request=request)

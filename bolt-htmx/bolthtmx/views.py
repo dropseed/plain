@@ -21,7 +21,7 @@ class HTMXViewMixin:
 
         return super().render_template_response(extra_context=extra_context)
 
-    def dispatch(self, *args, **kwargs):
+    def dispatch(self):
         if self.is_htmx_request:
             # You can use an htmx_{method} method on views
             # (or htmx_{method}_{action} for specific actions)
@@ -31,9 +31,9 @@ class HTMXViewMixin:
 
             handler = getattr(self, method, None)
             if handler:
-                return handler(*args, **kwargs)
+                return handler()
 
-        return super().dispatch(*args, **kwargs)
+        return super().dispatch()
 
     def get_template_names(self):
         # TODO is this part necessary anymore?? can I replace those with fragments now?

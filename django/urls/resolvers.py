@@ -369,7 +369,7 @@ class URLPattern:
             return []
 
     def _check_callback(self):
-        from django.views import View
+        from django.bolt.views import View
 
         view = self.callback
         if inspect.isclass(view) and issubclass(view, View):

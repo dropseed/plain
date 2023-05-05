@@ -67,10 +67,10 @@ class AccessMixin:
 class LoginRequiredMixin(AccessMixin):
     """Verify that the current user is authenticated."""
 
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
+    def dispatch(self):
+        if not self.request.user.is_authenticated:
             return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
+        return super().dispatch()
 
 
 class PermissionRequiredMixin(AccessMixin):
@@ -103,10 +103,10 @@ class PermissionRequiredMixin(AccessMixin):
         perms = self.get_permission_required()
         return self.request.user.has_perms(perms)
 
-    def dispatch(self, request, *args, **kwargs):
+    def dispatch(self):
         if not self.has_permission():
             return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
+        return super().dispatch()
 
 
 class UserPassesTestMixin(AccessMixin):
@@ -128,8 +128,8 @@ class UserPassesTestMixin(AccessMixin):
         """
         return self.test_func
 
-    def dispatch(self, request, *args, **kwargs):
+    def dispatch(self):
         user_test_result = self.get_test_func()()
         if not user_test_result:
             return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
+        return super().dispatch()
