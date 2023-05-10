@@ -6,7 +6,7 @@ packages = [
 ]
 
 version = "0.3.2"
-description = "HTMX integration for Forge"
+description = "HTMX integration for Bolt"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"

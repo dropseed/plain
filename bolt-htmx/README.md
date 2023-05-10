@@ -350,7 +350,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 The standard behavior for `{% htmxfragment %}` is to set `hx-indicator="this"` on the rendered element.
 This tells HTMX to add the `htmx-request` class to the fragment element when it is loading.
 
-Since Forge emphasizes using Tailwind CSS,
+Since Bolt emphasizes using Tailwind CSS,
 here's a simple variant you can add to your `tailwind.config.js` to easily style the loading state:
 
 ```js
