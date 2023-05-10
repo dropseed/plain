@@ -7,7 +7,11 @@ authors = ["Dave Gaeddert <dave.gaeddert@gmail.com>", "Past authors of Django"]
 
 packages = [
     { include = "django" },
+    { include = "bolt" },
 ]
+
+[tool.poetry.scripts]
+bolt = "bolt.cli:cli"
 
 [tool.poetry.dependencies]
 python = "^3.10"
