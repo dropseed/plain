@@ -31,6 +31,7 @@ def cli(pytest_args):
 
     bolt_tmp_dir = os.path.join(repo_root, ".bolt")
     if not os.path.exists(os.path.join(bolt_tmp_dir, ".gitignore")):
+        os.makedirs(bolt_tmp_dir, exist_ok=True)
         with open(os.path.join(bolt_tmp_dir, ".gitignore"), "w") as f:
             f.write("*\n")
 
