@@ -1,19 +1,19 @@
 [tool.poetry]
 
-name = "forge-test"
+name = "bolt-test"
 packages = [
-    { include = "forgetest" },
+    { include = "bolttest" },
 ]
 
 version = "1.1.0"
-description = "Testing for Forge"
+description = "Testing for Bolt"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://www.forgepackages.com/"
-documentation = "https://www.forgepackages.com/docs/"
-repository = "https://github.com/forgepackages/forge-test"
-keywords = ["django", "saas", "forge", "framework"]
+homepage = "https://www.boltpackages.com/"
+documentation = "https://www.boltpackages.com/docs/"
+repository = "https://github.com/boltpackages/bolt-test"
+keywords = ["django", "saas", "bolt", "framework"]
 classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",
@@ -23,11 +23,10 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"forge-test" = "forgetest:cli"
+"bolt-test" = "bolttest:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-forge-core = "^1.0.0"
 click = ">=8.0.0"
 pytest = "^7.0.0"
 pytest-django = "^4.5.2"
