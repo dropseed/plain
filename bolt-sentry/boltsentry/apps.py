@@ -5,9 +5,9 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from . import settings
 
 
-class ForgesentryConfig(AppConfig):
+class BoltsentryConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "forgesentry"
+    name = "boltsentry"
 
     def ready(self):
         if settings.SENTRY_DSN():
