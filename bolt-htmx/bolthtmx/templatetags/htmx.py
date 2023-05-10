@@ -24,7 +24,7 @@ class HTMXFragmentNode(template.Node):
         self.nodelist = template.NodeList(
             [
                 TextNode(
-                    f'<div fhx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this">'
+                    f'<div bhx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this">'
                 )
             ]
             + nodelist
@@ -37,7 +37,7 @@ class HTMXFragmentNode(template.Node):
             return template.NodeList(
                 [
                     TextNode(
-                        f'<div hx-get hx-trigger="fhxLoad from:body" fhx-fragment="{self.fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
+                        f'<div hx-get hx-trigger="bhxLoad from:body" bhx-fragment="{self.fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
                     ),
                 ]
             ).render(context)

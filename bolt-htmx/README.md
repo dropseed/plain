@@ -1,6 +1,6 @@
-# forge-htmx
+# bolt-htmx
 
-The `forge-htmx` Django package adds a couple of unique features for working with HTMX.
+The `bolt-htmx` Django package adds a couple of unique features for working with HTMX.
 One is [template fragments](#template-fragments) and the other is [view actions](#view-actions).
 
 The combination of these features lets you build HTMX-powered views that focus on server-side rendering and avoid overly complicated URL structures or REST APIs that you may not otherwise need.
@@ -12,7 +12,7 @@ simply inherit from the class (yes, this is designed to work with class-based vi
 ```python
 from django.views.generic import TemplateView
 
-from forgehtmx.views import HTMXViewMixin
+from bolthtmx.views import HTMXViewMixin
 
 
 class HomeView(HTMXViewMixin, TemplateView):
@@ -39,18 +39,18 @@ you can use the `{% htmx_js %}` template tag:
 
 ## Installation
 
-You can install `forge-htmx` with any Django project:
+You can install `bolt-htmx` with any Django project:
 
 ```sh
-pip install forge-htmx
+pip install bolt-htmx
 ```
 
-Then add `forgehtmx` to `settings.py`:
+Then add `bolthtmx` to `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     # ...
-    "forgehtmx",
+    "bolthtmx",
 ]
 ```
 
@@ -130,16 +130,16 @@ When you use the `{% htmxfragment %}` tag,
 a standard `div` is output that looks like this:
 
 ```html
-<div fhx-fragment="main" hx-swap="outerHTML" hx-target="this" hx-indicator="this">
+<div bhx-fragment="main" hx-swap="outerHTML" hx-target="this" hx-indicator="this">
   {{ fragment_content }}
 </div>
 ```
 
-The `fhx-fragment` is a custom attribute that we've added ("F" is for "Forge"),
+The `bhx-fragment` is a custom attribute that we've added ("F" is for "Bolt"),
 but the rest are standard HTMX attributes.
 
 When Django renders the response to an HTMX request,
-it will get the `FHX-Fragment` header,
+it will get the `BHX-Fragment` header,
 find the fragment with that name in the template,
 and render that for the response.
 
@@ -167,7 +167,7 @@ and associate buttons in that template with class methods in the view.
 
 As an example, let's say we have a `PullRequest` model and we want users to be able to open, close, or merge it with a button.
 
-In our template, we would use the `fhx-action` attribute to name the action:
+In our template, we would use the `bhx-action` attribute to name the action:
 
 ```html
 {% extends "base.html" %}
@@ -185,11 +185,11 @@ In our template, we would use the `fhx-action` attribute to name the action:
 
   {% if pullrequest.state == "open" %}
     <!-- If it's open, they can close or merge it -->
-    <button hx-post fhx-action="close">Close</button>
-    <button hx-post fhx-action="merge">Merge</button>
+    <button hx-post bhx-action="close">Close</button>
+    <button hx-post bhx-action="merge">Merge</button>
   {% else if pullrequest.state == "closed" %}
     <!-- If it's closed, it can be re-opened -->
-    <button hx-post fhx-action="open">Open</button>
+    <button hx-post bhx-action="open">Open</button>
   {% endif %}
 
   {% endhtmxfragment %}
@@ -197,7 +197,7 @@ In our template, we would use the `fhx-action` attribute to name the action:
 {% endblock %}
 ```
 
-Then in the view class, we can define methods for each HTTP method + `fhx-action`:
+Then in the view class, we can define methods for each HTTP method + `bhx-action`:
 
 ```python
 class PullRequestDetailView(HTMXViewMixin, DetailView):
@@ -260,7 +260,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         # The queryset will apply to all actions on the view, so "permission" logic can be shared
         return super().get_queryset().filter(users=self.request.user)
 
-    # You can also leave off the "fhx-action" attribute and just handle the HTTP method
+    # You can also leave off the "bhx-action" attribute and just handle the HTTP method
     def htmx_delete(self, request, *args, **kwargs):
         self.object = self.get_object()
 
@@ -274,7 +274,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 
 ## Dedicated Templates
 
-A small additional features of `forge-htmx` is that it will automatically find templates named `{template_name}_htmx.html` for HTMX requests.
+A small additional features of `bolt-htmx` is that it will automatically find templates named `{template_name}_htmx.html` for HTMX requests.
 More than anything, this is just a nice way to formalize a naming scheme for template "partials" dedicated to HTMX.
 
 Because template fragments don't work inside of loops,
@@ -308,7 +308,7 @@ And then subsequent HTMX requests/actions on individual items can be handled by 
   <!-- Send all HTMX requests to a URL for single pull requests (works inside of a loop, or on a single detail page) -->
   <h2>{{ pullrequest.title }}</h2>
   <button hx-get>Refresh</button>
-  <button hx-post fhx-action="update">Update</button>
+  <button hx-post bhx-action="update">Update</button>
 </div>
 ```
 
@@ -350,7 +350,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 The standard behavior for `{% htmxfragment %}` is to set `hx-indicator="this"` on the rendered element.
 This tells HTMX to add the `htmx-request` class to the fragment element when it is loading.
 
-Since Forge emphasizes using Tailwind CSS,
+Since Bolt emphasizes using Tailwind CSS,
 here's a simple variant you can add to your `tailwind.config.js` to easily style the loading state:
 
 ```js

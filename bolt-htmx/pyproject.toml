@@ -1,19 +1,19 @@
 [tool.poetry]
 
-name = "forge-htmx"
+name = "bolt-htmx"
 packages = [
-    { include = "forgehtmx" },
+    { include = "bolthtmx" },
 ]
 
 version = "0.3.2"
-description = "HTMX integration for Forge"
+description = "HTMX integration for Bolt"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://www.forgepackages.com/"
-documentation = "https://www.forgepackages.com/docs/"
-repository = "https://github.com/forgepackages/forge-htmx"
-keywords = ["django", "saas", "forge", "framework"]
+homepage = "https://www.boltpackages.com/"
+documentation = "https://www.boltpackages.com/docs/"
+repository = "https://github.com/boltpackages/bolt-htmx"
+keywords = ["django", "saas", "bolt", "framework"]
 classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",

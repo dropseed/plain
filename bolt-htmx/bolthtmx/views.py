@@ -102,8 +102,8 @@ class HTMXViewMixin:
     @property
     def htmx_fragment_name(self):
         # A custom header that we pass with the {% htmxfragment %} tag
-        return self.request.headers.get("FHX-Fragment", "")
+        return self.request.headers.get("BHX-Fragment", "")
 
     @property
     def htmx_action_name(self):
-        return self.request.headers.get("FHX-Action", "")
+        return self.request.headers.get("BHX-Action", "")
