@@ -1,12 +1,12 @@
-# forge-tailwind
+# bolt-tailwind
 
 Use [Tailwind CSS](https://tailwindcss.com/) with [Django](https://www.djangoproject.com/) *without* requiring JavaScript or npm.
 
 Made possible by the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli).
 
 ```console
-$ forge tailwind
-Usage: forge tailwind [OPTIONS] COMMAND [ARGS]...
+$ bolt tailwind
+Usage: bolt tailwind [OPTIONS] COMMAND [ARGS]...
 
   Tailwind CSS
 
@@ -21,16 +21,16 @@ Commands:
 
 ## Installation
 
-First, install `forge-tailwind` from [PyPI](https://pypi.org/project/forge-tailwind/):
+First, install `bolt-tailwind` from [PyPI](https://pypi.org/project/bolt-tailwind/):
 
 ```sh
-pip install forge-tailwind
+pip install bolt-tailwind
 ```
 
 Create a new `tailwind.config.js` file in your project root:
 
 ```sh
-forge tailwind init
+bolt tailwind init
 ```
 
 This will also create a `tailwind.css` file at `static/src/tailwind.css` where additional CSS can be added.
@@ -40,13 +40,13 @@ but this is the default (requires `STATICFILES_DIRS = [BASE_DIR / "static"]`).
 The `src/tailwind.css` file is then compiled into `dist/tailwind.css` by running `tailwind compile`:
 
 ```sh
-forge tailwind compile
+bolt tailwind compile
 ```
 
 When you're working locally, add `--watch` to automatically compile as changes are made:
 
 ```sh
-forge tailwind compile --watch
+bolt tailwind compile --watch
 ```
 
 Then include the compiled CSS in your base template `<head>`:
@@ -55,12 +55,12 @@ Then include the compiled CSS in your base template `<head>`:
 <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}">
 ```
 
-In your repo you will notice a new `.forge` directory that contains `tailwind` (the standalone CLI binary) and `tailwind.version` (to track the version currently installed).
-You should add `.forge` to your `.gitignore` file.
+In your repo you will notice a new `.bolt` directory that contains `tailwind` (the standalone CLI binary) and `tailwind.version` (to track the version currently installed).
+You should add `.bolt` to your `.gitignore` file.
 
 ## Updating Tailwind
 
-This package manages the Tailwind versioning by comparing `.forge/tailwind.version` to the `FORGE_TAILWIND_VERSION` variable that is injected into your `tailwind.config.js` file.
+This package manages the Tailwind versioning by comparing `.bolt/tailwind.version` to the `FORGE_TAILWIND_VERSION` variable that is injected into your `tailwind.config.js` file.
 
 ```js
 const FORGE_TAILWIND_VERSION = "3.0.24"
@@ -113,8 +113,8 @@ it should be done in `app/static/src/tailwind.css`.
 
 ## Deployment
 
-If possible, you should add `static/dist/tailwind.css` to your `.gitignore` and run the `forge tailwind compile --minify` command as a part of your deployment pipeline.
+If possible, you should add `static/dist/tailwind.css` to your `.gitignore` and run the `bolt tailwind compile --minify` command as a part of your deployment pipeline.
 
-When you run `forge tailwind compile`, it will automatically check whether the Tailwind standalone CLI has been installed, and install it if it isn't.
+When you run `bolt tailwind compile`, it will automatically check whether the Tailwind standalone CLI has been installed, and install it if it isn't.
 
-When using Forge on Heroku, we do this for you automatically in our [Forge buildpack](https://github.com/forgepackages/heroku-buildpack-forge/blob/master/bin/files/post_compile).
+When using Bolt on Heroku, we do this for you automatically in our [Bolt buildpack](https://github.com/boltpackages/heroku-buildpack-bolt/blob/master/bin/files/post_compile).

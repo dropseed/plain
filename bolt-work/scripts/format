@@ -1,6 +1,6 @@
 #!/bin/sh -e
-poetry run black forgework "$@"
-poetry run isort forgework --profile=black "$@"
+poetry run black boltwork "$@"
+poetry run isort boltwork --profile=black "$@"
 
 poetry run black tests "$@"
 poetry run isort tests --profile=black "$@"

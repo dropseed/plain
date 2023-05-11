@@ -261,15 +261,15 @@ files = [
 tests = ["asttokens", "littleutils", "pytest", "rich"]
 
 [[package]]
-name = "forge-core"
+name = "bolt-core"
 version = "1.0.0"
-description = "Core library for Forge"
+description = "Core library for Bolt"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "forge_core-1.0.0-py3-none-any.whl", hash = "sha256:7b3c523ea03e353fe9e3697f26fae0c7f5e2ae95d76c76a09e4d9eb4524b939f"},
-    {file = "forge_core-1.0.0.tar.gz", hash = "sha256:26cc9e89712d0a471da1a176e29aba20661bd0c323c10f32d166224959d62070"},
+    {file = "bolt_core-1.0.0-py3-none-any.whl", hash = "sha256:7b3c523ea03e353fe9e3697f26fae0c7f5e2ae95d76c76a09e4d9eb4524b939f"},
+    {file = "bolt_core-1.0.0.tar.gz", hash = "sha256:26cc9e89712d0a471da1a176e29aba20661bd0c323c10f32d166224959d62070"},
 ]
 
 [package.dependencies]

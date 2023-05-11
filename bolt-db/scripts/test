@@ -1,3 +1,0 @@
-#!/bin/sh -e
-poetry run pytest tests
-poetry run forge db --help

@@ -1,3 +1,0 @@
-#!/bin/sh -e
-poetry run black boltformat "$@"
-poetry run black tests "$@"

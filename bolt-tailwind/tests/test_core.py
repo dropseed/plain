@@ -1,6 +1,6 @@
-from forgecore import Forge
+from boltcore import Bolt
 
 
 def test_import():
     # Just make sure it loads for now
-    forge = Forge()
+    Bolt()

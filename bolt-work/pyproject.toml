@@ -1,19 +1,19 @@
 [tool.poetry]
 
-name = "forge-work"
+name = "bolt-work"
 packages = [
-    { include = "forgework" },
+    { include = "boltwork" },
 ]
 
 version = "1.1.0"
-description = "Work library for Forge"
+description = "Work library for Bolt"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://www.forgepackages.com/"
-documentation = "https://www.forgepackages.com/docs/"
-repository = "https://github.com/forgepackages/forge-work"
-keywords = ["django", "saas", "forge", "framework"]
+homepage = "https://www.boltpackages.com/"
+documentation = "https://www.boltpackages.com/docs/"
+repository = "https://github.com/boltpackages/bolt-work"
+keywords = ["django", "saas", "bolt", "framework"]
 classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",
@@ -23,23 +23,34 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"forge-work" = "forgework:cli"
+"bolt-work" = "boltwork:cli"
+"bolt-format" = "boltwork.format:cli"
+"bolt-db" = "boltwork.db:cli"
+"bolt-pre-commit" = "boltwork.precommit:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-forge-core = "^1.0.0"
 click = ">=8.0.0"
 python-dotenv = "*"
 honcho = "^1.1.0"
 debugpy = "^1.6.3"
 hupper = "^1.10.3"
 
+tomli = {version = "^2.0.1", python = "<3.11"}
+
+# db
+requests = ">=2.0.0"
+psycopg2-binary = "^2.9.3"
+dj-database-url = "^1.0.0"  # TODO move into bolt
+
+# format
+black = ">=22.0.0"
+ruff = "^0.0.259"
+
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 Django = "^4.0.5"
-isort = "^5.10.1"
-black = "^22.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
