@@ -3,11 +3,10 @@ import subprocess
 import sys
 
 import click
-from forgecore import Forge
 
 from .utils import generate_secret_key
 
-FORGE_BUILDPACK = "forgepackages/forge"
+BOLT_BUILDPACK = "https://github.com/dropseed/heroku-buildpack-bolt"
 
 
 @click.group("heroku")
@@ -122,8 +121,8 @@ def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
     subprocess.check_call(["git", "push", "heroku", branch_name])
 
     click.echo()
-    click.secho(f"Running `createsuperuser` on the production app", bold=True)
-    subprocess.check_call(["heroku", "run", "forge", "django", "createsuperuser"])
+    click.secho("Running `createsuperuser` on the production app", bold=True)
+    subprocess.check_call(["heroku", "run", "bolt", "django", "createsuperuser"])
 
     click.echo()
     click.secho(
@@ -137,17 +136,32 @@ def create(ctx, heroku_app_name, postgres_tier, redis_tier, team):
 def set_buildpacks(confirm):
     """Automatically determine and set buildpacks"""
     buildpacks = [
-        FORGE_BUILDPACK,
+        BOLT_BUILDPACK,
     ]
 
-    forge = Forge()
+    try:
+        repo_root = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--show-toplevel"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode("utf-8")
+            .strip()
+        )
+    except subprocess.CalledProcessError:
+        click.secho(
+            "All bolt projects are expected to be in a git repo and we couldn't find one.",
+            fg="red",
+        )
+        exit(1)
 
-    if os.path.exists(os.path.join(forge.repo_root, "package.json")):
+    if os.path.exists(os.path.join(repo_root, "package.json")):
         buildpacks.append("heroku/nodejs")
 
-    if os.path.exists(os.path.join(forge.repo_root, "poetry.lock")):
+    if os.path.exists(os.path.join(repo_root, "poetry.lock")):
         buildpacks.append(
-            "https://github.com/forgepackages/heroku-buildpack-poetry.git"
+            # TODO move to dropseed
+            "https://github.com/forgepackages/heroku-buildpack-poetry"
         )
 
     buildpacks.append("heroku/python")
@@ -172,23 +186,28 @@ def set_buildpacks(confirm):
 @cli.command()
 def shell():
     """Open a remote Django shell"""
-    subprocess.run(["heroku", "run", "forge shell"])
+    subprocess.run(["heroku", "run", "bolt shell"])
 
 
 @cli.command()
 def serve():
     """Run a production server using gunicorn"""
-    forge = Forge()
-    wsgi = (
-        "wsgi" if forge.user_file_exists("wsgi.py") else "forgecore.default_files.wsgi"
-    )
-    result = forge.venv_cmd(
-        "gunicorn",
-        f"{wsgi}:application",
-        "--log-file",
-        "-",
+    app_dir = os.path.join(os.getcwd(), "app")
+
+    if os.path.exists(os.path.join(app_dir, "wsgi.py")):
+        wsgi = "app.wsgi"
+    else:
+        wsgi = "bolt.wsgi.default"
+
+    result = subprocess.run(
+        [
+            "gunicorn",
+            f"{wsgi}:application",
+            "--log-file",
+            "-",
+        ],
         env={
-            "PYTHONPATH": forge.project_dir,
+            "PYTHONPATH": app_dir,
         },
     )
     sys.exit(result.returncode)
@@ -197,20 +216,20 @@ def serve():
 @cli.command("pre-deploy")
 def pre_deploy():
     """Pre-deploy checks for release process"""
-    forge = Forge()
-
     click.secho("Running Django system checks", bold=True)
-    forge.manage_cmd("check", "--deploy", "--fail-level", "WARNING", check=True)
+    subprocess.check_call(
+        ["bolt", "django", "check", "--deploy", "--fail-level", "WARNING"]
+    )
 
     click.echo()
 
     click.secho("Running Django migrations", bold=True)
-    forge.manage_cmd("migrate", check=True)
+    subprocess.check_call(["bolt", "django", "migrate"])
 
     click.echo()
 
     click.secho("Clearing expired sessions", bold=True)
-    forge.manage_cmd("clearsessions", check=True)
+    subprocess.check_call(["bolt", "django", "clearsessions"])
 
 
 if __name__ == "__main__":
