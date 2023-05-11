@@ -5,7 +5,7 @@ from django.conf import settings
 class ExcludeCommonURLsFilter(logging.Filter):
     def __init__(self):
         self.exclude_urls = [
-            "/admin/jsi18n/",  # could be customized...
+            # "/admin/jsi18n/",  # could be customized...
             "/favicon.ico",
         ]
 
