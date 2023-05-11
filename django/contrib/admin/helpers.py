@@ -312,10 +312,6 @@ class InlineAdminFormSet:
         prepopulated_fields=None,
         readonly_fields=None,
         model_admin=None,
-        has_add_permission=True,
-        has_change_permission=True,
-        has_delete_permission=True,
-        has_view_permission=True,
     ):
         self.opts = inline
         self.formset = formset
@@ -328,18 +324,9 @@ class InlineAdminFormSet:
             prepopulated_fields = {}
         self.prepopulated_fields = prepopulated_fields
         self.classes = " ".join(inline.classes) if inline.classes else ""
-        self.has_add_permission = has_add_permission
-        self.has_change_permission = has_change_permission
-        self.has_delete_permission = has_delete_permission
-        self.has_view_permission = has_view_permission
 
     def __iter__(self):
-        if self.has_change_permission:
-            readonly_fields_for_editing = self.readonly_fields
-        else:
-            readonly_fields_for_editing = self.readonly_fields + flatten_fieldsets(
-                self.fieldsets
-            )
+        readonly_fields_for_editing = self.readonly_fields
 
         for form, original in zip(
             self.formset.initial_forms, self.formset.get_queryset()
@@ -365,16 +352,15 @@ class InlineAdminFormSet:
                 self.readonly_fields,
                 model_admin=self.opts,
             )
-        if self.has_add_permission:
-            yield InlineAdminForm(
-                self.formset,
-                self.formset.empty_form,
-                self.fieldsets,
-                self.prepopulated_fields,
-                None,
-                self.readonly_fields,
-                model_admin=self.opts,
-            )
+        yield InlineAdminForm(
+            self.formset,
+            self.formset.empty_form,
+            self.fieldsets,
+            self.prepopulated_fields,
+            None,
+            self.readonly_fields,
+            model_admin=self.opts,
+        )
 
     def fields(self):
         fk = getattr(self.formset, "fk", None)
@@ -384,7 +370,7 @@ class InlineAdminFormSet:
         for i, field_name in enumerate(flatten_fieldsets(self.fieldsets)):
             if fk and fk.name == field_name:
                 continue
-            if not self.has_change_permission or field_name in self.readonly_fields:
+            if field_name in self.readonly_fields:
                 form_field = empty_form.fields.get(field_name)
                 widget_is_hidden = False
                 if form_field is not None:

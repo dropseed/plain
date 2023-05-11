@@ -26,9 +26,6 @@ class AutocompleteJsonView(BaseListView):
             to_field_name,
         ) = self.process_request(request)
 
-        if not self.has_perm(request):
-            raise PermissionDenied
-
         self.object_list = self.get_queryset()
         context = self.get_context_data()
         return JsonResponse(
@@ -116,7 +113,3 @@ class AutocompleteJsonView(BaseListView):
             raise PermissionDenied
 
         return term, model_admin, source_field, to_field_name
-
-    def has_perm(self, request, obj=None):
-        """Check if user has permission to access the related model."""
-        return self.model_admin.has_view_permission(request, obj=obj)

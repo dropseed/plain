@@ -182,11 +182,6 @@ class UserChangeForm(forms.ModelForm):
             password.help_text = password.help_text.format(
                 f"../../{self.instance.pk}/password/"
             )
-        user_permissions = self.fields.get("user_permissions")
-        if user_permissions:
-            user_permissions.queryset = user_permissions.queryset.select_related(
-                "content_type"
-            )
 
 
 class AuthenticationForm(forms.Form):

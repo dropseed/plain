@@ -145,8 +145,6 @@ def get_deleted_objects(objs, request, admin_site):
         no_edit_link = "%s: %s" % (capfirst(opts.verbose_name), obj)
 
         if has_admin:
-            if not admin_site._registry[model].has_delete_permission(request, obj):
-                perms_needed.add(opts.verbose_name)
             try:
                 admin_url = reverse(
                     "%s:%s_%s_change"

@@ -43,9 +43,9 @@ class Migration(migrations.Migration):
                 "verbose_name": "permission",
                 "verbose_name_plural": "permissions",
             },
-            managers=[
-                ("objects", django.contrib.auth.models.PermissionManager()),
-            ],
+            # managers=[
+            #     ("objects", django.contrib.auth.models.PermissionManager()),
+            # ],
         ),
         migrations.CreateModel(
             name="Group",
@@ -74,9 +74,9 @@ class Migration(migrations.Migration):
                 "verbose_name": "group",
                 "verbose_name_plural": "groups",
             },
-            managers=[
-                ("objects", django.contrib.auth.models.GroupManager()),
-            ],
+            # managers=[
+            #     ("objects", django.contrib.auth.models.GroupManager()),
+            # ],
         ),
         migrations.CreateModel(
             name="User",

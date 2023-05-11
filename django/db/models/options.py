@@ -33,7 +33,6 @@ DEFAULT_NAMES = (
     "db_table_comment",
     "ordering",
     "unique_together",
-    "permissions",
     "get_latest_by",
     "order_with_respect_to",
     "app_label",
@@ -46,7 +45,6 @@ DEFAULT_NAMES = (
     # Must be kept for backward compatibility with old migrations.
     "index_together",
     "apps",
-    "default_permissions",
     "select_on_save",
     "default_related_name",
     "required_db_features",
@@ -121,8 +119,6 @@ class Options:
         self.unique_together = []
         self.index_together = []  # RemovedInDjango51Warning.
         self.select_on_save = False
-        self.default_permissions = ("add", "change", "delete", "view")
-        self.permissions = []
         self.object_name = None
         self.app_label = app_label
         self.get_latest_by = None

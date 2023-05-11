@@ -223,13 +223,6 @@ def get_user(request):
     return user or AnonymousUser()
 
 
-def get_permission_codename(action, opts):
-    """
-    Return the codename of the permission for the specified action.
-    """
-    return "%s_%s" % (action, opts.model_name)
-
-
 def update_session_auth_hash(request, user):
     """
     Updating a user's password logs out all sessions for the user.

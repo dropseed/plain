@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.options import IS_POPUP_VAR
 from django.contrib.admin.utils import unquote
@@ -8,8 +7,7 @@ from django.contrib.auth.forms import (
     UserChangeForm,
     UserCreationForm,
 )
-from django.contrib.auth.models import Group, User
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.models import User
 from django.db import router, transaction
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -23,21 +21,6 @@ from django.views.decorators.debug import sensitive_post_parameters
 
 csrf_protect_m = method_decorator(csrf_protect)
 sensitive_post_parameters_m = method_decorator(sensitive_post_parameters())
-
-
-@admin.register(Group)
-class GroupAdmin(admin.ModelAdmin):
-    search_fields = ("name",)
-    ordering = ("name",)
-    filter_horizontal = ("permissions",)
-
-    def formfield_for_manytomany(self, db_field, request=None, **kwargs):
-        if db_field.name == "permissions":
-            qs = kwargs.get("queryset", db_field.remote_field.model.objects)
-            # Avoid a major performance hit resolving permission names which
-            # triggers a content_type load:
-            kwargs["queryset"] = qs.select_related("content_type")
-        return super().formfield_for_manytomany(db_field, request=request, **kwargs)
 
 
 @admin.register(User)
@@ -54,8 +37,6 @@ class UserAdmin(admin.ModelAdmin):
                     "is_active",
                     "is_staff",
                     "is_superuser",
-                    "groups",
-                    "user_permissions",
                 ),
             },
         ),
@@ -74,13 +55,9 @@ class UserAdmin(admin.ModelAdmin):
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
     list_display = ("username", "email", "first_name", "last_name", "is_staff")
-    list_filter = ("is_staff", "is_superuser", "is_active", "groups")
+    list_filter = ("is_staff", "is_superuser", "is_active",)
     search_fields = ("username", "first_name", "last_name", "email")
     ordering = ("username",)
-    filter_horizontal = (
-        "groups",
-        "user_permissions",
-    )
 
     def get_fieldsets(self, request, obj=None):
         if not obj:
@@ -119,23 +96,6 @@ class UserAdmin(admin.ModelAdmin):
             return self._add_view(request, form_url, extra_context)
 
     def _add_view(self, request, form_url="", extra_context=None):
-        # It's an error for a user to have add permission but NOT change
-        # permission for users. If we allowed such users to add users, they
-        # could create superusers, which would mean they would essentially have
-        # the permission to change users. To avoid the problem entirely, we
-        # disallow users from adding users if they don't have change
-        # permission.
-        if not self.has_change_permission(request):
-            if self.has_add_permission(request) and settings.DEBUG:
-                # Raise Http404 in debug mode so that the user gets a helpful
-                # error message.
-                raise Http404(
-                    'Your user does not have the "Change user" permission. In '
-                    "order to add users, Django requires that your user "
-                    'account have both the "Add user" and "Change user" '
-                    "permissions set."
-                )
-            raise PermissionDenied
         if extra_context is None:
             extra_context = {}
         username_field = self.opts.get_field(self.model.USERNAME_FIELD)
@@ -149,8 +109,6 @@ class UserAdmin(admin.ModelAdmin):
     @sensitive_post_parameters_m
     def user_change_password(self, request, id, form_url=""):
         user = self.get_object(request, unquote(id))
-        if not self.has_change_permission(request, user):
-            raise PermissionDenied
         if user is None:
             raise Http404(
                 _("%(name)s object with primary key %(key)r does not exist.")
@@ -194,8 +152,6 @@ class UserAdmin(admin.ModelAdmin):
             "is_popup_var": IS_POPUP_VAR,
             "add": True,
             "change": False,
-            "has_delete_permission": False,
-            "has_change_permission": True,
             "has_absolute_url": False,
             "opts": self.opts,
             "original": user,
