@@ -3,7 +3,6 @@ import json
 import os
 
 import requests
-from forgecore import Forge
 
 from . import settings
 
@@ -15,7 +14,7 @@ class RequestLog:
 
     @staticmethod
     def storage_path():
-        return os.path.join(Forge().forge_tmp_dir, "requestlog")
+        return os.path.join(".bolt", "requestlog")
 
     @classmethod
     def replay_request(cls, name):

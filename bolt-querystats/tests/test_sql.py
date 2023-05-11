@@ -1,4 +1,4 @@
-from forgequerystats.sql import pretty_print_sql
+from boltquerystats.sql import pretty_print_sql
 
 
 def test_pretty_print_sql():

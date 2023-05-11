@@ -1,4 +1,4 @@
-# forge-querystats
+# bolt-querystats
 
 On each page, the query stats will display how many database queries were performed and how long they took.
 
@@ -20,7 +20,7 @@ which can typically be removed by using `select_related`,
 # settings.py
 INSTALLED_APPS = [
     # ...
-    "forgequerystats",
+    "boltquerystats",
 ]
 
 MIDDLEWARE = [
@@ -32,13 +32,13 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 
-    "forgequerystats.QueryStatsMiddleware",
+    "boltquerystats.QueryStatsMiddleware",
     # Put additional middleware below querystats
     # ...
 ]
 ```
 
-We strongly recommend using the forge-stafftoolbar along with this,
+We strongly recommend using the bolt-stafftoolbar along with this,
 but if you aren't,
 you can add the querystats to your frontend templates with this include:
 
@@ -54,17 +54,17 @@ and the template include is the easiest way to do that.
 ## Tailwind CSS
 
 This package is styled with [Tailwind CSS](https://tailwindcss.com/),
-and pairs well with [`forge-tailwind`](https://github.com/forgepackages/forge-tailwind).
+and pairs well with [`bolt-tailwind`](https://github.com/boltpackages/bolt-tailwind).
 
 If you are using your own Tailwind implementation,
-you can modify the "content" in your Tailwind config to include any Forge packages:
+you can modify the "content" in your Tailwind config to include any Bolt packages:
 
 ```js
 // tailwind.config.js
 module.exports = {
   content: [
     // ...
-    ".venv/lib/python*/site-packages/forge*/**/*.{html,js}",
+    ".venv/lib/python*/site-packages/bolt*/**/*.{html,js}",
   ],
   // ...
 }

@@ -1,11 +1,11 @@
-# forge-impersonate
+# bolt-impersonate
 
 A key feature for providing customer support is to be able to view the site through their account.
 With `impersonate` installed, you can impersonate a user by finding them in the Django admin and clicking the "Impersonate" button.
 
 ![](/docs/img/impersonate-admin.png)
 
-Then with the [staff toolbar](/docs/forge-stafftoolbar/) enabled, you'll get a notice of the impersonation and a button to exit:
+Then with the [staff toolbar](/docs/bolt-stafftoolbar/) enabled, you'll get a notice of the impersonation and a button to exit:
 
 ![](/docs/img/impersonate-bar.png)
 
@@ -16,11 +16,11 @@ To impersonate users, you need the app, middleware, and URLs:
 ```python
 # settings.py
 INSTALLED_APPS = INSTALLED_APPS + [
-  "forgeimpersonate",
+  "boltimpersonate",
 ]
 
 MIDDLEWARE = MIDDLEWARE + [
-  "forgeimpersonate.ImpersonateMiddleware",
+  "boltimpersonate.ImpersonateMiddleware",
 ]
 ```
 
@@ -28,7 +28,7 @@ MIDDLEWARE = MIDDLEWARE + [
 # urls.py
 urlpatterns = [
     # ...
-    path("impersonate/", include("forgeimpersonate.urls")),
+    path("impersonate/", include("boltimpersonate.urls")),
 ]
 ```
 

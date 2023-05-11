@@ -1,18 +1,18 @@
-# forge-stafftoolbar
+# bolt-stafftoolbar
 
 The staff toolbar is enabled for every user who `is_staff`.
 
-![Forge staff toolbar](https://user-images.githubusercontent.com/649496/213781915-a2094f54-99b8-4a05-a36e-dee107405229.png)
+![Bolt staff toolbar](https://user-images.githubusercontent.com/649496/213781915-a2094f54-99b8-4a05-a36e-dee107405229.png)
 
 ## Installation
 
-Add `forgestafftoolbar` to your `INSTALLED_APPS`,
+Add `boltstafftoolbar` to your `INSTALLED_APPS`,
 and the `{% stafftoolbar %}` to your base template:
 
 ```python
 # settings.py
 INSTALLED_APPS += [
-    "forgestafftoolbar",
+    "boltstafftoolbar",
 ]
 ```
 
@@ -40,7 +40,7 @@ By default, it shows a link back to the Django admin:
 
 ```python
 # settings.py
-from forgestafftoolbar import StaffToolbarLink
+from boltstafftoolbar import StaffToolbarLink
 
 
 STAFFTOOLBAR_LINKS = [
@@ -61,17 +61,17 @@ you can change the classes via the template tag:
 ## Tailwind CSS
 
 This package is styled with [Tailwind CSS](https://tailwindcss.com/),
-and pairs well with [`forge-tailwind`](https://github.com/forgepackages/forge-tailwind).
+and pairs well with [`bolt-tailwind`](https://github.com/boltpackages/bolt-tailwind).
 
 If you are using your own Tailwind implementation,
-you can modify the "content" in your Tailwind config to include any Forge packages:
+you can modify the "content" in your Tailwind config to include any Bolt packages:
 
 ```js
 // tailwind.config.js
 module.exports = {
   content: [
     // ...
-    ".venv/lib/python*/site-packages/forge*/**/*.{html,js}",
+    ".venv/lib/python*/site-packages/bolt*/**/*.{html,js}",
   ],
   // ...
 }

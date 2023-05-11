@@ -1,6 +1,6 @@
-# forge-requestlog
+# bolt-requestlog
 
-The request log stores a local history of HTTP requests and responses during `forge work` (Django runserver).
+The request log stores a local history of HTTP requests and responses during `bolt work` (Django runserver).
 
 The request history will make it easy to see redirects,
 400 and 500 level errors,
@@ -20,12 +20,12 @@ Requests can be re-submitted by clicking the "replay" button.
 ```python
 # settings.py
 INSTALLED_APPS += [
-    "forgerequestlog",
+    "boltrequestlog",
 ]
 
 MIDDLEWARE = MIDDLEWARE + [
     # ...
-    "forgerequestlog.RequestLogMiddleware",
+    "boltrequestlog.RequestLogMiddleware",
 ]
 ```
 
@@ -45,17 +45,17 @@ REQUESTLOG_URL = "/requestlog/"
 ## Tailwind CSS
 
 This package is styled with [Tailwind CSS](https://tailwindcss.com/),
-and pairs well with [`forge-tailwind`](https://github.com/forgepackages/forge-tailwind).
+and pairs well with [`bolt-tailwind`](https://github.com/boltpackages/bolt-tailwind).
 
 If you are using your own Tailwind implementation,
-you can modify the "content" in your Tailwind config to include any Forge packages:
+you can modify the "content" in your Tailwind config to include any Bolt packages:
 
 ```js
 // tailwind.config.js
 module.exports = {
   content: [
     // ...
-    ".venv/lib/python*/site-packages/forge*/**/*.{html,js}",
+    ".venv/lib/python*/site-packages/bolt*/**/*.{html,js}",
   ],
   // ...
 }

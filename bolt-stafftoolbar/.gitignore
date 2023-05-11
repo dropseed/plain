@@ -1,6 +1,6 @@
 # Local development files
 /.env
-/.forge
+/.bolt
 *.sqlite3
 
 # Publishing

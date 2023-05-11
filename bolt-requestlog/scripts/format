@@ -1,6 +1,6 @@
 #!/bin/sh -e
-poetry run black forgerequestlog "$@"
-poetry run isort forgerequestlog --profile=black "$@"
+poetry run black boltrequestlog "$@"
+poetry run isort boltrequestlog --profile=black "$@"
 
 poetry run black tests "$@"
 poetry run isort tests --profile=black "$@"

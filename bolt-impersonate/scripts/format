@@ -1,6 +1,6 @@
 #!/bin/sh -e
-poetry run black forgeimpersonate "$@"
-poetry run isort forgeimpersonate --profile=black "$@"
+poetry run black boltimpersonate "$@"
+poetry run isort boltimpersonate --profile=black "$@"
 
 poetry run black tests "$@"
 poetry run isort tests --profile=black "$@"
