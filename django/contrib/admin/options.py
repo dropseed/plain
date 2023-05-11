@@ -27,7 +27,6 @@ from django.contrib.admin.utils import (
     quote,
     unquote,
 )
-from django.contrib.admin.widgets import AutocompleteSelect, AutocompleteSelectMultiple
 from django.core.exceptions import (
     FieldDoesNotExist,
     FieldError,
@@ -123,7 +122,6 @@ csrf_protect_m = method_decorator(csrf_protect)
 class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
     """Functionality common to both ModelAdmin and InlineAdmin."""
 
-    autocomplete_fields = ()
     raw_id_fields = ()
     fields = None
     exclude = None
@@ -246,11 +244,7 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
         db = kwargs.get("using")
 
         if "widget" not in kwargs:
-            if db_field.name in self.get_autocomplete_fields(request):
-                kwargs["widget"] = AutocompleteSelect(
-                    db_field, self.admin_site, using=db
-                )
-            elif db_field.name in self.raw_id_fields:
+            if db_field.name in self.raw_id_fields:
                 kwargs["widget"] = widgets.ForeignKeyRawIdWidget(
                     db_field.remote_field, self.admin_site, using=db
                 )
@@ -282,14 +276,7 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
         db = kwargs.get("using")
 
         if "widget" not in kwargs:
-            autocomplete_fields = self.get_autocomplete_fields(request)
-            if db_field.name in autocomplete_fields:
-                kwargs["widget"] = AutocompleteSelectMultiple(
-                    db_field,
-                    self.admin_site,
-                    using=db,
-                )
-            elif db_field.name in self.raw_id_fields:
+            if db_field.name in self.raw_id_fields:
                 kwargs["widget"] = widgets.ManyToManyRawIdWidget(
                     db_field.remote_field,
                     self.admin_site,
@@ -309,7 +296,7 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
             isinstance(form_field.widget, SelectMultiple)
             and form_field.widget.allow_multiple_selected
             and not isinstance(
-                form_field.widget, (CheckboxSelectMultiple, AutocompleteSelectMultiple)
+                form_field.widget, (CheckboxSelectMultiple,)
             )
         ):
             msg = _(
@@ -320,13 +307,6 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
                 format_lazy("{} {}", help_text, msg) if help_text else msg
             )
         return form_field
-
-    def get_autocomplete_fields(self, request):
-        """
-        Return a list of ForeignKey and/or ManyToMany fields which should use
-        an autocomplete widget.
-        """
-        return self.autocomplete_fields
 
     def get_view_on_site_url(self, obj=None):
         if obj is None or not self.view_on_site:
