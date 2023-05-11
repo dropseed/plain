@@ -41,6 +41,28 @@ def root_cli():
     pass
 
 
+@root_cli.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+    )
+)
+@click.argument("django_args", nargs=-1, type=click.UNPROCESSED)
+def django(django_args):
+    subprocess.check_call(
+        [
+            "python",
+            "-m",
+            "django",
+            *django_args,
+        ],
+        env={
+            **os.environ,
+            "PYTHONPATH": os.path.join(os.getcwd(), "app"),
+            "DJANGO_SETTINGS_MODULE": "settings",
+        },
+    )
+
+
 # @root_cli.command
 # def docs():
 #     """Open the Forge documentation in your browser"""

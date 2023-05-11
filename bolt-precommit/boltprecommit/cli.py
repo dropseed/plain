@@ -7,75 +7,100 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib
 
+import importlib
+
 import click
-from forgecore import Forge
-from forgecore.packages import forgepackage_installed
 
 from .install import install_git_hook
 
 
+def boltpackage_installed(name: str) -> bool:
+    try:
+        importlib.import_module(f"bolt{name}")
+        return True
+    except ImportError:
+        return False
+
+
 @click.command()
 @click.option("--install", is_flag=True)
-@click.pass_context
-def cli(ctx, install):
+def cli(install):
     """Git pre-commit checks"""
-    forge = Forge()
+    try:
+        repo_root = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--show-toplevel"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode("utf-8")
+            .strip()
+        )
+    except subprocess.CalledProcessError:
+        click.secho(
+            "All bolt projects are expected to be in a git repo and we couldn't find one.",
+            fg="red",
+        )
+        sys.exit(1)
 
     if install:
-        install_git_hook()
+        install_git_hook(repo_root)
         return
 
-    if forge.repo_root and has_pyproject_toml(forge.repo_root):
-        with open(Path(forge.repo_root, "pyproject.toml"), "rb") as f:
+    if repo_root and has_pyproject_toml(repo_root):
+        with open(Path(repo_root, "pyproject.toml"), "rb") as f:
             pyproject = tomllib.load(f)
-        for cmd in pyproject.get("tool", {}).get("forge-precommit", {}).get("run", []):
+        for cmd in pyproject.get("tool", {}).get("bolt-precommit", {}).get("run", []):
             print_event("Running custom pre-commit check")
             print(cmd)
             result = subprocess.run(cmd, shell=True)
             if result.returncode != 0:
                 sys.exit(result.returncode)
 
-    if forge.repo_root and is_using_poetry(forge.repo_root):
-        check_short("Checking poetry.lock", forge.venv_cmd, "poetry", "lock", "--check")
+    if repo_root and is_using_poetry(repo_root):
+        check_short("Checking poetry.lock", "poetry", "lock", "--check")
 
-    if forgepackage_installed("format"):
-        check_short(
-            "Checking code formatting", forge.venv_cmd, "forge", "format", "--check"
-        )
+    if boltpackage_installed("format"):
+        check_short("Checking code formatting", "bolt", "format", "--check")
 
     if django_db_connected():
         check_short(
             "Running Django system checks",
-            forge.manage_cmd,
+            "bolt",
+            "django",
             "check",
             "--database",
             "default",
         )
         check_short(
-            "Checking Django migrations", forge.manage_cmd, "migrate", "--check"
+            "Checking Django migrations", "bolt", "django", "migrate", "--check"
         )
         check_short(
             "Checking for Django models missing migrations",
-            forge.manage_cmd,
+            "bolt",
+            "django",
             "makemigrations",
             "--dry-run",
             "--check",
         )
     else:
         check_short(
-            "Running Django checks (without database)", forge.manage_cmd, "check"
+            "Running Django checks (without database)", "bolt", "django", "check"
         )
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
-    if forgepackage_installed("test"):
+    if boltpackage_installed("test"):
         print_event("Running tests")
-        forge.venv_cmd("forge", "test", check=True)
+        subprocess.check_call(["bolt", "test"])
 
 
 def django_db_connected():
-    result = Forge().manage_cmd(
-        "showmigrations",
-        "--skip-checks",
+    result = subprocess.run(
+        [
+            "bolt",
+            "django",
+            "showmigrations",
+            "--skip-checks",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -98,9 +123,9 @@ def print_event(msg, newline=True):
     click.secho(f"{arrow} {message}", nl=newline)
 
 
-def check_short(message, func, *args):
+def check_short(message, *args):
     print_event(message, newline=False)
-    result = func(*args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if result.returncode != 0:
         click.secho("✘", fg="red")
         click.secho(result.stdout.decode("utf-8"))

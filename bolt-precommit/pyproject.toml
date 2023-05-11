@@ -1,19 +1,19 @@
 [tool.poetry]
 
-name = "forge-precommit"
+name = "bolt-precommit"
 packages = [
-    { include = "forgeprecommit" },
+    { include = "boltprecommit" },
 ]
 
 version = "1.3.0"
-description = "Pre-commit command for Forge"
+description = "Pre-commit command for Bolt"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://www.forgepackages.com/"
-documentation = "https://www.forgepackages.com/docs/"
-repository = "https://github.com/forgepackages/forge-precommit"
-keywords = ["django", "saas", "forge", "framework"]
+homepage = "https://www.boltpackages.com/"
+documentation = "https://www.boltpackages.com/docs/"
+repository = "https://github.com/boltpackages/bolt-precommit"
+keywords = ["django", "saas", "bolt", "framework"]
 classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",
@@ -23,11 +23,10 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"forge-pre-commit" = "forgeprecommit:cli"
+"bolt-pre-commit" = "boltprecommit:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-forge-core = "^1.0.0"
 click = ">=8.0.0"
 tomli = {version = "^2.0.1", python = "<3.11"}
 

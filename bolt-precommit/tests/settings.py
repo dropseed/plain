@@ -1,3 +1,3 @@
 INSTALLED_APPS = [
-    "forgeprecommit",
+    "boltprecommit",
 ]

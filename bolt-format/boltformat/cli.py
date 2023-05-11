@@ -1,7 +1,7 @@
 import os
+import subprocess
 
 import click
-import subprocess
 
 
 @click.command("format")  # format is a keyword
@@ -20,7 +20,10 @@ def cli(check, files):
                 .strip()
             )
         except subprocess.CalledProcessError:
-            click.secho("All bolt projects are expected to be in a git repo and we couldn't find one.", fg="red")
+            click.secho(
+                "All bolt projects are expected to be in a git repo and we couldn't find one.",
+                fg="red",
+            )
             exit(1)
 
         # Make relative for nicer output
@@ -35,18 +38,22 @@ def cli(check, files):
 def fmt(files):
     # If we're fixing, we do ruff first so black can re-format any ruff fixes
     print_event(f"Fixing {', '.join(files)} with ruff")
-    subprocess.check_call([
-        "ruff",
-        "--fix-only",
-        "--exit-zero",
-        *files,
-    ])
+    subprocess.check_call(
+        [
+            "ruff",
+            "--fix-only",
+            "--exit-zero",
+            *files,
+        ]
+    )
 
     print_event(f"Formatting {', '.join(files)} with black")
-    subprocess.check_call([
-        "black",
-        *files,
-    ])
+    subprocess.check_call(
+        [
+            "black",
+            *files,
+        ]
+    )
 
 
 def fmt_check(files):
