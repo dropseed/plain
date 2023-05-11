@@ -1,4 +1,4 @@
-# forge-format
+# bolt-format
 
 A unified, opinionated code formatting command for Django projects.
 
@@ -7,16 +7,16 @@ Uses [black](https://github.com/psf/black) and [ruff](https://github.com/charlie
 
 ## Installation
 
-First, install `forge-format` from [PyPI](https://pypi.org/project/forge-format/):
+First, install `bolt-format` from [PyPI](https://pypi.org/project/bolt-format/):
 
 ```sh
-pip install forge-format
+pip install bolt-format
 ```
 
 Now you will have access to the `format` command:
 
 ```sh
-forge format
+bolt format
 ```
 
 Note that if you're using black + ruff for the first time,

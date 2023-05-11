@@ -1,7 +1,7 @@
 import os
 
 import click
-from forgecore import Forge
+import subprocess
 
 
 @click.command("format")  # format is a keyword
@@ -10,8 +10,21 @@ from forgecore import Forge
 def cli(check, files):
     """Format Python code with black and ruff"""
     if not files:
+        try:
+            repo_root = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    stderr=subprocess.DEVNULL,
+                )
+                .decode("utf-8")
+                .strip()
+            )
+        except subprocess.CalledProcessError:
+            click.secho("All bolt projects are expected to be in a git repo and we couldn't find one.", fg="red")
+            exit(1)
+
         # Make relative for nicer output
-        files = [os.path.relpath(Forge().project_dir)]
+        files = [os.path.relpath(os.path.join(repo_root, "app"))]
 
     if check:
         fmt_check(files)
@@ -20,34 +33,28 @@ def cli(check, files):
 
 
 def fmt(files):
-    forge = Forge()
-
     # If we're fixing, we do ruff first so black can re-format any ruff fixes
     print_event(f"Fixing {', '.join(files)} with ruff")
-    forge.venv_cmd(
+    subprocess.check_call([
         "ruff",
         "--fix-only",
         "--exit-zero",
         *files,
-        check=True,
-    )
+    ])
 
     print_event(f"Formatting {', '.join(files)} with black")
-    forge.venv_cmd(
+    subprocess.check_call([
         "black",
         *files,
-        check=True,
-    )
+    ])
 
 
 def fmt_check(files):
-    forge = Forge()
-
     print_event(f"Checking {', '.join(files)} with black")
-    forge.venv_cmd("black", "--check", *files, check=True)
+    subprocess.check_call(["black", "--check", *files])
 
     print_event(f"Checking {', '.join(files)} with ruff")
-    forge.venv_cmd("ruff", *files, check=True)
+    subprocess.check_call(["ruff", *files])
 
 
 def print_event(msg, newline=True):
