@@ -87,6 +87,11 @@ class DBContainer:
 
     def wait(self):
         print("Waiting for database...")
+        print(f"  Name: {self.name}")
+        print(f"  Port: {self.postgres_port}")
+        print(f"  DB: {self.postgres_db}")
+        print(f"  User: {self.postgres_user}")
+
         attempts = 1
 
         while True:
