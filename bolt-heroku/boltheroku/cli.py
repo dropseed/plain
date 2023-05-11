@@ -199,6 +199,8 @@ def serve():
     else:
         wsgi = "bolt.wsgi.default"
 
+    print(f"Using {wsgi} as WSGI entrypoint")
+
     result = subprocess.run(
         [
             "gunicorn",
@@ -207,6 +209,7 @@ def serve():
             "-",
         ],
         env={
+            **os.environ,
             "PYTHONPATH": app_dir,
         },
     )
