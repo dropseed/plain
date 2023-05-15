@@ -565,13 +565,6 @@ DEFAULT_EXCEPTION_REPORTER = "bolt.debug.responses.ExceptionReporter"
 # specifically assigned to the HttpRequest instance.
 DEFAULT_EXCEPTION_REPORTER_FILTER = "bolt.debug.responses.SafeExceptionReporterFilter"
 
-############
-# FIXTURES #
-############
-
-# The list of directories to search for fixtures
-FIXTURE_DIRS = []
-
 ###############
 # STATICFILES #
 ###############
