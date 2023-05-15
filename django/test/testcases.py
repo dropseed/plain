@@ -51,7 +51,7 @@ from django.test.utils import (
 )
 from django.utils.deprecation import RemovedInDjango51Warning
 from django.utils.functional import classproperty
-from django.views.static import serve
+from django.contrib.staticfiles.views import serve
 
 logger = logging.getLogger("django.test")
 

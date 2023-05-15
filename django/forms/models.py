@@ -343,7 +343,6 @@ class BaseModelForm(BaseForm, AltersData):
         empty_permitted=False,
         instance=None,
         use_required_attribute=None,
-        renderer=None,
     ):
         opts = self._meta
         if opts.model is None:
@@ -372,7 +371,6 @@ class BaseModelForm(BaseForm, AltersData):
             label_suffix,
             empty_permitted,
             use_required_attribute=use_required_attribute,
-            renderer=renderer,
         )
         for formfield in self.fields.values():
             apply_limit_choices_to_to_formfield(formfield)
@@ -834,7 +832,6 @@ class BaseModelFormSet(BaseFormSet, AltersData):
                         errors.append(self.get_unique_error_message(unique_check))
                         form._errors[NON_FIELD_ERRORS] = self.error_class(
                             [self.get_form_error()],
-                            renderer=self.renderer,
                         )
                         # Remove the data from the cleaned_data dict since it
                         # was invalid.
@@ -870,7 +867,6 @@ class BaseModelFormSet(BaseFormSet, AltersData):
                         errors.append(self.get_date_error_message(date_check))
                         form._errors[NON_FIELD_ERRORS] = self.error_class(
                             [self.get_form_error()],
-                            renderer=self.renderer,
                         )
                         # Remove the data from the cleaned_data dict since it
                         # was invalid.
@@ -1019,7 +1015,6 @@ def modelformset_factory(
     field_classes=None,
     absolute_max=None,
     can_delete_extra=True,
-    renderer=None,
     edit_only=False,
 ):
     """Return a FormSet class for the given Django model class."""
@@ -1058,7 +1053,6 @@ def modelformset_factory(
         validate_max=validate_max,
         absolute_max=absolute_max,
         can_delete_extra=can_delete_extra,
-        renderer=renderer,
     )
     FormSet.model = model
     FormSet.edit_only = edit_only
@@ -1282,7 +1276,6 @@ def inlineformset_factory(
     field_classes=None,
     absolute_max=None,
     can_delete_extra=True,
-    renderer=None,
     edit_only=False,
 ):
     """
@@ -1316,7 +1309,6 @@ def inlineformset_factory(
         "field_classes": field_classes,
         "absolute_max": absolute_max,
         "can_delete_extra": can_delete_extra,
-        "renderer": renderer,
         "edit_only": edit_only,
     }
     FormSet = modelformset_factory(model, **kwargs)

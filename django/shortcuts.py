@@ -9,19 +9,22 @@ from django.http import (
     HttpResponsePermanentRedirect,
     HttpResponseRedirect,
 )
-from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.functional import Promise
+from bolt import jinja
 
 
 def render(
-    request, template_name, context=None, content_type=None, status=None, using=None
+    request, template_name, context=None, content_type=None, status=None
 ):
     """
     Return an HttpResponse whose content is filled with the result of calling
     django.template.loader.render_to_string() with the passed arguments.
     """
-    content = loader.render_to_string(template_name, context, request, using=using)
+    template = jinja.get_or_select_template(template_name)
+    if "request" not in context:
+        context["request"] = request
+    content = template.render(context)
     return HttpResponse(content, content_type, status)
 
 

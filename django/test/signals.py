@@ -43,10 +43,7 @@ def update_installed_apps(*, setting, **kwargs):
         from django.core.management import get_commands
 
         get_commands.cache_clear()
-        # Rebuild get_app_template_dirs cache.
-        from django.template.utils import get_app_template_dirs
 
-        get_app_template_dirs.cache_clear()
         # Rebuild translations cache.
         from django.utils.translation import trans_real
 
@@ -85,29 +82,6 @@ def update_connections_time_zone(*, setting, **kwargs):
 def clear_routers_cache(*, setting, **kwargs):
     if setting == "DATABASE_ROUTERS":
         router.routers = ConnectionRouter().routers
-
-
-@receiver(setting_changed)
-def reset_template_engines(*, setting, **kwargs):
-    if setting in {
-        "TEMPLATES",
-        "DEBUG",
-        "INSTALLED_APPS",
-    }:
-        from django.template import engines
-
-        try:
-            del engines.templates
-        except AttributeError:
-            pass
-        engines._templates = None
-        engines._engines = {}
-        from django.template.engine import Engine
-
-        Engine.get_default.cache_clear()
-        from django.forms.renderers import get_default_renderer
-
-        get_default_renderer.cache_clear()
 
 
 @receiver(setting_changed)

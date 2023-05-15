@@ -1,4 +1,4 @@
-from django import template
+from django.contrib.admin.django import template
 
 register = template.Library()
 

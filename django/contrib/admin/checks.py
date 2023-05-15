@@ -10,8 +10,8 @@ from django.db import models
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.expressions import Combinable
 from django.forms.models import BaseModelForm, BaseModelFormSet, _get_foreign_key
-from django.template import engines
-from django.template.backends.django import DjangoTemplates
+from django.contrib.admin.django.template import engines
+from django.contrib.admin.django.template.backends.django import DjangoTemplates
 from django.utils.module_loading import import_string
 
 
@@ -75,64 +75,64 @@ def check_dependencies(**kwargs):
                     id="admin.E%d" % error_code,
                 )
             )
-    for engine in engines.all():
-        if isinstance(engine, DjangoTemplates):
-            django_templates_instance = engine.engine
-            break
-    else:
-        django_templates_instance = None
-    if not django_templates_instance:
-        errors.append(
-            checks.Error(
-                "A 'django.template.backends.django.DjangoTemplates' instance "
-                "must be configured in TEMPLATES in order to use the admin "
-                "application.",
-                id="admin.E403",
-            )
-        )
-    else:
-        if (
-            "django.contrib.auth.context_processors.auth"
-            not in django_templates_instance.context_processors
-            and _contains_subclass(
-                "django.contrib.auth.backends.ModelBackend",
-                settings.AUTHENTICATION_BACKENDS,
-            )
-        ):
-            errors.append(
-                checks.Error(
-                    "'django.contrib.auth.context_processors.auth' must be "
-                    "enabled in DjangoTemplates (TEMPLATES) if using the default "
-                    "auth backend in order to use the admin application.",
-                    id="admin.E402",
-                )
-            )
-        if (
-            "django.contrib.messages.context_processors.messages"
-            not in django_templates_instance.context_processors
-        ):
-            errors.append(
-                checks.Error(
-                    "'django.contrib.messages.context_processors.messages' must "
-                    "be enabled in DjangoTemplates (TEMPLATES) in order to use "
-                    "the admin application.",
-                    id="admin.E404",
-                )
-            )
-        sidebar_enabled = any(site.enable_nav_sidebar for site in all_sites)
-        if (
-            sidebar_enabled
-            and "django.template.context_processors.request"
-            not in django_templates_instance.context_processors
-        ):
-            errors.append(
-                checks.Warning(
-                    "'django.template.context_processors.request' must be enabled "
-                    "in DjangoTemplates (TEMPLATES) in order to use the admin "
-                    "navigation sidebar.",
-                    id="admin.W411",
-                )
-            )
+    # for engine in engines.all():
+    #     if isinstance(engine, DjangoTemplates):
+    #         django_templates_instance = engine.engine
+    #         break
+    # else:
+    #     django_templates_instance = None
+    # if not django_templates_instance:
+    #     errors.append(
+    #         checks.Error(
+    #             "A 'django.template.backends.django.DjangoTemplates' instance "
+    #             "must be configured in TEMPLATES in order to use the admin "
+    #             "application.",
+    #             id="admin.E403",
+    #         )
+    #     )
+    # else:
+    #     if (
+    #         "django.contrib.auth.context_processors.auth"
+    #         not in django_templates_instance.context_processors
+    #         and _contains_subclass(
+    #             "django.contrib.auth.backends.ModelBackend",
+    #             settings.AUTHENTICATION_BACKENDS,
+    #         )
+    #     ):
+    #         errors.append(
+    #             checks.Error(
+    #                 "'django.contrib.auth.context_processors.auth' must be "
+    #                 "enabled in DjangoTemplates (TEMPLATES) if using the default "
+    #                 "auth backend in order to use the admin application.",
+    #                 id="admin.E402",
+    #             )
+    #         )
+    #     if (
+    #         "django.contrib.messages.context_processors.messages"
+    #         not in django_templates_instance.context_processors
+    #     ):
+    #         errors.append(
+    #             checks.Error(
+    #                 "'django.contrib.messages.context_processors.messages' must "
+    #                 "be enabled in DjangoTemplates (TEMPLATES) in order to use "
+    #                 "the admin application.",
+    #                 id="admin.E404",
+    #             )
+    #         )
+    #     sidebar_enabled = any(site.enable_nav_sidebar for site in all_sites)
+    #     if (
+    #         sidebar_enabled
+    #         and "django.template.context_processors.request"
+    #         not in django_templates_instance.context_processors
+    #     ):
+    #         errors.append(
+    #             checks.Warning(
+    #                 "'django.template.context_processors.request' must be enabled "
+    #                 "in DjangoTemplates (TEMPLATES) in order to use the admin "
+    #                 "navigation sidebar.",
+    #                 id="admin.W411",
+    #             )
+    #         )
 
     if not _contains_subclass(
         "django.contrib.auth.middleware.AuthenticationMiddleware", settings.MIDDLEWARE

@@ -9,18 +9,12 @@ from django.contrib.auth.forms import (
 )
 from django.contrib.auth.models import User
 from django.db import router, transaction
-from django.http import Http404, HttpResponseRedirect
-from django.template.response import TemplateResponse
+from django.http import Http404, HttpResponseRedirect, HttpResponse
+from bolt import jinja
 from django.urls import path, reverse
-from django.utils.decorators import method_decorator
 from django.utils.html import escape
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
-from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.debug import sensitive_post_parameters
-
-csrf_protect_m = method_decorator(csrf_protect)
-sensitive_post_parameters_m = method_decorator(sensitive_post_parameters())
 
 
 @admin.register(User)
@@ -89,8 +83,8 @@ class UserAdmin(admin.ModelAdmin):
             lookup, value
         )
 
-    @sensitive_post_parameters_m
-    @csrf_protect_m
+    # @sensitive_post_parameters_m
+    # @csrf_protect_m
     def add_view(self, request, form_url="", extra_context=None):
         with transaction.atomic(using=router.db_for_write(self.model)):
             return self._add_view(request, form_url, extra_context)
@@ -106,7 +100,7 @@ class UserAdmin(admin.ModelAdmin):
         extra_context.update(defaults)
         return super().add_view(request, form_url, extra_context)
 
-    @sensitive_post_parameters_m
+    # @sensitive_post_parameters_m
     def user_change_password(self, request, id, form_url=""):
         user = self.get_object(request, unquote(id))
         if user is None:
@@ -144,6 +138,7 @@ class UserAdmin(admin.ModelAdmin):
         admin_form = admin.helpers.AdminForm(form, fieldsets, {})
 
         context = {
+            "request": request,
             "title": _("Change password: %s") % escape(user.get_username()),
             "adminForm": admin_form,
             "form_url": form_url,
@@ -162,12 +157,8 @@ class UserAdmin(admin.ModelAdmin):
 
         request.current_app = self.admin_site.name
 
-        return TemplateResponse(
-            request,
-            self.change_user_password_template
-            or "admin/auth/user/change_password.html",
-            context,
-        )
+        template = jinja.environment.get_or_select_template(self.change_user_password_template or "admin/auth/user/change_password.html")
+        return HttpResponse(template.render(context))
 
     def response_add(self, request, obj, post_url_continue=None):
         """

@@ -16,7 +16,7 @@ from django.db.models.fields.related import (
     OneToOneField,
 )
 from django.forms.utils import flatatt
-from django.template.defaultfilters import capfirst, linebreaksbr
+from django.contrib.admin.django.template.defaultfilters import capfirst, linebreaksbr
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import conditional_escape, format_html
 from django.utils.safestring import mark_safe

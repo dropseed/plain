@@ -1,7 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.forms import Form
 from django.forms.fields import BooleanField, IntegerField
-from django.forms.renderers import get_default_renderer
 from django.forms.utils import ErrorList, RenderableFormMixin
 from django.forms.widgets import CheckboxInput, HiddenInput, NumberInput
 from django.utils.functional import cached_property
@@ -149,7 +148,6 @@ class BaseFormSet(RenderableFormMixin):
                 self.data,
                 auto_id=self.auto_id,
                 prefix=self.prefix,
-                renderer=self.renderer,
             )
             form.full_clean()
         else:
@@ -162,7 +160,6 @@ class BaseFormSet(RenderableFormMixin):
                     MIN_NUM_FORM_COUNT: self.min_num,
                     MAX_NUM_FORM_COUNT: self.max_num,
                 },
-                renderer=self.renderer,
             )
         return form
 
@@ -224,7 +221,6 @@ class BaseFormSet(RenderableFormMixin):
             # incorrect validation for extra, optional, and deleted
             # forms in the formset.
             "use_required_attribute": False,
-            "renderer": self.renderer,
         }
         if self.is_bound:
             defaults["data"] = self.data
@@ -261,7 +257,6 @@ class BaseFormSet(RenderableFormMixin):
             "prefix": self.add_prefix("__prefix__"),
             "empty_permitted": True,
             "use_required_attribute": False,
-            "renderer": self.renderer,
         }
         form = self.form(**form_kwargs)
         self.add_fields(form, None)
@@ -398,7 +393,7 @@ class BaseFormSet(RenderableFormMixin):
         """
         self._errors = []
         self._non_form_errors = self.error_class(
-            error_class="nonform", renderer=self.renderer
+            error_class="nonform"
         )
         empty_forms_count = 0
 
@@ -456,7 +451,6 @@ class BaseFormSet(RenderableFormMixin):
             self._non_form_errors = self.error_class(
                 e.error_list,
                 error_class="nonform",
-                renderer=self.renderer,
             )
 
     def clean(self):
@@ -521,10 +515,6 @@ class BaseFormSet(RenderableFormMixin):
         else:
             return self.empty_form.media
 
-    @property
-    def template_name(self):
-        return self.renderer.formset_template_name
-
     def get_context(self):
         return {"formset": self}
 
@@ -541,7 +531,6 @@ def formset_factory(
     validate_min=False,
     absolute_max=None,
     can_delete_extra=True,
-    renderer=None,
 ):
     """Return a FormSet for the given form class."""
     if min_num is None:
@@ -566,7 +555,6 @@ def formset_factory(
         "absolute_max": absolute_max,
         "validate_min": validate_min,
         "validate_max": validate_max,
-        "renderer": renderer or get_default_renderer(),
     }
     return type(form.__name__ + "FormSet", (formset,), attrs)
 

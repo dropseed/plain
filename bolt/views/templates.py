@@ -33,9 +33,6 @@ class TemplateView(View):
             **response_kwargs,
         )
 
-    def get_template(self) -> jinja2.Template:
-        return jinja.environment.get_or_select_template(self.get_template_names())
-
     def get_template_names(self) -> list[str]:
         """
         Return a list of template names to be used for the request. Must return
@@ -48,6 +45,10 @@ class TemplateView(View):
             )
         else:
             return [self.template_name]
+
+    def get_template(self) -> jinja2.Template:
+        template_names = self.get_template_names()
+        return jinja.environment.get_or_select_template(template_names)
 
     def get_context_data(self) -> dict:
         return {

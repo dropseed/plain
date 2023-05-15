@@ -54,7 +54,7 @@ def include(arg, namespace=None):
 
 
 def _path(route, view, kwargs=None, name=None, Pattern=None):
-    from django.views import View
+    from bolt.views import View
 
     if kwargs is not None and not isinstance(kwargs, dict):
         raise TypeError(

@@ -16,7 +16,7 @@ from django.http import Http404
 from django.http.multipartparser import MultiPartParserError
 from django.urls import get_resolver, get_urlconf
 from django.utils.log import log_response
-from django.views import debug
+from bolt.debug import responses as debug_responses
 
 
 def convert_exception_to_response(get_response):
@@ -46,7 +46,7 @@ def convert_exception_to_response(get_response):
 def response_for_exception(request, exc):
     if isinstance(exc, Http404):
         if settings.DEBUG:
-            response = debug.technical_404_response(request, exc)
+            response = debug_responses.technical_404_response(request, exc)
         else:
             response = get_exception_response(
                 request, get_resolver(get_urlconf()), 404, exc
@@ -78,7 +78,7 @@ def response_for_exception(request, exc):
 
     elif isinstance(exc, BadRequest):
         if settings.DEBUG:
-            response = debug.technical_500_response(
+            response = debug_responses.technical_500_response(
                 request, *sys.exc_info(), status_code=400
             )
         else:
@@ -110,7 +110,7 @@ def response_for_exception(request, exc):
             extra={"status_code": 400, "request": request},
         )
         if settings.DEBUG:
-            response = debug.technical_500_response(
+            response = debug_responses.technical_500_response(
                 request, *sys.exc_info(), status_code=400
             )
         else:
@@ -161,7 +161,7 @@ def handle_uncaught_exception(request, resolver, exc_info):
         raise
 
     if settings.DEBUG:
-        return debug.technical_500_response(request, *exc_info)
+        return debug_responses.technical_500_response(request, *exc_info)
 
     # Return an HttpResponse that displays a friendly error message.
     callback = resolver.resolve_error_handler(500)

@@ -46,7 +46,7 @@ class BoundField:
         attrs = {"id": id_} if id_ else {}
         attrs = self.build_widget_attrs(attrs)
         return [
-            BoundWidget(self.field.widget, widget, self.form.renderer)
+            BoundWidget(self.field.widget, widget)
             for widget in self.field.widget.subwidgets(
                 self.html_name, self.value(), attrs=attrs
             )
@@ -78,7 +78,7 @@ class BoundField:
         Return an ErrorList (empty if there are no errors) for this field.
         """
         return self.form.errors.get(
-            self.name, self.form.error_class(renderer=self.form.renderer)
+            self.name, self.form.error_class()
         )
 
     def as_widget(self, widget=None, attrs=None, only_initial=False):
@@ -108,7 +108,6 @@ class BoundField:
             name=self.html_initial_name if only_initial else self.html_name,
             value=value,
             attrs=attrs,
-            renderer=self.form.renderer,
         )
 
     def as_text(self, attrs=None, **kwargs):
@@ -317,17 +316,16 @@ class BoundWidget:
     {% endfor %}
     """
 
-    def __init__(self, parent_widget, data, renderer):
+    def __init__(self, parent_widget, data):
         self.parent_widget = parent_widget
         self.data = data
-        self.renderer = renderer
 
     def __str__(self):
         return self.tag(wrap_label=True)
 
     def tag(self, wrap_label=False):
         context = {"widget": {**self.data, "wrap_label": wrap_label}}
-        return self.parent_widget._render(self.template_name, context, self.renderer)
+        return self.parent_widget._render(self.template_name, context)
 
     @property
     def template_name(self):

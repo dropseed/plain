@@ -204,9 +204,6 @@ INSTALLED_APPS = []
 
 TEMPLATES = []
 
-# Default form rendering class.
-FORM_RENDERER = "django.forms.renderers.DjangoTemplates"
-
 # Default email address to use for various automated correspondence from
 # the site managers.
 DEFAULT_FROM_EMAIL = "webmaster@localhost"
@@ -571,11 +568,11 @@ LOGGING = {}
 
 # Default exception reporter class used in case none has been
 # specifically assigned to the HttpRequest instance.
-DEFAULT_EXCEPTION_REPORTER = "django.views.debug.ExceptionReporter"
+DEFAULT_EXCEPTION_REPORTER = "bolt.debug.responses.ExceptionReporter"
 
 # Default exception reporter filter class used in case none has been
 # specifically assigned to the HttpRequest instance.
-DEFAULT_EXCEPTION_REPORTER_FILTER = "django.views.debug.SafeExceptionReporterFilter"
+DEFAULT_EXCEPTION_REPORTER_FILTER = "bolt.debug.responses.SafeExceptionReporterFilter"
 
 ############
 # FIXTURES #

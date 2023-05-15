@@ -13,8 +13,6 @@ from django.utils.datastructures import MultiValueDict
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 
-from .renderers import get_default_renderer
-
 __all__ = ("BaseForm", "Form")
 
 
@@ -57,7 +55,6 @@ class BaseForm(RenderableFormMixin):
     class.
     """
 
-    default_renderer = None
     field_order = None
     prefix = None
     use_required_attribute = True
@@ -80,7 +77,6 @@ class BaseForm(RenderableFormMixin):
         empty_permitted=False,
         field_order=None,
         use_required_attribute=None,
-        renderer=None,
     ):
         self.is_bound = data is not None or files is not None
         self.data = MultiValueDict() if data is None else data
@@ -112,17 +108,6 @@ class BaseForm(RenderableFormMixin):
                 "The empty_permitted and use_required_attribute arguments may "
                 "not both be True."
             )
-
-        # Initialize form renderer. Use a global default if not specified
-        # either as an argument or as self.default_renderer.
-        if renderer is None:
-            if self.default_renderer is None:
-                renderer = get_default_renderer()
-            else:
-                renderer = self.default_renderer
-                if isinstance(self.default_renderer, type):
-                    renderer = renderer()
-        self.renderer = renderer
 
     def order_fields(self, field_order):
         """
@@ -215,16 +200,12 @@ class BaseForm(RenderableFormMixin):
         # widgets split data over several HTML fields.
         return widget.value_from_datadict(self.data, self.files, html_name)
 
-    @property
-    def template_name(self):
-        return self.renderer.form_template_name
-
     def get_context(self):
         fields = []
         hidden_fields = []
         top_errors = self.non_field_errors().copy()
         for name, bf in self._bound_items():
-            bf_errors = self.error_class(bf.errors, renderer=self.renderer)
+            bf_errors = self.error_class(bf.errors)
             if bf.is_hidden:
                 if bf_errors:
                     top_errors += [
@@ -251,7 +232,7 @@ class BaseForm(RenderableFormMixin):
         """
         return self.errors.get(
             NON_FIELD_ERRORS,
-            self.error_class(error_class="nonfield", renderer=self.renderer),
+            self.error_class(error_class="nonfield"),
         )
 
     def add_error(self, field, error):
@@ -297,10 +278,10 @@ class BaseForm(RenderableFormMixin):
                     )
                 if field == NON_FIELD_ERRORS:
                     self._errors[field] = self.error_class(
-                        error_class="nonfield", renderer=self.renderer
+                        error_class="nonfield"
                     )
                 else:
-                    self._errors[field] = self.error_class(renderer=self.renderer)
+                    self._errors[field] = self.error_class()
             self._errors[field].extend(error_list)
             if field in self.cleaned_data:
                 del self.cleaned_data[field]

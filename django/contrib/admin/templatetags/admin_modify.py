@@ -1,7 +1,7 @@
 import json
 
-from django import template
-from django.template.context import Context
+from django.contrib.admin.django import template
+from django.contrib.admin.django.template.context import Context
 
 from .base import InclusionAdminNode
 

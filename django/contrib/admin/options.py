@@ -47,7 +47,7 @@ from django.forms.models import (
 from django.forms.widgets import CheckboxSelectMultiple, SelectMultiple
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponseBase
-from django.template.response import SimpleTemplateResponse, TemplateResponse
+from django.contrib.admin.django.template.response import SimpleTemplateResponse, TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.html import format_html
@@ -62,8 +62,8 @@ from django.utils.text import (
 )
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
-from django.views.decorators.csrf import csrf_protect
-from django.views.generic import RedirectView
+from django.contrib.admin.django.views.decorators.csrf import csrf_protect
+from django.contrib.admin.django.views.generic import RedirectView
 
 IS_POPUP_VAR = "_popup"
 TO_FIELD_VAR = "_to_field"

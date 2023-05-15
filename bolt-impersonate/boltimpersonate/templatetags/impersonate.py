@@ -1,4 +1,4 @@
-from django import template
+from django.contrib.admin.django import template
 
 from ..permissions import can_impersonate_user as _can_impersonate_user
 

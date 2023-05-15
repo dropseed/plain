@@ -3,12 +3,11 @@ from collections import UserList
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.forms.renderers import get_default_renderer
 from django.utils import timezone
 from django.utils.html import escape, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-
+from bolt import jinja
 
 def pretty_name(name):
     """Convert 'first_name' to 'First name'."""
@@ -48,11 +47,10 @@ class RenderableMixin:
             "Subclasses of RenderableMixin must provide a get_context() method."
         )
 
-    def render(self, template_name=None, context=None, renderer=None):
-        renderer = renderer or self.renderer
-        template = template_name or self.template_name
+    def render(self, template_name=None, context=None):
+        template = jinja.environment.get_or_select_template(template_name)
         context = context or self.get_context()
-        return mark_safe(renderer.render(template, context))
+        return mark_safe(template.render(context))
 
     __str__ = render
     __html__ = render
@@ -98,9 +96,8 @@ class ErrorDict(dict, RenderableErrorMixin):
     template_name_text = "django/forms/errors/dict/text.txt"
     template_name_ul = "django/forms/errors/dict/ul.html"
 
-    def __init__(self, *args, renderer=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.renderer = renderer or get_default_renderer()
 
     def as_data(self):
         return {f: e.as_data() for f, e in self.items()}
@@ -124,14 +121,13 @@ class ErrorList(UserList, list, RenderableErrorMixin):
     template_name_text = "django/forms/errors/list/text.txt"
     template_name_ul = "django/forms/errors/list/ul.html"
 
-    def __init__(self, initlist=None, error_class=None, renderer=None):
+    def __init__(self, initlist=None, error_class=None):
         super().__init__(initlist)
 
         if error_class is None:
             self.error_class = "errorlist"
         else:
             self.error_class = "errorlist {}".format(error_class)
-        self.renderer = renderer or get_default_renderer()
 
     def as_data(self):
         return ValidationError(self.data).error_list

@@ -8,7 +8,7 @@ from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.base import ModelBase
 from django.http import Http404, HttpResponsePermanentRedirect, HttpResponseRedirect
-from django.template.response import TemplateResponse
+from django.contrib.admin.django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 from django.utils.decorators import method_decorator
 from django.utils.functional import LazyObject
@@ -16,9 +16,9 @@ from django.utils.module_loading import import_string
 from django.utils.text import capfirst
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
-from django.views.decorators.cache import never_cache
-from django.views.decorators.common import no_append_slash
-from django.views.decorators.csrf import csrf_protect
+from django.contrib.admin.django.views.decorators.cache import never_cache
+from django.contrib.admin.django.views.decorators.common import no_append_slash
+from django.contrib.admin.django.views.decorators.csrf import csrf_protect
 
 all_sites = WeakSet()
 
@@ -398,6 +398,8 @@ class AdminSite:
             # Already logged-in, redirect to admin index
             index_path = reverse("admin:index", current_app=self.name)
             return HttpResponseRedirect(index_path)
+
+        return HttpResponseRedirect(reverse(settings.LOGIN_URL))
 
         # Since this module gets imported in the application's root package,
         # it cannot import models from other applications at the module level,
