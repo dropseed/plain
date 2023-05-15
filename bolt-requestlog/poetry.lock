@@ -345,7 +345,11 @@ tests = ["asttokens", "littleutils", "pytest", "rich"]
 [[package]]
 name = "bolt-core"
 version = "1.0.0"
+<<<<<<< HEAD
+description = "Core library for bolt"
+=======
 description = "Core library for Bolt"
+>>>>>>> master
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"

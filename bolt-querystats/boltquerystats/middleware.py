@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
 from django.http import HttpResponseRedirect
-from django.template.loader import select_template
+from bolt import jinja
 
 from .core import QueryStats
 
@@ -116,7 +116,7 @@ class QueryStatsMiddleware:
                     response.context_data["querystats"] = stored_querystats
 
                 # Extend the original template and overlay our querystats on top
-                response.context_data["querystats_extend_template"] = select_template(
+                response.context_data["querystats_extend_template"] = jinja.environment.get_or_select_template(
                     response.template_name
                 )
 

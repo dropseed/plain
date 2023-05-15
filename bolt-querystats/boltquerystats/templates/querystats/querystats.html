@@ -1,7 +1,7 @@
 {% extends querystats_extend_template %}
 
 {% block content %}
-{{ block.super }}
+{{ super() }}
 <div class="fixed inset-0 z-50 px-10 overflow-scroll py-14 bg-black/70" data-querystats-bg>
     <div class="px-4 py-6 rounded-md shadow-lg text-zinc-200 bg-zinc-900">
 
@@ -28,27 +28,27 @@
 
         <div class="flex w-full mt-5 overflow-auto rounded-sm">
             {% for query in querystats.queries %}
-            <a href="#query-{{ forloop.counter }}"
-                {% cycle 'class="h-4 bg-amber-400"' 'class="h-4 bg-amber-500"' 'class="h-4 bg-amber-600"' %}
+            <a href="#query-{{ loop.index }}"
+                {{ loop.cycle('class=\"h-4 bg-amber-400\"', 'class="h-4 bg-amber-500"', 'class="h-4 bg-amber-600"')|safe }}
                 title="[{{ query.duration_display }}] {{ query.sql_display }}"
-                style="width: {% widthratio query.duration querystats.total_time 2500 %}px">
+                style="width: {{ query.duration / querystats.total_time * 100 }}%">
             </a>
             {% endfor %}
         </div>
 
         <div class="mt-4 space-y-4 text-sm">
             {% for query in querystats.queries %}
-            <div id="query-{{ forloop.counter }}" class="p-2 rounded bg-zinc-800">
+            <div id="query-{{ loop.index }}" class="p-2 rounded bg-zinc-800">
                 <div class="float-right px-2 py-px mb-px ml-2 text-xs rounded-full bg-zinc-700">
                     <span>{{ query.duration_display }}</span>
-                    {% if query.duplicate_count %}
+                    {% if query.duplicate_count is defined %}
                     <span class="text-red-500">&nbsp; duplicated {{ query.duplicate_count }} times</span>
                     {% endif %}
 
-                    {% comment %}
+                    {#
                     <div>many {{ query.many }}</div>
                     <div>result {{ query.result }}</div>
-                    {% endcomment %}
+                    #}
                 </div>
                 <div>
                     <pre><code class="font-mono whitespace-pre-wrap text-zinc-100">{{ query.sql_display }}</code></pre>
@@ -62,7 +62,7 @@
                     <pre><code class="block overflow-x-scroll font-mono text-xs">{{ query.tb }}</code></pre>
                 </details>
             </div>
-            {% empty %}
+            {% else %}
             <div>No queries...</div>
             {% endfor %}
         </div>

@@ -1,73 +1,27 @@
 import re
 
-from django.template.context import make_context
-from django.template.loader_tags import ExtendsNode
-from django.template.response import TemplateResponse
-
-from .templatetags.htmx import HTMXFragmentNode
-
-
-class HTMXTemplateFragmentResponse(TemplateResponse):
-    def __init__(self, htmx_fragment_name, *args, **kwargs):
-        self.htmx_fragment_name = htmx_fragment_name
-        super().__init__(*args, **kwargs)
-
-    @property
-    def rendered_content(self) -> str:
-        template = self.resolve_template(self.template_name)
-        context = self.resolve_context(self.context_data)
-
-        # The base template obj is wrapped in DjangoTemplate, etc.
-        template_base = template.template
-
-        if len(template_base.nodelist) == 1 and isinstance(
-            template_base.nodelist[0], ExtendsNode
-        ):
-            # If the template extends another,
-            # the whole thing is wrapped in ExtendsNode
-            nodelist = template_base.nodelist[0].nodelist
-        else:
-            nodelist = template_base.nodelist
-
-        target_fragment_name = self.htmx_fragment_name
-
-        for node in nodelist.get_nodes_by_type(HTMXFragmentNode):
-            if node.fragment_name == target_fragment_name:
-                # Render the node by itself, so we don't mess
-                # with the template stored in memory
-                context = make_context(context, self._request)
-                with context.bind_template(template_base):
-                    context.template_name = template_base.name
-                    return node.render(
-                        context,
-                        allow_lazy=False,  # We're rendeirng a single fragment, so lazy is not allowed at this point
-                    )
-
-        raise ValueError(
-            f"HTMX fragment {target_fragment_name} not found in template {template_base.name}"
-        )
+from django.http import HttpResponse
 
 
 class HTMXViewMixin:
     htmx_template_name = ""
-    htmx_fragment_response_class = HTMXTemplateFragmentResponse
 
-    def render_to_response(self, context, **response_kwargs):
+    def render_template_response(self, extra_context={}) -> HttpResponse:
         if self.is_htmx_request and self.htmx_fragment_name:
-            response_kwargs.setdefault("content_type", self.content_type)
-            return self.htmx_fragment_response_class(
-                htmx_fragment_name=self.htmx_fragment_name,
-                # The regular kwargs
-                request=self.request,
-                template=self.get_template_names(),
+            from .jinja import HTMXFragmentExtension
+            template = self.get_template()
+            context = self.get_context_data()
+            context.update(extra_context)
+            rendered = HTMXFragmentExtension.render_template_fragment(
+                template=template,
+                fragment_name=self.htmx_fragment_name,
                 context=context,
-                using=self.template_engine,
-                **response_kwargs,
             )
+            return HttpResponse(rendered, content_type=self.content_type)
 
-        return super().render_to_response(context, **response_kwargs)
+        return super().render_template_response(extra_context=extra_context)
 
-    def dispatch(self, *args, **kwargs):
+    def dispatch(self):
         if self.is_htmx_request:
             # You can use an htmx_{method} method on views
             # (or htmx_{method}_{action} for specific actions)
@@ -77,9 +31,9 @@ class HTMXViewMixin:
 
             handler = getattr(self, method, None)
             if handler:
-                return handler(*args, **kwargs)
+                return handler()
 
-        return super().dispatch(*args, **kwargs)
+        return super().dispatch()
 
     def get_template_names(self):
         # TODO is this part necessary anymore?? can I replace those with fragments now?

@@ -1,7 +1,6 @@
 from urllib.parse import urlparse
 
 from django.conf import settings
-from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import resolve_url
@@ -52,6 +51,7 @@ class AuthViewMixin:
         try:
             self.check_auth()
         except LoginRequired as e:
+            from django.contrib.auth.views import redirect_to_login  # Import error on apps not ready
             # Ideally this could be handled elsewhere... like PermissionDenied
             # also seems like this code is used multiple places anyway...
             # could be easier to get redirect query param

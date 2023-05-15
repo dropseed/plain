@@ -1,14 +1,13 @@
 import stripe
 from django.http import HttpResponse, HttpResponseRedirect
-from django.utils.decorators import method_decorator
-from django.views import View
-from django.views.decorators.csrf import csrf_exempt
+from bolt.views import View
+from bolt.views.csrf import CsrfExemptViewMixin
 
 from . import settings
 
 
 class StripePortalView(View):
-    def post(self, *args, **kwargs):
+    def post(self):
         return self.get_redirect_response(self.request)
 
     def get_redirect_response(self, request):
@@ -26,7 +25,7 @@ class StripePortalView(View):
 
 
 class StripeCheckoutView(View):
-    def post(self, *args, **kwargs):
+    def post(self):
         return self.get_redirect_response(self.request)
 
     def get_redirect_response(self, request):
@@ -43,9 +42,8 @@ class StripeCheckoutView(View):
         raise NotImplementedError
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class StripeWebhookView(View):
-    def post(self, *args, **kwargs):
+class StripeWebhookView(View, CsrfExemptViewMixin):
+    def post(self):
         try:
             event = stripe.Webhook.construct_event(
                 self.request.body,

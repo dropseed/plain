@@ -135,7 +135,7 @@ a standard `div` is output that looks like this:
 </div>
 ```
 
-The `bhx-fragment` is a custom attribute that we've added ("F" is for "Bolt"),
+The `bhx-fragment` is a custom attribute that we've added ("F" is for "Forge"),
 but the rest are standard HTMX attributes.
 
 When Django renders the response to an HTMX request,

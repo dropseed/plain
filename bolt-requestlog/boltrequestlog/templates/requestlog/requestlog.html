@@ -1,11 +1,7 @@
 {% extends "base.html" %}
 
-{% load static %}
-
-{% block title %}Request log{% endblock %}
-
 {% block content %}
-{{ block.super }}
+{{ super() }}
 <div class="fixed inset-0 z-50 flex px-10 overflow-scroll py-14 bg-black/70" data-requestlog-bg>
     <div class="flex flex-col w-full h-full overflow-auto rounded-md shadow-lg text-zinc-200 bg-zinc-900">
 
@@ -44,10 +40,10 @@
                                 <span class="font-mono text-sm text-zinc-300">{{ log.request.full_path }}</span>
                             </td>
                             <td class="px-2 py-2 text-right border-b whitespace-nowrap border-zinc-700">
-                                <span title="{{ log.timestamp }}" class="text-xs tabular-nums whitespace-nowrap">{{ log.timestamp|time:"g:i:s A" }}</span>
+                                <span title="{{ log.timestamp }}" class="text-xs tabular-nums whitespace-nowrap">{{ log.timestamp|time("g:i:s A") }}</span>
                             </td>
                         </tr>
-                        {% empty %}
+                        {% else %}
                         <tr>
                             <td class="px-4 py-2 text-center">
                                 <span class="text-zinc-500">No logs yet!</span>
@@ -58,7 +54,7 @@
                         <tr>
                             <td colspan="4" class="px-1 py-3">
                                 <form method="post">
-                                    {% csrf_token %}
+                                    {{ csrf_input }}
                                     <input type="hidden" name="action" value="clear">
                                     <button type="submit" class="flex items-center mx-auto text-xs text-red-500/75 hover:text-red-500">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-trash3" viewBox="0 0 16 16">
@@ -81,7 +77,7 @@
                         {{ request.method }} <a href="{{ request.absolute_uri }}" class="font-mono hover:underline">{{ request.full_path }}</a>
                     </h3>
                     <form method="POST">
-                        {% csrf_token %}
+                        {{ csrf_input }}
                         <input type="hidden" name="log" value="{{ requestlog.name }}">
                         <button type="submit" class="flex items-center px-3 py-2 ml-4 text-sm rounded-full bg-zinc-600 hover:bg-zinc-500">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -92,31 +88,31 @@
 
                 {% if request.querydict %}
                 <dl class="px-2 pt-1 pb-2 mt-4 rounded bg-zinc-800">
-                {% for key, value in request.querydict.items %}
+                {% for key, value in request.querydict.items() %}
                     <dt class="mt-2 text-xs text-zinc-400">{{ key }}</dt>
-                    <dd class="text-xs break-all text-zinc-300"><code>{{ value|default:"(Empty)" }}</code></dd>
+                    <dd class="text-xs break-all text-zinc-300"><code>{{ value or "(Empty)" }}</code></dd>
                 {% endfor %}
                 </dl>
                 {% endif %}
 
                 <dl class="mt-4">
-                {% for key, value in request.headers.items %}
+                {% for key, value in request.headers.items() %}
                     <dt class="mt-2 text-xs text-zinc-400">{{ key }}</dt>
-                    <dd class="text-xs break-all text-zinc-300"><code>{{ value|default:"(Empty)" }}</code></dd>
+                    <dd class="text-xs break-all text-zinc-300"><code>{{ value or "(Empty)" }}</code></dd>
                 {% endfor %}
                 </dl>
-                <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ request.body|default:"(Empty)" }}</code></pre>
+                <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ request.body or "(Empty)" }}</code></pre>
                 {% endwith %}
 
                 {% with response=requestlog.response %}
                 <h3 class="mt-10 text-lg font-medium">HTTP <span class="font-mono">{{ response.status_code }}</span></h3>
                 <dl class="mt-4">
-                {% for key, value in response.headers.items %}
+                {% for key, value in response.headers.items() %}
                     <dt class="mt-2 text-xs text-zinc-400">{{ key }}</dt>
-                    <dd class="text-xs break-all text-zinc-300"><code>{{ value|default:"(Empty)" }}</code></dd>
+                    <dd class="text-xs break-all text-zinc-300"><code>{{ value or "(Empty)" }}</code></dd>
                 {% endfor %}
                 </dl>
-                <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ response.content|default:"(Empty)" }}</code></pre>
+                <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ response.content or "(Empty)" }}</code></pre>
                 {% endwith %}
             </div>
             {% endif %}

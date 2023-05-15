@@ -10,14 +10,10 @@ description = "HTMX integration for Bolt"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://www.boltpackages.com/"
-documentation = "https://www.boltpackages.com/docs/"
-repository = "https://github.com/boltpackages/bolt-htmx"
-keywords = ["django", "saas", "bolt", "framework"]
+repository = "https://github.com/dropseed/bolt"
+keywords = []
 classifiers = [
     "Environment :: Web Environment",
-    "Framework :: Django",
-    "Framework :: Django :: 4",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
 ]
