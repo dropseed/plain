@@ -211,9 +211,6 @@ DEFAULT_FROM_EMAIL = "webmaster@localhost"
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
 
-# Whether to prepend the "www." subdomain to URLs that don't have it.
-PREPEND_WWW = False
-
 # Override the server-derived value of SCRIPT_NAME
 FORCE_SCRIPT_NAME = None
 
