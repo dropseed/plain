@@ -226,8 +226,6 @@ FORCE_SCRIPT_NAME = None
 #     ]
 DISALLOWED_USER_AGENTS = []
 
-ABSOLUTE_URL_OVERRIDES = {}
-
 # A secret key for this particular Django installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Django will complain
 # loudly.
