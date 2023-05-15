@@ -43,19 +43,6 @@ class Release:
         if "HEROKU_SLUG_COMMIT" in os.environ:
             self.metadata["Commit SHA"] = os.environ["HEROKU_SLUG_COMMIT"]
             self.summary = f"{self.summary} ({os.environ['HEROKU_SLUG_COMMIT'][:7]})"
-        else:
-            try:
-                commit_sha = (
-                    subprocess.check_output(
-                        ["git", "rev-parse", "HEAD"], stderr=subprocess.PIPE
-                    )
-                    .decode("utf-8")
-                    .strip()
-                )
-                self.metadata["Commit SHA"] = commit_sha
-                self.summary = commit_sha[:7]
-            except subprocess.CalledProcessError:
-                pass
 
         if "HEROKU_RELEASE_CREATED_AT" in os.environ:
             self.metadata["Created at"] = os.environ["HEROKU_RELEASE_CREATED_AT"]
