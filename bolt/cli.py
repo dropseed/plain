@@ -2,6 +2,9 @@ import importlib
 import os
 import subprocess
 import sys
+import traceback
+import select
+from django.utils.datastructures import OrderedSet
 
 import click
 
@@ -117,6 +120,138 @@ def django(django_args):
 # def shell():
 #     """Alias to Django `shell`"""
 #     Forge().manage_cmd("shell")
+
+
+
+
+@root_cli.command()
+@click.option(
+    "--no-startup",
+    is_flag=True,
+    help=(
+        "When using plain Python, ignore the PYTHONSTARTUP environment "
+        "variable and ~/.pythonrc.py script."
+    ),
+)
+@click.option(
+    "-i",
+    "--interface",
+    type=click.Choice(["ipython", "bpython", "python"]),
+    help="Specify an interactive interpreter interface.",
+)
+@click.option(
+    "-c",
+    "--command",
+    help=(
+        "Instead of opening an interactive shell, run a command as Django and "
+        "exit."
+    ),
+)
+def shell(no_startup, interface, command):
+    """
+    Runs a Python interactive interpreter. Tries to use IPython or
+    bpython, if one of them is available. Any standard input is executed
+    as code.
+    """
+
+    # Execute the command and exit.
+    if command:
+        exec(command, globals())
+        return
+
+    # Execute stdin if it has anything to read and exit.
+    # Not supported on Windows due to select.select() limitations.
+    if (
+        sys.platform != "win32"
+        and not sys.stdin.isatty()
+        and select.select([sys.stdin], [], [], 0)[0]
+    ):
+        exec(sys.stdin.read(), globals())
+        return
+
+
+    def ipython_shell(no_startup):
+        from IPython import start_ipython
+
+        start_ipython(argv=[])
+
+    def bpython_shell(no_startup):
+        import bpython
+
+        bpython.embed()
+
+    def python_shell(no_startup):
+        import code
+
+        # Set up a dictionary to serve as the environment for the shell.
+        imported_objects = {}
+
+        # We want to honor both $PYTHONSTARTUP and .pythonrc.py, so follow system
+        # conventions and get $PYTHONSTARTUP first then .pythonrc.py.
+        if not no_startup:
+            for pythonrc in OrderedSet(
+                [os.environ.get("PYTHONSTARTUP"), os.path.expanduser("~/.pythonrc.py")]
+            ):
+                if not pythonrc:
+                    continue
+                if not os.path.isfile(pythonrc):
+                    continue
+                with open(pythonrc) as handle:
+                    pythonrc_code = handle.read()
+                # Match the behavior of the cpython shell where an error in
+                # PYTHONSTARTUP prints an exception and continues.
+                try:
+                    exec(compile(pythonrc_code, pythonrc, "exec"), imported_objects)
+                except Exception:
+                    traceback.print_exc()
+
+        # By default, this will set up readline to do tab completion and to read and
+        # write history to the .python_history file, but this can be overridden by
+        # $PYTHONSTARTUP or ~/.pythonrc.py.
+        try:
+            hook = sys.__interactivehook__
+        except AttributeError:
+            # Match the behavior of the cpython shell where a missing
+            # sys.__interactivehook__ is ignored.
+            pass
+        else:
+            try:
+                hook()
+            except Exception:
+                # Match the behavior of the cpython shell where an error in
+                # sys.__interactivehook__ prints a warning and the exception
+                # and continues.
+                print("Failed calling sys.__interactivehook__")
+                traceback.print_exc()
+
+        # Set up tab completion for objects imported by $PYTHONSTARTUP or
+        # ~/.pythonrc.py.
+        try:
+            import readline
+            import rlcompleter
+
+            readline.set_completer(rlcompleter.Completer(imported_objects).complete)
+        except ImportError:
+            pass
+
+        # Start the interactive interpreter.
+        code.interact(local=imported_objects)
+
+    available_shells = [interface] if interface else ["ipython", "bpython", "python"]
+
+    for shell in available_shells:
+        try:
+            if shell == "ipython":
+                return ipython_shell(no_startup)
+            elif shell == "bpython":
+                return bpython_shell(no_startup)
+            elif shell == "python":
+                return python_shell(no_startup)
+        except ImportError:
+            pass
+    
+    click.secho(f"Couldn't import {shell} interface.", fg="red")
+    sys.exit(1)
 
 
 cli = click.CommandCollection(sources=[NamespaceGroup(), root_cli])
