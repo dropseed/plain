@@ -1,2 +1,0 @@
-#!/bin/sh -e
-./.venv/bin/mypy boltoauth --ignore-missing-imports "$@"

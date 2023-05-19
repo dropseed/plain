@@ -1,6 +1,0 @@
-#!/bin/sh -e
-poetry run black boltsentry "$@"
-poetry run isort boltsentry --profile=black "$@"
-
-poetry run black tests "$@"
-poetry run isort tests --profile=black "$@"

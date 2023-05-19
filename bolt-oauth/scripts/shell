@@ -1,2 +1,0 @@
-#!/bin/sh -e
-./.venv/bin/python tests/manage.py shell

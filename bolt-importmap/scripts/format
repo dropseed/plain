@@ -1,5 +1,0 @@
-#!/bin/sh -e
-./.venv/bin/black boltimportmap "$@"
-./.venv/bin/black test_project "$@"
-./.venv/bin/isort --profile=black boltimportmap "$@"
-./.venv/bin/isort --profile=black test_project "$@"
