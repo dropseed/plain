@@ -49,7 +49,11 @@ class FormView(TemplateView):
 
     def form_invalid(self, form: BaseForm) -> HttpResponse:
         """If the form is invalid, render the invalid form."""
-        return self.render_template_response({"form": form})
+        context = {
+            **self.get_context_data(),
+            "form": form,
+        }
+        return self.render_template_response(context)
 
     def get_context_data(self) -> dict:
         """Insert the form into the context dict."""

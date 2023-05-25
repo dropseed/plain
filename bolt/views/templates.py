@@ -19,11 +19,9 @@ class TemplateView(View):
     template_name: str | None = None
     content_type: str | None = None
 
-    def render_template_response(self, extra_context={}, **response_kwargs) -> "TemplateResponse":
-        # TODO change arg to context=None and use get_context by default
-        # so you can pass a more specific context excluding the default?
-        context = self.get_context_data()
-        context.update(extra_context)
+    def render_template_response(self, context=None, **response_kwargs) -> "TemplateResponse":
+        if context is None:
+            context = self.get_context_data()
 
         response_kwargs.setdefault("content_type", self.content_type)
 
