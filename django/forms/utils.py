@@ -48,7 +48,7 @@ class RenderableMixin:
         )
 
     def render(self, template_name=None, context=None):
-        template = jinja.environment.get_or_select_template(template_name)
+        template = jinja.environment.get_or_select_template(template_name or self.template_name)
         context = context or self.get_context()
         return mark_safe(template.render(context))
 
