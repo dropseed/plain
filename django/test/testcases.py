@@ -26,7 +26,7 @@ from urllib.request import url2pathname
 
 from django.apps import apps
 from django.conf import settings
-from django.core import mail
+import boltmail as mail
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files import locks
 from django.core.handlers.wsgi import WSGIHandler, get_path_info

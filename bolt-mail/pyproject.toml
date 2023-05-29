@@ -1,0 +1,24 @@
+[tool.poetry]
+
+name = "bolt-mail"
+packages = [
+    { include = "boltmail" },
+]
+
+version = "0.1.0"
+description = ""
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+# readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+Django = "^4.0.5"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

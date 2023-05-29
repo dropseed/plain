@@ -15,7 +15,7 @@ from io import BytesIO, StringIO
 from pathlib import Path
 
 from django.conf import settings
-from django.core.mail.utils import DNS_NAME
+from .utils import DNS_NAME
 from django.utils.encoding import force_str, punycode
 
 # Don't BASE64-encode UTF-8 messages so that we avoid unwanted attention from
@@ -249,7 +249,7 @@ class EmailMessage:
         self.connection = connection
 
     def get_connection(self, fail_silently=False):
-        from django.core.mail import get_connection
+        from boltmail import get_connection
 
         if not self.connection:
             self.connection = get_connection(fail_silently=fail_silently)

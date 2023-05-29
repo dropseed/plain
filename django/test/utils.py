@@ -16,7 +16,7 @@ from xml.dom.minidom import Node, parseString
 from django.apps import apps
 from django.apps.registry import Apps
 from django.conf import UserSettingsHolder, settings
-from django.core import mail
+import boltmail as mail
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import request_started, setting_changed
 from django.db import DEFAULT_DB_ALIAS, connections, reset_queries
