@@ -42,7 +42,7 @@ class StripeCheckoutView(View):
         raise NotImplementedError
 
 
-class StripeWebhookView(View, CsrfExemptViewMixin):
+class StripeWebhookView(CsrfExemptViewMixin, View):
     def post(self):
         try:
             event = stripe.Webhook.construct_event(
