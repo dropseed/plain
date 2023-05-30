@@ -1,4 +1,3 @@
-import django.contrib.admin.models
 from django.conf import settings
 from django.db import migrations, models
 
@@ -69,7 +68,6 @@ class Migration(migrations.Migration):
             },
             bases=(models.Model,),
             managers=[
-                ("objects", django.contrib.admin.models.LogEntryManager()),
             ],
         ),
     ]

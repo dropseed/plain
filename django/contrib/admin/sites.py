@@ -332,7 +332,6 @@ class AdminSite:
             "available_apps": self.get_app_list(request),
             "is_popup": False,
             "is_nav_sidebar_enabled": self.enable_nav_sidebar,
-            "log_entries": self.get_log_entries(request),
         }
 
     def password_change(self, request, extra_context=None):
@@ -562,11 +561,6 @@ class AdminSite:
             or ["admin/%s/app_index.html" % app_label, "admin/app_index.html"],
             context,
         )
-
-    def get_log_entries(self, request):
-        from django.contrib.admin.models import LogEntry
-
-        return LogEntry.objects.select_related("content_type", "user")
 
 
 class DefaultAdminSite(LazyObject):

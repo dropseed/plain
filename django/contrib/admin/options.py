@@ -18,7 +18,6 @@ from django.contrib.admin.exceptions import DisallowedModelAdminToField
 from django.contrib.admin.templatetags.admin_urls import add_preserved_filters
 from django.contrib.admin.utils import (
     NestedObjects,
-    construct_change_message,
     flatten_fieldsets,
     get_deleted_objects,
     lookup_spawns_duplicates,
@@ -584,11 +583,6 @@ class ModelAdmin(BaseModelAdmin):
             path("", wrap(self.changelist_view), name="%s_%s_changelist" % info),
             path("add/", wrap(self.add_view), name="%s_%s_add" % info),
             path(
-                "<path:object_id>/history/",
-                wrap(self.history_view),
-                name="%s_%s_history" % info,
-            ),
-            path(
                 "<path:object_id>/delete/",
                 wrap(self.delete_view),
                 name="%s_%s_delete" % info,
@@ -777,57 +771,6 @@ class ModelAdmin(BaseModelAdmin):
         self, request, queryset, per_page, orphans=0, allow_empty_first_page=True
     ):
         return self.paginator(queryset, per_page, orphans, allow_empty_first_page)
-
-    def log_addition(self, request, obj, message):
-        """
-        Log that an object has been successfully added.
-
-        The default implementation creates an admin LogEntry object.
-        """
-        from django.contrib.admin.models import ADDITION, LogEntry
-
-        return LogEntry.objects.log_action(
-            user_id=request.user.pk,
-            content_type_id=get_content_type_for_model(obj).pk,
-            object_id=obj.pk,
-            object_repr=str(obj),
-            action_flag=ADDITION,
-            change_message=message,
-        )
-
-    def log_change(self, request, obj, message):
-        """
-        Log that an object has been successfully changed.
-
-        The default implementation creates an admin LogEntry object.
-        """
-        from django.contrib.admin.models import CHANGE, LogEntry
-
-        return LogEntry.objects.log_action(
-            user_id=request.user.pk,
-            content_type_id=get_content_type_for_model(obj).pk,
-            object_id=obj.pk,
-            object_repr=str(obj),
-            action_flag=CHANGE,
-            change_message=message,
-        )
-
-    def log_deletion(self, request, obj, object_repr):
-        """
-        Log that an object will be deleted. Note that this method must be
-        called before the deletion.
-
-        The default implementation creates an admin LogEntry object.
-        """
-        from django.contrib.admin.models import DELETION, LogEntry
-
-        return LogEntry.objects.log_action(
-            user_id=request.user.pk,
-            content_type_id=get_content_type_for_model(obj).pk,
-            object_id=obj.pk,
-            object_repr=object_repr,
-            action_flag=DELETION,
-        )
 
     def action_checkbox(self, obj):
         """
@@ -1033,12 +976,6 @@ class ModelAdmin(BaseModelAdmin):
             if preserved_filters:
                 return urlencode({"_changelist_filters": preserved_filters})
         return ""
-
-    def construct_change_message(self, request, form, formsets, add=False):
-        """
-        Construct a JSON structure describing changes from a changed object.
-        """
-        return construct_change_message(form, formsets, add)
 
     def message_user(
         self, request, message, level=messages.INFO, extra_tags="", fail_silently=False
@@ -1598,14 +1535,9 @@ class ModelAdmin(BaseModelAdmin):
             if all_valid(formsets) and form_validated:
                 self.save_model(request, new_object, form, not add)
                 self.save_related(request, form, formsets, not add)
-                change_message = self.construct_change_message(
-                    request, form, formsets, add
-                )
                 if add:
-                    self.log_addition(request, new_object, change_message)
                     return self.response_add(request, new_object)
                 else:
-                    self.log_change(request, new_object, change_message)
                     return self.response_change(request, new_object)
             else:
                 form_validated = False
@@ -1809,10 +1741,6 @@ class ModelAdmin(BaseModelAdmin):
                             obj = self.save_form(request, form, change=True)
                             self.save_model(request, obj, form, change=True)
                             self.save_related(request, form, formsets=[], change=True)
-                            change_msg = self.construct_change_message(
-                                request, form, None
-                            )
-                            self.log_change(request, obj, change_msg)
                             changecount += 1
                 if changecount:
                     msg = ngettext(
@@ -1925,7 +1853,6 @@ class ModelAdmin(BaseModelAdmin):
             obj_display = str(obj)
             attr = str(to_field) if to_field else self.opts.pk.attname
             obj_id = obj.serializable_value(attr)
-            self.log_deletion(request, obj, obj_display)
             self.delete_model(request, obj)
 
             return self.response_delete(request, obj_display, obj_id)
@@ -1956,63 +1883,6 @@ class ModelAdmin(BaseModelAdmin):
         }
 
         return self.render_delete_form(request, context)
-
-    def history_view(self, request, object_id, extra_context=None):
-        "The 'history' admin view for this model."
-        from django.contrib.admin.models import LogEntry
-        from django.contrib.admin.views.main import PAGE_VAR
-
-        # First check if the user can see this history.
-        model = self.model
-        obj = self.get_object(request, unquote(object_id))
-        if obj is None:
-            return self._get_obj_does_not_exist_redirect(
-                request, model._meta, object_id
-            )
-
-        # Then get the history for this object.
-        app_label = self.opts.app_label
-        action_list = (
-            LogEntry.objects.filter(
-                object_id=unquote(object_id),
-                content_type=get_content_type_for_model(model),
-            )
-            .select_related()
-            .order_by("action_time")
-        )
-
-        paginator = self.get_paginator(request, action_list, 100)
-        page_number = request.GET.get(PAGE_VAR, 1)
-        page_obj = paginator.get_page(page_number)
-        page_range = paginator.get_elided_page_range(page_obj.number)
-
-        context = {
-            **self.admin_site.each_context(request),
-            "title": _("Change history: %s") % obj,
-            "subtitle": None,
-            "action_list": page_obj,
-            "page_range": page_range,
-            "page_var": PAGE_VAR,
-            "pagination_required": paginator.count > 100,
-            "module_name": str(capfirst(self.opts.verbose_name_plural)),
-            "object": obj,
-            "opts": self.opts,
-            "preserved_filters": self.get_preserved_filters(request),
-            **(extra_context or {}),
-        }
-
-        request.current_app = self.admin_site.name
-
-        return TemplateResponse(
-            request,
-            self.object_history_template
-            or [
-                "admin/%s/%s/object_history.html" % (app_label, self.opts.model_name),
-                "admin/%s/object_history.html" % app_label,
-                "admin/object_history.html",
-            ],
-            context,
-        )
 
     def get_formset_kwargs(self, request, obj, inline, prefix):
         formset_params = {
