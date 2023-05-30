@@ -138,7 +138,7 @@ def setup_test_environment(debug=None):
     settings.DEBUG = debug
 
     saved_data.email_backend = settings.EMAIL_BACKEND
-    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    settings.EMAIL_BACKEND = "boltmail.backends.locmem.EmailBackend"
 
     saved_data.template_render = Template.render
     Template._original_render = Template.render

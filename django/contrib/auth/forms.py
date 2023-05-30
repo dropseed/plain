@@ -282,7 +282,7 @@ class PasswordResetForm(forms.Form):
         html_email_template_name=None,
     ):
         """
-        Send a django.core.mail.EmailMultiAlternatives to `to_email`.
+        Send a boltmail.EmailMultiAlternatives to `to_email`.
         """
         template = jinja.environment.from_string(subject_template_name)
         subject = template.render(context)
