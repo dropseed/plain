@@ -52,8 +52,6 @@ class AdminSite:
     # URL for the "View site" link at the top of each admin page.
     site_url = "/"
 
-    enable_nav_sidebar = True
-
     empty_value_display = "-"
 
     login_form = None
@@ -331,7 +329,6 @@ class AdminSite:
             "has_permission": self.has_permission(request),
             "available_apps": self.get_app_list(request),
             "is_popup": False,
-            "is_nav_sidebar_enabled": self.enable_nav_sidebar,
         }
 
     def password_change(self, request, extra_context=None):
