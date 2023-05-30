@@ -68,8 +68,5 @@ from .base import (  # NOQA isort:skip
 # Library management
 from .library import Library  # NOQA isort:skip
 
-# Import the .autoreload module to trigger the registrations of signals.
-from . import autoreload  # NOQA isort:skip
-
 
 __all__ += ("Template", "Context", "RequestContext")

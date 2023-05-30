@@ -47,7 +47,7 @@ def cli():
         )
         os.environ["STRIPE_WEBHOOK_SECRET"] = stripe_webhook_secret
 
-    runserver_port = os.environ.get("RUNSERVER_PORT", "8000")
+    runserver_port = os.environ.get("PORT", "8000")
 
     if "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ:
         codespace_base_url = f"https://{os.environ['CODESPACE_NAME']}-{runserver_port}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
@@ -61,8 +61,6 @@ def cli():
         click.secho("Django check failed!", fg="red")
         sys.exit(1)
 
-    manage_cmd = "bolt django"
-
     manager = HonchoManager()
 
     # Meant to work with Bolt Pro, but doesn't necessarily have to
@@ -72,13 +70,13 @@ def cli():
             f"stripe listen --forward-to localhost:{runserver_port}{os.environ['STRIPE_WEBHOOK_PATH']}",
         )
 
-    runserver_cmd = f"{manage_cmd} migrate && {manage_cmd} runserver {runserver_port}"
+    runserver_cmd = f"bolt django migrate && gunicorn --reload bolt.wsgi.default:application --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
     # if boltpackage_installed("db"):
     manager.add_process("postgres", "bolt db start --logs")
     runserver_cmd = "bolt db wait && " + runserver_cmd
 
-    manager.add_process("django", runserver_cmd, env=django_env)
+    manager.add_process("bolt", runserver_cmd, env=django_env)
 
     if "REDIS_URL" in os.environ:
         redis_url = os.environ["REDIS_URL"]

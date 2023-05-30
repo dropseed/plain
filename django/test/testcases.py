@@ -33,7 +33,6 @@ from django.core.handlers.wsgi import WSGIHandler, get_path_info
 from django.core.management import call_command
 from django.core.management.color import no_style
 from django.core.management.sql import emit_post_migrate_signal
-from django.core.servers.basehttp import ThreadedWSGIServer, WSGIRequestHandler
 from django.core.signals import setting_changed
 from django.db import DEFAULT_DB_ALIAS, connection, connections, transaction
 from django.forms.fields import CharField
@@ -1482,14 +1481,14 @@ def skipUnlessAnyDBFeature(*features):
     )
 
 
-class QuietWSGIRequestHandler(WSGIRequestHandler):
-    """
-    A WSGIRequestHandler that doesn't log to standard output any of the
-    requests received, so as to not clutter the test result output.
-    """
+# class QuietWSGIRequestHandler(WSGIRequestHandler):
+#     """
+#     A WSGIRequestHandler that doesn't log to standard output any of the
+#     requests received, so as to not clutter the test result output.
+#     """
 
-    def log_message(*args):
-        pass
+#     def log_message(*args):
+#         pass
 
 
 class FSFilesHandler(WSGIHandler):
@@ -1570,7 +1569,7 @@ class _MediaFilesHandler(FSFilesHandler):
 class LiveServerThread(threading.Thread):
     """Thread for running a live HTTP server while the tests are running."""
 
-    server_class = ThreadedWSGIServer
+    # server_class = ThreadedWSGIServer
 
     def __init__(self, host, static_handler, connections_override=None, port=0):
         self.host = host

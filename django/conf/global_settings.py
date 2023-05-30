@@ -407,13 +407,6 @@ X_FRAME_OPTIONS = "DENY"
 USE_X_FORWARDED_HOST = False
 USE_X_FORWARDED_PORT = False
 
-# The Python dotted path to the WSGI application that Django's internal server
-# (runserver) will use. If `None`, the return value of
-# 'django.core.wsgi.get_wsgi_application' is used, thus preserving the same
-# behavior as previous versions of Django. Otherwise this should point to an
-# actual WSGI application object.
-WSGI_APPLICATION = None
-
 # If your Django app is behind a proxy that sets a header to specify secure
 # connections, AND that proxy ensures that user-submitted headers with the
 # same name are ignored (so that people can't spoof it), set this value to

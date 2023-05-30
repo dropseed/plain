@@ -622,7 +622,6 @@ class StateApps(Apps):
         # which is called whenever Django duplicates a StateApps before
         # updating it.
         self._lock = None
-        self.ready_event = None
 
         self.render_multiple([*models.values(), *self.real_models])
 

@@ -194,10 +194,7 @@ def serve():
     """Run a production server using gunicorn"""
     app_dir = os.path.join(os.getcwd(), "app")
 
-    if os.path.exists(os.path.join(app_dir, "wsgi.py")):
-        wsgi = "app.wsgi"
-    else:
-        wsgi = "bolt.wsgi.default"
+    wsgi = "bolt.wsgi.default"
 
     print(f"Using {wsgi} as WSGI entrypoint")
 
