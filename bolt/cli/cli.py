@@ -154,4 +154,19 @@ def shell(interface):
         sys.exit(result.returncode)
 
 
+@root_cli.command()
+@click.argument("script", nargs=1, type=click.Path(exists=True))
+def run(script):
+    """Run a Python script in the context of your app"""
+    before_script = "import django; django.setup()"
+    command = f"{before_script}; exec(open('{script}').read())"
+    result = subprocess.run(["python", "-c", command], env={
+        "PYTHONPATH": os.path.join(os.getcwd(), "app"),
+        "DJANGO_SETTINGS_MODULE": "settings",
+        **os.environ,
+    })
+    if result.returncode:
+        sys.exit(result.returncode)
+
+
 cli = click.CommandCollection(sources=[NamespaceGroup(), root_cli])
