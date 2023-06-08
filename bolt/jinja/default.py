@@ -13,6 +13,7 @@ from django.utils.timesince import timeuntil, timesince
 from django.utils.module_loading import module_has_submodule
 from importlib import import_module
 from django.contrib.staticfiles.storage import staticfiles_storage
+import datetime
 
 def json_script(value, id):
     return format_html(
@@ -43,11 +44,15 @@ def get_default_environment_globals():
 def get_default_environment_filters():
     # Filters have more/easier access to context?
     return {
-        "json_script": json_script,
+        # The standard Python ones
+        "strftime": datetime.datetime.strftime,
+        "isoformat": datetime.datetime.isoformat,
+        # Django's...
         "date": date_format,
         "time": time_format,
         "timeuntil": timeuntil,
         "timesince": timesince,
+        "json_script": json_script,
         "islice": islice,  # slice for dict.items()
     }
 

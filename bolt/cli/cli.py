@@ -58,17 +58,18 @@ class NamespaceGroup(click.Group):
 
 
 @click.group()
-def root_cli():
+def bolt_cli():
     pass
 
 
-@root_cli.command(
+@bolt_cli.command(
+    "django",
     context_settings=dict(
         ignore_unknown_options=True,
     )
 )
 @click.argument("django_args", nargs=-1, type=click.UNPROCESSED)
-def django(django_args):
+def django_alias(django_args):
     subprocess.check_call(
         [
             "python",
@@ -84,7 +85,7 @@ def django(django_args):
     )
 
 
-# @root_cli.command
+# @bolt_cli.command
 # def docs():
 #     """Open the Forge documentation in your browser"""
 #     subprocess.run(["open", "https://www.forgepackages.com/docs/?ref=cli"])
@@ -116,7 +117,7 @@ def django(django_args):
 #         sys.exit(result.returncode)
 
 
-@root_cli.command()
+@bolt_cli.command()
 @click.option(
     "-i",
     "--interface",
@@ -154,7 +155,7 @@ def shell(interface):
         sys.exit(result.returncode)
 
 
-@root_cli.command()
+@bolt_cli.command()
 @click.argument("script", nargs=1, type=click.Path(exists=True))
 def run(script):
     """Run a Python script in the context of your app"""
@@ -169,4 +170,4 @@ def run(script):
         sys.exit(result.returncode)
 
 
-cli = click.CommandCollection(sources=[NamespaceGroup(), root_cli])
+cli = click.CommandCollection(sources=[NamespaceGroup(), bolt_cli])
