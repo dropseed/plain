@@ -1,5 +1,5 @@
 from bolt.jinja.extensions import InclusionTagExtension
-from .core import StaffToolbar
+from .stafftoolbar.core import StaffToolbar
 
 class StaffToolbarExtension(InclusionTagExtension):
     tags = {"stafftoolbar"}

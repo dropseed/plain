@@ -116,9 +116,7 @@ class QueryStatsMiddleware:
                     response.context_data["querystats"] = stored_querystats
 
                 # Extend the original template and overlay our querystats on top
-                response.context_data["querystats_extend_template"] = jinja.environment.get_or_select_template(
-                    response.template_name
-                )
+                response.context_data["querystats_extend_template"] = response.jinja_template
 
                 # Additional context for the view
                 response.context_data[
@@ -128,8 +126,8 @@ class QueryStatsMiddleware:
                 # Show full template debug info
                 response.context_data[
                     "querystats_template_name"
-                ] = response.template_name
+                ] = response.jinja_template.name
 
-                response.template_name = "querystats/querystats.html"
+                response.jinja_template = jinja.environment.get_template("querystats/querystats.html")
 
         return response
