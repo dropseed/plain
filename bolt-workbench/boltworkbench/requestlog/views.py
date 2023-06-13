@@ -1,7 +1,7 @@
 from bolt.views import TemplateView
 
-from . import settings
 from .core import RequestLog
+from django.http import HttpResponseRedirect
 
 
 class RequestLogView(TemplateView):
@@ -26,13 +26,15 @@ class RequestLogView(TemplateView):
         ctx["requestlogs"] = requestlogs
         ctx["requestlog"] = requestlog
 
-        if (
-            self.request.headers.get("referer")
-            and settings.REQUESTLOG_URL() not in self.request.headers["referer"]
-        ):
-            # TODO keep track of last non-requestlog url in session, use that
-            ctx["requestlog_exit_url"] = self.request.headers["referer"]
-        else:
-            ctx["requestlog_exit_url"] = "/"
-
         return ctx
+
+    def post(self):
+        if self.request.POST.get("action") == "clear":
+            RequestLog.clear()
+            return HttpResponseRedirect(self.request.path)
+        else:
+            RequestLog.replay_request(self.request.POST["log"])
+            return HttpResponseRedirect(
+                # TODO make this better
+                self.request.path + "?workbench=requestlog"
+            )

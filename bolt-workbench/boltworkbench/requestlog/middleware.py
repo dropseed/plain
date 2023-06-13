@@ -1,5 +1,5 @@
 from django.conf import settings as django_settings
-from django.http import HttpResponseRedirect
+
 
 from . import settings
 from .core import RequestLog
@@ -19,29 +19,22 @@ class RequestLogMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # Exit early if not enabled
         if not requestlog_enabled(request):
             return self.get_response(request)
 
-        if request.method == "GET" and request.path == settings.REQUESTLOG_URL():
+        if request.GET.get("workbench") == "requestlog" or request.POST.get(
+            "workbench"
+            ) == "requestlog":
             return RequestLogView.as_view()(request).render()
 
-        if request.method == "POST" and request.path == settings.REQUESTLOG_URL():
-            if request.POST.get("action") == "clear":
-                RequestLog.clear()
-                return HttpResponseRedirect(request.path)
-            else:
-                RequestLog.replay_request(request.POST["log"])
-                return HttpResponseRedirect(settings.REQUESTLOG_URL())
-
+        # Save the request to the log
         response = self.get_response(request)
-
         RequestLog(request=request, response=response).save()
-
         return response
 
     def process_template_response(self, request, response):
         if requestlog_enabled(request):
             response.context_data["requestlog_enabled"] = True
-            response.context_data["requestlog_url"] = settings.REQUESTLOG_URL()
 
         return response

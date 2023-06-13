@@ -1,11 +1,9 @@
-import re
 import time
 import traceback
 from collections import Counter
+import sqlparse
 
 from django.utils.functional import cached_property
-
-from .sql import pretty_print_sql
 
 IGNORE_STACK_FILES = [
     "threading",
@@ -23,6 +21,10 @@ IGNORE_STACK_FILES = [
     "django/core/servers",
     "django/core/handlers",
 ]
+
+
+def pretty_print_sql(sql):
+    return sqlparse.format(sql, reindent=True, keyword_case="upper")
 
 
 def get_stack():

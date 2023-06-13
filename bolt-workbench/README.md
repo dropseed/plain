@@ -196,7 +196,6 @@ REQUESTLOG_IGNORE_URL_PATHS = [
     "/admin/jsi18n/",
 ]
 REQUESTLOG_KEEP_LATEST = 50
-REQUESTLOG_URL = "/requestlog/"
 ```
 
 ## Tailwind CSS

@@ -115,9 +115,6 @@ class QueryStatsMiddleware:
                     stored_querystats = json.loads(stored_querystats)
                     response.context_data["querystats"] = stored_querystats
 
-                # Extend the original template and overlay our querystats on top
-                response.context_data["querystats_extend_template"] = response.jinja_template
-
                 # Additional context for the view
                 response.context_data[
                     "querystats_resolver_match"

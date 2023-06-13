@@ -1,4 +1,11 @@
-<form data-querystats action="." method="get" class="relative group" style="display: none;">
+<form
+    data-querystats
+    action="."
+    method="get"
+    hx-get
+    hx-target="#bolt-workbench-content"
+    class="relative group"
+    style="display: none;">
     <input type="hidden" name="querystats" value="store">
     <button type="submit" class="px-2 py-px text-xs rounded-full bg-zinc-700" data-querystats-summary></button>
     <div data-querystats-list style="display: none;" class="absolute right-0 z-50 hidden translate-y-full -bottom-1 group-hover:block">
