@@ -4,6 +4,7 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
+    JsonResponse,
 )
 from django.utils.decorators import classonlymethod
 
@@ -72,9 +73,26 @@ class View:
             self, self.request.method.lower(), self._http_method_not_allowed
         )
         try:
-            return handler()
+            result = handler()
         except HttpResponseException as e:
             return e.response
+
+        if isinstance(result, HttpResponse):
+            return result
+
+        # Allow return of an int (status code)
+        # or tuple (status code, content)?
+
+        if isinstance(result, str):
+            return HttpResponse(result)
+
+        if isinstance(result, list):
+            return JsonResponse(result, safe=False)
+
+        if isinstance(result, dict):
+            return JsonResponse(result)
+
+        raise ValueError(f"Unexpected view return type: {type(result)}")
 
     def _http_method_not_allowed(self) -> HttpResponse:
         logger.warning(
