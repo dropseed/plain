@@ -2,7 +2,6 @@
 
 from django.test.client import Client, RequestFactory
 from django.test.testcases import (
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )
@@ -19,7 +18,6 @@ __all__ = [
     "RequestFactory",
     "TestCase",
     "TransactionTestCase",
-    "SimpleTestCase",
     "ignore_warnings",
     "modify_settings",
     "override_settings",
