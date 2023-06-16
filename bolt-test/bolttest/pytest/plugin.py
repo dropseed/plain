@@ -17,7 +17,6 @@ from .fixtures import client  # noqa
 from .fixtures import db  # noqa
 from .fixtures import django_assert_max_num_queries  # noqa
 from .fixtures import django_assert_num_queries  # noqa
-from .fixtures import django_capture_on_commit_callbacks  # noqa
 from .fixtures import django_db_reset_sequences  # noqa
 from .fixtures import django_db_serialized_rollback  # noqa
 from .fixtures import django_db_setup  # noqa
@@ -35,10 +34,6 @@ if TYPE_CHECKING:
 
 
 SETTINGS_MODULE_ENV = "DJANGO_SETTINGS_MODULE"
-CONFIGURATION_ENV = "DJANGO_CONFIGURATION"
-INVALID_TEMPLATE_VARS_ENV = "FAIL_INVALID_TEMPLATE_VARS"
-
-_report_header = []
 
 
 # ############### pytest hooks ################
@@ -71,32 +66,6 @@ def pytest_addoption(parser) -> None:
         default=None,
         help="Set DJANGO_SETTINGS_MODULE.",
     )
-    group.addoption(
-        "--dc",
-        action="store",
-        type=str,
-        dest="dc",
-        default=None,
-        help="Set DJANGO_CONFIGURATION.",
-    )
-    group.addoption(
-        "--nomigrations",
-        "--no-migrations",
-        action="store_true",
-        dest="nomigrations",
-        default=False,
-        help="Disable Django migrations on test setup",
-    )
-    group.addoption(
-        "--migrations",
-        action="store_false",
-        dest="nomigrations",
-        default=False,
-        help="Enable Django migrations on test setup",
-    )
-    parser.addini(
-        CONFIGURATION_ENV, "django-configurations class to use by pytest-django."
-    )
     parser.addini(
         SETTINGS_MODULE_ENV, "Django settings module to use by pytest-django."
     )
@@ -112,19 +81,6 @@ def pytest_addoption(parser) -> None:
         "How to set the Django DEBUG setting (default `False`). "
         "Use `keep` to not override.",
         default="False",
-    )
-    group.addoption(
-        "--fail-on-template-vars",
-        action="store_true",
-        dest="itv",
-        default=False,
-        help="Fail for invalid variables in templates.",
-    )
-    parser.addini(
-        INVALID_TEMPLATE_VARS_ENV,
-        "Fail for invalid variables in templates.",
-        type="bool",
-        default=False,
     )
 
 
@@ -189,7 +145,8 @@ def _add_django_project_to_path(args) -> str:
                     return parent
         return None
 
-    project_dir = find_django_path(args)
+    from pathlib import Path
+    project_dir = Path.cwd()
     if project_dir:
         sys.path.insert(0, str(project_dir.absolute()))
         return PROJECT_FOUND % project_dir
@@ -281,15 +238,6 @@ def pytest_load_initial_conftests(
     else:
         _django_project_scan_outcome = PROJECT_SCAN_DISABLED
 
-    if (
-        options.itv
-        or _get_boolean_value(
-            os.environ.get(INVALID_TEMPLATE_VARS_ENV), INVALID_TEMPLATE_VARS_ENV
-        )
-        or early_config.getini(INVALID_TEMPLATE_VARS_ENV)
-    ):
-        os.environ[INVALID_TEMPLATE_VARS_ENV] = "true"
-
     def _get_option_with_source(
         option: Optional[str],
         envname: str,
@@ -304,20 +252,9 @@ def pytest_load_initial_conftests(
         return None, None
 
     ds, ds_source = _get_option_with_source(options.ds, SETTINGS_MODULE_ENV)
-    dc, dc_source = _get_option_with_source(options.dc, CONFIGURATION_ENV)
 
     if ds:
-        _report_header.append(f"settings: {ds} (from {ds_source})")
         os.environ[SETTINGS_MODULE_ENV] = ds
-
-        if dc:
-            _report_header.append(f"configuration: {dc} (from {dc_source})")
-            os.environ[CONFIGURATION_ENV] = dc
-
-            # Install the django-configurations importer
-            import configurations.importer
-
-            configurations.importer.install()
 
         # Forcefully load Django settings, throws ImportError or
         # ImproperlyConfigured if settings cannot be loaded.
@@ -327,13 +264,6 @@ def pytest_load_initial_conftests(
             dj_settings.DATABASES
 
     _setup_django()
-
-
-@pytest.hookimpl()
-def pytest_report_header() -> Optional[List[str]]:
-    if _report_header:
-        return ["django: " + ", ".join(_report_header)]
-    return None
 
 
 @pytest.hookimpl(trylast=True)

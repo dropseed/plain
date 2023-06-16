@@ -28,7 +28,6 @@ __all__ = [
     "settings",
     "django_assert_num_queries",
     "django_assert_max_num_queries",
-    "django_capture_on_commit_callbacks",
 ]
 
 
@@ -42,9 +41,6 @@ def django_db_setup(
     from django.test.utils import setup_databases, teardown_databases
 
     setup_databases_args = {}
-
-    if not not request.config.getvalue("nomigrations"):
-        _disable_migrations()
 
     if request.config.getvalue("reuse_db") and not request.config.getvalue("create_db"):
         setup_databases_args["keepdb"] = True
@@ -126,32 +122,6 @@ def _django_db_helper(
         if _databases is not None:
             databases = _databases
 
-        # For non-transactional tests, skip executing `django.test.TestCase`'s
-        # `setUpClass`/`tearDownClass`, only execute the super class ones.
-        #
-        # `TestCase`'s class setup manages the `setUpTestData`/class-level
-        # transaction functionality. We don't use it; instead we (will) offer
-        # our own alternatives. So it only adds overhead, and does some things
-        # which conflict with our (planned) functionality, particularly, it
-        # closes all database connections in `tearDownClass` which inhibits
-        # wrapping tests in higher-scoped transactions.
-        #
-        # It's possible a new version of Django will add some unrelated
-        # functionality to these methods, in which case skipping them completely
-        # would not be desirable. Let's cross that bridge when we get there...
-        if not transactional:
-            @classmethod
-            def setUpClass(cls) -> None:
-                super(django.test.TestCase, cls).setUpClass()
-                if VERSION < (4, 1):
-                    django.db.transaction.Atomic._ensure_durability = False
-
-            @classmethod
-            def tearDownClass(cls) -> None:
-                if VERSION < (4, 1):
-                    django.db.transaction.Atomic._ensure_durability = True
-                super(django.test.TestCase, cls).tearDownClass()
-
     PytestDjangoTestCase.setUpClass()
     if VERSION >= (4, 0):
         request.addfinalizer(PytestDjangoTestCase.doClassCleanups)
@@ -182,45 +152,6 @@ def validate_django_db(marker) -> "_DjangoDb":
         return transaction, reset_sequences, databases, serialized_rollback
 
     return apifun(*marker.args, **marker.kwargs)
-
-
-def _disable_migrations() -> None:
-    from django.conf import settings
-    from django.core.management.commands import migrate
-
-    class DisableMigrations:
-        def __contains__(self, item: str) -> bool:
-            return True
-
-        def __getitem__(self, item: str) -> None:
-            return None
-
-    settings.MIGRATION_MODULES = DisableMigrations()
-
-    class MigrateSilentCommand(migrate.Command):
-        def handle(self, *args, **kwargs):
-            kwargs["verbosity"] = 0
-            return super().handle(*args, **kwargs)
-
-    migrate.Command = MigrateSilentCommand
-
-
-def _set_suffix_to_test_databases(suffix: str) -> None:
-    from django.conf import settings
-
-    for db_settings in settings.DATABASES.values():
-        test_name = db_settings.get("TEST", {}).get("NAME")
-
-        if not test_name:
-            if db_settings["ENGINE"] == "django.db.backends.sqlite3":
-                continue
-            test_name = f"test_{db_settings['NAME']}"
-
-        if test_name == ":memory:":
-            continue
-
-        db_settings.setdefault("TEST", {})
-        db_settings["TEST"]["NAME"] = f"{test_name}_{suffix}"
 
 
 # ############### User visible fixtures ################
@@ -400,10 +331,3 @@ def django_assert_num_queries(pytestconfig):
 @pytest.fixture(scope="function")
 def django_assert_max_num_queries(pytestconfig):
     return partial(_assert_num_queries, pytestconfig, exact=False)
-
-
-@pytest.fixture(scope="function")
-def django_capture_on_commit_callbacks():
-    from django.test import TestCase
-
-    return TestCase.captureOnCommitCallbacks
