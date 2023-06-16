@@ -41,7 +41,7 @@ class _DatabaseFailure:
         raise DatabaseOperationForbidden(self.message)
 
 
-class SimpleTestCase(unittest.TestCase):
+class TransactionTestCase(unittest.TestCase):
     # The class we'll use for the test client self.client.
     # Can be overridden in derived classes.
     client_class = Client
@@ -61,6 +61,29 @@ class SimpleTestCase(unittest.TestCase):
         ("cursor", "queries"),
         ("chunked_cursor", "queries"),
     ]
+
+    # Subclasses can ask for resetting of auto increment sequence before each
+    # test case
+    reset_sequences = False
+
+    # Subclasses can enable only a subset of apps for faster tests
+    available_apps = None
+
+    # Subclasses can define fixtures which will be automatically installed.
+    fixtures = None
+
+    databases = {DEFAULT_DB_ALIAS}
+    _disallowed_database_msg = (
+        "Database %(operation)s to %(alias)r are not allowed in this test. "
+        "Add %(alias)r to %(test)s.databases to ensure proper test isolation "
+        "and silence this failure."
+    )
+
+    # If transactions aren't available, Django will serialize the database
+    # contents into a fixture during setup and flush and reload them
+    # during teardown (as flush does not restore data from migrations).
+    # This can be slow; this flag allows enabling on a per-case basis.
+    serialized_rollback = False
 
     @classmethod
     def setUpClass(cls):
@@ -179,58 +202,6 @@ class SimpleTestCase(unittest.TestCase):
         self.client = self.client_class()
         mail.outbox = []
 
-    def _post_teardown(self):
-        """Perform post-test things."""
-        pass
-
-    def settings(self, **kwargs):
-        """
-        A context manager that temporarily sets a setting and reverts to the
-        original value when exiting the context.
-        """
-        return override_settings(**kwargs)
-
-    def modify_settings(self, **kwargs):
-        """
-        A context manager that temporarily applies changes a list setting and
-        reverts back to the original value when exiting the context.
-        """
-        return modify_settings(**kwargs)
-
-
-class TransactionTestCase(SimpleTestCase):
-    # Subclasses can ask for resetting of auto increment sequence before each
-    # test case
-    reset_sequences = False
-
-    # Subclasses can enable only a subset of apps for faster tests
-    available_apps = None
-
-    # Subclasses can define fixtures which will be automatically installed.
-    fixtures = None
-
-    databases = {DEFAULT_DB_ALIAS}
-    _disallowed_database_msg = (
-        "Database %(operation)s to %(alias)r are not allowed in this test. "
-        "Add %(alias)r to %(test)s.databases to ensure proper test isolation "
-        "and silence this failure."
-    )
-
-    # If transactions aren't available, Django will serialize the database
-    # contents into a fixture during setup and flush and reload them
-    # during teardown (as flush does not restore data from migrations).
-    # This can be slow; this flag allows enabling on a per-case basis.
-    serialized_rollback = False
-
-    def _pre_setup(self):
-        """
-        Perform pre-test setup:
-        * If the class has an 'available_apps' attribute, restrict the app
-          registry to these applications, then fire the post_migrate signal --
-          it must run with the correct set of applications for the test case.
-        * If the class has a 'fixtures' attribute, install those fixtures.
-        """
-        super()._pre_setup()
         if self.available_apps is not None:
             apps.set_available_apps(self.available_apps)
             setting_changed.send(
@@ -258,6 +229,48 @@ class TransactionTestCase(SimpleTestCase):
         # then assertNumQueries() doesn't work.
         for db_name in self._databases_names(include_mirrors=False):
             connections[db_name].queries_log.clear()
+
+    def _post_teardown(self):
+        """
+        Perform post-test things:
+        * Flush the contents of the database to leave a clean slate. If the
+          class has an 'available_apps' attribute, don't fire post_migrate.
+        * Force-close the connection so the next test gets a clean cursor.
+        """
+        try:
+            self._fixture_teardown()
+            if self._should_reload_connections():
+                # Some DB cursors include SQL statements as part of cursor
+                # creation. If you have a test that does a rollback, the effect
+                # of these statements is lost, which can affect the operation of
+                # tests (e.g., losing a timezone setting causing objects to be
+                # created with the wrong time). To make sure this doesn't
+                # happen, get a clean connection at the start of every test.
+                for conn in connections.all(initialized_only=True):
+                    conn.close()
+        finally:
+            if self.available_apps is not None:
+                apps.unset_available_apps()
+                setting_changed.send(
+                    sender=settings._wrapped.__class__,
+                    setting="INSTALLED_APPS",
+                    value=settings.INSTALLED_APPS,
+                    enter=False,
+                )
+
+    def settings(self, **kwargs):
+        """
+        A context manager that temporarily sets a setting and reverts to the
+        original value when exiting the context.
+        """
+        return override_settings(**kwargs)
+
+    def modify_settings(self, **kwargs):
+        """
+        A context manager that temporarily applies changes a list setting and
+        reverts back to the original value when exiting the context.
+        """
+        return modify_settings(**kwargs)
 
     @classmethod
     def _databases_names(cls, include_mirrors=True):
@@ -311,35 +324,6 @@ class TransactionTestCase(SimpleTestCase):
 
     def _should_reload_connections(self):
         return True
-
-    def _post_teardown(self):
-        """
-        Perform post-test things:
-        * Flush the contents of the database to leave a clean slate. If the
-          class has an 'available_apps' attribute, don't fire post_migrate.
-        * Force-close the connection so the next test gets a clean cursor.
-        """
-        try:
-            self._fixture_teardown()
-            super()._post_teardown()
-            if self._should_reload_connections():
-                # Some DB cursors include SQL statements as part of cursor
-                # creation. If you have a test that does a rollback, the effect
-                # of these statements is lost, which can affect the operation of
-                # tests (e.g., losing a timezone setting causing objects to be
-                # created with the wrong time). To make sure this doesn't
-                # happen, get a clean connection at the start of every test.
-                for conn in connections.all(initialized_only=True):
-                    conn.close()
-        finally:
-            if self.available_apps is not None:
-                apps.unset_available_apps()
-                setting_changed.send(
-                    sender=settings._wrapped.__class__,
-                    setting="INSTALLED_APPS",
-                    value=settings.INSTALLED_APPS,
-                    enter=False,
-                )
 
     def _fixture_teardown(self):
         # Allow TRUNCATE ... CASCADE and don't emit the post_migrate signal

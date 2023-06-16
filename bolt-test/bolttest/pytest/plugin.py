@@ -275,31 +275,23 @@ def pytest_configure() -> None:
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(items: List[pytest.Item]) -> None:
-    from django.test import TestCase, TransactionTestCase
-
     def get_order_number(test: pytest.Item) -> int:
-        test_cls = getattr(test, "cls", None)
-        if test_cls and issubclass(test_cls, TransactionTestCase):
-            # Note, TestCase is a subclass of TransactionTestCase.
+        marker_db = test.get_closest_marker("django_db")
+        if marker_db:
+            (
+                transaction,
+                reset_sequences,
+                databases,
+                serialized_rollback,
+            ) = validate_django_db(marker_db)
             uses_db = True
-            transactional = not issubclass(test_cls, TestCase)
+            transactional = transaction or reset_sequences
         else:
-            marker_db = test.get_closest_marker("django_db")
-            if marker_db:
-                (
-                    transaction,
-                    reset_sequences,
-                    databases,
-                    serialized_rollback,
-                ) = validate_django_db(marker_db)
-                uses_db = True
-                transactional = transaction or reset_sequences
-            else:
-                uses_db = False
-                transactional = False
-            fixtures = getattr(test, "fixturenames", [])
-            transactional = transactional or "transactional_db" in fixtures
-            uses_db = uses_db or "db" in fixtures
+            uses_db = False
+            transactional = False
+        fixtures = getattr(test, "fixturenames", [])
+        transactional = transactional or "transactional_db" in fixtures
+        uses_db = uses_db or "db" in fixtures
 
         if transactional:
             return 1
