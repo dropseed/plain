@@ -25,7 +25,6 @@ python = "^3.8"
 pytest = "^7.1.2"
 pytest-django = "^4.5.2"
 ipdb = "^0.13.9"
-Django = "^4.0.5"
 black = "^23.1.0"
 isort = "^5.10.1"
 

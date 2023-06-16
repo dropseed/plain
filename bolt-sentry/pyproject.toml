@@ -15,7 +15,6 @@ sentry-sdk = "^1.8.0"
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
-Django = "^4.0.5"
 isort = "^5.10.1"
 black = "^22.6.0"
 pytest-django = "^4.5.2"
