@@ -25,11 +25,15 @@ classifiers = [
 [tool.poetry.scripts]
 "bolt-test" = "bolttest:cli"
 
+# Automatically sets this up with pytest
+[tool.poetry.plugins."pytest11"]
+"bolt" = "bolttest.pytest.plugin"
+
+
 [tool.poetry.dependencies]
 python = "^3.8"
 click = ">=8.0.0"
 pytest = "^7.0.0"
-pytest-django = "^4.5.2"
 coverage = "^7.0.1"
 
 [tool.poetry.dev-dependencies]
