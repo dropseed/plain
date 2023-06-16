@@ -1,56 +1,24 @@
-import difflib
-import json
 import logging
-import posixpath
 import sys
-import threading
 import unittest
-import warnings
-from collections import Counter
 from contextlib import contextmanager
-from copy import copy, deepcopy
 from difflib import get_close_matches
-from functools import wraps
 from unittest.suite import _DebugResult
-from unittest.util import safe_repr
-from urllib.parse import (
-    parse_qsl,
-    unquote,
-    urlencode,
-    urljoin,
-    urlparse,
-    urlsplit,
-    urlunparse,
-)
-from urllib.request import url2pathname
 
 from django.apps import apps
 from django.conf import settings
 import boltmail as mail
-from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.core.files import locks
-from django.core.handlers.wsgi import WSGIHandler, get_path_info
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.management.color import no_style
 from django.core.management.sql import emit_post_migrate_signal
 from django.core.signals import setting_changed
-from django.db import DEFAULT_DB_ALIAS, connection, connections, transaction
-from django.forms.fields import CharField
-from django.http import QueryDict
-from django.http.request import split_domain_port, validate_host
+from django.db import DEFAULT_DB_ALIAS, connections, transaction
 from django.test.client import Client
-from django.test.html import HTMLParseError, parse_html
-from django.test.signals import template_rendered
 from django.test.utils import (
-    CaptureQueriesContext,
-    ContextList,
-    compare_xml,
     modify_settings,
     override_settings,
 )
-from django.utils.deprecation import RemovedInDjango51Warning
-from django.utils.functional import classproperty
-from django.contrib.staticfiles.views import serve
 
 logger = logging.getLogger("django.test")
 
@@ -58,17 +26,7 @@ __all__ = (
     "TestCase",
     "TransactionTestCase",
     "SimpleTestCase",
-    "skipIfDBFeature",
-    "skipUnlessDBFeature",
 )
-
-
-def to_list(value):
-    """Put value into a list if it's not already one."""
-    if not isinstance(value, list):
-        value = [value]
-    return value
-
 
 class DatabaseOperationForbidden(AssertionError):
     pass
@@ -420,44 +378,6 @@ def connections_support_transactions(aliases=None):
     return all(conn.features.supports_transactions for conn in conns)
 
 
-class TestData:
-    """
-    Descriptor to provide TestCase instance isolation for attributes assigned
-    during the setUpTestData() phase.
-
-    Allow safe alteration of objects assigned in setUpTestData() by test
-    methods by exposing deep copies instead of the original objects.
-
-    Objects are deep copied using a memo kept on the test case instance in
-    order to maintain their original relationships.
-    """
-
-    memo_attr = "_testdata_memo"
-
-    def __init__(self, name, data):
-        self.name = name
-        self.data = data
-
-    def get_memo(self, testcase):
-        try:
-            memo = getattr(testcase, self.memo_attr)
-        except AttributeError:
-            memo = {}
-            setattr(testcase, self.memo_attr, memo)
-        return memo
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self.data
-        memo = self.get_memo(instance)
-        data = deepcopy(self.data, memo)
-        setattr(instance, self.name, data)
-        return data
-
-    def __repr__(self):
-        return "<TestData: name=%r, data=%r>" % (self.name, self.data)
-
-
 class TestCase(TransactionTestCase):
     """
     Similar to TransactionTestCase, but use `transaction.atomic()` to achieve
@@ -512,15 +432,6 @@ class TestCase(TransactionTestCase):
                 except Exception:
                     cls._rollback_atomics(cls.cls_atomics)
                     raise
-        pre_attrs = cls.__dict__.copy()
-        try:
-            cls.setUpTestData()
-        except Exception:
-            cls._rollback_atomics(cls.cls_atomics)
-            raise
-        for name, value in cls.__dict__.items():
-            if value is not pre_attrs.get(name):
-                setattr(cls, name, TestData(name, value))
 
     @classmethod
     def tearDownClass(cls):
@@ -530,11 +441,6 @@ class TestCase(TransactionTestCase):
                 conn.close()
         super().tearDownClass()
 
-    @classmethod
-    def setUpTestData(cls):
-        """Load initial data for the TestCase."""
-        pass
-
     def _should_reload_connections(self):
         if self._databases_support_transactions():
             return False
@@ -542,9 +448,6 @@ class TestCase(TransactionTestCase):
 
     def _fixture_setup(self):
         if not self._databases_support_transactions():
-            # If the backend does not support transactions, we should reload
-            # class data before each test
-            self.setUpTestData()
             return super()._fixture_setup()
 
         if self.reset_sequences:
@@ -600,367 +503,3 @@ class TestCase(TransactionTestCase):
                 if callback_count == len(connections[using].run_on_commit):
                     break
                 start_count = callback_count
-
-
-class CheckCondition:
-    """Descriptor class for deferred condition checking."""
-
-    def __init__(self, *conditions):
-        self.conditions = conditions
-
-    def add_condition(self, condition, reason):
-        return self.__class__(*self.conditions, (condition, reason))
-
-    def __get__(self, instance, cls=None):
-        # Trigger access for all bases.
-        if any(getattr(base, "__unittest_skip__", False) for base in cls.__bases__):
-            return True
-        for condition, reason in self.conditions:
-            if condition():
-                # Override this descriptor's value and set the skip reason.
-                cls.__unittest_skip__ = True
-                cls.__unittest_skip_why__ = reason
-                return True
-        return False
-
-
-def _deferredSkip(condition, reason, name):
-    def decorator(test_func):
-        nonlocal condition
-        if not (
-            isinstance(test_func, type) and issubclass(test_func, unittest.TestCase)
-        ):
-
-            @wraps(test_func)
-            def skip_wrapper(*args, **kwargs):
-                if (
-                    args
-                    and isinstance(args[0], unittest.TestCase)
-                    and connection.alias not in getattr(args[0], "databases", {})
-                ):
-                    raise ValueError(
-                        "%s cannot be used on %s as %s doesn't allow queries "
-                        "against the %r database."
-                        % (
-                            name,
-                            args[0],
-                            args[0].__class__.__qualname__,
-                            connection.alias,
-                        )
-                    )
-                if condition():
-                    raise unittest.SkipTest(reason)
-                return test_func(*args, **kwargs)
-
-            test_item = skip_wrapper
-        else:
-            # Assume a class is decorated
-            test_item = test_func
-            databases = getattr(test_item, "databases", None)
-            if not databases or connection.alias not in databases:
-                # Defer raising to allow importing test class's module.
-                def condition():
-                    raise ValueError(
-                        "%s cannot be used on %s as it doesn't allow queries "
-                        "against the '%s' database."
-                        % (
-                            name,
-                            test_item,
-                            connection.alias,
-                        )
-                    )
-
-            # Retrieve the possibly existing value from the class's dict to
-            # avoid triggering the descriptor.
-            skip = test_func.__dict__.get("__unittest_skip__")
-            if isinstance(skip, CheckCondition):
-                test_item.__unittest_skip__ = skip.add_condition(condition, reason)
-            elif skip is not True:
-                test_item.__unittest_skip__ = CheckCondition((condition, reason))
-        return test_item
-
-    return decorator
-
-
-def skipIfDBFeature(*features):
-    """Skip a test if a database has at least one of the named features."""
-    return _deferredSkip(
-        lambda: any(
-            getattr(connection.features, feature, False) for feature in features
-        ),
-        "Database has feature(s) %s" % ", ".join(features),
-        "skipIfDBFeature",
-    )
-
-
-def skipUnlessDBFeature(*features):
-    """Skip a test unless a database has all the named features."""
-    return _deferredSkip(
-        lambda: not all(
-            getattr(connection.features, feature, False) for feature in features
-        ),
-        "Database doesn't support feature(s): %s" % ", ".join(features),
-        "skipUnlessDBFeature",
-    )
-
-
-def skipUnlessAnyDBFeature(*features):
-    """Skip a test unless a database has any of the named features."""
-    return _deferredSkip(
-        lambda: not any(
-            getattr(connection.features, feature, False) for feature in features
-        ),
-        "Database doesn't support any of the feature(s): %s" % ", ".join(features),
-        "skipUnlessAnyDBFeature",
-    )
-
-
-# class QuietWSGIRequestHandler(WSGIRequestHandler):
-#     """
-#     A WSGIRequestHandler that doesn't log to standard output any of the
-#     requests received, so as to not clutter the test result output.
-#     """
-
-#     def log_message(*args):
-#         pass
-
-
-class FSFilesHandler(WSGIHandler):
-    """
-    WSGI middleware that intercepts calls to a directory, as defined by one of
-    the *_ROOT settings, and serves those files, publishing them under *_URL.
-    """
-
-    def __init__(self, application):
-        self.application = application
-        self.base_url = urlparse(self.get_base_url())
-        super().__init__()
-
-    def _should_handle(self, path):
-        """
-        Check if the path should be handled. Ignore the path if:
-        * the host is provided as part of the base_url
-        * the request's path isn't under the media path (or equal)
-        """
-        return path.startswith(self.base_url[2]) and not self.base_url[1]
-
-    def file_path(self, url):
-        """Return the relative path to the file on disk for the given URL."""
-        relative_url = url.removeprefix(self.base_url[2])
-        return url2pathname(relative_url)
-
-    def get_response(self, request):
-        from django.http import Http404
-
-        if self._should_handle(request.path):
-            try:
-                return self.serve(request)
-            except Http404:
-                pass
-        return super().get_response(request)
-
-    def serve(self, request):
-        os_rel_path = self.file_path(request.path)
-        os_rel_path = posixpath.normpath(unquote(os_rel_path))
-        # Emulate behavior of django.contrib.staticfiles.views.serve() when it
-        # invokes staticfiles' finders functionality.
-        # TODO: Modify if/when that internal API is refactored
-        final_rel_path = os_rel_path.replace("\\", "/").lstrip("/")
-        return serve(request, final_rel_path, document_root=self.get_base_dir())
-
-    def __call__(self, environ, start_response):
-        if not self._should_handle(get_path_info(environ)):
-            return self.application(environ, start_response)
-        return super().__call__(environ, start_response)
-
-
-class _StaticFilesHandler(FSFilesHandler):
-    """
-    Handler for serving static files. A private class that is meant to be used
-    solely as a convenience by LiveServerThread.
-    """
-
-    def get_base_dir(self):
-        return settings.STATIC_ROOT
-
-    def get_base_url(self):
-        return settings.STATIC_URL
-
-
-class _MediaFilesHandler(FSFilesHandler):
-    """
-    Handler for serving the media files. A private class that is meant to be
-    used solely as a convenience by LiveServerThread.
-    """
-
-    def get_base_dir(self):
-        return settings.MEDIA_ROOT
-
-    def get_base_url(self):
-        return settings.MEDIA_URL
-
-
-class LiveServerThread(threading.Thread):
-    """Thread for running a live HTTP server while the tests are running."""
-
-    # server_class = ThreadedWSGIServer
-
-    def __init__(self, host, static_handler, connections_override=None, port=0):
-        self.host = host
-        self.port = port
-        self.is_ready = threading.Event()
-        self.error = None
-        self.static_handler = static_handler
-        self.connections_override = connections_override
-        super().__init__()
-
-    def run(self):
-        """
-        Set up the live server and databases, and then loop over handling
-        HTTP requests.
-        """
-        if self.connections_override:
-            # Override this thread's database connections with the ones
-            # provided by the main thread.
-            for alias, conn in self.connections_override.items():
-                connections[alias] = conn
-        try:
-            # Create the handler for serving static and media files
-            handler = self.static_handler(_MediaFilesHandler(WSGIHandler()))
-            self.httpd = self._create_server(
-                connections_override=self.connections_override,
-            )
-            # If binding to port zero, assign the port allocated by the OS.
-            if self.port == 0:
-                self.port = self.httpd.server_address[1]
-            self.httpd.set_app(handler)
-            self.is_ready.set()
-            self.httpd.serve_forever()
-        except Exception as e:
-            self.error = e
-            self.is_ready.set()
-        finally:
-            connections.close_all()
-
-    def _create_server(self, connections_override=None):
-        return self.server_class(
-            (self.host, self.port),
-            QuietWSGIRequestHandler,
-            allow_reuse_address=False,
-            connections_override=connections_override,
-        )
-
-    def terminate(self):
-        if hasattr(self, "httpd"):
-            # Stop the WSGI server
-            self.httpd.shutdown()
-            self.httpd.server_close()
-        self.join()
-
-
-class LiveServerTestCase(TransactionTestCase):
-    """
-    Do basically the same as TransactionTestCase but also launch a live HTTP
-    server in a separate thread so that the tests may use another testing
-    framework, such as Selenium for example, instead of the built-in dummy
-    client.
-    It inherits from TransactionTestCase instead of TestCase because the
-    threads don't share the same transactions (unless if using in-memory sqlite)
-    and each thread needs to commit all their transactions so that the other
-    thread can see the changes.
-    """
-
-    host = "localhost"
-    port = 0
-    server_thread_class = LiveServerThread
-    static_handler = _StaticFilesHandler
-
-    @classproperty
-    def live_server_url(cls):
-        return "http://%s:%s" % (cls.host, cls.server_thread.port)
-
-    @classproperty
-    def allowed_host(cls):
-        return cls.host
-
-    @classmethod
-    def _make_connections_override(cls):
-        connections_override = {}
-        for conn in connections.all():
-            # If using in-memory sqlite databases, pass the connections to
-            # the server thread.
-            if conn.vendor == "sqlite" and conn.is_in_memory_db():
-                connections_override[conn.alias] = conn
-        return connections_override
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls._live_server_modified_settings = modify_settings(
-            ALLOWED_HOSTS={"append": cls.allowed_host},
-        )
-        cls._live_server_modified_settings.enable()
-        cls.addClassCleanup(cls._live_server_modified_settings.disable)
-        cls._start_server_thread()
-
-    @classmethod
-    def _start_server_thread(cls):
-        connections_override = cls._make_connections_override()
-        for conn in connections_override.values():
-            # Explicitly enable thread-shareability for this connection.
-            conn.inc_thread_sharing()
-
-        cls.server_thread = cls._create_server_thread(connections_override)
-        cls.server_thread.daemon = True
-        cls.server_thread.start()
-        cls.addClassCleanup(cls._terminate_thread)
-
-        # Wait for the live server to be ready
-        cls.server_thread.is_ready.wait()
-        if cls.server_thread.error:
-            raise cls.server_thread.error
-
-    @classmethod
-    def _create_server_thread(cls, connections_override):
-        return cls.server_thread_class(
-            cls.host,
-            cls.static_handler,
-            connections_override=connections_override,
-            port=cls.port,
-        )
-
-    @classmethod
-    def _terminate_thread(cls):
-        # Terminate the live server's thread.
-        cls.server_thread.terminate()
-        # Restore shared connections' non-shareability.
-        for conn in cls.server_thread.connections_override.values():
-            conn.dec_thread_sharing()
-
-
-class SerializeMixin:
-    """
-    Enforce serialization of TestCases that share a common resource.
-
-    Define a common 'lockfile' for each set of TestCases to serialize. This
-    file must exist on the filesystem.
-
-    Place it early in the MRO in order to isolate setUpClass()/tearDownClass().
-    """
-
-    lockfile = None
-
-    def __init_subclass__(cls, /, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if cls.lockfile is None:
-            raise ValueError(
-                "{}.lockfile isn't set. Set it to a unique value "
-                "in the base class.".format(cls.__name__)
-            )
-
-    @classmethod
-    def setUpClass(cls):
-        cls._lockfile = open(cls.lockfile)
-        cls.addClassCleanup(cls._lockfile.close)
-        locks.lock(cls._lockfile, locks.LOCK_EX)
-        super().setUpClass()
