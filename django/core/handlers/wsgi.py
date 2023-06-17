@@ -166,12 +166,8 @@ def get_script_name(environ):
     Return the equivalent of the HTTP request's SCRIPT_NAME environment
     variable. If Apache mod_rewrite is used, return what would have been
     the script name prior to any rewriting (so it's the script name as seen
-    from the client's perspective), unless the FORCE_SCRIPT_NAME setting is
-    set (to anything).
+    from the client's perspective).
     """
-    if settings.FORCE_SCRIPT_NAME is not None:
-        return settings.FORCE_SCRIPT_NAME
-
     # If Apache's mod_rewrite had a whack at the URL, Apache set either
     # SCRIPT_URL or REDIRECT_URL to the full resource URL before applying any
     # rewrites. Unfortunately not every web server (lighttpd!) passes this

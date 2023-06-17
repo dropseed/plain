@@ -206,9 +206,6 @@ DEFAULT_FROM_EMAIL = "webmaster@localhost"
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
 
-# Override the server-derived value of SCRIPT_NAME
-FORCE_SCRIPT_NAME = None
-
 # List of compiled regular expression objects representing User-Agent strings
 # that are not allowed to visit any page, systemwide. Use this for bad
 # robots/crawlers. Here are a few examples:
