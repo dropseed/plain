@@ -1,6 +1,5 @@
 from django.contrib import auth
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import SimpleLazyObject
 
 
@@ -10,8 +9,11 @@ def get_user(request):
     return request._cached_user
 
 
-class AuthenticationMiddleware(MiddlewareMixin):
-    def process_request(self, request):
+class AuthenticationMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
         if not hasattr(request, "session"):
             raise ImproperlyConfigured(
                 "The Django authentication middleware requires session "
@@ -21,3 +23,5 @@ class AuthenticationMiddleware(MiddlewareMixin):
                 "'django.contrib.auth.middleware.AuthenticationMiddleware'."
             )
         request.user = SimpleLazyObject(lambda: get_user(request))
+        response = self.get_response(request)
+        return response

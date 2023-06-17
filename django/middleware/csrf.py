@@ -15,7 +15,6 @@ from django.http import HttpHeaders, UnreadablePostError
 from django.urls import get_callable
 from django.utils.cache import patch_vary_headers
 from django.utils.crypto import constant_time_compare, get_random_string
-from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import cached_property
 from django.utils.http import is_same_domain
 from django.utils.log import log_response
@@ -161,7 +160,7 @@ class RejectRequest(Exception):
         self.reason = reason
 
 
-class CsrfViewMiddleware(MiddlewareMixin):
+class CsrfViewMiddleware:
     """
     Require a present and correct csrfmiddlewaretoken for POST requests that
     have a CSRF cookie, and set an outgoing CSRF cookie.
@@ -169,6 +168,36 @@ class CsrfViewMiddleware(MiddlewareMixin):
     This middleware should be used in conjunction with the {% csrf_token %}
     template tag.
     """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        try:
+            csrf_secret = self._get_secret(request)
+        except InvalidTokenFormat:
+            _add_new_csrf_cookie(request)
+        else:
+            if csrf_secret is not None:
+                # Use the same secret next time. If the secret was originally
+                # masked, this also causes it to be replaced with the unmasked
+                # form, but only in cases where the secret is already getting
+                # saved anyways.
+                request.META["CSRF_COOKIE"] = csrf_secret
+
+        response = self.get_response(request)
+
+        if request.META.get("CSRF_COOKIE_NEEDS_UPDATE"):
+            self._set_csrf_cookie(request, response)
+            # Unset the flag to prevent _set_csrf_cookie() from being
+            # unnecessarily called again in process_response() by other
+            # instances of CsrfViewMiddleware. This can happen e.g. when both a
+            # decorator and middleware are used. However,
+            # CSRF_COOKIE_NEEDS_UPDATE is still respected in subsequent calls
+            # e.g. in case rotate_token() is called in process_response() later
+            # by custom middleware but before those subsequent calls.
+            request.META["CSRF_COOKIE_NEEDS_UPDATE"] = False
+
+        return response
 
     @cached_property
     def csrf_trusted_origins_hosts(self):
@@ -397,19 +426,6 @@ class CsrfViewMiddleware(MiddlewareMixin):
             reason = self._bad_token_message("incorrect", token_source)
             raise RejectRequest(reason)
 
-    def process_request(self, request):
-        try:
-            csrf_secret = self._get_secret(request)
-        except InvalidTokenFormat:
-            _add_new_csrf_cookie(request)
-        else:
-            if csrf_secret is not None:
-                # Use the same secret next time. If the secret was originally
-                # masked, this also causes it to be replaced with the unmasked
-                # form, but only in cases where the secret is already getting
-                # saved anyways.
-                request.META["CSRF_COOKIE"] = csrf_secret
-
     def process_view(self, request, callback, callback_args, callback_kwargs):
         if getattr(request, "csrf_processing_done", False):
             return None
@@ -466,17 +482,3 @@ class CsrfViewMiddleware(MiddlewareMixin):
             return self._reject(request, exc.reason)
 
         return self._accept(request)
-
-    def process_response(self, request, response):
-        if request.META.get("CSRF_COOKIE_NEEDS_UPDATE"):
-            self._set_csrf_cookie(request, response)
-            # Unset the flag to prevent _set_csrf_cookie() from being
-            # unnecessarily called again in process_response() by other
-            # instances of CsrfViewMiddleware. This can happen e.g. when both a
-            # decorator and middleware are used. However,
-            # CSRF_COOKIE_NEEDS_UPDATE is still respected in subsequent calls
-            # e.g. in case rotate_token() is called in process_response() later
-            # by custom middleware but before those subsequent calls.
-            request.META["CSRF_COOKIE_NEEDS_UPDATE"] = False
-
-        return response

@@ -2,12 +2,11 @@ import re
 
 from django.conf import settings
 from django.http import HttpResponsePermanentRedirect
-from django.utils.deprecation import MiddlewareMixin
 
 
-class SecurityMiddleware(MiddlewareMixin):
+class SecurityMiddleware:
     def __init__(self, get_response):
-        super().__init__(get_response)
+        self.get_response = get_response
         self.sts_seconds = settings.SECURE_HSTS_SECONDS
         self.sts_include_subdomains = settings.SECURE_HSTS_INCLUDE_SUBDOMAINS
         self.sts_preload = settings.SECURE_HSTS_PRELOAD
@@ -18,7 +17,7 @@ class SecurityMiddleware(MiddlewareMixin):
         self.referrer_policy = settings.SECURE_REFERRER_POLICY
         self.cross_origin_opener_policy = settings.SECURE_CROSS_ORIGIN_OPENER_POLICY
 
-    def process_request(self, request):
+    def __call__(self, request):
         path = request.path.lstrip("/")
         if (
             self.redirect
@@ -30,7 +29,8 @@ class SecurityMiddleware(MiddlewareMixin):
                 "https://%s%s" % (host, request.get_full_path())
             )
 
-    def process_response(self, request, response):
+        response = self.get_response(request)
+
         if (
             self.sts_seconds
             and request.is_secure()
