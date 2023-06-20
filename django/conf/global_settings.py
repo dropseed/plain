@@ -161,9 +161,6 @@ LANGUAGE_COOKIE_SAMESITE = None
 # manually specified. It's used to construct the Content-Type header.
 DEFAULT_CHARSET = "utf-8"
 
-# Email address that error messages come from.
-SERVER_EMAIL = "root@localhost"
-
 # Database connection info. If left empty, will default to the dummy backend.
 DATABASES = {}
 
