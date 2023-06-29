@@ -1,17 +1,65 @@
+from pathlib import Path
 import importlib
 import os
 import subprocess
 import sys
-import traceback
-import select
-from django.utils.datastructures import OrderedSet
 
+import django
 import click
 
-# from .core import Forge
+
+class InstalledAppsGroup(click.Group):
+    BOLT_APPS_PREFIX = "bolt"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Save a list so we can put the prefix back easily for imports
+        self._bolt_prefixed_apps = []
+
+    def list_commands(self, ctx):
+        try:
+            django.setup()
+        except Exception as e:
+            click.secho(f"Error in Django setup\n{e}", fg="yellow")
+            return []
+
+        apps_with_commands = []
+
+        # Get installed apps with a cli.py module
+        for app in django.apps.apps.get_app_configs():
+            cli_module = app.name + ".cli"
+            try:
+                importlib.import_module(cli_module)
+            except ModuleNotFoundError:
+                continue
+
+            cli_name = app.name
+
+            if cli_name.startswith(self.BOLT_APPS_PREFIX):
+                cli_name = cli_name[len(self.BOLT_APPS_PREFIX):]
+                self._bolt_prefixed_apps.append(cli_name)
+
+            apps_with_commands.append(cli_name)
+
+        return apps_with_commands
+
+    def get_command(self, ctx, name):
+        if name in self._bolt_prefixed_apps:
+            name = self.BOLT_APPS_PREFIX + name
+
+        try:
+            cli = importlib.import_module(name + ".cli")
+        except ModuleNotFoundError:
+            return
+
+        # Get the app's cli.py group
+        try:
+            return cli.cli
+        except AttributeError:
+            return
 
 
-class NamespaceGroup(click.Group):
+class BinNamespaceGroup(click.Group):
     COMMAND_PREFIX = "bolt-"
 
     def list_commands(self, ctx):
@@ -77,11 +125,6 @@ def django_alias(django_args):
             "django",
             *django_args,
         ],
-        env={
-            **os.environ,
-            "PYTHONPATH": os.path.join(os.getcwd(), "app"),
-            "DJANGO_SETTINGS_MODULE": "settings",
-        },
     )
 
 
@@ -146,9 +189,7 @@ def shell(interface):
         interface = get_default_interface()
 
     result = subprocess.run(interface, env={
-        "PYTHONPATH": os.path.join(os.getcwd(), "app"),
         "PYTHONSTARTUP": os.path.join(os.path.dirname(__file__), "startup.py"),
-        "DJANGO_SETTINGS_MODULE": "settings",
         **os.environ,
     })
     if result.returncode:
@@ -161,13 +202,9 @@ def run(script):
     """Run a Python script in the context of your app"""
     before_script = "import django; django.setup()"
     command = f"{before_script}; exec(open('{script}').read())"
-    result = subprocess.run(["python", "-c", command], env={
-        "PYTHONPATH": os.path.join(os.getcwd(), "app"),
-        "DJANGO_SETTINGS_MODULE": "settings",
-        **os.environ,
-    })
+    result = subprocess.run(["python", "-c", command])
     if result.returncode:
         sys.exit(result.returncode)
 
 
-cli = click.CommandCollection(sources=[NamespaceGroup(), bolt_cli])
+cli = click.CommandCollection(sources=[InstalledAppsGroup(), BinNamespaceGroup(), bolt_cli])

@@ -33,9 +33,6 @@ if TYPE_CHECKING:
     import django
 
 
-SETTINGS_MODULE_ENV = "DJANGO_SETTINGS_MODULE"
-
-
 # ############### pytest hooks ################
 
 
@@ -58,24 +55,7 @@ def pytest_addoption(parser) -> None:
         help="Re-create the database, even if it exists. This "
         "option can be used to override --reuse-db.",
     )
-    group.addoption(
-        "--ds",
-        action="store",
-        type=str,
-        dest="ds",
-        default=None,
-        help="Set DJANGO_SETTINGS_MODULE.",
-    )
-    parser.addini(
-        SETTINGS_MODULE_ENV, "Django settings module to use by pytest-django."
-    )
 
-    parser.addini(
-        "django_find_project",
-        "Automatically find and add a Django project to the " "Python path.",
-        type="bool",
-        default=True,
-    )
     parser.addini(
         "django_debug_mode",
         "How to set the Django DEBUG setting (default `False`). "
@@ -84,89 +64,9 @@ def pytest_addoption(parser) -> None:
     )
 
 
-PROJECT_FOUND = (
-    "pytest-django found a Django project in %s "
-    "(it contains manage.py) and added it to the Python path.\n"
-    'If this is wrong, add "django_find_project = false" to '
-    "pytest.ini and explicitly manage your Python path."
-)
-
-PROJECT_NOT_FOUND = (
-    "pytest-django could not find a Django project "
-    "(no manage.py file could be found). You must "
-    "explicitly add your Django project to the Python path "
-    "to have it picked up."
-)
-
-PROJECT_SCAN_DISABLED = (
-    "pytest-django did not search for Django "
-    "projects since it is disabled in the configuration "
-    '("django_find_project = false")'
-)
-
-
-@contextlib.contextmanager
-def _handle_import_error(extra_message: str) -> Generator[None, None, None]:
-    try:
-        yield
-    except ImportError as e:
-        django_msg = (e.args[0] + "\n\n") if e.args else ""
-        msg = django_msg + extra_message
-        raise ImportError(msg)
-
-
-def _add_django_project_to_path(args) -> str:
-    def is_django_project(path: pathlib.Path) -> bool:
-        try:
-            return path.is_dir() and (path / "manage.py").exists()
-        except OSError:
-            return False
-
-    def arg_to_path(arg: str) -> pathlib.Path:
-        # Test classes or functions can be appended to paths separated by ::
-        arg = arg.split("::", 1)[0]
-        return pathlib.Path(arg)
-
-    def find_django_path(args) -> Optional[pathlib.Path]:
-        str_args = (str(arg) for arg in args)
-        path_args = [arg_to_path(x) for x in str_args if not x.startswith("-")]
-
-        cwd = pathlib.Path.cwd()
-        if not path_args:
-            path_args.append(cwd)
-        elif cwd not in path_args:
-            path_args.append(cwd)
-
-        for arg in path_args:
-            if is_django_project(arg):
-                return arg
-            for parent in arg.parents:
-                if is_django_project(parent):
-                    return parent
-        return None
-
-    from pathlib import Path
-    project_dir = Path.cwd()
-    if project_dir:
-        sys.path.insert(0, str(project_dir.absolute()))
-        return PROJECT_FOUND % project_dir
-    return PROJECT_NOT_FOUND
-
-
 def _setup_django() -> None:
-    if "django" not in sys.modules:
-        return
-
-    import django.conf
-
-    # Avoid force-loading Django when settings are not properly configured.
-    if not django.conf.settings.configured:
-        return
-
-    import django.apps
-
-    if not django.apps.apps.ready:
-        django.setup()
+    import django
+    django.setup()
 
     _blocking_manager.block()
 
@@ -228,40 +128,6 @@ def pytest_load_initial_conftests(
 
     if options.version or options.help:
         return
-
-    django_find_project = _get_boolean_value(
-        early_config.getini("django_find_project"), "django_find_project"
-    )
-
-    if django_find_project:
-        _django_project_scan_outcome = _add_django_project_to_path(args)
-    else:
-        _django_project_scan_outcome = PROJECT_SCAN_DISABLED
-
-    def _get_option_with_source(
-        option: Optional[str],
-        envname: str,
-    ) -> Union[Tuple[str, str], Tuple[None, None]]:
-        if option:
-            return option, "option"
-        if envname in os.environ:
-            return os.environ[envname], "env"
-        cfgval = early_config.getini(envname)
-        if cfgval:
-            return cfgval, "ini"
-        return None, None
-
-    ds, ds_source = _get_option_with_source(options.ds, SETTINGS_MODULE_ENV)
-
-    if ds:
-        os.environ[SETTINGS_MODULE_ENV] = ds
-
-        # Forcefully load Django settings, throws ImportError or
-        # ImproperlyConfigured if settings cannot be loaded.
-        from django.conf import settings as dj_settings
-
-        with _handle_import_error(_django_project_scan_outcome):
-            dj_settings.DATABASES
 
     _setup_django()
 

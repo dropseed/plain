@@ -200,7 +200,6 @@ def pull(ctx, backup, anonymize):
                     "--output",
                     dump_path,
                 ],
-                env={**os.environ, "PYTHONPATH": app_dir},
                 stdin=subprocess.PIPE,
             )
             for chunk in r.iter_content(2048):

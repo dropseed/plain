@@ -13,8 +13,6 @@ import click
 @click.argument("pytest_args", nargs=-1, type=click.UNPROCESSED)
 def cli(pytest_args):
     """Run tests with pytest"""
-    # This is the somewhat non-standard Bolt path for settings, which Pytest won't autodetect
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
     try:
         repo_root = (
@@ -50,7 +48,6 @@ def cli(pytest_args):
         ["bolt", "django", "collectstatic", "--noinput",],
         env={
             **os.environ,
-            "PYTHONPATH": bolt_app_dir,
             "APP_ENV": "test",
         },
     )
@@ -66,7 +63,6 @@ def cli(pytest_args):
         ],
         env={
             **os.environ,
-            "PYTHONPATH": bolt_app_dir,
             "APP_ENV": "test",
             "COVERAGE_FILE": coverage_file,
         },
@@ -98,7 +94,6 @@ def cli(pytest_args):
         ],
         env={
             **os.environ,
-            "PYTHONPATH": bolt_app_dir,
             "COVERAGE_FILE": coverage_file,
         },
     )

@@ -205,10 +205,6 @@ def serve():
             "--log-file",
             "-",
         ],
-        env={
-            **os.environ,
-            "PYTHONPATH": app_dir,
-        },
     )
     sys.exit(result.returncode)
 

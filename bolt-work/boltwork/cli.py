@@ -16,12 +16,10 @@ def cli():
     """Start local development"""
     # TODO check docker is available first
     repo_root = get_repo_root()
-    app_dir = os.path.join(repo_root, "app")
     dot_bolt_dir = os.path.join(repo_root, ".bolt")
 
     django_env = {
         **os.environ,  # Make a copy before load_dotenv, since Django will do it's own version of that
-        "PYTHONPATH": app_dir,
         "PYTHONUNBUFFERED": "true",
     }
 
@@ -93,7 +91,10 @@ def cli():
         manager.add_process(
             "celery",
             f"hupper -w .env -m celery --app {os.environ['CELERY_APP']} worker --loglevel info",
-            env=django_env,
+            env={
+                **django_env,
+                "PYTHONPATH": os.path.join(repo_root, "app"),
+            },
         )
 
     if boltpackage_installed("tailwind"):
