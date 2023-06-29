@@ -6,7 +6,9 @@ from django.utils.functional import LazyObject
 
 class JinjaEnvironment(LazyObject):
     def _setup(self):
-        environment_setting = getattr(settings, "JINJA_ENVIRONMENT", create_default_environment)
+        environment_setting = getattr(
+            settings, "JINJA_ENVIRONMENT", create_default_environment
+        )
 
         if isinstance(environment_setting, str):
             environment = import_string(environment_setting)()

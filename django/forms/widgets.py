@@ -10,7 +10,7 @@ from graphlib import CycleError, TopologicalSorter
 from itertools import chain
 
 from django.forms.utils import to_current_timezone
-from bolt.jinja.default import static
+from django.contrib.staticfiles.storage import staticfiles_storage
 from bolt import jinja
 from django.utils import formats
 from django.utils.dates import MONTHS
@@ -131,7 +131,7 @@ class Media:
         """
         if path.startswith(("http://", "https://", "/")):
             return path
-        return static(path)
+        return staticfiles_storage.url(path)
 
     def __getitem__(self, name):
         """Return a Media object that only contains media of the given type."""

@@ -1,60 +1,15 @@
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from jinja2.utils import htmlsafe_json_dumps
+
 from django.conf import settings
 from pathlib import Path
 import functools
 from django.apps import apps
-from django.utils.html import format_html
-from django.core.paginator import Paginator
-from django.utils.formats import date_format, time_format
 from django.conf import settings
-from itertools import islice
-from django.utils.timesince import timeuntil, timesince
 from django.utils.module_loading import module_has_submodule
 from importlib import import_module
-from django.contrib.staticfiles.storage import staticfiles_storage
-import datetime
 
-def json_script(value, id):
-    return format_html(
-        '<script type="application/json" id="{}">{}</script>',
-        id,
-        htmlsafe_json_dumps(value),
-    )
-
-
-def url(viewname, *args, **kwargs):
-    # A modified reverse that lets you pass args directly, excluding urlconf
-    from django.urls import reverse
-    return reverse(viewname, args=args, kwargs=kwargs)
-
-
-def static(path):
-    return staticfiles_storage.url(path)
-
-
-def get_default_environment_globals():
-    return {
-        "static": static,
-        "url": url,
-        "Paginator": Paginator,
-    }
-
-
-def get_default_environment_filters():
-    # Filters have more/easier access to context?
-    return {
-        # The standard Python ones
-        "strftime": datetime.datetime.strftime,
-        "isoformat": datetime.datetime.isoformat,
-        # Django's...
-        "date": date_format,
-        "time": time_format,
-        "timeuntil": timeuntil,
-        "timesince": timesince,
-        "json_script": json_script,
-        "islice": islice,  # slice for dict.items()
-    }
+from .filters import default_filters
+from .globals import default_globals
 
 
 @functools.lru_cache
@@ -85,60 +40,61 @@ def get_default_environment_kwargs():
     }
 
 
-def _get_app_jinja_attribute(app_config, attribute_name):
-    if module_has_submodule(app_config.module, "jinja"):
-        mod = import_module(f"{app_config.name}.jinja")
-        return getattr(mod, attribute_name, None)
-
-
-def get_app_extensions():
-    """Automatically load {app}.jinja.extensions from INSTALLED_APPS"""
+def _get_installed_extensions() -> tuple[list, dict, dict]:
+    """Automatically load extensions, globals, filters from INSTALLED_APPS jinja module and root jinja module"""
     extensions = []
-
-    for app_config in apps.get_app_configs():
-        if app_extensions := _get_app_jinja_attribute(app_config, "extensions"):
-            extensions.extend(app_extensions)
-
-    return extensions
-
-
-def get_app_globals():
-    """Automatically load {app}.jinja.globals from INSTALLED_APPS"""
     globals = {}
-
-    for app_config in apps.get_app_configs():
-        if app_globals := _get_app_jinja_attribute(app_config, "globals"):
-            globals.update(app_globals)
-
-    return globals
-
-
-def get_app_filters():
-    """Automatically load {app}.jinja.filters from INSTALLED_APPS"""
     filters = {}
 
     for app_config in apps.get_app_configs():
-        if app_filters := _get_app_jinja_attribute(app_config, "filters"):
-            filters.update(app_filters)
+        if module_has_submodule(app_config.module, "jinja"):
+            module = import_module(f"{app_config.name}.jinja")
+        else:
+            continue
 
-    return filters
+        if hasattr(module, "extensions"):
+            extensions.extend(module.extensions)
+
+        if hasattr(module, "globals"):
+            globals.update(module.globals)
+
+        if hasattr(module, "filters"):
+            filters.update(module.filters)
+
+    try:
+        import jinja
+
+        if hasattr(jinja, "extensions"):
+            extensions.extend(jinja.extensions)
+
+        if hasattr(jinja, "globals"):
+            globals.update(jinja.globals)
+
+        if hasattr(jinja, "filters"):
+            filters.update(jinja.filters)
+    except ImportError:
+        pass
+
+    return extensions, globals, filters
 
 
-def create_default_environment(extra_kwargs={}, include_apps=True):
+def create_default_environment(extra_kwargs={}, include_root=True, include_apps=True):
     kwargs = get_default_environment_kwargs()
     kwargs.update(extra_kwargs)
 
     env = Environment(**kwargs)
 
     # Load the top-level defaults
-    env.globals.update(get_default_environment_globals())
-    env.filters.update(get_default_environment_filters())
+    env.globals.update(default_globals)
+    env.filters.update(default_filters)
 
     if include_apps:
-        for extension in get_app_extensions():
+        app_extensions, app_globals, app_filters = _get_installed_extensions()
+
+        for extension in app_extensions:
             env.add_extension(extension)
 
-        env.globals.update(get_app_globals())
-        env.filters.update(get_app_filters())
+        env.globals.update(app_globals)
+        env.filters.update(app_filters)
 
     return env

@@ -1,8 +1,10 @@
 from jinja2 import nodes
 from jinja2.ext import Extension
 
+
 class InclusionTagExtension(Extension):
     """Intended to be subclassed"""
+
     # tags = {'inclusion_tag'}
     tags: set[str]
     template_name: str
@@ -13,17 +15,17 @@ class InclusionTagExtension(Extension):
             nodes.ContextReference(),
         ]
         kwargs = []
-        while parser.stream.current.type != 'block_end':
-            if parser.stream.current.type == 'name':
+        while parser.stream.current.type != "block_end":
+            if parser.stream.current.type == "name":
                 key = parser.stream.current.value
                 parser.stream.skip()
-                parser.stream.expect('assign')
+                parser.stream.expect("assign")
                 value = parser.parse_expression()
                 kwargs.append(nodes.Keyword(key, value))
             else:
                 args.append(parser.parse_expression())
 
-        call = self.call_method('_render', args=args, kwargs=kwargs, lineno=lineno)
+        call = self.call_method("_render", args=args, kwargs=kwargs, lineno=lineno)
         return nodes.CallBlock(call, [], [], []).set_lineno(lineno)
 
     def _render(self, context, *args, **kwargs):
@@ -32,4 +34,6 @@ class InclusionTagExtension(Extension):
         return template.render(context)
 
     def get_context(self, context, *args, **kwargs):
-        raise NotImplementedError("You need to implement the `get_context` method in your subclass.")
+        raise NotImplementedError(
+            "You need to implement the `get_context` method in your subclass."
+        )
