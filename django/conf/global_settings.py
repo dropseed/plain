@@ -423,8 +423,6 @@ MIDDLEWARE = []
 # SESSIONS #
 ############
 
-# Cache to store session data if using the cache session backend.
-SESSION_CACHE_ALIAS = "default"
 # Cookie name. This can be whatever you want.
 SESSION_COOKIE_NAME = "sessionid"
 # Age of cookie, in seconds (default: 2 weeks).
@@ -446,11 +444,6 @@ SESSION_SAVE_EVERY_REQUEST = False
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 # The module to store session data
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
-# Directory to store session files if using the file session module. If None,
-# the backend will use a sensible default.
-SESSION_FILE_PATH = None
-# class to serialize session data
-SESSION_SERIALIZER = "django.contrib.sessions.serializers.JSONSerializer"
 
 #########
 # CACHE #

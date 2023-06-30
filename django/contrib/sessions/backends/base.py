@@ -35,16 +35,12 @@ class SessionBase:
     Base class for all Session classes.
     """
 
-    TEST_COOKIE_NAME = "testcookie"
-    TEST_COOKIE_VALUE = "worked"
-
     __not_given = object()
 
     def __init__(self, session_key=None):
         self._session_key = session_key
         self.accessed = False
         self.modified = False
-        self.serializer = import_string(settings.SESSION_SERIALIZER)
 
     def __contains__(self, key):
         return key in self._session
@@ -80,28 +76,18 @@ class SessionBase:
             self._session[key] = value
             return value
 
-    def set_test_cookie(self):
-        self[self.TEST_COOKIE_NAME] = self.TEST_COOKIE_VALUE
-
-    def test_cookie_worked(self):
-        return self.get(self.TEST_COOKIE_NAME) == self.TEST_COOKIE_VALUE
-
-    def delete_test_cookie(self):
-        del self[self.TEST_COOKIE_NAME]
-
     def encode(self, session_dict):
         "Return the given session dictionary serialized and encoded as a string."
         return signing.dumps(
             session_dict,
             salt=self.key_salt,
-            serializer=self.serializer,
             compress=True,
         )
 
     def decode(self, session_data):
         try:
             return signing.loads(
-                session_data, salt=self.key_salt, serializer=self.serializer
+                session_data, salt=self.key_salt
             )
         except signing.BadSignature:
             logger = logging.getLogger("django.security.SuspiciousSession")

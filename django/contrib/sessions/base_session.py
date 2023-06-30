@@ -3,7 +3,6 @@ This module allows importing AbstractBaseSession even
 when django.contrib.sessions is not in INSTALLED_APPS.
 """
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 
 
 class BaseSessionManager(models.Manager):
@@ -24,16 +23,16 @@ class BaseSessionManager(models.Manager):
 
 
 class AbstractBaseSession(models.Model):
-    session_key = models.CharField(_("session key"), max_length=40, primary_key=True)
-    session_data = models.TextField(_("session data"))
-    expire_date = models.DateTimeField(_("expire date"), db_index=True)
+    session_key = models.CharField("session key", max_length=40, primary_key=True)
+    session_data = models.TextField("session data")
+    expire_date = models.DateTimeField("expire date", db_index=True)
 
     objects = BaseSessionManager()
 
     class Meta:
         abstract = True
-        verbose_name = _("session")
-        verbose_name_plural = _("sessions")
+        verbose_name = "session"
+        verbose_name_plural = "sessions"
 
     def __str__(self):
         return self.session_key
