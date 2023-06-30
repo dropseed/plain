@@ -11,7 +11,7 @@ class ObjectTemplateViewMixin:
 
     def get(self) -> HttpResponse:
         self.load_object()
-        return self.render_template_response()
+        return self.get_template_response()
 
     def load_object(self) -> None:
         try:

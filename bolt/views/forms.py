@@ -53,7 +53,7 @@ class FormView(TemplateView):
             **self.get_context_data(),
             "form": form,
         }
-        return self.render_template_response(context)
+        return self.get_template_response(context)
 
     def get_context_data(self) -> dict:
         """Insert the form into the context dict."""

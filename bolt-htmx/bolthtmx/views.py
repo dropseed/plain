@@ -6,7 +6,7 @@ from django.http import HttpResponse
 class HTMXViewMixin:
     htmx_template_name = ""
 
-    def render_template_response(self, context=None) -> HttpResponse:
+    def get_template_response(self, context=None) -> HttpResponse:
         if self.is_htmx_request and self.htmx_fragment_name:
             from .jinja import HTMXFragmentExtension
             template = self.get_template()
@@ -19,7 +19,7 @@ class HTMXViewMixin:
             )
             return HttpResponse(rendered, content_type=self.content_type)
 
-        return super().render_template_response(context=context)
+        return super().get_template_response(context=context)
 
     def dispatch(self):
         if self.is_htmx_request:

@@ -19,7 +19,7 @@ class TemplateView(View):
     template_name: str | None = None
     content_type: str | None = None
 
-    def render_template_response(self, context=None, **response_kwargs) -> "TemplateResponse":
+    def get_template_response(self, context=None, **response_kwargs) -> "TemplateResponse":
         if context is None:
             context = self.get_context_data()
 
@@ -56,7 +56,7 @@ class TemplateView(View):
         }
 
     def get(self):
-        return self.render_template_response()
+        return self.get_template_response()
 
 
 class ContentNotRenderedError(Exception):
