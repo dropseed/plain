@@ -51,14 +51,13 @@ def encrypt(files, key, force, diff):
                 exit(1)
 
         key = Fernet.generate_key()
+        print("Generated encryption key:", click.style(key, fg="green", bold=True))
+        print("You should save this somewhere safe, like a password manager!")
 
     fernet = Fernet(key)
 
-    print("Generated encryption key:", click.style(key.decode(), fg="green", bold=True))
-    print("You should save this somewhere safe, like a password manager!")
-
     for file in files:
-        print("Encrypting", file)
+        click.secho(file, bold=True)
         with open(file, "rb") as f:
             data = f.read()
 
@@ -69,10 +68,11 @@ def encrypt(files, key, force, diff):
             if diff:
                 with open(encrypted_path, "rb") as f:
                     old_data = f.read()
+                    old_data = fernet.decrypt(old_data)
 
                 diff = difflib.unified_diff(
                     old_data.decode().splitlines(),
-                    encrypted_data.decode().splitlines(),
+                    data.decode().splitlines(),
                     fromfile=encrypted_path,
                     tofile=encrypted_path,
                 )
@@ -82,13 +82,14 @@ def encrypt(files, key, force, diff):
                 else:
                     print("No changes")
             if not force:
-                print(
-                    f'File "{encrypted_path}" already exists, skipping (use --force to overwrite or --diff to see changes)'
+                click.secho(
+                    f'\nFile "{encrypted_path}" already exists, skipping (use --force to overwrite or --diff to see changes)\n', fg="yellow"
                 )
                 continue
 
         with open(encrypted_path, "wb") as f:
             f.write(encrypted_data)
+        click.secho(f"Encrypted to {encrypted_path}\n", fg="green")
 
 
 @cli.command()
