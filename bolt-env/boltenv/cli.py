@@ -15,6 +15,7 @@ def cli():
 @click.argument("files", nargs=-1)
 @click.option("--key", help="Encryption key", envvar="BOLT_ENV_ENCRYPTION_KEY")
 @click.option("--force", is_flag=True, help="Overwrite existing .encrypted files")
+@click.option("--diff", is_flag=True, help="Show diff of encrypted file")
 def encrypt(files, key, force, diff):
     """Encrypt .env files so they can be stored in git"""
 
@@ -50,10 +51,11 @@ def encrypt(files, key, force, diff):
                 exit(1)
 
         key = Fernet.generate_key()
-        print("Generated encryption key:", click.style(key, fg="green", bold=True))
-        print("You should save this somewhere safe, like a password manager!")
 
     fernet = Fernet(key)
+
+    print("Generated encryption key:", click.style(key.decode(), fg="green", bold=True))
+    print("You should save this somewhere safe, like a password manager!")
 
     for file in files:
         print("Encrypting", file)
@@ -63,11 +65,27 @@ def encrypt(files, key, force, diff):
         encrypted_data = fernet.encrypt(data)
         encrypted_path = file + ".encrypted"
 
-        if os.path.exists(encrypted_path) and not force:
-            print(
-                f'File "{encrypted_path}" already exists, skipping (use --force to overwrite or --diff to see changes)'
-            )
-            continue
+        if os.path.exists(encrypted_path):
+            if diff:
+                with open(encrypted_path, "rb") as f:
+                    old_data = f.read()
+
+                diff = difflib.unified_diff(
+                    old_data.decode().splitlines(),
+                    encrypted_data.decode().splitlines(),
+                    fromfile=encrypted_path,
+                    tofile=encrypted_path,
+                )
+                diff_str = "\n".join(diff)
+                if diff_str:
+                    print(diff_str)
+                else:
+                    print("No changes")
+            if not force:
+                print(
+                    f'File "{encrypted_path}" already exists, skipping (use --force to overwrite or --diff to see changes)'
+                )
+                continue
 
         with open(encrypted_path, "wb") as f:
             f.write(encrypted_data)
@@ -77,6 +95,7 @@ def encrypt(files, key, force, diff):
 @click.argument("files", nargs=-1)
 @click.option("--key", help="Encryption key", envvar="BOLT_ENV_ENCRYPTION_KEY")
 @click.option("--force", is_flag=True, help="Overwrite existing .env files")
+@click.option("--diff", is_flag=True, help="Show diff of decrypted file")
 def decrypt(files, key, force, diff):
     """Decrypt .env files so they can be used locally"""
 
@@ -113,65 +132,27 @@ def decrypt(files, key, force, diff):
 
         decrypted_path = file.replace(".encrypted", "")
 
-        if os.path.exists(decrypted_path) and not force:
-            print(
-                f'File "{decrypted_path}" already exists, skipping (use --force to overwrite or --diff to see changes)'
-            )
-            continue
+        if os.path.exists(decrypted_path):
+            if diff:
+                with open(decrypted_path, "rb") as f:
+                    old_data = f.read()
+
+                diff = difflib.unified_diff(
+                    old_data.decode().splitlines(),
+                    data.decode().splitlines(),
+                    fromfile=decrypted_path,
+                    tofile=file,
+                )
+                diff_str = "\n".join(diff)
+                if diff_str:
+                    print(diff_str)
+                else:
+                    print("No changes")
+            if not force:
+                print(
+                    f'File "{decrypted_path}" already exists, skipping (use --force to overwrite or --diff to see changes)'
+                )
+                continue
 
         with open(decrypted_path, "wb") as f:
             f.write(data)
-
-
-@cli.command()
-@click.argument("files", nargs=-1)
-@click.option("--key", help="Encryption key", envvar="BOLT_ENV_ENCRYPTION_KEY")
-def check(files, key):
-    if not files:
-        files = [x for x in os.listdir() if x.startswith(".env") and x.endswith(".encrypted")]
-
-    if not key:
-        click.secho(
-            "No encryption key provided. Use --key or BOLT_ENV_ENCRYPTION_KEY.",
-            fg="red",
-            bold=True,
-        )
-        exit(1)
-
-    fernet = Fernet(key)
-
-    differs = False
-
-    for file in files:
-        decrypted_path = file.replace(".encrypted", "")
-
-        click.secho(f"Checking {file}->{decrypted_path} ", bold=True, nl=False)
-
-        with open(file, "rb") as f:
-            encrypted_data = f.read()
-
-        data = fernet.decrypt(encrypted_data)
-
-        if os.path.exists(decrypted_path):
-            with open(decrypted_path, "rb") as f:
-                old_data = f.read()
-
-            diff = difflib.unified_diff(
-                old_data.decode().splitlines(),
-                data.decode().splitlines(),
-                fromfile=decrypted_path,
-                tofile=file,
-            )
-            diff_str = "\n".join(diff)
-            if diff_str:
-                click.secho("Changes found", fg="yellow")
-                print(diff_str)
-                differs = True
-            else:
-                click.secho("No changes", fg="green")
-        else:
-            print("Not decrypted yet")
-
-    if differs:
-        click.secho("\nUse `bolt env encrypt` to save your changes, or `bolt env decrypt` to discard them", fg="yellow")
-        exit(1)
