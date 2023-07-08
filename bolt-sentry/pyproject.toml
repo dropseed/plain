@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bolt-sentry"
 packages = [
-    { include = "boltsentry" },
+    { include = "bolt" },
 ]
 
 version = "0.3.0"

@@ -13,7 +13,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     # "django.contrib.staticfiles",
-    "boltimpersonate",
+    "bolt.impersonate",
 ]
 
 MIDDLEWARE = [
@@ -24,7 +24,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "boltimpersonate.middleware.ImpersonateMiddleware",
+    "bolt.impersonate.middleware.ImpersonateMiddleware",
 ]
 
 DATABASES = {

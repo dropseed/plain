@@ -2,7 +2,7 @@
 
 name = "bolt-work"
 packages = [
-    { include = "boltwork" },
+    { include = "bolt" },
 ]
 
 version = "1.1.0"
@@ -23,10 +23,10 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-work" = "boltwork:cli"
-"bolt-format" = "boltwork.format:cli"
-"bolt-db" = "boltwork.db:cli"
-"bolt-pre-commit" = "boltwork.precommit:cli"
+"bolt-work" = "bolt.work:cli"
+"bolt-format" = "bolt.work.format:cli"
+"bolt-db" = "bolt.work.db:cli"
+"bolt-pre-commit" = "bolt.work.precommit:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"

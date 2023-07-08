@@ -2,7 +2,7 @@
 
 name = "bolt-mail"
 packages = [
-    { include = "boltmail" },
+    { include = "bolt" },
 ]
 
 version = "0.1.0"

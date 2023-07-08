@@ -10,12 +10,12 @@ It allows you to debug production errors and also has some performance monitorin
 ```python
 # settings.py
 INSTALLED_APPS = INSTALLED_APPS + [
-  "boltsentry",
+  "bolt.sentry",
 ]
 
 # Enable the error page feedback widget
 MIDDLEWARE = MIDDLEWARE + [
-  "boltsentry.SentryFeedbackMiddleware",
+  "bolt.sentry.SentryFeedbackMiddleware",
 ]
 ```
 

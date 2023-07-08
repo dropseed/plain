@@ -81,7 +81,7 @@ class HomeView(TemplateView):
         context = super().get_context_data(**kwargs)
 
         # Make sure the debugger is attached (will need to be if runserver reloads)
-        from boltwork import debug; debug.attach()
+        from bolt.work import debug; debug.attach()
 
         # Add a breakpoint (or use the gutter in VSCode to add one)
         breakpoint()

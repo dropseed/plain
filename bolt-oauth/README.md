@@ -24,20 +24,20 @@ Install the package from PyPi:
 pip install bolt-oauth
 ```
 
-Add `boltoauth` to your `INSTALLED_APPS` in `settings.py`:
+Add `bolt.oauth` to your `INSTALLED_APPS` in `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     ...
-    "boltoauth",
+    "bolt.oauth",
 ]
 ```
 
-In your `urls.py`, include `boltoauth.urls`:
+In your `urls.py`, include `bolt.oauth.urls`:
 
 ```python
 urlpatterns = [
-    path("oauth/", include("boltoauth.urls")),
+    path("oauth/", include("bolt.oauth.urls")),
     ...
 ]
 ```
@@ -45,7 +45,7 @@ urlpatterns = [
 Then run migrations:
 
 ```sh
-python manage.py migrate boltoauth
+python manage.py migrate bolt.oauth
 ```
 
 Create a new OAuth provider ([or copy one from our examples](https://github.com/forgepackages/bolt-oauth/tree/master/provider_examples)):
@@ -54,7 +54,7 @@ Create a new OAuth provider ([or copy one from our examples](https://github.com/
 # yourapp/oauth.py
 import requests
 
-from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from bolt.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class ExampleOAuthProvider(OAuthProvider):
@@ -122,7 +122,7 @@ Then add a login button (which is a form using POST rather than a basic link, fo
 
 ```html
 <h1>Login</h1>
-<form action="{% url 'boltoauth:login' 'github' %}" method="post">
+<form action="{% url 'oauthlogin' 'github' %}" method="post">
     {{ csrf_input }}
     <button type="submit">Login with GitHub</button>
 </form>
@@ -205,7 +205,7 @@ Hello {{ request.user }}!
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         {% if connection.can_be_disconnected %}
-        <form action="{% url 'boltoauth:disconnect' connection.provider_key %}" method="post">
+        <form action="{% url 'oauthdisconnect' connection.provider_key %}" method="post">
             {{ csrf_input }}
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
@@ -220,7 +220,7 @@ Hello {{ request.user }}!
     {% for provider_key in oauth_provider_keys %}
     <li>
         {{ provider_key}}
-        <form action="{% url 'boltoauth:connect' provider_key %}" method="post">
+        <form action="{% url 'oauthconnect' provider_key %}" method="post">
             {{ csrf_input }}
             <button type="submit">Connect</button>
         </form>
@@ -234,7 +234,7 @@ Hello {{ request.user }}!
 The `get_provider_keys` function can help populate the list of options:
 
 ```python
-from boltoauth.providers import get_provider_keys
+from bolt.oauth.providers import get_provider_keys
 
 class ExampleView(TemplateView):
     template_name = "index.html"

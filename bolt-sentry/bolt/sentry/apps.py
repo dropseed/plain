@@ -6,7 +6,7 @@ from . import settings
 
 class BoltsentryConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "boltsentry"
+    name = "bolt.sentry"
 
     def ready(self):
         if settings.SENTRY_DSN():

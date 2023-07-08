@@ -1,4 +1,4 @@
-# boltenv
+# bolt.env
 
 Facilitates loading `.env` files and encrypting/decrypting `.env` files if you want to store them in git.
 

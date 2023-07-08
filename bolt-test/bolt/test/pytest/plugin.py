@@ -223,19 +223,23 @@ def _django_db_marker(request) -> None:
 
 @pytest.fixture(scope="function", autouse=True)
 def _dj_autoclear_mailbox() -> None:
-    import boltmail as mail
-
-    del mail.outbox[:]
+    try:
+        from bolt import mail
+        del mail.outbox[:]
+    except ImportError:
+        pass
 
 
 @pytest.fixture(scope="function")
 def mailoutbox(
     django_mail_patch_dns: None,
     _dj_autoclear_mailbox: None,
-) -> "Optional[List[boltmail.EmailMessage]]":
-    import boltmail as mail
-
-    return mail.outbox
+) -> "Optional[List[bolt.mail.EmailMessage]]":
+    try:
+        from bolt import mail
+        return mail.outbox
+    except ImportError:
+        pass
 
 
 @pytest.fixture(scope="function")
@@ -243,9 +247,11 @@ def django_mail_patch_dns(
     monkeypatch,
     django_mail_dnsname: str,
 ) -> None:
-    import boltmail as mail
-
-    monkeypatch.setattr(mail.message, "DNS_NAME", django_mail_dnsname)
+    try:
+        from bolt import mail
+        monkeypatch.setattr(mail.message, "DNS_NAME", django_mail_dnsname)
+    except ImportError:
+        pass
 
 
 @pytest.fixture(scope="function")

@@ -10,7 +10,7 @@ documentation = "https://github.com/forgepackages/bolt-oauth"
 repository = "https://github.com/forgepackages/bolt-oauth"
 keywords = []
 packages = [
-    { include = "boltoauth" },
+    { include = "bolt" },
 ]
 classifiers = [
     "Environment :: Web Environment",

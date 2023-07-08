@@ -10,7 +10,7 @@ documentation = "https://github.com/forgepackages/bolt-importmap"
 repository = "https://github.com/forgepackages/bolt-importmap"
 keywords = ["django", "javascript", "import", "map", "import-maps"]
 packages = [
-    { include = "boltimportmap" },
+    { include = "bolt" },
 ]
 classifiers = [
     "Environment :: Web Environment",
@@ -26,7 +26,7 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-importmap" = "boltimportmap:cli"
+"bolt-importmap" = "bolt.importmap:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"

@@ -2,7 +2,7 @@
 
 name = "bolt-tailwind"
 packages = [
-    { include = "bolttailwind" },
+    { include = "bolt" },
 ]
 
 version = "1.0.0"
@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-tailwind" = "bolttailwind:cli"
+"bolt-tailwind" = "bolt.tailwind:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"

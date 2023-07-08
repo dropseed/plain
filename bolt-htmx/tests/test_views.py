@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django.views import View
 
-from bolthtmx.views import HTMXViewMixin
+from bolt.htmx.views import HTMXViewMixin
 
 
 class V(HTMXViewMixin, View):

@@ -3,8 +3,8 @@ import datetime
 import pytest
 from django.contrib.auth import get_user_model
 
-from boltoauth.models import OAuthConnection
-from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from bolt.oauth.models import OAuthConnection
+from bolt.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class DummyProvider(OAuthProvider):

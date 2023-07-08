@@ -167,11 +167,11 @@ DATABASES = {}
 # Classes used to implement DB routing behavior.
 DATABASE_ROUTERS = []
 
-# The email backend to use. For possible shortcuts see boltmail.
+# The email backend to use. For possible shortcuts see bolt.mail.
 # The default is to use the SMTP backend.
 # Third-party backends can be specified by providing a Python path
 # to a module that defines an EmailBackend class.
-EMAIL_BACKEND = "boltmail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = "bolt.mail.backends.smtp.EmailBackend"
 
 # Host for sending email.
 EMAIL_HOST = "localhost"

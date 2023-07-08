@@ -1,6 +1,6 @@
 import pytest
 
-from boltoauth.providers import OAuthToken, OAuthUser
+from bolt.oauth.providers import OAuthToken, OAuthUser
 from tests.providers.github import GitHubOAuthProvider
 
 

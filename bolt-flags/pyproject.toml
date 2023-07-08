@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bolt-flags"
 packages = [
-    { include = "boltflags" },
+    { include = "bolt" },
 ]
 version = "0.0.0"
 description = ""

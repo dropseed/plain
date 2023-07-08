@@ -1,7 +1,7 @@
 import pytest
 
-from boltoauth.models import OAuthConnection
-from boltoauth.providers import OAuthToken, OAuthUser
+from bolt.oauth.models import OAuthConnection
+from bolt.oauth.providers import OAuthToken, OAuthUser
 
 
 @pytest.mark.django_db

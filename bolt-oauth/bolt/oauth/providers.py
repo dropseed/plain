@@ -95,7 +95,7 @@ class OAuthProvider:
         return self.scope
 
     def get_callback_url(self, *, request: HttpRequest) -> str:
-        url = reverse("boltoauth:callback", kwargs={"provider": self.provider_key})
+        url = reverse("oauthcallback", kwargs={"provider": self.provider_key})
         return request.build_absolute_uri(url)
 
     def generate_state(self) -> str:

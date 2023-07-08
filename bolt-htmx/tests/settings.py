@@ -1,5 +1,5 @@
 INSTALLED_APPS = [
-    "bolthtmx",
+    "bolt.htmx",
 ]
 
 USE_TZ = True

@@ -86,7 +86,7 @@ class Flag(models.Model):
                         Info(
                             f"Flag {flag_name} is not used.",
                             hint=f"Remove the flag from the database or define it in the {FLAGS_MODULE()} module.",
-                            id="boltflags.I001",
+                            id="bolt.flags.I001",
                         )
                     )
 

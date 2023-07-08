@@ -2,7 +2,7 @@
 
 name = "bolt-heroku"
 packages = [
-    { include = "boltheroku" },
+    { include = "bolt" },
 ]
 
 version = "1.0.0"
@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-heroku" = "boltheroku:cli"
+"bolt-heroku" = "bolt.heroku:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"

@@ -249,7 +249,7 @@ class EmailMessage:
         self.connection = connection
 
     def get_connection(self, fail_silently=False):
-        from boltmail import get_connection
+        from . import get_connection
 
         if not self.connection:
             self.connection = get_connection(fail_silently=fail_silently)

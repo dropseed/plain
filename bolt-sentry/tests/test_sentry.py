@@ -2,8 +2,8 @@ import sentry_sdk
 from django.contrib.auth import get_user_model
 from django.views.generic import TemplateView
 
-from boltsentry.middleware import SentryFeedbackMiddleware
-from boltsentry.templatetags.sentry import sentry_js
+from bolt.sentry.middleware import SentryFeedbackMiddleware
+from bolt.sentry.templatetags.sentry import sentry_js
 
 SENTRY_TEST_DSN = "https://publickey@1.ingest.sentry.io/1"
 

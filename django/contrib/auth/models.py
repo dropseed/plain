@@ -1,7 +1,7 @@
 from django.apps import apps
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.hashers import make_password
-from boltmail import send_mail
+from bolt.mail import send_mail
 from django.db import models
 from django.db.models.manager import EmptyManager
 from django.utils import timezone

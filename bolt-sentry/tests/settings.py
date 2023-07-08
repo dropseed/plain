@@ -13,7 +13,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     # "django.contrib.staticfiles",
-    "boltsentry",
+    "bolt.sentry",
 ]
 
 MIDDLEWARE = [
@@ -24,7 +24,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "boltsentry.middleware.SentryFeedbackMiddleware",
+    "bolt.sentry.middleware.SentryFeedbackMiddleware",
 ]
 
 DATABASES = {

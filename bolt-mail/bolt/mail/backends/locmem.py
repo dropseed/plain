@@ -2,7 +2,7 @@
 Backend for test environment.
 """
 
-import boltmail as mail
+from . import mail
 from .base import BaseEmailBackend
 
 

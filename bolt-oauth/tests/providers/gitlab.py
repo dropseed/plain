@@ -1,6 +1,6 @@
 import requests
 
-from boltoauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from bolt.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
 class GitLabOAuthProvider(OAuthProvider):

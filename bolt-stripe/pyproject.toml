@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bolt-stripe"
 packages = [
-    { include = "boltstripe" },
+    { include = "bolt" },
 ]
 
 version = "0.1.1"

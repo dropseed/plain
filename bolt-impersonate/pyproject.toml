@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bolt-impersonate"
 packages = [
-    { include = "boltimpersonate" },
+    { include = "bolt" },
 ]
 
 version = "0.1.0"

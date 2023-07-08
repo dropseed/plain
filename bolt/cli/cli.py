@@ -1,4 +1,4 @@
-from pathlib import Path
+import re
 import importlib
 import os
 import subprocess
@@ -9,7 +9,7 @@ import click
 
 
 class InstalledAppsGroup(click.Group):
-    BOLT_APPS_PREFIX = "bolt"
+    BOLT_APPS_PREFIX = "bolt."
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -75,10 +75,11 @@ class BinNamespaceGroup(click.Group):
     def get_command(self, ctx, name):
         # Remove hyphens and prepend w/ "bolt"
         # so "pre-commit" becomes "forgeprecommit" as an import
-        imported = self.import_module_cli("bolt" + name.replace("-", ""))
+        imported = self.import_module_cli("bolt." + name.replace("-", ""))
         if imported:
             return imported
 
+        # Re-create the bin path and make sure it exists
         bin_path = os.path.join(os.path.dirname(sys.executable), self.COMMAND_PREFIX + name)
         if not os.path.exists(bin_path):
             return
@@ -87,22 +88,19 @@ class BinNamespaceGroup(click.Group):
         # by looking at the contents of the bin command itself
         with open(bin_path) as f:
             for line in f:
-                if line.startswith("from bolt"):
-                    module = line.split(" import ")[0].split()[-1]
-                    imported = self.import_module_cli(module)
-                    if imported:
-                        return imported
+                if "from bolt." in line and "from bolt.cli" not in line:
+                    module = re.search(r"from (bolt\.([\w\.]+))", line).group(1)
+                    if module:
+                        imported = self.import_module_cli(module)
+                        if imported:
+                            return imported
 
     def import_module_cli(self, name):
         try:
             i = importlib.import_module(name)
             return i.cli
-        except ImportError:
-            # Built-in commands will appear here,
-            # but so would failed imports of new ones
+        except (ImportError, AttributeError):
             pass
-        except AttributeError as e:
-            click.secho(f'Error importing "{name}":\n  {e}\n', fg="red")
 
 
 @click.group()

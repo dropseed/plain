@@ -16,7 +16,6 @@ from xml.dom.minidom import Node, parseString
 from django.apps import apps
 from django.apps.registry import Apps
 from django.conf import UserSettingsHolder, settings
-import boltmail as mail
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import request_started, setting_changed
 from django.db import DEFAULT_DB_ALIAS, connections, reset_queries
@@ -137,14 +136,17 @@ def setup_test_environment(debug=None):
     saved_data.debug = settings.DEBUG
     settings.DEBUG = debug
 
-    saved_data.email_backend = settings.EMAIL_BACKEND
-    settings.EMAIL_BACKEND = "boltmail.backends.locmem.EmailBackend"
-
     saved_data.template_render = Template.render
     Template._original_render = Template.render
     Template.render = instrumented_test_render
 
-    mail.outbox = []
+    try:
+        from bolt import mail
+        mail.outbox = []
+        saved_data.email_backend = settings.EMAIL_BACKEND
+        settings.EMAIL_BACKEND = "bolt.mail.backends.locmem.EmailBackend"
+    except ImportError:
+        pass
 
     deactivate()
 
@@ -162,7 +164,12 @@ def teardown_test_environment():
     Template._render = saved_data.template_render
 
     del _TestState.saved_data
-    del mail.outbox
+
+    try:
+        from bolt import mail
+        del mail.outbox
+    except ImportError:
+        pass
 
 
 def setup_databases(

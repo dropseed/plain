@@ -2,7 +2,7 @@
 
 name = "bolt-htmx"
 packages = [
-    { include = "bolthtmx" },
+    { include = "bolt" },
 ]
 
 version = "0.3.2"

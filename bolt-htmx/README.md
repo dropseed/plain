@@ -12,7 +12,7 @@ simply inherit from the class (yes, this is designed to work with class-based vi
 ```python
 from django.views.generic import TemplateView
 
-from bolthtmx.views import HTMXViewMixin
+from bolt.htmx.views import HTMXViewMixin
 
 
 class HomeView(HTMXViewMixin, TemplateView):
@@ -45,12 +45,12 @@ You can install `bolt-htmx` with any Django project:
 pip install bolt-htmx
 ```
 
-Then add `bolthtmx` to `settings.py`:
+Then add `bolt.htmx` to `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     # ...
-    "bolthtmx",
+    "bolt.htmx",
 ]
 ```
 

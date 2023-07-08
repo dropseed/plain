@@ -2,7 +2,7 @@
 
 name = "bolt-test"
 packages = [
-    { include = "bolttest" },
+    { include = "bolt" },
 ]
 
 version = "1.1.0"
@@ -23,11 +23,11 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-test" = "bolttest:cli"
+"bolt-test" = "bolt.test:cli"
 
 # Automatically sets this up with pytest
 [tool.poetry.plugins."pytest11"]
-"bolt" = "bolttest.pytest.plugin"
+"bolt" = "bolt.test.pytest.plugin"
 
 
 [tool.poetry.dependencies]

@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bolt-workbench"
 packages = [
-    { include = "boltworkbench" },
+    { include = "bolt" },
 ]
 
 version = "0.3.0"

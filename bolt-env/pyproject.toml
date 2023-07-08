@@ -2,7 +2,7 @@
 
 name = "bolt-env"
 packages = [
-    { include = "boltenv" },
+    { include = "bolt" },
 ]
 
 version = "0.1.0"
@@ -12,7 +12,7 @@ license = "MIT"
 # readme = "README.md"
 
 [tool.poetry.scripts]
-"bolt-env" = "boltenv:cli"  # Rename to bolt-env
+"bolt-env" = "bolt.env:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"

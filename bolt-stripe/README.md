@@ -13,12 +13,12 @@ Bolt makes this even easier by providing classes you can extend.
 
 ## Installation
 
-Add `boltstripe` to the `INSTALLED_APPS`:
+Add `bolt.stripe` to the `INSTALLED_APPS`:
 
 ```python
 # settings.py
 INSTALLED_APPS = INSTALLED_APPS + [
-    "boltstripe",
+    "bolt.stripe",
 ]
 ```
 
@@ -40,7 +40,7 @@ or something more specific like a Stripe subscription or charge ID.
 
 ```python
 from django.db import models
-from boltstripe.models import StripeModel
+from bolt.stripe.models import StripeModel
 
 
 class Project(StripeModel):
@@ -113,7 +113,7 @@ The view is where you will put your custom logic and decide which plans/products
 You can use any info from the request itself, your settings, or database:
 
 ```python
-from boltstripe.views import StripeCheckoutView
+from bolt.stripe.views import StripeCheckoutView
 
 
 class ProjectCheckoutView(ProjectDetailMixin, StripeCheckoutView, generic.DetailView):
@@ -171,7 +171,7 @@ but you do need to have an existing customer ID to use the `StripePortalView`.
 
 
 ```python
-from boltstripe.views import StripePortalView
+from bolt.stripe.views import StripePortalView
 
 
 class TeamPortalView(
@@ -200,7 +200,7 @@ urlpatterns = [
 In this example we are going to save a specific Stripe subscription ID to a project:
 
 ```python
-from boltstripe.views import StripeWebhookView
+from bolt.stripe.views import StripeWebhookView
 
 
 class StripeWebhook(StripeWebhookView):

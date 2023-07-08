@@ -5,7 +5,7 @@ import uuid
 import django.db.models.deletion
 from django.db import migrations, models
 
-import boltflags.models
+import bolt.flags.models
 
 
 class Migration(migrations.Migration):
@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                     models.CharField(
                         max_length=255,
                         unique=True,
-                        validators=[boltflags.models.validate_flag_name],
+                        validators=[bolt.flags.models.validate_flag_name],
                     ),
                 ),
                 ("description", models.TextField(blank=True)),

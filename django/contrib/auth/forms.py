@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX, identify_hashe
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
-from boltmail import EmailMultiAlternatives
+from bolt.mail import EmailMultiAlternatives
 from bolt import jinja
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -282,7 +282,7 @@ class PasswordResetForm(forms.Form):
         html_email_template_name=None,
     ):
         """
-        Send a boltmail.EmailMultiAlternatives to `to_email`.
+        Send a bolt.mail.EmailMultiAlternatives to `to_email`.
         """
         template = jinja.environment.from_string(subject_template_name)
         subject = template.render(context)

@@ -6,7 +6,7 @@ from . import settings
 
 class BoltstripeConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "boltstripe"
+    name = "bolt.stripe"
 
     def ready(self):
         if settings.STRIPE_SECRET_KEY():

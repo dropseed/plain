@@ -7,7 +7,6 @@ from unittest.suite import _DebugResult
 
 from django.apps import apps
 from django.conf import settings
-import boltmail as mail
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.management.color import no_style
@@ -200,7 +199,12 @@ class TransactionTestCase(unittest.TestCase):
         * Clear the mail test outbox.
         """
         self.client = self.client_class()
-        mail.outbox = []
+
+        try:
+            from bolt import mail
+            mail.outbox = []
+        except ImportError:
+            pass
 
         if self.available_apps is not None:
             apps.set_available_apps(self.available_apps)

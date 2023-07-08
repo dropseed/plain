@@ -188,7 +188,7 @@ class OAuthConnection(models.Model):
                         "The following OAuth providers are in the database but not in the settings: {}".format(
                             ", ".join(keys_in_db - keys_in_settings)
                         ),
-                        id="boltoauth.E001",
+                        id="bolt.oauth.E001",
                     )
                 )
 
