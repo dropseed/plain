@@ -2,15 +2,15 @@
 
 {% block content %}
 <h1>Login</h1>
-<form action="{% url 'oauthlogin' 'github' %}" method="post">
+<form action="{% url 'oauth:login' 'github' %}" method="post">
     {{ csrf_input }}
     <button type="submit">Login with GitHub</button>
 </form>
-<form action="{% url 'oauthlogin' 'gitlab' %}" method="post">
+<form action="{% url 'oauth:login' 'gitlab' %}" method="post">
     {{ csrf_input }}
     <button type="submit">Login with GitLab</button>
 </form>
-<form action="{% url 'oauthlogin' 'bitbucket' %}" method="post">
+<form action="{% url 'oauth:login' 'bitbucket' %}" method="post">
     {{ csrf_input }}
     <button type="submit">Login with Bitbucket</button>
 </form>
