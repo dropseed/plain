@@ -41,8 +41,7 @@ def cli(install):
     if repo_root and is_using_poetry(repo_root):
         check_short("Checking poetry.lock", "poetry", "lock", "--check")
 
-    if boltpackage_installed("format"):
-        check_short("Checking code formatting", "bolt", "format", "--check")
+    check_short("Checking code formatting", "bolt", "format", "--check")
 
     if django_db_connected():
         check_short(
