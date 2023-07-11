@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.utils.module_loading import import_string
-from .default import create_default_environment
+from .defaults import create_default_environment, get_template_dirs
 from django.utils.functional import LazyObject
 
 
@@ -20,4 +20,4 @@ class JinjaEnvironment(LazyObject):
 
 environment = JinjaEnvironment()
 
-__all__ = ["environment", "create_default_environment"]
+__all__ = ["environment", "create_default_environment", "get_template_dirs"]

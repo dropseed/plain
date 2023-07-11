@@ -1,4 +1,4 @@
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from jinja2 import Environment, StrictUndefined
 
 from django.conf import settings
 from pathlib import Path
@@ -10,10 +10,11 @@ from importlib import import_module
 
 from .filters import default_filters
 from .globals import default_globals
+from .loaders import FileSystemHTMLComponentsLoader
 
 
 @functools.lru_cache
-def get_app_template_dirs():
+def _get_app_template_dirs():
     """
     Return an iterable of paths of directories to load app templates from.
 
@@ -28,16 +29,6 @@ def get_app_template_dirs():
     ]
     # Immutable return value because it will be cached and shared by callers.
     return tuple(template_dirs)
-
-
-def get_default_environment_kwargs():
-    template_dirs = (settings.path.parent / "templates",) + get_app_template_dirs()
-    return {
-        "loader": FileSystemLoader(template_dirs),
-        "autoescape": True,
-        "auto_reload": settings.DEBUG,
-        "undefined": StrictUndefined,
-    }
 
 
 def _get_installed_extensions() -> tuple[list, dict, dict]:
@@ -78,10 +69,22 @@ def _get_installed_extensions() -> tuple[list, dict, dict]:
     return extensions, globals, filters
 
 
-def create_default_environment(extra_kwargs={}, include_root=True, include_apps=True):
-    kwargs = get_default_environment_kwargs()
-    kwargs.update(extra_kwargs)
+def get_template_dirs():
+    return (settings.path.parent / "templates",) + _get_app_template_dirs()
 
+
+def create_default_environment(include_apps=True, **environment_kwargs):
+    """
+    This default jinja environment, also used by the error rendering and internal views so
+    customization needs to happen by using this function, not settings that hook in internally.
+    """
+    kwargs = {
+        "loader": FileSystemHTMLComponentsLoader(get_template_dirs()),
+        "autoescape": True,
+        "auto_reload": settings.DEBUG,
+        "undefined": StrictUndefined,
+    }
+    kwargs.update(**environment_kwargs)
     env = Environment(**kwargs)
 
     # Load the top-level defaults
