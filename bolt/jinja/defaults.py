@@ -10,7 +10,7 @@ from importlib import import_module
 
 from .filters import default_filters
 from .globals import default_globals
-from .loaders import FileSystemHTMLComponentsLoader
+from .components import FileSystemHTMLComponentsLoader
 
 
 @functools.lru_cache
@@ -69,6 +69,18 @@ def _get_installed_extensions() -> tuple[list, dict, dict]:
     return extensions, globals, filters
 
 
+def finalize_callable_error(obj):
+    """Prevent direct rendering of a callable (likely just forgotten ()) by raising a TypeError"""
+    if callable(obj):
+        raise TypeError(f"{obj} is callable, did you forget parentheses?")
+
+    # TODO find a way to prevent <object representation> from being rendered
+    # if obj.__class__.__str__ is object.__str__:
+    #     raise TypeError(f"{obj} does not have a __str__ method")
+
+    return obj
+
+
 def get_template_dirs():
     return (settings.path.parent / "templates",) + _get_app_template_dirs()
 
@@ -83,6 +95,7 @@ def create_default_environment(include_apps=True, **environment_kwargs):
         "autoescape": True,
         "auto_reload": settings.DEBUG,
         "undefined": StrictUndefined,
+        "finalize": finalize_callable_error,
     }
     kwargs.update(**environment_kwargs)
     env = Environment(**kwargs)

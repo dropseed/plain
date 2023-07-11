@@ -14,6 +14,11 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
     def get_source(self, environment: "Environment", template: str):
         contents, path, uptodate = super().get_source(environment, template)
 
+        # Clear components cache if it looks like a component changed
+        # if os.path.splitext(path)[1] == ".html" and "components" in path and "html_components" in self.__dict__:
+        #     del self.__dict__["html_components"]
+
+        # If it's html, replace component tags
         if os.path.splitext(path)[1] == ".html":
             self._html_components_environment = (
                 environment  # Save this so we can use it in html_components
@@ -52,6 +57,7 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                             value = parser.parse_expression()
                             kwargs.append(nodes.Keyword(key, value))
 
+                    print(self.component_name, kwargs)
                     body = parser.parse_statements(
                         ["name:end" + self.component_name], drop_needle=True
                     )
@@ -63,8 +69,7 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
 
                 def _render(self, context, **kwargs):
                     template = self.environment.get_template(self.template_name)
-                    context.vars.update(kwargs)
-                    return template.render(context)
+                    return template.render({**context, **kwargs})
 
             # Create a new class on the fly
             NamedComponentExtension = type(f"HTMLComponent.{component_name}", (ComponentExtension,), {
@@ -77,12 +82,20 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
         return components
 
     def replace_component_tags(self, contents: str):
+        def replace_quoted_braces(s) -> str:
+            """
+            We're converting to tag syntax, but it's very natural to write
+            <Label for="{{ thing }}"> vs <Label for=thing>
+            so we just convert the first to the second automatically.
+            """
+            return s.replace("\"{{", "").replace("}}\"", "")
+
         for component_name in self.html_components:
             closing_pattern = re.compile(
-                r"<{}([\s\S]*?)>([\s\S]*?)</{}>".format(component_name, component_name)
+                r"<{}(\s+[\s\S]*?)?>([\s\S]*?)</{}>".format(component_name, component_name)
             )
             self_closing_pattern = re.compile(
-                r"<{}([\s\S]*?)/>".format(component_name)
+                r"<{}(\s+[\s\S]*?)?/>".format(component_name)
             )
 
             def closing_cb(match: re.Match) -> str:
@@ -91,17 +104,19 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                         f"Component {component_name} cannot be nested in itself"
                     )
 
-                attrs_str = match.group(1)
+                attrs_str = match.group(1) or ""
                 inner = match.group(2)
 
-                return f"{{% {component_name}{attrs_str} %}}{inner}{{% end{component_name} %}}"
+                attrs_str = replace_quoted_braces(attrs_str)
+                return f"{{% {component_name} {attrs_str} %}}{inner}{{% end{component_name} %}}"
 
             contents = closing_pattern.sub(closing_cb, contents)
 
             def self_closing_cb(match: re.Match) -> str:
-                attrs_str = match.group(1)
+                attrs_str = match.group(1) or ""
 
-                return f"{{% {component_name}{attrs_str} %}}{{% end{component_name} %}}"
+                attrs_str = replace_quoted_braces(attrs_str)
+                return f"{{% {component_name} {attrs_str} %}}{{% end{component_name} %}}"
 
             contents = self_closing_pattern.sub(self_closing_cb, contents)
 
