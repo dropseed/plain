@@ -46,7 +46,7 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                 def parse(self, parser):
                     lineno = next(parser.stream).lineno
                     args = [
-                        nodes.ContextReference(),
+                        nodes.DerivedContextReference(),
                     ]
                     kwargs = []
                     while parser.stream.current.type != "block_end":
@@ -57,7 +57,6 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                             value = parser.parse_expression()
                             kwargs.append(nodes.Keyword(key, value))
 
-                    print(self.component_name, kwargs)
                     body = parser.parse_statements(
                         ["name:end" + self.component_name], drop_needle=True
                     )

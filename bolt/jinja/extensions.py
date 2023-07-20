@@ -12,7 +12,7 @@ class InclusionTagExtension(Extension):
     def parse(self, parser):
         lineno = next(parser.stream).lineno
         args = [
-            nodes.ContextReference(),
+            nodes.DerivedContextReference(),
         ]
         kwargs = []
         while parser.stream.current.type != "block_end":
