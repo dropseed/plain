@@ -415,7 +415,7 @@ class ExceptionReporter:
             return t.render(c)
         except Exception as e:
             logger.exception("Error rendering 500 template", e)
-            return HttpResponse(str(e), content_type="text/plain", status=500)
+            return HttpResponse(f"Error rendering 500 template: {e}", content_type="text/plain", status=500)
 
     def get_traceback_text(self):
         """Return plain text version of debug 500 HTTP error page."""
@@ -426,7 +426,7 @@ class ExceptionReporter:
             return t.render(c)
         except Exception as e:
             logger.exception("Error rendering 500 template", e)
-            return HttpResponse(str(e), content_type="text/plain", status=500)
+            return HttpResponse(f"Error rendering 500 template: {e}", content_type="text/plain", status=500)
 
     def _get_source(self, filename, loader, module_name):
         source = None
