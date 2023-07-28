@@ -1,19 +1,22 @@
+from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from django.core.exceptions import ImproperlyConfigured
-from django.forms import BaseForm
 from django.http import HttpResponse, HttpResponseRedirect
 
 from .templates import TemplateView
+
+if TYPE_CHECKING:
+    from django.forms import BaseForm
 
 
 class FormView(TemplateView):
     """A view for displaying a form and rendering a template response."""
 
-    form_class: type[BaseForm] | None = None
+    form_class: type["BaseForm"] | None = None
     success_url: Callable | str | None = None
 
-    def get_form(self) -> BaseForm:
+    def get_form(self) -> "BaseForm":
         """Return an instance of the form to be used in this view."""
         if not self.form_class:
             raise ImproperlyConfigured(
@@ -43,11 +46,11 @@ class FormView(TemplateView):
             raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
         return str(self.success_url)  # success_url may be lazy
 
-    def form_valid(self, form: BaseForm) -> HttpResponse:
+    def form_valid(self, form: "BaseForm") -> HttpResponse:
         """If the form is valid, redirect to the supplied URL."""
         return HttpResponseRedirect(self.get_success_url())
 
-    def form_invalid(self, form: BaseForm) -> HttpResponse:
+    def form_invalid(self, form: "BaseForm") -> HttpResponse:
         """If the form is invalid, render the invalid form."""
         context = {
             **self.get_context_data(),
