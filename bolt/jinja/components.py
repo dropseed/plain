@@ -34,14 +34,26 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
         for searchpath in self.searchpath:
             components_dir = os.path.join(searchpath, "components")
             if os.path.isdir(components_dir):
-                for component in os.listdir(components_dir):
-                    component_name = os.path.splitext(component)[0]
-                    # Nesting below components/{sub}/component.html is not supported...
-                    component_path = os.path.join(components_dir, component)
-                    if os.path.isfile(component_path):
-                        components.append(component_name)
+                for root, dirs, files in os.walk(components_dir):
+                    for file in files:
+                        relative_path = os.path.relpath(
+                            os.path.join(root, file), components_dir
+                        )
+                        # Replace slashes with .
+                        component_name = os.path.splitext(relative_path)[0].replace(
+                            os.sep, "."
+                        )
+                        components.append({
+                            "path": relative_path,
+                            "html_name": component_name,  # Uses . syntax
+                            "tag_name": component_name.replace(".", "_"),  # Uses _ syntax
+                        })
 
-        for component_name in components:
+        for component in components:
+            component_name = component["html_name"]
+            jinja_tag_name = component["tag_name"]
+            component_relative_path = component["path"]
+
             class ComponentExtension(Extension):
                 def parse(self, parser):
                     lineno = next(parser.stream).lineno
@@ -58,7 +70,7 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                             kwargs.append(nodes.Keyword(key, value))
 
                     body = parser.parse_statements(
-                        ["name:end" + self.component_name], drop_needle=True
+                        ["name:end" + self.jinja_tag_name], drop_needle=True
                     )
 
                     call = self.call_method(
@@ -72,9 +84,9 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
 
             # Create a new class on the fly
             NamedComponentExtension = type(f"HTMLComponent.{component_name}", (ComponentExtension,), {
-                "tags": {component_name, f"end{component_name}"},
-                "template_name": f"components/{component_name}.html",
-                "component_name": component_name,
+                "tags": {jinja_tag_name, f"end{jinja_tag_name}"},
+                "template_name": f"components/{component_relative_path}",
+                "jinja_tag_name": jinja_tag_name,
             })
             self._html_components_environment.add_extension(NamedComponentExtension)
 
@@ -89,7 +101,10 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
             """
             return s.replace("\"{{", "").replace("}}\"", "")
 
-        for component_name in self.html_components:
+        for component in self.html_components:
+            component_name = component["html_name"]
+            jinja_tag_name = component["tag_name"]
+
             closing_pattern = re.compile(
                 r"<{}(\s+[\s\S]*?)?>([\s\S]*?)</{}>".format(component_name, component_name)
             )
@@ -107,7 +122,7 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                 inner = match.group(2)
 
                 attrs_str = replace_quoted_braces(attrs_str)
-                return f"{{% {component_name} {attrs_str} %}}{inner}{{% end{component_name} %}}"
+                return f"{{% {jinja_tag_name} {attrs_str} %}}{inner}{{% end{jinja_tag_name} %}}"
 
             contents = closing_pattern.sub(closing_cb, contents)
 
@@ -115,7 +130,7 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                 attrs_str = match.group(1) or ""
 
                 attrs_str = replace_quoted_braces(attrs_str)
-                return f"{{% {component_name} {attrs_str} %}}{{% end{component_name} %}}"
+                return f"{{% {jinja_tag_name} {attrs_str} %}}{{% end{jinja_tag_name} %}}"
 
             contents = self_closing_pattern.sub(self_closing_cb, contents)
 
