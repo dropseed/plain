@@ -26,14 +26,14 @@ def cli(install):
     if repo_root and has_pyproject_toml(repo_root):
         with open(Path(repo_root, "pyproject.toml"), "rb") as f:
             pyproject = tomllib.load(f)
-        for cmd in (
+        for name, data in (
             pyproject.get("tool", {})
             .get("bolt", {})
             .get("pre-commit", {})
-            .get("run", [])
-        ):
-            print_event("Running custom pre-commit check")
-            print(cmd)
+            .get("run", {})
+        ).items():
+            cmd = data["cmd"]
+            print_event(f"{name} (custom)")
             result = subprocess.run(cmd, shell=True)
             if result.returncode != 0:
                 sys.exit(result.returncode)
