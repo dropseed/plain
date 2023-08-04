@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
-from django.shortcuts import resolve_url
+from django.urls import reverse
 
 
 class LoginRequired(Exception):
@@ -56,7 +56,7 @@ class AuthViewMixin:
             # also seems like this code is used multiple places anyway...
             # could be easier to get redirect query param
             path = self.request.build_absolute_uri()
-            resolved_login_url = resolve_url(e.login_url)
+            resolved_login_url = reverse(e.login_url)
             # If the login url is the same scheme and net location then use the
             # path as the "next" url.
             login_scheme, login_netloc = urlparse(resolved_login_url)[:2]

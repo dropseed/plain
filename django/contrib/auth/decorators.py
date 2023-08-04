@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import resolve_url
+from django.contrib.admin.shortcuts import resolve_url
 
 
 def user_passes_test(

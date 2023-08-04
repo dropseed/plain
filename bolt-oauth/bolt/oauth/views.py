@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect, render
 from bolt.views import View
+from django.http import HttpResponseRedirect, HttpResponseBadRequest
+from bolt import jinja
 
 from .exceptions import (
     OAuthCannotDisconnectError,
@@ -15,7 +16,7 @@ class OAuthLoginView(View):
         request = self.request
         provider = self.url_kwargs["provider"]
         if request.user.is_authenticated:
-            return redirect("/")
+            return HttpResponseRedirect("/")
 
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         return provider_instance.handle_login_request(request=request)
@@ -33,20 +34,18 @@ class OAuthCallbackView(View):
         try:
             return provider_instance.handle_callback_request(request=request)
         except OAuthUserAlreadyExistsError:
-            return render(
-                request,
-                "oauth/error.html",
-                {
+            template = jinja.get_template("oauth/error.html")
+            return HttpResponseBadRequest(
+                template.render({
                     "oauth_error": "A user already exists with this email address. Please log in first and then connect this OAuth provider to the existing account."
-                },
-                status=400,
+                })
             )
         except OAuthStateMismatchError:
-            return render(
-                request,
-                "oauth/error.html",
-                {"oauth_error": "The state parameter did not match. Please try again."},
-                status=400,
+            template = jinja.get_template("oauth/error.html")
+            return HttpResponseBadRequest(
+                template.render({
+                    "oauth_error": "The state parameter did not match. Please try again."
+                })
             )
 
 
