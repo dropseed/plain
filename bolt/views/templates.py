@@ -21,7 +21,7 @@ class TemplateView(View):
 
     def get_template_response(self, context=None, **response_kwargs) -> "TemplateResponse":
         if context is None:
-            context = self.get_context_data()
+            context = self.get_context()
 
         response_kwargs.setdefault("content_type", self.content_type)
 
@@ -48,7 +48,7 @@ class TemplateView(View):
         template_names = self.get_template_names()
         return jinja.environment.get_or_select_template(template_names)
 
-    def get_context_data(self) -> dict:
+    def get_context(self) -> dict:
         return {
             "request": self.request,
             "csrf_input": csrf_input_lazy(self.request),

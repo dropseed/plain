@@ -28,9 +28,9 @@ class ObjectTemplateViewMixin:
             f"get_object() is not implemented on {self.__class__.__name__}"
         )
 
-    def get_context_data(self) -> dict:
+    def get_context(self) -> dict:
         """Insert the single object into the context dict."""
-        context = super().get_context_data()  # type: ignore
+        context = super().get_context()  # type: ignore
         context["object"] = self.object
         if self.context_object_name:
             context[self.context_object_name] = self.object

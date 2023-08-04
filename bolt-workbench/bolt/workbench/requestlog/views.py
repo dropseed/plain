@@ -7,8 +7,8 @@ from django.http import HttpResponseRedirect
 class RequestLogView(TemplateView):
     template_name = "requestlog/requestlog.html"
 
-    def get_context_data(self):
-        ctx = super().get_context_data()
+    def get_context(self):
+        ctx = super().get_context()
         requestlogs = RequestLog.load_json_logs()
 
         if self.request.GET.get("log"):

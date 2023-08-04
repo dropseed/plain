@@ -19,12 +19,12 @@ logger = logging.getLogger("django.request")
 class ContextMixin:
     """
     A default context mixin that passes the keyword arguments received by
-    get_context_data() as the template context.
+    get_context() as the template context.
     """
 
     extra_context = None
 
-    def get_context_data(self, **kwargs):
+    def get_context(self, **kwargs):
         kwargs.setdefault("view", self)
         if self.extra_context is not None:
             kwargs.update(self.extra_context)
@@ -184,7 +184,7 @@ class TemplateView(TemplateResponseMixin, ContextMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-        context = self.get_context_data(**kwargs)
+        context = self.get_context(**kwargs)
         return self.render_to_response(context)
 
 

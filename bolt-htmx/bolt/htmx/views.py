@@ -11,7 +11,7 @@ class HTMXViewMixin:
             from .jinja import HTMXFragmentExtension
             template = self.get_template()
             if context is None:
-                context = self.get_context_data()
+                context = self.get_context()
             rendered = HTMXFragmentExtension.render_template_fragment(
                 template=template,
                 fragment_name=self.htmx_fragment_name,

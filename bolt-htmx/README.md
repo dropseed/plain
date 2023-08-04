@@ -108,8 +108,8 @@ def fetch_items():
 
 
 class HomeView(HTMXViewMixin, TemplateView):
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    def get_context(self, **kwargs):
+        context = super().get_context(**kwargs)
         context["items"] = fetch_items  # Missing () are on purpose!
         return context
 ```
@@ -218,7 +218,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 
         # Render the updated content the standard calls
         # (which will selectively render our fragment if applicable)
-        context = self.get_context_data(object=self.object)
+        context = self.get_context(object=self.object)
         return self.render_to_response(context)
 
     def htmx_post_close(self, request, *args, **kwargs):
@@ -230,7 +230,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         self.object.state = "open"
         self.object.save()
 
-        context = self.get_context_data(object=self.object)
+        context = self.get_context(object=self.object)
         return self.render_to_response(context)
 
     def htmx_post_merge(self, request, *args, **kwargs):
@@ -242,7 +242,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         self.object.state = "merged"
         self.object.save()
 
-        context = self.get_context_data(object=self.object)
+        context = self.get_context(object=self.object)
         return self.render_to_response(context)
 ```
 
@@ -341,7 +341,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 
       self.object.update()
 
-      context = self.get_context_data(object=self.object)
+      context = self.get_context(object=self.object)
       return self.render_to_response(context)
 ```
 

@@ -64,13 +64,13 @@ class FormMixin(ContextMixin):
 
     def form_invalid(self, form):
         """If the form is invalid, render the invalid form."""
-        return self.render_to_response(self.get_context_data(form=form))
+        return self.render_to_response(self.get_context(form=form))
 
-    def get_context_data(self, **kwargs):
+    def get_context(self, **kwargs):
         """Insert the form into the context dict."""
         if "form" not in kwargs:
             kwargs["form"] = self.get_form()
-        return super().get_context_data(**kwargs)
+        return super().get_context(**kwargs)
 
 
 class ModelFormMixin(FormMixin, SingleObjectMixin):
@@ -139,7 +139,7 @@ class ProcessFormView(View):
 
     def get(self, request, *args, **kwargs):
         """Handle GET requests: instantiate a blank version of the form."""
-        return self.render_to_response(self.get_context_data())
+        return self.render_to_response(self.get_context())
 
     def post(self, request, *args, **kwargs):
         """

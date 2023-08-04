@@ -119,7 +119,7 @@ class MultipleObjectMixin(ContextMixin):
         else:
             return None
 
-    def get_context_data(self, *, object_list=None, **kwargs):
+    def get_context(self, *, object_list=None, **kwargs):
         """Get the context for this view."""
         queryset = object_list if object_list is not None else self.object_list
         page_size = self.get_paginate_by(queryset)
@@ -144,7 +144,7 @@ class MultipleObjectMixin(ContextMixin):
         if context_object_name is not None:
             context[context_object_name] = queryset
         context.update(kwargs)
-        return super().get_context_data(**context)
+        return super().get_context(**context)
 
 
 class BaseListView(MultipleObjectMixin, View):
@@ -171,7 +171,7 @@ class BaseListView(MultipleObjectMixin, View):
                         "class_name": self.__class__.__name__,
                     }
                 )
-        context = self.get_context_data()
+        context = self.get_context()
         return self.render_to_response(context)
 
 

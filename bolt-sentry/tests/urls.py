@@ -5,7 +5,7 @@ from django.views.generic import TemplateView
 class ErrorView(TemplateView):
     template_name = "index.html"  # Won't actually render this, will error instead
 
-    def get_context_data(self, **kwargs):
+    def get_context(self, **kwargs):
         raise Exception("Test!")
 
 

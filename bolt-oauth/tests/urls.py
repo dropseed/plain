@@ -10,8 +10,8 @@ from bolt.oauth.providers import get_provider_keys
 class LoggedInView(LoginRequiredMixin, TemplateView):
     template_name = "index.html"
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    def get_context(self, **kwargs):
+        context = super().get_context(**kwargs)
         context["oauth_provider_keys"] = get_provider_keys()
         return context
 

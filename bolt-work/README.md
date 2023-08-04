@@ -77,8 +77,8 @@ First, import and run the `debug.attach()` function:
 class HomeView(TemplateView):
     template_name = "home.html"
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    def get_context(self, **kwargs):
+        context = super().get_context(**kwargs)
 
         # Make sure the debugger is attached (will need to be if runserver reloads)
         from bolt.work import debug; debug.attach()

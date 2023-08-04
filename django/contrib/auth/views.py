@@ -102,8 +102,8 @@ class LoginView(RedirectURLMixin, FormView):
         auth_login(self.request, form.get_user())
         return HttpResponseRedirect(self.get_success_url())
 
-    def get_context_data(self):
-        context = super().get_context_data()
+    def get_context(self):
+        context = super().get_context()
         context.update(
             {
                 self.redirect_field_name: self.get_redirect_url(),
@@ -145,8 +145,8 @@ class LogoutView(RedirectURLMixin, TemplateView):
         else:
             return self.request.path
 
-    def get_context_data(self):
-        context = super().get_context_data()
+    def get_context(self):
+        context = super().get_context()
         context.update(
             {
                 "title": _("Logged out"),
@@ -183,8 +183,8 @@ def redirect_to_login(next, login_url=None, redirect_field_name=REDIRECT_FIELD_N
 class PasswordContextMixin:
     extra_context = None
 
-    def get_context_data(self):
-        context = super().get_context_data()
+    def get_context(self):
+        context = super().get_context()
         context.update(
             {"title": self.title, "subtitle": None, **(self.extra_context or {})}
         )
@@ -272,7 +272,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
                     return response
 
         # Display the "Password reset unsuccessful" page.
-        response = self.render_to_response(self.get_context_data())
+        response = self.render_to_response(self.get_context())
         add_never_cache_headers(response)
         return response
 
@@ -303,8 +303,8 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
             auth_login(self.request, user, self.post_reset_login_backend)
         return super().form_valid(form)
 
-    def get_context_data(self):
-        context = super().get_context_data()
+    def get_context(self):
+        context = super().get_context()
         if self.validlink:
             context["validlink"] = True
         else:
@@ -322,8 +322,8 @@ class PasswordResetCompleteView(PasswordContextMixin, TemplateView):
     template_name = "registration/password_reset_complete.html"
     title = _("Password reset complete")
 
-    def get_context_data(self):
-        context = super().get_context_data()
+    def get_context(self):
+        context = super().get_context()
         context["login_url"] = resolve_url(settings.LOGIN_URL)
         return context
 
