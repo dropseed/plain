@@ -2,8 +2,6 @@ from os import environ
 
 from dotenv import load_dotenv
 
-from .cli import cli
-
 
 def load(path: str = "", env_name: str = "") -> None:
     if path:
@@ -18,4 +16,4 @@ def load(path: str = "", env_name: str = "") -> None:
     return load_dotenv()
 
 
-__all__ = ["cli", "load"]
+__all__ = ["load"]
