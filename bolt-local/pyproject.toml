@@ -1,6 +1,6 @@
 [tool.poetry]
 
-name = "bolt-work"
+name = "bolt-local"
 packages = [
     { include = "bolt" },
 ]
@@ -12,7 +12,7 @@ license = "MIT"
 readme = "README.md"
 homepage = "https://www.boltpackages.com/"
 documentation = "https://www.boltpackages.com/docs/"
-repository = "https://github.com/boltpackages/bolt-work"
+repository = "https://github.com/boltpackages/bolt-local"
 keywords = ["django", "saas", "bolt", "framework"]
 classifiers = [
     "Environment :: Web Environment",
@@ -23,10 +23,10 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-work" = "bolt.work:cli"
-"bolt-format" = "bolt.work.format:cli"
-"bolt-db" = "bolt.work.db:cli"
-"bolt-pre-commit" = "bolt.work.precommit:cli"
+"bolt-work" = "bolt.local:cli"
+"bolt-format" = "bolt.local.format:cli"
+"bolt-db" = "bolt.local.db:cli"
+"bolt-pre-commit" = "bolt.local.precommit:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"
