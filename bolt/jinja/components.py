@@ -10,25 +10,25 @@ if TYPE_CHECKING:
     from jinja2 import Environment
 
 
-class FileSystemHTMLComponentsLoader(FileSystemLoader):
+class FileSystemTemplateComponentsLoader(FileSystemLoader):
     def get_source(self, environment: "Environment", template: str):
         contents, path, uptodate = super().get_source(environment, template)
 
         # Clear components cache if it looks like a component changed
-        # if os.path.splitext(path)[1] == ".html" and "components" in path and "html_components" in self.__dict__:
-        #     del self.__dict__["html_components"]
+        # if os.path.splitext(path)[1] == ".html" and "components" in path and "template_components" in self.__dict__:
+        #     del self.__dict__["template_components"]
 
         # If it's html, replace component tags
         if os.path.splitext(path)[1] == ".html":
-            self._html_components_environment = (
-                environment  # Save this so we can use it in html_components
+            self._template_components_environment = (
+                environment  # Save this so we can use it in template_components
             )
-            contents = self.replace_component_tags(contents)
+            contents = self.replace_template_component_tags(contents)
 
         return contents, path, uptodate
 
     @cached_property
-    def html_components(self):
+    def template_components(self):
         components = []
 
         for searchpath in self.searchpath:
@@ -88,11 +88,11 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
                 "template_name": f"components/{component_relative_path}",
                 "jinja_tag_name": jinja_tag_name,
             })
-            self._html_components_environment.add_extension(NamedComponentExtension)
+            self._template_components_environment.add_extension(NamedComponentExtension)
 
         return components
 
-    def replace_component_tags(self, contents: str):
+    def replace_template_component_tags(self, contents: str):
         def replace_quoted_braces(s) -> str:
             """
             We're converting to tag syntax, but it's very natural to write
@@ -101,7 +101,7 @@ class FileSystemHTMLComponentsLoader(FileSystemLoader):
             """
             return s.replace("\"{{", "").replace("}}\"", "")
 
-        for component in self.html_components:
+        for component in self.template_components:
             component_name = component["html_name"]
             jinja_tag_name = component["tag_name"]
 

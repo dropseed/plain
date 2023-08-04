@@ -10,7 +10,7 @@ from importlib import import_module
 
 from .filters import default_filters
 from .globals import default_globals
-from .components import FileSystemHTMLComponentsLoader
+from .components import FileSystemTemplateComponentsLoader
 
 
 @functools.lru_cache
@@ -91,7 +91,7 @@ def create_default_environment(include_apps=True, **environment_kwargs):
     customization needs to happen by using this function, not settings that hook in internally.
     """
     kwargs = {
-        "loader": FileSystemHTMLComponentsLoader(get_template_dirs()),
+        "loader": FileSystemTemplateComponentsLoader(get_template_dirs()),
         "autoescape": True,
         "auto_reload": settings.DEBUG,
         "undefined": StrictUndefined,
