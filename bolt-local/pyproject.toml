@@ -43,7 +43,6 @@ tomli = {version = "^2.0.1", python = "<3.11"}
 # db
 requests = ">=2.0.0"
 psycopg2-binary = "^2.9.3"
-dj-database-url = "^1.0.0"  # TODO move into bolt
 
 # format
 black = ">=22.0.0"
