@@ -218,9 +218,6 @@ SECRET_KEY = ""
 # secret key rotation.
 SECRET_KEY_FALLBACKS = []
 
-# Default file storage mechanism that holds media.
-DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
-
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -536,9 +533,6 @@ DEFAULT_EXCEPTION_REPORTER_FILTER = "bolt.debug.responses.SafeExceptionReporterF
 
 # A list of locations of additional static files
 STATICFILES_DIRS = []
-
-# The default file storage backend used during the build process
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 # List of finder classes that know how to find static files in
 # various locations.
