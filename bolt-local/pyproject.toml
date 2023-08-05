@@ -34,7 +34,6 @@ click = ">=8.0.0"
 python-dotenv = "*"
 honcho = "^1.1.0"
 debugpy = "^1.6.3"
-hupper = "^1.10.3"
 
 # For local runserver
 gunicorn = "^20.1.0"

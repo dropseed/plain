@@ -32,25 +32,6 @@ def cli():
     dotenv_path = os.path.join(repo_root, ".env")
     load_dotenv(dotenv_path)
 
-    if (
-        "STRIPE_WEBHOOK_PATH" in os.environ
-        and "STRIPE_WEBHOOK_SECRET" not in os.environ
-    ):
-        # TODO check stripe command available, need to do the same with docker
-        stripe_webhook_secret = (
-            subprocess.check_output(["stripe", "listen", "--print-secret"])
-            .decode()
-            .strip()
-        )
-        click.secho("Adding automatic STRIPE_WEBHOOK_SECRET to .env", fg="green")
-        dotenv_set_key(
-            dotenv_path,
-            "STRIPE_WEBHOOK_SECRET",
-            stripe_webhook_secret,
-            quote_mode="auto",
-        )
-        os.environ["STRIPE_WEBHOOK_SECRET"] = stripe_webhook_secret
-
     runserver_port = os.environ.get("PORT", "8000")
 
     if "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ:
@@ -67,16 +48,8 @@ def cli():
 
     manager = HonchoManager()
 
-    # Meant to work with Bolt Pro, but doesn't necessarily have to
-    if "STRIPE_WEBHOOK_PATH" in os.environ:
-        manager.add_process(
-            "stripe",
-            f"stripe listen --forward-to localhost:{runserver_port}{os.environ['STRIPE_WEBHOOK_PATH']}",
-        )
-
     runserver_cmd = f"bolt django migrate && gunicorn --reload bolt.wsgi.default:application --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
-    # if boltpackage_installed("db"):
     manager.add_process("postgres", "bolt db start --logs")
     runserver_cmd = "bolt db wait && " + runserver_cmd
 
@@ -93,29 +66,8 @@ def cli():
                 f"docker run --name {redis_name} --rm -p {redis_port}:6379 -v {dot_bolt_dir}/redis:/data redis:{redis_version} redis-server --save 60 1 --loglevel warning",
             )
 
-    if "CELERY_APP" in os.environ:
-        manager.add_process(
-            "celery",
-            f"hupper -w .env -m celery --app {os.environ['CELERY_APP']} worker --loglevel info",
-            env={
-                **django_env,
-                "PYTHONPATH": os.path.join(repo_root, "app"),
-            },
-        )
-
     if boltpackage_installed("tailwind"):
         manager.add_process("tailwind", "bolt-tailwind compile --watch")
-
-    # Run package.json "watch" script automatically
-    package_json = os.path.join(repo_root, "package.json")
-    if os.path.exists(package_json):
-        with open(package_json) as f:
-            package_json_data = json.load(f)
-        if "watch" in package_json_data.get("scripts", {}):
-            manager.add_process(
-                "npm watch",
-                "npm run watch",
-            )
 
     custom_env = {
         **django_env,

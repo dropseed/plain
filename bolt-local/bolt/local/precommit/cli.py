@@ -33,7 +33,7 @@ def cli(install):
             .get("run", {})
         ).items():
             cmd = data["cmd"]
-            print_event(f"{name} (custom)")
+            print_event(f"Custom: {name}")
             result = subprocess.run(cmd, shell=True)
             if result.returncode != 0:
                 sys.exit(result.returncode)
