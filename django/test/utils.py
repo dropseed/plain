@@ -32,35 +32,17 @@ except ImportError:
 
 
 __all__ = (
-    "Approximate",
     "ContextList",
-    "isolate_lru_cache",
     "CaptureQueriesContext",
     "ignore_warnings",
-    "isolate_apps",
     "modify_settings",
     "override_settings",
-    "override_system_checks",
-    "tag",
-    "requires_tz_support",
     "setup_databases",
     "setup_test_environment",
     "teardown_test_environment",
 )
 
 TZ_SUPPORT = hasattr(time, "tzset")
-
-
-class Approximate:
-    def __init__(self, val, places=7):
-        self.val = val
-        self.places = places
-
-    def __repr__(self):
-        return repr(self.val)
-
-    def __eq__(self, other):
-        return self.val == other or round(abs(self.val - other), self.places) == 0
 
 
 class ContextList(list):
@@ -558,37 +540,6 @@ class modify_settings(override_settings):
         super().enable()
 
 
-class override_system_checks(TestContextDecorator):
-    """
-    Act as a decorator. Override list of registered system checks.
-    Useful when you override `INSTALLED_APPS`, e.g. if you exclude `auth` app,
-    you also need to exclude its system checks.
-    """
-
-    def __init__(self, new_checks, deployment_checks=None):
-        from django.core.checks.registry import registry
-
-        self.registry = registry
-        self.new_checks = new_checks
-        self.deployment_checks = deployment_checks
-        super().__init__()
-
-    def enable(self):
-        self.old_checks = self.registry.registered_checks
-        self.registry.registered_checks = set()
-        for check in self.new_checks:
-            self.registry.register(check, *getattr(check, "tags", ()))
-        self.old_deployment_checks = self.registry.deployment_checks
-        if self.deployment_checks is not None:
-            self.registry.deployment_checks = set()
-            for check in self.deployment_checks:
-                self.registry.register(check, *getattr(check, "tags", ()), deploy=True)
-
-    def disable(self):
-        self.registry.registered_checks = self.old_checks
-        self.registry.deployment_checks = self.old_deployment_checks
-
-
 def compare_xml(want, got):
     """
     Try to do a 'xml-comparison' of want and got. Plain string comparison
@@ -716,18 +667,6 @@ class ignore_warnings(TestContextDecorator):
         self.catch_warnings.__exit__(*sys.exc_info())
 
 
-# On OSes that don't provide tzset (Windows), we can't set the timezone
-# in which the program runs. As a consequence, we must skip tests that
-# don't enforce a specific timezone (with timezone.override or equivalent),
-# or attempt to interpret naive datetimes in the default timezone.
-
-requires_tz_support = skipUnless(
-    TZ_SUPPORT,
-    "This test relies on the ability to run a program in an arbitrary "
-    "time zone, but your operating system isn't able to do that.",
-)
-
-
 @contextmanager
 def extend_sys_path(*paths):
     """Context manager to temporarily add paths to sys.path."""
@@ -737,16 +676,6 @@ def extend_sys_path(*paths):
         yield
     finally:
         sys.path = _orig_sys_path
-
-
-@contextmanager
-def isolate_lru_cache(lru_cache_object):
-    """Clear the cache of an LRU cache object on entering and exiting."""
-    lru_cache_object.cache_clear()
-    try:
-        yield
-    finally:
-        lru_cache_object.cache_clear()
 
 
 @contextmanager
@@ -866,37 +795,6 @@ class LoggingCaptureMixin:
         self.logger.handlers[0].stream = self.old_stream
 
 
-class isolate_apps(TestContextDecorator):
-    """
-    Act as either a decorator or a context manager to register models defined
-    in its wrapped context to an isolated registry.
-
-    The list of installed apps the isolated registry should contain must be
-    passed as arguments.
-
-    Two optional keyword arguments can be specified:
-
-    `attr_name`: attribute assigned the isolated registry if used as a class
-                 decorator.
-
-    `kwarg_name`: keyword argument passing the isolated registry if used as a
-                  function decorator.
-    """
-
-    def __init__(self, *installed_apps, **kwargs):
-        self.installed_apps = installed_apps
-        super().__init__(**kwargs)
-
-    def enable(self):
-        self.old_apps = Options.default_apps
-        apps = Apps(self.installed_apps)
-        setattr(Options, "default_apps", apps)
-        return apps
-
-    def disable(self):
-        setattr(Options, "default_apps", self.old_apps)
-
-
 class TimeKeeper:
     def __init__(self):
         self.records = collections.defaultdict(list)
@@ -925,19 +823,6 @@ class NullTimeKeeper:
 
     def print_results(self):
         pass
-
-
-def tag(*tags):
-    """Decorator to add tags to a test class or method."""
-
-    def decorator(obj):
-        if hasattr(obj, "tags"):
-            obj.tags = obj.tags.union(tags)
-        else:
-            setattr(obj, "tags", set(tags))
-        return obj
-
-    return decorator
 
 
 @contextmanager
