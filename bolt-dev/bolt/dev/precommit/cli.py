@@ -69,7 +69,7 @@ def cli(install):
         )
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
-    if boltpackage_installed("test"):
+    if boltpackage_installed("pytest"):
         print_event("Running tests")
         subprocess.check_call(["bolt", "test"])
 

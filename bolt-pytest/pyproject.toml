@@ -1,6 +1,6 @@
 [tool.poetry]
 
-name = "bolt-test"
+name = "bolt-pytest"
 packages = [
     { include = "bolt" },
 ]
@@ -12,7 +12,7 @@ license = "MIT"
 readme = "README.md"
 homepage = "https://www.boltpackages.com/"
 documentation = "https://www.boltpackages.com/docs/"
-repository = "https://github.com/boltpackages/bolt-test"
+repository = "https://github.com/boltpackages/bolt-pytest"
 keywords = ["django", "saas", "bolt", "framework"]
 classifiers = [
     "Environment :: Web Environment",
@@ -23,11 +23,11 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-test" = "bolt.test:cli"
+"bolt-test" = "bolt.pytest:cli"
 
 # Automatically sets this up with pytest
 [tool.poetry.plugins."pytest11"]
-"bolt" = "bolt.test.pytest.plugin"
+"bolt" = "bolt.pytest.pytest.plugin"
 
 
 [tool.poetry.dependencies]
