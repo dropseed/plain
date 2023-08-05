@@ -14,7 +14,7 @@ def gettext_noop(s):
 # CORE             #
 ####################
 
-DEBUG = False
+DEBUG: bool = False
 
 # Whether the framework should propagate raw exceptions rather than catching
 # them. This is useful under some testing situations and should never be used
@@ -23,7 +23,7 @@ DEBUG_PROPAGATE_EXCEPTIONS = False
 
 # Hosts/domain names that are valid for this site.
 # "*" matches anything, ".example.com" matches example.com and all subdomains
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS: list[str] = []
 
 # Local time zone for this installation. All choices can be found here:
 # https://en.wikipedia.org/wiki/List_of_tz_zones_by_name (although not all
@@ -146,7 +146,7 @@ LANGUAGES_BIDI = ["he", "ar", "ar-dz", "ckb", "fa", "ur"]
 # If you set this to False, Django will make some optimizations so as not
 # to load the internationalization machinery.
 USE_I18N = True
-LOCALE_PATHS = []
+LOCALE_PATHS: list = []
 
 # Settings for language cookie
 LANGUAGE_COOKIE_NAME = "django_language"
@@ -186,7 +186,7 @@ EMAIL_SSL_KEYFILE = None
 EMAIL_TIMEOUT = None
 
 # List of strings representing installed apps.
-INSTALLED_APPS = []
+INSTALLED_APPS: list = []
 
 TEMPLATES = []
 
@@ -212,11 +212,11 @@ DISALLOWED_USER_AGENTS = []
 # A secret key for this particular Django installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Django will complain
 # loudly.
-SECRET_KEY = ""
+SECRET_KEY: str = ""
 
 # List of secret keys used to verify the validity of signatures. This allows
 # secret key rotation.
-SECRET_KEY_FALLBACKS = []
+SECRET_KEY_FALLBACKS: list[str] = []
 
 STORAGES = {
     "default": {

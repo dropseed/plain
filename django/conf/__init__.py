@@ -12,11 +12,12 @@ import time
 import traceback
 import warnings
 from pathlib import Path
+import types
+import typing
 
 import django
 from django.conf import global_settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.deprecation import RemovedInDjango51Warning
 from django.utils.functional import LazyObject, empty
 
 ENVIRONMENT_VARIABLE = "DJANGO_SETTINGS_MODULE"
@@ -94,21 +95,6 @@ class LazySettings(LazyObject):
         super().__delattr__(name)
         self.__dict__.pop(name, None)
 
-    def configure(self, default_settings=global_settings, **options):
-        """
-        Called to manually configure the settings. The 'default_settings'
-        parameter sets where to retrieve any unspecified values from (its
-        argument must support attribute access (__getattr__)).
-        """
-        if self._wrapped is not empty:
-            raise RuntimeError("Settings already configured.")
-        holder = UserSettingsHolder(default_settings)
-        for name, value in options.items():
-            if not name.isupper():
-                raise TypeError("Setting %r must be uppercase." % name)
-            setattr(holder, name, value)
-        self._wrapped = holder
-
     @staticmethod
     def _add_script_prefix(value):
         """
@@ -141,6 +127,11 @@ class LazySettings(LazyObject):
 
 class Settings:
     def __init__(self, settings_module):
+        # Store the expected type of each setting
+        self._setting_annotations = {
+            **getattr(global_settings, "__annotations__", {}),
+        }
+
         # update this dict from global settings (but only for ALL_CAPS settings)
         for setting in dir(global_settings):
             if setting.isupper():
@@ -155,24 +146,21 @@ class Settings:
         # so we can find files next to it (assume it's at the app root)
         self.path = Path(mod.__file__).resolve()
 
-        tuple_settings = (
-            "ALLOWED_HOSTS",
-            "INSTALLED_APPS",
-            "TEMPLATE_DIRS",
-            "LOCALE_PATHS",
-            "SECRET_KEY_FALLBACKS",
-        )
         self._explicit_settings = set()
         for setting in dir(mod):
             if setting.isupper():
                 setting_value = getattr(mod, setting)
 
-                if setting in tuple_settings and not isinstance(
-                    setting_value, (list, tuple)
+                # Verify correct setting types if there were type hints
+                setting_type = self._setting_annotations.get(setting, None)
+                if setting_type is not None and not is_instance_of_type(
+                    setting_value, setting_type
                 ):
                     raise ImproperlyConfigured(
-                        "The %s setting must be a list or a tuple." % setting
+                        "The %s setting must be of type %s"
+                        % (setting, setting_type)
                     )
+
                 setattr(self, setting, setting_value)
                 self._explicit_settings.add(setting)
 
@@ -198,6 +186,7 @@ class Settings:
         }
 
 
+# Currently used for test settings override... nothing else
 class UserSettingsHolder:
     """Holder for user configured settings."""
 
@@ -246,6 +235,22 @@ class UserSettingsHolder:
         return "<%(cls)s>" % {
             "cls": self.__class__.__name__,
         }
+
+
+def is_instance_of_type(value, type_hint) -> bool:
+    # Simple types
+    if isinstance(type_hint, type):
+        return isinstance(value, type_hint)
+
+    # Union types
+    if typing.get_origin(type_hint) is typing.Union or typing.get_origin(type_hint) is types.UnionType:
+        return any(is_instance_of_type(value, arg) for arg in typing.get_args(type_hint))
+
+    # List types
+    if typing.get_origin(type_hint) is list:
+        return isinstance(value, list) and all(is_instance_of_type(item, typing.get_args(type_hint)[0]) for item in value)
+
+    raise ValueError("Unsupported type hint: %s" % type_hint)
 
 
 settings = LazySettings()
