@@ -116,7 +116,7 @@ def bolt_cli():
 )
 @click.argument("django_args", nargs=-1, type=click.UNPROCESSED)
 def django_alias(django_args):
-    subprocess.check_call(
+    result = subprocess.run(
         [
             "python",
             "-m",
@@ -124,6 +124,8 @@ def django_alias(django_args):
             *django_args,
         ],
     )
+    if result.returncode:
+        sys.exit(result.returncode)
 
 
 # @bolt_cli.command
