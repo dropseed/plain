@@ -150,12 +150,6 @@ LOCALE_PATHS = []
 
 # Settings for language cookie
 LANGUAGE_COOKIE_NAME = "django_language"
-LANGUAGE_COOKIE_AGE = None
-LANGUAGE_COOKIE_DOMAIN = None
-LANGUAGE_COOKIE_PATH = "/"
-LANGUAGE_COOKIE_SECURE = False
-LANGUAGE_COOKIE_HTTPONLY = False
-LANGUAGE_COOKIE_SAMESITE = None
 
 # Default charset to use for all HttpResponse objects, if a MIME type isn't
 # manually specified. It's used to construct the Content-Type header.
