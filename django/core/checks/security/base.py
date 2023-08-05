@@ -33,7 +33,7 @@ SECRET_KEY_WARNING_MSG = (
 )
 
 W001 = Warning(
-    "You do not have 'django.middleware.security.SecurityMiddleware' "
+    "You do not have 'bolt.middleware.security.SecurityMiddleware' "
     "in your MIDDLEWARE so the SECURE_HSTS_SECONDS, "
     "SECURE_CONTENT_TYPE_NOSNIFF, SECURE_REFERRER_POLICY, "
     "SECURE_CROSS_ORIGIN_OPENER_POLICY, and SECURE_SSL_REDIRECT settings will "
@@ -43,7 +43,7 @@ W001 = Warning(
 
 W002 = Warning(
     "You do not have "
-    "'django.middleware.clickjacking.XFrameOptionsMiddleware' in your "
+    "'bolt.middleware.clickjacking.XFrameOptionsMiddleware' in your "
     "MIDDLEWARE, so your pages will not be served with an "
     "'x-frame-options' header. Unless there is a good reason for your "
     "site to be served in a frame, you should consider enabling this "
@@ -99,7 +99,7 @@ W018 = Warning(
 
 W019 = Warning(
     "You have "
-    "'django.middleware.clickjacking.XFrameOptionsMiddleware' in your "
+    "'bolt.middleware.clickjacking.XFrameOptionsMiddleware' in your "
     "MIDDLEWARE, but X_FRAME_OPTIONS is not set to 'DENY'. "
     "Unless there is a good reason for your site to serve other parts of "
     "itself in a frame, you should change it to 'DENY'.",
@@ -143,12 +143,12 @@ W025 = Warning(SECRET_KEY_WARNING_MSG, id="security.W025")
 
 
 def _security_middleware():
-    return "django.middleware.security.SecurityMiddleware" in settings.MIDDLEWARE
+    return "bolt.middleware.security.SecurityMiddleware" in settings.MIDDLEWARE
 
 
 def _xframe_middleware():
     return (
-        "django.middleware.clickjacking.XFrameOptionsMiddleware" in settings.MIDDLEWARE
+        "bolt.middleware.clickjacking.XFrameOptionsMiddleware" in settings.MIDDLEWARE
     )
 
 

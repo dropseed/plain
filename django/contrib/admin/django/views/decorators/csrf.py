@@ -1,6 +1,6 @@
 from functools import wraps
 
-from django.middleware.csrf import CsrfViewMiddleware, get_token
+from bolt.middleware.csrf import CsrfViewMiddleware, get_token
 from django.utils.decorators import decorator_from_middleware
 
 csrf_protect = decorator_from_middleware(CsrfViewMiddleware)

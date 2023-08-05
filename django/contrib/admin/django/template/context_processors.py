@@ -10,7 +10,7 @@ of a DjangoTemplates backend and used by RequestContext.
 import itertools
 
 from django.conf import settings
-from django.middleware.csrf import get_token
+from bolt.middleware.csrf import get_token
 from django.utils.functional import SimpleLazyObject, lazy
 
 

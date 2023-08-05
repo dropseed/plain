@@ -31,7 +31,7 @@ def csrf_failure(request, reason="", template_name=CSRF_FAILURE_TEMPLATE_NAME):
     """
     Default view used when request fails CSRF protection
     """
-    from django.middleware.csrf import REASON_NO_CSRF_COOKIE, REASON_NO_REFERER
+    from bolt.middleware.csrf import REASON_NO_CSRF_COOKIE, REASON_NO_REFERER
 
     c = {
         "title": _("Forbidden"),
