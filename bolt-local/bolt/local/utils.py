@@ -1,5 +1,6 @@
 import importlib
 import subprocess
+from pathlib import Path
 
 import click
 
@@ -28,3 +29,7 @@ def get_repo_root():
             fg="red",
         )
         exit(1)
+
+
+def has_pyproject_toml(target_path):
+    return (Path(target_path) / "pyproject.toml").exists()

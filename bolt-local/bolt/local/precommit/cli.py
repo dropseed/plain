@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 
 import click
 
-from ..utils import boltpackage_installed, get_repo_root
+from ..utils import boltpackage_installed, get_repo_root, has_pyproject_toml
 from .install import install_git_hook
 
 
@@ -90,10 +90,6 @@ def django_db_connected():
 
 def is_using_poetry(target_path):
     return (Path(target_path) / "poetry.lock").exists()
-
-
-def has_pyproject_toml(target_path):
-    return (Path(target_path) / "pyproject.toml").exists()
 
 
 def print_event(msg, newline=True):

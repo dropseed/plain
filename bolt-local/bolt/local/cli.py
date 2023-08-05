@@ -2,13 +2,19 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 import click
 from dotenv import load_dotenv
 from dotenv import set_key as dotenv_set_key
 from honcho.manager import Manager as HonchoManager
 
-from .utils import boltpackage_installed, get_repo_root
+from .utils import boltpackage_installed, get_repo_root, has_pyproject_toml
 
 
 @click.command()
@@ -100,12 +106,6 @@ def cli():
     if boltpackage_installed("tailwind"):
         manager.add_process("tailwind", "bolt-tailwind compile --watch")
 
-    if "NGROK_SUBDOMAIN" in os.environ:
-        manager.add_process(
-            "ngrok",
-            f"ngrok http {runserver_port} --log stdout --subdomain {os.environ['NGROK_SUBDOMAIN']}",
-        )
-
     # Run package.json "watch" script automatically
     package_json = os.path.join(repo_root, "package.json")
     if os.path.exists(package_json):
@@ -116,6 +116,27 @@ def cli():
                 "npm watch",
                 "npm run watch",
             )
+
+    custom_env = {
+        **django_env,
+        "PORT": runserver_port,
+        "PYTHONPATH": os.path.join(repo_root, "app"),
+    }
+
+    if repo_root and has_pyproject_toml(repo_root):
+        with open(Path(repo_root, "pyproject.toml"), "rb") as f:
+            pyproject = tomllib.load(f)
+        for name, data in (
+            pyproject.get("tool", {})
+            .get("bolt", {})
+            .get("work", {})
+            .get("run", {})
+        ).items():
+            env = {
+                **custom_env,
+                **data.get("env", {}),
+            }
+            manager.add_process(name, data["cmd"], env=env)
 
     manager.loop()
 
