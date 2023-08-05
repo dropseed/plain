@@ -1,4 +1,5 @@
-from django.http.cookie import SimpleCookie, parse_cookie
+from django.http.cookie import parse_cookie
+from http.cookies import SimpleCookie
 from django.http.request import (
     HttpHeaders,
     HttpRequest,

@@ -15,7 +15,8 @@ from django.core.handlers.wsgi import LimitedStream, WSGIRequest
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.signals import got_request_exception, request_finished, request_started
 from django.db import close_old_connections
-from django.http import HttpHeaders, HttpRequest, QueryDict, SimpleCookie
+from django.http import HttpHeaders, HttpRequest, QueryDict
+from http.cookies import SimpleCookie
 from django.test import signals
 from django.test.utils import ContextList
 from django.urls import resolve

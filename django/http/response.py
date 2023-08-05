@@ -15,7 +15,7 @@ from django.conf import settings
 from django.core import signals, signing
 from django.core.exceptions import DisallowedRedirect
 from django.core.serializers.json import DjangoJSONEncoder
-from django.http.cookie import SimpleCookie
+from http.cookies import SimpleCookie
 from django.utils import timezone
 from django.utils.datastructures import CaseInsensitiveMapping
 from django.utils.encoding import iri_to_uri
