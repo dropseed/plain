@@ -105,7 +105,7 @@ def base64_hmac(salt, value, key, algorithm="sha1"):
 
 def _cookie_signer_key(key):
     # SECRET_KEYS items may be str or bytes.
-    return b"django.http.cookies" + force_bytes(key)
+    return b"bolt.http.cookies" + force_bytes(key)
 
 
 def get_cookie_signer(salt="django.core.signing.get_cookie_signer"):

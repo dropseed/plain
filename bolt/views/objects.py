@@ -1,6 +1,6 @@
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db import models
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from bolt.http import Http404, HttpResponse, HttpResponseRedirect
 
 from .forms import FormView
 from .templates import TemplateView

@@ -8,7 +8,7 @@ import warnings
 from pathlib import Path
 
 from django.conf import settings
-from django.http import Http404, HttpResponse, HttpResponseNotFound
+from bolt.http import Http404, HttpResponse, HttpResponseNotFound
 from bolt.jinja.defaults import create_default_environment
 from pprint import pformat
 from django.urls import resolve

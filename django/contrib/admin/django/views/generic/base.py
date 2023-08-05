@@ -1,7 +1,7 @@
 import logging
 
 from django.core.exceptions import ImproperlyConfigured
-from django.http import (
+from bolt.http import (
     HttpResponse,
     HttpResponseGone,
     HttpResponseNotAllowed,

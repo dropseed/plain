@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import DisallowedHost, ImproperlyConfigured
-from django.http import HttpHeaders, UnreadablePostError
+from bolt.http import HttpHeaders, UnreadablePostError
 from django.utils.cache import patch_vary_headers
 from django.utils.crypto import constant_time_compare, get_random_string
 from django.utils.functional import cached_property

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from django.conf import settings
-from django.http import HttpResponseForbidden
+from bolt.http import HttpResponseForbidden
 from django.contrib.admin.django.template import Context, Engine, TemplateDoesNotExist, loader
 from django.utils.translation import gettext as _
 from django.utils.version import get_docs_version

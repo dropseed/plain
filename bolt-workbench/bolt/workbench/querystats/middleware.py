@@ -5,7 +5,7 @@ import threading
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
-from django.http import HttpResponseRedirect
+from bolt.http import HttpResponseRedirect
 from bolt import jinja
 
 from .core import QueryStats

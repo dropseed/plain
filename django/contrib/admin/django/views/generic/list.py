@@ -1,7 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured
 from django.core.paginator import InvalidPage, Paginator
 from django.db.models import QuerySet
-from django.http import Http404
+from bolt.http import Http404
 from django.utils.translation import gettext as _
 from django.contrib.admin.django.views.generic.base import ContextMixin, TemplateResponseMixin, View
 

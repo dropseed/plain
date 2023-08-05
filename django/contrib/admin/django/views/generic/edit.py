@@ -1,7 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import Form
 from django.forms import models as model_forms
-from django.http import HttpResponseRedirect
+from bolt.http import HttpResponseRedirect
 from django.contrib.admin.django.views.generic.base import ContextMixin, TemplateResponseMixin, View
 from django.contrib.admin.django.views.generic.detail import (
     BaseDetailView,

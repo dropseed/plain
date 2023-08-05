@@ -1,7 +1,7 @@
 import re
 
 from django.conf import settings
-from django.http import HttpResponsePermanentRedirect
+from bolt.http import HttpResponsePermanentRedirect
 
 
 class SecurityMiddleware:

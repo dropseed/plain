@@ -1,13 +1,12 @@
-from django.http.cookie import parse_cookie
-from http.cookies import SimpleCookie
-from django.http.request import (
+from bolt.http.cookie import parse_cookie
+from bolt.http.request import (
     HttpHeaders,
     HttpRequest,
     QueryDict,
     RawPostDataException,
     UnreadablePostError,
 )
-from django.http.response import (
+from bolt.http.response import (
     BadHeaderError,
     FileResponse,
     Http404,
@@ -27,7 +26,6 @@ from django.http.response import (
 )
 
 __all__ = [
-    "SimpleCookie",
     "parse_cookie",
     "HttpHeaders",
     "HttpRequest",

@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.http import HttpResponseForbidden
+from bolt.http import HttpResponseForbidden
 
 from .permissions import can_be_impersonator, can_impersonate_user
 from .views import IMPERSONATE_KEY

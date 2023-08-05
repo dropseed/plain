@@ -7,7 +7,7 @@ from django.contrib.admin import ModelAdmin, actions
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.base import ModelBase
-from django.http import Http404, HttpResponsePermanentRedirect, HttpResponseRedirect
+from bolt.http import Http404, HttpResponsePermanentRedirect, HttpResponseRedirect
 from django.contrib.admin.django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 from django.utils.decorators import method_decorator

@@ -1,5 +1,5 @@
 from django.core.exceptions import ImproperlyConfigured
-from django.http import HttpResponse
+from bolt.http import HttpResponse
 
 from .base import View
 from bolt import jinja

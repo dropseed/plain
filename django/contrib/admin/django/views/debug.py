@@ -7,7 +7,7 @@ import warnings
 from pathlib import Path
 
 from django.conf import settings
-from django.http import Http404, HttpResponse, HttpResponseNotFound
+from bolt.http import Http404, HttpResponse, HttpResponseNotFound
 from django.contrib.admin.django.template import Context, Engine, TemplateDoesNotExist
 from django.contrib.admin.django.template.defaultfilters import pprint
 from django.urls import resolve

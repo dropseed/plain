@@ -1,5 +1,5 @@
 import stripe
-from django.http import HttpResponse, HttpResponseRedirect
+from bolt.http import HttpResponse, HttpResponseRedirect
 from bolt.views import View
 from bolt.views.csrf import CsrfExemptViewMixin
 

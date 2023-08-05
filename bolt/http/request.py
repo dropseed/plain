@@ -13,7 +13,7 @@ from django.core.exceptions import (
     TooManyFieldsSent,
 )
 from django.core.files import uploadhandler
-from django.http.multipartparser import (
+from bolt.http.multipartparser import (
     MultiPartParser,
     MultiPartParserError,
     TooManyFilesSent,

@@ -1,4 +1,4 @@
-from django.http import HttpResponseForbidden, HttpResponseRedirect
+from bolt.http import HttpResponseForbidden, HttpResponseRedirect
 from bolt.views import View
 
 from .permissions import can_be_impersonator

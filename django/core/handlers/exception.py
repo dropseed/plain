@@ -12,8 +12,8 @@ from django.core.exceptions import (
     TooManyFieldsSent,
     TooManyFilesSent,
 )
-from django.http import Http404
-from django.http.multipartparser import MultiPartParserError
+from bolt.http import Http404
+from bolt.http.multipartparser import MultiPartParserError
 from django.urls import get_resolver, get_urlconf
 from django.utils.log import log_response
 from bolt.debug import responses as debug_responses

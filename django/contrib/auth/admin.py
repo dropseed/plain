@@ -9,7 +9,7 @@ from django.contrib.auth.forms import (
 )
 from django.contrib.auth.models import User
 from django.db import router, transaction
-from django.http import Http404, HttpResponseRedirect, HttpResponse
+from bolt.http import Http404, HttpResponseRedirect, HttpResponse
 from bolt import jinja
 from django.urls import path, reverse
 from django.utils.html import escape

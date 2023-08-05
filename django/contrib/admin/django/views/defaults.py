@@ -1,6 +1,6 @@
 from urllib.parse import quote
 
-from django.http import (
+from bolt.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
     HttpResponseNotFound,

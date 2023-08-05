@@ -1,7 +1,7 @@
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import Http404, HttpResponseRedirect
+from bolt.http import Http404, HttpResponseRedirect
 from django.utils.translation import gettext as _
 
 

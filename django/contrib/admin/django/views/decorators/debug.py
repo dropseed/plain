@@ -1,6 +1,6 @@
 from functools import wraps
 
-from django.http import HttpRequest
+from bolt.http import HttpRequest
 
 
 def sensitive_variables(*variables):

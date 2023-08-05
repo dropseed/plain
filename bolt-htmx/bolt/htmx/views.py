@@ -1,6 +1,6 @@
 import re
 
-from django.http import HttpResponse
+from bolt.http import HttpResponse
 
 
 class HTMXViewMixin:

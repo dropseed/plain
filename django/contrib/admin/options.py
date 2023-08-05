@@ -44,8 +44,8 @@ from django.forms.models import (
     modelformset_factory,
 )
 from django.forms.widgets import CheckboxSelectMultiple, SelectMultiple
-from django.http import HttpResponseRedirect
-from django.http.response import HttpResponseBase
+from bolt.http import HttpResponseRedirect
+from bolt.http.response import HttpResponseBase
 from django.contrib.admin.django.template.response import SimpleTemplateResponse, TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator

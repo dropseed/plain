@@ -135,7 +135,7 @@ class MultiPartParser:
 
         Return a tuple containing the POST and FILES dictionary, respectively.
         """
-        from django.http import QueryDict
+        from bolt.http import QueryDict
 
         encoding = self._encoding
         handlers = self._upload_handlers

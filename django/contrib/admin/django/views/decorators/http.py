@@ -4,7 +4,7 @@ Decorators for views based on HTTP headers.
 import datetime
 from functools import wraps
 
-from django.http import HttpResponseNotAllowed
+from bolt.http import HttpResponseNotAllowed
 from django.utils import timezone
 from django.utils.cache import get_conditional_response
 from django.utils.http import http_date, quote_etag

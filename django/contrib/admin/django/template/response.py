@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from bolt.http import HttpResponse
 
 from .loader import get_template, select_template
 

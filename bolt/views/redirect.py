@@ -1,6 +1,6 @@
 import logging
 
-from django.http import (
+from bolt.http import (
     HttpResponseGone,
     HttpResponsePermanentRedirect,
     HttpResponseRedirect,

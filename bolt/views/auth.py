@@ -2,7 +2,7 @@ from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse
+from bolt.http import HttpResponse
 from django.urls import reverse
 
 

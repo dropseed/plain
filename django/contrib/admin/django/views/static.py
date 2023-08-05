@@ -6,7 +6,7 @@ import mimetypes
 import posixpath
 from pathlib import Path
 
-from django.http import FileResponse, Http404, HttpResponse, HttpResponseNotModified
+from bolt.http import FileResponse, Http404, HttpResponse, HttpResponseNotModified
 from django.contrib.admin.django.template import Context, Engine, TemplateDoesNotExist, loader
 from django.utils._os import safe_join
 from django.utils.http import http_date, parse_http_date
