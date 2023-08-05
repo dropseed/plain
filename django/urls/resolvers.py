@@ -27,7 +27,6 @@ from django.utils.translation import get_language
 
 from .converters import get_converter
 from .exceptions import NoReverseMatch, Resolver404
-from .utils import get_callable
 
 
 class ResolverMatch:
@@ -697,7 +696,7 @@ class URLResolver:
             from django.conf import urls
 
             callback = getattr(urls, "handler%s" % view_type)
-        return get_callable(callback)
+        return callback
 
     def reverse(self, lookup_view, *args, **kwargs):
         return self._reverse_with_prefix(lookup_view, "", *args, **kwargs)

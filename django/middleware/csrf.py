@@ -12,7 +12,6 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import DisallowedHost, ImproperlyConfigured
 from django.http import HttpHeaders, UnreadablePostError
-from django.urls import get_callable
 from django.utils.cache import patch_vary_headers
 from django.utils.crypto import constant_time_compare, get_random_string
 from django.utils.functional import cached_property
@@ -47,7 +46,9 @@ CSRF_SESSION_KEY = "_csrftoken"
 
 def _get_failure_view():
     """Return the view to be used for CSRF rejections."""
-    return get_callable(settings.CSRF_FAILURE_VIEW)
+    # TODO override the template instead? why the view?
+    from django.contrib.admin.django.views.csrf import csrf_failure
+    return csrf_failure
 
 
 def _get_new_csrf_string():

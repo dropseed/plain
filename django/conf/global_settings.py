@@ -496,10 +496,6 @@ SIGNING_BACKEND = "django.core.signing.TimestampSigner"
 # CSRF #
 ########
 
-# Dotted path to callable to be used as view when a request is
-# rejected by the CSRF middleware.
-CSRF_FAILURE_VIEW = "django.contrib.admin.django.views.csrf.csrf_failure"
-
 # Settings for CSRF cookie.
 CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52

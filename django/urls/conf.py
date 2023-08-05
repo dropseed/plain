@@ -1,6 +1,5 @@
 """Functions for use in URLsconfs."""
 from functools import partial
-from importlib import import_module
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -33,8 +32,6 @@ def include(arg, namespace=None):
         # No namespace hint - use manually provided namespace.
         urlconf_module = arg
 
-    if isinstance(urlconf_module, str):
-        urlconf_module = import_module(urlconf_module)
     patterns = getattr(urlconf_module, "urlpatterns", urlconf_module)
     app_name = getattr(urlconf_module, "app_name", app_name)
     if namespace and not app_name:

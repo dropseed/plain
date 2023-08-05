@@ -9,7 +9,6 @@ from .base import (
     reverse_lazy,
     set_script_prefix,
     set_urlconf,
-    translate_url,
 )
 from .conf import include, path, re_path
 from .converters import register_converter
@@ -21,7 +20,6 @@ from .resolvers import (
     get_ns_resolver,
     get_resolver,
 )
-from .utils import get_callable, get_mod_func
 
 __all__ = [
     "NoReverseMatch",
@@ -31,8 +29,6 @@ __all__ = [
     "ResolverMatch",
     "clear_script_prefix",
     "clear_url_caches",
-    "get_callable",
-    "get_mod_func",
     "get_ns_resolver",
     "get_resolver",
     "get_script_prefix",
@@ -47,5 +43,4 @@ __all__ = [
     "reverse_lazy",
     "set_script_prefix",
     "set_urlconf",
-    "translate_url",
 ]
