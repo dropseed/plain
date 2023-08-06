@@ -16,11 +16,6 @@ def gettext_noop(s):
 
 DEBUG: bool = False
 
-# Whether the framework should propagate raw exceptions rather than catching
-# them. This is useful under some testing situations and should never be used
-# on a live site.
-DEBUG_PROPAGATE_EXCEPTIONS = False
-
 # Hosts/domain names that are valid for this site.
 # "*" matches anything, ".example.com" matches example.com and all subdomains
 ALLOWED_HOSTS: list[str] = []
