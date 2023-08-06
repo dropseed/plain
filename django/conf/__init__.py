@@ -19,6 +19,7 @@ import django
 from django.conf import global_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.functional import LazyObject, empty
+from django.apps import AppConfig
 
 ENVIRONMENT_VARIABLE = "DJANGO_SETTINGS_MODULE"
 DEFAULT_STORAGE_ALIAS = "default"
@@ -145,6 +146,30 @@ class Settings:
         # Keep a reference to the settings.py module path
         # so we can find files next to it (assume it's at the app root)
         self.path = Path(mod.__file__).resolve()
+
+        # Get INSTALLED_APPS from mod,
+        # then (without populating apps) do a check for default_settings in each
+        # app and load those now too.
+        for entry in getattr(mod, "INSTALLED_APPS", []):
+            try:
+                if isinstance(entry, AppConfig):
+                    app_settings = entry.module.default_settings
+                else:
+                    app_settings = importlib.import_module(f"{entry}.default_settings")
+            except ModuleNotFoundError:
+                continue
+
+            self._setting_annotations.update(
+                getattr(app_settings, "__annotations__", {})
+            )
+            for setting in dir(app_settings):
+                if setting.isupper():
+                    if hasattr(self, setting):
+                        raise ImproperlyConfigured(
+                            "The %s setting is duplicated in the default settings for app %s"
+                            % (setting, entry)
+                        )
+                    setattr(self, setting, getattr(app_settings, setting))
 
         self._explicit_settings = set()
         for setting in dir(mod):
