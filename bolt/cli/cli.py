@@ -7,6 +7,12 @@ import sys
 import django
 import click
 
+from rich.console import Console
+from rich.table import Table
+from rich import box
+from rich.text import Text
+from rich.pretty import Pretty
+
 
 class InstalledAppsGroup(click.Group):
     BOLT_APPS_PREFIX = "bolt."
@@ -205,6 +211,59 @@ def run(script):
     result = subprocess.run(["python", "-c", command])
     if result.returncode:
         sys.exit(result.returncode)
+
+
+@bolt_cli.command()
+@click.option("--filter", "-f", "name_filter", help="Filter settings by name")
+@click.option("--overridden", is_flag=True, help="Only show overridden settings")
+def settings(name_filter, overridden):
+    """Print Django settings"""
+    try:
+        django.setup()
+    except Exception as e:
+        click.secho(f"Error in Django setup\n{e}", fg="yellow")
+        return
+
+    from django.conf import settings
+
+    table = Table(box=box.MINIMAL)
+    table.add_column("Setting")
+    table.add_column("Default value")
+    table.add_column("App value")
+    table.add_column("Type")
+    table.add_column("Module")
+
+    for setting in dir(settings):
+        if setting.isupper():
+
+            if name_filter and name_filter.upper() not in setting:
+                continue
+
+            is_overridden = settings.is_overridden(setting)
+
+            if overridden and not is_overridden:
+                continue
+
+            default_setting = settings._default_settings.get(setting)
+            if default_setting:
+                default_value = default_setting.value
+                annotation = default_setting.annotation
+                module = default_setting.module
+            else:
+                default_value = ""
+                annotation = ""
+                module = ""
+
+            table.add_row(
+                setting,
+                Pretty(default_value) if default_value else "",
+                Pretty(getattr(settings, setting)) if is_overridden else Text("<Default>", style="italic dim"),
+                Pretty(annotation) if annotation else "",
+                str(module.__name__) if module else "",
+            )
+
+    console = Console()
+    console.print(table)
 
 
 cli = click.CommandCollection(sources=[InstalledAppsGroup(), BinNamespaceGroup(), bolt_cli])

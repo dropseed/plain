@@ -126,17 +126,46 @@ class LazySettings(LazyObject):
             warnings.warn(message, category, stacklevel=2)
 
 
+class DefaultSetting:
+    """Store some basic info about default settings and where they came from"""
+    def __init__(self, name, value, annotation, module):
+        self.name = name
+        self.value = value
+        self.annotation = annotation
+        self.module = module
+
+    def __str__(self):
+        return self.name
+
+    def check_type(self, obj):
+        if not self.annotation:
+            return
+
+        if not DefaultSetting._is_instance_of_type(obj, self.annotation):
+            raise ValueError("The %s setting must be of type %s" % (self.name, self.annotation))
+
+    @staticmethod
+    def _is_instance_of_type(value, type_hint) -> bool:
+        # Simple types
+        if isinstance(type_hint, type):
+            return isinstance(value, type_hint)
+
+        # Union types
+        if typing.get_origin(type_hint) is typing.Union or typing.get_origin(type_hint) is types.UnionType:
+            return any(DefaultSetting._is_instance_of_type(value, arg) for arg in typing.get_args(type_hint))
+
+        # List types
+        if typing.get_origin(type_hint) is list:
+            return isinstance(value, list) and all(DefaultSetting._is_instance_of_type(item, typing.get_args(type_hint)[0]) for item in value)
+
+        raise ValueError("Unsupported type hint: %s" % type_hint)
+
+
+
 class Settings:
     def __init__(self, settings_module):
-        # Store the expected type of each setting
-        self._setting_annotations = {
-            **getattr(global_settings, "__annotations__", {}),
-        }
-
-        # update this dict from global settings (but only for ALL_CAPS settings)
-        for setting in dir(global_settings):
-            if setting.isupper():
-                setattr(self, setting, getattr(global_settings, setting))
+        self._default_settings = {}
+        self._load_module_settings(global_settings)
 
         # store the settings module in case someone later cares
         self.SETTINGS_MODULE = settings_module
@@ -159,32 +188,15 @@ class Settings:
             except ModuleNotFoundError:
                 continue
 
-            self._setting_annotations.update(
-                getattr(app_settings, "__annotations__", {})
-            )
-            for setting in dir(app_settings):
-                if setting.isupper():
-                    if hasattr(self, setting):
-                        raise ImproperlyConfigured(
-                            "The %s setting is duplicated in the default settings for app %s"
-                            % (setting, entry)
-                        )
-                    setattr(self, setting, getattr(app_settings, setting))
+            self._load_module_settings(app_settings)
 
         self._explicit_settings = set()
         for setting in dir(mod):
             if setting.isupper():
                 setting_value = getattr(mod, setting)
 
-                # Verify correct setting types if there were type hints
-                setting_type = self._setting_annotations.get(setting, None)
-                if setting_type is not None and not is_instance_of_type(
-                    setting_value, setting_type
-                ):
-                    raise ImproperlyConfigured(
-                        "The %s setting must be of type %s"
-                        % (setting, setting_type)
-                    )
+                if setting in self._default_settings:
+                    self._default_settings[setting].check_type(setting_value)
 
                 setattr(self, setting, setting_value)
                 self._explicit_settings.add(setting)
@@ -200,6 +212,30 @@ class Settings:
             # we don't do this unconditionally (breaks Windows).
             os.environ["TZ"] = self.TIME_ZONE
             time.tzset()
+
+    def _load_module_settings(self, module):
+        annotations = getattr(module, "__annotations__", {})
+
+        for setting in dir(module):
+            if setting.isupper():
+
+                if hasattr(self, setting):
+                    raise ImproperlyConfigured(
+                        "The %s setting is duplicated" % setting
+                    )
+
+                setting_value = getattr(module, setting)
+
+                # Set a simple attr on the settings object
+                setattr(self, setting, setting_value)
+
+                # Store a more complex setting reference for more detail
+                self._default_settings[setting] = DefaultSetting(
+                    name=setting,
+                    value=setting_value,
+                    annotation=annotations.get(setting, ""),
+                    module=module,
+                )
 
     def is_overridden(self, setting):
         return setting in self._explicit_settings
@@ -260,22 +296,6 @@ class UserSettingsHolder:
         return "<%(cls)s>" % {
             "cls": self.__class__.__name__,
         }
-
-
-def is_instance_of_type(value, type_hint) -> bool:
-    # Simple types
-    if isinstance(type_hint, type):
-        return isinstance(value, type_hint)
-
-    # Union types
-    if typing.get_origin(type_hint) is typing.Union or typing.get_origin(type_hint) is types.UnionType:
-        return any(is_instance_of_type(value, arg) for arg in typing.get_args(type_hint))
-
-    # List types
-    if typing.get_origin(type_hint) is list:
-        return isinstance(value, list) and all(is_instance_of_type(item, typing.get_args(type_hint)[0]) for item in value)
-
-    raise ValueError("Unsupported type hint: %s" % type_hint)
 
 
 settings = LazySettings()
