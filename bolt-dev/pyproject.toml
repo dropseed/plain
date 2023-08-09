@@ -36,7 +36,7 @@ honcho = "^1.1.0"
 debugpy = "^1.6.3"
 
 # For local runserver
-gunicorn = "^20.1.0"
+gunicorn = ">20"
 
 tomli = {version = "^2.0.1", python = "<3.11"}
 

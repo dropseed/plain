@@ -266,4 +266,23 @@ def settings(name_filter, overridden):
     console.print(table)
 
 
+@bolt_cli.command()
+@click.pass_context
+def compile(ctx):
+    """Compile static assets"""
+    # For each installed app, if it has a compile command, run it?
+    # So this could be `bolt compile`
+    # and you have `bolt tailwind compile`
+    # and `bolt static compile`
+
+    # maybe also user customization in pyproject.toml (like bolt work)
+
+    # Compile our Tailwind CSS (including templates in bolt itself)
+    # TODO not necessarily installed
+    subprocess.check_call(["bolt", "tailwind", "compile", "--minify"])
+
+    # Run the regular collectstatic
+    ctx.invoke(django_alias, django_args=["collectstatic", "--noinput"])
+
+
 cli = click.CommandCollection(sources=[InstalledAppsGroup(), BinNamespaceGroup(), bolt_cli])
