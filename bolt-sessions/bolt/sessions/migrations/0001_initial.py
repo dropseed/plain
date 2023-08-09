@@ -1,4 +1,4 @@
-import django.contrib.sessions.models
+import bolt.sessions.models
 from django.db import migrations, models
 
 
@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
                 "verbose_name_plural": "sessions",
             },
             managers=[
-                ("objects", django.contrib.sessions.models.SessionManager()),
+                ("objects", bolt.sessions.models.SessionManager()),
             ],
         ),
     ]

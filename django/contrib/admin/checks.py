@@ -155,15 +155,15 @@ def check_dependencies(**kwargs):
             )
         )
     if not _contains_subclass(
-        "django.contrib.sessions.middleware.SessionMiddleware", settings.MIDDLEWARE
+        "bolt.sessions.middleware.SessionMiddleware", settings.MIDDLEWARE
     ):
         errors.append(
             checks.Error(
-                "'django.contrib.sessions.middleware.SessionMiddleware' must "
+                "'bolt.sessions.middleware.SessionMiddleware' must "
                 "be in MIDDLEWARE in order to use the admin application.",
                 hint=(
                     "Insert "
-                    "'django.contrib.sessions.middleware.SessionMiddleware' "
+                    "'bolt.sessions.middleware.SessionMiddleware' "
                     "before "
                     "'django.contrib.auth.middleware.AuthenticationMiddleware'."
                 ),

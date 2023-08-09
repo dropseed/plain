@@ -1,6 +1,6 @@
 import logging
 
-from django.contrib.sessions.backends.base import CreateError, SessionBase, UpdateError
+from bolt.sessions.backends.base import CreateError, SessionBase, UpdateError
 from django.core.exceptions import SuspiciousOperation
 from django.db import DatabaseError, IntegrityError, router, transaction
 from django.utils import timezone
@@ -18,8 +18,8 @@ class SessionStore(SessionBase):
     @classmethod
     def get_model_class(cls):
         # Avoids a circular import and allows importing SessionStore when
-        # django.contrib.sessions is not in INSTALLED_APPS.
-        from django.contrib.sessions.models import Session
+        # bolt.sessions is not in INSTALLED_APPS.
+        from bolt.sessions.models import Session
 
         return Session
 

@@ -2,8 +2,8 @@ import time
 from importlib import import_module
 
 from django.conf import settings
-from django.contrib.sessions.backends.base import UpdateError
-from django.contrib.sessions.exceptions import SessionInterrupted
+from bolt.sessions.backends.base import UpdateError
+from bolt.sessions.exceptions import SessionInterrupted
 from django.utils.cache import patch_vary_headers
 from django.utils.http import http_date
 

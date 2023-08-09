@@ -1,4 +1,4 @@
-from django.contrib.sessions.base_session import AbstractBaseSession, BaseSessionManager
+from bolt.sessions.base_session import AbstractBaseSession, BaseSessionManager
 
 
 class SessionManager(BaseSessionManager):
@@ -27,7 +27,7 @@ class Session(AbstractBaseSession):
 
     @classmethod
     def get_session_store_class(cls):
-        from django.contrib.sessions.backends.db import SessionStore
+        from bolt.sessions.backends.db import SessionStore
 
         return SessionStore
 

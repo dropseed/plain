@@ -12,7 +12,7 @@ def add_session_cookie_message(message):
 
 W010 = Warning(
     add_session_cookie_message(
-        "You have 'django.contrib.sessions' in your INSTALLED_APPS, "
+        "You have 'bolt.sessions' in your INSTALLED_APPS, "
         "but you have not set SESSION_COOKIE_SECURE to True."
     ),
     id="security.W010",
@@ -20,7 +20,7 @@ W010 = Warning(
 
 W011 = Warning(
     add_session_cookie_message(
-        "You have 'django.contrib.sessions.middleware.SessionMiddleware' "
+        "You have 'bolt.sessions.middleware.SessionMiddleware' "
         "in your MIDDLEWARE, but you have not set "
         "SESSION_COOKIE_SECURE to True."
     ),
@@ -42,7 +42,7 @@ def add_httponly_message(message):
 
 W013 = Warning(
     add_httponly_message(
-        "You have 'django.contrib.sessions' in your INSTALLED_APPS, "
+        "You have 'bolt.sessions' in your INSTALLED_APPS, "
         "but you have not set SESSION_COOKIE_HTTPONLY to True.",
     ),
     id="security.W013",
@@ -50,7 +50,7 @@ W013 = Warning(
 
 W014 = Warning(
     add_httponly_message(
-        "You have 'django.contrib.sessions.middleware.SessionMiddleware' "
+        "You have 'bolt.sessions.middleware.SessionMiddleware' "
         "in your MIDDLEWARE, but you have not set "
         "SESSION_COOKIE_HTTPONLY to True."
     ),
@@ -92,8 +92,8 @@ def check_session_cookie_httponly(app_configs, **kwargs):
 
 
 def _session_middleware():
-    return "django.contrib.sessions.middleware.SessionMiddleware" in settings.MIDDLEWARE
+    return "bolt.sessions.middleware.SessionMiddleware" in settings.MIDDLEWARE
 
 
 def _session_app():
-    return "django.contrib.sessions" in settings.INSTALLED_APPS
+    return "bolt.sessions" in settings.INSTALLED_APPS

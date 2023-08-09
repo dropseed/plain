@@ -7,7 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 class SessionStorage(BaseStorage):
     """
-    Store messages in the session (that is, django.contrib.sessions).
+    Store messages in the session (that is, bolt.sessions).
     """
 
     session_key = "_messages"

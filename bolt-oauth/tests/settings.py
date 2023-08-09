@@ -16,7 +16,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
-    "django.contrib.sessions",
+    "bolt.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "users",
@@ -25,7 +25,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "bolt.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
+    "bolt.sessions.middleware.SessionMiddleware",
     "bolt.middleware.common.CommonMiddleware",
     "bolt.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

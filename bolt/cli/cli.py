@@ -17,11 +17,6 @@ from rich.pretty import Pretty
 class InstalledAppsGroup(click.Group):
     BOLT_APPS_PREFIX = "bolt."
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Save a list so we can put the prefix back easily for imports
-        self._bolt_prefixed_apps = []
-
     def list_commands(self, ctx):
         try:
             django.setup()
@@ -43,26 +38,24 @@ class InstalledAppsGroup(click.Group):
 
             if cli_name.startswith(self.BOLT_APPS_PREFIX):
                 cli_name = cli_name[len(self.BOLT_APPS_PREFIX):]
-                self._bolt_prefixed_apps.append(cli_name)
 
             apps_with_commands.append(cli_name)
 
         return apps_with_commands
 
     def get_command(self, ctx, name):
-        if name in self._bolt_prefixed_apps:
-            name = self.BOLT_APPS_PREFIX + name
+        # Try it as bolt.x and just x (we don't know ahead of time which it is, but prefer bolt.x)
+        for name in [self.BOLT_APPS_PREFIX + name, name]:
+            try:
+                cli = importlib.import_module(name + ".cli")
+            except ModuleNotFoundError:
+                return
 
-        try:
-            cli = importlib.import_module(name + ".cli")
-        except ModuleNotFoundError:
-            return
-
-        # Get the app's cli.py group
-        try:
-            return cli.cli
-        except AttributeError:
-            return
+            # Get the app's cli.py group
+            try:
+                return cli.cli
+            except AttributeError:
+                return
 
 
 class BinNamespaceGroup(click.Group):

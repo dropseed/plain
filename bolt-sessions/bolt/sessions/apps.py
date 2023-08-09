@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class SessionsConfig(AppConfig):
-    name = "django.contrib.sessions"
+    name = "bolt.sessions"
     verbose_name = "Sessions"

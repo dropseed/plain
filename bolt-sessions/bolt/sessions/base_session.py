@@ -1,6 +1,6 @@
 """
 This module allows importing AbstractBaseSession even
-when django.contrib.sessions is not in INSTALLED_APPS.
+when bolt.sessions is not in INSTALLED_APPS.
 """
 from django.db import models
 
