@@ -45,7 +45,9 @@ class HTMXFragmentExtension(Extension):
         if render_lazy:
             return f'<div hx-get hx-trigger="bhxLoad from:body" bhx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
         else:
-            return f'<div bhx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this">{caller()}</div>'
+            # Swap innerHTML so we can re-run hx calls inside the fragment automatically
+            # (render_template_fragment won't render this part of the node again, just the inner nodes)
+            return f'<div bhx-fragment="{fragment_name}" hx-swap="innerHTML" hx-target="this" hx-indicator="this">{caller()}</div>'
 
     @staticmethod
     def find_template_fragment(template: jinja2.Template, fragment_name: str):
