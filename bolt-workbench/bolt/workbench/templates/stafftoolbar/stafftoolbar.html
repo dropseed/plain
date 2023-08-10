@@ -45,6 +45,12 @@
 
             {% if requestlog_enabled|default(false) %}{% include "requestlog/stafftoolbar.html" %}{% endif %}
 
+            {% if object|default(false) %}
+            <div class="font-mono text-xs" title="PK: {{ object.pk }}">
+                {{ object.__repr__() }}
+            </div>
+            {% endif %}
+
             <div class="flex items-center space-x-3">
                 {% for link in stafftoolbar.links %}
                 <a href="{{ link.url }}" class="hover:underline">{{ link.text }}</a>
