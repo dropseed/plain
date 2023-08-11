@@ -123,7 +123,7 @@ class AdminTrendPanelView(AdminChartPanelView):
         data = [date_values[date] for date in sorted(date_values.keys())]
 
         return {
-            "type": "line",
+            "type": "bar",
             "data": {
                 "labels": date_labels,
                 "datasets": [
