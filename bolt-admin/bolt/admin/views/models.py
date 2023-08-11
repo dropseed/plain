@@ -15,6 +15,9 @@ class AdminModelListView(AdminObjectsView):
     show_search = True
 
     model: "models.Model"
+
+    list_fields: list = ["pk"]
+    list_order = []
     search_fields: list = ["pk"]
 
     def get_context(self):
@@ -38,10 +41,12 @@ class AdminModelListView(AdminObjectsView):
     def get_objects(self):
         queryset = self.model.objects.all()
 
-        if "order_by" in self.request.GET:
-            queryset = queryset.order_by(self.request.GET["order_by"])
+        if order_by := self.request.GET.get("order_by"):
+            queryset = queryset.order_by(order_by)
+        elif self.list_order:
+            queryset = queryset.order_by(*self.list_order)
 
-        if search := self.request.GET.get("search", ""):
+        if search := self.request.GET.get("search"):
             filters = Q()
             for field in self.search_fields:
                 filters |= Q(**{f"{field}__icontains": search})
@@ -58,8 +63,11 @@ class AdminModelListView(AdminObjectsView):
 class AdminModelViewset:
     model: "models.Model"
     list_fields: list = ["pk"]
+    list_order = []
     search_fields = ["pk"]
+
     form_class = None  # TODO type annotation
+
     list_panels = []
     form_panels = []
 
@@ -70,6 +78,7 @@ class AdminModelViewset:
             title = cls.model._meta.verbose_name_plural.capitalize()
             slug = cls.model._meta.model_name
             list_fields = cls.list_fields
+            list_order = cls.list_order
             panels = cls.list_panels
             search_fields = cls.search_fields
 
