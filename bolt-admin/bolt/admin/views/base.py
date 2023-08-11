@@ -24,6 +24,13 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 
     show_in_nav: bool = True
 
+    def get_context(self):
+        context = super().get_context()
+        context["title"] = self.title
+        context["slug"] = self.slug
+        context["description"] = self.description
+        return context
+
     @classmethod
     def view_name(cls) -> str:
         raise NotImplementedError
@@ -40,9 +47,6 @@ class AdminPageView(BaseAdminView):
 
     def get_context(self):
         context = super().get_context()
-        context["title"] = self.title
-        context["slug"] = self.slug
-        context["description"] = self.description
         context["icon"] = self.icon
         context["admin_registry"] = registry
         context["panels"] = self.get_panels()

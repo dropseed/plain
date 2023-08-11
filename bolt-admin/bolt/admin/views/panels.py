@@ -19,11 +19,6 @@ class AdminPanelView(BaseAdminView):
     template_name = "bolt/admin/panel.html"
     size: PanelSize = PanelSize.MD
 
-    def get_context(self) -> dict:
-        context = super().get_context()
-        context["panel_slug"] = self.slug
-        return context
-
     @classmethod
     def view_name(cls) -> str:
         return f"panel_{cls.slug}"
@@ -139,4 +134,16 @@ class AdminTrendPanelView(AdminChartPanelView):
             },
             # Hide the label
             # "options": {"legend": {"display": False}},
+            # Hide the scales
+            "options": {
+                "plugins": {"legend": {"display": False}},
+                "scales": {
+                    "x": {
+                        "display": False,
+                    },
+                    "y": {
+                        "display": False,
+                    },
+                },
+            },
         }
