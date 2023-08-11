@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="flex min-h-screen text-white bg-zinc-900">
-    <div class="w-64 px-6 py-6">
+    <div class="flex-shrink-0 w-64 px-6 py-6">
         <div class="flex flex-col space-y-2">
             <a class="font-bold" href="{{ url('boltadmin:index') }}">Bolt Admin</a>
             {% for view in admin_registry.registered_views if view.show_in_nav %}
@@ -16,7 +16,7 @@
             {% endfor %}
         </div>
     </div>
-    <div class="flex-grow text-black rounded-l-lg bg-zinc-100">
+    <div class="flex-grow overflow-auto text-black rounded-l-lg bg-zinc-100">
         <div class="flex items-center px-8 py-4 space-x-2 text-sm border-b border-gray-200">
             <a class="text-gray-700" href="{{ url ('boltadmin:index') }}">Admin</a>
             <span class="text-gray-600">/</span>

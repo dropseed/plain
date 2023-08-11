@@ -1,26 +1,12 @@
 <div>
     <canvas id="panel-chart-{{ panel_slug }}"></canvas>
 </div>
-
+{{ chart_data|json_script(panel_slug) }}
 <script>
-  const ctx = document.getElementById('panel-chart-{{ panel_slug }}');
+  document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('panel-chart-{{ panel_slug }}');
 
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
-      datasets: [{
-        label: '# of Votes',
-        data: [12, 19, 3, 5, 2, 3],
-        borderWidth: 1
-      }]
-    },
-    options: {
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
-    }
+    const data = JSON.parse(document.getElementById('{{ panel_slug }}').textContent);
+    new Chart(ctx, data);
   });
 </script>

@@ -42,50 +42,52 @@
         </div>
         {% endif %}
 
-        <table class="w-full mt-4 text-sm table-auto">
-            <thead>
-                <tr>
-                    <th></th>
-                    {% for field in list_fields %}
-                    <th class="px-2 text-left">
-                        <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
-                            {{ field }}
-                            {% if field == order_by_field %}
-                            {% if order_by_direction == "-" %}
-                            <span class="text-xs">▲</span>
-                            {% else %}
-                            <span class="text-xs">▼</span>
-                            {% endif %}
-                            {% endif %}
-                        </a>
-                    </th>
-                    {% endfor %}
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-                {% for object in objects %}
-                <tr class="hover:bg-gray-50">
-                    <td class="py-2">
-                        <!-- <input type="checkbox" /> -->
-                    </td>
-                    {% for field in list_fields %}
-                    <td class="px-2 py-2">{{ object[field] }}</td>
-                    {% endfor %}
+        <div class="overflow-auto">
+            <table class="w-full mt-4 text-sm table-auto">
+                <thead>
+                    <tr>
+                        <th></th>
+                        {% for field in list_fields %}
+                        <th class="px-2 font-mono text-left text-gray-700">
+                            <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                                {{ field }}
+                                {% if field == order_by_field %}
+                                {% if order_by_direction == "-" %}
+                                <span class="text-xs">▲</span>
+                                {% else %}
+                                <span class="text-xs">▼</span>
+                                {% endif %}
+                                {% endif %}
+                            </a>
+                        </th>
+                        {% endfor %}
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for object in objects %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-2">
+                            <!-- <input type="checkbox" /> -->
+                        </td>
+                        {% for field in list_fields %}
+                        <td class="px-2 py-2 whitespace-nowrap">{{ object[field] }}</td>
+                        {% endfor %}
 
-                    {% set update_url = get_update_url(object) %}
-                    {% if update_url %}
-                    <td class="py-2">
-                        <a class="text-blue-600 hover:underline" href="{{ update_url }}">Edit</a>
-                    </td>
-                    {% else %}
-                    <td class="py-2">
-                    </td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        {% set update_url = get_update_url(object) %}
+                        {% if update_url %}
+                        <td class="py-2">
+                            <a class="text-blue-600 hover:underline" href="{{ update_url }}">Edit</a>
+                        </td>
+                        {% else %}
+                        <td class="py-2">
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
         <div class="mt-4">
             <div class="flex items-center justify-between">
