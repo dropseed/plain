@@ -1,0 +1,128 @@
+{% extends "bolt/admin/base.html" %}
+
+{% block content %}
+
+{% if panels %}
+<div class="grid grid-cols-4 gap-8 mb-8">
+{% for panel in panels %}
+    <div class="
+        bg-white rounded-sm drop-shadow-sm border border-zinc-200 p-2
+        {% if panel.size.value == 1 -%}
+        col-span-1
+        {%- elif panel.size.value == 2 -%}
+        col-span-2
+        {%- elif panel.size.value == 3 -%}
+        col-span-3
+        {%- elif panel.size.value == 4 -%}
+        col-span-4
+        {%- endif -%}">
+
+        {{ render_panel(panel)|safe }}
+
+    </div>
+{% endfor %}
+</div>
+{% endif %}
+
+<!-- <a href="#">New</a> -->
+
+{% if show_search %}
+<div>
+    <form method="GET">
+        <input
+            name="search"
+            {% if search_query %}value="{{ search_query }}"{% endif %}
+            />
+        <button type="submit">Search</button>
+    </form>
+</div>
+{% endif %}
+
+<div class="mt-6">
+    <div class="p-2 bg-white border border-gray-200 rounded">
+        <table class="w-full table-auto">
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for field in list_fields %}
+                    <th class="px-2 text-left">
+                        <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                            {{ field }}
+                            {% if field == order_by_field %}
+                            {% if order_by_direction == "-" %}
+                            <span class="text-xs">▲</span>
+                            {% else %}
+                            <span class="text-xs">▼</span>
+                            {% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    {% endfor %}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in objects %}
+                <tr>
+                    <td>
+                        <!-- <input type="checkbox" /> -->
+                    </td>
+                    {% for field in list_fields %}
+                    <td class="px-2">{{ object[field] }}</td>
+                    {% endfor %}
+
+                    {% set update_url = get_update_url(object) %}
+                    {% if update_url %}
+                    <td>
+                        <a class="text-blue-600 hover:underline" href="{{ update_url }}">Edit</a>
+                    </td>
+                    {% else %}
+                    <td>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="mt-4">
+            <div class="flex items-center justify-between">
+                <div class="p-2 text-sm text-gray-500">
+                    {% if page.has_other_pages() %}
+                    Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
+                    {% else %}
+                    Showing all {{ page.paginator.count }} results
+                    {% endif %}
+                </div>
+                {% if page.has_other_pages() %}
+                <ul class="flex justify-center">
+                    {% if page.has_previous() %}
+                    <li>
+                        <a class="text-blue-600 hover:underline" href="?page={{ page.previous_page_number() }}">&laquo;</a>
+                    </li>
+                    {% endif %}
+                    {% for page_num in page.paginator.page_range %}
+                    {% if page_num == page.number %}
+                    <li>
+                        <a class="text-blue-600 hover:underline" href="?page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li>
+                        <a href="?page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    {% if page.has_next() %}
+                    <li>
+                        <a class="text-blue-600 hover:underline" href="?page={{ page.next_page_number() }}">&raquo;</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

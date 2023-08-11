@@ -1,0 +1,27 @@
+{% extends "bolt/admin/base.html" %}
+
+{% block content %}
+
+{% if panels %}
+<div class="grid grid-cols-4 gap-8">
+{% for panel in panels %}
+    <div class="
+        bg-white rounded-sm drop-shadow-sm border border-zinc-200 p-2
+        {% if panel.size.value == 1 -%}
+        col-span-1
+        {%- elif panel.size.value == 2 -%}
+        col-span-2
+        {%- elif panel.size.value == 3 -%}
+        col-span-3
+        {%- elif panel.size.value == 4 -%}
+        col-span-4
+        {%- endif -%}">
+
+        {{ render_panel(panel)|safe }}
+
+    </div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bolt Admin</title>
+    <link href="{{ static('dist/tailwind.css') }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="flex min-h-screen text-white bg-zinc-900">
+    <div class="w-64 px-6 py-6">
+        <div class="flex flex-col space-y-2">
+            <a class="font-bold" href="{{ url('boltadmin:index') }}">Bolt Admin</a>
+            {% for view in admin_registry.registered_views if view.show_in_nav %}
+            <a href="{{ url('boltadmin:' + view.view_name() )}}">{{ view.title }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="flex-grow text-black rounded-l-lg bg-zinc-100">
+        <div class="flex items-center px-8 py-4 space-x-2 text-sm border-b border-gray-200">
+            <a class="text-gray-700" href="{{ url ('boltadmin:index') }}">Admin</a>
+            <span class="text-gray-600">/</span>
+            <a href="{{ request.path }}">{{ title }}</a>
+        </div>
+        <div class="px-8 mt-8">
+        {% block header %}
+            <h1 class="text-2xl font-semibold">{{ title }}</h1>
+            {% if description %}
+            <p class="mt-2 text-gray-600">{{ description }}</p>
+            {% endif %}
+        {% endblock %}
+        </div>
+        <div class="px-8 py-6">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>
