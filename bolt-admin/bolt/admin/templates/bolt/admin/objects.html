@@ -26,21 +26,23 @@
 
 <!-- <a href="#">New</a> -->
 
-{% if show_search %}
-<div>
-    <form method="GET">
-        <input
-            name="search"
-            {% if search_query %}value="{{ search_query }}"{% endif %}
-            />
-        <button type="submit">Search</button>
-    </form>
-</div>
-{% endif %}
-
 <div class="mt-6">
     <div class="p-2 bg-white border border-gray-200 rounded">
-        <table class="w-full table-auto">
+
+        {% if show_search %}
+        <div class="flex justify-end">
+            <form method="GET">
+                <input
+                    name="search"
+                    class="border rounded"
+                    {% if search_query %}value="{{ search_query }}"{% endif %}
+                    />
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <table class="w-full mt-4 text-sm table-auto">
             <thead>
                 <tr>
                     <th></th>
@@ -61,23 +63,23 @@
                     <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-gray-200">
                 {% for object in objects %}
-                <tr>
-                    <td>
+                <tr class="hover:bg-gray-50">
+                    <td class="py-2">
                         <!-- <input type="checkbox" /> -->
                     </td>
                     {% for field in list_fields %}
-                    <td class="px-2">{{ object[field] }}</td>
+                    <td class="px-2 py-2">{{ object[field] }}</td>
                     {% endfor %}
 
                     {% set update_url = get_update_url(object) %}
                     {% if update_url %}
-                    <td>
+                    <td class="py-2">
                         <a class="text-blue-600 hover:underline" href="{{ update_url }}">Edit</a>
                     </td>
                     {% else %}
-                    <td>
+                    <td class="py-2">
                     </td>
                     {% endif %}
                 </tr>
