@@ -123,7 +123,9 @@ class Tailwind:
 
         if not version:
             # Get the version from the redirect chain (latest -> vX.Y.Z)
-            version = response.history[1].url.split("/")[-2].lstrip("v")
+            version = response.history[1].url.split("/")[-2]
+
+        version = version.lstrip("v")
 
         with open(self.version_lockfile_path, "w") as f:
             f.write(version)
