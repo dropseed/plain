@@ -1,29 +1,6 @@
 {% extends "bolt/admin/base.html" %}
 
 {% block content %}
-
-{% if cards %}
-<div class="grid grid-cols-4 gap-8 mb-8">
-{% for card in cards %}
-    <div class="
-        bg-white rounded-sm drop-shadow-sm border border-zinc-200 p-2
-        {% if card.size.value == 1 -%}
-        col-span-1
-        {%- elif card.size.value == 2 -%}
-        col-span-2
-        {%- elif card.size.value == 3 -%}
-        col-span-3
-        {%- elif card.size.value == 4 -%}
-        col-span-4
-        {%- endif -%}">
-
-        {{ render_card(card)|safe }}
-
-    </div>
-{% endfor %}
-</div>
-{% endif %}
-
 <!-- <a href="#">New</a> -->
 
 <div class="">

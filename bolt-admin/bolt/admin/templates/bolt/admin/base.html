@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bolt Admin</title>
     <link href="{{ static('dist/tailwind.css') }}" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ static('bolt/admin/chart.js') }}"></script>
 </head>
 <body class="flex min-h-screen text-white bg-zinc-900">
     <div class="flex flex-col justify-between flex-shrink-0 w-64 px-6 pt-6 pb-3">
@@ -50,6 +50,28 @@
         </div>
 
         <div class="px-8 py-6">
+            {% if cards %}
+            <div class="grid grid-cols-4 gap-8 mb-8">
+            {% for card in cards %}
+                <div class="
+                    bg-white rounded-sm drop-shadow-sm border border-zinc-200 p-2
+                    {% if card.size.value == 1 -%}
+                    col-span-1
+                    {%- elif card.size.value == 2 -%}
+                    col-span-2
+                    {%- elif card.size.value == 3 -%}
+                    col-span-3
+                    {%- elif card.size.value == 4 -%}
+                    col-span-4
+                    {%- endif -%}">
+
+                    {{ render_card(card)|safe }}
+
+                </div>
+            {% endfor %}
+            </div>
+            {% endif %}
+
             {% block content %}{% endblock %}
         </div>
     </div>

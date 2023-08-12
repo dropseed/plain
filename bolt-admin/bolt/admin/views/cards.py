@@ -9,7 +9,7 @@ from .base import BaseAdminView
 
 
 class AdminCardView(BaseAdminView):
-    class CardSize(Enum):
+    class Sizes(Enum):
         # Three column grid
         SM = 1
         MD = 2
@@ -17,7 +17,7 @@ class AdminCardView(BaseAdminView):
         XL = 3
 
     template_name = "bolt/admin/card.html"
-    size: CardSize = CardSize.MD
+    size: Sizes = Sizes.MD
     # unique_id: str  # Use for tying to dashboards, require it
 
     @classmethod
