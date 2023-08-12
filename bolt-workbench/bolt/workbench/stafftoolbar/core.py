@@ -1,17 +1,12 @@
 import os
 import subprocess
 
-from . import settings
+from django.conf import settings
 
 
 class StaffToolbar:
     def __init__(self, *, request):
-        # Callable or list of StaffToolbarLink
-        self.links = settings.STAFFTOOLBAR_LINKS()
-
-        if callable(self.links):
-            self.links = self.links(request)
-
+        self.links = settings.STAFFTOOLBAR_LINKS
         self.release = Release()
         self.release.load()
 

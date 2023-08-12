@@ -5,7 +5,7 @@ class AdminViewRegistry:
     def __init__(self):
         # View classes that will be added to the admin automatically
         self.registered_views = set()
-        self.registered_panels = set()
+        self.registered_cards = set()
 
     def register_view(self, view=None):
         def inner(view):
@@ -19,14 +19,14 @@ class AdminViewRegistry:
         else:
             return inner
 
-    def register_panel(self, panel=None):
-        def inner(panel):
+    def register_card(self, card=None):
+        def inner(card):
             # TODO make s
-            self.registered_panels.add(panel)
-            return panel
+            self.registered_cards.add(card)
+            return card
 
-        if callable(panel):
-            return inner(panel)
+        if callable(card):
+            return inner(card)
         else:
             return inner
 
@@ -41,27 +41,33 @@ class AdminViewRegistry:
         else:
             return inner
 
+    def get_nav_views(self):
+        return sorted(
+            [view for view in self.registered_views if view.show_in_nav],
+            key=lambda v: v.title,
+        )
+
     def get_urls(self):
         urlpatterns = []
 
-        for view in self.registered_views:
-            # TODO unique slugs
-            urlpatterns.append(
-                path(f"v/{view.get_path()}/", view.as_view(), name=view.view_name())
-            )
+        paths_seen = set()
 
-        for view in self.registered_panels:
-            # TODO unique slugs
-            urlpatterns.append(
-                path(
-                    f"panels/{view.get_path()}/", view.as_view(), name=view.view_name()
-                )
-            )
+        def add_view_path(view, _path):
+            if _path in paths_seen:
+                raise ValueError(f"Path {_path} already registered")
+            paths_seen.add(_path)
+            urlpatterns.append(path(_path, view.as_view(), name=view.view_name()))
+
+        for view in self.registered_views:
+            add_view_path(view, f"pages/{view.get_path()}/")
+
+        for view in self.registered_cards:
+            add_view_path(view, f"cards/{view.get_path()}/")
 
         return urlpatterns
 
 
 registry = AdminViewRegistry()
 register_view = registry.register_view
-register_panel = registry.register_panel
+register_card = registry.register_card
 register_model = registry.register_model

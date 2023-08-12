@@ -8,25 +8,26 @@ from django.utils.functional import cached_property
 from .base import BaseAdminView
 
 
-class AdminPanelView(BaseAdminView):
-    class PanelSize(Enum):
+class AdminCardView(BaseAdminView):
+    class CardSize(Enum):
         # Three column grid
         SM = 1
         MD = 2
         LG = 3
         XL = 3
 
-    template_name = "bolt/admin/panel.html"
-    size: PanelSize = PanelSize.MD
+    template_name = "bolt/admin/card.html"
+    size: CardSize = CardSize.MD
+    # unique_id: str  # Use for tying to dashboards, require it
 
     @classmethod
     def view_name(cls) -> str:
-        return f"panel_{cls.slug}"
+        return f"card_{cls.get_slug()}"
 
 
-class AdminTextPanelView(AdminPanelView):
+class AdminTextCardView(AdminCardView):
     text: str = ""
-    template_name = "bolt/admin/panels/text.html"
+    template_name = "bolt/admin/cards/text.html"
 
     def get_context(self):
         context = super().get_context()
@@ -37,8 +38,8 @@ class AdminTextPanelView(AdminPanelView):
         return self.text
 
 
-class AdminChartPanelView(AdminPanelView):
-    template_name = "bolt/admin/panels/chart.html"
+class AdminChartCardView(AdminCardView):
+    template_name = "bolt/admin/cards/chart.html"
 
     def get_context(self):
         context = super().get_context()
@@ -82,7 +83,7 @@ class DateRange:
         return self.start <= item <= self.end
 
 
-class AdminTrendPanelView(AdminChartPanelView):
+class AdminTrendCardView(AdminChartCardView):
     class Ranges(Enum):
         LAST_365_DAYS = "last_365_days"
         LAST_30_DAYS = "last_30_days"

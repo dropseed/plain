@@ -1,11 +1,11 @@
 <div>{{ title }}</div>
 <div>
-    <canvas id="panel-chart-{{ slug }}"></canvas>
+    <canvas id="card-chart-{{ slug }}"></canvas>
 </div>
 {{ chart_data|json_script(slug) }}
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('panel-chart-{{ slug }}');
+    const ctx = document.getElementById('card-chart-{{ slug }}');
 
     const data = JSON.parse(document.getElementById('{{ slug }}').textContent);
     new Chart(ctx, data);

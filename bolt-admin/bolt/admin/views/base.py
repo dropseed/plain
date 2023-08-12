@@ -2,13 +2,14 @@ from typing import TYPE_CHECKING
 
 from django.core.paginator import Paginator
 from django.db import models
+from django.utils.text import slugify
 
 from bolt.views import AuthViewMixin, CreateView, DeleteView, TemplateView, UpdateView
 
 from .registry import registry
 
 if TYPE_CHECKING:
-    from .panels import AdminPanelView
+    from .cards import AdminCardView
 
 
 URL_NAMESPACE = "boltadmin"
@@ -18,7 +19,7 @@ class BaseAdminView(AuthViewMixin, TemplateView):
     staff_required = True
 
     title: str
-    slug: str
+    slug: str = ""
     path: str = ""
     description: str = ""
 
@@ -27,7 +28,7 @@ class BaseAdminView(AuthViewMixin, TemplateView):
     def get_context(self):
         context = super().get_context()
         context["title"] = self.title
-        context["slug"] = self.slug
+        context["slug"] = self.get_slug()
         context["description"] = self.description
         return context
 
@@ -36,33 +37,37 @@ class BaseAdminView(AuthViewMixin, TemplateView):
         raise NotImplementedError
 
     @classmethod
+    def get_slug(cls) -> str:
+        return cls.slug or slugify(cls.title)
+
+    @classmethod
     def get_path(cls) -> str:
-        return cls.path or cls.slug
+        return cls.path or cls.get_slug()
 
 
 class AdminPageView(BaseAdminView):
     template_name = "bolt/admin/page.html"
     icon: str = ""
-    panels: list["AdminPanelView"] = []
+    cards: list["AdminCardView"] = []
 
     def get_context(self):
         context = super().get_context()
         context["icon"] = self.icon
         context["admin_registry"] = registry
-        context["panels"] = self.get_panels()
-        context["render_panel"] = self.render_panel
+        context["cards"] = self.get_cards()
+        context["render_card"] = self.render_card
         return context
 
-    def get_panels(self):
-        return self.panels
+    def get_cards(self):
+        return self.cards
 
     @classmethod
     def view_name(cls) -> str:
-        return f"view_{cls.slug}"
+        return f"view_{cls.get_slug()}"
 
-    def render_panel(self, panel: "AdminPanelView"):
-        """Render panel as a subview"""
-        response = panel.as_view()(self.request)
+    def render_card(self, card: "AdminCardView"):
+        """Render card as a subview"""
+        response = card.as_view()(self.request)
         response.render()
         content = response.content.decode()
         return content

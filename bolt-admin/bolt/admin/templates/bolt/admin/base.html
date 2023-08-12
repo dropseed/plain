@@ -8,20 +8,38 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="flex min-h-screen text-white bg-zinc-900">
-    <div class="flex-shrink-0 w-64 px-6 py-6">
-        <div class="flex flex-col space-y-2">
+    <div class="flex flex-col justify-between flex-shrink-0 w-64 px-6 pt-6 pb-3">
+        <div>
             <a class="font-bold" href="{{ url('boltadmin:index') }}">Bolt Admin</a>
-            {% for view in admin_registry.registered_views if view.show_in_nav %}
-            <a href="{{ url('boltadmin:' + view.view_name() )}}">{{ view.title }}</a>
-            {% endfor %}
+            <div class="mt-4 space-y-2.5">
+                {% for view in admin_registry.get_nav_views() %}
+                <a class="block px-2 py-0.5 -mx-2 hover:text-white rounded text-zinc-200 hover:bg-zinc-600" href="{{ url('boltadmin:' + view.view_name() )}}">{{ view.title }}</a>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="flex items-center justify-between text-sm text-zinc-200">
+            <div class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-person-circle" viewBox="0 0 16 16">
+                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                </svg>
+                {{ request.user }}
+            </div>
+            <a class="hover:text-white hover:underline" href="{{ url('logout') }}">Log out</a>
         </div>
     </div>
     <div class="flex-grow overflow-auto text-black rounded-l-lg bg-zinc-100">
-        <div class="flex items-center px-8 py-4 space-x-2 text-sm border-b border-gray-200">
-            <a class="text-gray-700" href="{{ url ('boltadmin:index') }}">Admin</a>
-            <span class="text-gray-600">/</span>
-            <a href="{{ request.path }}">{{ title }}</a>
+        <div class="flex justify-between px-8 py-4 text-sm border-b border-gray-200">
+            <div class="flex items-center space-x-2">
+                <a class="text-gray-700" href="{{ url ('boltadmin:index') }}">Admin</a>
+                <span class="text-gray-600">/</span>
+                <a href="{{ request.path }}">{{ title }}</a>
+            </div>
+            <div>
+                <a href="/">Back to app</a>
+            </div>
         </div>
+
         <div class="px-8 mt-8">
         {% block header %}
             <h1 class="text-2xl font-semibold">{{ title }}</h1>
@@ -30,9 +48,14 @@
             {% endif %}
         {% endblock %}
         </div>
+
         <div class="px-8 py-6">
             {% block content %}{% endblock %}
         </div>
     </div>
+
+    <!-- TODO only if installed -->
+    {% stafftoolbar %}
+
 </body>
 </html>

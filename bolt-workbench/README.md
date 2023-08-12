@@ -115,11 +115,11 @@ By default, it shows a link back to the Django admin:
 
 ```python
 # settings.py
-from boltstafftoolbar import StaffToolbarLink
+from django.urls import reverse_lazy
 
 
 STAFFTOOLBAR_LINKS = [
-    StaffToolbarLink(text="Admin", url="admin:index"),
+    ("Admin", reverse_lazy("admin:index")),
 ]
 ```
 

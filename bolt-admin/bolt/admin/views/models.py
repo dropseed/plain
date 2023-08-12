@@ -68,8 +68,8 @@ class AdminModelViewset:
 
     form_class = None  # TODO type annotation
 
-    list_panels = []
-    form_panels = []
+    list_cards = []
+    form_cards = []
 
     @classmethod
     def get_list_view(cls) -> AdminModelListView:
@@ -79,7 +79,7 @@ class AdminModelViewset:
             slug = cls.model._meta.model_name
             list_fields = cls.list_fields
             list_order = cls.list_order
-            panels = cls.list_panels
+            cards = cls.list_cards
             search_fields = cls.search_fields
 
             def get_update_url(self, object):
@@ -104,7 +104,7 @@ class AdminModelViewset:
             slug = f"{cls.model._meta.model_name}_update"
             form_class = cls.form_class
             path = f"{cls.model._meta.model_name}/<int:pk>"
-            panels = cls.form_panels
+            cards = cls.form_cards
 
             def get_object(self):
                 return cls.model.objects.get(pk=self.url_kwargs["pk"])
