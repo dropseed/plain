@@ -43,14 +43,11 @@ def cli(pytest_args):
 #         pytest_args.append("-W")
 #         pytest_args.append("error::DeprecationWarning")
 
-    click.secho("Running Django collectstatic", bold=True)
-    subprocess.check_call(
-        ["bolt", "django", "collectstatic", "--noinput",],
-        env={
-            **os.environ,
-            "APP_ENV": "test",
-        },
-    )
+    click.secho("Running bolt compile", bold=True)
+    result = subprocess.run(["bolt", "compile"])
+    if result.returncode:
+        sys.exit(result.returncode)
+
     print()
 
     click.secho("Running pytest with coverage", bold=True)

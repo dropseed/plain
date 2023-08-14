@@ -117,8 +117,6 @@ def compile(watch, minify):
             os.path.relpath(app_dir) + "/**/*.{html,js}",
             os.path.relpath(app_dir)
             + "/../bolt/**/*.{html,js}",  # TODO use INSTALLED_APPS?
-            sys.exec_prefix
-            + "/lib/python*/site-packages/forge*/**/*.{html,js}",  # TODO remove
             sys.exec_prefix + "/lib/python*/site-packages/bolt*/**/*.{html,js}",
         ]
     )

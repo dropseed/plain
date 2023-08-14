@@ -272,7 +272,10 @@ def compile(ctx):
 
     # Compile our Tailwind CSS (including templates in bolt itself)
     # TODO not necessarily installed
-    subprocess.check_call(["bolt", "tailwind", "compile", "--minify"])
+    result = subprocess.run(["bolt", "tailwind", "compile", "--minify"])
+    if result.returncode:
+        click.secho(f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red")
+        sys.exit(result.returncode)
 
     # Run the regular collectstatic
     ctx.invoke(django_alias, django_args=["collectstatic", "--noinput"])
