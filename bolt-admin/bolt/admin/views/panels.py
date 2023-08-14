@@ -8,26 +8,25 @@ from django.utils.functional import cached_property
 from .base import BaseAdminView
 
 
-class AdminCardView(BaseAdminView):
-    class Sizes(Enum):
+class AdminPanelView(BaseAdminView):
+    class PanelSize(Enum):
         # Three column grid
-        SMALL = 1
-        MEDIUM = 2
-        LARGE = 3
-        FULL = 4
+        SM = 1
+        MD = 2
+        LG = 3
+        XL = 3
 
-    template_name = "admin/card.html"
-    size: Sizes = Sizes.MEDIUM
-    # unique_id: str  # Use for tying to dashboards, require it
+    template_name = "admin/panel.html"
+    size: PanelSize = PanelSize.MD
 
     @classmethod
     def view_name(cls) -> str:
-        return f"card_{cls.get_slug()}"
+        return f"panel_{cls.slug}"
 
 
-class AdminTextCardView(AdminCardView):
+class AdminTextPanelView(AdminPanelView):
     text: str = ""
-    template_name = "admin/cards/text.html"
+    template_name = "admin/panels/text.html"
 
     def get_context(self):
         context = super().get_context()
@@ -38,20 +37,8 @@ class AdminTextCardView(AdminCardView):
         return self.text
 
 
-class AdminStatCardView(AdminCardView):
-    template_name = "admin/cards/stat.html"
-
-    def get_context(self):
-        context = super().get_context()
-        context["stat"] = self.get_stat()
-        return context
-
-    def get_stat(self) -> str:
-        raise NotImplementedError
-
-
-class AdminChartCardView(AdminCardView):
-    template_name = "admin/cards/chart.html"
+class AdminChartPanelView(AdminPanelView):
+    template_name = "admin/panels/chart.html"
 
     def get_context(self):
         context = super().get_context()
@@ -95,7 +82,7 @@ class DateRange:
         return self.start <= item <= self.end
 
 
-class AdminTrendCardView(AdminChartCardView):
+class AdminTrendPanelView(AdminChartPanelView):
     class Ranges(Enum):
         LAST_365_DAYS = "last_365_days"
         LAST_30_DAYS = "last_30_days"

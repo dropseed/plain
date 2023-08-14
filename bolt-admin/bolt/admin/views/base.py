@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from .cards import AdminCardView
 
 
-URL_NAMESPACE = "boltadmin"
+URL_NAMESPACE = "admin"
 
 
 class BaseAdminView(AuthViewMixin, TemplateView):
@@ -58,7 +58,7 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 
 
 class AdminPageView(BaseAdminView):
-    template_name = "bolt/admin/page.html"
+    template_name = "admin/page.html"
     icon: str = ""
     cards: list["AdminCardView"] = []
 
@@ -86,7 +86,7 @@ class AdminPageView(BaseAdminView):
 
 
 class AdminObjectsView(AdminPageView):
-    template_name = "bolt/admin/objects.html"
+    template_name = "admin/objects.html"
     list_fields: list
     page_size = 100
     show_search = False
@@ -119,7 +119,7 @@ class AdminUpdateView(AdminPageView, UpdateView):
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [
-                f"bolt/admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             ]
 
         return super().get_template_names()
@@ -133,7 +133,7 @@ class AdminCreateView(AdminPageView, CreateView):
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [
-                f"bolt/admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             ]
 
         return super().get_template_names()
@@ -141,4 +141,4 @@ class AdminCreateView(AdminPageView, CreateView):
 
 class AdminDeleteView(AdminPageView, DeleteView):
     show_in_nav = False
-    template_name = "bolt/admin/confirm_delete.html"
+    template_name = "admin/confirm_delete.html"

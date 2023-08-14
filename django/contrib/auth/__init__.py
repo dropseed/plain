@@ -4,7 +4,7 @@ import re
 from django.apps import apps as django_apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from bolt.middleware.csrf import rotate_token
+from bolt.csrf.middleware import rotate_token
 from django.utils.crypto import constant_time_compare
 from django.utils.module_loading import import_string
 

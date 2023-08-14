@@ -1,4 +1,4 @@
-from bolt.middleware.csrf import get_token
+from bolt.csrf.middleware import get_token
 from django.utils.functional import lazy
 from django.utils.html import format_html
 from django.utils.safestring import SafeString

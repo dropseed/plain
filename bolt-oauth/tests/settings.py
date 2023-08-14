@@ -13,7 +13,6 @@ SECRET_KEY = "test"
 DEBUG = True
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "bolt.sessions",
@@ -27,7 +26,7 @@ MIDDLEWARE = [
     "bolt.middleware.security.SecurityMiddleware",
     "bolt.sessions.middleware.SessionMiddleware",
     "bolt.middleware.common.CommonMiddleware",
-    "bolt.middleware.csrf.CsrfViewMiddleware",
+    "bolt.csrf.middleware.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
