@@ -12,7 +12,7 @@ def cli():
 
 
 @cli.command()
-def clear():
+def clear_expired():
     django.setup()
     engine = import_module(settings.SESSION_ENGINE)
     try:

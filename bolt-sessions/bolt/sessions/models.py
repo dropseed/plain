@@ -1,11 +1,26 @@
-from bolt.sessions.base_session import AbstractBaseSession, BaseSessionManager
+from django.db import models
 
 
-class SessionManager(BaseSessionManager):
+class SessionManager(models.Manager):
     use_in_migrations = True
 
+    def encode(self, session_dict):
+        """
+        Return the given session dictionary serialized and encoded as a string.
+        """
+        session_store_class = self.model.get_session_store_class()
+        return session_store_class().encode(session_dict)
 
-class Session(AbstractBaseSession):
+    def save(self, session_key, session_dict, expire_date):
+        s = self.model(session_key, self.encode(session_dict), expire_date)
+        if session_dict:
+            s.save()
+        else:
+            s.delete()  # Clear sessions with no data.
+        return s
+
+
+class Session(models.Model):
     """
     Django provides full support for anonymous sessions. The session
     framework lets you store and retrieve arbitrary data on a
@@ -23,7 +38,14 @@ class Session(AbstractBaseSession):
     on the Django web site).
     """
 
+    session_key = models.CharField(max_length=40, primary_key=True)
+    session_data = models.TextField()
+    expire_date = models.DateTimeField(db_index=True)
+
     objects = SessionManager()
+
+    def __str__(self):
+        return self.session_key
 
     @classmethod
     def get_session_store_class(cls):
@@ -31,5 +53,9 @@ class Session(AbstractBaseSession):
 
         return SessionStore
 
-    class Meta(AbstractBaseSession.Meta):
+    def get_decoded(self):
+        session_store_class = self.get_session_store_class()
+        return session_store_class().decode(self.session_data)
+
+    class Meta:
         db_table = "django_session"
