@@ -3,122 +3,120 @@
 {% block content %}
 <!-- <a href="#">New</a> -->
 
-<div class="">
-    <div class="p-2 bg-white border border-gray-200 rounded">
+<div class="card">
 
-        {% if show_search %}
-        <div class="flex justify-end">
-            <form method="GET">
-                <input
-                    name="search"
-                    class="border rounded"
-                    {% if search_query %}value="{{ search_query }}"{% endif %}
-                    />
-                <button type="submit">Search</button>
-            </form>
-        </div>
-        {% endif %}
+    {% if show_search %}
+    <div class="flex justify-end">
+        <form method="GET">
+            <input
+                name="search"
+                class="border rounded"
+                {% if search_query %}value="{{ search_query }}"{% endif %}
+                />
+            <button type="submit">Search</button>
+        </form>
+    </div>
+    {% endif %}
 
-        <div class="overflow-auto">
-            <table class="w-full mt-4 text-sm table-auto">
-                <thead>
-                    <tr>
-                        <th></th>
-                        {% for field in list_fields %}
-                        <th class="px-2 font-mono text-left text-gray-700">
-                            <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
-                                {{ field }}
-                                {% if field == order_by_field %}
-                                {% if order_by_direction == "-" %}
-                                <span class="text-xs">▲</span>
-                                {% else %}
-                                <span class="text-xs">▼</span>
-                                {% endif %}
-                                {% endif %}
-                            </a>
-                        </th>
-                        {% endfor %}
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for object in objects %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="py-2">
-                            <!-- <input type="checkbox" /> -->
-                        </td>
-                        {% for field in list_fields %}
-                        <td class="px-2 py-2 whitespace-nowrap">
-                            <div class="flex">
-                                {% set value = get_object_field(object, field) %}
-                                {%- if value is true -%}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3 h-3 text-green-500 bi bi-check-circle-fill" viewBox="0 0 16 16">
-                                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                                </svg>
-                                {%- elif value is false -%}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3 h-3 text-red-600 bi bi-x-circle-fill" viewBox="0 0 16 16">
-                                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
-                                </svg>
-                                {%- else -%}
-                                {{ value }}
-                                {%- endif %}
-                            </div>
-                        </td>
-                        {% endfor %}
-
-                        {% set update_url = get_update_url(object) %}
-                        {% if update_url %}
-                        <td class="py-2">
-                            <a class="text-blue-600 hover:underline" href="{{ update_url }}">Edit</a>
-                        </td>
-                        {% else %}
-                        <td class="py-2">
-                        </td>
-                        {% endif %}
-                    </tr>
+    <div class="overflow-auto">
+        <table class="w-full mt-4 text-sm table-auto">
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for field in list_fields %}
+                    <th class="font-mono">
+                        <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                            {{ field }}
+                            {% if field == order_by_field %}
+                            {% if order_by_direction == "-" %}
+                            <span class="text-xs">▲</span>
+                            {% else %}
+                            <span class="text-xs">▼</span>
+                            {% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in objects %}
+                <tr>
+                    <td class="p-0 pl-1">
+                        <input class="rounded-sm" type="checkbox" />
+                    </td>
+                    {% for field in list_fields %}
+                    <td>
+                        <div class="flex">
+                            {% set value = get_object_field(object, field) %}
+                            {%- if value is true -%}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3 h-3 text-green-500 bi bi-check-circle-fill" viewBox="0 0 16 16">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                            </svg>
+                            {%- elif value is false -%}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3 h-3 text-red-600 bi bi-x-circle-fill" viewBox="0 0 16 16">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
+                            </svg>
+                            {%- else -%}
+                            {{ value }}
+                            {%- endif %}
+                        </div>
+                    </td>
+                    {% endfor %}
 
-        <div class="mt-4">
-            <div class="flex items-center justify-between">
-                <div class="p-2 text-sm text-gray-500">
-                    {% if page.has_other_pages() %}
-                    Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
+                    {% set update_url = get_update_url(object) %}
+                    {% if update_url %}
+                    <td>
+                        <a href="{{ update_url }}">Edit</a>
+                    </td>
                     {% else %}
-                    Showing all {{ page.paginator.count }} results
+                    <td>
+                    </td>
                     {% endif %}
-                </div>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4">
+        <div class="flex items-center justify-between">
+            <div class="p-2 text-sm text-gray-500">
                 {% if page.has_other_pages() %}
-                <ul class="flex justify-center">
-                    {% if page.has_previous() %}
-                    <li>
-                        <a class="text-blue-600 hover:underline" href="?page={{ page.previous_page_number() }}">&laquo;</a>
-                    </li>
-                    {% endif %}
-                    {% for page_num in page.paginator.page_range %}
-                    {% if page_num == page.number %}
-                    <li>
-                        <a class="text-blue-600 hover:underline" href="?page={{ page_num }}">{{ page_num }}</a>
-                    </li>
-                    {% else %}
-                    <li>
-                        <a href="?page={{ page_num }}">{{ page_num }}</a>
-                    </li>
-                    {% endif %}
-                    {% endfor %}
-                    {% if page.has_next() %}
-                    <li>
-                        <a class="text-blue-600 hover:underline" href="?page={{ page.next_page_number() }}">&raquo;</a>
-                    </li>
-                    {% endif %}
-                </ul>
+                Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
+                {% else %}
+                Showing all {{ page.paginator.count }} results
                 {% endif %}
             </div>
+            {% if page.has_other_pages() %}
+            <ul class="flex justify-center">
+                {% if page.has_previous() %}
+                <li>
+                    <a href="?page={{ page.previous_page_number() }}">&laquo;</a>
+                </li>
+                {% endif %}
+                {% for page_num in page.paginator.page_range %}
+                {% if page_num == page.number %}
+                <li>
+                    <a href="?page={{ page_num }}">{{ page_num }}</a>
+                </li>
+                {% else %}
+                <li>
+                    <a href="?page={{ page_num }}">{{ page_num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+                {% if page.has_next() %}
+                <li>
+                    <a href="?page={{ page.next_page_number() }}">&raquo;</a>
+                </li>
+                {% endif %}
+            </ul>
+            {% endif %}
         </div>
-
     </div>
+
 </div>
 
 {% endblock %}

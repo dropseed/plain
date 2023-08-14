@@ -1,0 +1,48 @@
+/*
+These standard CSS rules are intended to make it easier for the
+end-user to drop in HTML elements and have a decent, consistent starting point.
+ */
+table {
+    width: 100%;
+    font-size: .875rem;
+    line-height: 1.25rem;
+    table-layout: auto;
+}
+
+th {
+    text-align: left;
+    padding: 0 0.5rem;
+    color: rgb(55, 65, 81);
+}
+
+table th a {
+    color: rgb(55, 65, 81);
+}
+
+tbody tr:hover {
+    background-color: rgb(249, 250, 251);
+}
+
+td {
+    padding: 0.5rem 0.5rem;
+    white-space: nowrap;
+    border-bottom: 1px solid rgb(229, 231, 235);
+}
+tr:last-child td {
+    border-bottom: none;
+}
+
+main a {
+    color: rgb(37, 99, 235);
+}
+
+main a:hover {
+    text-decoration: underline;
+}
+
+.card {
+    background-color: white;
+    border-radius: 0.125rem;
+    border: 1px solid rgb(228, 227, 231);
+    padding: 0.5rem;
+}

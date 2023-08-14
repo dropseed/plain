@@ -11,6 +11,7 @@
         {%- endif -%}
     </title>
     <link href="{{ static('dist/tailwind.css') }}" rel="stylesheet">
+    <link href="{{ static('bolt/admin/admin.css') }}" rel="stylesheet">
     <script src="{{ static('bolt/admin/chart.js') }}"></script>
 </head>
 <body class="flex min-h-screen text-white bg-zinc-900">
@@ -65,8 +66,7 @@
             {% if cards %}
             <div class="grid grid-cols-4 gap-6 mb-6">
             {% for card in cards %}
-                <div class="
-                    bg-white rounded-sm drop-shadow-sm border border-zinc-200 p-2
+                <div class="card
                     {% if card.size.value == 1 -%}
                     col-span-1
                     {%- elif card.size.value == 2 -%}
@@ -84,7 +84,7 @@
             </div>
             {% endif %}
 
-            {% block content %}{% endblock %}
+            <main>{% block content %}{% endblock %}</main>
         </div>
     </div>
 
