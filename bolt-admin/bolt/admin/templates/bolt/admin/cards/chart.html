@@ -1,4 +1,6 @@
-<div class="font-light">{{ title }}</div>
+{% extends "bolt/admin/cards/base.html" %}
+
+{% block content %}
 <div>
     <canvas id="card-chart-{{ slug }}"></canvas>
 </div>
@@ -11,3 +13,4 @@
     new Chart(ctx, data);
   });
 </script>
+{% endblock %}

@@ -39,18 +39,29 @@ class AdminModelListView(AdminObjectsView):
         return context
 
     def get_objects(self):
-        queryset = self.model.objects.all()
+        queryset = self.get_initial_queryset()
+        queryset = self.order_queryset(queryset)
+        queryset = self.search_queryset(queryset)
+        return queryset
 
+    def get_initial_queryset(self):
+        # Separate override for the initial queryset
+        # so that annotations can be added BEFORE order_by, etc.
+        return self.model.objects.all()
+
+    def order_queryset(self, queryset):
         if order_by := self.request.GET.get("order_by"):
             queryset = queryset.order_by(order_by)
         elif self.list_order:
             queryset = queryset.order_by(*self.list_order)
 
+        return queryset
+
+    def search_queryset(self, queryset):
         if search := self.request.GET.get("search"):
             filters = Q()
             for field in self.search_fields:
                 filters |= Q(**{f"{field}__icontains": search})
-            print(filters)
 
             queryset = queryset.filter(filters)
 
@@ -58,6 +69,25 @@ class AdminModelListView(AdminObjectsView):
 
     def get_update_url(self, object) -> str | None:
         return None
+
+    def get_object_field(self, object, field: str):
+        if "__" in field:
+            # Allow __ syntax like querysets use,
+            # also automatically calling callables (like __date)
+            result = object
+            for part in field.split("__"):
+                result = getattr(result, part)
+
+                if callable(result):
+                    result = result()
+
+            return result
+
+        # Automatically call get_FOO_display() if it exists
+        if display := getattr(object, f"get_{field}_display", None):
+            return display()
+
+        return super().get_object_field(object, field)
 
 
 class AdminModelViewset:
@@ -92,6 +122,9 @@ class AdminModelViewset:
                     kwargs={"pk": object.pk},
                 )
 
+            def get_initial_queryset(self):
+                return cls.get_list_queryset(self)
+
         return V
 
     @classmethod
@@ -122,3 +155,6 @@ class AdminModelViewset:
             views.append(update_view)
 
         return views
+
+    def get_list_queryset(self):
+        return self.model.objects.all()

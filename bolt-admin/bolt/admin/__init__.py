@@ -2,6 +2,7 @@ from .views.base import AdminPageView
 from .views.cards import (
     AdminCardView,
     AdminChartCardView,
+    AdminStatCardView,
     AdminTextCardView,
     AdminTrendCardView,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "AdminTextCardView",
     "AdminChartCardView",
     "AdminTrendCardView",
+    "AdminStatCardView",
     "register_model",
     "register_card",
     "register_view",

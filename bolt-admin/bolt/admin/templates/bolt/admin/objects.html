@@ -48,7 +48,7 @@
                             <!-- <input type="checkbox" /> -->
                         </td>
                         {% for field in list_fields %}
-                        <td class="px-2 py-2 whitespace-nowrap">{{ object[field] }}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">{{ get_object_field(object, field) }}</td>
                         {% endfor %}
 
                         {% set update_url = get_update_url(object) %}

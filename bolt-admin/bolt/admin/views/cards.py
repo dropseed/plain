@@ -11,13 +11,13 @@ from .base import BaseAdminView
 class AdminCardView(BaseAdminView):
     class Sizes(Enum):
         # Three column grid
-        SM = 1
-        MD = 2
-        LG = 3
-        XL = 3
+        SMALL = 1
+        MEDIUM = 2
+        LARGE = 3
+        FULL = 4
 
     template_name = "bolt/admin/card.html"
-    size: Sizes = Sizes.MD
+    size: Sizes = Sizes.MEDIUM
     # unique_id: str  # Use for tying to dashboards, require it
 
     @classmethod
@@ -36,6 +36,18 @@ class AdminTextCardView(AdminCardView):
 
     def get_text(self) -> str:
         return self.text
+
+
+class AdminStatCardView(AdminCardView):
+    template_name = "bolt/admin/cards/stat.html"
+
+    def get_context(self):
+        context = super().get_context()
+        context["stat"] = self.get_stat()
+        return context
+
+    def get_stat(self) -> str:
+        raise NotImplementedError
 
 
 class AdminChartCardView(AdminCardView):

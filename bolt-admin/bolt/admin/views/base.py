@@ -88,11 +88,15 @@ class AdminObjectsView(AdminPageView):
 
         context["search_query"] = self.request.GET.get("search", "")
         context["show_search"] = self.show_search
+        context["get_object_field"] = self.get_object_field
 
         return context
 
     def get_objects(self) -> list:
         return []
+
+    def get_object_field(self, obj, field: str):
+        return getattr(obj, field)
 
 
 class AdminUpdateView(AdminPageView, UpdateView):
