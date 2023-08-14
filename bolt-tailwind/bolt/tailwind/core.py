@@ -3,6 +3,7 @@ import platform
 import re
 import subprocess
 import sys
+import tomlkit
 
 import requests
 
@@ -78,32 +79,25 @@ class Tailwind:
         return False
 
     def get_version_from_config(self) -> str:
-        if not self.config_exists():
+        pyproject_path = os.path.join(os.path.dirname(self.target_directory), "pyproject.toml")
+
+        if not os.path.exists(pyproject_path):
             return ""
 
-        config_contents = open(self.config_path).read()
-        matches = re.search(r"const FORGE_TAILWIND_VERSION = \"(.*)\"", config_contents)
-        if matches:
-            return matches.group(1)
-
-        return ""
+        with open(pyproject_path, "r") as f:
+            config = tomlkit.load(f)
+            return config.get("tool", {}).get("bolt", {}).get("tailwind", {}).get("version", "")
 
     def set_version_in_config(self, version):
-        config_contents = open(self.config_path).read()
-        if "const FORGE_TAILWIND_VERSION" not in config_contents:
-            # prepend it to the file
-            config_contents = (
-                f'const FORGE_TAILWIND_VERSION = "{version}"\n\n' + config_contents
-            )
-        else:
-            config_contents = re.sub(
-                r"const FORGE_TAILWIND_VERSION = \"(.*)\"",
-                f'const FORGE_TAILWIND_VERSION = "{version}"',
-                config_contents,
-            )
+        pyproject_path = os.path.join(os.path.dirname(self.target_directory), "pyproject.toml")
 
-        with open(self.config_path, "w") as f:
-            f.write(config_contents)
+        with open(pyproject_path, "r") as f:
+            config = tomlkit.load(f)
+
+        config.setdefault("tool", {}).setdefault("bolt", {}).setdefault("tailwind", {})["version"] = version
+
+        with open(pyproject_path, "w") as f:
+            tomlkit.dump(config, f)
 
     def download(self, version="") -> str:
         if version:
@@ -130,10 +124,12 @@ class Tailwind:
         with open(self.version_lockfile_path, "w") as f:
             f.write(version)
 
-    def install(self, version="") -> str:
-        self.download(version)
-        self.set_version_in_config(version)
         return version
+
+    def install(self, version="") -> str:
+        installed_version = self.download(version)
+        self.set_version_in_config(installed_version)
+        return installed_version
 
     @staticmethod
     def detect_platform_slug() -> str:
