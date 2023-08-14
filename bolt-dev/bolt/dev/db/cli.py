@@ -32,6 +32,11 @@ def stop():
 
 
 @cli.command()
+def shell():
+    DBContainer().shell()
+
+
+@cli.command()
 def wait():
     DBContainer().wait()
 
