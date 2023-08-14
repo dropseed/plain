@@ -92,6 +92,7 @@ class AdminModelListView(AdminObjectsView):
 
 class AdminModelViewset:
     model: "models.Model"
+    list_description = ""
     list_fields: list = ["pk"]
     list_order = []
     search_fields = ["pk"]
@@ -106,6 +107,7 @@ class AdminModelViewset:
         class V(AdminModelListView):
             model = cls.model
             title = cls.model._meta.verbose_name_plural.capitalize()
+            description = cls.list_description
             slug = cls.model._meta.model_name
             list_fields = cls.list_fields
             list_order = cls.list_order

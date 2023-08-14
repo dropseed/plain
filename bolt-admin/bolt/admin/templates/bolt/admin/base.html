@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bolt Admin</title>
+    <title>
+        {%- if title|default('') -%}
+            {{ title }} - Bolt Admin
+        {%- else -%}
+            Bolt Admin
+        {%- endif -%}
+    </title>
     <link href="{{ static('dist/tailwind.css') }}" rel="stylesheet">
     <script src="{{ static('bolt/admin/chart.js') }}"></script>
 </head>
@@ -28,7 +34,7 @@
             <a class="hover:text-white hover:underline" href="{{ url('logout') }}">Log out</a>
         </div>
     </div>
-    <div class="flex-grow ml-64 overflow-auto text-black rounded-l-lg bg-zinc-100">
+    <div class="flex-grow ml-64 overflow-auto text-black rounded-l-lg bg-stone-100">
         <div class="flex justify-between px-8 py-4 text-sm border-b border-gray-200">
             <div class="flex items-center space-x-2">
                 <a class="text-gray-700" href="{{ url ('boltadmin:index') }}">Admin</a>
@@ -44,14 +50,14 @@
         {% block header %}
             <h1 class="text-2xl font-semibold">{{ title }}</h1>
             {% if description %}
-            <p class="mt-2 text-gray-600">{{ description }}</p>
+            <p class="mt-2 text-sm text-gray-600">{{ description }}</p>
             {% endif %}
         {% endblock %}
         </div>
 
         <div class="px-8 py-6">
             {% if cards %}
-            <div class="grid grid-cols-4 gap-8 mb-8">
+            <div class="grid grid-cols-4 gap-6 mb-6">
             {% for card in cards %}
                 <div class="
                     bg-white rounded-sm drop-shadow-sm border border-zinc-200 p-2
