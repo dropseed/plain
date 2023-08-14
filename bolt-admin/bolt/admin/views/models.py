@@ -163,4 +163,5 @@ class AdminModelViewset:
         return views
 
     def get_list_queryset(self):
+        # Can't use super() with this the way it works now
         return self.model.objects.all()

@@ -51,15 +51,20 @@
             </div>
         </div>
 
-        <div class="px-8 mt-8">
-        {% block header %}
-            <h1 class="text-2xl font-semibold">{{ title }}</h1>
-            {% if description %}
-            <p class="mt-2 text-sm text-gray-600">{{ description }}</p>
-            {% elif object|default('') %}
-            <p class="mt-2 text-sm text-gray-600">{{ object.__repr__() }}</p>
-            {% endif %}
-        {% endblock %}
+        <div class="flex items-center justify-between px-8 mt-8">
+            <div>
+            {% block header %}
+                <h1 class="text-2xl font-semibold">{{ title }}</h1>
+                {% if description %}
+                <p class="mt-2 text-sm text-gray-600">{{ description }}</p>
+                {% elif object|default('') %}
+                <p class="mt-2 text-sm text-gray-600">{{ object.__repr__() }}</p>
+                {% endif %}
+            {% endblock %}
+            </div>
+            <div class="flex space-x-2 text-sm actions">
+                {% block actions %}{% endblock %}
+            </div>
         </div>
 
         <div class="px-8 py-6">
