@@ -33,9 +33,8 @@ def cli(pytest_args):
         with open(os.path.join(bolt_tmp_dir, ".gitignore"), "w") as f:
             f.write("*\n")
 
-    bolt_app_dir = os.path.join(repo_root, "app")
-
     coverage_file = os.path.join(bolt_tmp_dir, ".coverage")
+
 
     # Turn deprecation warnings into errors
 #     if "-W" not in pytest_args:
@@ -43,14 +42,10 @@ def cli(pytest_args):
 #         pytest_args.append("-W")
 #         pytest_args.append("error::DeprecationWarning")
 
-    click.secho("Running bolt compile", bold=True)
-    result = subprocess.run(["bolt", "compile"])
-    if result.returncode:
-        sys.exit(result.returncode)
-
-    print()
-
     click.secho("Running pytest with coverage", bold=True)
+
+    os.environ.setdefault("APP_ENV", "test")
+
     result = subprocess.run([
             "coverage",
             "run",
@@ -60,7 +55,6 @@ def cli(pytest_args):
         ],
         env={
             **os.environ,
-            "APP_ENV": "test",
             "COVERAGE_FILE": coverage_file,
         },
     )
