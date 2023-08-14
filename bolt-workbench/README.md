@@ -29,7 +29,6 @@ MIDDLEWARE = [
     "bolt.middleware.common.CommonMiddleware",
     "bolt.csrf.middleware.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
     "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
 
     "boltquerystats.QueryStatsMiddleware",

@@ -440,16 +440,6 @@ CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 CSRF_TRUSTED_ORIGINS = []
 CSRF_USE_SESSIONS = False
 
-############
-# MESSAGES #
-############
-
-# Class to use as messages backend
-MESSAGE_STORAGE = "django.contrib.messages.storage.fallback.FallbackStorage"
-
-# Default values of MESSAGE_LEVEL and MESSAGE_TAGS are defined within
-# django.contrib.messages to avoid imports in this settings file.
-
 ###########
 # LOGGING #
 ###########

@@ -10,7 +10,6 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "bolt.sessions",
-    "django.contrib.messages",
     # "django.contrib.staticfiles",
     "bolt.impersonate",
 ]
@@ -21,7 +20,6 @@ MIDDLEWARE = [
     "bolt.middleware.common.CommonMiddleware",
     "bolt.csrf.middleware.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
     "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
     "bolt.impersonate.middleware.ImpersonateMiddleware",
 ]
@@ -47,7 +45,6 @@ TEMPLATES = [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
