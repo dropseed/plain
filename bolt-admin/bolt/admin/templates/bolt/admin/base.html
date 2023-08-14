@@ -38,6 +38,10 @@
         <div class="flex justify-between px-8 py-4 text-sm border-b border-gray-200">
             <div class="flex items-center space-x-2">
                 <a class="text-gray-700" href="{{ url ('boltadmin:index') }}">Admin</a>
+                {% for parent in parent_view_classes %}
+                <span class="text-gray-600">/</span>
+                <a class="text-gray-700" href="{{ url('boltadmin:' + parent.view_name()) }}">{{ parent.title }}</a>
+                {% endfor %}
                 <span class="text-gray-600">/</span>
                 <a href="{{ request.path }}">{{ title }}</a>
             </div>
@@ -51,6 +55,8 @@
             <h1 class="text-2xl font-semibold">{{ title }}</h1>
             {% if description %}
             <p class="mt-2 text-sm text-gray-600">{{ description }}</p>
+            {% elif object|default('') %}
+            <p class="mt-2 text-sm text-gray-600">{{ object.__repr__() }}</p>
             {% endif %}
         {% endblock %}
         </div>

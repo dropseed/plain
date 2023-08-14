@@ -25,11 +25,14 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 
     show_in_nav: bool = True
 
+    parent_view_class: "BaseAdminView" = None
+
     def get_context(self):
         context = super().get_context()
         context["title"] = self.title
         context["slug"] = self.get_slug()
         context["description"] = self.description
+        context["parent_view_classes"] = self.get_parent_view_classes()
         return context
 
     @classmethod
@@ -43,6 +46,15 @@ class BaseAdminView(AuthViewMixin, TemplateView):
     @classmethod
     def get_path(cls) -> str:
         return cls.path or cls.get_slug()
+
+    @classmethod
+    def get_parent_view_classes(cls) -> list["BaseAdminView"]:
+        parents = []
+        parent = cls.parent_view_class
+        while parent:
+            parents.append(parent)
+            parent = parent.parent_view_class
+        return parents
 
 
 class AdminPageView(BaseAdminView):

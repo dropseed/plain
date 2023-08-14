@@ -1,0 +1,9 @@
+<input
+    id="{{ field.html_id }}"
+    type="{{ type|default('text') }}"
+    name="{{ field.html_name }}"
+    class="block w-full text-sm border rounded border-zinc-200"
+    {% if list is defined %}list="{{ list }}"{% endif %}
+    {% if field.value() != None %}value="{{ field.value() }}"{% endif %}
+    {% if field.field.required %}required{% endif %}
+    >

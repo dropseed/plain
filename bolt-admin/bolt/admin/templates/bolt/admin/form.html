@@ -1,0 +1,15 @@
+{% extends "bolt/admin/base.html" %}
+
+{% block content %}
+
+{% block before_form_content %}{% endblock %}
+
+<form method="post" class="p-4 bg-white border border-gray-200 rounded">
+    {{ csrf_input }}
+    {% block form_content %}{% endblock %}
+    <button class="px-5 py-2 mt-6 text-white bg-blue-600 rounded hover:bg-blue-700" type="submit">Save</button>
+</form>
+
+{% block after_form_content %}{% endblock %}
+
+{% endblock %}

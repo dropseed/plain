@@ -42,10 +42,27 @@ class AdminViewRegistry:
             return inner
 
     def get_nav_views(self):
-        return sorted(
+        # class NavItem:
+        #     def __init__(self, view, children):
+        #         self.view = view
+        #         self.children = children
+
+        sorted_views = sorted(
             [view for view in self.registered_views if view.show_in_nav],
             key=lambda v: v.title,
         )
+
+        return sorted_views
+
+        # root_nav_items = []
+
+        # for view in sorted_views:
+        #     if view.parent_view_class:
+        #         continue
+        #     children = [x for x in sorted_views if x.parent_view_class == view]
+        #     root_nav_items.append(NavItem(view, children))
+
+        # return root_nav_items
 
     def get_urls(self):
         urlpatterns = []

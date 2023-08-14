@@ -1,0 +1,11 @@
+<select
+    id="{{ field.html_id }}"
+    name="{{ field.html_name }}"
+    class="block w-full text-sm border rounded border-zinc-200"
+    {% if field.value() != None %}value="{{ field.value() }}"{% endif %}
+    {% if field.field.required %}required{% endif %}
+    >
+    {% for value, label in field.field.choices %}
+    <option value="{{ value }}" {% if value == field.value() %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+</select>

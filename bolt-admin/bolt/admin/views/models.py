@@ -115,12 +115,14 @@ class AdminModelViewset:
             search_fields = cls.search_fields
 
             def get_update_url(self, object):
-                if not cls.form_class:
+                update_view = cls.get_update_view()
+
+                if not update_view:
                     return None
 
                 # TODO a way to do this without explicit namespace?
                 return reverse_lazy(
-                    URL_NAMESPACE + ":" + cls.get_update_view().view_name(),
+                    URL_NAMESPACE + ":" + update_view.view_name(),
                     kwargs={"pk": object.pk},
                 )
 
@@ -135,11 +137,13 @@ class AdminModelViewset:
             return None
 
         class V(AdminUpdateView):
-            title = cls.model._meta.verbose_name.capitalize()
+            title = f"Update {cls.model._meta.verbose_name}"
             slug = f"{cls.model._meta.model_name}_update"
             form_class = cls.form_class
             path = f"{cls.model._meta.model_name}/<int:pk>"
             cards = cls.form_cards
+            success_url = "."  # Redirect back to the same update page by default
+            parent_view_class = cls.get_list_view()
 
             def get_object(self):
                 return cls.model.objects.get(pk=self.url_kwargs["pk"])
