@@ -168,7 +168,7 @@ class UserAttributeSimilarityValidator:
     as well as the full address.
     """
 
-    DEFAULT_USER_ATTRIBUTES = ("username", "first_name", "last_name", "email")
+    DEFAULT_USER_ATTRIBUTES = ("username", "email")
 
     def __init__(self, user_attributes=DEFAULT_USER_ATTRIBUTES, max_similarity=0.7):
         self.user_attributes = user_attributes
