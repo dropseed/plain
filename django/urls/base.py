@@ -5,10 +5,6 @@ from django.utils.functional import lazy
 from .exceptions import NoReverseMatch, Resolver404
 from .resolvers import _get_cached_resolver, get_ns_resolver, get_resolver
 
-# SCRIPT_NAME prefixes for each thread are stored here. If there's no entry for
-# the current thread (which is the only one we ever access), it is assumed to
-# be empty.
-_prefixes = local()
 
 # Overridden URLconfs for each thread are stored here.
 _urlconfs = local()
@@ -26,8 +22,6 @@ def reverse(viewname, urlconf=None, args=None, kwargs=None, current_app=None):
     resolver = get_resolver(urlconf)
     args = args or []
     kwargs = kwargs or {}
-
-    prefix = get_script_prefix()
 
     if not isinstance(viewname, str):
         view = viewname
@@ -81,7 +75,7 @@ def reverse(viewname, urlconf=None, args=None, kwargs=None, current_app=None):
                 ns_pattern, resolver, tuple(ns_converters.items())
             )
 
-    return resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+    return resolver.reverse(view, *args, **kwargs)
 
 
 reverse_lazy = lazy(reverse, str)
@@ -90,34 +84,6 @@ reverse_lazy = lazy(reverse, str)
 def clear_url_caches():
     _get_cached_resolver.cache_clear()
     get_ns_resolver.cache_clear()
-
-
-def set_script_prefix(prefix):
-    """
-    Set the script prefix for the current thread.
-    """
-    if not prefix.endswith("/"):
-        prefix += "/"
-    _prefixes.value = prefix
-
-
-def get_script_prefix():
-    """
-    Return the currently active script prefix. Useful for client code that
-    wishes to construct their own URLs manually (although accessing the request
-    instance is normally going to be a lot cleaner).
-    """
-    return getattr(_prefixes, "value", "/")
-
-
-def clear_script_prefix():
-    """
-    Unset the script prefix for the current thread.
-    """
-    try:
-        del _prefixes.value
-    except AttributeError:
-        pass
 
 
 def set_urlconf(urlconf_name):

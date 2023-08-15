@@ -4,7 +4,6 @@ from django.conf import settings
 from django.core import signals
 from bolt.handlers import base
 from bolt.http import HttpRequest, QueryDict, parse_cookie
-from django.urls import set_script_prefix
 from django.utils.encoding import repercent_broken_unicode
 from django.utils.functional import cached_property
 from django.utils.regex_helper import _lazy_re_compile
@@ -128,7 +127,6 @@ class WSGIHandler(base.BaseHandler):
         self.load_middleware()
 
     def __call__(self, environ, start_response):
-        set_script_prefix(get_script_name(environ))
         signals.request_started.send(sender=self.__class__, environ=environ)
         request = self.request_class(environ)
         response = self.get_response(request)

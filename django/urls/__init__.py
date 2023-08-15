@@ -1,13 +1,10 @@
 from .base import (
-    clear_script_prefix,
     clear_url_caches,
-    get_script_prefix,
     get_urlconf,
     is_valid_path,
     resolve,
     reverse,
     reverse_lazy,
-    set_script_prefix,
     set_urlconf,
 )
 from .conf import include, path, re_path
@@ -27,11 +24,9 @@ __all__ = [
     "URLResolver",
     "Resolver404",
     "ResolverMatch",
-    "clear_script_prefix",
     "clear_url_caches",
     "get_ns_resolver",
     "get_resolver",
-    "get_script_prefix",
     "get_urlconf",
     "include",
     "is_valid_path",
@@ -41,6 +36,5 @@ __all__ = [
     "resolve",
     "reverse",
     "reverse_lazy",
-    "set_script_prefix",
     "set_urlconf",
 ]

@@ -699,9 +699,6 @@ class URLResolver:
         return callback
 
     def reverse(self, lookup_view, *args, **kwargs):
-        return self._reverse_with_prefix(lookup_view, "", *args, **kwargs)
-
-    def _reverse_with_prefix(self, lookup_view, _prefix, *args, **kwargs):
         if args and kwargs:
             raise ValueError("Don't mix *args and **kwargs in call to reverse()!")
 
@@ -748,6 +745,11 @@ class URLResolver:
                 # without quoting to build a decoded URL and look for a match.
                 # Then, if we have a match, redo the substitution with quoted
                 # arguments in order to return a properly encoded URL.
+
+                # There was a lot of script_prefix handling code before,
+                # so this is a crutch to leave the below as-is for now.
+                _prefix = "/"
+
                 candidate_pat = _prefix.replace("%", "%%") + result
                 if re.search(
                     "^%s%s" % (re.escape(_prefix), pattern),

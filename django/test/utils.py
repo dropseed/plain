@@ -22,7 +22,6 @@ from django.db import DEFAULT_DB_ALIAS, connections, reset_queries
 from django.db.models.options import Options
 from jinja2 import Template
 from django.test.signals import template_rendered
-from django.urls import get_script_prefix, set_script_prefix
 from django.utils.translation import deactivate
 
 try:
@@ -741,21 +740,6 @@ def freeze_time(t):
         yield
     finally:
         time.time = _real_time
-
-
-class override_script_prefix(TestContextDecorator):
-    """Decorator or context manager to temporary override the script prefix."""
-
-    def __init__(self, prefix):
-        self.prefix = prefix
-        super().__init__()
-
-    def enable(self):
-        self.old_prefix = get_script_prefix()
-        set_script_prefix(self.prefix)
-
-    def disable(self):
-        set_script_prefix(self.old_prefix)
 
 
 class LoggingCaptureMixin:
