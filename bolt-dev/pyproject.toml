@@ -23,9 +23,9 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-"bolt-work" = "bolt.dev:cli"
+"bolt-dev" = "bolt.dev:cli"
+"bolt-work" = "bolt.dev.work:cli"
 "bolt-format" = "bolt.dev.format:cli"
-"bolt-db" = "bolt.dev.db:cli"
 "bolt-pre-commit" = "bolt.dev.precommit:cli"
 
 [tool.poetry.dependencies]

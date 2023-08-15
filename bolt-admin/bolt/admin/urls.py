@@ -3,7 +3,7 @@ from django.urls import include, path
 from .views.default import AdminIndexView
 from .views.registry import registry
 
-app_name = "boltadmin"
+app_name = "admin"
 
 
 urlpatterns = [

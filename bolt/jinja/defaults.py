@@ -96,6 +96,7 @@ def create_default_environment(include_apps=True, **environment_kwargs):
         "auto_reload": settings.DEBUG,
         "undefined": StrictUndefined,
         "finalize": finalize_callable_error,
+        "extensions": ["jinja2.ext.loopcontrols", "jinja2.ext.debug"],
     }
     kwargs.update(**environment_kwargs)
     env = Environment(**kwargs)

@@ -689,6 +689,7 @@ class BooleanField(Field):
             False: False,
             "true": True,
             "false": False,
+            "on": True,
         }.get(value)
 
 

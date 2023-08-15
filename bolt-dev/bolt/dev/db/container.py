@@ -62,6 +62,8 @@ class DBContainer:
                     "postgres",
                     "-c",
                     "stats_temp_directory=/tmp",
+                    "-c",
+                    "shared_preload_libraries=pg_stat_statements",
                 ],
                 stderr=subprocess.PIPE,
             )
@@ -125,6 +127,20 @@ class DBContainer:
                 "--tail",
                 "5",
                 self.name,
+            ],
+        )
+
+    def shell(self):
+        subprocess.check_call(
+            [
+                "docker",
+                "exec",
+                "-it",
+                self.name,
+                "psql",
+                "-U",
+                self.postgres_user,
+                self.postgres_db,
             ],
         )
 

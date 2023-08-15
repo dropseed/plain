@@ -39,18 +39,29 @@ class AdminModelListView(AdminObjectsView):
         return context
 
     def get_objects(self):
-        queryset = self.model.objects.all()
+        queryset = self.get_initial_queryset()
+        queryset = self.order_queryset(queryset)
+        queryset = self.search_queryset(queryset)
+        return queryset
 
+    def get_initial_queryset(self):
+        # Separate override for the initial queryset
+        # so that annotations can be added BEFORE order_by, etc.
+        return self.model.objects.all()
+
+    def order_queryset(self, queryset):
         if order_by := self.request.GET.get("order_by"):
             queryset = queryset.order_by(order_by)
         elif self.list_order:
             queryset = queryset.order_by(*self.list_order)
 
+        return queryset
+
+    def search_queryset(self, queryset):
         if search := self.request.GET.get("search"):
             filters = Q()
             for field in self.search_fields:
                 filters |= Q(**{f"{field}__icontains": search})
-            print(filters)
 
             queryset = queryset.filter(filters)
 
@@ -59,9 +70,29 @@ class AdminModelListView(AdminObjectsView):
     def get_update_url(self, object) -> str | None:
         return None
 
+    def get_object_field(self, object, field: str):
+        if "__" in field:
+            # Allow __ syntax like querysets use,
+            # also automatically calling callables (like __date)
+            result = object
+            for part in field.split("__"):
+                result = getattr(result, part)
+
+                if callable(result):
+                    result = result()
+
+            return result
+
+        # Automatically call get_FOO_display() if it exists
+        if display := getattr(object, f"get_{field}_display", None):
+            return display()
+
+        return super().get_object_field(object, field)
+
 
 class AdminModelViewset:
     model: "models.Model"
+    list_description = ""
     list_fields: list = ["pk"]
     list_order = []
     search_fields = ["pk"]
@@ -76,6 +107,7 @@ class AdminModelViewset:
         class V(AdminModelListView):
             model = cls.model
             title = cls.model._meta.verbose_name_plural.capitalize()
+            description = cls.list_description
             slug = cls.model._meta.model_name
             list_fields = cls.list_fields
             list_order = cls.list_order
@@ -83,14 +115,19 @@ class AdminModelViewset:
             search_fields = cls.search_fields
 
             def get_update_url(self, object):
-                if not cls.form_class:
+                update_view = cls.get_update_view()
+
+                if not update_view:
                     return None
 
                 # TODO a way to do this without explicit namespace?
                 return reverse_lazy(
-                    URL_NAMESPACE + ":" + cls.get_update_view().view_name(),
+                    URL_NAMESPACE + ":" + update_view.view_name(),
                     kwargs={"pk": object.pk},
                 )
+
+            def get_initial_queryset(self):
+                return cls.get_list_queryset(self)
 
         return V
 
@@ -100,11 +137,13 @@ class AdminModelViewset:
             return None
 
         class V(AdminUpdateView):
-            title = cls.model._meta.verbose_name.capitalize()
+            title = f"Update {cls.model._meta.verbose_name}"
             slug = f"{cls.model._meta.model_name}_update"
             form_class = cls.form_class
             path = f"{cls.model._meta.model_name}/<int:pk>"
             cards = cls.form_cards
+            success_url = "."  # Redirect back to the same update page by default
+            parent_view_class = cls.get_list_view()
 
             def get_object(self):
                 return cls.model.objects.get(pk=self.url_kwargs["pk"])
@@ -122,3 +161,7 @@ class AdminModelViewset:
             views.append(update_view)
 
         return views
+
+    def get_list_queryset(self):
+        # Can't use super() with this the way it works now
+        return self.model.objects.all()

@@ -2,12 +2,12 @@ from importlib import import_module
 
 from django.apps import AppConfig, apps
 
-MODULE_NAME = "badmin"
+MODULE_NAME = "admin"
 
 
 class BoltAdminConfig(AppConfig):
     name = "bolt.admin"
-    label = "boltadmin"
+    label = "admin"
 
     def ready(self):
         # Trigger register calls to fire by importing the modules

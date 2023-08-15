@@ -7,11 +7,9 @@ SECRET_KEY = "secret"
 DEBUG = True
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "bolt.sessions",
-    "django.contrib.messages",
     # "django.contrib.staticfiles",
     "bolt.sentry",
 ]
@@ -20,9 +18,8 @@ MIDDLEWARE = [
     "bolt.middleware.security.SecurityMiddleware",
     "bolt.sessions.middleware.SessionMiddleware",
     "bolt.middleware.common.CommonMiddleware",
-    "bolt.middleware.csrf.CsrfViewMiddleware",
+    "bolt.csrf.middleware.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
     "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
     "bolt.sentry.middleware.SentryFeedbackMiddleware",
 ]
@@ -48,7 +45,6 @@ TEMPLATES = [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
             ],
         },
     },

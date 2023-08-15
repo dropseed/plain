@@ -1,6 +1,0 @@
-{% load impersonate %}
-{% if request.user|can_impersonate_user:original %}
-<li>
-    <a href="{% url 'impersonate:start' original.pk %}">Impersonate</a>
-</li>
-{% endif %}

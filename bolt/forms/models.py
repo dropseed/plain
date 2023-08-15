@@ -855,7 +855,8 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
         # In HTML checkboxes, 'required' means "must be checked" which is
         # different from the choices case ("must select some value").
         # required=False allows unchecked checkboxes.
-        return form_class(required=False, **defaults)
+        defaults["required"] = False
+        return form_class(**defaults)
 
     if isinstance(modelfield, models.DecimalField):
         return fields.DecimalField(max_digits=modelfield.max_digits, decimal_places=modelfield.decimal_places, **defaults)

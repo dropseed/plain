@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from .cards import AdminCardView
 
 
-URL_NAMESPACE = "boltadmin"
+URL_NAMESPACE = "admin"
 
 
 class BaseAdminView(AuthViewMixin, TemplateView):
@@ -25,11 +25,14 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 
     show_in_nav: bool = True
 
+    parent_view_class: "BaseAdminView" = None
+
     def get_context(self):
         context = super().get_context()
         context["title"] = self.title
         context["slug"] = self.get_slug()
         context["description"] = self.description
+        context["parent_view_classes"] = self.get_parent_view_classes()
         return context
 
     @classmethod
@@ -44,9 +47,18 @@ class BaseAdminView(AuthViewMixin, TemplateView):
     def get_path(cls) -> str:
         return cls.path or cls.get_slug()
 
+    @classmethod
+    def get_parent_view_classes(cls) -> list["BaseAdminView"]:
+        parents = []
+        parent = cls.parent_view_class
+        while parent:
+            parents.append(parent)
+            parent = parent.parent_view_class
+        return parents
+
 
 class AdminPageView(BaseAdminView):
-    template_name = "bolt/admin/page.html"
+    template_name = "admin/page.html"
     icon: str = ""
     cards: list["AdminCardView"] = []
 
@@ -74,7 +86,7 @@ class AdminPageView(BaseAdminView):
 
 
 class AdminObjectsView(AdminPageView):
-    template_name = "bolt/admin/objects.html"
+    template_name = "admin/objects.html"
     list_fields: list
     page_size = 100
     show_search = False
@@ -88,11 +100,15 @@ class AdminObjectsView(AdminPageView):
 
         context["search_query"] = self.request.GET.get("search", "")
         context["show_search"] = self.show_search
+        context["get_object_field"] = self.get_object_field
 
         return context
 
     def get_objects(self) -> list:
         return []
+
+    def get_object_field(self, obj, field: str):
+        return getattr(obj, field)
 
 
 class AdminUpdateView(AdminPageView, UpdateView):
@@ -103,7 +119,7 @@ class AdminUpdateView(AdminPageView, UpdateView):
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [
-                f"bolt/admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             ]
 
         return super().get_template_names()
@@ -117,7 +133,7 @@ class AdminCreateView(AdminPageView, CreateView):
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [
-                f"bolt/admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             ]
 
         return super().get_template_names()
@@ -125,4 +141,4 @@ class AdminCreateView(AdminPageView, CreateView):
 
 class AdminDeleteView(AdminPageView, DeleteView):
     show_in_nav = False
-    template_name = "bolt/admin/confirm_delete.html"
+    template_name = "admin/confirm_delete.html"
