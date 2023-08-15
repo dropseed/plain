@@ -21,7 +21,7 @@ from django.utils.version import PY311, get_docs_version
 from jinja2.exceptions import TemplateNotFound
 
 # Minimal Django templates engine to render the error templates
-# regardless of the project's TEMPLATES setting. Templates are
+# regardless of the project's setting. Templates are
 # read directly from the filesystem so that the error handler
 # works even if the template loader is broken.
 def create_debug_environment():

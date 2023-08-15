@@ -159,8 +159,6 @@ DATABASE_ROUTERS = []
 # List of strings representing installed apps.
 INSTALLED_APPS: list = []
 
-TEMPLATES = []
-
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
 

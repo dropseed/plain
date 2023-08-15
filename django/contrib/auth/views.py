@@ -7,7 +7,7 @@ from django.contrib.auth import REDIRECT_FIELD_NAME, get_user_model
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.decorators import login_required
+from bolt.views import AuthViewMixin
 from django.contrib.auth.forms import (
     AuthenticationForm,
     PasswordChangeForm,
@@ -328,15 +328,12 @@ class PasswordResetCompleteView(PasswordContextMixin, TemplateView):
         return context
 
 
-class PasswordChangeView(PasswordContextMixin, FormView):
+class PasswordChangeView(PasswordContextMixin, AuthViewMixin, FormView):
     form_class = PasswordChangeForm
     success_url = reverse_lazy("password_change_done")
     template_name = "registration/password_change_form.html"
     title = _("Password change")
-
-    @method_decorator(login_required)
-    def dispatch(self):
-        return super().dispatch()
+    login_required = True
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -351,10 +348,7 @@ class PasswordChangeView(PasswordContextMixin, FormView):
         return super().form_valid(form)
 
 
-class PasswordChangeDoneView(PasswordContextMixin, TemplateView):
+class PasswordChangeDoneView(PasswordContextMixin, AuthViewMixin, TemplateView):
     template_name = "registration/password_change_done.html"
     title = _("Password change successful")
-
-    @method_decorator(login_required)
-    def dispatch(self):
-        return super().dispatch()
+    login_required = True
