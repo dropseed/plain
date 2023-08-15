@@ -13,7 +13,7 @@ class FieldDoesNotExist(Exception):
 
 
 class AppRegistryNotReady(Exception):
-    """The django.apps registry is not populated yet"""
+    """The bolt.apps registry is not populated yet"""
 
     pass
 

@@ -1,4 +1,4 @@
-from django.apps import apps
+from bolt.apps import apps
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.hashers import make_password
 from bolt.mail import send_mail

@@ -1,7 +1,7 @@
 import inspect
 import re
 
-from django.apps import apps as django_apps
+from bolt.apps import apps as django_apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from bolt.csrf.middleware import rotate_token

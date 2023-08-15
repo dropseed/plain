@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.core.management.utils import run_formatters

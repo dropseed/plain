@@ -3,7 +3,7 @@ import re
 from importlib import import_module
 
 from django import get_version
-from django.apps import apps
+from bolt.apps import apps
 
 # SettingsReference imported for backwards compatibility in Django 2.2.
 from django.conf import SettingsReference  # NOQA

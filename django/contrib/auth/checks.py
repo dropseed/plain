@@ -1,6 +1,6 @@
 from types import MethodType
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.core import checks
 

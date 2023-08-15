@@ -1,4 +1,4 @@
-from django.apps import AppConfig
+from bolt.apps import AppConfig
 
 
 class AppConfig(AppConfig):

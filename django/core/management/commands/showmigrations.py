@@ -1,6 +1,6 @@
 import sys
 
-from django.apps import apps
+from bolt.apps import apps
 from django.core.management.base import BaseCommand
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.loader import MigrationLoader

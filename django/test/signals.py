@@ -2,7 +2,7 @@ import os
 import time
 import warnings
 
-from django.apps import apps
+from bolt.apps import apps
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import setting_changed
 from django.db import connections, router

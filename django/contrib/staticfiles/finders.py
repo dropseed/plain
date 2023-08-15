@@ -1,7 +1,7 @@
 import functools
 import os
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.contrib.staticfiles import utils
 from django.core.checks import Error, Warning

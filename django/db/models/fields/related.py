@@ -3,7 +3,7 @@ import inspect
 from functools import partial
 
 from django import forms
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import SettingsReference, settings
 from django.core import checks, exceptions
 from django.db import connection, router

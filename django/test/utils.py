@@ -13,8 +13,8 @@ from types import SimpleNamespace
 from unittest import TestCase, skipIf, skipUnless
 from xml.dom.minidom import Node, parseString
 
-from django.apps import apps
-from django.apps.registry import Apps
+from bolt.apps import apps
+from bolt.apps.registry import Apps
 from django.conf import UserSettingsHolder, settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import request_started, setting_changed

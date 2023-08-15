@@ -78,7 +78,7 @@ class BaseDatabaseIntrospection:
         )
 
     def get_migratable_models(self):
-        from django.apps import apps
+        from bolt.apps import apps
         from django.db import router
 
         return (

@@ -8,7 +8,7 @@ import warnings
 
 from threading import local
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.conf.locale import LANG_INFO
 from django.core.exceptions import AppRegistryNotReady

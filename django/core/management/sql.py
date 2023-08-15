@@ -1,6 +1,6 @@
 import sys
 
-from django.apps import apps
+from bolt.apps import apps
 from django.db import models
 
 

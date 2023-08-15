@@ -27,7 +27,7 @@ class InstalledAppsGroup(click.Group):
         apps_with_commands = []
 
         # Get installed apps with a cli.py module
-        for app in django.apps.apps.get_app_configs():
+        for app in bolt.apps.apps.get_app_configs():
             cli_module = app.name + ".cli"
             try:
                 importlib.import_module(cli_module)

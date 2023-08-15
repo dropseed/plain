@@ -13,7 +13,7 @@ from difflib import get_close_matches
 from importlib import import_module
 
 import django
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import (

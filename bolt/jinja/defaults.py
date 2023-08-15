@@ -3,7 +3,7 @@ from jinja2 import Environment, StrictUndefined
 from django.conf import settings
 from pathlib import Path
 import functools
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.utils.module_loading import module_has_submodule
 from importlib import import_module

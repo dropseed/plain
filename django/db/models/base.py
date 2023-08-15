@@ -5,7 +5,7 @@ from functools import partialmethod
 from itertools import chain
 
 import django
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.core import checks
 from django.core.exceptions import (

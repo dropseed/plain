@@ -1,5 +1,5 @@
 import sentry_sdk
-from django.apps import AppConfig
+from bolt.apps import AppConfig
 
 from . import settings
 

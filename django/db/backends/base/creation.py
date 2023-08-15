@@ -2,7 +2,7 @@ import os
 import sys
 from io import StringIO
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from bolt.json import BoltJSONEncoder
 from django.db import router

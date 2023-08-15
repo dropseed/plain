@@ -626,7 +626,7 @@ class AppCommand(BaseCommand):
         )
 
     def handle(self, *app_labels, **options):
-        from django.apps import apps
+        from bolt.apps import apps
 
         try:
             app_configs = [apps.get_app_config(app_label) for app_label in app_labels]

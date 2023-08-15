@@ -3,9 +3,9 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 
-from django.apps import AppConfig
-from django.apps.registry import Apps
-from django.apps.registry import apps as global_apps
+from bolt.apps import AppConfig
+from bolt.apps.registry import Apps
+from bolt.apps.registry import apps as global_apps
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models

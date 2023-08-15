@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from difflib import get_close_matches
 from unittest.suite import _DebugResult
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command

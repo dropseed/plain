@@ -1,6 +1,6 @@
 from importlib import import_module
 
-from django.apps import AppConfig, apps
+from bolt.apps import AppConfig, apps
 
 MODULE_NAME = "admin"
 

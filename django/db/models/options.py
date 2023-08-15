@@ -4,7 +4,7 @@ import inspect
 import warnings
 from collections import defaultdict
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import connections

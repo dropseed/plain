@@ -1,4 +1,4 @@
-from django.apps import AppConfig
+from bolt.apps import AppConfig
 from django.contrib.staticfiles.checks import check_finders
 from django.core import checks
 from django.utils.translation import gettext_lazy as _

@@ -3,7 +3,7 @@ import types
 from collections import defaultdict
 from itertools import chain
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.core.checks import Error, Tags, Warning, register
 

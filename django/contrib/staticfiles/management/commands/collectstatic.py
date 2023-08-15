@@ -1,6 +1,6 @@
 import os
 
-from django.apps import apps
+from bolt.apps import apps
 from django.contrib.staticfiles.finders import get_finders
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.checks import Tags

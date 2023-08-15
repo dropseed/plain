@@ -1,4 +1,4 @@
-from django.apps.registry import apps as global_apps
+from bolt.apps.registry import apps as global_apps
 from django.db import migrations, router
 
 from .exceptions import InvalidMigrationPlan

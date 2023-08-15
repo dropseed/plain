@@ -1,7 +1,7 @@
 import copy
 from decimal import Decimal
 
-from django.apps.registry import Apps
+from bolt.apps.registry import Apps
 from django.db import NotSupportedError
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import Statement

@@ -2,7 +2,7 @@ import pkgutil
 import sys
 from importlib import import_module, reload
 
-from django.apps import apps
+from bolt.apps import apps
 from django.conf import settings
 from django.db.migrations.graph import MigrationGraph
 from django.db.migrations.recorder import MigrationRecorder
