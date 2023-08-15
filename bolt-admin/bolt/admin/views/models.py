@@ -3,12 +3,36 @@ from typing import TYPE_CHECKING
 from django.db.models import Q
 from django.urls import reverse_lazy
 
-from .base import URL_NAMESPACE, AdminObjectsView, AdminUpdateView
+from .base import URL_NAMESPACE, AdminDetailView, AdminObjectsView, AdminUpdateView
 
 if TYPE_CHECKING:
     from django.db import models
 
     from bolt.views import View
+
+
+def get_model_field(instance, field):
+    if "__" in field:
+        # Allow __ syntax like querysets use,
+        # also automatically calling callables (like __date)
+        result = instance
+        for part in field.split("__"):
+            result = getattr(result, part)
+
+            # If we hit a None, just return it
+            if not result:
+                return result
+
+            if callable(result):
+                result = result()
+
+        return result
+
+    # Automatically call get_FOO_display() if it exists
+    if display := getattr(instance, f"get_{field}_display", None):
+        return display()
+
+    return getattr(instance, field)
 
 
 class AdminModelListView(AdminObjectsView):
@@ -24,6 +48,7 @@ class AdminModelListView(AdminObjectsView):
         context = super().get_context()
 
         context["get_update_url"] = self.get_update_url
+        context["get_detail_url"] = self.get_detail_url
 
         order_by = self.request.GET.get("order_by", "")
         if order_by.startswith("-"):
@@ -70,28 +95,11 @@ class AdminModelListView(AdminObjectsView):
     def get_update_url(self, object) -> str | None:
         return None
 
+    def get_detail_url(self, object) -> str | None:
+        return None
+
     def get_object_field(self, object, field: str):
-        if "__" in field:
-            # Allow __ syntax like querysets use,
-            # also automatically calling callables (like __date)
-            result = object
-            for part in field.split("__"):
-                result = getattr(result, part)
-
-                # If we hit a None, just return it
-                if not result:
-                    return result
-
-                if callable(result):
-                    result = result()
-
-            return result
-
-        # Automatically call get_FOO_display() if it exists
-        if display := getattr(object, f"get_{field}_display", None):
-            return display()
-
-        return super().get_object_field(object, field)
+        return get_model_field(object, field)
 
 
 class AdminModelViewset:
@@ -99,6 +107,7 @@ class AdminModelViewset:
     list_description = ""
     list_fields: list = ["pk"]
     list_order = []
+    detail_fields: list = []
     search_fields = ["pk"]
 
     form_class = None  # TODO type annotation
@@ -130,6 +139,17 @@ class AdminModelViewset:
                     kwargs={"pk": object.pk},
                 )
 
+            def get_detail_url(self, object):
+                detail_view = cls.get_detail_view()
+
+                if not detail_view:
+                    return None
+
+                return reverse_lazy(
+                    URL_NAMESPACE + ":" + detail_view.view_name(),
+                    kwargs={"pk": object.pk},
+                )
+
             def get_initial_queryset(self):
                 return cls.get_list_queryset(self)
 
@@ -144,13 +164,42 @@ class AdminModelViewset:
             title = f"Update {cls.model._meta.verbose_name}"
             slug = f"{cls.model._meta.model_name}_update"
             form_class = cls.form_class
-            path = f"{cls.model._meta.model_name}/<int:pk>"
+            path = f"{cls.model._meta.model_name}/<int:pk>/update/"
             cards = cls.form_cards
             success_url = "."  # Redirect back to the same update page by default
             parent_view_class = cls.get_list_view()
 
             def get_object(self):
                 return cls.model.objects.get(pk=self.url_kwargs["pk"])
+
+        return V
+
+    @classmethod
+    def get_detail_view(cls) -> AdminDetailView | None:
+        class V(AdminDetailView):
+            title = cls.model._meta.verbose_name.capitalize()
+            slug = f"{cls.model._meta.model_name}_detail"
+            path = f"{cls.model._meta.model_name}/<int:pk>/"
+            parent_view_class = cls.get_list_view()
+            fields = cls.detail_fields
+
+            def get_context(self):
+                context = super().get_context()
+                context["fields"] = self.fields or ["pk"] + [
+                    f.name for f in self.object._meta.get_fields() if not f.remote_field
+                ]
+                return context
+
+            def get_object(self):
+                return cls.model.objects.get(pk=self.url_kwargs["pk"])
+
+            def get_template_names(self) -> list[str]:
+                return super().get_template_names() + [
+                    "admin/object.html",
+                ]
+
+            def get_object_field(self, object, field: str):
+                return get_model_field(object, field)
 
         return V
 
@@ -163,6 +212,9 @@ class AdminModelViewset:
 
         if update_view := cls.get_update_view():
             views.append(update_view)
+
+        if detail_view := cls.get_detail_view():
+            views.append(detail_view)
 
         return views
 

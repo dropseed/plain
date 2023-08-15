@@ -1,0 +1,15 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+
+<div class="card">
+    <h1 class="text-2xl font-semibold">Fields</h1>
+    <dl class="grid grid-cols-2 mt-6 text-sm">
+        {% for field in fields %}
+        <dt class="font-mono bg-gray-100 rounded inline-block px-0.5">{{ field }}</dt>
+        <dd>{{ get_object_field(object, field) or "Empty" }}</dd>
+        {% endfor %}
+    </dl>
+</div>
+
+{% endblock %}

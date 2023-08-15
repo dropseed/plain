@@ -4,7 +4,14 @@ from django.core.paginator import Paginator
 from django.db import models
 from django.utils.text import slugify
 
-from bolt.views import AuthViewMixin, CreateView, DeleteView, TemplateView, UpdateView
+from bolt.views import (
+    AuthViewMixin,
+    CreateView,
+    DeleteView,
+    DetailView,
+    TemplateView,
+    UpdateView,
+)
 
 from .registry import registry
 
@@ -106,6 +113,28 @@ class AdminObjectsView(AdminPageView):
 
     def get_objects(self) -> list:
         return []
+
+    def get_object_field(self, obj, field: str):
+        return getattr(obj, field)
+
+
+class AdminDetailView(AdminPageView, DetailView):
+    show_in_nav = False
+    template_name = None
+
+    def get_context(self):
+        context = super().get_context()
+        context["get_object_field"] = self.get_object_field
+        return context
+
+    def get_template_names(self) -> list[str]:
+        if not self.template_name and isinstance(self.object, models.Model):
+            object_meta = self.object._meta
+            return [
+                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+            ]
+
+        return super().get_template_names()
 
     def get_object_field(self, obj, field: str):
         return getattr(obj, field)

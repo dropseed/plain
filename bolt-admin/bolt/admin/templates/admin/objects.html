@@ -38,6 +38,7 @@
                     </th>
                     {% endfor %}
                     <th></th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -64,6 +65,16 @@
                         </div>
                     </td>
                     {% endfor %}
+
+                    {% set detail_url = get_detail_url(object) %}
+                    {% if detail_url %}
+                    <td>
+                        <a href="{{ detail_url }}">View</a>
+                    </td>
+                    {% else %}
+                    <td>
+                    </td>
+                    {% endif %}
 
                     {% set update_url = get_update_url(object) %}
                     {% if update_url %}
