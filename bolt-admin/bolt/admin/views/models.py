@@ -78,6 +78,10 @@ class AdminModelListView(AdminObjectsView):
             for part in field.split("__"):
                 result = getattr(result, part)
 
+                # If we hit a None, just return it
+                if not result:
+                    return result
+
                 if callable(result):
                     result = result()
 
