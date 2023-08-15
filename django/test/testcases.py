@@ -308,16 +308,16 @@ class TransactionTestCase(unittest.TestCase):
                 self._reset_sequences(db_name)
 
             # Provide replica initial data from migrated apps, if needed.
-            if self.serialized_rollback and hasattr(
-                connections[db_name], "_test_serialized_contents"
-            ):
-                if self.available_apps is not None:
-                    apps.unset_available_apps()
-                connections[db_name].creation.deserialize_db_from_string(
-                    connections[db_name]._test_serialized_contents
-                )
-                if self.available_apps is not None:
-                    apps.set_available_apps(self.available_apps)
+            # if self.serialized_rollback and hasattr(
+            #     connections[db_name], "_test_serialized_contents"
+            # ):
+            #     if self.available_apps is not None:
+            #         apps.unset_available_apps()
+            #     connections[db_name].creation.deserialize_db_from_string(
+            #         connections[db_name]._test_serialized_contents
+            #     )
+            #     if self.available_apps is not None:
+            #         apps.set_available_apps(self.available_apps)
 
             if self.fixtures:
                 # We have to use this slightly awkward syntax due to the fact
@@ -339,7 +339,7 @@ class TransactionTestCase(unittest.TestCase):
                 or (  # Inhibit the post_migrate signal when using serialized
                     # rollback to avoid trying to recreate the serialized data.
                     self.serialized_rollback
-                    and hasattr(connections[db_name], "_test_serialized_contents")
+                    # and hasattr(connections[db_name], "_test_serialized_contents")
                 )
             )
             call_command(

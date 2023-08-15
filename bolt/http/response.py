@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core import signals, signing
 from django.core.exceptions import DisallowedRedirect
-from django.core.serializers.json import DjangoJSONEncoder
+from bolt.json import BoltJSONEncoder
 from http.cookies import SimpleCookie
 from django.utils import timezone
 from django.utils.datastructures import CaseInsensitiveMapping
@@ -685,7 +685,7 @@ class JsonResponse(HttpResponse):
       are allowed to be passed due to a security flaw before ECMAScript 5. See
       the ``safe`` parameter for more information.
     :param encoder: Should be a json encoder class. Defaults to
-      ``django.core.serializers.json.DjangoJSONEncoder``.
+      ``bolt.json.BoltJSONEncoder``.
     :param safe: Controls if only ``dict`` objects may be serialized. Defaults
       to ``True``.
     :param json_dumps_params: A dictionary of kwargs passed to json.dumps().
@@ -694,7 +694,7 @@ class JsonResponse(HttpResponse):
     def __init__(
         self,
         data,
-        encoder=DjangoJSONEncoder,
+        encoder=BoltJSONEncoder,
         safe=True,
         json_dumps_params=None,
         **kwargs,

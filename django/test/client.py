@@ -12,7 +12,7 @@ from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 from django.conf import settings
 from django.core.handlers.base import BaseHandler
 from django.core.handlers.wsgi import LimitedStream, WSGIRequest
-from django.core.serializers.json import DjangoJSONEncoder
+from bolt.json import BoltJSONEncoder
 from django.core.signals import got_request_exception, request_finished, request_started
 from django.db import close_old_connections
 from bolt.http import HttpHeaders, HttpRequest, QueryDict
@@ -300,7 +300,7 @@ class RequestFactory:
     just as if that view had been hooked up using a URLconf.
     """
 
-    def __init__(self, *, json_encoder=DjangoJSONEncoder, headers=None, **defaults):
+    def __init__(self, *, json_encoder=BoltJSONEncoder, headers=None, **defaults):
         self.json_encoder = json_encoder
         self.defaults = defaults
         self.cookies = SimpleCookie()

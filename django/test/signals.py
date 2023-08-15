@@ -106,14 +106,6 @@ def storages_changed(*, setting, **kwargs):
 
 
 @receiver(setting_changed)
-def clear_serializers_cache(*, setting, **kwargs):
-    if setting == "SERIALIZATION_MODULES":
-        from django.core import serializers
-
-        serializers._serializers = {}
-
-
-@receiver(setting_changed)
 def language_changed(*, setting, **kwargs):
     if setting in {"LANGUAGES", "LANGUAGE_CODE", "LOCALE_PATHS"}:
         from django.utils.translation import trans_real

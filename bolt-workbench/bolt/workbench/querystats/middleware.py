@@ -3,7 +3,7 @@ import logging
 import threading
 
 from django.conf import settings
-from django.core.serializers.json import DjangoJSONEncoder
+from bolt.json import BoltJSONEncoder
 from django.db import connection
 from bolt.http import HttpResponseRedirect
 from bolt import jinja
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 _local = threading.local()
 
 
-class QueryStatsJSONEncoder(DjangoJSONEncoder):
+class QueryStatsJSONEncoder(BoltJSONEncoder):
     def default(self, obj):
         try:
             return super().default(obj)

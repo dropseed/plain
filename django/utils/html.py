@@ -65,9 +65,9 @@ def json_script(value, element_id=None, encoder=None):
     value is safe to be output anywhere except for inside a tag attribute. Wrap
     the escaped JSON in a script tag.
     """
-    from django.core.serializers.json import DjangoJSONEncoder
+    from bolt.json import BoltJSONEncoder
 
-    json_str = json.dumps(value, cls=encoder or DjangoJSONEncoder).translate(
+    json_str = json.dumps(value, cls=encoder or BoltJSONEncoder).translate(
         _json_script_escapes
     )
     if element_id:
