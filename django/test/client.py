@@ -10,8 +10,8 @@ from io import BytesIO, IOBase
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
 from django.conf import settings
-from django.core.handlers.base import BaseHandler
-from django.core.handlers.wsgi import LimitedStream, WSGIRequest
+from bolt.handlers.base import BaseHandler
+from bolt.handlers.wsgi import LimitedStream, WSGIRequest
 from bolt.json import BoltJSONEncoder
 from django.core.signals import got_request_exception, request_finished, request_started
 from django.db import close_old_connections

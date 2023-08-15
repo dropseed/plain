@@ -46,7 +46,8 @@ def cli():
 
     manager = HonchoManager()
 
-    runserver_cmd = f"bolt django migrate && gunicorn --reload bolt.wsgi.default:application --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+    # env var to switch wsgi app, if necessary...
+    runserver_cmd = f"bolt django migrate && gunicorn --reload bolt.wsgi:app --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
     manager.add_process("postgres", "bolt dev db start --logs")
     runserver_cmd = "bolt dev db wait && " + runserver_cmd
