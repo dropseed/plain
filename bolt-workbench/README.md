@@ -114,7 +114,7 @@ By default, it shows a link back to the Django admin:
 
 ```python
 # settings.py
-from django.urls import reverse_lazy
+from bolt.urls import reverse_lazy
 
 
 STAFFTOOLBAR_LINKS = [

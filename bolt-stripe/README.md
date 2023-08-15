@@ -84,7 +84,7 @@ There are three Stripe-related views mixins in Bolt:
 Use `StripeCheckoutView` to create new subscriptions.
 
 ```python
-from django.urls import path
+from bolt.urls import path
 
 from . import views
 

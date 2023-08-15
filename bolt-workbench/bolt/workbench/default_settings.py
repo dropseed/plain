@@ -1,4 +1,4 @@
-from django.urls import reverse_lazy
+from bolt.urls import reverse_lazy
 
 
 STAFFTOOLBAR_LINKS = [

@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, MiddlewareNotUsed
 from django.core.signals import request_finished
 from django.db import connections, transaction
-from django.urls import get_resolver, set_urlconf
+from bolt.urls import get_resolver, set_urlconf
 from django.utils.log import log_response
 from django.utils.module_loading import import_string
 

@@ -5,7 +5,7 @@ from bolt.http import (
     HttpResponsePermanentRedirect,
     HttpResponseRedirect,
 )
-from django.urls import reverse
+from bolt.urls import reverse
 
 from .base import View
 

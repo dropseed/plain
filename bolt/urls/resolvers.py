@@ -251,7 +251,7 @@ def _route_to_regex(route, is_endpoint=False):
     Convert a path pattern into a regular expression. Return the regular
     expression and a dictionary mapping the capture names to the converters.
     For example, 'foo/<int:pk>' returns '^foo\\/(?P<pk>[0-9]+)'
-    and {'pk': <django.urls.converters.IntConverter>}.
+    and {'pk': <bolt.urls.converters.IntConverter>}.
     """
     original_route = route
     parts = ["^"]
@@ -324,7 +324,7 @@ class RoutePattern(CheckURLMixin):
                 Warning(
                     "Your URL pattern {} has a route that contains '(?P<', begins "
                     "with a '^', or ends with a '$'. This was likely an oversight "
-                    "when migrating to django.urls.path().".format(self.describe()),
+                    "when migrating to bolt.urls.path().".format(self.describe()),
                     id="2_0.W001",
                 )
             )

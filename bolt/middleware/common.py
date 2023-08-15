@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from bolt.http import HttpResponsePermanentRedirect
-from django.urls import is_valid_path
+from bolt.urls import is_valid_path
 from django.utils.http import escape_leading_slashes
 
 

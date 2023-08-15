@@ -11,7 +11,7 @@ from django.conf import settings
 from bolt.http import Http404, HttpResponse, HttpResponseNotFound
 from bolt.jinja.defaults import create_default_environment
 from pprint import pformat
-from django.urls import resolve
+from bolt.urls import resolve
 from django.utils import timezone
 from django.utils.datastructures import MultiValueDict
 from django.utils.encoding import force_str

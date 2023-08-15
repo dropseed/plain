@@ -1,4 +1,4 @@
-from django.urls import include
+from bolt.urls import include
 from . import defaults
 
 __all__ = ["handler400", "handler403", "handler404", "handler500", "include"]

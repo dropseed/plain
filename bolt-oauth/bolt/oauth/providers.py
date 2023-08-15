@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib.auth import login as auth_login
 from bolt.http import HttpRequest, HttpResponse, HttpResponseRedirect
-from django.urls import reverse
+from bolt.urls import reverse
 from django.utils.crypto import get_random_string
 from django.utils.module_loading import import_string
 

@@ -1,4 +1,4 @@
-from django.urls import path
+from bolt.urls import path
 
 
 class AdminViewRegistry:

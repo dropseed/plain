@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.test import Client, TestCase
-from django.urls import reverse
+from bolt.urls import reverse
 
 
 class TestTemplate(TestCase):

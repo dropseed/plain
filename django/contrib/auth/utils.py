@@ -1,4 +1,4 @@
-from django.urls import NoReverseMatch, reverse
+from bolt.urls import NoReverseMatch, reverse
 from django.utils.functional import Promise
 
 

@@ -1,4 +1,4 @@
-from django.urls import include, path
+from bolt.urls import include, path
 
 from .views.default import AdminIndexView
 from .views.registry import registry

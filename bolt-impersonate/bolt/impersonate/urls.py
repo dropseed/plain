@@ -1,4 +1,4 @@
-from django.urls import path
+from bolt.urls import path
 
 from .views import ImpersonateStartView, ImpersonateStopView
 

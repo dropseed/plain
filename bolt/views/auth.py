@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from bolt.http import HttpResponse
-from django.urls import reverse
+from bolt.urls import reverse
 
 
 class LoginRequired(Exception):

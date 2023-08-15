@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from django.db.models import Q
-from django.urls import reverse_lazy
+from bolt.urls import reverse_lazy
 
 from .base import URL_NAMESPACE, AdminDetailView, AdminObjectsView, AdminUpdateView
 

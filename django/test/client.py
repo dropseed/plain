@@ -19,7 +19,7 @@ from bolt.http import HttpHeaders, HttpRequest, QueryDict
 from http.cookies import SimpleCookie
 from django.test import signals
 from django.test.utils import ContextList
-from django.urls import resolve
+from bolt.urls import resolve
 from django.utils.encoding import force_bytes
 from django.utils.functional import SimpleLazyObject
 from django.utils.http import urlencode
