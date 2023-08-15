@@ -4,7 +4,7 @@ from django.utils.functional import cached_property
 
 
 class StripeModel(models.Model):
-    stripe_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    stripe_id = models.CharField(max_length=255, blank=True, db_index=True)
 
     class Meta:
         abstract = True
