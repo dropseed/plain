@@ -205,10 +205,6 @@ def user_model_swapped(*, setting, **kwargs):
 
             forms.UserModel = UserModel
 
-            from django.contrib.auth.management.commands import changepassword
-
-            changepassword.UserModel = UserModel
-
             from django.contrib.auth import views
 
             views.UserModel = UserModel
