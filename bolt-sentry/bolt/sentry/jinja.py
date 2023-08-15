@@ -31,7 +31,7 @@ class SentryScriptsExtension(InclusionTagExtension):
             # Get user directly if no request (like in server error context)
             user = context.get("user", None)
 
-        if settings.SENTRY_PII_ENABLED() and user and user.is_authenticated:
+        if settings.SENTRY_PII_ENABLED() and user:
             sentry_context["sentry_init"]["initialScope"] = {
                 "user": {
                     "id": user.id,

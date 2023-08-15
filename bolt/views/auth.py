@@ -30,7 +30,7 @@ class AuthViewMixin:
                 "AuthViewMixin requires the request attribute to be set."
             )
 
-        if self.login_required and not self.request.user.is_authenticated:
+        if self.login_required and not self.request.user:
             raise LoginRequired(login_url=self.login_url)
 
         if self.staff_required and not self.request.user.is_staff:

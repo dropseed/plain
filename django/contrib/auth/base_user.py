@@ -88,22 +88,6 @@ class AbstractBaseUser(models.Model):
     def natural_key(self):
         return (self.get_username(),)
 
-    @property
-    def is_anonymous(self):
-        """
-        Always return False. This is a way of comparing User objects to
-        anonymous users.
-        """
-        return False
-
-    @property
-    def is_authenticated(self):
-        """
-        Always return True. This is a way to tell if the user has been
-        authenticated in templates.
-        """
-        return True
-
     def set_password(self, raw_password):
         self.password = make_password(raw_password)
         self._password = raw_password

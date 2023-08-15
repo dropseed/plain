@@ -149,14 +149,10 @@ def logout(request):
     # Dispatch the signal before the user is logged out so the receivers have a
     # chance to find out *who* logged out.
     user = getattr(request, "user", None)
-    if not getattr(user, "is_authenticated", True):
-        user = None
     user_logged_out.send(sender=user.__class__, request=request, user=user)
     request.session.flush()
     if hasattr(request, "user"):
-        from django.contrib.auth.models import AnonymousUser
-
-        request.user = AnonymousUser()
+        request.user = None
 
 
 def get_user_model():
@@ -179,10 +175,8 @@ def get_user_model():
 def get_user(request):
     """
     Return the user model instance associated with the given request session.
-    If no user is retrieved, return an instance of `AnonymousUser`.
+    If no user is retrieved, return None.
     """
-    from .models import AnonymousUser
-
     user = None
     try:
         user_id = _get_user_session_key(request)
@@ -217,7 +211,7 @@ def get_user(request):
                         request.session.flush()
                         user = None
 
-    return user or AnonymousUser()
+    return user
 
 
 def update_session_auth_hash(request, user):

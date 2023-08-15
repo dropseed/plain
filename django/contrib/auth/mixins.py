@@ -44,7 +44,7 @@ class AccessMixin:
         return self.redirect_field_name
 
     def handle_no_permission(self):
-        if self.raise_exception or self.request.user.is_authenticated:
+        if self.raise_exception or self.request.user:
             raise PermissionDenied(self.get_permission_denied_message())
 
         path = self.request.build_absolute_uri()
@@ -68,6 +68,6 @@ class LoginRequiredMixin(AccessMixin):
     """Verify that the current user is authenticated."""
 
     def dispatch(self):
-        if not self.request.user.is_authenticated:
+        if not self.request.user:
             return self.handle_no_permission()
         return super().dispatch()

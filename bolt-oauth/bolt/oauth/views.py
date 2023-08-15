@@ -15,7 +15,7 @@ class OAuthLoginView(View):
     def post(self):
         request = self.request
         provider = self.url_kwargs["provider"]
-        if request.user.is_authenticated:
+        if request.user:
             return HttpResponseRedirect("/")
 
         provider_instance = get_oauth_provider_instance(provider_key=provider)

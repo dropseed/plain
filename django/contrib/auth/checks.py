@@ -78,24 +78,4 @@ def check_user_model(app_configs=None, **kwargs):
                 )
             )
 
-    if isinstance(cls().is_anonymous, MethodType):
-        errors.append(
-            checks.Critical(
-                "%s.is_anonymous must be an attribute or property rather than "
-                "a method. Ignoring this is a security issue as anonymous "
-                "users will be treated as authenticated!" % cls,
-                obj=cls,
-                id="auth.C009",
-            )
-        )
-    if isinstance(cls().is_authenticated, MethodType):
-        errors.append(
-            checks.Critical(
-                "%s.is_authenticated must be an attribute or property rather "
-                "than a method. Ignoring this is a security issue as anonymous "
-                "users will be treated as authenticated!" % cls,
-                obj=cls,
-                id="auth.C010",
-            )
-        )
     return errors

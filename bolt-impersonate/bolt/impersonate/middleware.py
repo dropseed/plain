@@ -21,7 +21,7 @@ class ImpersonateMiddleware:
     def __call__(self, request):
         if (
             IMPERSONATE_KEY in request.session
-            and request.user.is_authenticated
+            and request.user
             and can_be_impersonator(request.user)
         ):
             user_to_impersonate = get_user_by_pk(request.session[IMPERSONATE_KEY])

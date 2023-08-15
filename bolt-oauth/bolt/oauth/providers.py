@@ -153,7 +153,7 @@ class OAuthProvider:
         oauth_token = self.get_oauth_token(code=request.GET["code"], request=request)
         oauth_user = self.get_oauth_user(oauth_token=oauth_token)
 
-        if request.user.is_authenticated:
+        if request.user:
             connection = OAuthConnection.connect(
                 user=request.user,
                 provider_key=self.provider_key,

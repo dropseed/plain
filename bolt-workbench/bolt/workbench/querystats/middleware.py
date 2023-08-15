@@ -86,12 +86,12 @@ class QueryStatsMiddleware:
         if getattr(request, "impersonator", None):
             # Support for impersonation (still want the real staff user to see the querystats)
             return (
-                request.impersonator.is_authenticated and request.impersonator.is_staff
+                request.impersonator and request.impersonator.is_staff
             )
 
         return (
             hasattr(request, "user")
-            and request.user.is_authenticated
+            and request.user
             and request.user.is_staff
         )
 

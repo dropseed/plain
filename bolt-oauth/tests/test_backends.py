@@ -1,5 +1,4 @@
 import pytest
-from django.contrib.auth.models import AnonymousUser
 
 from bolt.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
@@ -44,7 +43,7 @@ def test_single_backend(client, settings):
 
     # Now logged in
     response = client.get("/")
-    assert response.context["user"].is_authenticated
+    assert response.context["user"]
 
 
 @pytest.mark.django_db
@@ -70,4 +69,4 @@ def test_multiple_backends(client, settings):
 
     # Now logged in
     response = client.get("/")
-    assert response.context["user"].is_authenticated
+    assert response.context["user"]

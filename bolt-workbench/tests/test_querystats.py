@@ -56,7 +56,7 @@ def test_tidy_stack():
   File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 34, in __call__
     is_staff = self.is_staff_request(request)
   File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 72, in is_staff_request
-    and request.user.is_authenticated
+    and request.user
   File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 25, in <lambda>
     request.user = SimpleLazyObject(lambda: get_user(request))
   File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 11, in get_user
@@ -83,7 +83,7 @@ def test_tidy_stack():
         == """  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 34, in __call__
     is_staff = self.is_staff_request(request)
   File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 72, in is_staff_request
-    and request.user.is_authenticated
+    and request.user
   File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 25, in <lambda>
     request.user = SimpleLazyObject(lambda: get_user(request))
   File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 11, in get_user

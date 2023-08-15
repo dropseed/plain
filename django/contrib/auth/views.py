@@ -70,7 +70,7 @@ class LoginView(RedirectURLMixin, FormView):
     extra_context = None
 
     def dispatch(self):
-        if self.redirect_authenticated_user and self.request.user.is_authenticated:
+        if self.redirect_authenticated_user and self.request.user:
             redirect_to = self.get_success_url()
             if redirect_to == self.request.path:
                 raise ValueError(
