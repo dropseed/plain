@@ -32,7 +32,6 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     "django.contrib.auth",
-    "django.contrib.contenttypes",
     "bolt.sessions",
     "django.contrib.staticfiles",
     "bolt.importmap",

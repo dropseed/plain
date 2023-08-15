@@ -8,7 +8,6 @@ DEBUG = True
 
 INSTALLED_APPS = [
     "django.contrib.auth",
-    "django.contrib.contenttypes",
     "bolt.sessions",
     # "django.contrib.staticfiles",
     "bolt.stripe",
