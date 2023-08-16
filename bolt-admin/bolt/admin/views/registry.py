@@ -73,13 +73,15 @@ class AdminViewRegistry:
             if _path in paths_seen:
                 raise ValueError(f"Path {_path} already registered")
             paths_seen.add(_path)
+            if not _path.endswith("/"):
+                _path += "/"
             urlpatterns.append(path(_path, view.as_view(), name=view.view_name()))
 
         for view in self.registered_views:
-            add_view_path(view, f"pages/{view.get_path()}/")
+            add_view_path(view, f"pages/{view.get_path()}")
 
         for view in self.registered_cards:
-            add_view_path(view, f"cards/{view.get_path()}/")
+            add_view_path(view, f"cards/{view.get_path()}")
 
         return urlpatterns
 

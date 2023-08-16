@@ -99,7 +99,7 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
             <Label for="{{ thing }}"> vs <Label for=thing>
             so we just convert the first to the second automatically.
             """
-            return s.replace("\"{{", "").replace("}}\"", "")
+            return re.sub(r'(?<=\"{{)(.+)(?=}}\")', r"\1", s)
 
         for component in self.template_components:
             component_name = component["html_name"]
