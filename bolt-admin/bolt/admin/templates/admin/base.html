@@ -14,13 +14,13 @@
     <link href="{{ static('admin/admin.css') }}" rel="stylesheet">
     <script src="{{ static('admin/chart.js') }}"></script>
 </head>
-<body class="flex min-h-screen text-white bg-zinc-900">
+<body class="flex min-h-screen text-white bg-[#2b251f]">
     <div class="fixed flex flex-col justify-between flex-shrink-0 w-64 h-full px-6 pt-6 pb-3">
         <div>
-            <a class="font-bold" href="{{ url('admin:index') }}">Bolt Admin</a>
+            <a class="font-bold text-[#eeede6]" href="{{ url('admin:index') }}">Bolt Admin</a>
             <div class="mt-4 space-y-2.5">
                 {% for view in admin_registry.get_nav_views() %}
-                <a class="block px-2 py-0.5 -mx-2 hover:text-white rounded text-zinc-200 hover:bg-zinc-600" href="{{ url('admin:' + view.view_name() )}}">{{ view.title }}</a>
+                <a class="block px-2 py-0.5 -mx-2 hover:text-white rounded text-[#dcd9cc] hover:bg-zinc-600" href="{{ url('admin:' + view.view_name() )}}">{{ view.title }}</a>
                 {% endfor %}
             </div>
         </div>
