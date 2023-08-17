@@ -1,0 +1,8 @@
+## Testing - pytest
+
+Django includes its own test runner and [unittest](https://docs.python.org/3/library/unittest.html#module-unittest) classes.
+But a lot of people (myself included) prefer [pytest](https://docs.pytest.org/en/latest/contents.html).
+
+In Bolt I've removed the Django test runner and a lot of the implications that come with it.
+There are a few utilities that remain to make testing easier,
+and `bolt-test` is a wrapper around `pytest`.
