@@ -1,5 +1,132 @@
+# Jinja
 
-## Templates - Jinja
+Bolt uses [Jinja2](https://jinja.palletsprojects.com/en/latest/) for rendering templates.
+
+There is a default set of globals, filters, and extensions.
+
+## Templates
+
+Templates can be stored inside `INSTALLED_APPS` or in the `templates` directory at the root of your project.
+
+## Default globals
+
+- `static` - a function that returns the URL for a static file
+- `url` - a function that returns the URL for a view
+- `Paginator` - the Bolt Paginator class
+
+## Default filters
+
+- `strftime` - `datetime.datetime.strftime`
+- `isoformat` - `datetime.datetime.isoformat`
+- `localtime` - convert a datetime to the activated time zone (or a given time zone)
+- `date` - Django's date formatter
+- `time` - Django's time formatter
+- `timeuntil` - human readable time until a date
+- `timesince` - human readable time since a date
+- `json_script` - serialize a value as JSON and wrap it in a `<script>` tag
+- `islice` - `itertools.islice` which is a slice for `dict.items()`
+
+## Default extensions
+
+- `jinja2.ext.debug`
+- `jinja2.ext.loopcontrols`
+
+## Default request context
+
+Each request is rendered with a `context`.
+This will include the [default globals](#default-globals),
+any app or project globals,
+as well as the `get_context()` from your view.
+
+When a view is rendered,
+the default context includes the `request` itself,
+as well as a `csrf_input` (and `csrf_token`) to be used in forms.
+
+## Extending with a root `jinja.py`
+
+You can customize the Jinja environment by adding a `jinja.py` module to your app root.
+This works just like [extending with apps](#extending-with-apps),
+where you can define `filters`, `globals`, and `extensions`.
+
+## Extending with Apps
+
+Any of your `INSTALLED_APPS` can customize Jinja by adding a `jinja.py` module.
+
+To put it simply, the three things you can "export" from this module are:
+- `filters` - functions that can be used in templates
+- `globals` - variables that can be used in templates
+- `extensions` - a list of custom Jinja extensions to install
+
+All you need to do is define a variable with the correct name:
+
+```python
+# <appname>/jinja.py
+from jinja2 import Extension
+
+
+def add_exclamation(obj):
+    return obj + "!"
+
+
+class MyExtension(Extension):
+    # ...
+    pass
+
+# Filters are used on a variable with a pipe,
+# like {{ variable|add_exclamation }}.
+# You can use these to add new features to all variables.
+filters = {
+    "add_exclamation": add_exclamation,
+}
+
+# Globals are essentially variables that are available in all templates.
+# But you can also include functions here, which can be called in the template like {{ a_callable_global() }}.
+globals = {
+    "my_global": "my global value",
+}
+
+# Extensions are classes that can add new features to the Jinja environment.
+extensions = [
+    MyExtension,
+]
+```
+
+TODO - when to use a global function vs a filter
+
+## Time zone aware output
+
+TODO - example middleware, `|localtime` filter
+
+## Settings
+
+Most Jinja customization happens in `jinja.py` at the root of your app or in `INSTALLED_APPS`.
+But if you need to further customize the environment,
+you can define your own callable which will be used to create the Jinja environment.
+
+```python
+# app/settings.py
+JINJA_ENVIRONMENT = "myjinja.create_environment"
+```
+
+```python
+# app/myjinja.py
+from jinja2 import Environment
+
+
+def create_environment():
+    return Environment(
+        # ...
+    )
+```
+
+## HTML Components
+
+- `{% include %}` shorthand
+- strictly html, no python classes to back them
+- react-inspired syntax
+- react components in the future? live-wire style? script tags?
+
+## Background
 
 Django has two options for template languages: the [Django template language (DTL)](https://docs.djangoproject.com/en/4.2/topics/templates/) and [Jinja templates](https://jinja.palletsprojects.com/en/3.1.x/).
 
@@ -92,10 +219,3 @@ or check `{% if variable is defined %}` if you want to conditionally render some
     {{ variable }}
 {% endif %}
 ```
-
-## HTML Components
-
-- `{% include %}` shorthand
-- strictly html, no python classes to back them
-- react-inspired syntax
-- react components in the future? live-wire style? script tags?
