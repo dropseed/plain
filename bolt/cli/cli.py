@@ -12,6 +12,7 @@ from rich.table import Table
 from rich import box
 from rich.text import Text
 from rich.pretty import Pretty
+from bolt import apps
 
 
 class InstalledAppsGroup(click.Group):
@@ -27,7 +28,7 @@ class InstalledAppsGroup(click.Group):
         apps_with_commands = []
 
         # Get installed apps with a cli.py module
-        for app in bolt.apps.apps.get_app_configs():
+        for app in apps.apps.get_app_configs():
             cli_module = app.name + ".cli"
             try:
                 importlib.import_module(cli_module)
