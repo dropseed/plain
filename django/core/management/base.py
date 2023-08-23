@@ -9,7 +9,7 @@ from argparse import ArgumentParser, HelpFormatter
 from functools import partial
 from io import TextIOBase
 
-import django
+import bolt.runtime
 from bolt import checks
 from bolt.exceptions import ImproperlyConfigured
 from django.core.management.color import color_style, no_style
@@ -280,7 +280,7 @@ class BaseCommand:
         Django commands. User-supplied commands can override this method to
         return their own version.
         """
-        return django.get_version()
+        return bolt.runtime.get_version()
 
     def create_parser(self, prog_name, subcommand, **kwargs):
         """

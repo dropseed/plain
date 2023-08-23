@@ -12,7 +12,7 @@ from collections import defaultdict
 from difflib import get_close_matches
 from importlib import import_module
 
-import django
+import bolt.runtime
 from bolt.apps import apps
 from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
@@ -385,7 +385,7 @@ class ManagementUtility:
             self.settings_exception = exc
 
         if settings.configured:
-            django.setup()
+            bolt.runtime.setup()
 
         self.autocomplete()
 
@@ -401,7 +401,7 @@ class ManagementUtility:
         # Special-cases: We want 'django-admin --version' and
         # 'django-admin --help' to work, for backwards compatibility.
         elif subcommand == "version" or self.argv[1:] == ["--version"]:
-            sys.stdout.write(django.get_version() + "\n")
+            sys.stdout.write(bolt.runtime.get_version() + "\n")
         elif self.argv[1:] in (["--help"], ["-h"]):
             sys.stdout.write(self.main_help_text() + "\n")
         else:

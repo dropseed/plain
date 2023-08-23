@@ -356,7 +356,7 @@ class ExceptionReporter:
                     "ascii",
                     errors="replace",
                 )
-        from django import get_version
+        from bolt.runtime import get_version
 
         if self.request is None:
             user_str = None

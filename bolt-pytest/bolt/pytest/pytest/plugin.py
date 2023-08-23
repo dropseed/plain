@@ -30,7 +30,7 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import ContextManager, NoReturn
 
-    import django
+    import bolt.runtime
 
 
 # ############### pytest hooks ################
@@ -65,8 +65,8 @@ def pytest_addoption(parser) -> None:
 
 
 def _setup_django() -> None:
-    import django
-    django.setup()
+    import bolt.runtime
+    bolt.runtime.setup()
 
     _blocking_manager.block()
 

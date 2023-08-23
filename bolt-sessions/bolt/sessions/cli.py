@@ -1,7 +1,7 @@
 import click
 from importlib import import_module
 
-import django
+import bolt.runtime
 from bolt.runtime import settings
 
 
@@ -13,7 +13,7 @@ def cli():
 
 @cli.command()
 def clear_expired():
-    django.setup()
+    bolt.runtime.setup()
     engine = import_module(settings.SESSION_ENGINE)
     try:
         engine.SessionStore.clear_expired()

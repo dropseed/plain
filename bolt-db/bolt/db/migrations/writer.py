@@ -2,7 +2,7 @@ import os
 import re
 from importlib import import_module
 
-from django import get_version
+from bolt.runtime import get_version
 from bolt.apps import apps
 
 from bolt.db import migrations

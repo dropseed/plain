@@ -1,7 +1,7 @@
 import sys
 import subprocess
 
-import django
+import bolt.runtime
 from bolt.db import DEFAULT_DB_ALIAS, connections
 import click
 
@@ -24,7 +24,7 @@ def cli():
 def shell(database, parameters):
     """Runs the command-line client for specified database, or the default database if none is provided."""
 
-    django.setup()
+    bolt.runtime.setup()
 
     connection = connections[database]
     try:

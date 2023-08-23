@@ -4,7 +4,7 @@ import warnings
 from functools import partialmethod
 from itertools import chain
 
-import django
+import bolt.runtime
 from bolt.apps import apps
 from bolt.runtime import settings
 from bolt import checks
@@ -598,7 +598,7 @@ class Model(AltersData, metaclass=ModelBase):
 
     def __reduce__(self):
         data = self.__getstate__()
-        data[DJANGO_VERSION_PICKLE_KEY] = django.__version__
+        data[DJANGO_VERSION_PICKLE_KEY] = bolt.runtime.__version__
         class_id = self._meta.app_label, self._meta.object_name
         return model_unpickle, (class_id,), data
 
@@ -622,11 +622,11 @@ class Model(AltersData, metaclass=ModelBase):
     def __setstate__(self, state):
         pickled_version = state.get(DJANGO_VERSION_PICKLE_KEY)
         if pickled_version:
-            if pickled_version != django.__version__:
+            if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
                     "Pickled model instance's Django version %s does not "
                     "match the current version %s."
-                    % (pickled_version, django.__version__),
+                    % (pickled_version, bolt.runtime.__version__),
                     RuntimeWarning,
                     stacklevel=2,
                 )

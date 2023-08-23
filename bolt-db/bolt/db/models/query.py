@@ -7,7 +7,7 @@ import operator
 import warnings
 from itertools import chain, islice
 
-import django
+import bolt.runtime
 from bolt.runtime import settings
 from bolt import exceptions
 from bolt.db import (
@@ -319,16 +319,16 @@ class QuerySet(AltersData):
     def __getstate__(self):
         # Force the cache to be fully populated.
         self._fetch_all()
-        return {**self.__dict__, DJANGO_VERSION_PICKLE_KEY: django.__version__}
+        return {**self.__dict__, DJANGO_VERSION_PICKLE_KEY: bolt.runtime.__version__}
 
     def __setstate__(self, state):
         pickled_version = state.get(DJANGO_VERSION_PICKLE_KEY)
         if pickled_version:
-            if pickled_version != django.__version__:
+            if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
                     "Pickled queryset instance's Django version %s does not "
                     "match the current version %s."
-                    % (pickled_version, django.__version__),
+                    % (pickled_version, bolt.runtime.__version__),
                     RuntimeWarning,
                     stacklevel=2,
                 )

@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-import django
+import bolt.runtime
 import click
 
 from rich.console import Console
@@ -20,7 +20,7 @@ class InstalledAppsGroup(click.Group):
 
     def list_commands(self, ctx):
         try:
-            django.setup()
+            bolt.runtime.setup()
         except Exception as e:
             click.secho(f"Error in Django setup\n{e}", fg="yellow")
             return []
@@ -200,7 +200,7 @@ def shell(interface):
 @click.argument("script", nargs=1, type=click.Path(exists=True))
 def run(script):
     """Run a Python script in the context of your app"""
-    before_script = "import django; django.setup()"
+    before_script = "import bolt.runtime; bolt.runtime.setup()"
     command = f"{before_script}; exec(open('{script}').read())"
     result = subprocess.run(["python", "-c", command])
     if result.returncode:
@@ -213,7 +213,7 @@ def run(script):
 def settings(name_filter, overridden):
     """Print Django settings"""
     try:
-        django.setup()
+        bolt.runtime.setup()
     except Exception as e:
         click.secho(f"Error in Django setup\n{e}", fg="yellow")
         return

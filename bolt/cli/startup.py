@@ -1,6 +1,6 @@
-import django
+import bolt.runtime
 
-django.setup()
+bolt.runtime.setup()
 
 print("\033[1m", end="")
 print("🔩 Welcome to the Bolt shell!")

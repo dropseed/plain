@@ -10,7 +10,7 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Literal
 
-    import django
+    import bolt.runtime
 
     _DjangoDbDatabases = Optional[Union["Literal['__all__']", Iterable[str]]]
     # transaction, reset_sequences, databases, serialized_rollback
@@ -73,7 +73,7 @@ def _django_db_helper(
     django_db_setup: None,
     django_db_blocker,
 ) -> None:
-    from django import VERSION
+    from bolt.runtime import VERSION
 
     marker = request.node.get_closest_marker("django_db")
     if marker:
