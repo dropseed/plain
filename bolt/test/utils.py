@@ -22,7 +22,6 @@ from django.db import DEFAULT_DB_ALIAS, connections, reset_queries
 from django.db.models.options import Options
 from jinja2 import Template
 from bolt.test.signals import template_rendered
-from bolt.utils.translation import deactivate
 
 try:
     import jinja2
@@ -128,8 +127,6 @@ def setup_test_environment(debug=None):
         settings.EMAIL_BACKEND = "bolt.mail.backends.locmem.EmailBackend"
     except ImportError:
         pass
-
-    deactivate()
 
 
 def teardown_test_environment():

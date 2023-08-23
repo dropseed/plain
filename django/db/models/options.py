@@ -15,7 +15,6 @@ from bolt.utils.deprecation import RemovedInDjango51Warning
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string
 from bolt.utils.text import camel_case_to_spaces, format_lazy
-from bolt.utils.translation import override
 
 PROXY_PARENTS = object()
 
@@ -401,12 +400,6 @@ class Options:
                 for feat in self.required_db_features
             )
         return True
-
-    @property
-    def verbose_name_raw(self):
-        """Return the untranslated verbose name."""
-        with override(None):
-            return str(self.verbose_name)
 
     @property
     def swapped(self):

@@ -23,7 +23,6 @@ from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.functional import cached_property
 from bolt.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
 from bolt.utils.regex_helper import _lazy_re_compile, normalize
-from bolt.utils.translation import get_language
 
 from .converters import get_converter
 from .exceptions import NoReverseMatch, Resolver404
@@ -123,29 +122,6 @@ def get_ns_resolver(ns_pattern, resolver, converters):
     return URLResolver(RegexPattern(r"^/"), [ns_resolver])
 
 
-class LocaleRegexDescriptor:
-    def __init__(self, attr):
-        self.attr = attr
-
-    def __get__(self, instance, cls=None):
-        """
-        Return a compiled regular expression based on the active language.
-        """
-        if instance is None:
-            return self
-        # As a performance optimization, if the given regex string is a regular
-        # string (not a lazily-translated string proxy), compile it once and
-        # avoid per-language compilation.
-        pattern = getattr(instance, self.attr)
-        if isinstance(pattern, str):
-            instance.__dict__["regex"] = instance._compile(pattern)
-            return instance.__dict__["regex"]
-        language_code = get_language()
-        if language_code not in instance._regex_dict:
-            instance._regex_dict[language_code] = instance._compile(str(pattern))
-        return instance._regex_dict[language_code]
-
-
 class CheckURLMixin:
     def describe(self):
         """
@@ -182,14 +158,13 @@ class CheckURLMixin:
 
 
 class RegexPattern(CheckURLMixin):
-    regex = LocaleRegexDescriptor("_regex")
-
     def __init__(self, regex, name=None, is_endpoint=False):
         self._regex = regex
         self._regex_dict = {}
         self._is_endpoint = is_endpoint
         self.name = name
         self.converters = {}
+        self.regex = self._compile(str(regex))
 
     def match(self, path):
         match = (
@@ -293,14 +268,13 @@ def _route_to_regex(route, is_endpoint=False):
 
 
 class RoutePattern(CheckURLMixin):
-    regex = LocaleRegexDescriptor("_route")
-
     def __init__(self, route, name=None, is_endpoint=False):
         self._route = route
         self._regex_dict = {}
         self._is_endpoint = is_endpoint
         self.name = name
         self.converters = _route_to_regex(str(route), is_endpoint)[1]
+        self.regex = self._compile(str(route))
 
     def match(self, path):
         match = self.regex.search(path)
@@ -504,7 +478,6 @@ class URLResolver:
             lookups = MultiValueDict()
             namespaces = {}
             apps = {}
-            language_code = get_language()
             for url_pattern in reversed(self.url_patterns):
                 p_pattern = url_pattern.pattern.regex.pattern
                 p_pattern = p_pattern.removeprefix("^")
@@ -569,33 +542,30 @@ class URLResolver:
                         for app_name, namespace_list in url_pattern.app_dict.items():
                             apps.setdefault(app_name, []).extend(namespace_list)
                     self._callback_strs.update(url_pattern._callback_strs)
-            self._namespace_dict[language_code] = namespaces
-            self._app_dict[language_code] = apps
-            self._reverse_dict[language_code] = lookups
+            self._namespace_dict = namespaces
+            self._app_dict = apps
+            self._reverse_dict = lookups
             self._populated = True
         finally:
             self._local.populating = False
 
     @property
     def reverse_dict(self):
-        language_code = get_language()
-        if language_code not in self._reverse_dict:
+        if not self._reverse_dict:
             self._populate()
-        return self._reverse_dict[language_code]
+        return self._reverse_dict
 
     @property
     def namespace_dict(self):
-        language_code = get_language()
-        if language_code not in self._namespace_dict:
+        if not self._namespace_dict:
             self._populate()
-        return self._namespace_dict[language_code]
+        return self._namespace_dict
 
     @property
     def app_dict(self):
-        language_code = get_language()
-        if language_code not in self._app_dict:
+        if not self._app_dict:
             self._populate()
-        return self._app_dict[language_code]
+        return self._app_dict
 
     @staticmethod
     def _extend_tried(tried, pattern, sub_tried=None):

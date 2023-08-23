@@ -9,7 +9,6 @@ from django.db import connections, router
 from django.db.utils import ConnectionRouter
 from bolt.signals.dispatch import Signal, receiver
 from bolt.utils import timezone
-from bolt.utils.formats import FORMAT_SETTINGS, reset_format_cache
 from bolt.utils.functional import empty
 from bolt.utils.module_loading import import_string
 
@@ -46,11 +45,6 @@ def update_installed_apps(*, setting, **kwargs):
         from django.core.management import get_commands
 
         get_commands.cache_clear()
-
-        # Rebuild translations cache.
-        from bolt.utils.translation import trans_real
-
-        trans_real._translations = {}
 
 
 @receiver(setting_changed)
@@ -106,26 +100,6 @@ def storages_changed(*, setting, **kwargs):
 
         default_storage._wrapped = empty
         staticfiles_storage._wrapped = empty
-
-
-@receiver(setting_changed)
-def language_changed(*, setting, **kwargs):
-    if setting in {"LANGUAGES", "LANGUAGE_CODE", "LOCALE_PATHS"}:
-        from bolt.utils.translation import trans_real
-
-        trans_real._default = None
-        trans_real._active = local()
-    if setting in {"LANGUAGES", "LOCALE_PATHS"}:
-        from bolt.utils.translation import trans_real
-
-        trans_real._translations = {}
-        trans_real.check_for_language.cache_clear()
-
-
-@receiver(setting_changed)
-def localize_settings_changed(*, setting, **kwargs):
-    if setting in FORMAT_SETTINGS or setting == "USE_THOUSAND_SEPARATOR":
-        reset_format_cache()
 
 
 @receiver(setting_changed)

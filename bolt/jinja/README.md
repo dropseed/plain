@@ -17,10 +17,8 @@ Templates can be stored inside `INSTALLED_APPS` or in the `templates` directory 
 ## Default filters
 
 - `strftime` - `datetime.datetime.strftime`
-- `isoformat` - `datetime.datetime.isoformat`
+- `strptime` - `datetime.datetime.strptime`
 - `localtime` - convert a datetime to the activated time zone (or a given time zone)
-- `date` - Django's date formatter
-- `time` - Django's time formatter
 - `timeuntil` - human readable time until a date
 - `timesince` - human readable time since a date
 - `json_script` - serialize a value as JSON and wrap it in a `<script>` tag

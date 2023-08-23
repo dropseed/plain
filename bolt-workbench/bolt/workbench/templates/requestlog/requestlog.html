@@ -24,7 +24,7 @@
                         <span class="font-mono text-sm text-zinc-300">{{ log.request.full_path }}</span>
                     </td>
                     <td class="px-2 py-2 text-right border-b whitespace-nowrap border-zinc-700">
-                        <span title="{{ log.timestamp }}" class="text-xs tabular-nums whitespace-nowrap">{{ log.timestamp|time("g:i:s A") }}</span>
+                        <span title="{{ log.timestamp }}" class="text-xs tabular-nums whitespace-nowrap">{{ log.timestamp|strftime("%H:%M:%S") }}</span>
                     </td>
                 </tr>
                 {% else %}

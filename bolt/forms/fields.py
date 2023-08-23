@@ -16,7 +16,6 @@ from bolt import validators
 from bolt.exceptions import ValidationError
 from django.db.models.enums import ChoicesMeta
 from .boundfield import BoundField
-from bolt.utils import formats
 from bolt.utils.dateparse import parse_datetime, parse_duration
 from bolt.utils.duration import duration_string
 from bolt.utils.regex_helper import _lazy_re_compile
@@ -313,6 +312,51 @@ class DecimalField(IntegerField):
 
 
 class BaseTemporalField(Field):
+    # Default formats to be used when parsing dates from input boxes, in order
+    # See all available format string here:
+    # https://docs.python.org/library/datetime.html#strftime-behavior
+    # * Note that these format strings are different from the ones to display dates
+    DATE_INPUT_FORMATS = [
+        "%Y-%m-%d",  # '2006-10-25'
+        "%m/%d/%Y",  # '10/25/2006'
+        "%m/%d/%y",  # '10/25/06'
+        "%b %d %Y",  # 'Oct 25 2006'
+        "%b %d, %Y",  # 'Oct 25, 2006'
+        "%d %b %Y",  # '25 Oct 2006'
+        "%d %b, %Y",  # '25 Oct, 2006'
+        "%B %d %Y",  # 'October 25 2006'
+        "%B %d, %Y",  # 'October 25, 2006'
+        "%d %B %Y",  # '25 October 2006'
+        "%d %B, %Y",  # '25 October, 2006'
+    ]
+
+    # Default formats to be used when parsing times from input boxes, in order
+    # See all available format string here:
+    # https://docs.python.org/library/datetime.html#strftime-behavior
+    # * Note that these format strings are different from the ones to display dates
+    TIME_INPUT_FORMATS = [
+        "%H:%M:%S",  # '14:30:59'
+        "%H:%M:%S.%f",  # '14:30:59.000200'
+        "%H:%M",  # '14:30'
+    ]
+
+    # Default formats to be used when parsing dates and times from input boxes,
+    # in order
+    # See all available format string here:
+    # https://docs.python.org/library/datetime.html#strftime-behavior
+    # * Note that these format strings are different from the ones to display dates
+    DATETIME_INPUT_FORMATS = [
+        "%Y-%m-%d %H:%M:%S",  # '2006-10-25 14:30:59'
+        "%Y-%m-%d %H:%M:%S.%f",  # '2006-10-25 14:30:59.000200'
+        "%Y-%m-%d %H:%M",  # '2006-10-25 14:30'
+        "%m/%d/%Y %H:%M:%S",  # '10/25/2006 14:30:59'
+        "%m/%d/%Y %H:%M:%S.%f",  # '10/25/2006 14:30:59.000200'
+        "%m/%d/%Y %H:%M",  # '10/25/2006 14:30'
+        "%m/%d/%y %H:%M:%S",  # '10/25/06 14:30:59'
+        "%m/%d/%y %H:%M:%S.%f",  # '10/25/06 14:30:59.000200'
+        "%m/%d/%y %H:%M",  # '10/25/06 14:30'
+    ]
+
     def __init__(self, *, input_formats=None, **kwargs):
         super().__init__(**kwargs)
         if input_formats is not None:
@@ -333,7 +377,7 @@ class BaseTemporalField(Field):
 
 
 class DateField(BaseTemporalField):
-    input_formats = formats.get_format_lazy("DATE_INPUT_FORMATS")
+    input_formats = BaseTemporalField.DATE_INPUT_FORMATS
     default_error_messages = {
         "invalid": "Enter a valid date.",
     }
@@ -356,7 +400,7 @@ class DateField(BaseTemporalField):
 
 
 class TimeField(BaseTemporalField):
-    input_formats = formats.get_format_lazy("TIME_INPUT_FORMATS")
+    input_formats = BaseTemporalField.TIME_INPUT_FORMATS
     default_error_messages = {"invalid": "Enter a valid time."}
 
     def to_python(self, value):
@@ -376,8 +420,8 @@ class TimeField(BaseTemporalField):
 
 class DateTimeFormatsIterator:
     def __iter__(self):
-        yield from formats.get_format("DATETIME_INPUT_FORMATS")
-        yield from formats.get_format("DATE_INPUT_FORMATS")
+        yield from BaseTemporalField.DATETIME_INPUT_FORMATS
+        yield from BaseTemporalField.DATE_INPUT_FORMATS
 
 
 class DateTimeField(BaseTemporalField):
