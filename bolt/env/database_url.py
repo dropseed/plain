@@ -36,17 +36,12 @@ SCHEMES = {
     "postgres": "django.db.backends.postgresql",
     "postgresql": "django.db.backends.postgresql",
     "pgsql": "django.db.backends.postgresql",
-    "postgis": "django.contrib.gis.db.backends.postgis",
     "mysql": "django.db.backends.mysql",
     "mysql2": "django.db.backends.mysql",
-    "mysqlgis": "django.contrib.gis.db.backends.mysql",
     "mysql-connector": "mysql.connector.django",
     "mssql": "sql_server.pyodbc",
     "mssqlms": "mssql",
-    "spatialite": "django.contrib.gis.db.backends.spatialite",
     "sqlite": "django.db.backends.sqlite3",
-    "oracle": "django.db.backends.oracle",
-    "oraclegis": "django.contrib.gis.db.backends.oracle",
     "redshift": "django_redshift_backend",
     "cockroach": "django_cockroachdb",
     "timescale": "timescale.db.backends.postgresql",
@@ -194,7 +189,6 @@ def parse(
 
     # Support for Postgres Schema URLs
     if "currentSchema" in options and engine in (
-        "django.contrib.gis.db.backends.postgis",
         "django.db.backends.postgresql_psycopg2",
         "django.db.backends.postgresql",
         "django_redshift_backend",
