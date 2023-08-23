@@ -5,9 +5,9 @@ from bolt.runtime import settings
 from bolt.legacy.management.color import color_style
 from bolt.utils.module_loading import import_string
 
-request_logger = logging.getLogger("django.request")
+request_logger = logging.getLogger("bolt.request")
 
-# Default logging for Django. This sends an email to the site admins on every
+# Default logging for Bolt. This sends an email to the site admins on every
 # HTTP 500 error. Depending on DEBUG, all other log records are either sent to
 # the console (DEBUG=True) or discarded (DEBUG=False) by means of the
 # require_debug_true filter. This configuration is quoted in
@@ -24,7 +24,7 @@ DEFAULT_LOGGING = {
         },
     },
     "formatters": {
-        "django.server": {
+        "bolt.server": {
             "()": "bolt.utils.log.ServerFormatter",
             "format": "[{server_time}] {message}",
             "style": "{",
@@ -36,19 +36,19 @@ DEFAULT_LOGGING = {
             "filters": ["require_debug_true"],
             "class": "logging.StreamHandler",
         },
-        "django.server": {
+        "bolt.server": {
             "level": "INFO",
             "class": "logging.StreamHandler",
-            "formatter": "django.server",
+            "formatter": "bolt.server",
         },
     },
     "loggers": {
-        "django": {
+        "bolt": {
             "handlers": ["console"],
             "level": "INFO",
         },
-        "django.server": {
-            "handlers": ["django.server"],
+        "bolt.server": {
+            "handlers": ["bolt.server"],
             "level": "INFO",
             "propagate": False,
         },

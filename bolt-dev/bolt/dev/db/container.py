@@ -179,7 +179,7 @@ class DBContainer:
             )
 
     def restore_dump(self, dump_path, compressed=False):
-        """Imports a dump into {name}_import, then renames to {name} to prevent Django connections during process"""
+        """Imports a dump into {name}_import, then renames to {name} to prevent Bolt connections during process"""
         maintenance_db = "template1"
         import_db = f"{self.postgres_db}_import"
 

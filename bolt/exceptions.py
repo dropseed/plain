@@ -1,5 +1,5 @@
 """
-Global Django exception and warning classes.
+Global Bolt exception and warning classes.
 """
 import operator
 
@@ -116,7 +116,7 @@ class MiddlewareNotUsed(Exception):
 
 
 class ImproperlyConfigured(Exception):
-    """Django is somehow improperly configured"""
+    """Bolt is somehow improperly configured"""
 
     pass
 

@@ -1,4 +1,4 @@
-"""Django Unit Test framework."""
+"""Bolt Unit Test framework."""
 
 from bolt.test.client import Client, RequestFactory
 from bolt.test.testcases import (

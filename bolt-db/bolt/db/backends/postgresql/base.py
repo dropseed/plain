@@ -1,5 +1,5 @@
 """
-PostgreSQL database backend for Django.
+PostgreSQL database backend for Bolt.
 
 Requires psycopg2 >= 2.8.4 or psycopg >= 3.1.8
 """
@@ -349,7 +349,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         task_ident = "sync"
         # Use that and the thread ident to get a unique name
         return self._cursor(
-            name="_django_curs_%d_%s_%d"
+            name="_bolt_curs_%d_%s_%d"
             % (
                 # Avoid reusing name in other threads / tasks
                 threading.current_thread().ident,
@@ -373,7 +373,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def is_usable(self):
         try:
-            # Use a psycopg cursor directly, bypassing Django's utilities.
+            # Use a psycopg cursor directly, bypassing Bolt's utilities.
             with self.connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
         except Database.Error:
@@ -391,10 +391,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             if cursor is not None:
                 raise
             warnings.warn(
-                "Normally Django will use a connection to the 'postgres' database "
+                "Normally Bolt will use a connection to the 'postgres' database "
                 "to avoid running initialization queries against the production "
                 "database when it's not needed (for example, when running tests). "
-                "Django was unable to create a connection to the 'postgres' database "
+                "Bolt was unable to create a connection to the 'postgres' database "
                 "and will use the first PostgreSQL database instead.",
                 RuntimeWarning,
             )

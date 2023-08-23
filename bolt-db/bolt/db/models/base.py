@@ -17,7 +17,7 @@ from bolt.exceptions import (
     ValidationError,
 )
 from bolt.db import (
-    DJANGO_VERSION_PICKLE_KEY,
+    BOLT_VERSION_PICKLE_KEY,
     DatabaseError,
     connection,
     connections,
@@ -105,7 +105,7 @@ class ModelBase(type):
         if classcell is not None:
             new_attrs["__classcell__"] = classcell
         attr_meta = attrs.pop("Meta", None)
-        # Pass all attrs without a (Django-specific) contribute_to_class()
+        # Pass all attrs without a (Bolt-specific) contribute_to_class()
         # method to type.__new__() so that they're properly initialized
         # (i.e. __set_name__()).
         contributable_attrs = {}
@@ -598,7 +598,7 @@ class Model(AltersData, metaclass=ModelBase):
 
     def __reduce__(self):
         data = self.__getstate__()
-        data[DJANGO_VERSION_PICKLE_KEY] = bolt.runtime.__version__
+        data[BOLT_VERSION_PICKLE_KEY] = bolt.runtime.__version__
         class_id = self._meta.app_label, self._meta.object_name
         return model_unpickle, (class_id,), data
 
@@ -620,11 +620,11 @@ class Model(AltersData, metaclass=ModelBase):
         return state
 
     def __setstate__(self, state):
-        pickled_version = state.get(DJANGO_VERSION_PICKLE_KEY)
+        pickled_version = state.get(BOLT_VERSION_PICKLE_KEY)
         if pickled_version:
             if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
-                    "Pickled model instance's Django version %s does not "
+                    "Pickled model instance's Bolt version %s does not "
                     "match the current version %s."
                     % (pickled_version, bolt.runtime.__version__),
                     RuntimeWarning,
@@ -632,7 +632,7 @@ class Model(AltersData, metaclass=ModelBase):
                 )
         else:
             warnings.warn(
-                "Pickled model instance's Django version is not specified.",
+                "Pickled model instance's Bolt version is not specified.",
                 RuntimeWarning,
                 stacklevel=2,
             )

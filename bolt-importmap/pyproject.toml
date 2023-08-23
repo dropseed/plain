@@ -8,7 +8,7 @@ readme = "README.md"
 homepage = "https://github.com/forgepackages/bolt-importmap"
 documentation = "https://github.com/forgepackages/bolt-importmap"
 repository = "https://github.com/forgepackages/bolt-importmap"
-keywords = ["django", "javascript", "import", "map", "import-maps"]
+keywords = ["bolt", "javascript", "import", "map", "import-maps"]
 packages = [
     { include = "bolt" },
 ]

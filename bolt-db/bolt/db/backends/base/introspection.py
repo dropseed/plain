@@ -22,7 +22,7 @@ class BaseDatabaseIntrospection:
     def get_field_type(self, data_type, description):
         """
         Hook for a database backend to use the cursor description to
-        match a Django field type to a database column.
+        match a Bolt field type to a database column.
 
         For Oracle, the column data_type on its own is insufficient to
         distinguish between a FloatField and IntegerField, for example.
@@ -88,9 +88,9 @@ class BaseDatabaseIntrospection:
             if model._meta.can_migrate(self.connection)
         )
 
-    def django_table_names(self, only_existing=False, include_views=True):
+    def bolt_table_names(self, only_existing=False, include_views=True):
         """
-        Return a list of all table names that have associated Django models and
+        Return a list of all table names that have associated Bolt models and
         are in INSTALLED_APPS.
 
         If only_existing is True, include only the tables in the database.

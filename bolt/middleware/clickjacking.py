@@ -17,7 +17,7 @@ class XFrameOptionsMiddleware:
     By default, set the X-Frame-Options header to 'DENY', meaning the response
     cannot be displayed in a frame, regardless of the site attempting to do so.
     To enable the response to be loaded on a frame within the same site, set
-    X_FRAME_OPTIONS in your project's Django settings to 'SAMEORIGIN'.
+    X_FRAME_OPTIONS in your project's Bolt settings to 'SAMEORIGIN'.
     """
 
     def __init__(self, get_response):

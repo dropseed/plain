@@ -2526,7 +2526,7 @@ class Query(BaseExpression):
         """
         Check if the given field should be treated as nullable.
 
-        Some backends treat '' as null and Django treats such fields as
+        Some backends treat '' as null and Bolt treats such fields as
         nullable for those backends. In such situations field.null can be
         False even if we should treat the field as nullable.
         """

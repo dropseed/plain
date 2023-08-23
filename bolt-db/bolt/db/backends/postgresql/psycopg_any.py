@@ -39,12 +39,12 @@ try:
 
         context.adapters.register_loader("timestamptz", SpecificTzLoader)
 
-    class DjangoRangeDumper(RangeDumper):
-        """A Range dumper customized for Django."""
+    class BoltRangeDumper(RangeDumper):
+        """A Range dumper customized for Bolt."""
 
         def upgrade(self, obj, format):
             # Dump ranges containing naive datetimes as tstzrange, because
-            # Django doesn't use tz-aware ones.
+            # Bolt doesn't use tz-aware ones.
             dumper = super().upgrade(obj, format)
             if dumper is not self and dumper.oid == TSRANGE_OID:
                 dumper.oid = TSTZRANGE_OID
@@ -62,7 +62,7 @@ try:
         # ipaddress.
         ctx.register_loader("inet", TextLoader)
         ctx.register_loader("cidr", TextLoader)
-        ctx.register_dumper(Range, DjangoRangeDumper)
+        ctx.register_dumper(Range, BoltRangeDumper)
         # Register a timestamptz loader configured on self.timezone.
         # This, however, can be overridden by create_cursor.
         register_tzloader(timezone, ctx)

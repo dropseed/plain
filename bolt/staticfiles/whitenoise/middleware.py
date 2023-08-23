@@ -18,9 +18,9 @@ __all__ = ["WhiteNoiseMiddleware"]
 
 class WhiteNoiseFileResponse(FileResponse):
     """
-    Wrap Django's FileResponse to prevent setting any default headers. For the
+    Wrap Bolt's FileResponse to prevent setting any default headers. For the
     most part these just duplicate work already done by WhiteNoise but in some
-    cases (e.g. the content-disposition header introduced in Django 3.0) they
+    cases (e.g. the content-disposition header introduced in Bolt 3.0) they
     are actively harmful.
     """
 
@@ -30,7 +30,7 @@ class WhiteNoiseFileResponse(FileResponse):
 
 class WhiteNoiseMiddleware(WhiteNoise):
     """
-    Wrap WhiteNoise to allow it to function as Django middleware, rather
+    Wrap WhiteNoise to allow it to function as Bolt middleware, rather
     than WSGI middleware.
     """
 
@@ -183,7 +183,7 @@ class WhiteNoiseMiddleware(WhiteNoise):
         Removes the version hash from a filename e.g, transforms
         'css/application.f3ea4bcc2.css' into 'css/application.css'
 
-        Note: this is specific to the naming scheme used by Django's
+        Note: this is specific to the naming scheme used by Bolt's
         CachedStaticFilesStorage. You may have to override this if
         you are using a different static files versioning system
         """

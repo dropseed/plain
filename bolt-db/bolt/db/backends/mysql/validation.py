@@ -21,13 +21,10 @@ class DatabaseValidation(BaseDatabaseValidation):
                         "%s's Strict Mode fixes many data integrity problems in "
                         "%s, such as data truncation upon insertion, by "
                         "escalating warnings into errors. It is strongly "
-                        "recommended you activate it. See: "
-                        "https://docs.djangoproject.com/en/%s/ref/databases/"
-                        "#mysql-sql-mode"
+                        "recommended you activate it."
                         % (
                             self.connection.display_name,
                             self.connection.display_name,
-                            get_docs_version(),
                         ),
                     ),
                     id="mysql.W002",
@@ -53,10 +50,6 @@ class DatabaseValidation(BaseDatabaseValidation):
                     "%s may not allow unique CharFields to have a max_length "
                     "> 255." % self.connection.display_name,
                     obj=field,
-                    hint=(
-                        "See: https://docs.djangoproject.com/en/%s/ref/"
-                        "databases/#mysql-character-fields" % get_docs_version()
-                    ),
                     id="mysql.W003",
                 )
             )

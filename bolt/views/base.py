@@ -10,7 +10,7 @@ from bolt.utils.decorators import classonlymethod
 
 from .exceptions import HttpResponseException
 
-logger = logging.getLogger("django.request")
+logger = logging.getLogger("bolt.request")
 
 
 class View:
@@ -60,7 +60,7 @@ class View:
         return self.dispatch()
 
     def dispatch(self, *args, **kwargs) -> HttpResponse:
-        """Compatible with Django's dispatch, but we disregard the args/kwargs"""
+        """Compatible with Bolt's dispatch, but we disregard the args/kwargs"""
         # Warning?
 
         if not self.request.method:

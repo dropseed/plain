@@ -87,10 +87,10 @@ class CommonMiddleware:
         if settings.DEBUG and request.method in ("POST", "PUT", "PATCH"):
             raise RuntimeError(
                 "You called this URL via %(method)s, but the URL doesn't end "
-                "in a slash and you have APPEND_SLASH set. Django can't "
+                "in a slash and you have APPEND_SLASH set. Bolt can't "
                 "redirect to the slash URL while maintaining %(method)s data. "
                 "Change your form to point to %(url)s (note the trailing "
-                "slash), or set APPEND_SLASH=False in your Django settings."
+                "slash), or set APPEND_SLASH=False in your Bolt settings."
                 % {
                     "method": request.method,
                     "url": request.get_host() + new_path,

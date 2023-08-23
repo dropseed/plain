@@ -1,7 +1,7 @@
 """
-Dummy database backend for Django.
+Dummy database backend for Bolt.
 
-Django uses this if the database ENGINE setting is empty (None or empty string).
+Bolt uses this if the database ENGINE setting is empty (None or empty string).
 
 Each of these API functions, except connection.close(), raise
 ImproperlyConfigured.

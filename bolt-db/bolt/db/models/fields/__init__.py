@@ -118,7 +118,7 @@ class Field(RegisterLookupMixin):
     empty_values = list(validators.EMPTY_VALUES)
 
     # These track each time a Field instance is created. Used to retain order.
-    # The auto_creation_counter is used for fields that Django implicitly
+    # The auto_creation_counter is used for fields that Bolt implicitly
     # creates, creation_counter is used for all user-specified fields.
     creation_counter = 0
     auto_creation_counter = -1
@@ -504,7 +504,7 @@ class Field(RegisterLookupMixin):
         """
         Custom format for select clauses. For example, GIS columns need to be
         selected as AsText(table.col) on MySQL as the table.col data can't be
-        used by Django.
+        used by Bolt.
         """
         return sql, params
 
@@ -585,7 +585,7 @@ class Field(RegisterLookupMixin):
             else:
                 if value is not default:
                     keywords[name] = value
-        # Work out path - we shorten it for known Django core fields
+        # Work out path - we shorten it for known Bolt core fields
         path = "%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)
         if path.startswith("bolt.db.models.fields.related"):
             path = path.replace("bolt.db.models.fields.related", "bolt.db.models")
@@ -801,14 +801,14 @@ class Field(RegisterLookupMixin):
         # "internal type".
         #
         # A Field class can implement the get_internal_type() method to specify
-        # which *preexisting* Django Field class it's most similar to -- i.e.,
+        # which *preexisting* Bolt Field class it's most similar to -- i.e.,
         # a custom field might be represented by a TEXT column type, which is
-        # the same as the TextField Django field type, which means the custom
+        # the same as the TextField Bolt field type, which means the custom
         # field's get_internal_type() returns 'TextField'.
         #
         # But the limitation of the get_internal_type() / data_types approach
         # is that it cannot handle database column types that aren't already
-        # mapped to one of the built-in Django field types. In this case, you
+        # mapped to one of the built-in Bolt field types. In this case, you
         # can implement db_type() instead of get_internal_type() to specify
         # exactly which wacky database column type you want to use.
         data = self.db_type_parameters(connection)
@@ -869,7 +869,7 @@ class Field(RegisterLookupMixin):
     @property
     def db_returning(self):
         """
-        Private API intended only to be used by Django itself. Currently only
+        Private API intended only to be used by Bolt itself. Currently only
         the PostgreSQL backend supports returning multiple fields on a model.
         """
         return False
@@ -2500,7 +2500,7 @@ class AutoFieldMeta(type):
     create a non-integer automatically-generated field using column defaults
     stored in the database.
 
-    In many areas Django also relies on using isinstance() to check for an
+    In many areas Bolt also relies on using isinstance() to check for an
     automatically-generated field as a subclass of AutoField. A new flag needs
     to be implemented on Field to be used instead.
 

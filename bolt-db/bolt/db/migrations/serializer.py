@@ -389,7 +389,6 @@ def serializer_factory(value):
         if isinstance(value, type_):
             return serializer_cls(value)
     raise ValueError(
-        "Cannot serialize: %r\nThere are some values Django cannot serialize into "
-        "migration files.\nFor more, see https://docs.djangoproject.com/en/%s/"
-        "topics/migrations/#migration-serializing" % (value, get_docs_version())
+        "Cannot serialize: %r\nThere are some values Bolt cannot serialize into "
+        "migration files." % value
     )

@@ -106,7 +106,7 @@ def no_style():
 
 def color_style(force_color=False):
     """
-    Return a Style object from the Django color scheme.
+    Return a Style object from the Bolt color scheme.
     """
     if not force_color and not supports_color():
         return no_style()

@@ -1,5 +1,5 @@
 from bolt.http import HttpResponse
-from django.views import View
+from bolt.views import View
 
 from bolt.htmx.views import HTMXViewMixin
 

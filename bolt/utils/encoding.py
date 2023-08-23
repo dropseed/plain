@@ -8,7 +8,7 @@ from urllib.parse import quote
 from bolt.utils.functional import Promise
 
 
-class DjangoUnicodeDecodeError(UnicodeDecodeError):
+class BoltUnicodeDecodeError(UnicodeDecodeError):
     def __init__(self, obj, *args):
         self.obj = obj
         super().__init__(*args)
@@ -59,7 +59,7 @@ def force_str(s, encoding="utf-8", strings_only=False, errors="strict"):
         else:
             s = str(s)
     except UnicodeDecodeError as e:
-        raise DjangoUnicodeDecodeError(s, *e.args)
+        raise BoltUnicodeDecodeError(s, *e.args)
     return s
 
 
@@ -91,9 +91,9 @@ def iri_to_uri(iri):
     This is the algorithm from RFC 3987 Section 3.1, slightly simplified since
     the input is assumed to be a string rather than an arbitrary byte stream.
 
-    Take an IRI (string or UTF-8 bytes, e.g. '/I ♥ Django/' or
-    b'/I \xe2\x99\xa5 Django/') and return a string containing the encoded
-    result with ASCII chars only (e.g. '/I%20%E2%99%A5%20Django/').
+    Take an IRI (string or UTF-8 bytes, e.g. '/I ♥ Bolt/' or
+    b'/I \xe2\x99\xa5 Bolt/') and return a string containing the encoded
+    result with ASCII chars only (e.g. '/I%20%E2%99%A5%20Bolt/').
     """
     # The list of safe characters here is constructed from the "reserved" and
     # "unreserved" characters specified in RFC 3986 Sections 2.2 and 2.3:
@@ -138,8 +138,8 @@ def uri_to_iri(uri):
 
     This is the algorithm from RFC 3987 Section 3.2, excluding step 4.
 
-    Take an URI in ASCII bytes (e.g. '/I%20%E2%99%A5%20Django/') and return
-    a string containing the encoded result (e.g. '/I%20♥%20Django/').
+    Take an URI in ASCII bytes (e.g. '/I%20%E2%99%A5%20Bolt/') and return
+    a string containing the encoded result (e.g. '/I%20♥%20Bolt/').
     """
     if uri is None:
         return uri

@@ -1,4 +1,4 @@
-"""All pytest-django fixtures"""
+"""All pytest-bolt fixtures"""
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, Generator, Iterable, List, Optional, Tuple, Union
@@ -18,24 +18,24 @@ if TYPE_CHECKING:
 
 
 __all__ = [
-    "django_db_setup",
+    "bolt_db_setup",
     "db",
     "transactional_db",
-    "django_db_reset_sequences",
-    "django_db_serialized_rollback",
+    "bolt_db_reset_sequences",
+    "bolt_db_serialized_rollback",
     "client",
     "rf",
     "settings",
-    "django_assert_num_queries",
-    "django_assert_max_num_queries",
+    "bolt_assert_num_queries",
+    "bolt_assert_max_num_queries",
 ]
 
 
 @pytest.fixture(scope="session")
-def django_db_setup(
+def bolt_db_setup(
     request,
-    django_test_environment: None,
-    django_db_blocker,
+    bolt_test_environment: None,
+    bolt_db_blocker,
 ) -> None:
     """Top level fixture to ensure test databases are available"""
     from bolt.test.utils import setup_databases, teardown_databases
@@ -45,7 +45,7 @@ def django_db_setup(
     if request.config.getvalue("reuse_db") and not request.config.getvalue("create_db"):
         setup_databases_args["keepdb"] = True
 
-    with django_db_blocker.unblock():
+    with bolt_db_blocker.unblock():
         db_cfg = setup_databases(
             verbosity=request.config.option.verbose,
             interactive=False,
@@ -53,7 +53,7 @@ def django_db_setup(
         )
 
     def teardown_database() -> None:
-        with django_db_blocker.unblock():
+        with bolt_db_blocker.unblock():
             try:
                 teardown_databases(db_cfg, verbosity=request.config.option.verbose)
             except Exception as exc:
@@ -68,21 +68,21 @@ def django_db_setup(
 
 
 @pytest.fixture()
-def _django_db_helper(
+def _bolt_db_helper(
     request,
-    django_db_setup: None,
-    django_db_blocker,
+    bolt_db_setup: None,
+    bolt_db_blocker,
 ) -> None:
     from bolt.runtime import VERSION
 
-    marker = request.node.get_closest_marker("django_db")
+    marker = request.node.get_closest_marker("bolt_db")
     if marker:
         (
             transactional,
             reset_sequences,
             databases,
             serialized_rollback,
-        ) = validate_django_db(marker)
+        ) = validate_bolt_db(marker)
     else:
         (
             transactional,
@@ -95,14 +95,14 @@ def _django_db_helper(
         "transactional_db" in request.fixturenames
     )
     reset_sequences = reset_sequences or (
-        "django_db_reset_sequences" in request.fixturenames
+        "bolt_db_reset_sequences" in request.fixturenames
     )
     serialized_rollback = serialized_rollback or (
-        "django_db_serialized_rollback" in request.fixturenames
+        "bolt_db_serialized_rollback" in request.fixturenames
     )
 
-    django_db_blocker.unblock()
-    request.addfinalizer(django_db_blocker.restore)
+    bolt_db_blocker.unblock()
+    request.addfinalizer(bolt_db_blocker.restore)
 
     import bolt.db
     import bolt.test
@@ -132,8 +132,8 @@ def _django_db_helper(
     request.addfinalizer(test_case._post_teardown)
 
 
-def validate_django_db(marker) -> "_DjangoDb":
-    """Validate the django_db marker.
+def validate_bolt_db(marker) -> "_DjangoDb":
+    """Validate the bolt_db marker.
 
     It checks the signature and creates the ``transaction``,
     ``reset_sequences``, ``databases`` and ``serialized_rollback`` attributes on
@@ -158,8 +158,8 @@ def validate_django_db(marker) -> "_DjangoDb":
 
 
 @pytest.fixture(scope="function")
-def db(_django_db_helper: None) -> None:
-    """Require a django test database.
+def db(_bolt_db_helper: None) -> None:
+    """Require a bolt test database.
 
     This database will be setup with the default fixtures and will have
     the transaction management disabled. At the end of the test the outer
@@ -171,14 +171,14 @@ def db(_django_db_helper: None) -> None:
     If both ``db`` and ``transactional_db`` are requested,
     ``transactional_db`` takes precedence.
     """
-    # The `_django_db_helper` fixture checks if `db` is requested.
+    # The `_bolt_db_helper` fixture checks if `db` is requested.
 
 
 @pytest.fixture(scope="function")
-def transactional_db(_django_db_helper: None) -> None:
-    """Require a django test database with transaction support.
+def transactional_db(_bolt_db_helper: None) -> None:
+    """Require a bolt test database with transaction support.
 
-    This will re-initialise the django database for each test and is
+    This will re-initialise the bolt database for each test and is
     thus slower than the normal ``db`` fixture.
 
     If you want to use the database with transactions you must request
@@ -187,12 +187,12 @@ def transactional_db(_django_db_helper: None) -> None:
     If both ``db`` and ``transactional_db`` are requested,
     ``transactional_db`` takes precedence.
     """
-    # The `_django_db_helper` fixture checks if `transactional_db` is requested.
+    # The `_bolt_db_helper` fixture checks if `transactional_db` is requested.
 
 
 @pytest.fixture(scope="function")
-def django_db_reset_sequences(
-    _django_db_helper: None,
+def bolt_db_reset_sequences(
+    _bolt_db_helper: None,
     transactional_db: None,
 ) -> None:
     """Require a transactional test database with sequence reset support.
@@ -202,13 +202,13 @@ def django_db_reset_sequences(
     test relies on such values (e.g. ids as primary keys), you should
     request this resource to ensure they are consistent across tests.
     """
-    # The `_django_db_helper` fixture checks if `django_db_reset_sequences`
+    # The `_bolt_db_helper` fixture checks if `bolt_db_reset_sequences`
     # is requested.
 
 
 @pytest.fixture(scope="function")
-def django_db_serialized_rollback(
-    _django_db_helper: None,
+def bolt_db_serialized_rollback(
+    _bolt_db_helper: None,
     db: None,
 ) -> None:
     """Require a test database with serialized rollbacks.
@@ -223,13 +223,13 @@ def django_db_serialized_rollback(
 
     Note that this will slow down that test suite by approximately 3x.
     """
-    # The `_django_db_helper` fixture checks if `django_db_serialized_rollback`
+    # The `_bolt_db_helper` fixture checks if `bolt_db_serialized_rollback`
     # is requested.
 
 
 @pytest.fixture()
 def client() -> "bolt.test.client.Client":
-    """A Django test client instance."""
+    """A Bolt test client instance."""
     from bolt.test.client import Client
 
     return Client()
@@ -278,7 +278,7 @@ class SettingsWrapper:
 
 @pytest.fixture()
 def settings():
-    """A Django settings object which restores changes after the testrun"""
+    """A Bolt settings object which restores changes after the testrun"""
     wrapper = SettingsWrapper()
     yield wrapper
     wrapper.finalize()
@@ -324,10 +324,10 @@ def _assert_num_queries(
 
 
 @pytest.fixture(scope="function")
-def django_assert_num_queries(pytestconfig):
+def bolt_assert_num_queries(pytestconfig):
     return partial(_assert_num_queries, pytestconfig)
 
 
 @pytest.fixture(scope="function")
-def django_assert_max_num_queries(pytestconfig):
+def bolt_assert_max_num_queries(pytestconfig):
     return partial(_assert_num_queries, pytestconfig, exact=False)

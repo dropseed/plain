@@ -11,7 +11,7 @@ from bolt.utils.module_loading import import_string
 
 from .exception import convert_exception_to_response
 
-logger = logging.getLogger("django.request")
+logger = logging.getLogger("bolt.request")
 
 
 class BaseHandler:

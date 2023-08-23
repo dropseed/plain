@@ -196,7 +196,7 @@ def get_bytes_from_wsgi(environ, key, default):
     """
     value = environ.get(key, default)
     # Non-ASCII values in the WSGI environ are arbitrarily decoded with
-    # ISO-8859-1. This is wrong for Django websites where UTF-8 is the default.
+    # ISO-8859-1. This is wrong for Bolt websites where UTF-8 is the default.
     # Re-encode to recover the original bytestring.
     return value.encode("iso-8859-1")
 

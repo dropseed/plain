@@ -1447,12 +1447,12 @@ class ManyToManyField(RelatedField):
                             "The model is used as an intermediate model by "
                             "'%s', but it has more than two foreign keys "
                             "to '%s', which is ambiguous. You must specify "
-                            "which two foreign keys Django should use via the "
+                            "which two foreign keys Bolt should use via the "
                             "through_fields keyword argument."
                             % (self, from_model_name),
                             hint=(
                                 "Use through_fields to specify which two foreign keys "
-                                "Django should use."
+                                "Bolt should use."
                             ),
                             obj=self.remote_field.through,
                             id="fields.E333",
@@ -1477,7 +1477,7 @@ class ManyToManyField(RelatedField):
                                 "The model is used as an intermediate model by "
                                 "'%s', but it has more than one foreign key "
                                 "from '%s', which is ambiguous. You must specify "
-                                "which foreign key Django should use via the "
+                                "which foreign key Bolt should use via the "
                                 "through_fields keyword argument."
                             )
                             % (self, from_model_name),
@@ -1500,7 +1500,7 @@ class ManyToManyField(RelatedField):
                             "The model is used as an intermediate model by "
                             "'%s', but it has more than one foreign key "
                             "to '%s', which is ambiguous. You must specify "
-                            "which foreign key Django should use via the "
+                            "which foreign key Bolt should use via the "
                             "through_fields keyword argument." % (self, to_model_name),
                             hint=(
                                 "If you want to create a recursive relationship, "

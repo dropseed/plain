@@ -26,7 +26,7 @@ def get_field_size(name):
 # types include variables in them -- e.g. "varchar(30)" -- and can't be matched
 # as a simple dictionary lookup.
 class FlexibleFieldLookupDict:
-    # Maps SQL types to Django Field types. Some of the SQL types have multiple
+    # Maps SQL types to Bolt Field types. Some of the SQL types have multiple
     # entries here because SQLite allows for anything and doesn't normalize the
     # field type; it uses whatever was given.
     base_data_types_reverse = {

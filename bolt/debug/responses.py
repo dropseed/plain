@@ -20,7 +20,7 @@ from bolt.utils.regex_helper import _lazy_re_compile
 from bolt.utils.version import PY311, get_docs_version
 from jinja2.exceptions import TemplateNotFound
 
-# Minimal Django templates engine to render the error templates
+# Minimal Jinja templates engine to render the error templates
 # regardless of the project's setting. Templates are
 # read directly from the filesystem so that the error handler
 # works even if the template loader is broken.
@@ -383,7 +383,7 @@ class ExceptionReporter:
             "sys_executable": sys.executable,
             "sys_version_info": "%d.%d.%d" % sys.version_info[0:3],
             "server_time": timezone.now(),
-            "django_version_info": get_version(),
+            "bolt_version_info": get_version(),
             "sys_path": sys.path,
             "template_info": self.template_info,
             "template_does_not_exist": self.template_does_not_exist,
@@ -580,7 +580,7 @@ class ExceptionReporter:
                 "exc_cause": exc_cause,
                 "exc_cause_explicit": exc_cause_explicit,
                 "tb": tb,
-                "type": "django" if module_name.startswith("django.") else "user",
+                "type": "bolt" if module_name.startswith("bolt.") else "user",
                 "filename": filename,
                 "function": function,
                 "lineno": lineno + 1,

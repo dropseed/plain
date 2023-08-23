@@ -8,7 +8,7 @@ from bolt.utils.regex_helper import _lazy_re_compile
 
 # Private, stable API for detecting the Python version. PYXY means "Python X.Y
 # or later". So that third-party apps can use these values, each constant
-# should remain as long as the oldest supported Django version supports that
+# should remain as long as the oldest supported Bolt version supports that
 # Python version.
 PY311 = sys.version_info >= (3, 11)
 
@@ -46,7 +46,7 @@ def get_main_version(version=None):
 
 def get_complete_version(version=None):
     """
-    Return a tuple of the django version. If version argument is non-empty,
+    Return a tuple of the Bolt version. If version argument is non-empty,
     check for correctness of the tuple provided.
     """
     if version is None:

@@ -9,7 +9,7 @@ from bolt.urls import reverse
 
 from .base import View
 
-logger = logging.getLogger("django.request")
+logger = logging.getLogger("bolt.request")
 
 
 class RedirectView(View):

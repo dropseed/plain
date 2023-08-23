@@ -234,7 +234,7 @@ class ManagementUtility:
             if self.settings_exception is not None:
                 usage.append(
                     style.NOTICE(
-                        "Note that only Django core commands are listed "
+                        "Note that only Bolt core commands are listed "
                         "as settings are not properly configured (error: %s)."
                         % self.settings_exception
                     )
@@ -253,14 +253,14 @@ class ManagementUtility:
         try:
             app_name = commands[subcommand]
         except KeyError:
-            if os.environ.get("DJANGO_SETTINGS_MODULE"):
+            if os.environ.get("BOLT_SETTINGS_MODULE"):
                 # If `subcommand` is missing due to misconfigured settings, the
                 # following line will retrigger an ImproperlyConfigured exception
                 # (get_commands() swallows the original one) so the user is
                 # informed about it.
                 settings.INSTALLED_APPS
             elif not settings.configured:
-                sys.stderr.write("No Django settings specified.\n")
+                sys.stderr.write("No Bolt settings specified.\n")
             possible_matches = get_close_matches(subcommand, commands)
             sys.stderr.write("Unknown command: %r" % subcommand)
             if possible_matches:
@@ -324,7 +324,7 @@ class ManagementUtility:
                     # Get the last part of the dotted path as the app name.
                     options.extend((app_config.label, 0) for app_config in app_configs)
                 except ImportError:
-                    # Fail silently if DJANGO_SETTINGS_MODULE isn't set. The
+                    # Fail silently if BOLT_SETTINGS_MODULE isn't set. The
                     # user will find out once they execute the command.
                     pass
             parser = subcommand_cls.create_parser("", cwords[0])

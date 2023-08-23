@@ -619,7 +619,7 @@ class StateApps(Apps):
         super().__init__(app_configs)
 
         # These locks get in the way of copying as implemented in clone(),
-        # which is called whenever Django duplicates a StateApps before
+        # which is called whenever Bolt duplicates a StateApps before
         # updating it.
         self._lock = None
 
@@ -668,10 +668,8 @@ class StateApps(Apps):
                     raise InvalidBasesError(
                         "Cannot resolve bases for %r\nThis can happen if you are "
                         "inheriting models from an app with migrations (e.g. "
-                        "contrib.auth)\n in an app with no migrations; see "
-                        "https://docs.djangoproject.com/en/%s/topics/migrations/"
-                        "#dependencies for more"
-                        % (new_unrendered_models, get_docs_version())
+                        "contrib.auth)\n in an app with no migrations"
+                        % new_unrendered_models
                     )
                 unrendered_models = new_unrendered_models
 
@@ -709,7 +707,7 @@ class StateApps(Apps):
 
 class ModelState:
     """
-    Represent a Django Model. Don't use the actual Model class as it's not
+    Represent a Bolt Model. Don't use the actual Model class as it's not
     designed to have its options changed - instead, mutate this one and then
     render it into a Model as required.
 

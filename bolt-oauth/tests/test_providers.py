@@ -45,7 +45,7 @@ class DummyProvider(OAuthProvider):
         )
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_signup(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -105,7 +105,7 @@ def test_dummy_signup(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_login_connection(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -187,7 +187,7 @@ def test_dummy_login_connection(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_login_without_connection(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -230,7 +230,7 @@ def test_dummy_login_without_connection(client, settings):
     assert response.templates[0].name == "oauth/error.html"
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_connect(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -290,7 +290,7 @@ def test_dummy_connect(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_disconnect_to_password(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -340,7 +340,7 @@ def test_dummy_disconnect_to_password(client, settings):
     assert OAuthConnection.objects.count() == 0
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_disconnect_to_connection(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -403,7 +403,7 @@ def test_dummy_disconnect_to_connection(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_disconnect_last(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -453,7 +453,7 @@ def test_dummy_disconnect_last(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_dummy_refresh(settings, monkeypatch):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {

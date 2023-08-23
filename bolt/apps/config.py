@@ -11,7 +11,7 @@ MODELS_MODULE_NAME = "models"
 
 
 class AppConfig:
-    """Class representing a Django application and its configuration."""
+    """Class representing a Bolt application and its configuration."""
     migrations_module = "migrations"
 
     def __init__(self, app_name, app_module):
@@ -30,7 +30,7 @@ class AppConfig:
         # subclass, hence the test-and-set pattern.
 
         # Last component of the Python path to the application e.g. 'admin'.
-        # This value must be unique across a Django project.
+        # This value must be unique across a Bolt project.
         if not hasattr(self, "label"):
             self.label = app_name.rpartition(".")[2]
         if not self.label.isidentifier():
@@ -271,5 +271,5 @@ class AppConfig:
 
     def ready(self):
         """
-        Override this method in subclasses to run code when Django starts.
+        Override this method in subclasses to run code when Bolt starts.
         """

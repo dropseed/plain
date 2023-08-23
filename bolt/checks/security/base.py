@@ -19,7 +19,7 @@ REFERRER_POLICY_VALUES = {
     "unsafe-url",
 }
 
-SECRET_KEY_INSECURE_PREFIX = "django-insecure-"
+SECRET_KEY_INSECURE_PREFIX = "bolt-insecure-"
 SECRET_KEY_MIN_LENGTH = 50
 SECRET_KEY_MIN_UNIQUE_CHARACTERS = 5
 
@@ -27,8 +27,8 @@ SECRET_KEY_WARNING_MSG = (
     f"Your %s has less than {SECRET_KEY_MIN_LENGTH} characters, less than "
     f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS} unique characters, or it's prefixed "
     f"with '{SECRET_KEY_INSECURE_PREFIX}' indicating that it was generated "
-    f"automatically by Django. Please generate a long and random value, "
-    f"otherwise many of Django's security-critical features will be "
+    f"automatically by Bolt. Please generate a long and random value, "
+    f"otherwise many of Bolt's security-critical features will be "
     f"vulnerable to attack."
 )
 

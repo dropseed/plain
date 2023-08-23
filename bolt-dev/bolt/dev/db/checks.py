@@ -19,7 +19,7 @@ def check_database_tables(app_configs, **kwargs):
 
     for database in databases:
         db_tables = connection.introspection.table_names()
-        model_tables = connection.introspection.django_table_names()
+        model_tables = connection.introspection.bolt_table_names()
 
         unknown_tables = set(db_tables) - set(model_tables) - set(cache_tables)
         unknown_tables.discard("django_migrations")  # Know this could be there

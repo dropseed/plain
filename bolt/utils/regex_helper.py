@@ -1,6 +1,6 @@
 """
 Functions for reversing a regular expression (used in reverse URL resolving).
-Used internally by Django and not intended for external use.
+Used internally by Bolt and not intended for external use.
 
 This is not, and is not intended to be, a complete reg-exp decompiler. It
 should be good enough for a large class of URLS, however.
@@ -53,7 +53,7 @@ def normalize(pattern):
     (4) Ignore look-ahead and look-behind assertions.
     (5) Raise an error on any disjunctive ('|') constructs.
 
-    Django's URLs for forward resolving are either all positional arguments or
+    Bolt's URLs for forward resolving are either all positional arguments or
     all keyword arguments. That is assumed here, as well. Although reverse
     resolving can be done using positional args when keyword args are
     specified, the two cannot be mixed in the same reverse() call.

@@ -47,11 +47,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         "cs": "binary",
         "non_default": "nocase",
     }
-    django_test_expected_failures = {
-        # The django_format_dtdelta() function doesn't properly handle mixed
-        # Date/DateTime fields and timedeltas.
-        "expressions.tests.FTimeDeltaTests.test_mixed_comparisons1",
-    }
     create_test_table_with_composite_primary_key = """
         CREATE TABLE test_table_composite_pk (
             column_1 INTEGER NOT NULL,
@@ -59,75 +54,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             PRIMARY KEY(column_1, column_2)
         )
     """
-
-    @cached_property
-    def django_test_skips(self):
-        skips = {
-            "SQLite stores values rounded to 15 significant digits.": {
-                "model_fields.test_decimalfield.DecimalFieldTests."
-                "test_fetch_from_db_without_float_rounding",
-            },
-            "SQLite naively remakes the table on field alteration.": {
-                "schema.tests.SchemaTests.test_unique_no_unnecessary_fk_drops",
-                "schema.tests.SchemaTests.test_unique_and_reverse_m2m",
-                "schema.tests.SchemaTests."
-                "test_alter_field_default_doesnt_perform_queries",
-                "schema.tests.SchemaTests."
-                "test_rename_column_renames_deferred_sql_references",
-            },
-            "SQLite doesn't support negative precision for ROUND().": {
-                "db_functions.math.test_round.RoundTests."
-                "test_null_with_negative_precision",
-                "db_functions.math.test_round.RoundTests."
-                "test_decimal_with_negative_precision",
-                "db_functions.math.test_round.RoundTests."
-                "test_float_with_negative_precision",
-                "db_functions.math.test_round.RoundTests."
-                "test_integer_with_negative_precision",
-            },
-        }
-        if Database.sqlite_version_info < (3, 27):
-            skips.update(
-                {
-                    "Nondeterministic failure on SQLite < 3.27.": {
-                        "expressions_window.tests.WindowFunctionTests."
-                        "test_subquery_row_range_rank",
-                    },
-                }
-            )
-        if self.connection.is_in_memory_db():
-            skips.update(
-                {
-                    "the sqlite backend's close() method is a no-op when using an "
-                    "in-memory database": {
-                        "servers.test_liveserverthread.LiveServerThreadTest."
-                        "test_closes_connections",
-                        "servers.tests.LiveServerTestCloseConnectionTest."
-                        "test_closes_connections",
-                    },
-                    "For SQLite in-memory tests, closing the connection destroys"
-                    "the database.": {
-                        "test_utils.tests.AssertNumQueriesUponConnectionTests."
-                        "test_ignores_connection_configuration_queries",
-                    },
-                }
-            )
-        else:
-            skips.update(
-                {
-                    "Only connections to in-memory SQLite databases are passed to the "
-                    "server thread.": {
-                        "servers.tests.LiveServerInMemoryDatabaseLockTest."
-                        "test_in_memory_database_lock",
-                    },
-                    "multiprocessing's start method is checked only for in-memory "
-                    "SQLite databases": {
-                        "backends.sqlite.test_creation.TestDbSignatureTests."
-                        "test_get_test_db_clone_settings_not_supported",
-                    },
-                }
-            )
-        return skips
 
     @cached_property
     def supports_atomic_references_rename(self):

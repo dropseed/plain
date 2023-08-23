@@ -21,7 +21,7 @@ class DummyProvider(OAuthProvider):
         return
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_single_backend(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -46,7 +46,7 @@ def test_single_backend(client, settings):
     assert response.context["user"]
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_multiple_backends(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {

@@ -506,7 +506,7 @@ class Expression(BaseExpression, Combinable):
 #
 # The current approach for NULL is based on lowest common denominator behavior
 # i.e. if one of the supported databases is raising an error (rather than
-# return NULL) for `val <op> NULL`, then Django raises FieldError.
+# return NULL) for `val <op> NULL`, then Bolt raises FieldError.
 
 _connector_combinations = [
     # Numeric operations - operands of same type.

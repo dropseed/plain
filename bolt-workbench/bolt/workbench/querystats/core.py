@@ -13,13 +13,13 @@ IGNORE_STACK_FILES = [
     "whitenoise",
     "sentry_sdk",
     "querystats/core",
-    "django/template/base",
-    "django/utils/decorators",
-    "django/utils/deprecation",
-    "django/db",
-    "django/utils/functional",
-    "django/core/servers",
-    "django/core/handlers",
+    "bolt/template/base",
+    "bolt/utils/decorators",
+    "bolt/utils/deprecation",
+    "bolt/db",
+    "bolt/utils/functional",
+    "bolt/core/servers",
+    "bolt/core/handlers",
 ]
 
 

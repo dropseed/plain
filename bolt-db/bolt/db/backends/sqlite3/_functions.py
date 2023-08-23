@@ -41,23 +41,23 @@ def register(connection):
         connection.create_function,
         deterministic=True,
     )
-    create_deterministic_function("django_date_extract", 2, _sqlite_datetime_extract)
-    create_deterministic_function("django_date_trunc", 4, _sqlite_date_trunc)
+    create_deterministic_function("bolt_date_extract", 2, _sqlite_datetime_extract)
+    create_deterministic_function("bolt_date_trunc", 4, _sqlite_date_trunc)
     create_deterministic_function(
-        "django_datetime_cast_date", 3, _sqlite_datetime_cast_date
+        "bolt_datetime_cast_date", 3, _sqlite_datetime_cast_date
     )
     create_deterministic_function(
-        "django_datetime_cast_time", 3, _sqlite_datetime_cast_time
+        "bolt_datetime_cast_time", 3, _sqlite_datetime_cast_time
     )
     create_deterministic_function(
-        "django_datetime_extract", 4, _sqlite_datetime_extract
+        "bolt_datetime_extract", 4, _sqlite_datetime_extract
     )
-    create_deterministic_function("django_datetime_trunc", 4, _sqlite_datetime_trunc)
-    create_deterministic_function("django_time_extract", 2, _sqlite_time_extract)
-    create_deterministic_function("django_time_trunc", 4, _sqlite_time_trunc)
-    create_deterministic_function("django_time_diff", 2, _sqlite_time_diff)
-    create_deterministic_function("django_timestamp_diff", 2, _sqlite_timestamp_diff)
-    create_deterministic_function("django_format_dtdelta", 3, _sqlite_format_dtdelta)
+    create_deterministic_function("bolt_datetime_trunc", 4, _sqlite_datetime_trunc)
+    create_deterministic_function("bolt_time_extract", 2, _sqlite_time_extract)
+    create_deterministic_function("bolt_time_trunc", 4, _sqlite_time_trunc)
+    create_deterministic_function("bolt_time_diff", 2, _sqlite_time_diff)
+    create_deterministic_function("bolt_timestamp_diff", 2, _sqlite_timestamp_diff)
+    create_deterministic_function("bolt_format_dtdelta", 3, _sqlite_format_dtdelta)
     create_deterministic_function("regexp", 2, _sqlite_regexp)
     create_deterministic_function("BITXOR", 2, _sqlite_bitxor)
     create_deterministic_function("COT", 1, _sqlite_cot)

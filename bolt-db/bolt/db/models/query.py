@@ -11,7 +11,7 @@ import bolt.runtime
 from bolt.runtime import settings
 from bolt import exceptions
 from bolt.db import (
-    DJANGO_VERSION_PICKLE_KEY,
+    BOLT_VERSION_PICKLE_KEY,
     IntegrityError,
     NotSupportedError,
     connections,
@@ -319,14 +319,14 @@ class QuerySet(AltersData):
     def __getstate__(self):
         # Force the cache to be fully populated.
         self._fetch_all()
-        return {**self.__dict__, DJANGO_VERSION_PICKLE_KEY: bolt.runtime.__version__}
+        return {**self.__dict__, BOLT_VERSION_PICKLE_KEY: bolt.runtime.__version__}
 
     def __setstate__(self, state):
-        pickled_version = state.get(DJANGO_VERSION_PICKLE_KEY)
+        pickled_version = state.get(BOLT_VERSION_PICKLE_KEY)
         if pickled_version:
             if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
-                    "Pickled queryset instance's Django version %s does not "
+                    "Pickled queryset instance's Bolt version %s does not "
                     "match the current version %s."
                     % (pickled_version, bolt.runtime.__version__),
                     RuntimeWarning,
@@ -334,7 +334,7 @@ class QuerySet(AltersData):
                 )
         else:
             warnings.warn(
-                "Pickled queryset instance's Django version is not specified.",
+                "Pickled queryset instance's Bolt version is not specified.",
                 RuntimeWarning,
                 stacklevel=2,
             )
@@ -2119,7 +2119,7 @@ def prefetch_related_objects(model_instances, *related_lookups):
                         # Must be an immutable object from
                         # values_list(flat=True), for example (TypeError) or
                         # a QuerySet subclass that isn't returning Model
-                        # instances (AttributeError), either in Django or a 3rd
+                        # instances (AttributeError), either in Bolt or a 3rd
                         # party. prefetch_related() doesn't make sense, so quit.
                         good_objects = False
                         break

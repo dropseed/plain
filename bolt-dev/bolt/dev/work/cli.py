@@ -22,8 +22,8 @@ def cli():
     repo_root = get_repo_root()
     dot_bolt_dir = os.path.join(repo_root, ".bolt")
 
-    django_env = {
-        **os.environ,  # Make a copy before load_dotenv, since Django will do it's own version of that
+    bolt_env = {
+        **os.environ,  # Make a copy before load_dotenv, since Bolt will do it's own version of that
         "PYTHONUNBUFFERED": "true",
     }
 
@@ -38,10 +38,10 @@ def cli():
             f"Automatically using Codespace BASE_URL={click.style(codespace_base_url, underline=True)}",
             bold=True,
         )
-        django_env["BASE_URL"] = codespace_base_url
+        bolt_env["BASE_URL"] = codespace_base_url
 
-    if subprocess.run(["bolt", "legacy", "check"], env=django_env).returncode:
-        click.secho("Django check failed!", fg="red")
+    if subprocess.run(["bolt", "legacy", "check"], env=bolt_env).returncode:
+        click.secho("Bolt check failed!", fg="red")
         sys.exit(1)
 
     manager = HonchoManager()
@@ -52,7 +52,7 @@ def cli():
     manager.add_process("postgres", "bolt dev db start --logs")
     runserver_cmd = "bolt dev db wait && " + runserver_cmd
 
-    manager.add_process("bolt", runserver_cmd, env=django_env)
+    manager.add_process("bolt", runserver_cmd, env=bolt_env)
 
     if "REDIS_URL" in os.environ:
         redis_url = os.environ["REDIS_URL"]
@@ -69,7 +69,7 @@ def cli():
         manager.add_process("tailwind", "bolt-tailwind compile --watch")
 
     custom_env = {
-        **django_env,
+        **bolt_env,
         "PORT": runserver_port,
         "PYTHONPATH": os.path.join(repo_root, "app"),
     }

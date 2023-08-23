@@ -45,7 +45,7 @@ def cli(install):
 
     if bolt_db_connected():
         check_short(
-            "Running Django system checks",
+            "Running Bolt system checks",
             "bolt",
             "legacy",
             "check",
@@ -53,10 +53,10 @@ def cli(install):
             "default",
         )
         check_short(
-            "Checking Django migrations", "bolt", "legacy", "migrate", "--check"
+            "Checking Bolt migrations", "bolt", "legacy", "migrate", "--check"
         )
         check_short(
-            "Checking for Django models missing migrations",
+            "Checking for Bolt models missing migrations",
             "bolt",
             "legacy",
             "makemigrations",
@@ -65,7 +65,7 @@ def cli(install):
         )
     else:
         check_short(
-            "Running Django checks (without database)", "bolt", "legacy", "check"
+            "Running Bolt checks (without database)", "bolt", "legacy", "check"
         )
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 

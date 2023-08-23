@@ -1,4 +1,4 @@
-"""A pytest plugin which helps testing Django applications
+"""A pytest plugin which helps testing Bolt applications
 
 This plugin handles creating and destroying the test environment and
 test database and provides some useful text fixtures.
@@ -12,18 +12,18 @@ from typing import Generator, List, Optional, Tuple, Union
 
 import pytest
 
-from .fixtures import _django_db_helper  # noqa
+from .fixtures import _bolt_db_helper  # noqa
 from .fixtures import client  # noqa
 from .fixtures import db  # noqa
-from .fixtures import django_assert_max_num_queries  # noqa
-from .fixtures import django_assert_num_queries  # noqa
-from .fixtures import django_db_reset_sequences  # noqa
-from .fixtures import django_db_serialized_rollback  # noqa
-from .fixtures import django_db_setup  # noqa
+from .fixtures import bolt_assert_max_num_queries  # noqa
+from .fixtures import bolt_assert_num_queries  # noqa
+from .fixtures import bolt_db_reset_sequences  # noqa
+from .fixtures import bolt_db_serialized_rollback  # noqa
+from .fixtures import bolt_db_setup  # noqa
 from .fixtures import rf  # noqa
 from .fixtures import settings  # noqa
 from .fixtures import transactional_db  # noqa
-from .fixtures import validate_django_db
+from .fixtures import validate_bolt_db
 
 
 TYPE_CHECKING = False
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 @pytest.hookimpl()
 def pytest_addoption(parser) -> None:
-    group = parser.getgroup("django")
+    group = parser.getgroup("bolt")
     group.addoption(
         "--reuse-db",
         action="store_true",
@@ -57,14 +57,14 @@ def pytest_addoption(parser) -> None:
     )
 
     parser.addini(
-        "django_debug_mode",
-        "How to set the Django DEBUG setting (default `False`). "
+        "bolt_debug_mode",
+        "How to set the Bolt DEBUG setting (default `False`). "
         "Use `keep` to not override.",
         default="False",
     )
 
 
-def _setup_django() -> None:
+def _setup_bolt() -> None:
     import bolt.runtime
     bolt.runtime.setup()
 
@@ -99,11 +99,11 @@ def pytest_load_initial_conftests(
     # Register the marks
     early_config.addinivalue_line(
         "markers",
-        "django_db(transaction=False, reset_sequences=False, databases=None, "
+        "bolt_db(transaction=False, reset_sequences=False, databases=None, "
         "serialized_rollback=False): "
-        "Mark the test as using the Django test database.  "
+        "Mark the test as using the Bolt test database.  "
         "The *transaction* argument allows you to use real transactions "
-        "in the test like Django's TransactionTestCase.  "
+        "in the test like Bolt's TransactionTestCase.  "
         "The *reset_sequences* argument resets database sequences before "
         "the test.  "
         "The *databases* argument sets which database aliases the test "
@@ -114,7 +114,7 @@ def pytest_load_initial_conftests(
     early_config.addinivalue_line(
         "markers",
         "urls(modstr): Use a different URLconf for this test, similar to "
-        "the `urls` attribute of Django's `TestCase` objects.  *modstr* is "
+        "the `urls` attribute of Bolt's `TestCase` objects.  *modstr* is "
         "a string specifying the module of a URL config, e.g. "
         '"my_app.test_urls".',
     )
@@ -129,27 +129,27 @@ def pytest_load_initial_conftests(
     if options.version or options.help:
         return
 
-    _setup_django()
+    _setup_bolt()
 
 
 @pytest.hookimpl(trylast=True)
 def pytest_configure() -> None:
-    # Allow Django settings to be configured in a user pytest_configure call,
-    # but make sure we call django.setup()
-    _setup_django()
+    # Allow Bolt settings to be configured in a user pytest_configure call,
+    # but make sure we call bolt.setup()
+    _setup_bolt()
 
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(items: List[pytest.Item]) -> None:
     def get_order_number(test: pytest.Item) -> int:
-        marker_db = test.get_closest_marker("django_db")
+        marker_db = test.get_closest_marker("bolt_db")
         if marker_db:
             (
                 transaction,
                 reset_sequences,
                 databases,
                 serialized_rollback,
-            ) = validate_django_db(marker_db)
+            ) = validate_bolt_db(marker_db)
             uses_db = True
             transactional = transaction or reset_sequences
         else:
@@ -170,38 +170,38 @@ def pytest_collection_modifyitems(items: List[pytest.Item]) -> None:
 
 
 @pytest.fixture(autouse=True, scope="session")
-def django_test_environment(request) -> None:
+def bolt_test_environment(request) -> None:
     """
-    Ensure that Django is loaded and has its testing environment setup.
+    Ensure that Bolt is loaded and has its testing environment setup.
 
     XXX It is a little dodgy that this is an autouse fixture.  Perhaps
         an email fixture should be requested in order to be able to
-        use the Django email machinery just like you need to request a
-        db fixture for access to the Django database, etc.  But
-        without duplicating a lot more of Django's test support code
+        use the Bolt email machinery just like you need to request a
+        db fixture for access to the Bolt database, etc.  But
+        without duplicating a lot more of Bolt's test support code
         we need to follow this model.
     """
-    _setup_django()
+    _setup_bolt()
     from bolt.test.utils import (
         setup_test_environment, teardown_test_environment,
     )
 
-    debug_ini = request.config.getini("django_debug_mode")
+    debug_ini = request.config.getini("bolt_debug_mode")
     if debug_ini == "keep":
         debug = None
     else:
-        debug = _get_boolean_value(debug_ini, "django_debug_mode", False)
+        debug = _get_boolean_value(debug_ini, "bolt_debug_mode", False)
 
     setup_test_environment(debug=debug)
     request.addfinalizer(teardown_test_environment)
 
 
 @pytest.fixture(scope="session")
-def django_db_blocker() -> "Optional[_DatabaseBlocker]":
-    """Wrapper around Django's database access.
+def bolt_db_blocker() -> "Optional[_DatabaseBlocker]":
+    """Wrapper around Bolt's database access.
 
     This object can be used to re-enable database access.  This fixture is used
-    internally in pytest-django to build the other fixtures and can be used for
+    internally in pytest-bolt to build the other fixtures and can be used for
     special database handling.
 
     The object is a context manager and provides the methods
@@ -214,11 +214,11 @@ def django_db_blocker() -> "Optional[_DatabaseBlocker]":
 
 
 @pytest.fixture(autouse=True)
-def _django_db_marker(request) -> None:
-    """Implement the django_db marker, internal to pytest-django."""
-    marker = request.node.get_closest_marker("django_db")
+def _bolt_db_marker(request) -> None:
+    """Implement the bolt_db marker, internal to pytest-bolt."""
+    marker = request.node.get_closest_marker("bolt_db")
     if marker:
-        request.getfixturevalue("_django_db_helper")
+        request.getfixturevalue("_bolt_db_helper")
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -232,7 +232,7 @@ def _dj_autoclear_mailbox() -> None:
 
 @pytest.fixture(scope="function")
 def mailoutbox(
-    django_mail_patch_dns: None,
+    bolt_mail_patch_dns: None,
     _dj_autoclear_mailbox: None,
 ) -> "Optional[List[bolt.mail.EmailMessage]]":
     try:
@@ -243,19 +243,19 @@ def mailoutbox(
 
 
 @pytest.fixture(scope="function")
-def django_mail_patch_dns(
+def bolt_mail_patch_dns(
     monkeypatch,
-    django_mail_dnsname: str,
+    bolt_mail_dnsname: str,
 ) -> None:
     try:
         from bolt import mail
-        monkeypatch.setattr(mail.message, "DNS_NAME", django_mail_dnsname)
+        monkeypatch.setattr(mail.message, "DNS_NAME", bolt_mail_dnsname)
     except ImportError:
         pass
 
 
 @pytest.fixture(scope="function")
-def django_mail_dnsname() -> str:
+def bolt_mail_dnsname() -> str:
     return "fake-tests.example.com"
 
 
@@ -276,7 +276,7 @@ class _DatabaseBlockerContextManager:
 class _DatabaseBlocker:
     """Manager for bolt.db.backends.base.base.BaseDatabaseWrapper.
 
-    This is the object returned by django_db_blocker.
+    This is the object returned by bolt_db_blocker.
     """
 
     def __init__(self):
@@ -302,18 +302,18 @@ class _DatabaseBlocker:
         __tracebackhide__  # Silence pyflakes
         raise RuntimeError(
             "Database access not allowed, "
-            'use the "django_db" mark, or the '
+            'use the "bolt_db" mark, or the '
             '"db" or "transactional_db" fixtures to enable it.'
         )
 
     def unblock(self) -> "ContextManager[None]":
-        """Enable access to the Django database."""
+        """Enable access to the Bolt database."""
         self._save_active_wrapper()
         self._dj_db_wrapper.ensure_connection = self._real_ensure_connection
         return _DatabaseBlockerContextManager(self)
 
     def block(self) -> "ContextManager[None]":
-        """Disable access to the Django database."""
+        """Disable access to the Bolt database."""
         self._save_active_wrapper()
         self._dj_db_wrapper.ensure_connection = self._blocking_wrapper
         return _DatabaseBlockerContextManager(self)

@@ -1,7 +1,7 @@
 """
-Settings and configuration for Django.
+Settings and configuration for Bolt.
 
-Read values from the module specified by the DJANGO_SETTINGS_MODULE environment
+Read values from the module specified by the BOLT_SETTINGS_MODULE environment
 variable, and then from bolt.global_settings; see the global_settings.py
 for a list of all possible variables.
 """
@@ -20,7 +20,7 @@ from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.functional import LazyObject, empty
 from bolt.apps import AppConfig
 
-ENVIRONMENT_VARIABLE = "DJANGO_SETTINGS_MODULE"
+ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"
 DEFAULT_STORAGE_ALIAS = "default"
 STATICFILES_STORAGE_ALIAS = "staticfiles"
 
@@ -40,9 +40,9 @@ class SettingsReference(str):
 
 class LazySettings(LazyObject):
     """
-    A lazy proxy for either global Django settings or a custom settings object.
+    A lazy proxy for either global Bolt settings or a custom settings object.
     The user can manually configure settings prior to using them. Otherwise,
-    Django uses the settings module pointed to by DJANGO_SETTINGS_MODULE.
+    Bolt uses the settings module pointed to by BOLT_SETTINGS_MODULE.
     """
 
     def _setup(self, name=None):

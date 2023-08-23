@@ -5,7 +5,7 @@ from bolt.runtime import settings
 from .. import Error, Tags, Warning, register
 
 W003 = Warning(
-    "You don't appear to be using Django's built-in "
+    "You don't appear to be using Bolt's built-in "
     "cross-site request forgery protection via the middleware "
     "('bolt.csrf.middleware.CsrfViewMiddleware' is not in your "
     "MIDDLEWARE). Enabling the middleware is the safest approach "

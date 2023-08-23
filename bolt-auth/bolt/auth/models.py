@@ -114,7 +114,7 @@ class AbstractUser(AbstractBaseUser):
 
 class User(AbstractUser):
     """
-    Users within the Django authentication system are represented by this
+    Users within the Bolt authentication system are represented by this
     model.
 
     Username and password are required. Other fields are optional.

@@ -16,7 +16,6 @@ pytest = "^7.1.2"
 ipdb = "^0.13.9"
 isort = "^5.10.1"
 black = "^22.6.0"
-pytest-django = "^4.5.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

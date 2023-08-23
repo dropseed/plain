@@ -5,7 +5,7 @@ from bolt.legacy.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
-    help = "Checks the entire Django project for potential problems."
+    help = "Checks the entire Bolt project for potential problems."
 
     requires_system_checks = []
 

@@ -1,5 +1,5 @@
 """
-MySQL database backend for Django.
+MySQL database backend for Bolt.
 
 Requires mysqlclient: https://pypi.org/project/mysqlclient/
 """
@@ -37,9 +37,9 @@ if version < (1, 4, 3):
 
 
 # MySQLdb returns TIME columns as timedelta -- they are more like timedelta in
-# terms of actual behavior as they are signed and include days -- and Django
+# terms of actual behavior as they are signed and include days -- and Bolt
 # expects time.
-django_conversions = {
+bolt_conversions = {
     **conversions,
     **{FIELD_TYPE.TIME: backend_utils.typecast_time},
 }
@@ -74,7 +74,7 @@ class CursorWrapper:
             return self.cursor.execute(query, args)
         except Database.OperationalError as e:
             # Map some error codes to IntegrityError, since they seem to be
-            # misclassified and Django would prefer the more logical place.
+            # misclassified and Bolt would prefer the more logical place.
             if e.args[0] in self.codes_for_integrityerror:
                 raise IntegrityError(*tuple(e.args))
             raise
@@ -84,7 +84,7 @@ class CursorWrapper:
             return self.cursor.executemany(query, args)
         except Database.OperationalError as e:
             # Map some error codes to IntegrityError, since they seem to be
-            # misclassified and Django would prefer the more logical place.
+            # misclassified and Bolt would prefer the more logical place.
             if e.args[0] in self.codes_for_integrityerror:
                 raise IntegrityError(*tuple(e.args))
             raise
@@ -204,7 +204,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def get_connection_params(self):
         kwargs = {
-            "conv": django_conversions,
+            "conv": bolt_conversions,
             "charset": "utf8",
         }
         settings_dict = self.settings_dict
@@ -244,8 +244,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def get_new_connection(self, conn_params):
         connection = Database.connect(**conn_params)
         # bytes encoder in mysqlclient doesn't work and was added only to
-        # prevent KeyErrors in Django < 2.0. We can remove this workaround when
-        # mysqlclient 2.1 becomes the minimal mysqlclient supported by Django.
+        # prevent KeyErrors in Bolt < 2.0. We can remove this workaround when
+        # mysqlclient 2.1 becomes the minimal mysqlclient supported by Bolt.
         # See https://github.com/PyMySQL/mysqlclient/issues/489
         if connection.encoders.get(bytes) is bytes:
             connection.encoders.pop(bytes)

@@ -89,7 +89,7 @@ def handle_default_options(options):
     user commands.
     """
     if options.settings:
-        os.environ["DJANGO_SETTINGS_MODULE"] = options.settings
+        os.environ["BOLT_SETTINGS_MODULE"] = options.settings
     if options.pythonpath:
         sys.path.insert(0, options.pythonpath)
 
@@ -276,8 +276,8 @@ class BaseCommand:
 
     def get_version(self):
         """
-        Return the Django version, which should be correct for all built-in
-        Django commands. User-supplied commands can override this method to
+        Return the Bolt version, which should be correct for all built-in
+        Bolt commands. User-supplied commands can override this method to
         return their own version.
         """
         return bolt.runtime.get_version()
@@ -320,7 +320,7 @@ class BaseCommand:
             help=(
                 "The Python path to a settings module, e.g. "
                 '"myproject.settings.main". If this isn\'t provided, the '
-                "DJANGO_SETTINGS_MODULE environment variable will be used."
+                "BOLT_SETTINGS_MODULE environment variable will be used."
             ),
         )
         self.add_base_argument(
@@ -386,7 +386,7 @@ class BaseCommand:
     def run_from_argv(self, argv):
         """
         Set up any environment changes requested (e.g., Python path
-        and Django settings), then run this command. If the
+        and Bolt settings), then run this command. If the
         command raises a ``CommandError``, intercept it and print it sensibly
         to stderr. If the ``--traceback`` option is present or the raised
         ``Exception`` is not ``CommandError``, raise it.
@@ -468,7 +468,7 @@ class BaseCommand:
         databases=None,
     ):
         """
-        Use the system check framework to validate entire Django project.
+        Use the system check framework to validate entire Bolt project.
         Raise CommandError for any serious message (error or critical errors).
         If there are only light messages (like warnings), print them to stderr
         and don't raise an exception.

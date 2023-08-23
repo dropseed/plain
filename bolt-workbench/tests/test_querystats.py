@@ -31,49 +31,49 @@ def test_tidy_stack():
     self.handle_request(listener, req, client, addr)
   File "/app/.heroku/python/lib/python3.9/site-packages/gunicorn/workers/sync.py", line 179, in handle_request
     respiter = self.wsgi(environ, resp.start_response)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/__init__.py", line 127, in sentry_patched_wsgi_handler
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/__init__.py", line 127, in sentry_patched_wsgi_handler
     return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
   File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/wsgi.py", line 132, in __call__
     rv = self.app(
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
   File "/app/.heroku/python/lib/python3.9/site-packages/whitenoise/middleware.py", line 60, in __call__
     response = self.get_response(request)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/middleware.py", line 175, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
   File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 34, in __call__
     is_staff = self.is_staff_request(request)
   File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 72, in is_staff_request
     and request.user
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 25, in <lambda>
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/middleware.py", line 25, in <lambda>
     request.user = SimpleLazyObject(lambda: get_user(request))
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 11, in get_user
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/middleware.py", line 11, in get_user
     request._cached_user = auth.get_user(request)
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/__init__.py", line 191, in get_user
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/__init__.py", line 191, in get_user
     user_id = _get_user_session_key(request)
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/__init__.py", line 60, in _get_user_session_key
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/__init__.py", line 60, in _get_user_session_key
     return get_user_model()._meta.pk.to_python(request.session[SESSION_KEY])
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/base.py", line 53, in __getitem__
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/base.py", line 53, in __getitem__
     return self._session[key]
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/base.py", line 192, in _get_session
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/base.py", line 192, in _get_session
     self._session_cache = self.load()
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/db.py", line 42, in load
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/db.py", line 42, in load
     s = self._get_session_from_db()
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/db.py", line 32, in _get_session_from_db
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/db.py", line 32, in _get_session_from_db
     return self.model.objects.get(
-  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/django/__init__.py", line 544, in execute
+  File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/__init__.py", line 544, in execute
     return real_execute(self, sql, params)"""
 
     # The actual traceback.format_stack() includes newlines when iterating,
@@ -84,20 +84,20 @@ def test_tidy_stack():
     is_staff = self.is_staff_request(request)
   File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 72, in is_staff_request
     and request.user
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 25, in <lambda>
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/middleware.py", line 25, in <lambda>
     request.user = SimpleLazyObject(lambda: get_user(request))
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/middleware.py", line 11, in get_user
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/middleware.py", line 11, in get_user
     request._cached_user = auth.get_user(request)
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/__init__.py", line 191, in get_user
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/__init__.py", line 191, in get_user
     user_id = _get_user_session_key(request)
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/auth/__init__.py", line 60, in _get_user_session_key
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/__init__.py", line 60, in _get_user_session_key
     return get_user_model()._meta.pk.to_python(request.session[SESSION_KEY])
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/base.py", line 53, in __getitem__
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/base.py", line 53, in __getitem__
     return self._session[key]
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/base.py", line 192, in _get_session
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/base.py", line 192, in _get_session
     self._session_cache = self.load()
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/db.py", line 42, in load
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/db.py", line 42, in load
     s = self._get_session_from_db()
-  File "/app/.heroku/python/lib/python3.9/site-packages/django/contrib/sessions/backends/db.py", line 32, in _get_session_from_db
+  File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/sessions/backends/db.py", line 32, in _get_session_from_db
     return self.model.objects.get("""
     )

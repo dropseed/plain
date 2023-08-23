@@ -563,7 +563,7 @@ class BaseDatabaseOperations:
             return value
 
         if timezone.is_aware(value):
-            raise ValueError("Django does not support timezone-aware times.")
+            raise ValueError("Bolt does not support timezone-aware times.")
         return str(value)
 
     def adapt_decimalfield_value(self, value, max_digits=None, decimal_places=None):

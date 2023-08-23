@@ -10,7 +10,7 @@ from bolt.utils.timezone import now as tz_now
 
 
 class Options:
-    """A class that will quack like a Django model _meta class.
+    """A class that will quack like a Bolt model _meta class.
 
     This allows cache operations to be controlled by the router
     """

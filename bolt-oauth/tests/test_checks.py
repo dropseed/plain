@@ -4,7 +4,7 @@ from bolt.auth import get_user_model
 from bolt.oauth.models import OAuthConnection
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_oauth_provider_keys_check_pass(settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "google": {
@@ -27,7 +27,7 @@ def test_oauth_provider_keys_check_pass(settings):
     assert len(errors) == 0
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_oauth_provider_keys_check_pass(settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "google": {

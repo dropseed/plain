@@ -49,7 +49,7 @@ class Index:
         if expressions and opclasses:
             raise ValueError(
                 "Index.opclasses cannot be used with expressions. Use "
-                "django.contrib.postgres.indexes.OpClass() instead."
+                "a custom OpClass() instead."
             )
         if opclasses and len(fields) != len(opclasses):
             raise ValueError(

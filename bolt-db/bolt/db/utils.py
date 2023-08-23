@@ -4,14 +4,12 @@ from importlib import import_module
 from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 
-# For backwards compatibility with Django < 3.2
-from bolt.utils.connection import ConnectionDoesNotExist  # NOQA: F401
 from bolt.utils.connection import BaseConnectionHandler
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string
 
 DEFAULT_DB_ALIAS = "default"
-DJANGO_VERSION_PICKLE_KEY = "_django_version"
+BOLT_VERSION_PICKLE_KEY = "_django_version"
 
 
 class Error(Exception):
@@ -53,7 +51,7 @@ class NotSupportedError(DatabaseError):
 class DatabaseErrorWrapper:
     """
     Context manager and decorator that reraises backend-specific database
-    exceptions using Django's common wrappers.
+    exceptions using Bolt's common wrappers.
     """
 
     def __init__(self, wrapper):
@@ -105,10 +103,6 @@ def load_backend(backend_name):
     Return a database backend's "base" module given a fully qualified database
     backend name, or raise an error if it doesn't exist.
     """
-    # This backend was renamed in Django 1.9.
-    if backend_name == "bolt.db.backends.postgresql_psycopg2":
-        backend_name = "bolt.db.backends.postgresql"
-
     try:
         return import_module("%s.base" % backend_name)
     except ImportError as e_user:
@@ -131,7 +125,7 @@ def load_backend(backend_name):
                 "    %s" % (backend_name, ", ".join(backend_reprs))
             ) from e_user
         else:
-            # If there's some other error, this must be an error in Django
+            # If there's some other error, this must be an error in Bolt
             raise
 
 
@@ -179,7 +173,7 @@ class ConnectionHandler(BaseConnectionHandler):
     def databases(self):
         # Maintained for backward compatibility as some 3rd party packages have
         # made use of this private API in the past. It is no longer used within
-        # Django itself.
+        # Bolt itself.
         return self.settings
 
     def create_connection(self, alias):

@@ -83,7 +83,7 @@ def conditional_escape(text):
     """
     Similar to escape(), except that it doesn't operate on pre-escaped strings.
 
-    This function relies on the __html__ convention used both by Django's
+    This function relies on the __html__ convention used both by Bolt's
     SafeData class and by third-party libraries like markupsafe.
     """
     if isinstance(text, Promise):
@@ -403,7 +403,7 @@ def avoid_wrapping(value):
 
 def html_safe(klass):
     """
-    A decorator that defines the __html__ method. This helps non-Django
+    A decorator that defines the __html__ method. This helps non-Bolt
     templates to detect classes whose __str__ methods return SafeString.
     """
     if "__html__" in klass.__dict__:

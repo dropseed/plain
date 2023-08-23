@@ -19,7 +19,7 @@ class DummyGitHubOAuthProvider(GitHubOAuthProvider):
         )
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_github_provider(client, monkeypatch, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "github": {

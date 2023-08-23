@@ -4,7 +4,7 @@ from bolt.oauth.models import OAuthConnection
 from bolt.oauth.providers import OAuthToken, OAuthUser
 
 
-@pytest.mark.django_db
+@pytest.mark.bolt_db
 def test_email_normalized():
     """Make sure that the normalize_email function is being called somewhere in here (was concerned it wasn't)"""
     connection = OAuthConnection.get_or_createuser(

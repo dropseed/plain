@@ -295,7 +295,7 @@ class MigrationLoader:
                     tries = ", ".join("%s.%s" % c for c in candidates)
                     raise NodeNotFoundError(
                         "Migration {0} depends on nonexistent node ('{1}', '{2}'). "
-                        "Django tried to replace migration {1}.{2} with any of [{3}] "
+                        "Bolt tried to replace migration {1}.{2} with any of [{3}] "
                         "but wasn't able to because some of the replaced migrations "
                         "are already applied.".format(
                             exc.origin, exc.node[0], exc.node[1], tries

@@ -20,7 +20,7 @@ from bolt.utils.log import log_response
 from bolt.utils.regex_helper import _lazy_re_compile
 
 
-logger = logging.getLogger("django.security.csrf")
+logger = logging.getLogger("bolt.security.csrf")
 # This matches if any character is not in CSRF_ALLOWED_CHARS.
 invalid_token_chars_re = _lazy_re_compile("[^a-zA-Z0-9]")
 
@@ -270,9 +270,6 @@ class CsrfViewMiddleware:
                 _check_token_format(csrf_secret)
         if csrf_secret is None:
             return None
-        # Django versions before 4.0 masked the secret before storing.
-        if len(csrf_secret) == CSRF_TOKEN_LENGTH:
-            csrf_secret = _unmask_cipher_token(csrf_secret)
         return csrf_secret
 
     def _set_csrf_cookie(self, request, response):

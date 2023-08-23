@@ -20,7 +20,6 @@ default_filters = {
     "strptime": datetime.datetime.strptime,
     # To convert to user time zone
     "localtime": localtime,
-    # Django's...
     "timeuntil": timeuntil,
     "timesince": timesince,
     "json_script": json_script,

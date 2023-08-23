@@ -119,9 +119,9 @@ def pull(ctx, backup, anonymize):
     app_dir = os.path.join(repo_root, "app")
     dot_bolt_dir = os.path.join(repo_root, ".bolt")
 
-    # Make sure Django works first
+    # Make sure Bolt works first
     if subprocess.run(["bolt", "legacy", "check"]).returncode:
-        click.secho("Django check failed!", fg="red")
+        click.secho("Bolt check failed!", fg="red")
         sys.exit(1)
 
     anonymize_installed = (

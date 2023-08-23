@@ -1,5 +1,5 @@
 from bolt.urls import path
-from django.views.generic import TemplateView
+from bolt.views import TemplateView
 
 
 class ErrorView(TemplateView):

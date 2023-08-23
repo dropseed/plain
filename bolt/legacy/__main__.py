@@ -1,8 +1,3 @@
-"""
-Invokes django-admin when the django module is run as a script.
-
-Example: python -m django check
-"""
 from pathlib import Path
 import sys
 from bolt.legacy import management

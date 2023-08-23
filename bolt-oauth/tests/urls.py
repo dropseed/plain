@@ -1,8 +1,8 @@
-from django.contrib import admin
+from bolt import admin
 from bolt.auth.mixins import LoginRequiredMixin
 from bolt.auth.views import LogoutView
 from bolt.urls import include, path
-from django.views.generic import TemplateView
+from bolt.views import TemplateView
 
 from bolt.oauth.providers import get_provider_keys
 

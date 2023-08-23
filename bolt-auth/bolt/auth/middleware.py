@@ -16,7 +16,7 @@ class AuthenticationMiddleware:
     def __call__(self, request):
         if not hasattr(request, "session"):
             raise ImproperlyConfigured(
-                "The Django authentication middleware requires session "
+                "The Bolt authentication middleware requires session "
                 "middleware to be installed. Edit your MIDDLEWARE setting to "
                 "insert "
                 "'bolt.sessions.middleware.SessionMiddleware' before "

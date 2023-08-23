@@ -1,5 +1,5 @@
 """
-Helper functions for creating Form classes from Django models
+Helper functions for creating Form classes from Bolt models
 and database field objects.
 """
 from itertools import chain

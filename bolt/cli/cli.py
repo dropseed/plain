@@ -22,7 +22,7 @@ class InstalledAppsGroup(click.Group):
         try:
             bolt.runtime.setup()
         except Exception as e:
-            click.secho(f"Error in Django setup\n{e}", fg="yellow")
+            click.secho(f"Error in bolt.runtime.setup()\n{e}", fg="yellow")
             return []
 
         apps_with_commands = []
@@ -134,32 +134,6 @@ def legacy_alias(legacy_args):
 #     subprocess.run(["open", "https://www.forgepackages.com/docs/?ref=cli"])
 
 
-# @cli.command(
-#     context_settings=dict(
-#         ignore_unknown_options=True,
-#     )
-# )
-# @click.argument("makemigrations_args", nargs=-1, type=click.UNPROCESSED)
-# def makemigrations(makemigrations_args):
-#     """Alias to Django `makemigrations`"""
-#     result = Forge().manage_cmd("makemigrations", *makemigrations_args)
-#     if result.returncode:
-#         sys.exit(result.returncode)
-
-
-# @cli.command(
-#     context_settings=dict(
-#         ignore_unknown_options=True,
-#     )
-# )
-# @click.argument("migrate_args", nargs=-1, type=click.UNPROCESSED)
-# def migrate(migrate_args):
-#     """Alias to Django `migrate`"""
-#     result = Forge().manage_cmd("migrate", *migrate_args)
-#     if result.returncode:
-#         sys.exit(result.returncode)
-
-
 @bolt_cli.command()
 @click.option(
     "-i",
@@ -211,11 +185,11 @@ def run(script):
 @click.option("--filter", "-f", "name_filter", help="Filter settings by name")
 @click.option("--overridden", is_flag=True, help="Only show overridden settings")
 def settings(name_filter, overridden):
-    """Print Django settings"""
+    """Print Bolt settings"""
     try:
         bolt.runtime.setup()
     except Exception as e:
-        click.secho(f"Error in Django setup\n{e}", fg="yellow")
+        click.secho(f"Error in bolt.runtime.setup()\n{e}", fg="yellow")
         return
 
     from bolt.runtime import settings

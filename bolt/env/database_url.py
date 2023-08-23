@@ -11,7 +11,7 @@
 #        notice, this list of conditions and the following disclaimer in the
 #        documentation and/or other materials provided with the distribution.
 
-#     3. Neither the name of Django nor the names of its contributors may be used
+#     3. Neither the name of Bolt nor the names of its contributors may be used
 #        to endorse or promote products derived from this software without
 #        specific prior written permission.
 
@@ -38,14 +38,7 @@ SCHEMES = {
     "pgsql": "bolt.db.backends.postgresql",
     "mysql": "bolt.db.backends.mysql",
     "mysql2": "bolt.db.backends.mysql",
-    "mysql-connector": "mysql.connector.django",
-    "mssql": "sql_server.pyodbc",
-    "mssqlms": "mssql",
     "sqlite": "bolt.db.backends.sqlite3",
-    "redshift": "django_redshift_backend",
-    "cockroach": "django_cockroachdb",
-    "timescale": "timescale.db.backends.postgresql",
-    "timescalegis": "timescale.db.backends.postgis",
 }
 
 # Register database schemes in URLs.
@@ -148,12 +141,7 @@ def parse(
                 % (spliturl.scheme, ", ".join(sorted(SCHEMES.keys())))
             )
 
-    port = (
-        str(spliturl.port)
-        if spliturl.port
-        and engine in (SCHEMES["mssql"], SCHEMES["mssqlms"])
-        else spliturl.port
-    )
+    port = spliturl.port
 
     # Update with environment configuration.
     parsed_config.update(
@@ -191,9 +179,6 @@ def parse(
     if "currentSchema" in options and engine in (
         "bolt.db.backends.postgresql_psycopg2",
         "bolt.db.backends.postgresql",
-        "django_redshift_backend",
-        "timescale.db.backends.postgresql",
-        "timescale.db.backends.postgis",
     ):
         options["options"] = "-c search_path={}".format(options.pop("currentSchema"))
 

@@ -31,7 +31,7 @@ class ForeignObjectRel(FieldCacheMixin):
     editable = False
     is_relation = True
 
-    # Reverse relations are always nullable (Django can't enforce that a
+    # Reverse relations are always nullable (Bolt can't enforce that a
     # foreign key on the related model points to this model).
     null = True
     empty_strings_allowed = False

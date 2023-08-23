@@ -197,7 +197,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 ],
             )
         elif old_is_auto and not new_is_auto:
-            # Drop IDENTITY if exists (pre-Django 4.1 serial columns don't have
+            # Drop IDENTITY if exists (pre-Bolt 4.1 serial columns don't have
             # it).
             self.execute(
                 self.sql_drop_indentity
@@ -210,7 +210,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             fragment, _ = super()._alter_column_type_sql(
                 model, old_field, new_field, new_type, old_collation, new_collation
             )
-            # Drop the sequence if exists (Django 4.1+ identity columns don't
+            # Drop the sequence if exists (Bolt 4.1+ identity columns don't
             # have it).
             other_actions = []
             if sequence_name := self._get_sequence_name(table, column):
@@ -234,7 +234,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 "BigAutoField": "bigint",
                 "SmallAutoField": "smallint",
             }
-            # Alter the sequence type if exists (Django 4.1+ identity columns
+            # Alter the sequence type if exists (Bolt 4.1+ identity columns
             # don't have it).
             other_actions = []
             if sequence_name := self._get_sequence_name(table, column):

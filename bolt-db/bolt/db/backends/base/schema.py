@@ -711,7 +711,7 @@ class BaseDatabaseSchemaEditor:
         }
         self.execute(sql, params)
         # Drop the default if we need to
-        # (Django usually does not use in-database defaults)
+        # (Bolt usually does not use in-database defaults)
         if (
             not self.skip_default_on_alter(field)
             and self.effective_default(field) is not None
@@ -1183,7 +1183,7 @@ class BaseDatabaseSchemaEditor:
                 self._create_check_sql(model, constraint_name, new_db_params["check"])
             )
         # Drop the default if we need to
-        # (Django usually does not use in-database defaults)
+        # (Bolt usually does not use in-database defaults)
         if needs_database_default:
             changes_sql, params = self._alter_column_default_sql(
                 model, old_field, new_field, drop=True
