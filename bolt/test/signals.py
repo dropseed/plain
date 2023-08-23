@@ -5,8 +5,8 @@ import warnings
 from bolt.apps import apps
 from bolt.exceptions import ImproperlyConfigured
 from bolt.signals import setting_changed
-from django.db import connections, router
-from django.db.utils import ConnectionRouter
+from bolt.db import connections, router
+from bolt.db.utils import ConnectionRouter
 from bolt.signals.dispatch import Signal, receiver
 from bolt.utils import timezone
 from bolt.utils.functional import empty

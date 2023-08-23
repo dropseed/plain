@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from bolt.paginator import Paginator
-from django.db import models
+from bolt.db import models
 from bolt.utils.text import slugify
 
 from bolt.views import (

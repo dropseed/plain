@@ -104,7 +104,7 @@ def _django_db_helper(
     django_db_blocker.unblock()
     request.addfinalizer(django_db_blocker.restore)
 
-    import django.db
+    import bolt.db
     import bolt.test
 
     if transactional:
@@ -295,7 +295,7 @@ def _assert_num_queries(
     from bolt.test.utils import CaptureQueriesContext
 
     if connection is None:
-        from django.db import connection as conn
+        from bolt.db import connection as conn
     else:
         conn = connection
 

@@ -13,7 +13,7 @@ import django
 from bolt import checks
 from bolt.exceptions import ImproperlyConfigured
 from django.core.management.color import color_style, no_style
-from django.db import DEFAULT_DB_ALIAS, connections
+from bolt.db import DEFAULT_DB_ALIAS, connections
 
 ALL_CHECKS = "__all__"
 
@@ -559,7 +559,7 @@ class BaseCommand:
         Print a warning if the set of migrations on disk don't match the
         migrations in the database.
         """
-        from django.db.migrations.executor import MigrationExecutor
+        from bolt.db.migrations.executor import MigrationExecutor
 
         try:
             executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])

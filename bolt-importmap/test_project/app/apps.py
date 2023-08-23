@@ -2,5 +2,5 @@ from bolt.apps import AppConfig
 
 
 class AppConfig(AppConfig):
-    default_auto_field = "django.db.models.BigAutoField"
+    default_auto_field = "bolt.db.models.BigAutoField"
     name = "app"

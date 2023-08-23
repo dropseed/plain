@@ -10,7 +10,7 @@ from bolt.exceptions import (
     ImproperlyConfigured,
     ValidationError,
 )
-from django.db.models.utils import AltersData
+from bolt.db.models.utils import AltersData
 from .fields import ChoiceField, Field
 from . import fields
 from .forms import BaseForm, DeclarativeFieldsMetaclass
@@ -33,7 +33,7 @@ def construct_instance(form, instance, fields=None):
     Construct and return a model instance from the bound ``form``'s
     ``cleaned_data``, but do not save the returned instance to the database.
     """
-    from django.db import models
+    from bolt.db import models
 
     opts = instance._meta
 
@@ -121,7 +121,7 @@ def fields_for_model(
     ignored = []
     opts = model._meta
     # Avoid circular import
-    from django.db.models.fields import Field as ModelField
+    from bolt.db.models.fields import Field as ModelField
 
     sortable_private_fields = [
         f for f in opts.private_fields if isinstance(f, ModelField)
@@ -793,7 +793,7 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
         return form_class(**defaults)
 
     # Avoid a circular import
-    from django.db import models
+    from bolt.db import models
 
     # Auto fields aren't rendered by default
     if isinstance(modelfield, models.AutoField) or issubclass(modelfield.__class__, models.AutoField):
@@ -827,7 +827,7 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
         # TODO: Handle multiple backends with different feature flags.
-        from django.db import connection
+        from bolt.db import connection
         if modelfield.null and not connection.features.interprets_empty_strings_as_nulls:
             defaults["empty_value"] = None
         return fields.CharField(

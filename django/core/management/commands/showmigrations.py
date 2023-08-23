@@ -2,9 +2,9 @@ import sys
 
 from bolt.apps import apps
 from django.core.management.base import BaseCommand
-from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.migrations.loader import MigrationLoader
-from django.db.migrations.recorder import MigrationRecorder
+from bolt.db import DEFAULT_DB_ALIAS, connections
+from bolt.db.migrations.loader import MigrationLoader
+from bolt.db.migrations.recorder import MigrationRecorder
 
 
 class Command(BaseCommand):

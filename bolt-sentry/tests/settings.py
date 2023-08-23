@@ -25,7 +25,7 @@ MIDDLEWARE = [
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
+        "ENGINE": "bolt.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }

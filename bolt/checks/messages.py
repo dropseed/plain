@@ -23,7 +23,7 @@ class CheckMessage:
         )
 
     def __str__(self):
-        from django.db import models
+        from bolt.db import models
 
         if self.obj is None:
             obj = "?"

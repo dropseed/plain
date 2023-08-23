@@ -1,4 +1,4 @@
-from django.db import models
+from bolt.db import models
 
 
 class SessionManager(models.Manager):

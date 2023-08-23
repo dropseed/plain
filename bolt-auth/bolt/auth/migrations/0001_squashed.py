@@ -2,9 +2,9 @@
 
 import bolt.auth.models
 import bolt.auth.validators
-import django.db.models.deletion
+import bolt.db.models.deletion
 import bolt.utils.timezone
-from django.db import migrations, models
+from bolt.db import migrations, models
 
 
 # Functions from the following migrations need manual copying.

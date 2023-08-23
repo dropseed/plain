@@ -12,7 +12,7 @@ from django.core.management import call_command
 from django.core.management.color import no_style
 from django.core.management.sql import emit_post_migrate_signal
 from bolt.signals import setting_changed
-from django.db import DEFAULT_DB_ALIAS, connections, transaction
+from bolt.db import DEFAULT_DB_ALIAS, connections, transaction
 from bolt.test.client import Client
 from bolt.test.utils import (
     modify_settings,

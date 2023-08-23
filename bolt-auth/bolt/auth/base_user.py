@@ -12,7 +12,7 @@ from bolt.auth.hashers import (
     is_password_usable,
     make_password,
 )
-from django.db import models
+from bolt.db import models
 from bolt.utils.crypto import get_random_string, salted_hmac
 from bolt.utils.deprecation import RemovedInDjango51Warning
 

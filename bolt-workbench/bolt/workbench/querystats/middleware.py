@@ -4,7 +4,7 @@ import threading
 
 from django.conf import settings
 from bolt.json import BoltJSONEncoder
-from django.db import connection
+from bolt.db import connection
 from bolt.http import HttpResponseRedirect
 from bolt import jinja
 

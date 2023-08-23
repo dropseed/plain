@@ -1,5 +1,5 @@
 import bolt.sessions.models
-from django.db import migrations, models
+from bolt.db import migrations, models
 
 
 class Migration(migrations.Migration):

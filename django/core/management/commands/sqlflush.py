@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.core.management.sql import sql_flush
-from django.db import DEFAULT_DB_ALIAS, connections
+from bolt.db import DEFAULT_DB_ALIAS, connections
 
 
 class Command(BaseCommand):

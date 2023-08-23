@@ -4,11 +4,11 @@ import sys
 from bolt.apps import apps
 from django.core.management.base import BaseCommand, CommandError
 from django.core.management.utils import run_formatters
-from django.db import migrations
-from django.db.migrations.exceptions import AmbiguityError
-from django.db.migrations.loader import MigrationLoader
-from django.db.migrations.optimizer import MigrationOptimizer
-from django.db.migrations.writer import MigrationWriter
+from bolt.db import migrations
+from bolt.db.migrations.exceptions import AmbiguityError
+from bolt.db.migrations.loader import MigrationLoader
+from bolt.db.migrations.optimizer import MigrationOptimizer
+from bolt.db.migrations.writer import MigrationWriter
 from bolt.utils.version import get_docs_version
 
 

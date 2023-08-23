@@ -33,15 +33,15 @@ from typing import Any, TypedDict
 DEFAULT_ENV = "DATABASE_URL"
 
 SCHEMES = {
-    "postgres": "django.db.backends.postgresql",
-    "postgresql": "django.db.backends.postgresql",
-    "pgsql": "django.db.backends.postgresql",
-    "mysql": "django.db.backends.mysql",
-    "mysql2": "django.db.backends.mysql",
+    "postgres": "bolt.db.backends.postgresql",
+    "postgresql": "bolt.db.backends.postgresql",
+    "pgsql": "bolt.db.backends.postgresql",
+    "mysql": "bolt.db.backends.mysql",
+    "mysql2": "bolt.db.backends.mysql",
     "mysql-connector": "mysql.connector.django",
     "mssql": "sql_server.pyodbc",
     "mssqlms": "mssql",
-    "sqlite": "django.db.backends.sqlite3",
+    "sqlite": "bolt.db.backends.sqlite3",
     "redshift": "django_redshift_backend",
     "cockroach": "django_cockroachdb",
     "timescale": "timescale.db.backends.postgresql",
@@ -189,8 +189,8 @@ def parse(
 
     # Support for Postgres Schema URLs
     if "currentSchema" in options and engine in (
-        "django.db.backends.postgresql_psycopg2",
-        "django.db.backends.postgresql",
+        "bolt.db.backends.postgresql_psycopg2",
+        "bolt.db.backends.postgresql",
         "django_redshift_backend",
         "timescale.db.backends.postgresql",
         "timescale.db.backends.postgis",

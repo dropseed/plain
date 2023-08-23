@@ -39,7 +39,7 @@ where you will typically store a Stripe customer ID (like on a Team),
 or something more specific like a Stripe subscription or charge ID.
 
 ```python
-from django.db import models
+from bolt.db import models
 from bolt.stripe.models import StripeModel
 
 

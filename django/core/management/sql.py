@@ -1,7 +1,7 @@
 import sys
 
 from bolt.apps import apps
-from django.db import models
+from bolt.db import models
 
 
 def sql_flush(style, connection, reset_sequences=True, allow_cascade=False):

@@ -14,7 +14,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from bolt import validators
 from bolt.exceptions import ValidationError
-from django.db.models.enums import ChoicesMeta
+from bolt.db.models.enums import ChoicesMeta
 from .boundfield import BoundField
 from bolt.utils.dateparse import parse_datetime, parse_duration
 from bolt.utils.duration import duration_string

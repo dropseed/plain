@@ -5,11 +5,11 @@ from bolt.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.core.management.utils import run_formatters
-from django.db import DEFAULT_DB_ALIAS, connections, migrations
-from django.db.migrations.loader import AmbiguityError, MigrationLoader
-from django.db.migrations.migration import SwappableTuple
-from django.db.migrations.optimizer import MigrationOptimizer
-from django.db.migrations.writer import MigrationWriter
+from bolt.db import DEFAULT_DB_ALIAS, connections, migrations
+from bolt.db.migrations.loader import AmbiguityError, MigrationLoader
+from bolt.db.migrations.migration import SwappableTuple
+from bolt.db.migrations.optimizer import MigrationOptimizer
+from bolt.db.migrations.writer import MigrationWriter
 from bolt.utils.version import get_docs_version
 
 

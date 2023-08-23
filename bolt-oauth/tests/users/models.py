@@ -1,5 +1,5 @@
 from bolt.auth.models import AbstractUser
-from django.db import models
+from bolt.db import models
 
 
 class User(AbstractUser):

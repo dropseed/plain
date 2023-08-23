@@ -5,11 +5,11 @@ from importlib import import_module
 from bolt.apps import apps
 from django.core.management.base import BaseCommand, CommandError, no_translations
 from django.core.management.sql import emit_post_migrate_signal, emit_pre_migrate_signal
-from django.db import DEFAULT_DB_ALIAS, connections, router
-from django.db.migrations.autodetector import MigrationAutodetector
-from django.db.migrations.executor import MigrationExecutor
-from django.db.migrations.loader import AmbiguityError
-from django.db.migrations.state import ModelState, ProjectState
+from bolt.db import DEFAULT_DB_ALIAS, connections, router
+from bolt.db.migrations.autodetector import MigrationAutodetector
+from bolt.db.migrations.executor import MigrationExecutor
+from bolt.db.migrations.loader import AmbiguityError
+from bolt.db.migrations.state import ModelState, ProjectState
 from bolt.utils.module_loading import module_has_submodule
 from bolt.utils.text import Truncator
 

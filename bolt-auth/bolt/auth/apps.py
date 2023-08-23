@@ -1,6 +1,6 @@
 from bolt.apps import AppConfig
 from bolt import checks
-from django.db.models.query_utils import DeferredAttribute
+from bolt.db.models.query_utils import DeferredAttribute
 
 from . import get_user_model
 from .checks import check_user_model
@@ -8,7 +8,7 @@ from .signals import user_logged_in
 
 
 class AuthConfig(AppConfig):
-    default_auto_field = "django.db.models.AutoField"
+    default_auto_field = "bolt.db.models.AutoField"
     name = "bolt.auth"
     verbose_name = "Authentication and Authorization"
 

@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from bolt.auth import get_user_model
 from bolt.checks import Error
-from django.db import models, transaction
-from django.db.utils import IntegrityError, OperationalError, ProgrammingError
+from bolt.db import models, transaction
+from bolt.db.utils import IntegrityError, OperationalError, ProgrammingError
 from bolt.utils import timezone
 
 from .exceptions import OAuthUserAlreadyExistsError

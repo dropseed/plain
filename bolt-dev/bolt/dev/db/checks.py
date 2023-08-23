@@ -1,6 +1,6 @@
 from django.conf import settings
 from bolt.checks import Error, Tags, register
-from django.db import connection
+from bolt.db import connection
 
 
 @register("boltdb", Tags.database)

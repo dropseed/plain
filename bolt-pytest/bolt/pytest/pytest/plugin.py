@@ -274,7 +274,7 @@ class _DatabaseBlockerContextManager:
 
 
 class _DatabaseBlocker:
-    """Manager for django.db.backends.base.base.BaseDatabaseWrapper.
+    """Manager for bolt.db.backends.base.base.BaseDatabaseWrapper.
 
     This is the object returned by django_db_blocker.
     """
@@ -284,8 +284,8 @@ class _DatabaseBlocker:
         self._real_ensure_connection = None
 
     @property
-    def _dj_db_wrapper(self) -> "django.db.backends.base.base.BaseDatabaseWrapper":
-        from django.db.backends.base.base import BaseDatabaseWrapper
+    def _dj_db_wrapper(self) -> "bolt.db.backends.base.base.BaseDatabaseWrapper":
+        from bolt.db.backends.base.base import BaseDatabaseWrapper
 
         # The first time the _dj_db_wrapper is accessed, we will save a
         # reference to the real implementation.

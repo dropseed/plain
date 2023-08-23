@@ -18,8 +18,8 @@ from bolt.apps.registry import Apps
 from django.conf import UserSettingsHolder, settings
 from bolt.exceptions import ImproperlyConfigured
 from bolt.signals import request_started, setting_changed
-from django.db import DEFAULT_DB_ALIAS, connections, reset_queries
-from django.db.models.options import Options
+from bolt.db import DEFAULT_DB_ALIAS, connections, reset_queries
+from bolt.db.models.options import Options
 from jinja2 import Template
 from bolt.test.signals import template_rendered
 

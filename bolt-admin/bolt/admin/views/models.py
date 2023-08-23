@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING
 
-from django.db.models import Q
+from bolt.db.models import Q
 from bolt.urls import reverse_lazy
 
 from .base import URL_NAMESPACE, AdminDetailView, AdminObjectsView, AdminUpdateView
 
 if TYPE_CHECKING:
-    from django.db import models
+    from bolt.db import models
 
     from bolt.views import View
 

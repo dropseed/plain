@@ -3,7 +3,7 @@
 import bolt.auth.models
 import bolt.auth.validators
 import bolt.utils.timezone
-from django.db import migrations, models
+from bolt.db import migrations, models
 
 
 class Migration(migrations.Migration):

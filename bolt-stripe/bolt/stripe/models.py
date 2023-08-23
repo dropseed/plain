@@ -1,5 +1,5 @@
 import stripe
-from django.db import models
+from bolt.db import models
 from bolt.utils.functional import cached_property
 
 

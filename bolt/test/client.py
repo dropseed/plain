@@ -14,7 +14,7 @@ from bolt.handlers.base import BaseHandler
 from bolt.handlers.wsgi import LimitedStream, WSGIRequest
 from bolt.json import BoltJSONEncoder
 from bolt.signals import got_request_exception, request_finished, request_started
-from django.db import close_old_connections
+from bolt.db import close_old_connections
 from bolt.http import HttpHeaders, HttpRequest, QueryDict
 from http.cookies import SimpleCookie
 from bolt.test import signals

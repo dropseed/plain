@@ -2,8 +2,8 @@
 
 import uuid
 
-import django.db.models.deletion
-from django.db import migrations, models
+import bolt.db.models.deletion
+from bolt.db import migrations, models
 
 import bolt.flags.models
 
@@ -68,7 +68,7 @@ class Migration(migrations.Migration):
                 (
                     "flag",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
+                        on_delete=bolt.db.models.deletion.CASCADE,
                         to="boltflags.flag",
                     ),
                 ),

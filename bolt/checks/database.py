@@ -1,4 +1,4 @@
-from django.db import connections
+from bolt.db import connections
 
 from . import Tags, register
 

@@ -1,5 +1,5 @@
 from bolt.exceptions import ImproperlyConfigured, ObjectDoesNotExist
-from django.db import models
+from bolt.db import models
 from bolt.http import Http404, HttpResponse, HttpResponseRedirect
 
 from .forms import FormView
