@@ -24,7 +24,7 @@ def setup():
     if app_dir.exists() and app_dir not in sys.path:
         sys.path.insert(0, app_dir.as_posix())
 
-    configure_logging(settings.LOGGING_CONFIG, settings.LOGGING)
+    configure_logging(settings.LOGGING)
 
     apps.populate(settings.INSTALLED_APPS)
 

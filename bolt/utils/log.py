@@ -1,9 +1,9 @@
+from os import environ
 import logging
-import logging.config  # needed when logging_config doesn't start with logging.config
+import logging.config
 
 from bolt.legacy.management.color import color_style
 from bolt.runtime import settings
-from bolt.utils.module_loading import import_string
 
 request_logger = logging.getLogger("bolt.request")
 
@@ -24,6 +24,9 @@ DEFAULT_LOGGING = {
         },
     },
     "formatters": {
+        "simple": {
+            "format": "[%(levelname)s] %(message)s",
+        },
         "bolt.server": {
             "()": "bolt.utils.log.ServerFormatter",
             "format": "[{server_time}] {message}",
@@ -35,6 +38,7 @@ DEFAULT_LOGGING = {
             "level": "INFO",
             "filters": ["require_debug_true"],
             "class": "logging.StreamHandler",
+            "formatter": "simple",
         },
         "bolt.server": {
             "level": "INFO",
@@ -45,27 +49,29 @@ DEFAULT_LOGGING = {
     "loggers": {
         "bolt": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": environ.get("BOLT_LOG_LEVEL", "INFO"),
         },
         "bolt.server": {
             "handlers": ["bolt.server"],
             "level": "INFO",
             "propagate": False,
         },
+        "app": {
+            "handlers": ["console"],
+            "level": environ.get("APP_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
     },
 }
 
 
-def configure_logging(logging_config, logging_settings):
-    if logging_config:
-        # First find the logging configuration function ...
-        logging_config_func = import_string(logging_config)
+def configure_logging(logging_settings):
+    # Load the defaults
+    logging.config.dictConfig(DEFAULT_LOGGING)
 
-        logging.config.dictConfig(DEFAULT_LOGGING)
-
-        # ... then invoke it with the logging settings
-        if logging_settings:
-            logging_config_func(logging_settings)
+    # Then customize it from settings
+    if logging_settings:
+        logging.config.dictConfig(logging_settings)
 
 
 class CallbackFilter(logging.Filter):
