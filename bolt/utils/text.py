@@ -270,7 +270,7 @@ def get_text_list(list_, last_word=gettext_lazy("or")):
         return str(list_[0])
     return "%s %s %s" % (
         # Translators: This string is used as a separator between list elements
-        _(", ").join(str(i) for i in list_[:-1]),
+        ", ".join(str(i) for i in list_[:-1]),
         str(last_word),
         str(list_[-1]),
     )

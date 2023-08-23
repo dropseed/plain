@@ -203,7 +203,7 @@ class UserAttributeSimilarityValidator:
                     except FieldDoesNotExist:
                         verbose_name = attribute_name
                     raise ValidationError(
-                        _("The password is too similar to the %(verbose_name)s."),
+                        "The password is too similar to the %(verbose_name)s.",
                         code="password_too_similar",
                         params={"verbose_name": verbose_name},
                     )
@@ -242,12 +242,12 @@ class CommonPasswordValidator:
     def validate(self, password, user=None):
         if password.lower().strip() in self.passwords:
             raise ValidationError(
-                _("This password is too common."),
+                "This password is too common.",
                 code="password_too_common",
             )
 
     def get_help_text(self):
-        return _("Your password can’t be a commonly used password.")
+        return "Your password can’t be a commonly used password."
 
 
 class NumericPasswordValidator:
@@ -258,9 +258,9 @@ class NumericPasswordValidator:
     def validate(self, password, user=None):
         if password.isdigit():
             raise ValidationError(
-                _("This password is entirely numeric."),
+                "This password is entirely numeric.",
                 code="password_entirely_numeric",
             )
 
     def get_help_text(self):
-        return _("Your password can’t be entirely numeric.")
+        return "Your password can’t be entirely numeric."

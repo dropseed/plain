@@ -6,7 +6,7 @@ from bolt.utils.translation import gettext_lazy as _
 
 class StaticFilesConfig(AppConfig):
     name = "bolt.staticfiles"
-    verbose_name = _("Static Files")
+    verbose_name = "Static Files"
     ignore_patterns = ["CVS", ".*", "*~"]
 
     def ready(self):

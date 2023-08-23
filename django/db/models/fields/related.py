@@ -893,9 +893,9 @@ class ForeignKey(ForeignObject):
 
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _("%(model)s instance with %(field)s %(value)r does not exist.")
+        "invalid": "%(model)s instance with %(field)s %(value)r does not exist."
     }
-    description = _("Foreign Key (type determined by related field)")
+    description = "Foreign Key (type determined by related field)"
 
     def __init__(
         self,
@@ -1172,7 +1172,7 @@ class OneToOneField(ForeignKey):
     forward_related_accessor_class = ForwardOneToOneDescriptor
     rel_class = OneToOneRel
 
-    description = _("One-to-one relationship")
+    description = "One-to-one relationship"
 
     def __init__(self, to, on_delete, to_field=None, **kwargs):
         kwargs["unique"] = True
@@ -1224,9 +1224,9 @@ def create_many_to_many_intermediary_model(field, klass):
             "app_label": klass._meta.app_label,
             "db_tablespace": klass._meta.db_tablespace,
             "unique_together": (from_, to),
-            "verbose_name": _("%(from)s-%(to)s relationship")
+            "verbose_name": "%(from)s-%(to)s relationship"
             % {"from": from_, "to": to},
-            "verbose_name_plural": _("%(from)s-%(to)s relationships")
+            "verbose_name_plural": "%(from)s-%(to)s relationships"
             % {"from": from_, "to": to},
             "apps": field.model._meta.apps,
         },
@@ -1274,7 +1274,7 @@ class ManyToManyField(RelatedField):
 
     rel_class = ManyToManyRel
 
-    description = _("Many-to-many relationship")
+    description = "Many-to-many relationship"
 
     def __init__(
         self,

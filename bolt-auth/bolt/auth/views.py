@@ -149,7 +149,7 @@ class LogoutView(RedirectURLMixin, TemplateView):
         context = super().get_context()
         context.update(
             {
-                "title": _("Logged out"),
+                "title": "Logged out",
                 "subtitle": None,
                 **(self.extra_context or {}),
             }
@@ -200,7 +200,7 @@ class PasswordResetView(PasswordContextMixin, FormView):
     subject_template_name = "registration/password_reset_subject.txt"
     success_url = reverse_lazy("password_reset_done")
     template_name = "registration/password_reset_form.html"
-    title = _("Password reset")
+    title = "Password reset"
     token_generator = default_token_generator
 
     def dispatch(self):
@@ -225,7 +225,7 @@ INTERNAL_RESET_SESSION_TOKEN = "_password_reset_token"
 
 class PasswordResetDoneView(PasswordContextMixin, TemplateView):
     template_name = "registration/password_reset_done.html"
-    title = _("Password reset sent")
+    title = "Password reset sent"
 
 
 class PasswordResetConfirmView(PasswordContextMixin, FormView):
@@ -235,7 +235,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
     reset_url_token = "set-password"
     success_url = reverse_lazy("password_reset_complete")
     template_name = "registration/password_reset_confirm.html"
-    title = _("Enter new password")
+    title = "Enter new password"
     token_generator = default_token_generator
 
     def dispatch(self):
@@ -311,7 +311,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
             context.update(
                 {
                     "form": None,
-                    "title": _("Password reset unsuccessful"),
+                    "title": "Password reset unsuccessful",
                     "validlink": False,
                 }
             )
@@ -320,7 +320,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
 
 class PasswordResetCompleteView(PasswordContextMixin, TemplateView):
     template_name = "registration/password_reset_complete.html"
-    title = _("Password reset complete")
+    title = "Password reset complete"
 
     def get_context(self):
         context = super().get_context()
@@ -332,7 +332,7 @@ class PasswordChangeView(PasswordContextMixin, AuthViewMixin, FormView):
     form_class = PasswordChangeForm
     success_url = reverse_lazy("password_change_done")
     template_name = "registration/password_change_form.html"
-    title = _("Password change")
+    title = "Password change"
     login_required = True
 
     def get_form_kwargs(self):
@@ -350,5 +350,5 @@ class PasswordChangeView(PasswordContextMixin, AuthViewMixin, FormView):
 
 class PasswordChangeDoneView(PasswordContextMixin, AuthViewMixin, TemplateView):
     template_name = "registration/password_change_done.html"
-    title = _("Password change successful")
+    title = "Password change successful"
     login_required = True

@@ -461,7 +461,7 @@ class InlineForeignKeyField(Field):
     """
 
     default_error_messages = {
-        "invalid_choice": _("The inline value did not match the parent instance."),
+        "invalid_choice": "The inline value did not match the parent instance.",
     }
 
     def __init__(self, parent_instance, *args, pk_field=False, to_field=None, **kwargs):
@@ -654,11 +654,11 @@ class ModelMultipleChoiceField(ModelChoiceField):
     """A MultipleChoiceField whose choices are a model QuerySet."""
 
     default_error_messages = {
-        "invalid_list": _("Enter a list of values."),
+        "invalid_list": "Enter a list of values.",
         "invalid_choice": _(
             "Select a valid choice. %(value)s is not one of the available choices."
         ),
-        "invalid_pk_value": _("“%(pk)s” is not a valid value."),
+        "invalid_pk_value": "“%(pk)s” is not a valid value.",
     }
 
     def __init__(self, queryset, **kwargs):

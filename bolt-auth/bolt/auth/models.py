@@ -70,7 +70,7 @@ class AbstractUser(AbstractBaseUser):
     username_validator = UnicodeUsernameValidator()
 
     username = models.CharField(
-        _("username"),
+        "username",
         max_length=150,
         unique=True,
         help_text=_(
@@ -78,17 +78,17 @@ class AbstractUser(AbstractBaseUser):
         ),
         validators=[username_validator],
         error_messages={
-            "unique": _("A user with that username already exists."),
+            "unique": "A user with that username already exists.",
         },
     )
     email = models.EmailField(_("email address"), blank=True)
     is_staff = models.BooleanField(
-        _("staff status"),
+        "staff status",
         default=False,
         help_text=_("Designates whether the user can log into this admin site."),
     )
     is_superuser = models.BooleanField(
-        _("superuser status"),
+        "superuser status",
         default=False,
         help_text=_(
             "Designates that this user has all permissions without "
@@ -96,7 +96,7 @@ class AbstractUser(AbstractBaseUser):
         ),
     )
     is_active = models.BooleanField(
-        _("active"),
+        "active",
         default=True,
         help_text=_(
             "Designates whether this user should be treated as active. "
@@ -112,8 +112,8 @@ class AbstractUser(AbstractBaseUser):
     REQUIRED_FIELDS = ["email"]
 
     class Meta:
-        verbose_name = _("user")
-        verbose_name_plural = _("users")
+        verbose_name = "user"
+        verbose_name_plural = "users"
         abstract = True
 
     def clean(self):

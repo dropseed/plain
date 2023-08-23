@@ -19,7 +19,7 @@ EMPTY_VALUES = (None, "", [], (), {})
 @deconstructible
 class RegexValidator:
     regex = ""
-    message = _("Enter a valid value.")
+    message = "Enter a valid value."
     code = "invalid"
     inverse_match = False
     flags = 0
@@ -101,7 +101,7 @@ class URLValidator(RegexValidator):
         r"\Z",
         re.IGNORECASE,
     )
-    message = _("Enter a valid URL.")
+    message = "Enter a valid URL."
     schemes = ["http", "https", "ftp", "ftps"]
     unsafe_chars = frozenset("\t\r\n")
 
@@ -172,7 +172,7 @@ def validate_integer(value):
 
 @deconstructible
 class EmailValidator:
-    message = _("Enter a valid email address.")
+    message = "Enter a valid email address."
     code = "invalid"
     user_regex = _lazy_re_compile(
         # dot-atom
@@ -253,7 +253,7 @@ slug_re = _lazy_re_compile(r"^[-a-zA-Z0-9_]+\Z")
 validate_slug = RegexValidator(
     slug_re,
     # Translators: "letters" means latin letters: a-z and A-Z.
-    _("Enter a valid “slug” consisting of letters, numbers, underscores or hyphens."),
+    "Enter a valid “slug” consisting of letters, numbers, underscores or hyphens.",
     "invalid",
 )
 
@@ -273,14 +273,14 @@ def validate_ipv4_address(value):
         ipaddress.IPv4Address(value)
     except ValueError:
         raise ValidationError(
-            _("Enter a valid IPv4 address."), code="invalid", params={"value": value}
+            "Enter a valid IPv4 address.", code="invalid", params={"value": value}
         )
 
 
 def validate_ipv6_address(value):
     if not is_valid_ipv6_address(value):
         raise ValidationError(
-            _("Enter a valid IPv6 address."), code="invalid", params={"value": value}
+            "Enter a valid IPv6 address.", code="invalid", params={"value": value}
         )
 
 
@@ -292,16 +292,16 @@ def validate_ipv46_address(value):
             validate_ipv6_address(value)
         except ValidationError:
             raise ValidationError(
-                _("Enter a valid IPv4 or IPv6 address."),
+                "Enter a valid IPv4 or IPv6 address.",
                 code="invalid",
                 params={"value": value},
             )
 
 
 ip_address_validator_map = {
-    "both": ([validate_ipv46_address], _("Enter a valid IPv4 or IPv6 address.")),
-    "ipv4": ([validate_ipv4_address], _("Enter a valid IPv4 address.")),
-    "ipv6": ([validate_ipv6_address], _("Enter a valid IPv6 address.")),
+    "both": ([validate_ipv46_address], "Enter a valid IPv4 or IPv6 address."),
+    "ipv4": ([validate_ipv4_address], "Enter a valid IPv4 address."),
+    "ipv6": ([validate_ipv6_address], "Enter a valid IPv6 address."),
 }
 
 
@@ -341,7 +341,7 @@ validate_comma_separated_integer_list = int_list_validator(
 
 @deconstructible
 class BaseValidator:
-    message = _("Ensure this value is %(limit_value)s (it is %(show_value)s).")
+    message = "Ensure this value is %(limit_value)s (it is %(show_value)s)."
     code = "limit_value"
 
     def __init__(self, limit_value, message=None):
@@ -376,7 +376,7 @@ class BaseValidator:
 
 @deconstructible
 class MaxValueValidator(BaseValidator):
-    message = _("Ensure this value is less than or equal to %(limit_value)s.")
+    message = "Ensure this value is less than or equal to %(limit_value)s."
     code = "max_value"
 
     def compare(self, a, b):
@@ -385,7 +385,7 @@ class MaxValueValidator(BaseValidator):
 
 @deconstructible
 class MinValueValidator(BaseValidator):
-    message = _("Ensure this value is greater than or equal to %(limit_value)s.")
+    message = "Ensure this value is greater than or equal to %(limit_value)s."
     code = "min_value"
 
     def compare(self, a, b):
@@ -394,7 +394,7 @@ class MinValueValidator(BaseValidator):
 
 @deconstructible
 class StepValueValidator(BaseValidator):
-    message = _("Ensure this value is a multiple of step size %(limit_value)s.")
+    message = "Ensure this value is a multiple of step size %(limit_value)s."
     code = "step_size"
 
     def compare(self, a, b):
@@ -445,7 +445,7 @@ class DecimalValidator:
     """
 
     messages = {
-        "invalid": _("Enter a number."),
+        "invalid": "Enter a number.",
         "max_digits": ngettext_lazy(
             "Ensure that there are no more than %(max)s digit in total.",
             "Ensure that there are no more than %(max)s digits in total.",
@@ -589,7 +589,7 @@ def validate_image_file_extension(value):
 class ProhibitNullCharactersValidator:
     """Validate that the string doesn't contain the null character."""
 
-    message = _("Null characters are not allowed.")
+    message = "Null characters are not allowed."
     code = "null_characters_not_allowed"
 
     def __init__(self, message=None, code=None):

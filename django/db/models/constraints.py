@@ -17,7 +17,7 @@ __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"
 
 
 class BaseConstraint:
-    default_violation_error_message = _("Constraint “%(name)s” is violated.")
+    default_violation_error_message = "Constraint “%(name)s” is violated."
     violation_error_code = None
     violation_error_message = None
 

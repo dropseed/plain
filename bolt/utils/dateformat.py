@@ -70,14 +70,14 @@ class TimeFormat(Formatter):
     def a(self):
         "'a.m.' or 'p.m.'"
         if self.data.hour > 11:
-            return _("p.m.")
-        return _("a.m.")
+            return "p.m."
+        return "a.m."
 
     def A(self):
         "'AM' or 'PM'"
         if self.data.hour > 11:
-            return _("PM")
-        return _("AM")
+            return "PM"
+        return "AM"
 
     def e(self):
         """
@@ -149,9 +149,9 @@ class TimeFormat(Formatter):
         Proprietary extension.
         """
         if self.data.minute == 0 and self.data.hour == 0:
-            return _("midnight")
+            return "midnight"
         if self.data.minute == 0 and self.data.hour == 12:
-            return _("noon")
+            return "noon"
         return "%s %s" % (self.f(), self.a())
 
     def s(self):

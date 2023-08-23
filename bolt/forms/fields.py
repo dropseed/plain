@@ -56,7 +56,7 @@ class Field:
     # Add an 'invalid' entry to default_error_message if you want a specific
     # field error message not raised by the field validators.
     default_error_messages = {
-        "required": _("This field is required."),
+        "required": "This field is required.",
     }
     empty_values = list(validators.EMPTY_VALUES)
 
@@ -210,7 +210,7 @@ class CharField(Field):
 
 class IntegerField(Field):
     default_error_messages = {
-        "invalid": _("Enter a whole number."),
+        "invalid": "Enter a whole number.",
     }
     re_decimal = _lazy_re_compile(r"\.0*\s*$")
 
@@ -243,7 +243,7 @@ class IntegerField(Field):
 
 class FloatField(IntegerField):
     default_error_messages = {
-        "invalid": _("Enter a number."),
+        "invalid": "Enter a number.",
     }
 
     def to_python(self, value):
@@ -270,7 +270,7 @@ class FloatField(IntegerField):
 
 class DecimalField(IntegerField):
     default_error_messages = {
-        "invalid": _("Enter a number."),
+        "invalid": "Enter a number.",
     }
 
     def __init__(
@@ -336,7 +336,7 @@ class BaseTemporalField(Field):
 class DateField(BaseTemporalField):
     input_formats = formats.get_format_lazy("DATE_INPUT_FORMATS")
     default_error_messages = {
-        "invalid": _("Enter a valid date."),
+        "invalid": "Enter a valid date.",
     }
 
     def to_python(self, value):
@@ -358,7 +358,7 @@ class DateField(BaseTemporalField):
 
 class TimeField(BaseTemporalField):
     input_formats = formats.get_format_lazy("TIME_INPUT_FORMATS")
-    default_error_messages = {"invalid": _("Enter a valid time.")}
+    default_error_messages = {"invalid": "Enter a valid time."}
 
     def to_python(self, value):
         """
@@ -384,7 +384,7 @@ class DateTimeFormatsIterator:
 class DateTimeField(BaseTemporalField):
     input_formats = DateTimeFormatsIterator()
     default_error_messages = {
-        "invalid": _("Enter a valid date/time."),
+        "invalid": "Enter a valid date/time.",
     }
 
     def prepare_value(self, value):
@@ -418,8 +418,8 @@ class DateTimeField(BaseTemporalField):
 
 class DurationField(Field):
     default_error_messages = {
-        "invalid": _("Enter a valid duration."),
-        "overflow": _("The number of days must be between {min_days} and {max_days}."),
+        "invalid": "Enter a valid duration.",
+        "overflow": "The number of days must be between {min_days} and {max_days}.",
     }
 
     def prepare_value(self, value):
@@ -483,9 +483,9 @@ class EmailField(CharField):
 
 class FileField(Field):
     default_error_messages = {
-        "invalid": _("No file was submitted. Check the encoding type on the form."),
-        "missing": _("No file was submitted."),
-        "empty": _("The submitted file is empty."),
+        "invalid": "No file was submitted. Check the encoding type on the form.",
+        "missing": "No file was submitted.",
+        "empty": "The submitted file is empty.",
         "max_length": ngettext_lazy(
             "Ensure this filename has at most %(max)d character (it has %(length)d).",
             "Ensure this filename has at most %(max)d characters (it has %(length)d).",
@@ -610,7 +610,7 @@ class ImageField(FileField):
 
 class URLField(CharField):
     default_error_messages = {
-        "invalid": _("Enter a valid URL."),
+        "invalid": "Enter a valid URL.",
     }
     default_validators = [validators.URLValidator()]
 
@@ -823,7 +823,7 @@ class MultipleChoiceField(ChoiceField):
         "invalid_choice": _(
             "Select a valid choice. %(value)s is not one of the available choices."
         ),
-        "invalid_list": _("Enter a list of values."),
+        "invalid_list": "Enter a list of values.",
     }
 
     def to_python(self, value):
@@ -877,7 +877,7 @@ class SlugField(CharField):
 
 class UUIDField(CharField):
     default_error_messages = {
-        "invalid": _("Enter a valid UUID."),
+        "invalid": "Enter a valid UUID.",
     }
 
     def prepare_value(self, value):
@@ -907,7 +907,7 @@ class JSONString(str):
 
 class JSONField(CharField):
     default_error_messages = {
-        "invalid": _("Enter a valid JSON."),
+        "invalid": "Enter a valid JSON.",
     }
 
     def __init__(self, encoder=None, decoder=None, **kwargs):

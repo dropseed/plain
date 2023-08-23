@@ -1389,7 +1389,7 @@ class Model(AltersData, metaclass=ModelBase):
             field_labels = [
                 capfirst(opts.get_field(f).verbose_name) for f in unique_check
             ]
-            params["field_labels"] = get_text_list(field_labels, _("and"))
+            params["field_labels"] = get_text_list(field_labels, "and")
             return ValidationError(
                 message=_("%(model_name)s with this %(field_labels)s already exists."),
                 code="unique_together",

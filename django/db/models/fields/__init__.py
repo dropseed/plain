@@ -125,10 +125,10 @@ class Field(RegisterLookupMixin):
     auto_creation_counter = -1
     default_validators = []  # Default set of validators
     default_error_messages = {
-        "invalid_choice": _("Value %(value)r is not a valid choice."),
-        "null": _("This field cannot be null."),
-        "blank": _("This field cannot be blank."),
-        "unique": _("%(model_name)s with this %(field_label)s already exists."),
+        "invalid_choice": "Value %(value)r is not a valid choice.",
+        "null": "This field cannot be null.",
+        "blank": "This field cannot be blank.",
+        "unique": "%(model_name)s with this %(field_label)s already exists.",
         "unique_for_date": _(
             # Translators: The 'lookup_type' is one of 'date', 'year' or
             # 'month'. Eg: "Title must be unique for pub_date year"
@@ -170,7 +170,7 @@ class Field(RegisterLookupMixin):
 
     # Generic field type description, usually overridden by subclasses
     def _description(self):
-        return _("Field of type: %(field_type)s") % {
+        return "Field of type: %(field_type)s" % {
             "field_type": self.__class__.__name__
         }
 
@@ -1044,10 +1044,10 @@ class Field(RegisterLookupMixin):
 class BooleanField(Field):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _("“%(value)s” value must be either True or False."),
-        "invalid_nullable": _("“%(value)s” value must be either True, False, or None."),
+        "invalid": "“%(value)s” value must be either True or False.",
+        "invalid_nullable": "“%(value)s” value must be either True, False, or None.",
     }
-    description = _("Boolean (Either True or False)")
+    description = "Boolean (Either True or False)"
 
     def get_internal_type(self):
         return "BooleanField"
@@ -1085,9 +1085,9 @@ class CharField(Field):
     @property
     def description(self):
         if self.max_length is not None:
-            return _("String (up to %(max_length)s)")
+            return "String (up to %(max_length)s)"
         else:
-            return _("String (unlimited)")
+            return "String (unlimited)"
 
     def check(self, **kwargs):
         databases = kwargs.get("databases") or []
@@ -1180,7 +1180,7 @@ class CharField(Field):
 
 class CommaSeparatedIntegerField(CharField):
     default_validators = [validators.validate_comma_separated_integer_list]
-    description = _("Comma-separated integers")
+    description = "Comma-separated integers"
     system_check_removed_details = {
         "msg": (
             "CommaSeparatedIntegerField is removed except for support in "
@@ -1289,7 +1289,7 @@ class DateField(DateTimeCheckMixin, Field):
             "but it is an invalid date."
         ),
     }
-    description = _("Date (without time)")
+    description = "Date (without time)"
 
     def __init__(
         self, verbose_name=None, name=None, auto_now=False, auto_now_add=False, **kwargs
@@ -1421,7 +1421,7 @@ class DateTimeField(DateField):
             "but it is an invalid date/time."
         ),
     }
-    description = _("Date (with time)")
+    description = "Date (with time)"
 
     # __init__ is inherited from DateField
 
@@ -1537,9 +1537,9 @@ class DateTimeField(DateField):
 class DecimalField(Field):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _("“%(value)s” value must be a decimal number."),
+        "invalid": "“%(value)s” value must be a decimal number.",
     }
-    description = _("Decimal number")
+    description = "Decimal number"
 
     def __init__(
         self,
@@ -1696,7 +1696,7 @@ class DurationField(Field):
             "[DD] [[HH:]MM:]ss[.uuuuuu] format."
         )
     }
-    description = _("Duration")
+    description = "Duration"
 
     def get_internal_type(self):
         return "DurationField"
@@ -1740,7 +1740,7 @@ class DurationField(Field):
 
 class EmailField(CharField):
     default_validators = [validators.validate_email]
-    description = _("Email address")
+    description = "Email address"
 
     def __init__(self, *args, **kwargs):
         # max_length=254 to be compliant with RFCs 3696 and 5321
@@ -1755,7 +1755,7 @@ class EmailField(CharField):
 
 
 class FilePathField(Field):
-    description = _("File path")
+    description = "File path"
 
     def __init__(
         self,
@@ -1820,9 +1820,9 @@ class FilePathField(Field):
 class FloatField(Field):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _("“%(value)s” value must be a float."),
+        "invalid": "“%(value)s” value must be a float.",
     }
-    description = _("Floating point number")
+    description = "Floating point number"
 
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
@@ -1854,9 +1854,9 @@ class FloatField(Field):
 class IntegerField(Field):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _("“%(value)s” value must be an integer."),
+        "invalid": "“%(value)s” value must be an integer.",
     }
-    description = _("Integer")
+    description = "Integer"
 
     def check(self, **kwargs):
         return [
@@ -1944,7 +1944,7 @@ class IntegerField(Field):
 
 
 class BigIntegerField(IntegerField):
-    description = _("Big (8 byte) integer")
+    description = "Big (8 byte) integer"
     MAX_BIGINT = 9223372036854775807
 
     def get_internal_type(self):
@@ -1952,7 +1952,7 @@ class BigIntegerField(IntegerField):
 
 
 class SmallIntegerField(IntegerField):
-    description = _("Small integer")
+    description = "Small integer"
 
     def get_internal_type(self):
         return "SmallIntegerField"
@@ -1960,7 +1960,7 @@ class SmallIntegerField(IntegerField):
 
 class IPAddressField(Field):
     empty_strings_allowed = False
-    description = _("IPv4 address")
+    description = "IPv4 address"
     system_check_removed_details = {
         "msg": (
             "IPAddressField has been removed except for support in "
@@ -1991,7 +1991,7 @@ class IPAddressField(Field):
 
 class GenericIPAddressField(Field):
     empty_strings_allowed = False
-    description = _("IP address")
+    description = "IP address"
     default_error_messages = {}
 
     def __init__(
@@ -2075,10 +2075,10 @@ class GenericIPAddressField(Field):
 
 class NullBooleanField(BooleanField):
     default_error_messages = {
-        "invalid": _("“%(value)s” value must be either None, True or False."),
-        "invalid_nullable": _("“%(value)s” value must be either None, True or False."),
+        "invalid": "“%(value)s” value must be either None, True or False.",
+        "invalid_nullable": "“%(value)s” value must be either None, True or False.",
     }
-    description = _("Boolean (Either True, False or None)")
+    description = "Boolean (Either True, False or None)"
     system_check_removed_details = {
         "msg": (
             "NullBooleanField is removed except for support in historical "
@@ -2129,21 +2129,21 @@ class PositiveIntegerRelDbTypeMixin:
 
 
 class PositiveBigIntegerField(PositiveIntegerRelDbTypeMixin, BigIntegerField):
-    description = _("Positive big integer")
+    description = "Positive big integer"
 
     def get_internal_type(self):
         return "PositiveBigIntegerField"
 
 
 class PositiveIntegerField(PositiveIntegerRelDbTypeMixin, IntegerField):
-    description = _("Positive integer")
+    description = "Positive integer"
 
     def get_internal_type(self):
         return "PositiveIntegerField"
 
 
 class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField):
-    description = _("Positive small integer")
+    description = "Positive small integer"
 
     def get_internal_type(self):
         return "PositiveSmallIntegerField"
@@ -2151,7 +2151,7 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
 
 class SlugField(CharField):
     default_validators = [validators.validate_slug]
-    description = _("Slug (up to %(max_length)s)")
+    description = "Slug (up to %(max_length)s)"
 
     def __init__(
         self, *args, max_length=50, db_index=True, allow_unicode=False, **kwargs
@@ -2178,7 +2178,7 @@ class SlugField(CharField):
 
 
 class TextField(Field):
-    description = _("Text")
+    description = "Text"
 
     def __init__(self, *args, db_collation=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -2249,7 +2249,7 @@ class TimeField(DateTimeCheckMixin, Field):
             "(HH:MM[:ss[.uuuuuu]]) but it is an invalid time."
         ),
     }
-    description = _("Time")
+    description = "Time"
 
     def __init__(
         self, verbose_name=None, name=None, auto_now=False, auto_now_add=False, **kwargs
@@ -2349,7 +2349,7 @@ class TimeField(DateTimeCheckMixin, Field):
 
 class URLField(CharField):
     default_validators = [validators.URLValidator()]
-    description = _("URL")
+    description = "URL"
 
     def __init__(self, verbose_name=None, name=None, **kwargs):
         kwargs.setdefault("max_length", 200)
@@ -2363,7 +2363,7 @@ class URLField(CharField):
 
 
 class BinaryField(Field):
-    description = _("Raw binary data")
+    description = "Raw binary data"
     empty_values = [None, b""]
 
     def __init__(self, *args, **kwargs):
@@ -2428,9 +2428,9 @@ class BinaryField(Field):
 
 class UUIDField(Field):
     default_error_messages = {
-        "invalid": _("“%(value)s” is not a valid UUID."),
+        "invalid": "“%(value)s” is not a valid UUID.",
     }
-    description = _("Universally unique identifier")
+    description = "Universally unique identifier"
     empty_strings_allowed = False
 
     def __init__(self, verbose_name=None, **kwargs):
