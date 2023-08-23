@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model
+from bolt.auth import get_user_model
 from bolt.http import HttpResponseForbidden
 
 from .permissions import can_be_impersonator, can_impersonate_user

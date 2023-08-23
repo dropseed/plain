@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser
+from bolt.auth.models import AbstractUser
 from django.db import models
 
 

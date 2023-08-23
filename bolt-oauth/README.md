@@ -147,7 +147,7 @@ one way to do this is to have your own `User` model:
 
 ```python
 # In an app named "users", for example
-from django.contrib.auth.models import AbstractUser
+from bolt.auth.models import AbstractUser
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)

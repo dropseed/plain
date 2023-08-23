@@ -7,7 +7,7 @@ SECRET_KEY = "secret"
 DEBUG = True
 
 INSTALLED_APPS = [
-    "django.contrib.auth",
+    "bolt.auth",
     "bolt.sessions",
     # "bolt.staticfiles",
     "bolt.impersonate",
@@ -18,7 +18,7 @@ MIDDLEWARE = [
     "bolt.sessions.middleware.SessionMiddleware",
     "bolt.middleware.common.CommonMiddleware",
     "bolt.csrf.middleware.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "bolt.auth.middleware.AuthenticationMiddleware",
     "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
     "bolt.impersonate.middleware.ImpersonateMiddleware",
 ]

@@ -34,7 +34,7 @@ def test_single_backend(client, settings):
         }
     }
     settings.AUTHENTICATION_BACKENDS = [
-        "django.contrib.auth.backends.ModelBackend",
+        "bolt.auth.backends.ModelBackend",
     ]
 
     response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
@@ -59,8 +59,8 @@ def test_multiple_backends(client, settings):
         }
     }
     settings.AUTHENTICATION_BACKENDS = [
-        "django.contrib.auth.backends.ModelBackend",
-        "django.contrib.auth.backends.ModelBackend",
+        "bolt.auth.backends.ModelBackend",
+        "bolt.auth.backends.ModelBackend",
     ]
 
     response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")

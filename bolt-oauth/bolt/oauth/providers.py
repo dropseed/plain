@@ -4,7 +4,7 @@ from typing import Any, List
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.contrib.auth import login as auth_login
+from bolt.auth import login as auth_login
 from bolt.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from bolt.urls import reverse
 from bolt.utils.crypto import get_random_string
@@ -56,7 +56,7 @@ class OAuthProvider:
         # Not necessarily required, but commonly used
         scope: str = "",
         # Authentication backend only needs to be set if you have custom backends which don't include the default
-        authentication_backend: str = "django.contrib.auth.backends.ModelBackend",
+        authentication_backend: str = "bolt.auth.backends.ModelBackend",
     ):
         self.provider_key = provider_key
         self.client_id = client_id

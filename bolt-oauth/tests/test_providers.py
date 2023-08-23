@@ -1,7 +1,7 @@
 import datetime
 
 import pytest
-from django.contrib.auth import get_user_model
+from bolt.auth import get_user_model
 
 from bolt.oauth.models import OAuthConnection
 from bolt.oauth.providers import OAuthProvider, OAuthToken, OAuthUser

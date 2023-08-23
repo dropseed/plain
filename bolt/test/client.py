@@ -577,7 +577,7 @@ class ClientMixin:
         Return True if login is possible or False if the provided credentials
         are incorrect.
         """
-        from django.contrib.auth import authenticate
+        from bolt.auth import authenticate
 
         user = authenticate(**credentials)
         if user:
@@ -587,7 +587,7 @@ class ClientMixin:
 
     def force_login(self, user, backend=None):
         def get_backend():
-            from django.contrib.auth import load_backend
+            from bolt.auth import load_backend
 
             for backend_path in settings.AUTHENTICATION_BACKENDS:
                 backend = load_backend(backend_path)
@@ -600,7 +600,7 @@ class ClientMixin:
         self._login(user, backend)
 
     def _login(self, user, backend=None):
-        from django.contrib.auth import login
+        from bolt.auth import login
 
         # Create a fake request to store login details.
         request = HttpRequest()
@@ -626,7 +626,7 @@ class ClientMixin:
 
     def logout(self):
         """Log out the user by removing the cookies and session object."""
-        from django.contrib.auth import get_user, logout
+        from bolt.auth import get_user, logout
 
         request = HttpRequest()
         if self.session:

@@ -173,7 +173,7 @@ def static_finders_changed(*, setting, **kwargs):
 @receiver(setting_changed)
 def auth_password_validators_changed(*, setting, **kwargs):
     if setting == "AUTH_PASSWORD_VALIDATORS":
-        from django.contrib.auth.password_validation import (
+        from bolt.auth.password_validation import (
             get_default_password_validators,
         )
 
@@ -185,21 +185,21 @@ def user_model_swapped(*, setting, **kwargs):
     if setting == "AUTH_USER_MODEL":
         apps.clear_cache()
         try:
-            from django.contrib.auth import get_user_model
+            from bolt.auth import get_user_model
 
             UserModel = get_user_model()
         except ImproperlyConfigured:
             # Some tests set an invalid AUTH_USER_MODEL.
             pass
         else:
-            from django.contrib.auth import backends
+            from bolt.auth import backends
 
             backends.UserModel = UserModel
 
-            from django.contrib.auth import forms
+            from bolt.auth import forms
 
             forms.UserModel = UserModel
 
-            from django.contrib.auth import views
+            from bolt.auth import views
 
             views.UserModel = UserModel

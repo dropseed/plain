@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from bolt.auth.mixins import LoginRequiredMixin
 from bolt.views import View
 from bolt.http import HttpResponseRedirect, HttpResponseBadRequest
 from bolt import jinja

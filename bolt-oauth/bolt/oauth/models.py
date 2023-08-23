@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from bolt.auth import get_user_model
 from django.core.checks import Error
 from django.db import models, transaction
 from django.db.utils import IntegrityError, OperationalError, ProgrammingError
