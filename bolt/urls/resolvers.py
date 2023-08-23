@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 from threading import local
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.checks import Error, Warning
 from bolt.checks.urls import check_resolver
 from bolt.exceptions import ImproperlyConfigured, ViewDoesNotExist
@@ -661,8 +661,6 @@ class URLResolver:
     def resolve_error_handler(self, view_type):
         callback = getattr(self.urlconf_module, "handler%s" % view_type, None)
         if not callback:
-            # No handler specified in file; use lazy import, since
-            # django.conf.urls imports this file.
             from . import errors
 
             callback = getattr(errors, "handler%s" % view_type)

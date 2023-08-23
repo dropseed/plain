@@ -14,7 +14,7 @@ from importlib import import_module
 
 import django
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 from django.core.management.base import (
     BaseCommand,

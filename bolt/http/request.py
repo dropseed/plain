@@ -4,7 +4,7 @@ from io import BytesIO
 from itertools import chain
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt import signing
 from bolt.exceptions import (
     DisallowedHost,

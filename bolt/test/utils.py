@@ -15,7 +15,8 @@ from xml.dom.minidom import Node, parseString
 
 from bolt.apps import apps
 from bolt.apps.registry import Apps
-from django.conf import UserSettingsHolder, settings
+from bolt.user_settings import UserSettingsHolder
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 from bolt.signals import request_started, setting_changed
 from bolt.db import DEFAULT_DB_ALIAS, connections, reset_queries

@@ -3,7 +3,7 @@
 import datetime
 import os
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 from .console import EmailBackend as ConsoleEmailBackend
 

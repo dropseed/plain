@@ -5,7 +5,7 @@ This module provides a middleware that implements protection against a
 malicious site loading resources from your site in a hidden frame.
 """
 
-from django.conf import settings
+from bolt.runtime import settings
 
 class XFrameOptionsMiddleware:
     """

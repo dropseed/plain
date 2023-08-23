@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from urllib.parse import urljoin
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.files import File, locks
 from bolt.files.move import file_move_safe
 from bolt.signals import setting_changed

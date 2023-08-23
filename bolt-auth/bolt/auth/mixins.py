@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.auth import REDIRECT_FIELD_NAME
 from bolt.auth.views import redirect_to_login
 from bolt.exceptions import ImproperlyConfigured, PermissionDenied

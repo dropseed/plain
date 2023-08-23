@@ -1,6 +1,6 @@
 import inspect
 
-from django.conf import settings
+from bolt.runtime import settings
 
 from .. import Error, Tags, Warning, register
 

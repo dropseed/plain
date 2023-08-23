@@ -12,7 +12,7 @@ from rich.table import Table
 from rich import box
 from rich.text import Text
 from rich.pretty import Pretty
-from bolt import apps
+from bolt.apps import apps
 
 
 class InstalledAppsGroup(click.Group):
@@ -28,7 +28,7 @@ class InstalledAppsGroup(click.Group):
         apps_with_commands = []
 
         # Get installed apps with a cli.py module
-        for app in apps.apps.get_app_configs():
+        for app in apps.get_app_configs():
             cli_module = app.name + ".cli"
             try:
                 importlib.import_module(cli_module)
@@ -218,7 +218,7 @@ def settings(name_filter, overridden):
         click.secho(f"Error in Django setup\n{e}", fg="yellow")
         return
 
-    from django.conf import settings
+    from bolt.runtime import settings
 
     table = Table(box=box.MINIMAL)
     table.add_column("Setting")

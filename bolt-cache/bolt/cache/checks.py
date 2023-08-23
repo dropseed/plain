@@ -1,6 +1,6 @@
 import pathlib
 
-from django.conf import settings
+from bolt.runtime import settings
 from .backends.filebased import FileBasedCache
 from .constants import DEFAULT_CACHE_ALIAS
 

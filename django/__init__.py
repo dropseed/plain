@@ -13,7 +13,7 @@ def setup():
     first setting), configure logging and populate the app registry.
     """
     from bolt.apps import apps
-    from django.conf import settings
+    from bolt.runtime import settings
     from bolt.utils.log import configure_logging
 
     # Automatically put the app dir on the Python path for convenience

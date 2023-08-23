@@ -5,7 +5,8 @@ import re
 from hashlib import md5
 from urllib.parse import unquote, urldefrag, urlsplit, urlunsplit
 
-from django.conf import STATICFILES_STORAGE_ALIAS, settings
+from bolt.user_settings import STATICFILES_STORAGE_ALIAS
+from bolt.runtime import settings
 from bolt.staticfiles.utils import check_settings, matches_patterns
 from bolt.exceptions import ImproperlyConfigured
 from bolt.files.base import ContentFile

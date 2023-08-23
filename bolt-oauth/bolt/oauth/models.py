@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.auth import get_user_model
 from bolt.checks import Error
 from bolt.db import models, transaction

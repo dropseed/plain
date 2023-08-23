@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.utils.crypto import constant_time_compare, salted_hmac
 from bolt.utils.http import base36_to_int, int_to_base36
 

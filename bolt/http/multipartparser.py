@@ -9,7 +9,7 @@ import binascii
 import collections
 import html
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import (
     RequestDataTooBig,
     SuspiciousMultipartForm,

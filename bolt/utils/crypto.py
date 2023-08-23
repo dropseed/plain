@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import secrets
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.utils.encoding import force_bytes
 
 

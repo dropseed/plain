@@ -1,4 +1,4 @@
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.cache import caches
 from bolt.cache.backends.db import BaseDatabaseCache
 from django.core.management.base import BaseCommand, CommandError

@@ -2,7 +2,7 @@ import json
 import logging
 import threading
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.json import BoltJSONEncoder
 from bolt.db import connection
 from bolt.http import HttpResponseRedirect

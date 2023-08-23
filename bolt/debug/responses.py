@@ -7,7 +7,7 @@ import types
 import warnings
 from pathlib import Path
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.http import Http404, HttpResponse, HttpResponseNotFound
 from bolt.jinja.defaults import create_default_environment
 from pprint import pformat

@@ -1,7 +1,7 @@
 import pkgutil
 from importlib import import_module
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 
 # For backwards compatibility with Django < 3.2

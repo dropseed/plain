@@ -1,7 +1,7 @@
 import logging
 import types
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured, MiddlewareNotUsed
 from bolt.signals import request_finished
 from bolt.db import connections, transaction

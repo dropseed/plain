@@ -5,7 +5,7 @@ Classes representing uploaded files.
 import os
 from io import BytesIO
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.files import temp as tempfile
 from bolt.files.base import File
 from bolt.files.utils import validate_file_name

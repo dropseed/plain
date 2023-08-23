@@ -8,7 +8,7 @@ import threading
 import warnings
 from contextlib import contextmanager
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 from bolt.db import DatabaseError as WrappedDatabaseError
 from bolt.db import connections

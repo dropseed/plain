@@ -1,4 +1,4 @@
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.checks import Error, Tags, register
 from bolt.db import connection
 

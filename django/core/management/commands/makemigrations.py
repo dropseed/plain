@@ -4,7 +4,7 @@ import warnings
 from itertools import takewhile
 
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from django.core.management.base import BaseCommand, CommandError, no_translations
 from django.core.management.utils import run_formatters
 from bolt.db import DEFAULT_DB_ALIAS, OperationalError, connections, router

@@ -6,7 +6,7 @@ from functools import partial
 from bolt.apps import AppConfig
 from bolt.apps.registry import Apps
 from bolt.apps.registry import apps as global_apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import FieldDoesNotExist
 from bolt.db import models
 from bolt.db.migrations.utils import field_is_referenced, get_references

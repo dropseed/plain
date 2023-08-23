@@ -6,7 +6,7 @@ from difflib import get_close_matches
 from unittest.suite import _DebugResult
 
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.management.color import no_style

@@ -1,6 +1,6 @@
 from os import environ
 
-from django.conf import settings
+from bolt.runtime import settings
 
 
 def STRIPE_SECRET_KEY():

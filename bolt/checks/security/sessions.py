@@ -1,4 +1,4 @@
-from django.conf import settings
+from bolt.runtime import settings
 
 from .. import Tags, Warning, register
 

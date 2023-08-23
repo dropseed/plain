@@ -11,7 +11,7 @@ import re
 import types
 import uuid
 
-from django.conf import SettingsReference
+from bolt.user_settings import SettingsReference
 from bolt.db import models
 from bolt.db.migrations.operations.base import Operation
 from bolt.db.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
@@ -289,7 +289,7 @@ class SetSerializer(BaseSequenceSerializer):
 class SettingsReferenceSerializer(BaseSerializer):
     def serialize(self):
         return "settings.%s" % self.value.setting_name, {
-            "from django.conf import settings"
+            "from bolt.runtime import settings"
         }
 
 

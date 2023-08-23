@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.db.models.expressions import Func
 from bolt.db.models.fields import (
     DateField,

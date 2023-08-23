@@ -5,7 +5,7 @@ from importlib import import_module
 
 import sqlparse
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.db import NotSupportedError, transaction
 from bolt.db.backends import utils
 from bolt.utils import timezone

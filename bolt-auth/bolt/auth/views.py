@@ -1,6 +1,6 @@
 from urllib.parse import urlparse, urlunparse
 
-from django.conf import settings
+from bolt.runtime import settings
 
 # Avoid shadowing the login() and logout() views below.
 from bolt.auth import REDIRECT_FIELD_NAME, get_user_model

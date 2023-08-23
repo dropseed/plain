@@ -2,7 +2,7 @@ import functools
 import os
 
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.staticfiles import utils
 from bolt.checks import Error, Warning
 from bolt.exceptions import ImproperlyConfigured

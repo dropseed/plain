@@ -2,7 +2,7 @@ import click
 from importlib import import_module
 
 import django
-from django.conf import settings
+from bolt.runtime import settings
 
 
 @click.group()

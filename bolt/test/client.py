@@ -9,7 +9,7 @@ from importlib import import_module
 from io import BytesIO, IOBase
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.handlers.base import BaseHandler
 from bolt.handlers.wsgi import LimitedStream, WSGIRequest
 from bolt.json import BoltJSONEncoder

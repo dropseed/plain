@@ -9,7 +9,7 @@ import string
 from collections import defaultdict
 from urllib.parse import urlparse
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import DisallowedHost, ImproperlyConfigured
 from bolt.http import HttpHeaders, UnreadablePostError
 from bolt.utils.cache import patch_vary_headers

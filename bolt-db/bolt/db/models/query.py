@@ -8,7 +8,7 @@ import warnings
 from itertools import chain, islice
 
 import django
-from django.conf import settings
+from bolt.runtime import settings
 from bolt import exceptions
 from bolt.db import (
     DJANGO_VERSION_PICKLE_KEY,

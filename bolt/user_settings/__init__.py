@@ -2,7 +2,7 @@
 Settings and configuration for Django.
 
 Read values from the module specified by the DJANGO_SETTINGS_MODULE environment
-variable, and then from django.conf.global_settings; see the global_settings.py
+variable, and then from bolt.global_settings; see the global_settings.py
 for a list of all possible variables.
 """
 
@@ -16,7 +16,7 @@ import types
 import typing
 
 import django
-from django.conf import global_settings
+from bolt.user_settings import global_settings
 from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.functional import LazyObject, empty
 from bolt.apps import AppConfig
@@ -279,6 +279,3 @@ class UserSettingsHolder:
         return "<%(cls)s>" % {
             "cls": self.__class__.__name__,
         }
-
-
-settings = LazySettings()

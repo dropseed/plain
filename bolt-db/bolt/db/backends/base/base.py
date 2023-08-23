@@ -9,7 +9,7 @@ import zoneinfo
 from collections import deque
 from contextlib import contextmanager
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 from bolt.db import DEFAULT_DB_ALIAS, DatabaseError, NotSupportedError
 from bolt.db.backends import utils

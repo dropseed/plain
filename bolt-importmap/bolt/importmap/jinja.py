@@ -1,5 +1,5 @@
 from bolt.jinja.extensions import InclusionTagExtension
-from django.conf import settings
+from bolt.runtime import settings
 from .core import Importmap
 import json
 

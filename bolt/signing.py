@@ -40,7 +40,7 @@ import time
 import warnings
 import zlib
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.utils.crypto import constant_time_compare, salted_hmac
 from bolt.utils.deprecation import RemovedInDjango51Warning
 from bolt.utils.encoding import force_bytes

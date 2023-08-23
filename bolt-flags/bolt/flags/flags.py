@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.functional import cached_property
 

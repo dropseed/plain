@@ -1,7 +1,7 @@
 """
 Tools for sending email.
 """
-from django.conf import settings
+from bolt.runtime import settings
 
 # Imported for backwards compatibility and for the sake
 # of a cleaner namespace. These symbols used to be in

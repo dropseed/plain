@@ -4,7 +4,7 @@ import os
 from posixpath import basename
 from urllib.parse import urlparse
 
-from django.conf import settings
+from bolt.runtime import settings
 
 from bolt.http import FileResponse
 from bolt.staticfiles import finders

@@ -5,7 +5,7 @@ import warnings
 from collections import defaultdict
 
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from bolt.db import connections
 from bolt.db.models import AutoField, Manager, OrderWrt, UniqueConstraint

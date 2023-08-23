@@ -1,6 +1,6 @@
 import uuid
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.db.backends.base.operations import BaseDatabaseOperations
 from bolt.db.backends.utils import split_tzname_delta
 from bolt.db.models import Exists, ExpressionWrapper, Lookup

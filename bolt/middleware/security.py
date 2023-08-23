@@ -1,6 +1,6 @@
 import re
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.http import HttpResponsePermanentRedirect
 
 

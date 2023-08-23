@@ -14,7 +14,7 @@ from email.utils import formataddr, formatdate, getaddresses, make_msgid
 from io import BytesIO, StringIO
 from pathlib import Path
 
-from django.conf import settings
+from bolt.runtime import settings
 from .utils import DNS_NAME
 from bolt.utils.encoding import force_str, punycode
 

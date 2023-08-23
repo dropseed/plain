@@ -4,7 +4,7 @@ Base file upload handler classes, and the built-in concrete subclasses
 import os
 from io import BytesIO
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from bolt.utils.module_loading import import_string
 

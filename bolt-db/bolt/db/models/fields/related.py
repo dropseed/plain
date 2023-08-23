@@ -3,7 +3,8 @@ import inspect
 from functools import partial
 
 from bolt.apps import apps
-from django.conf import SettingsReference, settings
+from bolt.user_settings import SettingsReference
+from bolt.runtime import settings
 from bolt import checks, exceptions
 from bolt.db import connection, router
 from bolt.db.backends import utils

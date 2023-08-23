@@ -3,7 +3,7 @@ import base64
 import pickle
 from datetime import datetime, timezone
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 from bolt.db import DatabaseError, connections, models, router, transaction
 from bolt.utils.timezone import now as tz_now

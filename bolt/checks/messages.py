@@ -51,7 +51,7 @@ class CheckMessage:
         return self.level >= level
 
     def is_silenced(self):
-        from django.conf import settings
+        from bolt.runtime import settings
 
         return self.id in settings.SILENCED_SYSTEM_CHECKS
 

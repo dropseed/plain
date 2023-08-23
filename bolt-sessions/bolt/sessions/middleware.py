@@ -1,7 +1,7 @@
 import time
 from importlib import import_module
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.sessions.backends.base import UpdateError
 from bolt.sessions.exceptions import SessionInterrupted
 from bolt.utils.cache import patch_vary_headers

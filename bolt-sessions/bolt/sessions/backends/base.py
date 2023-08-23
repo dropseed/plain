@@ -2,7 +2,7 @@ import logging
 import string
 from datetime import datetime, timedelta
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt import signing
 from bolt.utils import timezone
 from bolt.utils.crypto import get_random_string

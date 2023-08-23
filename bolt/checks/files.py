@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from django.conf import settings
+from bolt.runtime import settings
 
 from . import Error, Tags, register
 

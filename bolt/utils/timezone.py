@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone, tzinfo
 
 from threading import local
 
-from django.conf import settings
+from bolt.runtime import settings
 
 __all__ = [
     "get_fixed_timezone",

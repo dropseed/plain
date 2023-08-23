@@ -1,4 +1,4 @@
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.utils.module_loading import import_string
 from .defaults import create_default_environment, get_template_dirs
 from bolt.utils.functional import LazyObject

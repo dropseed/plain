@@ -1,6 +1,6 @@
 from threading import local
 
-from django.conf import settings as django_settings
+from bolt.runtime import settings as bolt_settings
 from bolt.utils.functional import cached_property
 
 
@@ -46,7 +46,7 @@ class BaseConnectionHandler:
 
     def configure_settings(self, settings):
         if settings is None:
-            settings = getattr(django_settings, self.settings_name)
+            settings = getattr(bolt_settings, self.settings_name)
         return settings
 
     def create_connection(self, alias):

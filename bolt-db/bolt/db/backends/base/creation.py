@@ -3,7 +3,7 @@ import sys
 from io import StringIO
 
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.json import BoltJSONEncoder
 from bolt.db import router
 from bolt.db.transaction import atomic

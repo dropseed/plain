@@ -9,7 +9,7 @@ import os
 import pathlib
 from urllib.parse import urljoin
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.files.base import ContentFile
 from bolt.signals import setting_changed
 from bolt.utils._os import safe_join

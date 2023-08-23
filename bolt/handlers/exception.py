@@ -2,7 +2,7 @@ import logging
 import sys
 from functools import wraps
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt import signals
 from bolt.exceptions import (
     BadRequest,

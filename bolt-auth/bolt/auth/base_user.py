@@ -5,7 +5,7 @@ not in INSTALLED_APPS.
 import unicodedata
 import warnings
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.auth import password_validation
 from bolt.auth.hashers import (
     check_password,

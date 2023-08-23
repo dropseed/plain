@@ -7,7 +7,7 @@ import textwrap
 from collections.abc import Iterator
 from typing import Any
 
-from django.conf import settings
+from bolt.runtime import settings
 
 from bolt.staticfiles.storage import (
     ManifestStaticFilesStorage,

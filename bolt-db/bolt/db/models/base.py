@@ -6,7 +6,7 @@ from itertools import chain
 
 import django
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt import checks
 from bolt.exceptions import (
     NON_FIELD_ERRORS,

@@ -1,4 +1,4 @@
-from django.conf import settings
+from bolt.runtime import settings
 
 
 def IMPERSONATE_ALLOWED(user):

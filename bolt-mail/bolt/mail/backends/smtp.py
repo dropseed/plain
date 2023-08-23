@@ -3,7 +3,7 @@ import smtplib
 import ssl
 import threading
 
-from django.conf import settings
+from bolt.runtime import settings
 from ..backends.base import BaseEmailBackend
 from ..message import sanitize_address
 from ..utils import DNS_NAME

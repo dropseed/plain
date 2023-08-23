@@ -32,7 +32,7 @@ EXAMPLE_SETTING: str = "example"
 
 ```python
 # <app>/models.py
-from django.conf import settings
+from bolt.runtime import settings
 
 
 print(settings.EXAMPLE_SETTING)

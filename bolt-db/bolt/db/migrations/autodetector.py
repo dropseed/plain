@@ -4,7 +4,7 @@ from collections import defaultdict
 from graphlib import TopologicalSorter
 from itertools import chain
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.db import models
 from bolt.db.migrations import operations
 from bolt.db.migrations.migration import Migration

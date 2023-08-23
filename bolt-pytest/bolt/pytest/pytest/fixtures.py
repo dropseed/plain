@@ -251,7 +251,7 @@ class SettingsWrapper:
 
         override = override_settings()
         override.enable()
-        from django.conf import settings
+        from bolt.runtime import settings
 
         delattr(settings, attr)
 
@@ -265,7 +265,7 @@ class SettingsWrapper:
         self._to_restore.append(override)
 
     def __getattr__(self, attr: str):
-        from django.conf import settings
+        from bolt.runtime import settings
 
         return getattr(settings, attr)
 

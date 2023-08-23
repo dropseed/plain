@@ -1,7 +1,7 @@
 import json
 from functools import lru_cache, partial
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.db.backends.base.operations import BaseDatabaseOperations
 from bolt.db.backends.postgresql.psycopg_any import (
     Inet,

@@ -5,8 +5,6 @@ from importlib import import_module
 from django import get_version
 from bolt.apps import apps
 
-# SettingsReference imported for backwards compatibility in Django 2.2.
-from django.conf import SettingsReference  # NOQA
 from bolt.db import migrations
 from bolt.db.migrations.loader import MigrationLoader
 from bolt.db.migrations.serializer import Serializer, serializer_factory
@@ -151,7 +149,7 @@ class MigrationWriter:
                     "        migrations.swappable_dependency(settings.%s),"
                     % dependency[1]
                 )
-                imports.add("from django.conf import settings")
+                imports.add("from bolt.runtime import settings")
             else:
                 dependencies.append("        %s," % self.serialize(dependency)[0])
         items["dependencies"] = "\n".join(dependencies) + "\n" if dependencies else ""

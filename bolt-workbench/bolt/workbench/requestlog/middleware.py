@@ -1,4 +1,4 @@
-from django.conf import settings as django_settings
+from bolt.runtime import settings as bolt_settings
 
 
 from . import settings
@@ -8,7 +8,7 @@ from .views import RequestLogView
 
 def requestlog_enabled(request):
     return (
-        django_settings.DEBUG
+        bolt_settings.DEBUG
         and request.path not in settings.REQUESTLOG_IGNORE_URL_PATHS()
         and "querystats" not in request.GET
     )

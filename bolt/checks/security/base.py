@@ -1,4 +1,4 @@
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 
 from .. import Error, Tags, Warning, register

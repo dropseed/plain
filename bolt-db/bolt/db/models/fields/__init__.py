@@ -9,7 +9,7 @@ from base64 import b64decode, b64encode
 from functools import partialmethod, total_ordering
 
 from bolt.apps import apps
-from django.conf import settings
+from bolt.runtime import settings
 from bolt import checks, exceptions, validators
 from bolt.db import connection, connections, router
 from bolt.db.models.constants import LOOKUP_SEP

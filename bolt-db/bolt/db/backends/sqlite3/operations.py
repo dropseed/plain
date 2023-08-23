@@ -4,7 +4,7 @@ import uuid
 from functools import lru_cache
 from itertools import chain
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.exceptions import FieldError
 from bolt.db import DatabaseError, NotSupportedError, models
 from bolt.db.backends.base.operations import BaseDatabaseOperations

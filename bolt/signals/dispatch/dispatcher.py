@@ -78,7 +78,7 @@ class Signal:
                 a receiver. This will usually be a string, though it may be
                 anything hashable.
         """
-        from django.conf import settings
+        from bolt.runtime import settings
 
         # If DEBUG is on, check that we got a good receiver
         if settings.configured and settings.DEBUG:

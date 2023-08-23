@@ -2,7 +2,7 @@ import logging
 import operator
 from datetime import datetime
 
-from django.conf import settings
+from bolt.runtime import settings
 from bolt.db.backends.ddl_references import (
     Columns,
     Expressions,
