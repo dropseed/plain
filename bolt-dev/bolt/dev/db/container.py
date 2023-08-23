@@ -6,7 +6,7 @@ import time
 
 from dotenv import dotenv_values
 
-from bolt.env import database_url
+from bolt.db import database_url
 
 from ..utils import get_repo_root
 
