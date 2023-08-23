@@ -9,8 +9,6 @@ from io import BytesIO
 from bolt.exceptions import SuspiciousFileOperation
 from bolt.utils.functional import SimpleLazyObject, keep_lazy_text, lazy
 from bolt.utils.regex_helper import _lazy_re_compile
-from bolt.utils.translation import gettext as _
-from bolt.utils.translation import gettext_lazy, pgettext
 
 
 @keep_lazy_text
@@ -74,9 +72,7 @@ class Truncator(SimpleLazyObject):
 
     def add_truncation_text(self, text, truncate=None):
         if truncate is None:
-            truncate = pgettext(
-                "String to return when truncating text", "%(truncated_text)s…"
-            )
+            truncate = "%(truncated_text)s…"
         if "%(truncated_text)s" in truncate:
             return truncate % {"truncated_text": text}
         # The truncation text didn't contain the %(truncated_text)s string
@@ -251,7 +247,7 @@ def get_valid_filename(name):
 
 
 @keep_lazy_text
-def get_text_list(list_, last_word=gettext_lazy("or")):
+def get_text_list(list_, last_word="or"):
     """
     >>> get_text_list(['a', 'b', 'c', 'd'])
     'a, b, c or d'
@@ -450,6 +446,70 @@ def _format_lazy(format_string, *args, **kwargs):
     and/or kwargs might be lazy.
     """
     return format_string.format(*args, **kwargs)
+
+
+def pluralize(singular, plural, number):
+    if number == 1:
+        return singular
+    else:
+        return plural
+
+
+def pluralize_lazy(singular, plural, number):
+    def _lazy_number_unpickle(func, resultclass, number, kwargs):
+        return lazy_number(func, resultclass, number=number, **kwargs)
+
+    def lazy_number(func, resultclass, number=None, **kwargs):
+        if isinstance(number, int):
+            kwargs["number"] = number
+            proxy = lazy(func, resultclass)(**kwargs)
+        else:
+            original_kwargs = kwargs.copy()
+
+            class NumberAwareString(resultclass):
+                def __bool__(self):
+                    return bool(kwargs["singular"])
+
+                def _get_number_value(self, values):
+                    try:
+                        return values[number]
+                    except KeyError:
+                        raise KeyError(
+                            "Your dictionary lacks key '%s'. Please provide "
+                            "it, because it is required to determine whether "
+                            "string is singular or plural." % number
+                        )
+
+                def _translate(self, number_value):
+                    kwargs["number"] = number_value
+                    return func(**kwargs)
+
+                def format(self, *args, **kwargs):
+                    number_value = (
+                        self._get_number_value(kwargs) if kwargs and number else args[0]
+                    )
+                    return self._translate(number_value).format(*args, **kwargs)
+
+                def __mod__(self, rhs):
+                    if isinstance(rhs, dict) and number:
+                        number_value = self._get_number_value(rhs)
+                    else:
+                        number_value = rhs
+                    translated = self._translate(number_value)
+                    try:
+                        translated %= rhs
+                    except TypeError:
+                        # String doesn't contain a placeholder for the number.
+                        pass
+                    return translated
+
+            proxy = lazy(lambda **kwargs: NumberAwareString(), NumberAwareString)(**kwargs)
+            proxy.__reduce__ = lambda: (
+                _lazy_number_unpickle,
+                (func, resultclass, number, original_kwargs),
+            )
+        return proxy
+    return lazy_number(pluralize, str, singular=singular, plural=plural, number=number)
 
 
 format_lazy = lazy(_format_lazy, str)

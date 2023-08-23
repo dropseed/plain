@@ -11,7 +11,6 @@ from django.db.models.query_utils import Q
 from django.db.models.sql.query import Query
 from django.db.utils import DEFAULT_DB_ALIAS
 from bolt.utils.deprecation import RemovedInDjango60Warning
-from bolt.utils.translation import gettext_lazy as _
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 

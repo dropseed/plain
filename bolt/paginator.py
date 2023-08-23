@@ -5,7 +5,6 @@ from math import ceil
 
 from bolt.utils.functional import cached_property
 from bolt.utils.inspect import method_has_no_args
-from bolt.utils.translation import gettext_lazy as _
 
 
 class UnorderedObjectListWarning(RuntimeWarning):
@@ -47,11 +46,11 @@ class Paginator:
                 raise ValueError
             number = int(number)
         except (TypeError, ValueError):
-            raise PageNotAnInteger(_("That page number is not an integer"))
+            raise PageNotAnInteger("That page number is not an integer")
         if number < 1:
-            raise EmptyPage(_("That page number is less than 1"))
+            raise EmptyPage("That page number is less than 1")
         if number > self.num_pages:
-            raise EmptyPage(_("That page contains no results"))
+            raise EmptyPage("That page contains no results")
         return number
 
     def get_page(self, number):

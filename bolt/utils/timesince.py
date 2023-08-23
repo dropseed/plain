@@ -2,15 +2,15 @@ import datetime
 
 from bolt.utils.html import avoid_wrapping
 from bolt.utils.timezone import is_aware
-from bolt.utils.translation import gettext, ngettext_lazy
+from bolt.utils.text import pluralize_lazy
 
 TIME_STRINGS = {
-    "year": ngettext_lazy("%(num)d year", "%(num)d years", "num"),
-    "month": ngettext_lazy("%(num)d month", "%(num)d months", "num"),
-    "week": ngettext_lazy("%(num)d week", "%(num)d weeks", "num"),
-    "day": ngettext_lazy("%(num)d day", "%(num)d days", "num"),
-    "hour": ngettext_lazy("%(num)d hour", "%(num)d hours", "num"),
-    "minute": ngettext_lazy("%(num)d minute", "%(num)d minutes", "num"),
+    "year": pluralize_lazy("%(num)d year", "%(num)d years", "num"),
+    "month": pluralize_lazy("%(num)d month", "%(num)d months", "num"),
+    "week": pluralize_lazy("%(num)d week", "%(num)d weeks", "num"),
+    "day": pluralize_lazy("%(num)d day", "%(num)d days", "num"),
+    "hour": pluralize_lazy("%(num)d hour", "%(num)d hours", "num"),
+    "minute": pluralize_lazy("%(num)d minute", "%(num)d minutes", "num"),
 }
 
 TIME_STRINGS_KEYS = list(TIME_STRINGS.keys())
@@ -128,7 +128,7 @@ def timesince(d, now=None, reversed=False, time_strings=None, depth=2):
         current_depth += 1
         i += 1
 
-    return gettext(", ").join(result)
+    return ", ".join(result)
 
 
 def timeuntil(d, now=None, time_strings=None, depth=2):

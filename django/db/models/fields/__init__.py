@@ -28,7 +28,6 @@ from bolt.utils.functional import Promise, cached_property
 from bolt.utils.ipv6 import clean_ipv6_address
 from bolt.utils.itercompat import is_iterable
 from bolt.utils.text import capfirst
-from bolt.utils.translation import gettext_lazy as _
 
 __all__ = [
     "AutoField",
@@ -129,12 +128,7 @@ class Field(RegisterLookupMixin):
         "null": "This field cannot be null.",
         "blank": "This field cannot be blank.",
         "unique": "%(model_name)s with this %(field_label)s already exists.",
-        "unique_for_date": _(
-            # Translators: The 'lookup_type' is one of 'date', 'year' or
-            # 'month'. Eg: "Title must be unique for pub_date year"
-            "%(field_label)s must be unique for "
-            "%(date_field_label)s %(lookup_type)s."
-        ),
+        "unique_for_date": "%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s."
     }
     system_check_deprecated_details = None
     system_check_removed_details = None
@@ -1280,14 +1274,8 @@ class DateTimeCheckMixin:
 class DateField(DateTimeCheckMixin, Field):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _(
-            "“%(value)s” value has an invalid date format. It must be "
-            "in YYYY-MM-DD format."
-        ),
-        "invalid_date": _(
-            "“%(value)s” value has the correct format (YYYY-MM-DD) "
-            "but it is an invalid date."
-        ),
+        "invalid": "“%(value)s” value has an invalid date format. It must be in YYYY-MM-DD format.",
+        "invalid_date": "“%(value)s” value has the correct format (YYYY-MM-DD) but it is an invalid date.",
     }
     description = "Date (without time)"
 
@@ -1407,19 +1395,9 @@ class DateField(DateTimeCheckMixin, Field):
 class DateTimeField(DateField):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _(
-            "“%(value)s” value has an invalid format. It must be in "
-            "YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format."
-        ),
-        "invalid_date": _(
-            "“%(value)s” value has the correct format "
-            "(YYYY-MM-DD) but it is an invalid date."
-        ),
-        "invalid_datetime": _(
-            "“%(value)s” value has the correct format "
-            "(YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) "
-            "but it is an invalid date/time."
-        ),
+        "invalid": "“%(value)s” value has an invalid format. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format.",
+        "invalid_date": "“%(value)s” value has the correct format (YYYY-MM-DD) but it is an invalid date.",
+        "invalid_datetime": "“%(value)s” value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) but it is an invalid date/time.",
     }
     description = "Date (with time)"
 
@@ -1691,10 +1669,7 @@ class DurationField(Field):
 
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _(
-            "“%(value)s” value has an invalid format. It must be in "
-            "[DD] [[HH:]MM:]ss[.uuuuuu] format."
-        )
+        "invalid": "“%(value)s” value has an invalid format. It must be in [DD] [[HH:]MM:]ss[.uuuuuu] format.",
     }
     description = "Duration"
 
@@ -2240,14 +2215,8 @@ class TextField(Field):
 class TimeField(DateTimeCheckMixin, Field):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": _(
-            "“%(value)s” value has an invalid format. It must be in "
-            "HH:MM[:ss[.uuuuuu]] format."
-        ),
-        "invalid_time": _(
-            "“%(value)s” value has the correct format "
-            "(HH:MM[:ss[.uuuuuu]]) but it is an invalid time."
-        ),
+        "invalid": "“%(value)s” value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] format.",
+        "invalid_time": "“%(value)s” value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an invalid time.",
     }
     description = "Time"
 

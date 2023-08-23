@@ -10,7 +10,6 @@ from django.db.models import signals
 from django.db.models.fields import Field
 from django.db.models.query_utils import DeferredAttribute
 from django.db.models.utils import AltersData
-from bolt.utils.translation import gettext_lazy as _
 
 
 class FieldFile(File, AltersData):

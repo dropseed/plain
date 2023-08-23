@@ -9,8 +9,7 @@ from bolt.utils.deconstruct import deconstructible
 from bolt.utils.encoding import punycode
 from bolt.utils.ipv6 import is_valid_ipv6_address
 from bolt.utils.regex_helper import _lazy_re_compile
-from bolt.utils.translation import gettext_lazy as _
-from bolt.utils.translation import ngettext_lazy
+from bolt.utils.text import pluralize_lazy
 
 # These values, if given to validate(), will trigger the self.required check.
 EMPTY_VALUES = (None, "", [], (), {})
@@ -161,7 +160,7 @@ class URLValidator(RegexValidator):
 
 integer_validator = RegexValidator(
     _lazy_re_compile(r"^-?\d+\Z"),
-    message=_("Enter a valid integer."),
+    message="Enter a valid integer.",
     code="invalid",
 )
 
@@ -260,10 +259,7 @@ validate_slug = RegexValidator(
 slug_unicode_re = _lazy_re_compile(r"^[-\w]+\Z")
 validate_unicode_slug = RegexValidator(
     slug_unicode_re,
-    _(
-        "Enter a valid “slug” consisting of Unicode letters, numbers, underscores, or "
-        "hyphens."
-    ),
+    "Enter a valid “slug” consisting of Unicode letters, numbers, underscores, or hyphens."
     "invalid",
 )
 
@@ -335,7 +331,7 @@ def int_list_validator(sep=",", message=None, code="invalid", allow_negative=Fal
 
 
 validate_comma_separated_integer_list = int_list_validator(
-    message=_("Enter only digits separated by commas."),
+    message="Enter only digits separated by commas.",
 )
 
 
@@ -403,7 +399,7 @@ class StepValueValidator(BaseValidator):
 
 @deconstructible
 class MinLengthValidator(BaseValidator):
-    message = ngettext_lazy(
+    message = pluralize_lazy(
         "Ensure this value has at least %(limit_value)d character (it has "
         "%(show_value)d).",
         "Ensure this value has at least %(limit_value)d characters (it has "
@@ -421,7 +417,7 @@ class MinLengthValidator(BaseValidator):
 
 @deconstructible
 class MaxLengthValidator(BaseValidator):
-    message = ngettext_lazy(
+    message = pluralize_lazy(
         "Ensure this value has at most %(limit_value)d character (it has "
         "%(show_value)d).",
         "Ensure this value has at most %(limit_value)d characters (it has "
@@ -446,17 +442,17 @@ class DecimalValidator:
 
     messages = {
         "invalid": "Enter a number.",
-        "max_digits": ngettext_lazy(
+        "max_digits": pluralize_lazy(
             "Ensure that there are no more than %(max)s digit in total.",
             "Ensure that there are no more than %(max)s digits in total.",
             "max",
         ),
-        "max_decimal_places": ngettext_lazy(
+        "max_decimal_places": pluralize_lazy(
             "Ensure that there are no more than %(max)s decimal place.",
             "Ensure that there are no more than %(max)s decimal places.",
             "max",
         ),
-        "max_whole_digits": ngettext_lazy(
+        "max_whole_digits": pluralize_lazy(
             "Ensure that there are no more than %(max)s digit before the decimal "
             "point.",
             "Ensure that there are no more than %(max)s digits before the decimal "
@@ -527,10 +523,7 @@ class DecimalValidator:
 
 @deconstructible
 class FileExtensionValidator:
-    message = _(
-        "File extension “%(extension)s” is not allowed. "
-        "Allowed extensions are: %(allowed_extensions)s."
-    )
+    message = "File extension “%(extension)s” is not allowed. Allowed extensions are: %(allowed_extensions)s."
     code = "invalid_extension"
 
     def __init__(self, allowed_extensions=None, message=None, code=None):

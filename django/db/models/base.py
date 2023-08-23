@@ -50,7 +50,6 @@ from django.db.models.utils import AltersData, make_model_tuple
 from bolt.utils.encoding import force_str
 from bolt.utils.hashable import make_hashable
 from bolt.utils.text import capfirst, get_text_list
-from bolt.utils.translation import gettext_lazy as _
 
 
 class Deferred:
@@ -1391,7 +1390,7 @@ class Model(AltersData, metaclass=ModelBase):
             ]
             params["field_labels"] = get_text_list(field_labels, "and")
             return ValidationError(
-                message=_("%(model_name)s with this %(field_labels)s already exists."),
+                message="%(model_name)s with this %(field_labels)s already exists.",
                 code="unique_together",
                 params=params,
             )

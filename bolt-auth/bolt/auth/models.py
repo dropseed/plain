@@ -6,7 +6,6 @@ from django.db import models
 from django.db.models.manager import EmptyManager
 from bolt.utils import timezone
 from bolt.utils.itercompat import is_iterable
-from bolt.utils.translation import gettext_lazy as _
 
 from .validators import UnicodeUsernameValidator
 
@@ -73,37 +72,29 @@ class AbstractUser(AbstractBaseUser):
         "username",
         max_length=150,
         unique=True,
-        help_text=_(
-            "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-        ),
+        help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
         validators=[username_validator],
         error_messages={
             "unique": "A user with that username already exists.",
         },
     )
-    email = models.EmailField(_("email address"), blank=True)
+    email = models.EmailField("email address", blank=True)
     is_staff = models.BooleanField(
         "staff status",
         default=False,
-        help_text=_("Designates whether the user can log into this admin site."),
+        help_text="Designates whether the user can log into this admin site.",
     )
     is_superuser = models.BooleanField(
         "superuser status",
         default=False,
-        help_text=_(
-            "Designates that this user has all permissions without "
-            "explicitly assigning them."
-        ),
+        help_text="Designates that this user has all permissions without explicitly assigning them.",
     )
     is_active = models.BooleanField(
         "active",
         default=True,
-        help_text=_(
-            "Designates whether this user should be treated as active. "
-            "Unselect this instead of deleting accounts."
-        ),
+        help_text="Designates whether this user should be treated as active. Unselect this instead of deleting accounts.",
     )
-    date_joined = models.DateTimeField(_("date joined"), default=timezone.now)
+    date_joined = models.DateTimeField("date joined", default=timezone.now)
 
     objects = UserManager()
 

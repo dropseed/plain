@@ -1,8 +1,5 @@
 "Commonly-used date structures"
 
-from bolt.utils.translation import gettext_lazy as _
-from bolt.utils.translation import pgettext_lazy
-
 WEEKDAYS = {
     0: "Monday",
     1: "Tuesday",
@@ -50,30 +47,30 @@ MONTHS_3 = {
     12: "dec",
 }
 MONTHS_AP = {  # month names in Associated Press style
-    1: pgettext_lazy("abbrev. month", "Jan."),
-    2: pgettext_lazy("abbrev. month", "Feb."),
-    3: pgettext_lazy("abbrev. month", "March"),
-    4: pgettext_lazy("abbrev. month", "April"),
-    5: pgettext_lazy("abbrev. month", "May"),
-    6: pgettext_lazy("abbrev. month", "June"),
-    7: pgettext_lazy("abbrev. month", "July"),
-    8: pgettext_lazy("abbrev. month", "Aug."),
-    9: pgettext_lazy("abbrev. month", "Sept."),
-    10: pgettext_lazy("abbrev. month", "Oct."),
-    11: pgettext_lazy("abbrev. month", "Nov."),
-    12: pgettext_lazy("abbrev. month", "Dec."),
+    1: "Jan.",
+    2: "Feb.",
+    3: "March",
+    4: "April",
+    5: "May",
+    6: "June",
+    7: "July",
+    8: "Aug.",
+    9: "Sept.",
+    10: "Oct.",
+    11: "Nov.",
+    12: "Dec.",
 }
 MONTHS_ALT = {  # required for long date representation by some locales
-    1: pgettext_lazy("alt. month", "January"),
-    2: pgettext_lazy("alt. month", "February"),
-    3: pgettext_lazy("alt. month", "March"),
-    4: pgettext_lazy("alt. month", "April"),
-    5: pgettext_lazy("alt. month", "May"),
-    6: pgettext_lazy("alt. month", "June"),
-    7: pgettext_lazy("alt. month", "July"),
-    8: pgettext_lazy("alt. month", "August"),
-    9: pgettext_lazy("alt. month", "September"),
-    10: pgettext_lazy("alt. month", "October"),
-    11: pgettext_lazy("alt. month", "November"),
-    12: pgettext_lazy("alt. month", "December"),
+    1: "January",
+    2: "February",
+    3: "March",
+    4: "April",
+    5: "May",
+    6: "June",
+    7: "July",
+    8: "August",
+    9: "September",
+    10: "October",
+    11: "November",
+    12: "December",
 }

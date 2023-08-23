@@ -21,7 +21,6 @@ from .utils import resolve_url
 from bolt.urls import reverse_lazy
 from bolt.utils.decorators import method_decorator
 from bolt.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode
-from bolt.utils.translation import gettext_lazy as _
 from bolt.utils.cache import add_never_cache_headers
 from bolt.views import TemplateView, FormView
 

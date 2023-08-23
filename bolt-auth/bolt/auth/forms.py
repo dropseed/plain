@@ -11,8 +11,6 @@ from bolt import jinja
 from bolt.utils.encoding import force_bytes
 from bolt.utils.http import urlsafe_base64_encode
 from bolt.utils.text import capfirst
-from bolt.utils.translation import gettext
-from bolt.utils.translation import gettext_lazy as _
 
 UserModel = get_user_model()
 
@@ -90,16 +88,16 @@ class BaseUserCreationForm(forms.ModelForm):
         "password_mismatch": "The two password fields didn’t match.",
     }
     password1 = forms.CharField(
-        # label=_("Password"),
+        # label="Password",
         strip=False,
         # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         # help_text=password_validation.password_validators_help_text_html(),
     )
     password2 = forms.CharField(
-        # label=_("Password confirmation"),
+        # label="Password confirmation",
         # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         strip=False,
-        # help_text=_("Enter the same password as before, for verification."),
+        # help_text="Enter the same password as before, for verification.",
     )
 
     class Meta:
@@ -162,7 +160,7 @@ class UserCreationForm(BaseUserCreationForm):
 
 class UserChangeForm(forms.ModelForm):
     password = ReadOnlyPasswordHashField(
-        # label=_("Password"),
+        # label="Password",
         # help_text=_(
         #     "Raw passwords are not stored, so there is no way to see this "
         #     "user’s password, but you can change the password using "
@@ -194,16 +192,13 @@ class AuthenticationForm(forms.Form):
         # widget=forms.TextInput(attrs={"autofocus": True})
     )
     password = forms.CharField(
-        # label=_("Password"),
+        # label="Password",
         strip=False,
         # widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
     )
 
     error_messages = {
-        "invalid_login": _(
-            "Please enter a correct %(username)s and password. Note that both "
-            "fields may be case-sensitive."
-        ),
+        "invalid_login": "Please enter a correct %(username)s and password. Note that both fields may be case-sensitive.",
         "inactive": "This account is inactive.",
     }
 
@@ -269,7 +264,7 @@ class AuthenticationForm(forms.Form):
 
 class PasswordResetForm(forms.Form):
     email = forms.EmailField(
-        # label=_("Email"),
+        # label="Email",
         max_length=254,
         # widget=forms.EmailInput(attrs={"autocomplete": "email"}),
     )
@@ -368,13 +363,13 @@ class SetPasswordForm(forms.Form):
         "password_mismatch": "The two password fields didn’t match.",
     }
     new_password1 = forms.CharField(
-        # label=_("New password"),
+        # label="New password",
         # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         strip=False,
         # help_text=password_validation.password_validators_help_text_html(),
     )
     new_password2 = forms.CharField(
-        # label=_("New password confirmation"),
+        # label="New password confirmation",
         strip=False,
         # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
@@ -413,7 +408,7 @@ class PasswordChangeForm(SetPasswordForm):
         "password_incorrect": "Your old password was entered incorrectly. Please enter it again.",
     }
     old_password = forms.CharField(
-        # label=_("Old password"),
+        # label="Old password",
         strip=False,
         # widget=forms.PasswordInput(
         #     attrs={"autocomplete": "current-password", "autofocus": True}

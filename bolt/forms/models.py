@@ -14,7 +14,6 @@ from django.db.models.utils import AltersData
 from .fields import ChoiceField, Field
 from . import fields
 from .forms import BaseForm, DeclarativeFieldsMetaclass
-from bolt.utils.translation import gettext_lazy as _
 
 __all__ = (
     "ModelForm",

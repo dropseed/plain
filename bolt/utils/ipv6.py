@@ -1,11 +1,10 @@
 import ipaddress
 
 from bolt.exceptions import ValidationError
-from bolt.utils.translation import gettext_lazy as _
 
 
 def clean_ipv6_address(
-    ip_str, unpack_ipv4=False, error_message=_("This is not a valid IPv6 address.")
+    ip_str, unpack_ipv4=False, error_message="This is not a valid IPv6 address."
 ):
     """
     Clean an IPv6 address string.

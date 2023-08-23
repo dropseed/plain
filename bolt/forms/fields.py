@@ -20,8 +20,7 @@ from bolt.utils import formats
 from bolt.utils.dateparse import parse_datetime, parse_duration
 from bolt.utils.duration import duration_string
 from bolt.utils.regex_helper import _lazy_re_compile
-from bolt.utils.translation import gettext_lazy as _
-from bolt.utils.translation import ngettext_lazy
+from bolt.utils.text import pluralize_lazy
 
 from .exceptions import FormFieldMissingError
 
@@ -486,7 +485,7 @@ class FileField(Field):
         "invalid": "No file was submitted. Check the encoding type on the form.",
         "missing": "No file was submitted.",
         "empty": "The submitted file is empty.",
-        "max_length": ngettext_lazy(
+        "text": pluralize_lazy(
             "Ensure this filename has at most %(max)d character (it has %(length)d).",
             "Ensure this filename has at most %(max)d characters (it has %(length)d).",
             "max",
@@ -556,10 +555,7 @@ class FileField(Field):
 class ImageField(FileField):
     default_validators = [validators.validate_image_file_extension]
     default_error_messages = {
-        "invalid_image": _(
-            "Upload a valid image. The file you uploaded was either not an "
-            "image or a corrupted image."
-        ),
+        "invalid_image": "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
     }
 
     def to_python(self, data):

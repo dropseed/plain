@@ -29,7 +29,6 @@ from bolt.utils.timezone import (
     is_naive,
     make_aware,
 )
-from bolt.utils.translation import gettext as _
 
 re_formatchars = _lazy_re_compile(r"(?<!\\)([aAbcdDeEfFgGhHiIjlLmMnNoOPrsStTUuwWyYzZ])")
 re_escaped = _lazy_re_compile(r"\\(.)")

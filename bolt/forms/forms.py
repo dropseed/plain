@@ -10,7 +10,6 @@ from .exceptions import ValidationError
 from .fields import Field, FileField
 from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.functional import cached_property
-from bolt.utils.translation import gettext as _
 
 __all__ = ("BaseForm", "Form")
 

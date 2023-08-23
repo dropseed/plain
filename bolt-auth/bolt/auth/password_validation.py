@@ -13,8 +13,7 @@ from bolt.exceptions import (
 from bolt.utils.functional import cached_property, lazy
 from bolt.utils.html import format_html, format_html_join
 from bolt.utils.module_loading import import_string
-from bolt.utils.translation import gettext as _
-from bolt.utils.translation import ngettext
+from bolt.utils.text import pluralize
 
 
 @functools.cache
@@ -107,7 +106,7 @@ class MinimumLengthValidator:
     def validate(self, password, user=None):
         if len(password) < self.min_length:
             raise ValidationError(
-                ngettext(
+                pluralize(
                     "This password is too short. It must contain at least "
                     "%(min_length)d character.",
                     "This password is too short. It must contain at least "
@@ -119,7 +118,7 @@ class MinimumLengthValidator:
             )
 
     def get_help_text(self):
-        return ngettext(
+        return pluralize(
             "Your password must contain at least %(min_length)d character.",
             "Your password must contain at least %(min_length)d characters.",
             self.min_length,

@@ -17,7 +17,6 @@ from bolt.utils.crypto import (
     pbkdf2,
 )
 from bolt.utils.module_loading import import_string
-from bolt.utils.translation import gettext_noop as _
 
 UNUSABLE_PASSWORD_PREFIX = "!"  # This will never be a valid encoded hash
 UNUSABLE_PASSWORD_SUFFIX_LENGTH = (
