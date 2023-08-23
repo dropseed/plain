@@ -64,11 +64,12 @@ class MigrationLoader:
         and a boolean indicating if the module is specified in
         settings.MIGRATION_MODULE.
         """
-        if app_label in settings.MIGRATION_MODULES:
-            return settings.MIGRATION_MODULES[app_label], True
-        else:
-            app_package_name = apps.get_app_config(app_label).name
-            return "%s.%s" % (app_package_name, MIGRATIONS_MODULE_NAME), False
+
+        app = apps.get_app_config(app_label)
+        if app.migrations_module is None:
+            return None, True
+        explicit = app.migrations_module != MIGRATIONS_MODULE_NAME
+        return "%s.%s" % (app.name, app.migrations_module), explicit
 
     def load_disk(self):
         """Load the migrations from all INSTALLED_APPS from disk."""

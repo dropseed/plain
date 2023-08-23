@@ -27,7 +27,7 @@ def check_database_tables(app_configs, **kwargs):
             table_names = ", ".join(unknown_tables)
             specific_hint = (
                 f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | '
-                + "bolt django dbshell"
+                + "bolt db shell"
             )
             errors.append(
                 Error(

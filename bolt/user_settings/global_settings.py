@@ -144,12 +144,6 @@ LANGUAGE_COOKIE_NAME = "django_language"
 # manually specified. It's used to construct the Content-Type header.
 DEFAULT_CHARSET = "utf-8"
 
-# Database connection info. If left empty, will default to the dummy backend.
-DATABASES = {}
-
-# Classes used to implement DB routing behavior.
-DATABASE_ROUTERS = []
-
 # List of strings representing installed apps.
 INSTALLED_APPS: list = []
 
@@ -239,10 +233,6 @@ FILE_UPLOAD_PERMISSIONS = 0o644
 # see https://docs.python.org/library/os.html#files-and-directories.
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = None
 
-# The tablespaces to use for each model when not specified otherwise.
-DEFAULT_TABLESPACE = ""
-DEFAULT_INDEX_TABLESPACE = ""
-
 # Default primary key field type.
 DEFAULT_AUTO_FIELD = "bolt.db.models.AutoField"
 
@@ -324,13 +314,6 @@ STATICFILES_FINDERS = [
     "bolt.staticfiles.finders.AppDirectoriesFinder",
     # 'bolt.staticfiles.finders.DefaultStorageFinder',
 ]
-
-##############
-# MIGRATIONS #
-##############
-
-# Migration module overrides for apps, by app label.
-MIGRATION_MODULES = {}
 
 #################
 # SYSTEM CHECKS #

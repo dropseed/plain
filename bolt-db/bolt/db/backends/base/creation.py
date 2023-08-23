@@ -68,10 +68,9 @@ class BaseDatabaseCreation:
         try:
             if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
                 # Disable migrations for all apps.
-                old_migration_modules = settings.MIGRATION_MODULES
-                settings.MIGRATION_MODULES = {
-                    app.label: None for app in apps.get_app_configs()
-                }
+                for app in apps.get_app_configs():
+                    app._old_migrations_module = app.migrations_module
+                    app.migrations_module = None
             # We report migrate messages at one level lower than that
             # requested. This ensures we don't get flooded with messages during
             # testing (unless you really ask to be flooded).
@@ -84,7 +83,9 @@ class BaseDatabaseCreation:
             )
         finally:
             if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
-                settings.MIGRATION_MODULES = old_migration_modules
+                for app in apps.get_app_configs():
+                    app.migrations_module = app._old_migrations_module
+                    del app._old_migrations_module
 
         # We then serialize the current state of the database into a string
         # and store it on the connection. This slightly horrific process is so people
