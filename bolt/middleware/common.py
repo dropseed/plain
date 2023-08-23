@@ -1,4 +1,3 @@
-from bolt.exceptions import PermissionDenied
 from bolt.http import HttpResponsePermanentRedirect
 from bolt.runtime import settings
 from bolt.urls import is_valid_path
@@ -8,8 +7,6 @@ from bolt.utils.http import escape_leading_slashes
 class CommonMiddleware:
     """
     "Common" middleware for taking care of some basic operations:
-
-        - Forbid access to User-Agents in settings.DISALLOWED_USER_AGENTS
 
         - URL rewriting: Based on the APPEND_SLASH setting,
           append missing slashes.
@@ -31,16 +28,8 @@ class CommonMiddleware:
 
     def __call__(self, request):
         """
-        Check for denied User-Agents and rewrite the URL based on
-        settings.APPEND_SLASH
+        Rewrite the URL based on settings.APPEND_SLASH
         """
-
-        # Check for denied User-Agents
-        user_agent = request.META.get("HTTP_USER_AGENT")
-        if user_agent is not None:
-            for user_agent_regex in settings.DISALLOWED_USER_AGENTS:
-                if user_agent_regex.search(user_agent):
-                    raise PermissionDenied("Forbidden user agent")
 
         response = self.get_response(request)
 

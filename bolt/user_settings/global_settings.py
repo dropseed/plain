@@ -33,18 +33,6 @@ INSTALLED_APPS: list = []
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
 
-# List of compiled regular expression objects representing User-Agent strings
-# that are not allowed to visit any page, systemwide. Use this for bad
-# robots/crawlers. Here are a few examples:
-#     import re
-#     DISALLOWED_USER_AGENTS = [
-#         re.compile(r'^NaverBot.*'),
-#         re.compile(r'^EmailSiphon.*'),
-#         re.compile(r'^SiteSucker.*'),
-#         re.compile(r'^sohu-search'),
-#     ]
-DISALLOWED_USER_AGENTS = []
-
 # A secret key for this particular Bolt installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Bolt will complain
 # loudly.
