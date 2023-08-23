@@ -151,7 +151,7 @@ def parse(
     port = (
         str(spliturl.port)
         if spliturl.port
-        and engine in (SCHEMES["oracle"], SCHEMES["mssql"], SCHEMES["mssqlms"])
+        and engine in (SCHEMES["mssql"], SCHEMES["mssqlms"])
         else spliturl.port
     )
 
