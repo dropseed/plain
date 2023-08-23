@@ -1,5 +1,4 @@
 .venv
 *.egg-info
-*.pot
 *.py[co]
 __pycache__

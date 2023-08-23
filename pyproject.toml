@@ -2,7 +2,7 @@
 name = "bolt"
 version = "0.1.0"
 description = ""
-authors = ["Dave Gaeddert <dave.gaeddert@gmail.com>", "Past authors of Django"]
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
 
 packages = [
