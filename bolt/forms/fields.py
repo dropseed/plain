@@ -93,8 +93,6 @@ class Field:
 
         self.validators = [*self.default_validators, *validators]
 
-        super().__init__()
-
     def prepare_value(self, value):
         return value
 
@@ -862,6 +860,9 @@ class MultipleChoiceField(ChoiceField):
         initial_set = {str(value) for value in initial}
         data_set = {str(value) for value in data}
         return data_set != initial_set
+
+    def value_from_form_data(self, data, files, html_name):
+        return data.getlist(html_name)
 
 
 class SlugField(CharField):

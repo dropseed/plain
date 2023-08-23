@@ -1,6 +1,6 @@
 import unicodedata
 
-from django import forms
+from bolt import forms
 from django.contrib.auth import authenticate, get_user_model, password_validation
 from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX, identify_hasher
 from django.contrib.auth.models import User
@@ -29,38 +29,38 @@ def _unicode_ci_compare(s1, s2):
     )
 
 
-class ReadOnlyPasswordHashWidget(forms.Widget):
-    template_name = "auth/widgets/read_only_password_hash.html"
-    read_only = True
+# class ReadOnlyPasswordHashWidget(forms.Widget):
+#     template_name = "auth/widgets/read_only_password_hash.html"
+#     read_only = True
 
-    def get_context(self, name, value, attrs):
-        context = super().get_context(name, value, attrs)
-        summary = []
-        if not value or value.startswith(UNUSABLE_PASSWORD_PREFIX):
-            summary.append({"label": gettext("No password set.")})
-        else:
-            try:
-                hasher = identify_hasher(value)
-            except ValueError:
-                summary.append(
-                    {
-                        "label": gettext(
-                            "Invalid password format or unknown hashing algorithm."
-                        )
-                    }
-                )
-            else:
-                for key, value_ in hasher.safe_summary(value).items():
-                    summary.append({"label": gettext(key), "value": value_})
-        context["summary"] = summary
-        return context
+#     def get_context(self, name, value, attrs):
+#         context = super().get_context(name, value, attrs)
+#         summary = []
+#         if not value or value.startswith(UNUSABLE_PASSWORD_PREFIX):
+#             summary.append({"label": gettext("No password set.")})
+#         else:
+#             try:
+#                 hasher = identify_hasher(value)
+#             except ValueError:
+#                 summary.append(
+#                     {
+#                         "label": gettext(
+#                             "Invalid password format or unknown hashing algorithm."
+#                         )
+#                     }
+#                 )
+#             else:
+#                 for key, value_ in hasher.safe_summary(value).items():
+#                     summary.append({"label": gettext(key), "value": value_})
+#         context["summary"] = summary
+#         return context
 
-    def id_for_label(self, id_):
-        return None
+#     def id_for_label(self, id_):
+#         return None
 
 
 class ReadOnlyPasswordHashField(forms.Field):
-    widget = ReadOnlyPasswordHashWidget
+    # widget = ReadOnlyPasswordHashWidget
 
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("required", False)
@@ -90,16 +90,16 @@ class BaseUserCreationForm(forms.ModelForm):
         "password_mismatch": _("The two password fields didn’t match."),
     }
     password1 = forms.CharField(
-        label=_("Password"),
+        # label=_("Password"),
         strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
-        help_text=password_validation.password_validators_help_text_html(),
+        # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        # help_text=password_validation.password_validators_help_text_html(),
     )
     password2 = forms.CharField(
-        label=_("Password confirmation"),
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        # label=_("Password confirmation"),
+        # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         strip=False,
-        help_text=_("Enter the same password as before, for verification."),
+        # help_text=_("Enter the same password as before, for verification."),
     )
 
     class Meta:
@@ -162,12 +162,12 @@ class UserCreationForm(BaseUserCreationForm):
 
 class UserChangeForm(forms.ModelForm):
     password = ReadOnlyPasswordHashField(
-        label=_("Password"),
-        help_text=_(
-            "Raw passwords are not stored, so there is no way to see this "
-            "user’s password, but you can change the password using "
-            '<a href="{}">this form</a>.'
-        ),
+        # label=_("Password"),
+        # help_text=_(
+        #     "Raw passwords are not stored, so there is no way to see this "
+        #     "user’s password, but you can change the password using "
+        #     '<a href="{}">this form</a>.'
+        # ),
     )
 
     class Meta:
@@ -190,11 +190,13 @@ class AuthenticationForm(forms.Form):
     username/password logins.
     """
 
-    username = UsernameField(widget=forms.TextInput(attrs={"autofocus": True}))
+    username = UsernameField(
+        # widget=forms.TextInput(attrs={"autofocus": True})
+    )
     password = forms.CharField(
-        label=_("Password"),
+        # label=_("Password"),
         strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+        # widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
     )
 
     error_messages = {
@@ -267,9 +269,9 @@ class AuthenticationForm(forms.Form):
 
 class PasswordResetForm(forms.Form):
     email = forms.EmailField(
-        label=_("Email"),
+        # label=_("Email"),
         max_length=254,
-        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+        # widget=forms.EmailInput(attrs={"autocomplete": "email"}),
     )
 
     def send_mail(
@@ -366,15 +368,15 @@ class SetPasswordForm(forms.Form):
         "password_mismatch": _("The two password fields didn’t match."),
     }
     new_password1 = forms.CharField(
-        label=_("New password"),
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        # label=_("New password"),
+        # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         strip=False,
-        help_text=password_validation.password_validators_help_text_html(),
+        # help_text=password_validation.password_validators_help_text_html(),
     )
     new_password2 = forms.CharField(
-        label=_("New password confirmation"),
+        # label=_("New password confirmation"),
         strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
 
     def __init__(self, user, *args, **kwargs):
@@ -413,11 +415,11 @@ class PasswordChangeForm(SetPasswordForm):
         ),
     }
     old_password = forms.CharField(
-        label=_("Old password"),
+        # label=_("Old password"),
         strip=False,
-        widget=forms.PasswordInput(
-            attrs={"autocomplete": "current-password", "autofocus": True}
-        ),
+        # widget=forms.PasswordInput(
+        #     attrs={"autocomplete": "current-password", "autofocus": True}
+        # ),
     )
 
     field_order = ["old_password", "new_password1", "new_password2"]

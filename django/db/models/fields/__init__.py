@@ -8,7 +8,6 @@ import warnings
 from base64 import b64decode, b64encode
 from functools import partialmethod, total_ordering
 
-from django import forms
 from bolt.apps import apps
 from django.conf import settings
 from django.core import checks, exceptions, validators
@@ -1037,55 +1036,6 @@ class Field(RegisterLookupMixin):
     def save_form_data(self, instance, data):
         setattr(instance, self.name, data)
 
-    def formfield(self, form_class=None, choices_form_class=None, **kwargs):
-        """Return a django.forms.Field instance for this field."""
-        defaults = {
-            "required": not self.blank,
-            "label": capfirst(self.verbose_name),
-            "help_text": self.help_text,
-        }
-        if self.has_default():
-            if callable(self.default):
-                defaults["initial"] = self.default
-                defaults["show_hidden_initial"] = True
-            else:
-                defaults["initial"] = self.get_default()
-        if self.choices is not None:
-            # Fields with choices get special treatment.
-            include_blank = self.blank or not (
-                self.has_default() or "initial" in kwargs
-            )
-            defaults["choices"] = self.get_choices(include_blank=include_blank)
-            defaults["coerce"] = self.to_python
-            if self.null:
-                defaults["empty_value"] = None
-            if choices_form_class is not None:
-                form_class = choices_form_class
-            else:
-                form_class = forms.TypedChoiceField
-            # Many of the subclass-specific formfield arguments (min_value,
-            # max_value) don't apply for choice fields, so be sure to only pass
-            # the values that TypedChoiceField will understand.
-            for k in list(kwargs):
-                if k not in (
-                    "coerce",
-                    "empty_value",
-                    "choices",
-                    "required",
-                    "widget",
-                    "label",
-                    "initial",
-                    "help_text",
-                    "error_messages",
-                    "show_hidden_initial",
-                    "disabled",
-                ):
-                    del kwargs[k]
-        defaults.update(kwargs)
-        if form_class is None:
-            form_class = forms.CharField
-        return form_class(**defaults)
-
     def value_from_object(self, obj):
         """Return the value of this field in the given model instance."""
         return getattr(obj, self.attname)
@@ -1123,18 +1073,6 @@ class BooleanField(Field):
         if value is None:
             return None
         return self.to_python(value)
-
-    def formfield(self, **kwargs):
-        if self.choices is not None:
-            include_blank = not (self.has_default() or "initial" in kwargs)
-            defaults = {"choices": self.get_choices(include_blank=include_blank)}
-        else:
-            form_class = forms.NullBooleanField if self.null else forms.BooleanField
-            # In HTML checkboxes, 'required' means "must be checked" which is
-            # different from the choices case ("must select some value").
-            # required=False allows unchecked checkboxes.
-            defaults = {"form_class": form_class, "required": False}
-        return super().formfield(**{**defaults, **kwargs})
 
 
 class CharField(Field):
@@ -1232,17 +1170,6 @@ class CharField(Field):
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
         return self.to_python(value)
-
-    def formfield(self, **kwargs):
-        # Passing max_length to forms.CharField means that the value's length
-        # will be validated twice. This is considered acceptable since we want
-        # the value in the form field (to pass into widget for example).
-        defaults = {"max_length": self.max_length}
-        # TODO: Handle multiple backends with different feature flags.
-        if self.null and not connection.features.interprets_empty_strings_as_nulls:
-            defaults["empty_value"] = None
-        defaults.update(kwargs)
-        return super().formfield(**defaults)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -1476,14 +1403,6 @@ class DateField(DateTimeCheckMixin, Field):
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.DateField,
-                **kwargs,
-            }
-        )
-
 
 class DateTimeField(DateField):
     empty_strings_allowed = False
@@ -1613,14 +1532,6 @@ class DateTimeField(DateField):
     def value_to_string(self, obj):
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
-
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.DateTimeField,
-                **kwargs,
-            }
-        )
 
 
 class DecimalField(Field):
@@ -1769,16 +1680,6 @@ class DecimalField(Field):
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "max_digits": self.max_digits,
-                "decimal_places": self.decimal_places,
-                "form_class": forms.DecimalField,
-                **kwargs,
-            }
-        )
-
 
 class DurationField(Field):
     """
@@ -1836,14 +1737,6 @@ class DurationField(Field):
         val = self.value_from_object(obj)
         return "" if val is None else duration_string(val)
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.DurationField,
-                **kwargs,
-            }
-        )
-
 
 class EmailField(CharField):
     default_validators = [validators.validate_email]
@@ -1859,16 +1752,6 @@ class EmailField(CharField):
         # We do not exclude max_length if it matches default as we want to change
         # the default in future.
         return name, path, args, kwargs
-
-    def formfield(self, **kwargs):
-        # As with CharField, this will cause email validation to be performed
-        # twice.
-        return super().formfield(
-            **{
-                "form_class": forms.EmailField,
-                **kwargs,
-            }
-        )
 
 
 class FilePathField(Field):
@@ -1930,19 +1813,6 @@ class FilePathField(Field):
             return None
         return str(value)
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "path": self.path() if callable(self.path) else self.path,
-                "match": self.match,
-                "recursive": self.recursive,
-                "form_class": forms.FilePathField,
-                "allow_files": self.allow_files,
-                "allow_folders": self.allow_folders,
-                **kwargs,
-            }
-        )
-
     def get_internal_type(self):
         return "FilePathField"
 
@@ -1979,14 +1849,6 @@ class FloatField(Field):
                 code="invalid",
                 params={"value": value},
             )
-
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.FloatField,
-                **kwargs,
-            }
-        )
 
 
 class IntegerField(Field):
@@ -2080,14 +1942,6 @@ class IntegerField(Field):
                 params={"value": value},
             )
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.IntegerField,
-                **kwargs,
-            }
-        )
-
 
 class BigIntegerField(IntegerField):
     description = _("Big (8 byte) integer")
@@ -2095,15 +1949,6 @@ class BigIntegerField(IntegerField):
 
     def get_internal_type(self):
         return "BigIntegerField"
-
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "min_value": -BigIntegerField.MAX_BIGINT - 1,
-                "max_value": BigIntegerField.MAX_BIGINT,
-                **kwargs,
-            }
-        )
 
 
 class SmallIntegerField(IntegerField):
@@ -2227,15 +2072,6 @@ class GenericIPAddressField(Field):
                 pass
         return str(value)
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "protocol": self.protocol,
-                "form_class": forms.GenericIPAddressField,
-                **kwargs,
-            }
-        )
-
 
 class NullBooleanField(BooleanField):
     default_error_messages = {
@@ -2298,14 +2134,6 @@ class PositiveBigIntegerField(PositiveIntegerRelDbTypeMixin, BigIntegerField):
     def get_internal_type(self):
         return "PositiveBigIntegerField"
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "min_value": 0,
-                **kwargs,
-            }
-        )
-
 
 class PositiveIntegerField(PositiveIntegerRelDbTypeMixin, IntegerField):
     description = _("Positive integer")
@@ -2313,28 +2141,12 @@ class PositiveIntegerField(PositiveIntegerRelDbTypeMixin, IntegerField):
     def get_internal_type(self):
         return "PositiveIntegerField"
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "min_value": 0,
-                **kwargs,
-            }
-        )
-
 
 class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField):
     description = _("Positive small integer")
 
     def get_internal_type(self):
         return "PositiveSmallIntegerField"
-
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "min_value": 0,
-                **kwargs,
-            }
-        )
 
 
 class SlugField(CharField):
@@ -2363,15 +2175,6 @@ class SlugField(CharField):
 
     def get_internal_type(self):
         return "SlugField"
-
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.SlugField,
-                "allow_unicode": self.allow_unicode,
-                **kwargs,
-            }
-        )
 
 
 class TextField(Field):
@@ -2426,18 +2229,6 @@ class TextField(Field):
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
         return self.to_python(value)
-
-    def formfield(self, **kwargs):
-        # Passing max_length to forms.CharField means that the value's length
-        # will be validated twice. This is considered acceptable since we want
-        # the value in the form field (to pass into widget for example).
-        return super().formfield(
-            **{
-                "max_length": self.max_length,
-                **({} if self.choices is not None else {"widget": forms.Textarea}),
-                **kwargs,
-            }
-        )
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -2555,14 +2346,6 @@ class TimeField(DateTimeCheckMixin, Field):
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.TimeField,
-                **kwargs,
-            }
-        )
-
 
 class URLField(CharField):
     default_validators = [validators.URLValidator()]
@@ -2577,16 +2360,6 @@ class URLField(CharField):
         if kwargs.get("max_length") == 200:
             del kwargs["max_length"]
         return name, path, args, kwargs
-
-    def formfield(self, **kwargs):
-        # As with CharField, this will cause URL validation to be performed
-        # twice.
-        return super().formfield(
-            **{
-                "form_class": forms.URLField,
-                **kwargs,
-            }
-        )
 
 
 class BinaryField(Field):
@@ -2699,14 +2472,6 @@ class UUIDField(Field):
                 )
         return value
 
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.UUIDField,
-                **kwargs,
-            }
-        )
-
 
 class AutoFieldMixin:
     db_returning = True
@@ -2756,9 +2521,6 @@ class AutoFieldMixin:
             )
         super().contribute_to_class(cls, name, **kwargs)
         cls._meta.auto_field = self
-
-    def formfield(self, **kwargs):
-        return None
 
 
 class AutoFieldMeta(type):

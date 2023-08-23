@@ -142,29 +142,6 @@ class BaseForm:
         """
         return "%s-%s" % (self.prefix, field_name) if self.prefix else field_name
 
-    def get_context(self):
-        fields = []
-        hidden_fields = []
-        top_errors = self.non_field_errors().copy()
-        for name, bf in self._bound_items():
-            if bf.is_hidden:
-                if bf.errors:
-                    top_errors += [
-                        _("(Hidden field %(name)s) %(error)s")
-                        % {"name": name, "error": str(e)}
-                        for e in bf.errors
-                    ]
-                hidden_fields.append(bf)
-            else:
-                errors_str = str(bf.errors)
-                fields.append((bf, errors_str))
-        return {
-            "form": self,
-            "fields": fields,
-            "hidden_fields": hidden_fields,
-            "errors": top_errors,
-        }
-
     @property
     def non_field_errors(self):
         """
@@ -232,12 +209,6 @@ class BaseForm:
             # The field had an error, so removed it from the final data
             if field in self.cleaned_data:
                 del self.cleaned_data[field]
-
-    def has_error(self, field, code=None):
-        return field in self.errors and (
-            code is None
-            or any(error.code == code for error in self.errors.as_data()[field])
-        )
 
     def full_clean(self):
         """

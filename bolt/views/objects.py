@@ -88,6 +88,18 @@ class CreateView(ObjectTemplateViewMixin, FormView):
 
     template_name_suffix = "_form"
 
+    def post(self) -> HttpResponse:
+        """
+        Handle POST requests: instantiate a form instance with the passed
+        POST variables and then check if it's valid.
+        """
+        # Context expects self.object to exist
+        self.load_object()
+        return super().post()
+
+    def load_object(self) -> None:
+        self.object = None
+
     # TODO? would rather you have to specify this...
     def get_success_url(self):
         """Return the URL to redirect to after processing a valid form."""
@@ -107,9 +119,6 @@ class CreateView(ObjectTemplateViewMixin, FormView):
         """If the form is valid, save the associated model."""
         self.object = form.save()
         return super().form_valid(form)
-
-    def load_object(self) -> None:
-        self.object = None
 
 
 class UpdateView(ObjectTemplateViewMixin, FormView):

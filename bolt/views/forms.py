@@ -7,7 +7,7 @@ from bolt.http import HttpResponse, HttpResponseRedirect
 from .templates import TemplateView
 
 if TYPE_CHECKING:
-    from django.forms import BaseForm
+    from bolt.forms import BaseForm
 
 
 class FormView(TemplateView):

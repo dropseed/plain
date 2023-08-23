@@ -139,4 +139,9 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                 f"Found unmatched uppercase tag in template: {match.group(0)}"
             )
 
+        if match := re.search(r"<[a-z_]+\.[A-Z]+.*>", contents):
+            raise ValueError(
+                f"Found unmatched nested tag in template: {match.group(0)}"
+            )
+
         return contents

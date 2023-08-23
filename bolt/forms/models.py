@@ -96,31 +96,12 @@ def model_to_dict(instance, fields=None):
     return data
 
 
-def apply_limit_choices_to_to_formfield(formfield):
-    """Apply limit_choices_to to the formfield's queryset if needed."""
-    from django.db.models import Exists, OuterRef, Q
-
-    if hasattr(formfield, "queryset") and hasattr(formfield, "get_limit_choices_to"):
-        limit_choices_to = formfield.get_limit_choices_to()
-        if limit_choices_to:
-            complex_filter = limit_choices_to
-            if not isinstance(complex_filter, Q):
-                complex_filter = Q(**limit_choices_to)
-            complex_filter &= Q(pk=OuterRef("pk"))
-            # Use Exists() to avoid potential duplicates.
-            formfield.queryset = formfield.queryset.filter(
-                Exists(formfield.queryset.model._base_manager.filter(complex_filter)),
-            )
-
-
 def fields_for_model(
     model,
     fields=None,
     formfield_callback=None,
     error_messages=None,
     field_classes=None,
-    *,
-    apply_limit_choices_to=True,
 ):
     """
     Return a dictionary containing form fields for the given model.
@@ -136,9 +117,6 @@ def fields_for_model(
 
     ``field_classes`` is a dictionary of model field names mapped to a form
     field class.
-
-    ``apply_limit_choices_to`` is a boolean indicating if limit_choices_to
-    should be applied to a field's queryset.
     """
     field_dict = {}
     ignored = []
@@ -179,8 +157,6 @@ def fields_for_model(
             formfield = formfield_callback(f, **kwargs)
 
         if formfield:
-            if apply_limit_choices_to:
-                apply_limit_choices_to_to_formfield(formfield)
             field_dict[f.name] = formfield
         else:
             ignored.append(f.name)
@@ -248,8 +224,6 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
                 opts.formfield_callback,
                 opts.error_messages,
                 opts.field_classes,
-                # limit_choices_to will be applied during ModelForm.__init__().
-                apply_limit_choices_to=False,
             )
 
             # make sure opts.fields doesn't specify an invalid field
@@ -304,8 +278,6 @@ class BaseModelForm(BaseForm, AltersData):
             prefix,
             object_data,
         )
-        for formfield in self.fields.values():
-            apply_limit_choices_to_to_formfield(formfield)
 
     def _get_validation_exclusions(self):
         """
@@ -591,10 +563,8 @@ class ModelChoiceField(ChoiceField):
         *,
         empty_label="---------",
         required=True,
-        widget=None,
         initial=None,
         to_field_name=None,
-        limit_choices_to=None,
         blank=False,
         **kwargs,
     ):
@@ -603,29 +573,15 @@ class ModelChoiceField(ChoiceField):
         Field.__init__(
             self,
             required=required,
-            widget=widget,
             initial=initial,
             **kwargs,
         )
-        if (required and initial is not None) or (
-            isinstance(self.widget, RadioSelect) and not blank
-        ):
+        if (required and initial is not None):
             self.empty_label = None
         else:
             self.empty_label = empty_label
         self.queryset = queryset
-        self.limit_choices_to = limit_choices_to  # limit the queryset later.
         self.to_field_name = to_field_name
-
-    def get_limit_choices_to(self):
-        """
-        Return ``limit_choices_to`` for this form field.
-
-        If it is a callable, invoke it and return the result.
-        """
-        if callable(self.limit_choices_to):
-            return self.limit_choices_to()
-        return self.limit_choices_to
 
     def __deepcopy__(self, memo):
         result = super(ChoiceField, self).__deepcopy__(memo)
@@ -639,7 +595,6 @@ class ModelChoiceField(ChoiceField):
 
     def _set_queryset(self, queryset):
         self._queryset = None if queryset is None else queryset.all()
-        self.widget.choices = self.choices
 
     queryset = property(_get_queryset, _set_queryset)
 
@@ -791,6 +746,9 @@ class ModelMultipleChoiceField(ModelChoiceField):
         data_set = {str(value) for value in data}
         return data_set != initial_set
 
+    def value_from_form_data(self, data, files, html_name):
+        return data.getlist(html_name)
+
 
 def modelform_defines_fields(form_class):
     return hasattr(form_class, "_meta") and (
@@ -799,17 +757,13 @@ def modelform_defines_fields(form_class):
 
 
 def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None, **kwargs):
-
     defaults = {
         "required": not modelfield.blank,
     }
 
-
     if modelfield.has_default():
-        if callable(modelfield.default):
-            defaults["initial"] = modelfield.default
-        else:
-            defaults["initial"] = modelfield.get_default()
+        defaults["initial"] = modelfield.get_default()
+
     if modelfield.choices is not None:
         # Fields with choices get special treatment.
         include_blank = modelfield.blank or not (
@@ -889,7 +843,15 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
     if isinstance(modelfield, models.JSONField):
         return fields.JSONField(encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults)
 
-    # TODO files (FileField, ImageField), related (FK, OneToOne, m2m)
+    if isinstance(modelfield, models.ForeignKey):
+        return ModelChoiceField(
+            queryset=modelfield.remote_field.model._default_manager,
+            to_field_name=modelfield.remote_field.field_name,
+            blank=modelfield.blank,
+            **defaults
+        )
+
+    # TODO files (FileField, ImageField), related (OneToOne, m2m)
 
     # If there's a form field of the exact same name, use it
     # (models.URLField -> forms.URLField)

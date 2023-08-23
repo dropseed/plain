@@ -1,7 +1,6 @@
 import json
 import warnings
 
-from django import forms
 from django.core import checks, exceptions
 from django.db import NotSupportedError, connections, router
 from django.db.models import expressions, lookups
@@ -152,16 +151,6 @@ class JSONField(CheckFieldDefaultMixin, Field):
 
     def value_to_string(self, obj):
         return self.value_from_object(obj)
-
-    def formfield(self, **kwargs):
-        return super().formfield(
-            **{
-                "form_class": forms.JSONField,
-                "encoder": self.encoder,
-                "decoder": self.decoder,
-                **kwargs,
-            }
-        )
 
 
 def compile_json_path(key_transforms, include_root=True):
