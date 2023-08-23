@@ -49,9 +49,7 @@ def register(connection):
     create_deterministic_function(
         "bolt_datetime_cast_time", 3, _sqlite_datetime_cast_time
     )
-    create_deterministic_function(
-        "bolt_datetime_extract", 4, _sqlite_datetime_extract
-    )
+    create_deterministic_function("bolt_datetime_extract", 4, _sqlite_datetime_extract)
     create_deterministic_function("bolt_datetime_trunc", 4, _sqlite_datetime_trunc)
     create_deterministic_function("bolt_time_extract", 2, _sqlite_time_extract)
     create_deterministic_function("bolt_time_trunc", 4, _sqlite_time_trunc)

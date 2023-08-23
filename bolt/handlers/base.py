@@ -64,9 +64,7 @@ class BaseHandler:
                 )
             if hasattr(mw_instance, "process_template_response"):
                 self._template_response_middleware.append(
-                    self.adapt_method_mode(
-                        mw_instance.process_template_response
-                    ),
+                    self.adapt_method_mode(mw_instance.process_template_response),
                 )
             if hasattr(mw_instance, "process_exception"):
                 # The exception-handling stack is still always synchronous for

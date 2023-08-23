@@ -8,9 +8,8 @@ class HTMXScriptsExtension(InclusionTagExtension):
     template_name = "htmx/scripts.html"
 
     def get_context(self, context, *args, **kwargs):
-        return {
-            "csrf_token": context["csrf_token"]
-        }
+        return {"csrf_token": context["csrf_token"]}
+
 
 class HTMXFragmentExtension(Extension):
     tags = {"htmxfragment"}
@@ -24,7 +23,10 @@ class HTMXFragmentExtension(Extension):
 
         fragment_name = parser.parse_expression()
 
-        if parser.stream.current.type == "name" and parser.stream.current.value == "lazy":
+        if (
+            parser.stream.current.type == "name"
+            and parser.stream.current.value == "lazy"
+        ):
             next(parser.stream)
             fragment_lazy = True
         else:
@@ -33,11 +35,16 @@ class HTMXFragmentExtension(Extension):
         body = parser.parse_statements(["name:endhtmxfragment"], drop_needle=True)
 
         render_lazy = jinja2.nodes.Const(fragment_lazy)
-        call = self.call_method('_render_htmx_fragment', args=[fragment_name, render_lazy, jinja2.nodes.ContextReference()])
+        call = self.call_method(
+            "_render_htmx_fragment",
+            args=[fragment_name, render_lazy, jinja2.nodes.ContextReference()],
+        )
         node = jinja2.nodes.CallBlock(call, [], [], body).set_lineno(lineno)
 
         # Store a reference to the node for later
-        self.environment.htmx_fragment_nodes.setdefault(parser.name, {})[fragment_name.value] = node
+        self.environment.htmx_fragment_nodes.setdefault(parser.name, {})[
+            fragment_name.value
+        ] = node
 
         return node
 
@@ -51,14 +58,17 @@ class HTMXFragmentExtension(Extension):
 
     @staticmethod
     def find_template_fragment(template: jinja2.Template, fragment_name: str):
-        callblock_node = template.environment.htmx_fragment_nodes.get(template.name, {}).get(fragment_name)
+        callblock_node = template.environment.htmx_fragment_nodes.get(
+            template.name, {}
+        ).get(fragment_name)
         if not callblock_node:
-            raise jinja2.TemplateNotFound(f"Fragment {fragment_name} not found in template {template.name}")
+            raise jinja2.TemplateNotFound(
+                f"Fragment {fragment_name} not found in template {template.name}"
+            )
 
         # Create a new template from the node
         template_node = jinja2.nodes.Template(callblock_node.body)
         return template.environment.from_string(template_node)
-
 
     @staticmethod
     def render_template_fragment(*, template, fragment_name, context):

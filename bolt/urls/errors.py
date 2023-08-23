@@ -6,6 +6,7 @@ from bolt.http import (
     HttpResponseNotFound,
     HttpResponseServerError,
 )
+
 # from django.views.decorators.csrf import requires_csrf_token
 from bolt import jinja
 from jinja2.exceptions import TemplateNotFound

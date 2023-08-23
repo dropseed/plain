@@ -36,16 +36,20 @@ class OAuthCallbackView(View):
         except OAuthUserAlreadyExistsError:
             template = jinja.get_template("oauth/error.html")
             return HttpResponseBadRequest(
-                template.render({
-                    "oauth_error": "A user already exists with this email address. Please log in first and then connect this OAuth provider to the existing account."
-                })
+                template.render(
+                    {
+                        "oauth_error": "A user already exists with this email address. Please log in first and then connect this OAuth provider to the existing account."
+                    }
+                )
             )
         except OAuthStateMismatchError:
             template = jinja.get_template("oauth/error.html")
             return HttpResponseBadRequest(
-                template.render({
-                    "oauth_error": "The state parameter did not match. Please try again."
-                })
+                template.render(
+                    {
+                        "oauth_error": "The state parameter did not match. Please try again."
+                    }
+                )
             )
 
 

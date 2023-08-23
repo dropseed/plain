@@ -12,6 +12,7 @@ MODELS_MODULE_NAME = "models"
 
 class AppConfig:
     """Class representing a Bolt application and its configuration."""
+
     migrations_module = "migrations"
 
     def __init__(self, app_name, app_module):

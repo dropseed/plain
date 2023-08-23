@@ -23,9 +23,10 @@ class RequestLogMiddleware:
         if not requestlog_enabled(request):
             return self.get_response(request)
 
-        if request.GET.get("workbench") == "requestlog" or request.POST.get(
-            "workbench"
-            ) == "requestlog":
+        if (
+            request.GET.get("workbench") == "requestlog"
+            or request.POST.get("workbench") == "requestlog"
+        ):
             return RequestLogView.as_view()(request).render()
 
         # Save the request to the log

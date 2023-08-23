@@ -27,6 +27,7 @@ __all__ = (
     "SimpleTestCase",
 )
 
+
 class DatabaseOperationForbidden(AssertionError):
     pass
 
@@ -202,6 +203,7 @@ class TransactionTestCase(unittest.TestCase):
 
         try:
             from bolt import mail
+
             mail.outbox = []
         except ImportError:
             pass

@@ -14,7 +14,6 @@ class GZipMiddleware:
 
     max_random_bytes = 100
 
-
     def __init__(self, get_response):
         self.get_response = get_response
 

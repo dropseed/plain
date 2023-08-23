@@ -38,7 +38,7 @@ class InstalledAppsGroup(click.Group):
             cli_name = app.name
 
             if cli_name.startswith(self.BOLT_APPS_PREFIX):
-                cli_name = cli_name[len(self.BOLT_APPS_PREFIX):]
+                cli_name = cli_name[len(self.BOLT_APPS_PREFIX) :]
 
             apps_with_commands.append(cli_name)
 
@@ -80,7 +80,9 @@ class BinNamespaceGroup(click.Group):
             return imported
 
         # Re-create the bin path and make sure it exists
-        bin_path = os.path.join(os.path.dirname(sys.executable), self.COMMAND_PREFIX + name)
+        bin_path = os.path.join(
+            os.path.dirname(sys.executable), self.COMMAND_PREFIX + name
+        )
         if not os.path.exists(bin_path):
             return
 
@@ -112,7 +114,7 @@ def bolt_cli():
     "legacy",
     context_settings=dict(
         ignore_unknown_options=True,
-    )
+    ),
 )
 @click.argument("legacy_args", nargs=-1, type=click.UNPROCESSED)
 def legacy_alias(legacy_args):
@@ -150,6 +152,7 @@ def shell(interface):
     if interface:
         interface = [interface]
     else:
+
         def get_default_interface():
             try:
                 import IPython  # noqa
@@ -162,10 +165,13 @@ def shell(interface):
 
         interface = get_default_interface()
 
-    result = subprocess.run(interface, env={
-        "PYTHONSTARTUP": os.path.join(os.path.dirname(__file__), "startup.py"),
-        **os.environ,
-    })
+    result = subprocess.run(
+        interface,
+        env={
+            "PYTHONSTARTUP": os.path.join(os.path.dirname(__file__), "startup.py"),
+            **os.environ,
+        },
+    )
     if result.returncode:
         sys.exit(result.returncode)
 
@@ -203,7 +209,6 @@ def settings(name_filter, overridden):
 
     for setting in dir(settings):
         if setting.isupper():
-
             if name_filter and name_filter.upper() not in setting:
                 continue
 
@@ -225,7 +230,9 @@ def settings(name_filter, overridden):
             table.add_row(
                 setting,
                 Pretty(default_value) if default_value else "",
-                Pretty(getattr(settings, setting)) if is_overridden else Text("<Default>", style="italic dim"),
+                Pretty(getattr(settings, setting))
+                if is_overridden
+                else Text("<Default>", style="italic dim"),
                 Pretty(annotation) if annotation else "",
                 str(module.__name__) if module else "",
             )
@@ -249,11 +256,15 @@ def compile(ctx):
     # TODO not necessarily installed
     result = subprocess.run(["bolt", "tailwind", "compile", "--minify"])
     if result.returncode:
-        click.secho(f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red")
+        click.secho(
+            f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red"
+        )
         sys.exit(result.returncode)
 
     # Run the regular collectstatic
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
 
 
-cli = click.CommandCollection(sources=[InstalledAppsGroup(), BinNamespaceGroup(), bolt_cli])
+cli = click.CommandCollection(
+    sources=[InstalledAppsGroup(), BinNamespaceGroup(), bolt_cli]
+)

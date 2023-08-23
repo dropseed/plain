@@ -101,6 +101,7 @@ class LazySettings(LazyObject):
 
 class DefaultSetting:
     """Store some basic info about default settings and where they came from"""
+
     def __init__(self, name, value, annotation, module):
         self.name = name
         self.value = value
@@ -115,7 +116,9 @@ class DefaultSetting:
             return
 
         if not DefaultSetting._is_instance_of_type(obj, self.annotation):
-            raise ValueError("The %s setting must be of type %s" % (self.name, self.annotation))
+            raise ValueError(
+                "The %s setting must be of type %s" % (self.name, self.annotation)
+            )
 
     @staticmethod
     def _is_instance_of_type(value, type_hint) -> bool:
@@ -124,15 +127,23 @@ class DefaultSetting:
             return isinstance(value, type_hint)
 
         # Union types
-        if typing.get_origin(type_hint) is typing.Union or typing.get_origin(type_hint) is types.UnionType:
-            return any(DefaultSetting._is_instance_of_type(value, arg) for arg in typing.get_args(type_hint))
+        if (
+            typing.get_origin(type_hint) is typing.Union
+            or typing.get_origin(type_hint) is types.UnionType
+        ):
+            return any(
+                DefaultSetting._is_instance_of_type(value, arg)
+                for arg in typing.get_args(type_hint)
+            )
 
         # List types
         if typing.get_origin(type_hint) is list:
-            return isinstance(value, list) and all(DefaultSetting._is_instance_of_type(item, typing.get_args(type_hint)[0]) for item in value)
+            return isinstance(value, list) and all(
+                DefaultSetting._is_instance_of_type(item, typing.get_args(type_hint)[0])
+                for item in value
+            )
 
         raise ValueError("Unsupported type hint: %s" % type_hint)
-
 
 
 class Settings:
@@ -191,11 +202,8 @@ class Settings:
 
         for setting in dir(module):
             if setting.isupper():
-
                 if hasattr(self, setting):
-                    raise ImproperlyConfigured(
-                        "The %s setting is duplicated" % setting
-                    )
+                    raise ImproperlyConfigured("The %s setting is duplicated" % setting)
 
                 setting_value = getattr(module, setting)
 

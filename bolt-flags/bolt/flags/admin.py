@@ -11,7 +11,6 @@ class FlagAdmin(AdminModelViewset):
     search_fields = ["name", "description"]
 
 
-
 class FlagResultForm(forms.ModelForm):
     class Meta:
         model = FlagResult
@@ -21,7 +20,14 @@ class FlagResultForm(forms.ModelForm):
 @register_model
 class FlagResultAdmin(AdminModelViewset):
     model = FlagResult
-    list_fields = ["flag", "key", "value", "created_at__date", "updated_at__date", "uuid"]
+    list_fields = [
+        "flag",
+        "key",
+        "value",
+        "created_at__date",
+        "updated_at__date",
+        "uuid",
+    ]
     search_fields = ["flag__name", "key"]
     form_class = FlagResultForm
 

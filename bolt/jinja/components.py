@@ -43,11 +43,15 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                         component_name = os.path.splitext(relative_path)[0].replace(
                             os.sep, "."
                         )
-                        components.append({
-                            "path": relative_path,
-                            "html_name": component_name,  # Uses . syntax
-                            "tag_name": component_name.replace(".", "_"),  # Uses _ syntax
-                        })
+                        components.append(
+                            {
+                                "path": relative_path,
+                                "html_name": component_name,  # Uses . syntax
+                                "tag_name": component_name.replace(
+                                    ".", "_"
+                                ),  # Uses _ syntax
+                            }
+                        )
 
         for component in components:
             component_name = component["html_name"]
@@ -83,11 +87,15 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                     return template.render({**context, **kwargs})
 
             # Create a new class on the fly
-            NamedComponentExtension = type(f"HTMLComponent.{component_name}", (ComponentExtension,), {
-                "tags": {jinja_tag_name, f"end{jinja_tag_name}"},
-                "template_name": f"components/{component_relative_path}",
-                "jinja_tag_name": jinja_tag_name,
-            })
+            NamedComponentExtension = type(
+                f"HTMLComponent.{component_name}",
+                (ComponentExtension,),
+                {
+                    "tags": {jinja_tag_name, f"end{jinja_tag_name}"},
+                    "template_name": f"components/{component_relative_path}",
+                    "jinja_tag_name": jinja_tag_name,
+                },
+            )
             self._template_components_environment.add_extension(NamedComponentExtension)
 
         return components
@@ -99,14 +107,16 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
             <Label for="{{ thing }}"> vs <Label for=thing>
             so we just convert the first to the second automatically.
             """
-            return re.sub(r'(?<=\"{{)(.+)(?=}}\")', r"\1", s)
+            return re.sub(r"(?<=\"{{)(.+)(?=}}\")", r"\1", s)
 
         for component in self.template_components:
             component_name = component["html_name"]
             jinja_tag_name = component["tag_name"]
 
             closing_pattern = re.compile(
-                r"<{}(\s+[\s\S]*?)?>([\s\S]*?)</{}>".format(component_name, component_name)
+                r"<{}(\s+[\s\S]*?)?>([\s\S]*?)</{}>".format(
+                    component_name, component_name
+                )
             )
             self_closing_pattern = re.compile(
                 r"<{}(\s+[\s\S]*?)?/>".format(component_name)
@@ -130,7 +140,9 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                 attrs_str = match.group(1) or ""
 
                 attrs_str = replace_quoted_braces(attrs_str)
-                return f"{{% {jinja_tag_name} {attrs_str} %}}{{% end{jinja_tag_name} %}}"
+                return (
+                    f"{{% {jinja_tag_name} {attrs_str} %}}{{% end{jinja_tag_name} %}}"
+                )
 
             contents = self_closing_pattern.sub(self_closing_cb, contents)
 

@@ -107,7 +107,9 @@ class OAuthProvider:
         if not secrets.compare_digest(state, expected_state):
             raise OAuthStateMismatchError()
 
-    def handle_login_request(self, *, request: HttpRequest, redirect_to: str = "") -> HttpResponse:
+    def handle_login_request(
+        self, *, request: HttpRequest, redirect_to: str = ""
+    ) -> HttpResponse:
         authorization_url = self.get_authorization_url(request=request)
         authorization_params = self.get_authorization_url_params(request=request)
 
@@ -126,7 +128,9 @@ class OAuthProvider:
         redirect_url = authorization_url + "?" + urlencode(sorted_authorization_params)
         return HttpResponseRedirect(redirect_url)
 
-    def handle_connect_request(self, *, request: HttpRequest, redirect_to: str = "") -> HttpResponse:
+    def handle_connect_request(
+        self, *, request: HttpRequest, redirect_to: str = ""
+    ) -> HttpResponse:
         return self.handle_login_request(request=request, redirect_to=redirect_to)
 
     def handle_disconnect_request(self, *, request: HttpRequest) -> HttpResponse:

@@ -24,7 +24,10 @@ def cli(pytest_args):
             .strip()
         )
     except subprocess.CalledProcessError:
-        click.secho("All bolt projects are expected to be in a git repo and we couldn't find one.", fg="red")
+        click.secho(
+            "All bolt projects are expected to be in a git repo and we couldn't find one.",
+            fg="red",
+        )
         sys.exit(1)
 
     bolt_tmp_dir = os.path.join(repo_root, ".bolt")
@@ -35,18 +38,18 @@ def cli(pytest_args):
 
     coverage_file = os.path.join(bolt_tmp_dir, ".coverage")
 
-
     # Turn deprecation warnings into errors
-#     if "-W" not in pytest_args:
-#         pytest_args = list(pytest_args)  # Make sure it's a list instead of tuple
-#         pytest_args.append("-W")
-#         pytest_args.append("error::DeprecationWarning")
+    #     if "-W" not in pytest_args:
+    #         pytest_args = list(pytest_args)  # Make sure it's a list instead of tuple
+    #         pytest_args.append("-W")
+    #         pytest_args.append("error::DeprecationWarning")
 
     click.secho("Running pytest with coverage", bold=True)
 
     os.environ.setdefault("APP_ENV", "test")
 
-    result = subprocess.run([
+    result = subprocess.run(
+        [
             "coverage",
             "run",
             "-m",
@@ -76,7 +79,8 @@ def cli(pytest_args):
             shell=True,
         )
 
-    html_result = subprocess.run([
+    html_result = subprocess.run(
+        [
             "coverage",
             "html",
             "--skip-empty",

@@ -123,6 +123,7 @@ def setup_test_environment(debug=None):
 
     try:
         from bolt import mail
+
         mail.outbox = []
         saved_data.email_backend = settings.EMAIL_BACKEND
         settings.EMAIL_BACKEND = "bolt.mail.backends.locmem.EmailBackend"
@@ -146,6 +147,7 @@ def teardown_test_environment():
 
     try:
         from bolt import mail
+
         del mail.outbox
     except ImportError:
         pass
@@ -395,7 +397,6 @@ class TestContextDecorator:
         raise TypeError("Can only decorate subclasses of unittest.TestCase")
 
     def decorate_callable(self, func):
-
         @wraps(func)
         def inner(*args, **kwargs):
             with self as context:

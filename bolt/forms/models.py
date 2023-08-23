@@ -130,10 +130,7 @@ def fields_for_model(
         chain(opts.concrete_fields, sortable_private_fields, opts.many_to_many)
     ):
         if not getattr(f, "editable", False):
-            if (
-                fields is not None
-                and f.name in fields
-            ):
+            if fields is not None and f.name in fields:
                 raise FieldError(
                     "'%s' cannot be specified for %s model form as it is a "
                     "non-editable field" % (f.name, model.__name__)
@@ -160,11 +157,7 @@ def fields_for_model(
         else:
             ignored.append(f.name)
     if fields:
-        field_dict = {
-            f: field_dict.get(f)
-            for f in fields
-            if f not in ignored
-        }
+        field_dict = {f: field_dict.get(f) for f in fields if f not in ignored}
     return field_dict
 
 
@@ -375,9 +368,7 @@ class BaseModelForm(BaseForm, AltersData):
                 exclude.add(name)
 
         try:
-            self.instance = construct_instance(
-                self, self.instance, opts.fields
-            )
+            self.instance = construct_instance(self, self.instance, opts.fields)
         except ValidationError as e:
             self._update_errors(e)
 
@@ -573,7 +564,7 @@ class ModelChoiceField(ChoiceField):
             initial=initial,
             **kwargs,
         )
-        if (required and initial is not None):
+        if required and initial is not None:
             self.empty_label = None
         else:
             self.empty_label = empty_label
@@ -746,12 +737,12 @@ class ModelMultipleChoiceField(ModelChoiceField):
 
 
 def modelform_defines_fields(form_class):
-    return hasattr(form_class, "_meta") and (
-        form_class._meta.fields is not None
-    )
+    return hasattr(form_class, "_meta") and (form_class._meta.fields is not None)
 
 
-def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None, **kwargs):
+def modelfield_to_formfield(
+    modelfield, form_class=None, choices_form_class=None, **kwargs
+):
     defaults = {
         "required": not modelfield.blank,
     }
@@ -796,7 +787,9 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
     from bolt.db import models
 
     # Auto fields aren't rendered by default
-    if isinstance(modelfield, models.AutoField) or issubclass(modelfield.__class__, models.AutoField):
+    if isinstance(modelfield, models.AutoField) or issubclass(
+        modelfield.__class__, models.AutoField
+    ):
         return None
 
     if isinstance(modelfield, models.BooleanField):
@@ -808,7 +801,11 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
         return form_class(**defaults)
 
     if isinstance(modelfield, models.DecimalField):
-        return fields.DecimalField(max_digits=modelfield.max_digits, decimal_places=modelfield.decimal_places, **defaults)
+        return fields.DecimalField(
+            max_digits=modelfield.max_digits,
+            decimal_places=modelfield.decimal_places,
+            **defaults,
+        )
 
     if issubclass(modelfield.__class__, models.fields.PositiveIntegerRelDbTypeMixin):
         return fields.IntegerField(min_value=0, **defaults)
@@ -828,7 +825,11 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
         # the value in the form field (to pass into widget for example).
         # TODO: Handle multiple backends with different feature flags.
         from bolt.db import connection
-        if modelfield.null and not connection.features.interprets_empty_strings_as_nulls:
+
+        if (
+            modelfield.null
+            and not connection.features.interprets_empty_strings_as_nulls
+        ):
             defaults["empty_value"] = None
         return fields.CharField(
             max_length=modelfield.max_length,
@@ -836,14 +837,16 @@ def modelfield_to_formfield(modelfield, form_class=None, choices_form_class=None
         )
 
     if isinstance(modelfield, models.JSONField):
-        return fields.JSONField(encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults)
+        return fields.JSONField(
+            encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
+        )
 
     if isinstance(modelfield, models.ForeignKey):
         return ModelChoiceField(
             queryset=modelfield.remote_field.model._default_manager,
             to_field_name=modelfield.remote_field.field_name,
             blank=modelfield.blank,
-            **defaults
+            **defaults,
         )
 
     # TODO files (FileField, ImageField), related (OneToOne, m2m)

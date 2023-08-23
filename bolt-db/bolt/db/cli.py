@@ -38,7 +38,7 @@ def shell(database, parameters):
             "You appear not to have the %r program installed or on your path."
             % connection.client.executable_name,
             fg="red",
-            err=True
+            err=True,
         )
         sys.exit(1)
     except subprocess.CalledProcessError as e:
@@ -49,6 +49,6 @@ def shell(database, parameters):
                 e.returncode,
             ),
             fg="red",
-            err=True
+            err=True,
         )
         sys.exit(e.returncode)

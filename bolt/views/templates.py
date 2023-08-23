@@ -19,7 +19,9 @@ class TemplateView(View):
     template_name: str | None = None
     content_type: str | None = None
 
-    def get_template_response(self, context=None, **response_kwargs) -> "TemplateResponse":
+    def get_template_response(
+        self, context=None, **response_kwargs
+    ) -> "TemplateResponse":
         if context is None:
             context = self.get_context()
 

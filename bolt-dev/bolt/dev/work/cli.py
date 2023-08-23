@@ -78,10 +78,7 @@ def cli():
         with open(Path(repo_root, "pyproject.toml"), "rb") as f:
             pyproject = tomllib.load(f)
         for name, data in (
-            pyproject.get("tool", {})
-            .get("bolt", {})
-            .get("work", {})
-            .get("run", {})
+            pyproject.get("tool", {}).get("bolt", {}).get("work", {}).get("run", {})
         ).items():
             env = {
                 **custom_env,

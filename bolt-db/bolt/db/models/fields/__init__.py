@@ -128,7 +128,7 @@ class Field(RegisterLookupMixin):
         "null": "This field cannot be null.",
         "blank": "This field cannot be blank.",
         "unique": "%(model_name)s with this %(field_label)s already exists.",
-        "unique_for_date": "%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s."
+        "unique_for_date": "%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s.",
     }
     system_check_deprecated_details = None
     system_check_removed_details = None
@@ -164,9 +164,7 @@ class Field(RegisterLookupMixin):
 
     # Generic field type description, usually overridden by subclasses
     def _description(self):
-        return "Field of type: %(field_type)s" % {
-            "field_type": self.__class__.__name__
-        }
+        return "Field of type: %(field_type)s" % {"field_type": self.__class__.__name__}
 
     description = property(_description)
 

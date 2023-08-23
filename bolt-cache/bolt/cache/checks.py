@@ -22,6 +22,7 @@ def check_default_cache_is_configured(app_configs, **kwargs):
 @register(Tags.caches, deploy=True)
 def check_cache_location_not_exposed(app_configs, **kwargs):
     from bolt.cache import caches
+
     errors = []
     for name in ("MEDIA_ROOT", "STATIC_ROOT", "STATICFILES_DIRS"):
         setting = getattr(settings, name, None)
@@ -62,6 +63,7 @@ def check_cache_location_not_exposed(app_configs, **kwargs):
 @register(Tags.caches)
 def check_file_based_cache_is_absolute(app_configs, **kwargs):
     from bolt.cache import caches
+
     errors = []
     for alias, config in settings.CACHES.items():
         cache = caches[alias]

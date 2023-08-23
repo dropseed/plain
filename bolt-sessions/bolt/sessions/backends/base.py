@@ -86,9 +86,7 @@ class SessionBase:
 
     def decode(self, session_data):
         try:
-            return signing.loads(
-                session_data, salt=self.key_salt
-            )
+            return signing.loads(session_data, salt=self.key_salt)
         except signing.BadSignature:
             logger = logging.getLogger("bolt.security.SuspiciousSession")
             logger.warning("Session data corrupted")

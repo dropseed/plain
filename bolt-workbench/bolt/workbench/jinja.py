@@ -1,6 +1,7 @@
 from bolt.jinja.extensions import InclusionTagExtension
 from .stafftoolbar.core import StaffToolbar
 
+
 class StaffToolbarExtension(InclusionTagExtension):
     tags = {"stafftoolbar"}
     template_name = "stafftoolbar/stafftoolbar.html"

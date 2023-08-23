@@ -66,6 +66,7 @@ def pytest_addoption(parser) -> None:
 
 def _setup_bolt() -> None:
     import bolt.runtime
+
     bolt.runtime.setup()
 
     _blocking_manager.block()
@@ -183,7 +184,8 @@ def bolt_test_environment(request) -> None:
     """
     _setup_bolt()
     from bolt.test.utils import (
-        setup_test_environment, teardown_test_environment,
+        setup_test_environment,
+        teardown_test_environment,
     )
 
     debug_ini = request.config.getini("bolt_debug_mode")
@@ -225,6 +227,7 @@ def _bolt_db_marker(request) -> None:
 def _dj_autoclear_mailbox() -> None:
     try:
         from bolt import mail
+
         del mail.outbox[:]
     except ImportError:
         pass
@@ -237,6 +240,7 @@ def mailoutbox(
 ) -> "Optional[List[bolt.mail.EmailMessage]]":
     try:
         from bolt import mail
+
         return mail.outbox
     except ImportError:
         pass
@@ -249,6 +253,7 @@ def bolt_mail_patch_dns(
 ) -> None:
     try:
         from bolt import mail
+
         monkeypatch.setattr(mail.message, "DNS_NAME", bolt_mail_dnsname)
     except ImportError:
         pass

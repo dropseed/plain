@@ -7,6 +7,7 @@ malicious site loading resources from your site in a hidden frame.
 
 from bolt.runtime import settings
 
+
 class XFrameOptionsMiddleware:
     """
     Set the X-Frame-Options HTTP header in HTTP responses.

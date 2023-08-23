@@ -60,6 +60,7 @@ class Ceil(Transform):
     function = "CEILING"
     lookup_name = "ceil"
 
+
 class Cos(NumericOutputFieldMixin, Transform):
     function = "COS"
     lookup_name = "cos"
@@ -112,6 +113,7 @@ class Mod(FixDecimalInputMixin, NumericOutputFieldMixin, Func):
 class Pi(NumericOutputFieldMixin, Func):
     function = "PI"
     arity = 0
+
 
 class Power(NumericOutputFieldMixin, Func):
     function = "POWER"

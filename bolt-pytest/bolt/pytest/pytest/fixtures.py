@@ -49,7 +49,7 @@ def bolt_db_setup(
         db_cfg = setup_databases(
             verbosity=request.config.option.verbose,
             interactive=False,
-            **setup_databases_args
+            **setup_databases_args,
         )
 
     def teardown_database() -> None:
@@ -89,10 +89,15 @@ def _bolt_db_helper(
             reset_sequences,
             databases,
             serialized_rollback,
-        ) = False, False, None, False
+        ) = (
+            False,
+            False,
+            None,
+            False,
+        )
 
-    transactional = transactional or reset_sequences or (
-        "transactional_db" in request.fixturenames
+    transactional = (
+        transactional or reset_sequences or ("transactional_db" in request.fixturenames)
     )
     reset_sequences = reset_sequences or (
         "bolt_db_reset_sequences" in request.fixturenames

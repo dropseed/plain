@@ -7,7 +7,6 @@ from bolt.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -51,9 +50,7 @@ class Migration(migrations.Migration):
                         help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
                         max_length=150,
                         unique=True,
-                        validators=[
-                            bolt.auth.validators.UnicodeUsernameValidator()
-                        ],
+                        validators=[bolt.auth.validators.UnicodeUsernameValidator()],
                         verbose_name="username",
                     ),
                 ),

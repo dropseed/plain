@@ -85,15 +85,9 @@ class QueryStatsMiddleware:
     def is_staff_request(request):
         if getattr(request, "impersonator", None):
             # Support for impersonation (still want the real staff user to see the querystats)
-            return (
-                request.impersonator and request.impersonator.is_staff
-            )
+            return request.impersonator and request.impersonator.is_staff
 
-        return (
-            hasattr(request, "user")
-            and request.user
-            and request.user.is_staff
-        )
+        return hasattr(request, "user") and request.user and request.user.is_staff
 
     def process_template_response(self, request, response):
         # Template hasn't been rendered yet, so we can't include querystats themselves
@@ -125,6 +119,8 @@ class QueryStatsMiddleware:
                     "querystats_template_name"
                 ] = response.jinja_template.name
 
-                response.jinja_template = jinja.environment.get_template("querystats/querystats.html")
+                response.jinja_template = jinja.environment.get_template(
+                    "querystats/querystats.html"
+                )
 
         return response

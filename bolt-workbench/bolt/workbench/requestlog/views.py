@@ -36,5 +36,6 @@ class RequestLogView(TemplateView):
             RequestLog.replay_request(self.request.POST["log"])
             return HttpResponseRedirect(
                 # TODO make this better
-                self.request.path + "?workbench=requestlog"
+                self.request.path
+                + "?workbench=requestlog"
             )

@@ -1,6 +1,7 @@
 from bolt.jinja.extensions import InclusionTagExtension
 from . import settings
 
+
 class SentryScriptsExtension(InclusionTagExtension):
     tags = {"sentry_scripts"}
     template_name = "sentry/scripts.html"

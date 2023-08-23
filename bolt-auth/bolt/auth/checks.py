@@ -53,9 +53,7 @@ def check_user_model(app_configs=None, **kwargs):
         constraint.fields == (cls.USERNAME_FIELD,)
         for constraint in cls._meta.total_unique_constraints
     ):
-        if settings.AUTHENTICATION_BACKENDS == [
-            "bolt.auth.backends.ModelBackend"
-        ]:
+        if settings.AUTHENTICATION_BACKENDS == ["bolt.auth.backends.ModelBackend"]:
             errors.append(
                 checks.Error(
                     "'%s.%s' must be unique because it is named as the "

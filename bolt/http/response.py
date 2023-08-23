@@ -606,16 +606,19 @@ class HttpResponseRedirectBase(HttpResponse):
 
 class HttpResponseRedirect(HttpResponseRedirectBase):
     """HTTP 302 response"""
+
     status_code = 302
 
 
 class HttpResponsePermanentRedirect(HttpResponseRedirectBase):
     """HTTP 301 response"""
+
     status_code = 301
 
 
 class HttpResponseNotModified(HttpResponse):
     """HTTP 304 response"""
+
     status_code = 304
 
     def __init__(self, *args, **kwargs):
@@ -633,21 +636,25 @@ class HttpResponseNotModified(HttpResponse):
 
 class HttpResponseBadRequest(HttpResponse):
     """HTTP 400 response"""
+
     status_code = 400
 
 
 class HttpResponseNotFound(HttpResponse):
     """HTTP 404 response"""
+
     status_code = 404
 
 
 class HttpResponseForbidden(HttpResponse):
     """HTTP 403 response"""
+
     status_code = 403
 
 
 class HttpResponseNotAllowed(HttpResponse):
     """HTTP 405 response"""
+
     status_code = 405
 
     def __init__(self, permitted_methods, *args, **kwargs):
@@ -665,11 +672,13 @@ class HttpResponseNotAllowed(HttpResponse):
 
 class HttpResponseGone(HttpResponse):
     """HTTP 410 response"""
+
     status_code = 410
 
 
 class HttpResponseServerError(HttpResponse):
     """HTTP 500 response"""
+
     status_code = 500
 
 

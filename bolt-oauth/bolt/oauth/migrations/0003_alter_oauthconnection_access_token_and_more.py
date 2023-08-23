@@ -4,7 +4,6 @@ from bolt.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("boltoauth", "0002_alter_oauthconnection_options_and_more"),
     ]

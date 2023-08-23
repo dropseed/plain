@@ -147,9 +147,7 @@ def _security_middleware():
 
 
 def _xframe_middleware():
-    return (
-        "bolt.middleware.clickjacking.XFrameOptionsMiddleware" in settings.MIDDLEWARE
-    )
+    return "bolt.middleware.clickjacking.XFrameOptionsMiddleware" in settings.MIDDLEWARE
 
 
 @register(Tags.security, deploy=True)

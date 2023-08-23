@@ -1,6 +1,7 @@
 from bolt.utils.decorators import method_decorator
 from functools import wraps
 
+
 def csrf_exempt(view_func):
     """Mark a view function as being exempt from the CSRF view protection."""
 
@@ -17,5 +18,6 @@ def csrf_exempt(view_func):
 @method_decorator(csrf_exempt, name="get_response")
 class CsrfExemptViewMixin:
     """CsrfExemptViewMixin needs to come before View in the class definition"""
+
     def get_response(self):
         return super().get_response()

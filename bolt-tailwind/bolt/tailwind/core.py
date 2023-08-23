@@ -79,22 +79,33 @@ class Tailwind:
         return False
 
     def get_version_from_config(self) -> str:
-        pyproject_path = os.path.join(os.path.dirname(self.target_directory), "pyproject.toml")
+        pyproject_path = os.path.join(
+            os.path.dirname(self.target_directory), "pyproject.toml"
+        )
 
         if not os.path.exists(pyproject_path):
             return ""
 
         with open(pyproject_path, "r") as f:
             config = tomlkit.load(f)
-            return config.get("tool", {}).get("bolt", {}).get("tailwind", {}).get("version", "")
+            return (
+                config.get("tool", {})
+                .get("bolt", {})
+                .get("tailwind", {})
+                .get("version", "")
+            )
 
     def set_version_in_config(self, version):
-        pyproject_path = os.path.join(os.path.dirname(self.target_directory), "pyproject.toml")
+        pyproject_path = os.path.join(
+            os.path.dirname(self.target_directory), "pyproject.toml"
+        )
 
         with open(pyproject_path, "r") as f:
             config = tomlkit.load(f)
 
-        config.setdefault("tool", {}).setdefault("bolt", {}).setdefault("tailwind", {})["version"] = version
+        config.setdefault("tool", {}).setdefault("bolt", {}).setdefault("tailwind", {})[
+            "version"
+        ] = version
 
         with open(pyproject_path, "w") as f:
             tomlkit.dump(config, f)

@@ -14,18 +14,14 @@ class BoundField:
         self.html_id = form.add_prefix(self._auto_id)
 
     def __repr__(self):
-        return "<{} \"{}\">".format(
-            self.__class__.__name__, self.html_name
-        )
+        return '<{} "{}">'.format(self.__class__.__name__, self.html_name)
 
     @property
     def errors(self):
         """
         Return an error list (empty if there are no errors) for this field.
         """
-        return self._form.errors.get(
-            self.name, []
-        )
+        return self._form.errors.get(self.name, [])
 
     def value(self):
         """
@@ -34,7 +30,9 @@ class BoundField:
         """
         data = self.initial
         if self._form.is_bound:
-            data = self.field.bound_data(self._form._field_data_value(self.field, self.html_name), data)
+            data = self.field.bound_data(
+                self._form._field_data_value(self.field, self.html_name), data
+            )
         return self.field.prepare_value(data)
 
     @cached_property
@@ -42,7 +40,9 @@ class BoundField:
         return self._form.get_initial_for_field(self.field, self.name)
 
     def _has_changed(self):
-        return self.field.has_changed(self.initial, self._form._field_data_value(self.field, self.html_name))
+        return self.field.has_changed(
+            self.initial, self._form._field_data_value(self.field, self.html_name)
+        )
 
     @property
     def _auto_id(self):

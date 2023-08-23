@@ -503,12 +503,15 @@ def pluralize_lazy(singular, plural, number):
                         pass
                     return translated
 
-            proxy = lazy(lambda **kwargs: NumberAwareString(), NumberAwareString)(**kwargs)
+            proxy = lazy(lambda **kwargs: NumberAwareString(), NumberAwareString)(
+                **kwargs
+            )
             proxy.__reduce__ = lambda: (
                 _lazy_number_unpickle,
                 (func, resultclass, number, original_kwargs),
             )
         return proxy
+
     return lazy_number(pluralize, str, singular=singular, plural=plural, number=number)
 
 

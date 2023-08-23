@@ -231,9 +231,7 @@ class BaseForm:
             # Allow custom parsing from form data/files at the form level
             return getattr(self, "parse_%s" % html_name)()
 
-        return field.value_from_form_data(
-            self.data, self.files, html_name
-        )
+        return field.value_from_form_data(self.data, self.files, html_name)
 
     def _clean_fields(self):
         for name, bf in self._bound_items():

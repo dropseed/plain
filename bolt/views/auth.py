@@ -51,7 +51,10 @@ class AuthViewMixin:
         try:
             self.check_auth()
         except LoginRequired as e:
-            from bolt.auth.views import redirect_to_login  # Import error on apps not ready
+            from bolt.auth.views import (
+                redirect_to_login,
+            )  # Import error on apps not ready
+
             # Ideally this could be handled elsewhere... like PermissionDenied
             # also seems like this code is used multiple places anyway...
             # could be easier to get redirect query param

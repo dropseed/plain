@@ -45,7 +45,6 @@ CSRF_ALLOWED_CHARS = string.ascii_letters + string.digits
 CSRF_SESSION_KEY = "_csrftoken"
 
 
-
 def _get_new_csrf_string():
     return get_random_string(CSRF_SECRET_LENGTH, allowed_chars=CSRF_ALLOWED_CHARS)
 
@@ -164,6 +163,7 @@ class CsrfViewMiddleware:
     This middleware should be used in conjunction with the {% csrf_token %}
     template tag.
     """
+
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -232,6 +232,7 @@ class CsrfViewMiddleware:
 
     def _reject(self, request, reason):
         from .views import CsrfFailureView
+
         response = CsrfFailureView.as_view()(request, reason=reason)
         log_response(
             "Forbidden (%s): %s",

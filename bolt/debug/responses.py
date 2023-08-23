@@ -20,6 +20,7 @@ from bolt.utils.regex_helper import _lazy_re_compile
 from bolt.utils.version import PY311, get_docs_version
 from jinja2.exceptions import TemplateNotFound
 
+
 # Minimal Jinja templates engine to render the error templates
 # regardless of the project's setting. Templates are
 # read directly from the filesystem so that the error handler
@@ -415,7 +416,11 @@ class ExceptionReporter:
             return t.render(c)
         except Exception as e:
             logger.exception("Error rendering 500 template", e)
-            return HttpResponse(f"Error rendering 500 template: {e}", content_type="text/plain", status=500)
+            return HttpResponse(
+                f"Error rendering 500 template: {e}",
+                content_type="text/plain",
+                status=500,
+            )
 
     def get_traceback_text(self):
         """Return plain text version of debug 500 HTTP error page."""
@@ -426,7 +431,11 @@ class ExceptionReporter:
             return t.render(c)
         except Exception as e:
             logger.exception("Error rendering 500 template", e)
-            return HttpResponse(f"Error rendering 500 template: {e}", content_type="text/plain", status=500)
+            return HttpResponse(
+                f"Error rendering 500 template: {e}",
+                content_type="text/plain",
+                status=500,
+            )
 
     def _get_source(self, filename, loader, module_name):
         source = None
