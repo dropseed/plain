@@ -11,7 +11,7 @@ from threading import local
 from bolt.apps import apps
 from django.conf import settings
 from django.conf.locale import LANG_INFO
-from django.core.exceptions import AppRegistryNotReady
+from bolt.exceptions import AppRegistryNotReady
 from bolt.signals import setting_changed
 from bolt.signals.dispatch import receiver
 from bolt.utils.regex_helper import _lazy_re_compile

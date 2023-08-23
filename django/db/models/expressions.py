@@ -7,7 +7,7 @@ from decimal import Decimal
 from types import NoneType
 from uuid import UUID
 
-from django.core.exceptions import EmptyResultSet, FieldError, FullResultSet
+from bolt.exceptions import EmptyResultSet, FieldError, FullResultSet
 from django.db import DatabaseError, NotSupportedError, connection
 from django.db.models import fields
 from django.db.models.constants import LOOKUP_SEP

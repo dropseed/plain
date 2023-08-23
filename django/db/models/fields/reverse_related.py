@@ -9,7 +9,7 @@ They also act as reverse fields for the purposes of the Meta API because
 they're the closest concept currently available.
 """
 
-from django.core import exceptions
+from bolt import exceptions
 from bolt.utils.functional import cached_property
 from bolt.utils.hashable import make_hashable
 

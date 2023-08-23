@@ -63,7 +63,7 @@ and two directions (forward and reverse) for a total of six combinations.
    ``ReverseManyToManyDescriptor``, use ``ManyToManyDescriptor`` instead.
 """
 
-from django.core.exceptions import FieldError
+from bolt.exceptions import FieldError
 from django.db import (
     DEFAULT_DB_ALIAS,
     NotSupportedError,

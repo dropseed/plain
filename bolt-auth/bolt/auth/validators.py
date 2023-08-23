@@ -1,6 +1,6 @@
 import re
 
-from django.core import validators
+from bolt import validators
 from bolt.utils.deconstruct import deconstructible
 from bolt.utils.translation import gettext_lazy as _
 

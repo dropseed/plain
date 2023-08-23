@@ -1,8 +1,8 @@
 import re
 import uuid
 
-from django.core.checks import Info
-from django.core.exceptions import ValidationError
+from bolt.checks import Info
+from bolt.exceptions import ValidationError
 from django.db import models, ProgrammingError
 
 from .bridge import get_flag_class

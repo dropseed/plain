@@ -4,7 +4,7 @@ from functools import partial
 
 from bolt.apps import apps
 from django.conf import SettingsReference, settings
-from django.core import checks, exceptions
+from bolt import checks, exceptions
 from django.db import connection, router
 from django.db.backends import utils
 from django.db.models import Q

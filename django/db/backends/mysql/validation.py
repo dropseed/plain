@@ -1,4 +1,4 @@
-from django.core import checks
+from bolt import checks
 from django.db.backends.base.validation import BaseDatabaseValidation
 from bolt.utils.version import get_docs_version
 

@@ -1,6 +1,6 @@
 import ipaddress
 
-from django.core.exceptions import ValidationError
+from bolt.exceptions import ValidationError
 from bolt.utils.translation import gettext_lazy as _
 
 

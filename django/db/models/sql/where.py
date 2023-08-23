@@ -4,7 +4,7 @@ Code to manage the creation and SQL rendering of 'where' constraints.
 import operator
 from functools import reduce
 
-from django.core.exceptions import EmptyResultSet, FullResultSet
+from bolt.exceptions import EmptyResultSet, FullResultSet
 from django.db.models.expressions import Case, When
 from django.db.models.lookups import Exact
 from bolt.utils import tree

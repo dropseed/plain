@@ -5,7 +5,7 @@ from bolt.auth import authenticate, get_user_model, password_validation
 from bolt.auth.hashers import UNUSABLE_PASSWORD_PREFIX, identify_hasher
 from bolt.auth.models import User
 from bolt.auth.tokens import default_token_generator
-from django.core.exceptions import ValidationError
+from bolt.exceptions import ValidationError
 from bolt.mail import EmailMultiAlternatives
 from bolt import jinja
 from bolt.utils.encoding import force_bytes

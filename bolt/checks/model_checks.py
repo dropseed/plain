@@ -5,7 +5,7 @@ from itertools import chain
 
 from bolt.apps import apps
 from django.conf import settings
-from django.core.checks import Error, Tags, Warning, register
+from bolt.checks import Error, Tags, Warning, register
 
 
 @register(Tags.models)

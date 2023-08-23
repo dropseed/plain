@@ -4,7 +4,7 @@ from functools import wraps
 
 from django.conf import settings
 from bolt import signals
-from django.core.exceptions import (
+from bolt.exceptions import (
     BadRequest,
     PermissionDenied,
     RequestDataTooBig,

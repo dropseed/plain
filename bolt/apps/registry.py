@@ -5,7 +5,7 @@ import warnings
 from collections import Counter, defaultdict
 from functools import partial
 
-from django.core.exceptions import AppRegistryNotReady, ImproperlyConfigured
+from bolt.exceptions import AppRegistryNotReady, ImproperlyConfigured
 
 from .config import AppConfig
 

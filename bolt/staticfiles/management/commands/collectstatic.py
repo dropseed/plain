@@ -3,7 +3,7 @@ import os
 from bolt.apps import apps
 from bolt.staticfiles.finders import get_finders
 from bolt.staticfiles.storage import staticfiles_storage
-from django.core.checks import Tags
+from bolt.checks import Tags
 from bolt.files.storage import FileSystemStorage
 from django.core.management.base import BaseCommand, CommandError
 from django.core.management.color import no_style

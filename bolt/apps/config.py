@@ -2,7 +2,7 @@ import inspect
 import os
 from importlib import import_module
 
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string, module_has_submodule
 

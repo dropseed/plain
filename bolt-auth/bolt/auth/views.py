@@ -15,7 +15,7 @@ from bolt.auth.forms import (
     SetPasswordForm,
 )
 from bolt.auth.tokens import default_token_generator
-from django.core.exceptions import ImproperlyConfigured, ValidationError
+from bolt.exceptions import ImproperlyConfigured, ValidationError
 from bolt.http import HttpResponseRedirect, QueryDict
 from .utils import resolve_url
 from bolt.urls import reverse_lazy

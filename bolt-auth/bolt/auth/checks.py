@@ -2,7 +2,7 @@ from types import MethodType
 
 from bolt.apps import apps
 from django.conf import settings
-from django.core import checks
+from bolt import checks
 
 
 def check_user_model(app_configs=None, **kwargs):

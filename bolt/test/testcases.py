@@ -7,7 +7,7 @@ from unittest.suite import _DebugResult
 
 from bolt.apps import apps
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.management.color import no_style
 from django.core.management.sql import emit_post_migrate_signal

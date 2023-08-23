@@ -6,7 +6,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 from django.conf import settings
 from bolt import signing
-from django.core.exceptions import (
+from bolt.exceptions import (
     DisallowedHost,
     ImproperlyConfigured,
     RequestDataTooBig,

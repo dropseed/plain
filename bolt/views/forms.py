@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.http import HttpResponse, HttpResponseRedirect
 
 from .templates import TemplateView

@@ -7,7 +7,7 @@ import math
 import warnings
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.signals import setting_changed
 from bolt.signals.dispatch import receiver
 from bolt.utils.crypto import (

@@ -1,7 +1,7 @@
 import json
 import warnings
 
-from django.core import checks, exceptions
+from bolt import checks, exceptions
 from django.db import NotSupportedError, connections, router
 from django.db.models import expressions, lookups
 from django.db.models.constants import LOOKUP_SEP

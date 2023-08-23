@@ -1,7 +1,7 @@
 import logging
 
 from bolt.sessions.backends.base import CreateError, SessionBase, UpdateError
-from django.core.exceptions import SuspiciousOperation
+from bolt.exceptions import SuspiciousOperation
 from django.db import DatabaseError, IntegrityError, router, transaction
 from bolt.utils import timezone
 from bolt.utils.functional import cached_property

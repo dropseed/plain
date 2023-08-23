@@ -1,7 +1,7 @@
 """Functions for use in URLsconfs."""
 from functools import partial
 
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 
 from .resolvers import (
     RegexPattern,

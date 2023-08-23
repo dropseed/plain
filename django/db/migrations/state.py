@@ -7,7 +7,7 @@ from bolt.apps import AppConfig
 from bolt.apps.registry import Apps
 from bolt.apps.registry import apps as global_apps
 from django.conf import settings
-from django.core.exceptions import FieldDoesNotExist
+from bolt.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.migrations.utils import field_is_referenced, get_references
 from django.db.models import NOT_PROVIDED
@@ -626,7 +626,7 @@ class StateApps(Apps):
         self.render_multiple([*models.values(), *self.real_models])
 
         # There shouldn't be any operations pending at this point.
-        from django.core.checks.model_checks import _check_lazy_references
+        from bolt.checks.model_checks import _check_lazy_references
 
         ignore = (
             {make_model_tuple(settings.AUTH_USER_MODEL)} if ignore_swappable else set()

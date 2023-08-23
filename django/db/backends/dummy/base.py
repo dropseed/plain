@@ -7,7 +7,7 @@ Each of these API functions, except connection.close(), raise
 ImproperlyConfigured.
 """
 
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.base.client import BaseDatabaseClient
 from django.db.backends.base.creation import BaseDatabaseCreation

@@ -1,4 +1,4 @@
-from django.core.exceptions import ValidationError
+from bolt.exceptions import ValidationError
 
 
 class FormFieldMissingError(Exception):

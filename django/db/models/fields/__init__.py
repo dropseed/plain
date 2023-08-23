@@ -10,7 +10,7 @@ from functools import partialmethod, total_ordering
 
 from bolt.apps import apps
 from django.conf import settings
-from django.core import checks, exceptions, validators
+from bolt import checks, exceptions, validators
 from django.db import connection, connections, router
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.enums import ChoicesMeta
@@ -701,7 +701,7 @@ class Field(RegisterLookupMixin):
     def to_python(self, value):
         """
         Convert the input value into the expected Python data type, raising
-        django.core.exceptions.ValidationError if the data can't be converted.
+        bolt.exceptions.ValidationError if the data can't be converted.
         Return the converted value. Subclasses should override this.
         """
         return value

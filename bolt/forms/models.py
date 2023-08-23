@@ -4,7 +4,7 @@ and database field objects.
 """
 from itertools import chain
 
-from django.core.exceptions import (
+from bolt.exceptions import (
     NON_FIELD_ERRORS,
     FieldError,
     ImproperlyConfigured,

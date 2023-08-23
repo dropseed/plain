@@ -12,8 +12,8 @@ from decimal import Decimal, DecimalException
 from io import BytesIO
 from urllib.parse import urlsplit, urlunsplit
 
-from django.core import validators
-from django.core.exceptions import ValidationError
+from bolt import validators
+from bolt.exceptions import ValidationError
 from django.db.models.enums import ChoicesMeta
 from .boundfield import BoundField
 from bolt.utils import formats

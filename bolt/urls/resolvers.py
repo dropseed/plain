@@ -16,9 +16,9 @@ from urllib.parse import quote
 from threading import local
 
 from django.conf import settings
-from django.core.checks import Error, Warning
-from django.core.checks.urls import check_resolver
-from django.core.exceptions import ImproperlyConfigured, ViewDoesNotExist
+from bolt.checks import Error, Warning
+from bolt.checks.urls import check_resolver
+from bolt.exceptions import ImproperlyConfigured, ViewDoesNotExist
 from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.functional import cached_property
 from bolt.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes

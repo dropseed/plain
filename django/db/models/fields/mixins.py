@@ -1,4 +1,4 @@
-from django.core import checks
+from bolt import checks
 
 NOT_PROVIDED = object()
 

@@ -4,7 +4,7 @@ import datetime
 import os
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from .console import EmailBackend as ConsoleEmailBackend
 
 

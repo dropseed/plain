@@ -6,7 +6,7 @@ from gzip import GzipFile
 from gzip import compress as gzip_compress
 from io import BytesIO
 
-from django.core.exceptions import SuspiciousFileOperation
+from bolt.exceptions import SuspiciousFileOperation
 from bolt.utils.functional import SimpleLazyObject, keep_lazy_text, lazy
 from bolt.utils.regex_helper import _lazy_re_compile
 from bolt.utils.translation import gettext as _

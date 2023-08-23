@@ -3,7 +3,7 @@ import time
 import warnings
 
 from bolt.apps import apps
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.signals import setting_changed
 from django.db import connections, router
 from django.db.utils import ConnectionRouter

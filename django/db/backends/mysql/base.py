@@ -3,7 +3,7 @@ MySQL database backend for Django.
 
 Requires mysqlclient: https://pypi.org/project/mysqlclient/
 """
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends import utils as backend_utils
 from django.db.backends.base.base import BaseDatabaseWrapper

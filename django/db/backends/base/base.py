@@ -10,7 +10,7 @@ from collections import deque
 from contextlib import contextmanager
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS, DatabaseError, NotSupportedError
 from django.db.backends import utils
 from django.db.backends.base.validation import BaseDatabaseValidation

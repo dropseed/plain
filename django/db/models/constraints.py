@@ -2,7 +2,7 @@ import warnings
 from enum import Enum
 from types import NoneType
 
-from django.core.exceptions import FieldError, ValidationError
+from bolt.exceptions import FieldError, ValidationError
 from django.db import connections
 from django.db.models.expressions import Exists, ExpressionList, F, OrderBy
 from django.db.models.indexes import IndexExpression

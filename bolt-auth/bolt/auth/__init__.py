@@ -3,7 +3,7 @@ import re
 
 from bolt.apps import apps as django_apps
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured, PermissionDenied
+from bolt.exceptions import ImproperlyConfigured, PermissionDenied
 from bolt.csrf.middleware import rotate_token
 from bolt.utils.crypto import constant_time_compare
 from bolt.utils.module_loading import import_string

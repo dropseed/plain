@@ -1,4 +1,4 @@
-from django.core.paginator import Paginator
+from bolt.paginator import Paginator
 from bolt.staticfiles.storage import staticfiles_storage
 
 

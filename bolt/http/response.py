@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 from django.conf import settings
 from bolt import signals, signing
-from django.core.exceptions import DisallowedRedirect
+from bolt.exceptions import DisallowedRedirect
 from bolt.json import BoltJSONEncoder
 from http.cookies import SimpleCookie
 from bolt.utils import timezone

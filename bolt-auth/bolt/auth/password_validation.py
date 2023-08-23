@@ -5,7 +5,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from django.conf import settings
-from django.core.exceptions import (
+from bolt.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
     ValidationError,

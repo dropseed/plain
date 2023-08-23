@@ -9,7 +9,7 @@ from itertools import chain, islice
 
 import django
 from django.conf import settings
-from django.core import exceptions
+from bolt import exceptions
 from django.db import (
     DJANGO_VERSION_PICKLE_KEY,
     IntegrityError,

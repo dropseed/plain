@@ -2,7 +2,7 @@
 Query subclasses which provide extra functionality beyond simple data retrieval.
 """
 
-from django.core.exceptions import FieldError
+from bolt.exceptions import FieldError
 from django.db.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
 from django.db.models.sql.query import Query
 

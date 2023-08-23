@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from itertools import chain, tee
 from sqlite3 import dbapi2 as Database
 
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends.base.base import BaseDatabaseWrapper
 from bolt.utils.dateparse import parse_date, parse_datetime, parse_time

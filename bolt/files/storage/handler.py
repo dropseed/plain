@@ -1,5 +1,5 @@
 from django.conf import DEFAULT_STORAGE_ALIAS, STATICFILES_STORAGE_ALIAS, settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string
 

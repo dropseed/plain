@@ -5,7 +5,7 @@ from functools import lru_cache
 from itertools import chain
 
 from django.conf import settings
-from django.core.exceptions import FieldError
+from bolt.exceptions import FieldError
 from django.db import DatabaseError, NotSupportedError, models
 from django.db.backends.base.operations import BaseDatabaseOperations
 from django.db.models.constants import OnConflict

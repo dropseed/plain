@@ -5,7 +5,7 @@ Form classes
 import copy
 import datetime
 
-from django.core.exceptions import NON_FIELD_ERRORS
+from bolt.exceptions import NON_FIELD_ERRORS
 from .exceptions import ValidationError
 from .fields import Field, FileField
 from bolt.utils.datastructures import MultiValueDict

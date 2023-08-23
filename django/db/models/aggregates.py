@@ -1,7 +1,7 @@
 """
 Classes to represent the definitions of aggregate functions.
 """
-from django.core.exceptions import FieldError, FullResultSet
+from bolt.exceptions import FieldError, FullResultSet
 from django.db.models.expressions import Case, Func, Star, Value, When
 from django.db.models.fields import IntegerField
 from django.db.models.functions.comparison import Coalesce

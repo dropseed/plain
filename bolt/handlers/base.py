@@ -2,7 +2,7 @@ import logging
 import types
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured, MiddlewareNotUsed
+from bolt.exceptions import ImproperlyConfigured, MiddlewareNotUsed
 from bolt.signals import request_finished
 from django.db import connections, transaction
 from bolt.urls import get_resolver, set_urlconf

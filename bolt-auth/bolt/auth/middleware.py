@@ -1,5 +1,5 @@
 from bolt import auth
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.functional import SimpleLazyObject
 
 

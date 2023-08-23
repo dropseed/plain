@@ -7,7 +7,7 @@ from urllib.parse import unquote, urldefrag, urlsplit, urlunsplit
 
 from django.conf import STATICFILES_STORAGE_ALIAS, settings
 from bolt.staticfiles.utils import check_settings, matches_patterns
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.files.base import ContentFile
 from bolt.files.storage import FileSystemStorage, storages
 from bolt.utils.functional import LazyObject

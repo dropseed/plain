@@ -4,7 +4,7 @@ from django.conf import settings
 from .backends.filebased import FileBasedCache
 from .constants import DEFAULT_CACHE_ALIAS
 
-from django.core.checks import Error, Tags, Warning, register
+from bolt.checks import Error, Tags, Warning, register
 
 E001 = Error(
     "You must define a '%s' cache in your CACHES setting." % DEFAULT_CACHE_ALIAS,

@@ -7,8 +7,8 @@ from itertools import chain
 import django
 from bolt.apps import apps
 from django.conf import settings
-from django.core import checks
-from django.core.exceptions import (
+from bolt import checks
+from bolt.exceptions import (
     NON_FIELD_ERRORS,
     FieldDoesNotExist,
     FieldError,

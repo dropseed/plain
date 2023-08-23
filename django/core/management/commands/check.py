@@ -1,6 +1,6 @@
 from bolt.apps import apps
-from django.core import checks
-from django.core.checks.registry import registry
+from bolt import checks
+from bolt.checks.registry import registry
 from django.core.management.base import BaseCommand, CommandError
 
 

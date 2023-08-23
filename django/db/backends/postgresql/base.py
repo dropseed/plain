@@ -9,7 +9,7 @@ import warnings
 from contextlib import contextmanager
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from django.db import DatabaseError as WrappedDatabaseError
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper

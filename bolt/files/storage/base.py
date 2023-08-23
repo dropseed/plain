@@ -1,7 +1,7 @@
 import os
 import pathlib
 
-from django.core.exceptions import SuspiciousFileOperation
+from bolt.exceptions import SuspiciousFileOperation
 from bolt.files import File
 from bolt.files.utils import validate_file_name
 from bolt.utils.crypto import get_random_string

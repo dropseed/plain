@@ -17,7 +17,7 @@ import typing
 
 import django
 from django.conf import global_settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.functional import LazyObject, empty
 from bolt.apps import AppConfig
 

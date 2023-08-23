@@ -1,5 +1,5 @@
 from bolt.apps import AppConfig
-from django.core import checks
+from bolt import checks
 from django.db.models.query_utils import DeferredAttribute
 from bolt.utils.translation import gettext_lazy as _
 

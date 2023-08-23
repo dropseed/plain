@@ -2,7 +2,7 @@ import pkgutil
 from importlib import import_module
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 
 # For backwards compatibility with Django < 3.2
 from bolt.utils.connection import ConnectionDoesNotExist  # NOQA: F401

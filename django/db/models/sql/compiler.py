@@ -4,7 +4,7 @@ import re
 from functools import partial
 from itertools import chain
 
-from django.core.exceptions import EmptyResultSet, FieldError, FullResultSet
+from bolt.exceptions import EmptyResultSet, FieldError, FullResultSet
 from django.db import DatabaseError, NotSupportedError
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.expressions import F, OrderBy, RawSQL, Ref, Value

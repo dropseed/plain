@@ -10,7 +10,7 @@ import collections
 import html
 
 from django.conf import settings
-from django.core.exceptions import (
+from bolt.exceptions import (
     RequestDataTooBig,
     SuspiciousMultipartForm,
     TooManyFieldsSent,

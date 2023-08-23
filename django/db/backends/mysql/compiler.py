@@ -1,4 +1,4 @@
-from django.core.exceptions import FieldError, FullResultSet
+from bolt.exceptions import FieldError, FullResultSet
 from django.db.models.expressions import Col
 from django.db.models.sql import compiler
 

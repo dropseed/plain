@@ -2,7 +2,7 @@
 import time
 import warnings
 
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.module_loading import import_string
 
 

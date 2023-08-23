@@ -1,7 +1,7 @@
 import datetime
 import posixpath
 
-from django.core import checks
+from bolt import checks
 from bolt.files.base import File
 from bolt.files.images import ImageFile
 from bolt.files.storage import Storage, default_storage

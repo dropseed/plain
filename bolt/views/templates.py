@@ -1,4 +1,4 @@
-from django.core.exceptions import ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured
 from bolt.http import HttpResponse
 
 from .base import View

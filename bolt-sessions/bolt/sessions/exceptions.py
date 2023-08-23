@@ -1,4 +1,4 @@
-from django.core.exceptions import BadRequest, SuspiciousOperation
+from bolt.exceptions import BadRequest, SuspiciousOperation
 
 
 class SuspiciousSession(SuspiciousOperation):

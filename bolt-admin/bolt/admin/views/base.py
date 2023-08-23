@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from django.core.paginator import Paginator
+from bolt.paginator import Paginator
 from django.db import models
 from bolt.utils.text import slugify
 

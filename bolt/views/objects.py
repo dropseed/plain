@@ -1,4 +1,4 @@
-from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from bolt.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db import models
 from bolt.http import Http404, HttpResponse, HttpResponseRedirect
 

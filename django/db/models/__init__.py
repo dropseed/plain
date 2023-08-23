@@ -1,4 +1,4 @@
-from django.core.exceptions import ObjectDoesNotExist
+from bolt.exceptions import ObjectDoesNotExist
 from django.db.models import signals
 from django.db.models.aggregates import *  # NOQA
 from django.db.models.aggregates import __all__ as aggregates_all

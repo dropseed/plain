@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-from django.core.exceptions import ValidationError
+from bolt.exceptions import ValidationError
 from bolt.utils.deconstruct import deconstructible
 from bolt.utils.encoding import punycode
 from bolt.utils.ipv6 import is_valid_ipv6_address
