@@ -8,9 +8,9 @@ from unittest.suite import _DebugResult
 from bolt.apps import apps
 from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
-from django.core.management import call_command
-from django.core.management.color import no_style
-from django.core.management.sql import emit_post_migrate_signal
+from bolt.legacy.management import call_command
+from bolt.legacy.management.color import no_style
+from bolt.legacy.management.sql import emit_post_migrate_signal
 from bolt.signals import setting_changed
 from bolt.db import DEFAULT_DB_ALIAS, connections, transaction
 from bolt.test.client import Client

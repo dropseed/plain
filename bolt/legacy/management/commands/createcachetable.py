@@ -1,7 +1,7 @@
 from bolt.runtime import settings
 from bolt.cache import caches
 from bolt.cache.backends.db import BaseDatabaseCache
-from django.core.management.base import BaseCommand, CommandError
+from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.db import (
     DEFAULT_DB_ALIAS,
     DatabaseError,

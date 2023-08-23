@@ -5,8 +5,8 @@ from itertools import takewhile
 
 from bolt.apps import apps
 from bolt.runtime import settings
-from django.core.management.base import BaseCommand, CommandError, no_translations
-from django.core.management.utils import run_formatters
+from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
+from bolt.legacy.management.utils import run_formatters
 from bolt.db import DEFAULT_DB_ALIAS, OperationalError, connections, router
 from bolt.db.migrations import Migration
 from bolt.db.migrations.autodetector import MigrationAutodetector

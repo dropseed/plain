@@ -40,14 +40,14 @@ def cli():
         )
         django_env["BASE_URL"] = codespace_base_url
 
-    if subprocess.run(["bolt", "django", "check"], env=django_env).returncode:
+    if subprocess.run(["bolt", "legacy", "check"], env=django_env).returncode:
         click.secho("Django check failed!", fg="red")
         sys.exit(1)
 
     manager = HonchoManager()
 
     # env var to switch wsgi app, if necessary...
-    runserver_cmd = f"bolt django migrate && gunicorn --reload bolt.wsgi:app --timeout 0 --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+    runserver_cmd = f"bolt legacy migrate && gunicorn --reload bolt.wsgi:app --timeout 0 --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
     manager.add_process("postgres", "bolt dev db start --logs")
     runserver_cmd = "bolt dev db wait && " + runserver_cmd

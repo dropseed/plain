@@ -2,8 +2,8 @@ import shutil
 import sys
 
 from bolt.apps import apps
-from django.core.management.base import BaseCommand, CommandError
-from django.core.management.utils import run_formatters
+from bolt.legacy.management.base import BaseCommand, CommandError
+from bolt.legacy.management.utils import run_formatters
 from bolt.db import migrations
 from bolt.db.migrations.exceptions import AmbiguityError
 from bolt.db.migrations.loader import MigrationLoader

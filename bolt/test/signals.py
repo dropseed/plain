@@ -42,7 +42,7 @@ def update_installed_apps(*, setting, **kwargs):
 
         get_finder.cache_clear()
         # Rebuild management commands cache
-        from django.core.management import get_commands
+        from bolt.legacy.management import get_commands
 
         get_commands.cache_clear()
 

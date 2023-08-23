@@ -5,8 +5,8 @@ from bolt.staticfiles.finders import get_finders
 from bolt.staticfiles.storage import staticfiles_storage
 from bolt.checks import Tags
 from bolt.files.storage import FileSystemStorage
-from django.core.management.base import BaseCommand, CommandError
-from django.core.management.color import no_style
+from bolt.legacy.management.base import BaseCommand, CommandError
+from bolt.legacy.management.color import no_style
 from bolt.utils.functional import cached_property
 
 

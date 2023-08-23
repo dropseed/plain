@@ -109,19 +109,19 @@ def bolt_cli():
 
 
 @bolt_cli.command(
-    "django",
+    "legacy",
     context_settings=dict(
         ignore_unknown_options=True,
     )
 )
-@click.argument("django_args", nargs=-1, type=click.UNPROCESSED)
-def django_alias(django_args):
+@click.argument("legacy_args", nargs=-1, type=click.UNPROCESSED)
+def legacy_alias(legacy_args):
     result = subprocess.run(
         [
             "python",
             "-m",
-            "django",
-            *django_args,
+            "bolt.legacy",
+            *legacy_args,
         ],
     )
     if result.returncode:
@@ -279,7 +279,7 @@ def compile(ctx):
         sys.exit(result.returncode)
 
     # Run the regular collectstatic
-    ctx.invoke(django_alias, django_args=["collectstatic", "--noinput"])
+    ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
 
 
 cli = click.CommandCollection(sources=[InstalledAppsGroup(), BinNamespaceGroup(), bolt_cli])

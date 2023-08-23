@@ -36,8 +36,8 @@ class BaseDatabaseCreation:
         Create a test database, prompting the user for confirmation if the
         database already exists. Return the name of the test database created.
         """
-        # Don't import django.core.management if it isn't needed.
-        from django.core.management import call_command
+        # Don't import bolt.legacy.management if it isn't needed.
+        from bolt.legacy.management import call_command
 
         test_database_name = self._get_test_db_name()
 

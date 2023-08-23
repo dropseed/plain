@@ -3,8 +3,8 @@ import time
 from importlib import import_module
 
 from bolt.apps import apps
-from django.core.management.base import BaseCommand, CommandError, no_translations
-from django.core.management.sql import emit_post_migrate_signal, emit_pre_migrate_signal
+from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
+from bolt.legacy.management.sql import emit_post_migrate_signal, emit_pre_migrate_signal
 from bolt.db import DEFAULT_DB_ALIAS, connections, router
 from bolt.db.migrations.autodetector import MigrationAutodetector
 from bolt.db.migrations.executor import MigrationExecutor

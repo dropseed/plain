@@ -109,7 +109,7 @@ class DBContainer:
         result = subprocess.run(
             [
                 "bolt",
-                "django",
+                "legacy",
                 "showmigrations",
                 "--skip-checks",
             ],

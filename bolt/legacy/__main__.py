@@ -5,7 +5,7 @@ Example: python -m django check
 """
 from pathlib import Path
 import sys
-from django.core import management
+from bolt.legacy import management
 
 if __name__ == "__main__":
     # Automatically put the app dir on the Python path for convenience

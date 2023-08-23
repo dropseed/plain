@@ -1,12 +1,11 @@
 [tool.poetry]
-name = "django"
-version = "50.0.0"
+name = "bolt"
+version = "0.1.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@gmail.com>", "Past authors of Django"]
 # readme = "README.md"
 
 packages = [
-    { include = "django" },
     { include = "bolt" },
 ]
 

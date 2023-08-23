@@ -43,29 +43,29 @@ def cli(install):
 
     check_short("Checking code formatting", "bolt", "format", "--check")
 
-    if django_db_connected():
+    if bolt_db_connected():
         check_short(
             "Running Django system checks",
             "bolt",
-            "django",
+            "legacy",
             "check",
             "--database",
             "default",
         )
         check_short(
-            "Checking Django migrations", "bolt", "django", "migrate", "--check"
+            "Checking Django migrations", "bolt", "legacy", "migrate", "--check"
         )
         check_short(
             "Checking for Django models missing migrations",
             "bolt",
-            "django",
+            "legacy",
             "makemigrations",
             "--dry-run",
             "--check",
         )
     else:
         check_short(
-            "Running Django checks (without database)", "bolt", "django", "check"
+            "Running Django checks (without database)", "bolt", "legacy", "check"
         )
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
@@ -77,11 +77,11 @@ def cli(install):
         subprocess.check_call(["bolt", "test"])
 
 
-def django_db_connected():
+def bolt_db_connected():
     result = subprocess.run(
         [
             "bolt",
-            "django",
+            "legacy",
             "showmigrations",
             "--skip-checks",
         ],

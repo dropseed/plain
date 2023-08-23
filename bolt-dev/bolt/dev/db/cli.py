@@ -120,7 +120,7 @@ def pull(ctx, backup, anonymize):
     dot_bolt_dir = os.path.join(repo_root, ".bolt")
 
     # Make sure Django works first
-    if subprocess.run(["bolt", "django", "check"]).returncode:
+    if subprocess.run(["bolt", "legacy", "check"]).returncode:
         click.secho("Django check failed!", fg="red")
         sys.exit(1)
 
@@ -128,7 +128,7 @@ def pull(ctx, backup, anonymize):
         subprocess.run(
             [
                 "bolt",
-                "django",
+                "legacy",
                 "anonymizedump",
                 "--help",
             ],
@@ -200,7 +200,7 @@ def pull(ctx, backup, anonymize):
             p = subprocess.Popen(
                 [
                     "bolt",
-                    "django",
+                    "legacy",
                     "anonymizedump",
                     "--output",
                     dump_path,

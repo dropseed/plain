@@ -1,7 +1,7 @@
 from bolt.apps import apps
 from bolt import checks
 from bolt.checks.registry import registry
-from django.core.management.base import BaseCommand, CommandError
+from bolt.legacy.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):

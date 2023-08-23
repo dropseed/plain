@@ -2,7 +2,7 @@ import logging
 import logging.config  # needed when logging_config doesn't start with logging.config
 
 from bolt.runtime import settings
-from django.core.management.color import color_style
+from bolt.legacy.management.color import color_style
 from bolt.utils.module_loading import import_string
 
 request_logger = logging.getLogger("django.request")

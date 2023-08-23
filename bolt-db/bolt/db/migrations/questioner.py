@@ -4,7 +4,7 @@ import os
 import sys
 
 from bolt.apps import apps
-from django.core.management.base import OutputWrapper
+from bolt.legacy.management.base import OutputWrapper
 from bolt.db.models import NOT_PROVIDED
 from bolt.utils import timezone
 from bolt.utils.version import get_docs_version

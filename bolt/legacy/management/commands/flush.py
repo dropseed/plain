@@ -1,9 +1,9 @@
 from importlib import import_module
 
 from bolt.apps import apps
-from django.core.management.base import BaseCommand, CommandError
-from django.core.management.color import no_style
-from django.core.management.sql import emit_post_migrate_signal, sql_flush
+from bolt.legacy.management.base import BaseCommand, CommandError
+from bolt.legacy.management.color import no_style
+from bolt.legacy.management.sql import emit_post_migrate_signal, sql_flush
 from bolt.db import DEFAULT_DB_ALIAS, connections
 
 
