@@ -663,9 +663,9 @@ class URLResolver:
         if not callback:
             # No handler specified in file; use lazy import, since
             # django.conf.urls imports this file.
-            from django.conf import urls
+            from . import errors
 
-            callback = getattr(urls, "handler%s" % view_type)
+            callback = getattr(errors, "handler%s" % view_type)
         return callback
 
     def reverse(self, lookup_view, *args, **kwargs):

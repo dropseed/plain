@@ -149,3 +149,9 @@ def permission_denied(request, exception, template_name=ERROR_403_TEMPLATE_NAME)
     return HttpResponseForbidden(
         template.render(context={"exception": str(exception), "request": request})
     )
+
+
+handler400 = bad_request
+handler403 = permission_denied
+handler404 = page_not_found
+handler500 = server_error
