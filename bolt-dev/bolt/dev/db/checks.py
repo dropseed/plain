@@ -14,7 +14,7 @@ def check_database_tables(app_configs, **kwargs):
     cache_tables = [
         x["LOCATION"]
         for x in settings.CACHES.values()
-        if x["BACKEND"] == "django.core.cache.backends.db.DatabaseCache"
+        if x["BACKEND"] == "bolt.cache.backends.db.DatabaseCache"
     ]
 
     for database in databases:

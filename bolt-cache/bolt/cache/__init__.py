@@ -4,7 +4,7 @@ Caching framework.
 This package defines set of cache backends that all conform to a simple API.
 In a nutshell, a cache is a set of values -- which can be any object that
 may be pickled -- identified by string keys.  For the complete API, see
-the abstract BaseCache class in django.core.cache.backends.base.
+the abstract BaseCache class in bolt.cache.backends.base.
 
 Client code should use the `cache` variable defined here to access the default
 cache backend and look up non-default cache backends in the `caches` dict-like
@@ -13,7 +13,7 @@ object.
 See docs/topics/cache.txt for information on the public API.
 """
 from django.core import signals
-from django.core.cache.backends.base import (
+from .backends.base import (
     BaseCache,
     CacheKeyWarning,
     InvalidCacheBackendError,
@@ -21,6 +21,9 @@ from django.core.cache.backends.base import (
 )
 from django.utils.connection import BaseConnectionHandler, ConnectionProxy
 from django.utils.module_loading import import_string
+
+from .constants import DEFAULT_CACHE_ALIAS
+from . import checks  # noqa
 
 __all__ = [
     "cache",
@@ -31,8 +34,6 @@ __all__ = [
     "BaseCache",
     "InvalidCacheKey",
 ]
-
-DEFAULT_CACHE_ALIAS = "default"
 
 
 class CacheHandler(BaseConnectionHandler):

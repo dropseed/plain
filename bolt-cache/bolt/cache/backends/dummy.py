@@ -1,6 +1,6 @@
 "Dummy cache backend"
 
-from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
+from bolt.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 
 
 class DummyCache(BaseCache):

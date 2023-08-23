@@ -19,7 +19,6 @@ from collections import defaultdict
 from hashlib import md5
 
 from django.conf import settings
-from django.core.cache import caches
 from bolt.http import HttpResponse, HttpResponseNotModified
 from django.utils.http import http_date, parse_etags, parse_http_date_safe, quote_etag
 from django.utils.log import log_response

@@ -1,10 +1,10 @@
 import pathlib
 
 from django.conf import settings
-from django.core.cache import DEFAULT_CACHE_ALIAS, caches
-from django.core.cache.backends.filebased import FileBasedCache
+from .backends.filebased import FileBasedCache
+from .constants import DEFAULT_CACHE_ALIAS
 
-from . import Error, Tags, Warning, register
+from django.core.checks import Error, Tags, Warning, register
 
 E001 = Error(
     "You must define a '%s' cache in your CACHES setting." % DEFAULT_CACHE_ALIAS,
@@ -21,6 +21,7 @@ def check_default_cache_is_configured(app_configs, **kwargs):
 
 @register(Tags.caches, deploy=True)
 def check_cache_location_not_exposed(app_configs, **kwargs):
+    from bolt.cache import caches
     errors = []
     for name in ("MEDIA_ROOT", "STATIC_ROOT", "STATICFILES_DIRS"):
         setting = getattr(settings, name, None)
@@ -60,6 +61,7 @@ def check_cache_location_not_exposed(app_configs, **kwargs):
 
 @register(Tags.caches)
 def check_file_based_cache_is_absolute(app_configs, **kwargs):
+    from bolt.cache import caches
     errors = []
     for alias, config in settings.CACHES.items():
         cache = caches[alias]

@@ -375,17 +375,6 @@ SECURE_PROXY_SSL_HEADER = None
 # phase the middleware will be applied in reverse order.
 MIDDLEWARE = []
 
-#########
-# CACHE #
-#########
-
-# The cache backends to use.
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-    }
-}
-
 ##################
 # AUTHENTICATION #
 ##################

@@ -8,7 +8,7 @@ import time
 import zlib
 from hashlib import md5
 
-from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
+from bolt.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 from django.core.files import locks
 from django.core.files.move import file_move_safe
 

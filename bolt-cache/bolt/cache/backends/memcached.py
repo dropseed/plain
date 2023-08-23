@@ -3,7 +3,7 @@
 import re
 import time
 
-from django.core.cache.backends.base import (
+from bolt.cache.backends.base import (
     DEFAULT_TIMEOUT,
     BaseCache,
     InvalidCacheKey,

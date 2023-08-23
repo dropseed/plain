@@ -25,7 +25,10 @@ COMPLEX_OVERRIDE_SETTINGS = {"DATABASES"}
 @receiver(setting_changed)
 def clear_cache_handlers(*, setting, **kwargs):
     if setting == "CACHES":
-        from django.core.cache import caches, close_caches
+        try:
+            from bolt.cache import caches, close_caches
+        except ImportError:
+            return
 
         close_caches()
         caches._settings = caches.settings = caches.configure_settings(None)
