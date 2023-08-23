@@ -1,7 +1,6 @@
+from bolt.htmx.views import HTMXViewMixin
 from bolt.http import HttpResponse
 from bolt.views import View
-
-from bolt.htmx.views import HTMXViewMixin
 
 
 class V(HTMXViewMixin, View):

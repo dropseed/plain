@@ -1,5 +1,5 @@
-from bolt.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from bolt.db import models
+from bolt.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from bolt.http import Http404, HttpResponse, HttpResponseRedirect
 
 from .forms import FormView

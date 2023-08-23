@@ -1,13 +1,12 @@
 import unicodedata
 
-from bolt import forms
+from bolt import forms, jinja
 from bolt.auth import authenticate, get_user_model, password_validation
 from bolt.auth.hashers import UNUSABLE_PASSWORD_PREFIX, identify_hasher
 from bolt.auth.models import User
 from bolt.auth.tokens import default_token_generator
 from bolt.exceptions import ValidationError
 from bolt.mail import EmailMultiAlternatives
-from bolt import jinja
 from bolt.utils.encoding import force_bytes
 from bolt.utils.http import urlsafe_base64_encode
 from bolt.utils.text import capfirst

@@ -1,6 +1,6 @@
+from bolt import checks
 from bolt.apps import AppConfig
 from bolt.staticfiles.checks import check_finders
-from bolt import checks
 
 
 class StaticFilesConfig(AppConfig):

@@ -3,9 +3,9 @@ import platform
 import re
 import subprocess
 import sys
-import tomlkit
 
 import requests
+import tomlkit
 
 DEFAULT_CSS = """@tailwind base;
 

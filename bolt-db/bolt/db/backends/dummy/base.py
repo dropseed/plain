@@ -7,13 +7,13 @@ Each of these API functions, except connection.close(), raise
 ImproperlyConfigured.
 """
 
-from bolt.exceptions import ImproperlyConfigured
 from bolt.db.backends.base.base import BaseDatabaseWrapper
 from bolt.db.backends.base.client import BaseDatabaseClient
 from bolt.db.backends.base.creation import BaseDatabaseCreation
 from bolt.db.backends.base.introspection import BaseDatabaseIntrospection
 from bolt.db.backends.base.operations import BaseDatabaseOperations
 from bolt.db.backends.dummy.features import DummyDatabaseFeatures
+from bolt.exceptions import ImproperlyConfigured
 
 
 def complain(*args, **kwargs):

@@ -4,10 +4,11 @@ import ssl
 import threading
 
 from bolt.runtime import settings
+from bolt.utils.functional import cached_property
+
 from ..backends.base import BaseEmailBackend
 from ..message import sanitize_address
 from ..utils import DNS_NAME
-from bolt.utils.functional import cached_property
 
 
 class EmailBackend(BaseEmailBackend):

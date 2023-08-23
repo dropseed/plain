@@ -18,8 +18,8 @@ import time
 from collections import defaultdict
 from hashlib import md5
 
-from bolt.runtime import settings
 from bolt.http import HttpResponse, HttpResponseNotModified
+from bolt.runtime import settings
 from bolt.utils.http import http_date, parse_etags, parse_http_date_safe, quote_etag
 from bolt.utils.log import log_response
 from bolt.utils.regex_helper import _lazy_re_compile

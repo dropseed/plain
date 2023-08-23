@@ -1,7 +1,5 @@
-from bolt.runtime import settings
 from bolt.cache import caches
 from bolt.cache.backends.db import BaseDatabaseCache
-from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.db import (
     DEFAULT_DB_ALIAS,
     DatabaseError,
@@ -10,6 +8,8 @@ from bolt.db import (
     router,
     transaction,
 )
+from bolt.legacy.management.base import BaseCommand, CommandError
+from bolt.runtime import settings
 
 
 class Command(BaseCommand):

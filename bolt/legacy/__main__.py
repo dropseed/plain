@@ -1,5 +1,6 @@
-from pathlib import Path
 import sys
+from pathlib import Path
+
 from bolt.legacy import management
 
 if __name__ == "__main__":

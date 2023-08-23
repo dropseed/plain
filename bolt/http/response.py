@@ -9,13 +9,13 @@ import time
 import warnings
 from email.header import Header
 from http.client import responses
+from http.cookies import SimpleCookie
 from urllib.parse import urlparse
 
-from bolt.runtime import settings
 from bolt import signals, signing
 from bolt.exceptions import DisallowedRedirect
 from bolt.json import BoltJSONEncoder
-from http.cookies import SimpleCookie
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.datastructures import CaseInsensitiveMapping
 from bolt.utils.encoding import iri_to_uri

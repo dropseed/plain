@@ -2,8 +2,8 @@ import re
 import uuid
 
 from bolt.checks import Info
+from bolt.db import ProgrammingError, models
 from bolt.exceptions import ValidationError
-from bolt.db import models, ProgrammingError
 
 from .bridge import get_flag_class
 from .exceptions import FlagImportError

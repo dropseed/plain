@@ -15,7 +15,6 @@ from collections.abc import Iterator, Mapping
 from itertools import chain, count, product
 from string import ascii_uppercase
 
-from bolt.exceptions import FieldDoesNotExist, FieldError
 from bolt.db import DEFAULT_DB_ALIAS, NotSupportedError, connections
 from bolt.db.models.aggregates import Count
 from bolt.db.models.constants import LOOKUP_SEP
@@ -40,6 +39,7 @@ from bolt.db.models.query_utils import (
 from bolt.db.models.sql.constants import INNER, LOUTER, ORDER_DIR, SINGLE
 from bolt.db.models.sql.datastructures import BaseTable, Empty, Join, MultiJoin
 from bolt.db.models.sql.where import AND, OR, ExtraWhere, NothingNode, WhereNode
+from bolt.exceptions import FieldDoesNotExist, FieldError
 from bolt.utils.functional import cached_property
 from bolt.utils.regex_helper import _lazy_re_compile
 from bolt.utils.tree import Node

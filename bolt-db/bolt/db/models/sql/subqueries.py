@@ -2,9 +2,9 @@
 Query subclasses which provide extra functionality beyond simple data retrieval.
 """
 
-from bolt.exceptions import FieldError
 from bolt.db.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
 from bolt.db.models.sql.query import Query
+from bolt.exceptions import FieldError
 
 __all__ = ["DeleteQuery", "UpdateQuery", "InsertQuery", "AggregateQuery"]
 

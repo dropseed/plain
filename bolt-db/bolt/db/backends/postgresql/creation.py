@@ -1,9 +1,9 @@
 import sys
 
-from bolt.exceptions import ImproperlyConfigured
 from bolt.db.backends.base.creation import BaseDatabaseCreation
 from bolt.db.backends.postgresql.psycopg_any import errors
 from bolt.db.backends.utils import strip_quotes
+from bolt.exceptions import ImproperlyConfigured
 
 
 class DatabaseCreation(BaseDatabaseCreation):

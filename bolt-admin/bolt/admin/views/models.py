@@ -7,7 +7,6 @@ from .base import URL_NAMESPACE, AdminDetailView, AdminObjectsView, AdminUpdateV
 
 if TYPE_CHECKING:
     from bolt.db import models
-
     from bolt.views import View
 
 

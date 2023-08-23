@@ -1,15 +1,15 @@
 from urllib.parse import quote
 
+from jinja2.exceptions import TemplateNotFound
+
+# from django.views.decorators.csrf import requires_csrf_token
+from bolt import jinja
 from bolt.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
     HttpResponseNotFound,
     HttpResponseServerError,
 )
-
-# from django.views.decorators.csrf import requires_csrf_token
-from bolt import jinja
-from jinja2.exceptions import TemplateNotFound
 from bolt.views import TemplateView
 
 ERROR_404_TEMPLATE_NAME = "404.html"

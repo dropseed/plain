@@ -4,9 +4,8 @@ import os
 from posixpath import basename
 from urllib.parse import urlparse
 
-from bolt.runtime import settings
-
 from bolt.http import FileResponse
+from bolt.runtime import settings
 from bolt.staticfiles import finders
 from bolt.staticfiles.storage import staticfiles_storage
 

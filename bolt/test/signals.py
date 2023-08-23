@@ -3,10 +3,10 @@ import time
 import warnings
 
 from bolt.apps import apps
-from bolt.exceptions import ImproperlyConfigured
-from bolt.signals import setting_changed
 from bolt.db import connections, router
 from bolt.db.utils import ConnectionRouter
+from bolt.exceptions import ImproperlyConfigured
+from bolt.signals import setting_changed
 from bolt.signals.dispatch import Signal, receiver
 from bolt.utils import timezone
 from bolt.utils.functional import empty
@@ -83,8 +83,8 @@ def clear_routers_cache(*, setting, **kwargs):
 
 @receiver(setting_changed)
 def storages_changed(*, setting, **kwargs):
-    from bolt.staticfiles.storage import staticfiles_storage
     from bolt.files.storage import default_storage, storages
+    from bolt.staticfiles.storage import staticfiles_storage
 
     if setting in (
         "STORAGES",

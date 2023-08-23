@@ -1,7 +1,6 @@
 import itertools
 import math
 
-from bolt.exceptions import EmptyResultSet, FullResultSet
 from bolt.db.models.expressions import Case, Expression, Func, Value, When
 from bolt.db.models.fields import (
     BooleanField,
@@ -12,6 +11,7 @@ from bolt.db.models.fields import (
     UUIDField,
 )
 from bolt.db.models.query_utils import RegisterLookupMixin
+from bolt.exceptions import EmptyResultSet, FullResultSet
 from bolt.utils.datastructures import OrderedSet
 from bolt.utils.functional import cached_property
 from bolt.utils.hashable import make_hashable

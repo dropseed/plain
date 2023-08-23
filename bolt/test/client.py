@@ -5,18 +5,18 @@ import sys
 from copy import copy
 from functools import partial
 from http import HTTPStatus
+from http.cookies import SimpleCookie
 from importlib import import_module
 from io import BytesIO, IOBase
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
-from bolt.runtime import settings
+from bolt.db import close_old_connections
 from bolt.handlers.base import BaseHandler
 from bolt.handlers.wsgi import LimitedStream, WSGIRequest
-from bolt.json import BoltJSONEncoder
-from bolt.signals import got_request_exception, request_finished, request_started
-from bolt.db import close_old_connections
 from bolt.http import HttpHeaders, HttpRequest, QueryDict
-from http.cookies import SimpleCookie
+from bolt.json import BoltJSONEncoder
+from bolt.runtime import settings
+from bolt.signals import got_request_exception, request_finished, request_started
 from bolt.test import signals
 from bolt.test.utils import ContextList
 from bolt.urls import resolve

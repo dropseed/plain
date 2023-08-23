@@ -1,7 +1,9 @@
+import json
+
 from bolt.jinja.extensions import InclusionTagExtension
 from bolt.runtime import settings
+
 from .core import Importmap
-import json
 
 
 class ImportmapScriptsExtension(InclusionTagExtension):

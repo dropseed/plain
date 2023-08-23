@@ -2,9 +2,9 @@ import os
 from datetime import datetime, timezone
 from urllib.parse import urljoin
 
-from bolt.runtime import settings
 from bolt.files import File, locks
 from bolt.files.move import file_move_safe
+from bolt.runtime import settings
 from bolt.signals import setting_changed
 from bolt.utils._os import safe_join
 from bolt.utils.deconstruct import deconstructible

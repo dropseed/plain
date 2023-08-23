@@ -2,7 +2,6 @@ import logging
 import operator
 from datetime import datetime
 
-from bolt.runtime import settings
 from bolt.db.backends.ddl_references import (
     Columns,
     Expressions,
@@ -15,6 +14,7 @@ from bolt.db.backends.utils import names_digest, split_identifier, truncate_name
 from bolt.db.models import Deferrable, Index
 from bolt.db.models.sql import Query
 from bolt.db.transaction import TransactionManagementError, atomic
+from bolt.runtime import settings
 from bolt.utils import timezone
 
 logger = logging.getLogger("bolt.db.backends.schema")

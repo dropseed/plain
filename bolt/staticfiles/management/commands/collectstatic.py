@@ -1,12 +1,12 @@
 import os
 
 from bolt.apps import apps
-from bolt.staticfiles.finders import get_finders
-from bolt.staticfiles.storage import staticfiles_storage
 from bolt.checks import Tags
 from bolt.files.storage import FileSystemStorage
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.color import no_style
+from bolt.staticfiles.finders import get_finders
+from bolt.staticfiles.storage import staticfiles_storage
 from bolt.utils.functional import cached_property
 
 

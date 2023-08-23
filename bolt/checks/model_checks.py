@@ -4,8 +4,8 @@ from collections import defaultdict
 from itertools import chain
 
 from bolt.apps import apps
-from bolt.runtime import settings
 from bolt.checks import Error, Tags, Warning, register
+from bolt.runtime import settings
 
 
 @register(Tags.models)

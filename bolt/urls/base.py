@@ -5,7 +5,6 @@ from bolt.utils.functional import lazy
 from .exceptions import NoReverseMatch, Resolver404
 from .resolvers import _get_cached_resolver, get_ns_resolver, get_resolver
 
-
 # Overridden URLconfs for each thread are stored here.
 _urlconfs = local()
 

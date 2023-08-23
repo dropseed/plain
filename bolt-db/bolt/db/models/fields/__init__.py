@@ -8,13 +8,13 @@ import warnings
 from base64 import b64decode, b64encode
 from functools import partialmethod, total_ordering
 
-from bolt.apps import apps
-from bolt.runtime import settings
 from bolt import checks, exceptions, validators
+from bolt.apps import apps
 from bolt.db import connection, connections, router
 from bolt.db.models.constants import LOOKUP_SEP
 from bolt.db.models.enums import ChoicesMeta
 from bolt.db.models.query_utils import DeferredAttribute, RegisterLookupMixin
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.datastructures import DictWrapper
 from bolt.utils.dateparse import (

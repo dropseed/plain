@@ -1,4 +1,3 @@
-from bolt.exceptions import ObjectDoesNotExist
 from bolt.db.models import signals
 from bolt.db.models.aggregates import *  # NOQA
 from bolt.db.models.aggregates import __all__ as aggregates_all
@@ -46,6 +45,7 @@ from bolt.db.models.lookups import Lookup, Transform
 from bolt.db.models.manager import Manager
 from bolt.db.models.query import Prefetch, QuerySet, prefetch_related_objects
 from bolt.db.models.query_utils import FilteredRelation, Q
+from bolt.exceptions import ObjectDoesNotExist
 
 # Imports that would create circular imports if sorted
 from bolt.db.models.base import DEFERRED, Model  # isort:skip

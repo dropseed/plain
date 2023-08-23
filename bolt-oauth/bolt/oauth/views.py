@@ -1,7 +1,7 @@
-from bolt.auth.mixins import LoginRequiredMixin
-from bolt.views import View
-from bolt.http import HttpResponseRedirect, HttpResponseBadRequest
 from bolt import jinja
+from bolt.auth.mixins import LoginRequiredMixin
+from bolt.http import HttpResponseBadRequest, HttpResponseRedirect
+from bolt.views import View
 
 from .exceptions import (
     OAuthCannotDisconnectError,

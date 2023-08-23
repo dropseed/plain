@@ -1,8 +1,8 @@
 import datetime
 
 from bolt.utils.html import avoid_wrapping
-from bolt.utils.timezone import is_aware
 from bolt.utils.text import pluralize_lazy
+from bolt.utils.timezone import is_aware
 
 TIME_STRINGS = {
     "year": pluralize_lazy("%(num)d year", "%(num)d years", "num"),

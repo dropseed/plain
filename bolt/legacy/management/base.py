@@ -11,9 +11,9 @@ from io import TextIOBase
 
 import bolt.runtime
 from bolt import checks
+from bolt.db import DEFAULT_DB_ALIAS, connections
 from bolt.exceptions import ImproperlyConfigured
 from bolt.legacy.management.color import color_style, no_style
-from bolt.db import DEFAULT_DB_ALIAS, connections
 
 ALL_CHECKS = "__all__"
 

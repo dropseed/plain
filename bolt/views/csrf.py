@@ -1,5 +1,6 @@
-from bolt.utils.decorators import method_decorator
 from functools import wraps
+
+from bolt.utils.decorators import method_decorator
 
 
 def csrf_exempt(view_func):

@@ -7,11 +7,11 @@ from decimal import Decimal
 from types import NoneType
 from uuid import UUID
 
-from bolt.exceptions import EmptyResultSet, FieldError, FullResultSet
 from bolt.db import DatabaseError, NotSupportedError, connection
 from bolt.db.models import fields
 from bolt.db.models.constants import LOOKUP_SEP
 from bolt.db.models.query_utils import Q
+from bolt.exceptions import EmptyResultSet, FieldError, FullResultSet
 from bolt.utils.deconstruct import deconstructible
 from bolt.utils.functional import cached_property
 from bolt.utils.hashable import make_hashable

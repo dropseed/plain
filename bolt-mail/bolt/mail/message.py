@@ -15,8 +15,9 @@ from io import BytesIO, StringIO
 from pathlib import Path
 
 from bolt.runtime import settings
-from .utils import DNS_NAME
 from bolt.utils.encoding import force_str, punycode
+
+from .utils import DNS_NAME
 
 # Don't BASE64-encode UTF-8 messages so that we avoid unwanted attention from
 # some spam filters.

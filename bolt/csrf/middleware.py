@@ -9,16 +9,15 @@ import string
 from collections import defaultdict
 from urllib.parse import urlparse
 
-from bolt.runtime import settings
 from bolt.exceptions import DisallowedHost, ImproperlyConfigured
 from bolt.http import HttpHeaders, UnreadablePostError
+from bolt.runtime import settings
 from bolt.utils.cache import patch_vary_headers
 from bolt.utils.crypto import constant_time_compare, get_random_string
 from bolt.utils.functional import cached_property
 from bolt.utils.http import is_same_domain
 from bolt.utils.log import log_response
 from bolt.utils.regex_helper import _lazy_re_compile
-
 
 logger = logging.getLogger("bolt.security.csrf")
 # This matches if any character is not in CSRF_ALLOWED_CHARS.

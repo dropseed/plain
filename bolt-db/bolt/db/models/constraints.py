@@ -2,7 +2,6 @@ import warnings
 from enum import Enum
 from types import NoneType
 
-from bolt.exceptions import FieldError, ValidationError
 from bolt.db import connections
 from bolt.db.models.expressions import Exists, ExpressionList, F, OrderBy
 from bolt.db.models.indexes import IndexExpression
@@ -10,6 +9,7 @@ from bolt.db.models.lookups import Exact
 from bolt.db.models.query_utils import Q
 from bolt.db.models.sql.query import Query
 from bolt.db.utils import DEFAULT_DB_ALIAS
+from bolt.exceptions import FieldError, ValidationError
 from bolt.utils.deprecation import RemovedInDjango60Warning
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]

@@ -1,4 +1,5 @@
 import sentry_sdk
+
 from bolt.apps import AppConfig
 
 from . import settings

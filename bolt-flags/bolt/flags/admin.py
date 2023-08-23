@@ -1,5 +1,5 @@
-from bolt.admin import AdminModelViewset, register_model
 from bolt import forms
+from bolt.admin import AdminModelViewset, register_model
 
 from .models import Flag, FlagResult
 

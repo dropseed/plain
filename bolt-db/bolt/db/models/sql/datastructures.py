@@ -2,8 +2,8 @@
 Useful auxiliary data structures for query construction. Not useful outside
 the SQL domain.
 """
-from bolt.exceptions import FullResultSet
 from bolt.db.models.sql.constants import INNER, LOUTER
+from bolt.exceptions import FullResultSet
 
 
 class MultiJoin(Exception):

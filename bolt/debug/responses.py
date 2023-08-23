@@ -1,16 +1,18 @@
-import logging
 import functools
 import itertools
+import logging
 import re
 import sys
 import types
 import warnings
 from pathlib import Path
+from pprint import pformat
 
-from bolt.runtime import settings
+from jinja2.exceptions import TemplateNotFound
+
 from bolt.http import Http404, HttpResponse, HttpResponseNotFound
 from bolt.jinja.defaults import create_default_environment
-from pprint import pformat
+from bolt.runtime import settings
 from bolt.urls import resolve
 from bolt.utils import timezone
 from bolt.utils.datastructures import MultiValueDict
@@ -18,7 +20,6 @@ from bolt.utils.encoding import force_str
 from bolt.utils.module_loading import import_string
 from bolt.utils.regex_helper import _lazy_re_compile
 from bolt.utils.version import PY311, get_docs_version
-from jinja2.exceptions import TemplateNotFound
 
 
 # Minimal Jinja templates engine to render the error templates

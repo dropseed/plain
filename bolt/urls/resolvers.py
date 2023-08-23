@@ -11,14 +11,13 @@ import re
 import string
 from importlib import import_module
 from pickle import PicklingError
+from threading import local
 from urllib.parse import quote
 
-from threading import local
-
-from bolt.runtime import settings
 from bolt.checks import Error, Warning
 from bolt.checks.urls import check_resolver
 from bolt.exceptions import ImproperlyConfigured, ViewDoesNotExist
+from bolt.runtime import settings
 from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.functional import cached_property
 from bolt.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes

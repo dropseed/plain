@@ -4,9 +4,9 @@ Code to manage the creation and SQL rendering of 'where' constraints.
 import operator
 from functools import reduce
 
-from bolt.exceptions import EmptyResultSet, FullResultSet
 from bolt.db.models.expressions import Case, When
 from bolt.db.models.lookups import Exact
+from bolt.exceptions import EmptyResultSet, FullResultSet
 from bolt.utils import tree
 from bolt.utils.functional import cached_property
 

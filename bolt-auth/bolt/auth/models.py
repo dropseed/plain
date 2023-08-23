@@ -1,9 +1,9 @@
 from bolt.apps import apps
 from bolt.auth.base_user import AbstractBaseUser, BaseUserManager
 from bolt.auth.hashers import make_password
-from bolt.mail import send_mail
 from bolt.db import models
 from bolt.db.models.manager import EmptyManager
+from bolt.mail import send_mail
 from bolt.utils import timezone
 from bolt.utils.itercompat import is_iterable
 

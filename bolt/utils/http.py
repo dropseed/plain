@@ -4,9 +4,8 @@ import re
 import unicodedata
 from binascii import Error as BinasciiError
 from email.utils import formatdate
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlparse
 from urllib.parse import urlencode as original_urlencode
-from urllib.parse import urlparse
 
 from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.regex_helper import _lazy_re_compile

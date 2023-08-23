@@ -5,17 +5,8 @@ from functools import partialmethod
 from itertools import chain
 
 import bolt.runtime
-from bolt.apps import apps
-from bolt.runtime import settings
 from bolt import checks
-from bolt.exceptions import (
-    NON_FIELD_ERRORS,
-    FieldDoesNotExist,
-    FieldError,
-    MultipleObjectsReturned,
-    ObjectDoesNotExist,
-    ValidationError,
-)
+from bolt.apps import apps
 from bolt.db import (
     BOLT_VERSION_PICKLE_KEY,
     DatabaseError,
@@ -47,6 +38,15 @@ from bolt.db.models.signals import (
     pre_save,
 )
 from bolt.db.models.utils import AltersData, make_model_tuple
+from bolt.exceptions import (
+    NON_FIELD_ERRORS,
+    FieldDoesNotExist,
+    FieldError,
+    MultipleObjectsReturned,
+    ObjectDoesNotExist,
+    ValidationError,
+)
+from bolt.runtime import settings
 from bolt.utils.encoding import force_str
 from bolt.utils.hashable import make_hashable
 from bolt.utils.text import capfirst, get_text_list

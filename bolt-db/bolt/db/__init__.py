@@ -1,7 +1,7 @@
 from bolt import signals
 from bolt.db.utils import (
-    DEFAULT_DB_ALIAS,
     BOLT_VERSION_PICKLE_KEY,
+    DEFAULT_DB_ALIAS,
     ConnectionHandler,
     ConnectionRouter,
     DatabaseError,

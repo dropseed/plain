@@ -1,16 +1,16 @@
+import functools
+from importlib import import_module
+from pathlib import Path
+
 from jinja2 import Environment, StrictUndefined
 
-from bolt.runtime import settings
-from pathlib import Path
-import functools
 from bolt.apps import apps
 from bolt.runtime import settings
 from bolt.utils.module_loading import module_has_submodule
-from importlib import import_module
 
+from .components import FileSystemTemplateComponentsLoader
 from .filters import default_filters
 from .globals import default_globals
-from .components import FileSystemTemplateComponentsLoader
 
 
 @functools.lru_cache

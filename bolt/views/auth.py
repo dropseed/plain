@@ -1,8 +1,8 @@
 from urllib.parse import urlparse
 
-from bolt.runtime import settings
 from bolt.exceptions import PermissionDenied
 from bolt.http import HttpResponse
+from bolt.runtime import settings
 from bolt.urls import reverse
 
 
@@ -53,7 +53,7 @@ class AuthViewMixin:
         except LoginRequired as e:
             from bolt.auth.views import (
                 redirect_to_login,
-            )  # Import error on apps not ready
+            )
 
             # Ideally this could be handled elsewhere... like PermissionDenied
             # also seems like this code is used multiple places anyway...

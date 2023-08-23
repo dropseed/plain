@@ -2,12 +2,11 @@ import os
 import re
 from importlib import import_module
 
-from bolt.runtime import get_version
 from bolt.apps import apps
-
 from bolt.db import migrations
 from bolt.db.migrations.loader import MigrationLoader
 from bolt.db.migrations.serializer import Serializer, serializer_factory
+from bolt.runtime import get_version
 from bolt.utils.inspect import get_func_args
 from bolt.utils.module_loading import module_dir
 from bolt.utils.timezone import now

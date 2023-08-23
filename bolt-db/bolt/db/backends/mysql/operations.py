@@ -1,10 +1,10 @@
 import uuid
 
-from bolt.runtime import settings
 from bolt.db.backends.base.operations import BaseDatabaseOperations
 from bolt.db.backends.utils import split_tzname_delta
 from bolt.db.models import Exists, ExpressionWrapper, Lookup
 from bolt.db.models.constants import OnConflict
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.encoding import force_str
 from bolt.utils.regex_helper import _lazy_re_compile

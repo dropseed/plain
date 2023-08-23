@@ -9,7 +9,6 @@ import binascii
 import collections
 import html
 
-from bolt.runtime import settings
 from bolt.exceptions import (
     RequestDataTooBig,
     SuspiciousMultipartForm,
@@ -17,6 +16,7 @@ from bolt.exceptions import (
     TooManyFilesSent,
 )
 from bolt.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
+from bolt.runtime import settings
 from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.encoding import force_str
 from bolt.utils.http import parse_header_parameters

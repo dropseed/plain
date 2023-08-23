@@ -5,11 +5,11 @@ import warnings
 from collections import defaultdict
 
 from bolt.apps import apps
-from bolt.runtime import settings
-from bolt.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from bolt.db import connections
 from bolt.db.models import AutoField, Manager, OrderWrt, UniqueConstraint
 from bolt.db.models.query_utils import PathInfo
+from bolt.exceptions import FieldDoesNotExist, ImproperlyConfigured
+from bolt.runtime import settings
 from bolt.utils.datastructures import ImmutableList, OrderedSet
 from bolt.utils.deprecation import RemovedInDjango51Warning
 from bolt.utils.functional import cached_property

@@ -3,9 +3,8 @@
 import uuid
 
 import bolt.db.models.deletion
-from bolt.db import migrations, models
-
 import bolt.flags.models
+from bolt.db import migrations, models
 
 
 class Migration(migrations.Migration):

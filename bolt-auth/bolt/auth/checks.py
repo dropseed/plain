@@ -1,8 +1,8 @@
 from types import MethodType
 
+from bolt import checks
 from bolt.apps import apps
 from bolt.runtime import settings
-from bolt import checks
 
 
 def check_user_model(app_configs=None, **kwargs):

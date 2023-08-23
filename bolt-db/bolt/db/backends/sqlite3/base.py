@@ -8,9 +8,9 @@ from collections.abc import Mapping
 from itertools import chain, tee
 from sqlite3 import dbapi2 as Database
 
-from bolt.exceptions import ImproperlyConfigured
 from bolt.db import IntegrityError
 from bolt.db.backends.base.base import BaseDatabaseWrapper
+from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.dateparse import parse_date, parse_datetime, parse_time
 from bolt.utils.regex_helper import _lazy_re_compile
 

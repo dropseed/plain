@@ -2,14 +2,14 @@ import datetime
 import posixpath
 
 from bolt import checks
-from bolt.files.base import File
-from bolt.files.images import ImageFile
-from bolt.files.storage import Storage, default_storage
-from bolt.files.utils import validate_file_name
 from bolt.db.models import signals
 from bolt.db.models.fields import Field
 from bolt.db.models.query_utils import DeferredAttribute
 from bolt.db.models.utils import AltersData
+from bolt.files.base import File
+from bolt.files.images import ImageFile
+from bolt.files.storage import Storage, default_storage
+from bolt.files.utils import validate_file_name
 
 
 class FieldFile(File, AltersData):

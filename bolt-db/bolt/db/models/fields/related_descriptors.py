@@ -63,7 +63,6 @@ and two directions (forward and reverse) for a total of six combinations.
    ``ReverseManyToManyDescriptor``, use ``ManyToManyDescriptor`` instead.
 """
 
-from bolt.exceptions import FieldError
 from bolt.db import (
     DEFAULT_DB_ALIAS,
     NotSupportedError,
@@ -77,6 +76,7 @@ from bolt.db.models.lookups import GreaterThan, LessThanOrEqual
 from bolt.db.models.query import QuerySet
 from bolt.db.models.query_utils import DeferredAttribute
 from bolt.db.models.utils import AltersData, resolve_callables
+from bolt.exceptions import FieldError
 from bolt.utils.functional import cached_property
 
 

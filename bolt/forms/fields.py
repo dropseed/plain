@@ -13,14 +13,14 @@ from io import BytesIO
 from urllib.parse import urlsplit, urlunsplit
 
 from bolt import validators
-from bolt.exceptions import ValidationError
 from bolt.db.models.enums import ChoicesMeta
-from .boundfield import BoundField
+from bolt.exceptions import ValidationError
 from bolt.utils.dateparse import parse_datetime, parse_duration
 from bolt.utils.duration import duration_string
 from bolt.utils.regex_helper import _lazy_re_compile
 from bolt.utils.text import pluralize_lazy
 
+from .boundfield import BoundField
 from .exceptions import FormFieldMissingError
 
 __all__ = (

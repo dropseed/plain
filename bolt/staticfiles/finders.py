@@ -2,11 +2,11 @@ import functools
 import os
 
 from bolt.apps import apps
-from bolt.runtime import settings
-from bolt.staticfiles import utils
 from bolt.checks import Error, Warning
 from bolt.exceptions import ImproperlyConfigured
 from bolt.files.storage import FileSystemStorage, Storage, default_storage
+from bolt.runtime import settings
+from bolt.staticfiles import utils
 from bolt.utils._os import safe_join
 from bolt.utils.functional import LazyObject, empty
 from bolt.utils.module_loading import import_string

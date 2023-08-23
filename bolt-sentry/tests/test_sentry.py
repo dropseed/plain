@@ -1,9 +1,9 @@
 import sentry_sdk
-from bolt.auth import get_user_model
-from bolt.views import TemplateView
 
+from bolt.auth import get_user_model
 from bolt.sentry.middleware import SentryFeedbackMiddleware
 from bolt.sentry.templatetags.sentry import sentry_js
+from bolt.views import TemplateView
 
 SENTRY_TEST_DSN = "https://publickey@1.ingest.sentry.io/1"
 

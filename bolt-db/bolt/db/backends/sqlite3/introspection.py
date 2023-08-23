@@ -3,9 +3,8 @@ from collections import namedtuple
 import sqlparse
 
 from bolt.db import DatabaseError
-from bolt.db.backends.base.introspection import BaseDatabaseIntrospection
+from bolt.db.backends.base.introspection import BaseDatabaseIntrospection, TableInfo
 from bolt.db.backends.base.introspection import FieldInfo as BaseFieldInfo
-from bolt.db.backends.base.introspection import TableInfo
 from bolt.db.models import Index
 from bolt.utils.regex_helper import _lazy_re_compile
 

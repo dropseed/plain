@@ -1,9 +1,11 @@
-from itertools import islice
-from bolt.utils.timesince import timeuntil, timesince
-from jinja2.utils import htmlsafe_json_dumps
-from bolt.utils.timezone import localtime
 import datetime
+from itertools import islice
+
+from jinja2.utils import htmlsafe_json_dumps
+
 from bolt.utils.html import format_html
+from bolt.utils.timesince import timesince, timeuntil
+from bolt.utils.timezone import localtime
 
 
 def json_script(value, id):

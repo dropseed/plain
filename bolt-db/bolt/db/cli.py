@@ -1,9 +1,10 @@
-import sys
 import subprocess
+import sys
+
+import click
 
 import bolt.runtime
 from bolt.db import DEFAULT_DB_ALIAS, connections
-import click
 
 
 @click.group()

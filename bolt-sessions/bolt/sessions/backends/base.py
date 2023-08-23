@@ -2,8 +2,8 @@ import logging
 import string
 from datetime import datetime, timedelta
 
-from bolt.runtime import settings
 from bolt import signing
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.crypto import get_random_string
 from bolt.utils.module_loading import import_string

@@ -2,11 +2,11 @@ import json
 import logging
 import threading
 
-from bolt.runtime import settings
-from bolt.json import BoltJSONEncoder
+from bolt import jinja
 from bolt.db import connection
 from bolt.http import HttpResponseRedirect
-from bolt import jinja
+from bolt.json import BoltJSONEncoder
+from bolt.runtime import settings
 
 from .core import QueryStats
 

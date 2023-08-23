@@ -2,10 +2,8 @@ import functools
 import inspect
 from functools import partial
 
-from bolt.apps import apps
-from bolt.user_settings import SettingsReference
-from bolt.runtime import settings
 from bolt import checks, exceptions
+from bolt.apps import apps
 from bolt.db import connection, router
 from bolt.db.backends import utils
 from bolt.db.models import Q
@@ -13,6 +11,8 @@ from bolt.db.models.constants import LOOKUP_SEP
 from bolt.db.models.deletion import CASCADE, SET_DEFAULT, SET_NULL
 from bolt.db.models.query_utils import PathInfo
 from bolt.db.models.utils import make_model_tuple
+from bolt.runtime import settings
+from bolt.user_settings import SettingsReference
 from bolt.utils.functional import cached_property
 
 from . import Field

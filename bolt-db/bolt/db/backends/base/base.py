@@ -9,8 +9,6 @@ import zoneinfo
 from collections import deque
 from contextlib import contextmanager
 
-from bolt.runtime import settings
-from bolt.exceptions import ImproperlyConfigured
 from bolt.db import DEFAULT_DB_ALIAS, DatabaseError, NotSupportedError
 from bolt.db.backends import utils
 from bolt.db.backends.base.validation import BaseDatabaseValidation
@@ -18,6 +16,8 @@ from bolt.db.backends.signals import connection_created
 from bolt.db.backends.utils import debug_transaction
 from bolt.db.transaction import TransactionManagementError
 from bolt.db.utils import DatabaseErrorWrapper
+from bolt.exceptions import ImproperlyConfigured
+from bolt.runtime import settings
 from bolt.utils.functional import cached_property
 
 NO_DB_ALIAS = "__no_db__"

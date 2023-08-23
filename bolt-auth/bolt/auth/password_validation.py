@@ -4,12 +4,12 @@ import re
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from bolt.runtime import settings
 from bolt.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
     ValidationError,
 )
+from bolt.runtime import settings
 from bolt.utils.functional import cached_property, lazy
 from bolt.utils.html import format_html, format_html_join
 from bolt.utils.module_loading import import_string

@@ -1,10 +1,10 @@
 import logging
 import types
 
-from bolt.runtime import settings
-from bolt.exceptions import ImproperlyConfigured, MiddlewareNotUsed
-from bolt.signals import request_finished
 from bolt.db import connections, transaction
+from bolt.exceptions import ImproperlyConfigured, MiddlewareNotUsed
+from bolt.runtime import settings
+from bolt.signals import request_finished
 from bolt.urls import get_resolver, set_urlconf
 from bolt.utils.log import log_response
 from bolt.utils.module_loading import import_string

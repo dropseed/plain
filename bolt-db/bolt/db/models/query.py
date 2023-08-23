@@ -8,7 +8,6 @@ import warnings
 from itertools import chain, islice
 
 import bolt.runtime
-from bolt.runtime import settings
 from bolt import exceptions
 from bolt.db import (
     BOLT_VERSION_PICKLE_KEY,
@@ -30,6 +29,7 @@ from bolt.db.models.utils import (
     create_namedtuple_class,
     resolve_callables,
 )
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.functional import cached_property, partition
 

@@ -1,7 +1,7 @@
+from bolt.http import HttpResponseRedirect
 from bolt.views import TemplateView
 
 from .core import RequestLog
-from bolt.http import HttpResponseRedirect
 
 
 class RequestLogView(TemplateView):

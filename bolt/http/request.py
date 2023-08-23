@@ -4,7 +4,6 @@ from io import BytesIO
 from itertools import chain
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
-from bolt.runtime import settings
 from bolt import signing
 from bolt.exceptions import (
     DisallowedHost,
@@ -18,6 +17,7 @@ from bolt.http.multipartparser import (
     MultiPartParserError,
     TooManyFilesSent,
 )
+from bolt.runtime import settings
 from bolt.utils.datastructures import (
     CaseInsensitiveMapping,
     ImmutableList,

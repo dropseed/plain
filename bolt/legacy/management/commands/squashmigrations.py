@@ -2,14 +2,14 @@ import os
 import shutil
 
 from bolt.apps import apps
-from bolt.runtime import settings
-from bolt.legacy.management.base import BaseCommand, CommandError
-from bolt.legacy.management.utils import run_formatters
 from bolt.db import DEFAULT_DB_ALIAS, connections, migrations
 from bolt.db.migrations.loader import AmbiguityError, MigrationLoader
 from bolt.db.migrations.migration import SwappableTuple
 from bolt.db.migrations.optimizer import MigrationOptimizer
 from bolt.db.migrations.writer import MigrationWriter
+from bolt.legacy.management.base import BaseCommand, CommandError
+from bolt.legacy.management.utils import run_formatters
+from bolt.runtime import settings
 from bolt.utils.version import get_docs_version
 
 

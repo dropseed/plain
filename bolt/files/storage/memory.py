@@ -9,8 +9,8 @@ import os
 import pathlib
 from urllib.parse import urljoin
 
-from bolt.runtime import settings
 from bolt.files.base import ContentFile
+from bolt.runtime import settings
 from bolt.signals import setting_changed
 from bolt.utils._os import safe_join
 from bolt.utils.deconstruct import deconstructible

@@ -6,14 +6,14 @@ from functools import partial
 from bolt.apps import AppConfig
 from bolt.apps.registry import Apps
 from bolt.apps.registry import apps as global_apps
-from bolt.runtime import settings
-from bolt.exceptions import FieldDoesNotExist
 from bolt.db import models
 from bolt.db.migrations.utils import field_is_referenced, get_references
 from bolt.db.models import NOT_PROVIDED
 from bolt.db.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from bolt.db.models.options import DEFAULT_NAMES, normalize_together
 from bolt.db.models.utils import make_model_tuple
+from bolt.exceptions import FieldDoesNotExist
+from bolt.runtime import settings
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string
 from bolt.utils.version import get_docs_version

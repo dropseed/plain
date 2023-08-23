@@ -1,8 +1,9 @@
 import sys
 from pathlib import Path
-from bolt.utils.version import get_version
-from .user_settings import LazySettings
 
+from bolt.utils.version import get_version
+
+from .user_settings import LazySettings
 
 VERSION = (5, 0, 0, "alpha", 0)
 

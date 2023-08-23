@@ -5,9 +5,9 @@ from importlib import import_module
 
 import sqlparse
 
-from bolt.runtime import settings
 from bolt.db import NotSupportedError, transaction
 from bolt.db.backends import utils
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.encoding import force_str
 

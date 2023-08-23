@@ -1,5 +1,5 @@
-from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
+from bolt.runtime import settings
 
 from .. import Error, Tags, Warning, register
 

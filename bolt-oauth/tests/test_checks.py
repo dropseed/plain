@@ -1,6 +1,6 @@
 import pytest
-from bolt.auth import get_user_model
 
+from bolt.auth import get_user_model
 from bolt.oauth.models import OAuthConnection
 
 

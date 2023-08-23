@@ -5,7 +5,6 @@ not in INSTALLED_APPS.
 import unicodedata
 import warnings
 
-from bolt.runtime import settings
 from bolt.auth import password_validation
 from bolt.auth.hashers import (
     check_password,
@@ -13,6 +12,7 @@ from bolt.auth.hashers import (
     make_password,
 )
 from bolt.db import models
+from bolt.runtime import settings
 from bolt.utils.crypto import get_random_string, salted_hmac
 from bolt.utils.deprecation import RemovedInDjango51Warning
 

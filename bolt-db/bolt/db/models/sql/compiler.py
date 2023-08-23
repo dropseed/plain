@@ -4,7 +4,6 @@ import re
 from functools import partial
 from itertools import chain
 
-from bolt.exceptions import EmptyResultSet, FieldError, FullResultSet
 from bolt.db import DatabaseError, NotSupportedError
 from bolt.db.models.constants import LOOKUP_SEP
 from bolt.db.models.expressions import F, OrderBy, RawSQL, Ref, Value
@@ -22,6 +21,7 @@ from bolt.db.models.sql.constants import (
 from bolt.db.models.sql.query import Query, get_order_dir
 from bolt.db.models.sql.where import AND
 from bolt.db.transaction import TransactionManagementError
+from bolt.exceptions import EmptyResultSet, FieldError, FullResultSet
 from bolt.utils.functional import cached_property
 from bolt.utils.hashable import make_hashable
 from bolt.utils.regex_helper import _lazy_re_compile

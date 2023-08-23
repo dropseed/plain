@@ -1,6 +1,5 @@
 from bolt.runtime import settings as bolt_settings
 
-
 from . import settings
 from .core import RequestLog
 from .views import RequestLogView

@@ -3,10 +3,10 @@ MySQL database backend for Bolt.
 
 Requires mysqlclient: https://pypi.org/project/mysqlclient/
 """
-from bolt.exceptions import ImproperlyConfigured
 from bolt.db import IntegrityError
 from bolt.db.backends import utils as backend_utils
 from bolt.db.backends.base.base import BaseDatabaseWrapper
+from bolt.exceptions import ImproperlyConfigured
 from bolt.utils.functional import cached_property
 from bolt.utils.regex_helper import _lazy_re_compile
 

@@ -4,15 +4,16 @@ and database field objects.
 """
 from itertools import chain
 
+from bolt.db.models.utils import AltersData
 from bolt.exceptions import (
     NON_FIELD_ERRORS,
     FieldError,
     ImproperlyConfigured,
     ValidationError,
 )
-from bolt.db.models.utils import AltersData
-from .fields import ChoiceField, Field
+
 from . import fields
+from .fields import ChoiceField, Field
 from .forms import BaseForm, DeclarativeFieldsMetaclass
 
 __all__ = (

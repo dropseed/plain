@@ -12,19 +12,20 @@ from typing import Generator, List, Optional, Tuple, Union
 
 import pytest
 
-from .fixtures import _bolt_db_helper  # noqa
-from .fixtures import client  # noqa
-from .fixtures import db  # noqa
-from .fixtures import bolt_assert_max_num_queries  # noqa
-from .fixtures import bolt_assert_num_queries  # noqa
-from .fixtures import bolt_db_reset_sequences  # noqa
-from .fixtures import bolt_db_serialized_rollback  # noqa
-from .fixtures import bolt_db_setup  # noqa
-from .fixtures import rf  # noqa
-from .fixtures import settings  # noqa
-from .fixtures import transactional_db  # noqa
-from .fixtures import validate_bolt_db
-
+from .fixtures import (
+    _bolt_db_helper,  # noqa
+    bolt_assert_max_num_queries,  # noqa
+    bolt_assert_num_queries,  # noqa
+    bolt_db_reset_sequences,  # noqa
+    bolt_db_serialized_rollback,  # noqa
+    bolt_db_setup,  # noqa
+    client,  # noqa
+    db,  # noqa
+    rf,  # noqa
+    settings,  # noqa
+    transactional_db,  # noqa
+    validate_bolt_db,
+)
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:

@@ -3,9 +3,9 @@ import secrets
 from typing import Any, List
 from urllib.parse import urlencode
 
-from bolt.runtime import settings
 from bolt.auth import login as auth_login
 from bolt.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from bolt.runtime import settings
 from bolt.urls import reverse
 from bolt.utils.crypto import get_random_string
 from bolt.utils.module_loading import import_string

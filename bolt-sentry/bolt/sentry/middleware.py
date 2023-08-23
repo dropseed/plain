@@ -1,4 +1,5 @@
 import sentry_sdk
+
 from bolt import jinja
 
 

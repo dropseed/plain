@@ -1,6 +1,7 @@
 import time
 import traceback
 from collections import Counter
+
 import sqlparse
 
 from bolt.utils.functional import cached_property

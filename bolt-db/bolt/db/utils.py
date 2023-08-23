@@ -1,9 +1,8 @@
 import pkgutil
 from importlib import import_module
 
-from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
-
+from bolt.runtime import settings
 from bolt.utils.connection import BaseConnectionHandler
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string

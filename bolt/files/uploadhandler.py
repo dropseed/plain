@@ -4,8 +4,8 @@ Base file upload handler classes, and the built-in concrete subclasses
 import os
 from io import BytesIO
 
-from bolt.runtime import settings
 from bolt.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
+from bolt.runtime import settings
 from bolt.utils.module_loading import import_string
 
 __all__ = [

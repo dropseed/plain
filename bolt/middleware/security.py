@@ -1,7 +1,7 @@
 import re
 
-from bolt.runtime import settings
 from bolt.http import HttpResponsePermanentRedirect
+from bolt.runtime import settings
 
 
 class SecurityMiddleware:

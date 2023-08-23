@@ -4,9 +4,6 @@ import warnings
 from itertools import takewhile
 
 from bolt.apps import apps
-from bolt.runtime import settings
-from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
-from bolt.legacy.management.utils import run_formatters
 from bolt.db import DEFAULT_DB_ALIAS, OperationalError, connections, router
 from bolt.db.migrations import Migration
 from bolt.db.migrations.autodetector import MigrationAutodetector
@@ -21,6 +18,9 @@ from bolt.db.migrations.questioner import (
 from bolt.db.migrations.state import ProjectState
 from bolt.db.migrations.utils import get_migration_name_timestamp
 from bolt.db.migrations.writer import MigrationWriter
+from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
+from bolt.legacy.management.utils import run_formatters
+from bolt.runtime import settings
 
 
 class Command(BaseCommand):

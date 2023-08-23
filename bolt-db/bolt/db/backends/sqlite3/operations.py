@@ -4,12 +4,12 @@ import uuid
 from functools import lru_cache
 from itertools import chain
 
-from bolt.runtime import settings
-from bolt.exceptions import FieldError
 from bolt.db import DatabaseError, NotSupportedError, models
 from bolt.db.backends.base.operations import BaseDatabaseOperations
 from bolt.db.models.constants import OnConflict
 from bolt.db.models.expressions import Col
+from bolt.exceptions import FieldError
+from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.dateparse import parse_date, parse_datetime, parse_time
 from bolt.utils.functional import cached_property

@@ -1,4 +1,5 @@
 from bolt.jinja.extensions import InclusionTagExtension
+
 from . import settings
 
 

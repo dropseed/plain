@@ -6,7 +6,6 @@ import bolt.db.models.deletion
 import bolt.utils.timezone
 from bolt.db import migrations, models
 
-
 # Functions from the following migrations need manual copying.
 # Move them and any dependencies into this file, then update the
 # RunPython operations to refer to the local versions:

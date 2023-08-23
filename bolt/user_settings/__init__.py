@@ -10,15 +10,15 @@ import importlib
 import os
 import time
 import traceback
-import warnings
-from pathlib import Path
 import types
 import typing
+import warnings
+from pathlib import Path
 
-from bolt.user_settings import global_settings
-from bolt.exceptions import ImproperlyConfigured
-from bolt.utils.functional import LazyObject, empty
 from bolt.apps import AppConfig
+from bolt.exceptions import ImproperlyConfigured
+from bolt.user_settings import global_settings
+from bolt.utils.functional import LazyObject, empty
 
 ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"
 DEFAULT_STORAGE_ALIAS = "default"

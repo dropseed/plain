@@ -1,6 +1,6 @@
-from bolt.exceptions import FieldError, FullResultSet
 from bolt.db.models.expressions import Col
 from bolt.db.models.sql import compiler
+from bolt.exceptions import FieldError, FullResultSet
 
 
 class SQLCompiler(compiler.SQLCompiler):

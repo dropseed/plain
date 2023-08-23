@@ -1,6 +1,6 @@
-from bolt.runtime import settings
 from bolt.exceptions import PermissionDenied
 from bolt.http import HttpResponsePermanentRedirect
+from bolt.runtime import settings
 from bolt.urls import is_valid_path
 from bolt.utils.http import escape_leading_slashes
 

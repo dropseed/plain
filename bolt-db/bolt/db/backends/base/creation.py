@@ -3,10 +3,10 @@ import sys
 from io import StringIO
 
 from bolt.apps import apps
-from bolt.runtime import settings
-from bolt.json import BoltJSONEncoder
 from bolt.db import router
 from bolt.db.transaction import atomic
+from bolt.json import BoltJSONEncoder
+from bolt.runtime import settings
 from bolt.utils.module_loading import import_string
 
 # The prefix to put on the default database name when creating

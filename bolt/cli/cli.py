@@ -1,17 +1,17 @@
-import re
 import importlib
 import os
+import re
 import subprocess
 import sys
 
-import bolt.runtime
 import click
-
-from rich.console import Console
-from rich.table import Table
 from rich import box
-from rich.text import Text
+from rich.console import Console
 from rich.pretty import Pretty
+from rich.table import Table
+from rich.text import Text
+
+import bolt.runtime
 from bolt.apps import apps
 
 

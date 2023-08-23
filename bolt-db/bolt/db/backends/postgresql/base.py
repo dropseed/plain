@@ -8,12 +8,12 @@ import threading
 import warnings
 from contextlib import contextmanager
 
-from bolt.runtime import settings
-from bolt.exceptions import ImproperlyConfigured
 from bolt.db import DatabaseError as WrappedDatabaseError
 from bolt.db import connections
 from bolt.db.backends.base.base import BaseDatabaseWrapper
 from bolt.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
+from bolt.exceptions import ImproperlyConfigured
+from bolt.runtime import settings
 from bolt.utils.functional import cached_property
 from bolt.utils.safestring import SafeString
 from bolt.utils.version import get_version_tuple

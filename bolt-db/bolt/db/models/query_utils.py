@@ -10,9 +10,9 @@ import inspect
 import logging
 from collections import namedtuple
 
-from bolt.exceptions import FieldError
 from bolt.db import DEFAULT_DB_ALIAS, DatabaseError, connections
 from bolt.db.models.constants import LOOKUP_SEP
+from bolt.exceptions import FieldError
 from bolt.utils import tree
 
 logger = logging.getLogger("bolt.db.models")

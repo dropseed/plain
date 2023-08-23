@@ -1,10 +1,11 @@
+import jinja2
+
+from bolt import jinja
 from bolt.exceptions import ImproperlyConfigured
 from bolt.http import HttpResponse
+from bolt.jinja.context import csrf_input_lazy, csrf_token_lazy
 
 from .base import View
-from bolt import jinja
-from bolt.jinja.context import csrf_input_lazy, csrf_token_lazy
-import jinja2
 
 
 class TemplateDoesNotExist(Exception):

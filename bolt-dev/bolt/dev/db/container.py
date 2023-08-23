@@ -4,8 +4,9 @@ import shlex
 import subprocess
 import time
 
-from bolt.env import database_url
 from dotenv import dotenv_values
+
+from bolt.env import database_url
 
 from ..utils import get_repo_root
 

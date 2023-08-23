@@ -2,6 +2,7 @@
 Tools for sending email.
 """
 from bolt.runtime import settings
+from bolt.utils.module_loading import import_string
 
 # Imported for backwards compatibility and for the sake
 # of a cleaner namespace. These symbols used to be in
@@ -18,7 +19,6 @@ from .message import (
     make_msgid,
 )
 from .utils import DNS_NAME, CachedDnsName
-from bolt.utils.module_loading import import_string
 
 __all__ = [
     "CachedDnsName",

@@ -1,5 +1,5 @@
-from bolt.apps import apps
 from bolt import checks
+from bolt.apps import apps
 from bolt.checks.registry import registry
 from bolt.legacy.management.base import BaseCommand, CommandError
 

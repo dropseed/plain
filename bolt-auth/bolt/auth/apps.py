@@ -1,5 +1,5 @@
-from bolt.apps import AppConfig
 from bolt import checks
+from bolt.apps import AppConfig
 from bolt.db.models.query_utils import DeferredAttribute
 
 from . import get_user_model

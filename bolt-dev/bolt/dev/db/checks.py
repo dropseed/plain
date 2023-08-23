@@ -1,6 +1,6 @@
-from bolt.runtime import settings
 from bolt.checks import Error, Tags, register
 from bolt.db import connection
+from bolt.runtime import settings
 
 
 @register("boltdb", Tags.database)

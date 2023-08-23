@@ -5,7 +5,6 @@ from typing import Any, Generator, Iterable, List, Optional, Tuple, Union
 
 import pytest
 
-
 TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Literal

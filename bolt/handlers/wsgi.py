@@ -1,9 +1,9 @@
 from io import IOBase
 
-from bolt.runtime import settings
 from bolt import signals
 from bolt.handlers import base
 from bolt.http import HttpRequest, QueryDict, parse_cookie
+from bolt.runtime import settings
 from bolt.utils.encoding import repercent_broken_unicode
 from bolt.utils.functional import cached_property
 from bolt.utils.regex_helper import _lazy_re_compile

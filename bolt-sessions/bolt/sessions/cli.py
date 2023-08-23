@@ -1,5 +1,6 @@
-import click
 from importlib import import_module
+
+import click
 
 import bolt.runtime
 from bolt.runtime import settings

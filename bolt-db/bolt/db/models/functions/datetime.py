@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from bolt.runtime import settings
 from bolt.db.models.expressions import Func
 from bolt.db.models.fields import (
     DateField,
@@ -18,6 +17,7 @@ from bolt.db.models.lookups import (
     YearLt,
     YearLte,
 )
+from bolt.runtime import settings
 from bolt.utils import timezone
 
 

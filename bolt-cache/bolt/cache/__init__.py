@@ -13,17 +13,17 @@ object.
 See docs/topics/cache.txt for information on the public API.
 """
 from bolt import signals
+from bolt.utils.connection import BaseConnectionHandler, ConnectionProxy
+from bolt.utils.module_loading import import_string
+
+from . import checks  # noqa
 from .backends.base import (
     BaseCache,
     CacheKeyWarning,
     InvalidCacheBackendError,
     InvalidCacheKey,
 )
-from bolt.utils.connection import BaseConnectionHandler, ConnectionProxy
-from bolt.utils.module_loading import import_string
-
 from .constants import DEFAULT_CACHE_ALIAS
-from . import checks  # noqa
 
 __all__ = [
     "cache",

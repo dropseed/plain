@@ -14,7 +14,6 @@ from importlib import import_module
 
 import bolt.runtime
 from bolt.apps import apps
-from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
 from bolt.legacy.management.base import (
     BaseCommand,
@@ -23,6 +22,7 @@ from bolt.legacy.management.base import (
     handle_default_options,
 )
 from bolt.legacy.management.color import color_style
+from bolt.runtime import settings
 
 
 def find_commands(management_dir):

@@ -1,10 +1,10 @@
 import datetime
 
 import requests
-from bolt.utils import timezone
 
 from bolt.oauth.exceptions import OAuthError
 from bolt.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from bolt.utils import timezone
 
 
 class GitHubOAuthProvider(OAuthProvider):

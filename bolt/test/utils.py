@@ -13,16 +13,17 @@ from types import SimpleNamespace
 from unittest import TestCase, skipIf, skipUnless
 from xml.dom.minidom import Node, parseString
 
+from jinja2 import Template
+
 from bolt.apps import apps
 from bolt.apps.registry import Apps
-from bolt.user_settings import UserSettingsHolder
-from bolt.runtime import settings
-from bolt.exceptions import ImproperlyConfigured
-from bolt.signals import request_started, setting_changed
 from bolt.db import DEFAULT_DB_ALIAS, connections, reset_queries
 from bolt.db.models.options import Options
-from jinja2 import Template
+from bolt.exceptions import ImproperlyConfigured
+from bolt.runtime import settings
+from bolt.signals import request_started, setting_changed
 from bolt.test.signals import template_rendered
+from bolt.user_settings import UserSettingsHolder
 
 try:
     import jinja2

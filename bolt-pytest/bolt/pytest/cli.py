@@ -1,6 +1,6 @@
-import sys
-import subprocess
 import os
+import subprocess
+import sys
 
 import click
 

@@ -1,7 +1,6 @@
 """
 Classes to represent the definitions of aggregate functions.
 """
-from bolt.exceptions import FieldError, FullResultSet
 from bolt.db.models.expressions import Case, Func, Star, Value, When
 from bolt.db.models.fields import IntegerField
 from bolt.db.models.functions.comparison import Coalesce
@@ -9,6 +8,7 @@ from bolt.db.models.functions.mixins import (
     FixDurationInputMixin,
     NumericOutputFieldMixin,
 )
+from bolt.exceptions import FieldError, FullResultSet
 
 __all__ = [
     "Aggregate",

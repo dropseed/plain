@@ -1,13 +1,9 @@
 from urllib.parse import urlparse, urlunparse
 
-from bolt.runtime import settings
-
 # Avoid shadowing the login() and logout() views below.
-from bolt.auth import REDIRECT_FIELD_NAME, get_user_model
+from bolt.auth import REDIRECT_FIELD_NAME, get_user_model, update_session_auth_hash
 from bolt.auth import login as auth_login
 from bolt.auth import logout as auth_logout
-from bolt.auth import update_session_auth_hash
-from bolt.views import AuthViewMixin
 from bolt.auth.forms import (
     AuthenticationForm,
     PasswordChangeForm,
@@ -17,12 +13,14 @@ from bolt.auth.forms import (
 from bolt.auth.tokens import default_token_generator
 from bolt.exceptions import ImproperlyConfigured, ValidationError
 from bolt.http import HttpResponseRedirect, QueryDict
-from .utils import resolve_url
+from bolt.runtime import settings
 from bolt.urls import reverse_lazy
+from bolt.utils.cache import add_never_cache_headers
 from bolt.utils.decorators import method_decorator
 from bolt.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode
-from bolt.utils.cache import add_never_cache_headers
-from bolt.views import TemplateView, FormView
+from bolt.views import AuthViewMixin, FormView, TemplateView
+
+from .utils import resolve_url
 
 UserModel = get_user_model()
 

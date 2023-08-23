@@ -3,8 +3,9 @@
 import datetime
 import os
 
-from bolt.runtime import settings
 from bolt.exceptions import ImproperlyConfigured
+from bolt.runtime import settings
+
 from .console import EmailBackend as ConsoleEmailBackend
 
 

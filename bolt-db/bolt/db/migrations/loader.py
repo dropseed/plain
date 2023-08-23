@@ -3,9 +3,9 @@ import sys
 from importlib import import_module, reload
 
 from bolt.apps import apps
-from bolt.runtime import settings
 from bolt.db.migrations.graph import MigrationGraph
 from bolt.db.migrations.recorder import MigrationRecorder
+from bolt.runtime import settings
 
 from .exceptions import (
     AmbiguityError,
