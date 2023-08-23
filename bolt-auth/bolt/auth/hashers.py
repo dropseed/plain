@@ -79,7 +79,7 @@ def make_password(password, salt=None, hasher="default"):
         return UNUSABLE_PASSWORD_PREFIX + get_random_string(
             UNUSABLE_PASSWORD_SUFFIX_LENGTH
         )
-    if not isinstance(password, (bytes, str)):
+    if not isinstance(password, bytes | str):
         raise TypeError(
             "Password must be a string or bytes, got %s." % type(password).__qualname__
         )
@@ -192,7 +192,7 @@ class BasePasswordHasher:
 
     def _load_library(self):
         if self.library is not None:
-            if isinstance(self.library, (tuple, list)):
+            if isinstance(self.library, tuple | list):
                 name, mod_path = self.library
             else:
                 mod_path = self.library
@@ -482,7 +482,7 @@ class BCryptSHA256PasswordHasher(BasePasswordHasher):
             password = binascii.hexlify(self.digest(password).digest())
 
         data = bcrypt.hashpw(password, salt)
-        return "%s$%s" % (self.algorithm, data.decode("ascii"))
+        return "{}${}".format(self.algorithm, data.decode("ascii"))
 
     def decode(self, encoded):
         algorithm, empty, algostr, work_factor, data = encoded.split("$", 4)

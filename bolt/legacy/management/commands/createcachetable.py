@@ -91,7 +91,7 @@ class Command(BaseCommand):
                     "CREATE %sINDEX %s ON %s (%s);"
                     % (
                         unique,
-                        qn("%s_%s" % (tablename, f.name)),
+                        qn(f"{tablename}_{f.name}"),
                         qn(tablename),
                         qn(f.name),
                     )
@@ -100,7 +100,7 @@ class Command(BaseCommand):
         full_statement = ["CREATE TABLE %s (" % qn(tablename)]
         for i, line in enumerate(table_output):
             full_statement.append(
-                "    %s%s" % (line, "," if i < len(table_output) - 1 else "")
+                "    {}{}".format(line, "," if i < len(table_output) - 1 else "")
             )
         full_statement.append(");")
 

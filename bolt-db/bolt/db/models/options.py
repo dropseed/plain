@@ -64,10 +64,10 @@ def normalize_together(option_together):
     try:
         if not option_together:
             return ()
-        if not isinstance(option_together, (tuple, list)):
+        if not isinstance(option_together, tuple | list):
             raise TypeError
         first_element = option_together[0]
-        if not isinstance(first_element, (tuple, list)):
+        if not isinstance(first_element, tuple | list):
             option_together = (option_together,)
         # Normalize everything to tuples
         return tuple(tuple(ot) for ot in option_together)
@@ -156,11 +156,11 @@ class Options:
 
     @property
     def label(self):
-        return "%s.%s" % (self.app_label, self.object_name)
+        return f"{self.app_label}.{self.object_name}"
 
     @property
     def label_lower(self):
-        return "%s.%s" % (self.app_label, self.model_name)
+        return f"{self.app_label}.{self.model_name}"
 
     @property
     def app_config(self):
@@ -233,7 +233,7 @@ class Options:
 
         # If the db_table wasn't provided, use the app_label + model_name.
         if not self.db_table:
-            self.db_table = "%s_%s" % (self.app_label, self.model_name)
+            self.db_table = f"{self.app_label}_{self.model_name}"
             self.db_table = truncate_name(
                 self.db_table, connection.ops.max_name_length()
             )
@@ -294,7 +294,7 @@ class Options:
                 )
             except StopIteration:
                 raise FieldDoesNotExist(
-                    "%s has no field named '%s'" % (self.object_name, query)
+                    f"{self.object_name} has no field named '{query}'"
                 )
 
             self.ordering = ("_order",)
@@ -422,10 +422,7 @@ class Options:
                     # or as part of validation.
                     return swapped_for
 
-                if (
-                    "%s.%s" % (swapped_label, swapped_object.lower())
-                    != self.label_lower
-                ):
+                if f"{swapped_label}.{swapped_object.lower()}" != self.label_lower:
                     return swapped_for
         return None
 
@@ -659,9 +656,9 @@ class Options:
             # unavailable, therefore we throw a FieldDoesNotExist exception.
             if not self.apps.models_ready:
                 raise FieldDoesNotExist(
-                    "%s has no field named '%s'. The app cache isn't ready yet, "
+                    "{} has no field named '{}'. The app cache isn't ready yet, "
                     "so if this is an auto-created related field, it won't "
-                    "be available yet." % (self.object_name, field_name)
+                    "be available yet.".format(self.object_name, field_name)
                 )
 
         try:
@@ -670,7 +667,7 @@ class Options:
             return self.fields_map[field_name]
         except KeyError:
             raise FieldDoesNotExist(
-                "%s has no field named '%s'" % (self.object_name, field_name)
+                f"{self.object_name} has no field named '{field_name}'"
             )
 
     def get_base_chain(self, model):
@@ -868,9 +865,7 @@ class Options:
           parent chain to the model's concrete model.
         """
         if include_parents not in (True, False, PROXY_PARENTS):
-            raise TypeError(
-                "Invalid argument for include_parents: %s" % (include_parents,)
-            )
+            raise TypeError(f"Invalid argument for include_parents: {include_parents}")
         # This helper function is used to allow recursion in ``get_fields()``
         # implementation and to provide a fast way for Bolt's internals to
         # access specific subsets of fields.

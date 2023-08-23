@@ -133,8 +133,8 @@ def fields_for_model(
         if not getattr(f, "editable", False):
             if fields is not None and f.name in fields:
                 raise FieldError(
-                    "'%s' cannot be specified for %s model form as it is a "
-                    "non-editable field" % (f.name, model.__name__)
+                    "'{}' cannot be specified for {} model form as it is a "
+                    "non-editable field".format(f.name, model.__name__)
                 )
             continue
         if fields is not None and f.name not in fields:
@@ -662,7 +662,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
             raise ValidationError(self.error_messages["required"], code="required")
         elif not self.required and not value:
             return self.queryset.none()
-        if not isinstance(value, (list, tuple)):
+        if not isinstance(value, list | tuple):
             raise ValidationError(
                 self.error_messages["invalid_list"],
                 code="invalid_list",

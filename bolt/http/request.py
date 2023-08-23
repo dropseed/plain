@@ -78,7 +78,7 @@ class HttpRequest:
     def __repr__(self):
         if self.method is None or not self.get_full_path():
             return "<%s>" % self.__class__.__name__
-        return "<%s: %s %r>" % (
+        return "<{}: {} {!r}>".format(
             self.__class__.__name__,
             self.method,
             self.get_full_path(),
@@ -141,7 +141,7 @@ class HttpRequest:
             host = self.META["SERVER_NAME"]
             server_port = self.get_port()
             if server_port != ("443" if self.is_secure() else "80"):
-                host = "%s:%s" % (host, server_port)
+                host = f"{host}:{server_port}"
         return host
 
     def get_host(self):
@@ -183,7 +183,7 @@ class HttpRequest:
     def _get_full_path(self, path, force_append_slash):
         # RFC 3986 requires query string arguments to be in the ASCII range.
         # Rather than crash if this doesn't happen, we encode defensively.
-        return "%s%s%s" % (
+        return "{}{}{}".format(
             escape_uri_path(path),
             "/" if force_append_slash and not path.endswith("/") else "",
             ("?" + iri_to_uri(self.META.get("QUERY_STRING", "")))
@@ -256,7 +256,7 @@ class HttpRequest:
 
     @cached_property
     def _current_scheme_host(self):
-        return "{}://{}".format(self.scheme, self.get_host())
+        return f"{self.scheme}://{self.get_host()}"
 
     def _get_scheme(self):
         """
@@ -645,7 +645,7 @@ class QueryDict(MultiValueDict):
             safe = safe.encode(self.encoding)
 
             def encode(k, v):
-                return "%s=%s" % ((quote(k, safe), quote(v, safe)))
+                return f"{quote(k, safe)}={quote(v, safe)}"
 
         else:
 
@@ -668,15 +668,15 @@ class MediaType:
         self.main_type, _, self.sub_type = full_type.partition("/")
 
     def __str__(self):
-        params_str = "".join("; %s=%s" % (k, v) for k, v in self.params.items())
-        return "%s%s%s" % (
+        params_str = "".join(f"; {k}={v}" for k, v in self.params.items())
+        return "{}{}{}".format(
             self.main_type,
             ("/%s" % self.sub_type) if self.sub_type else "",
             params_str,
         )
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__qualname__, self)
+        return f"<{self.__class__.__qualname__}: {self}>"
 
     @property
     def is_all_types(self):

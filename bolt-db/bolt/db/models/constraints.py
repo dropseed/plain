@@ -72,7 +72,7 @@ class BaseConstraint:
         return self.violation_error_message % {"name": self.name}
 
     def deconstruct(self):
-        path = "%s.%s" % (self.__class__.__module__, self.__class__.__name__)
+        path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         path = path.replace("bolt.db.models.constraints", "bolt.db.models")
         kwargs = {"name": self.name}
         if (
@@ -133,7 +133,7 @@ class CheckConstraint(BaseConstraint):
             pass
 
     def __repr__(self):
-        return "<%s: check=%s name=%s%s%s>" % (
+        return "<{}: check={} name={}{}{}>".format(
             self.__class__.__qualname__,
             self.check,
             repr(self.name),
@@ -199,7 +199,7 @@ class UniqueConstraint(BaseConstraint):
             raise ValueError(
                 "UniqueConstraint.fields and expressions are mutually exclusive."
             )
-        if not isinstance(condition, (NoneType, Q)):
+        if not isinstance(condition, NoneType | Q):
             raise ValueError("UniqueConstraint.condition must be a Q instance.")
         if condition and deferrable:
             raise ValueError("UniqueConstraint with conditions cannot be deferred.")
@@ -214,13 +214,13 @@ class UniqueConstraint(BaseConstraint):
                 "UniqueConstraint.opclasses cannot be used with expressions. "
                 "Use a custom OpClass() instead."
             )
-        if not isinstance(deferrable, (NoneType, Deferrable)):
+        if not isinstance(deferrable, NoneType | Deferrable):
             raise ValueError(
                 "UniqueConstraint.deferrable must be a Deferrable instance."
             )
-        if not isinstance(include, (NoneType, list, tuple)):
+        if not isinstance(include, NoneType | list | tuple):
             raise ValueError("UniqueConstraint.include must be a list or tuple.")
-        if not isinstance(opclasses, (list, tuple)):
+        if not isinstance(opclasses, list | tuple):
             raise ValueError("UniqueConstraint.opclasses must be a list or tuple.")
         if opclasses and len(fields) != len(opclasses):
             raise ValueError(
@@ -320,7 +320,7 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def __repr__(self):
-        return "<%s:%s%s%s%s%s%s%s%s%s>" % (
+        return "<{}:{}{}{}{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
             "" if not self.fields else " fields=%s" % repr(self.fields),
             "" if not self.expressions else " expressions=%s" % repr(self.expressions),

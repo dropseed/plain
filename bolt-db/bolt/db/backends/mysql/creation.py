@@ -52,7 +52,7 @@ class DatabaseCreation(BaseDatabaseCreation):
                                 ),
                             )
                         )
-                    cursor.execute("DROP DATABASE %(dbname)s" % test_db_params)
+                    cursor.execute("DROP DATABASE {dbname}".format(**test_db_params))
                     self._execute_create_test_db(cursor, test_db_params, keepdb)
                 except Exception as e:
                     self.log("Got an error recreating the test database: %s" % e)

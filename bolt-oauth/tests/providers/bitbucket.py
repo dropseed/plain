@@ -48,7 +48,7 @@ class BitbucketOAuthProvider(OAuthProvider):
         response = requests.get(
             "https://api.bitbucket.org/2.0/user",
             headers={
-                "Authorization": "Bearer {}".format(oauth_token.access_token),
+                "Authorization": f"Bearer {oauth_token.access_token}",
             },
         )
         response.raise_for_status()
@@ -58,7 +58,7 @@ class BitbucketOAuthProvider(OAuthProvider):
         response = requests.get(
             "https://api.bitbucket.org/2.0/user/emails",
             headers={
-                "Authorization": "Bearer {}".format(oauth_token.access_token),
+                "Authorization": f"Bearer {oauth_token.access_token}",
             },
         )
         response.raise_for_status()

@@ -6,7 +6,6 @@ import os
 import re
 import sys
 import time
-import warnings
 from email.header import Header
 from http.client import responses
 from http.cookies import SimpleCookie
@@ -309,7 +308,7 @@ class HttpResponseBase:
         # Handle string types -- we can't rely on force_bytes here because:
         # - Python attempts str conversion first
         # - when self._charset != 'utf-8' it re-encodes the content
-        if isinstance(value, (bytes, memoryview)):
+        if isinstance(value, bytes | memoryview):
             return bytes(value)
         if isinstance(value, str):
             return bytes(value.encode(self.charset))
@@ -411,7 +410,7 @@ class HttpResponse(HttpResponseBase):
     def content(self, value):
         # Consume iterators upon assignment to allow repeated iteration.
         if hasattr(value, "__iter__") and not isinstance(
-            value, (bytes, memoryview, str)
+            value, bytes | memoryview | str
         ):
             content = b"".join(self.make_bytes(chunk) for chunk in value)
             if hasattr(value, "close"):

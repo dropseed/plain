@@ -90,7 +90,7 @@ class QueryStats:
     def get_time_display(seconds):
         if seconds < 0.01:
             return "{:.0f} ms".format(seconds * 1000)
-        return "{:.2f} seconds".format(seconds)
+        return f"{seconds:.2f} seconds"
 
     @cached_property
     def total_time_display(self):

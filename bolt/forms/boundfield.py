@@ -14,7 +14,7 @@ class BoundField:
         self.html_id = form.add_prefix(self._auto_id)
 
     def __repr__(self):
-        return '<{} "{}">'.format(self.__class__.__name__, self.html_name)
+        return f'<{self.__class__.__name__} "{self.html_name}">'
 
     @property
     def errors(self):

@@ -120,9 +120,7 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                     component_name, component_name
                 )
             )
-            self_closing_pattern = re.compile(
-                r"<{}(\s+[\s\S]*?)?/>".format(component_name)
-            )
+            self_closing_pattern = re.compile(rf"<{component_name}(\s+[\s\S]*?)?/>")
 
             def closing_cb(match: re.Match) -> str:
                 if f"<{component_name}" in match.group(2):

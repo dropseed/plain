@@ -11,7 +11,7 @@ class SQLCompiler(compiler.SQLCompiler):
         return (
             "(%s) IN (%s)"
             % (
-                ", ".join("%s.%s" % (qn(alias), qn2(column)) for column in columns),
+                ", ".join(f"{qn(alias)}.{qn2(column)}" for column in columns),
                 sql,
             ),
             params,

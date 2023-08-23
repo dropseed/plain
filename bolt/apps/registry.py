@@ -221,9 +221,9 @@ class Apps:
                 and model.__module__ == app_models[model_name].__module__
             ):
                 warnings.warn(
-                    "Model '%s.%s' was already registered. Reloading models is not "
+                    "Model '{}.{}' was already registered. Reloading models is not "
                     "advised as it can lead to inconsistencies, most notably with "
-                    "related models." % (app_label, model_name),
+                    "related models.".format(app_label, model_name),
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -274,7 +274,7 @@ class Apps:
         """
         model = self.all_models[app_label].get(model_name.lower())
         if model is None:
-            raise LookupError("Model '%s.%s' not registered." % (app_label, model_name))
+            raise LookupError(f"Model '{app_label}.{model_name}' not registered.")
         return model
 
     @functools.cache

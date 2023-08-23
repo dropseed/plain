@@ -34,7 +34,7 @@ def default_key_func(key, key_prefix, version):
     the `key_prefix`. KEY_FUNCTION can be used to specify an alternate
     function with custom key making behavior.
     """
-    return "%s:%s:%s" % (key_prefix, version, key)
+    return f"{key_prefix}:{version}:{key}"
 
 
 def get_key_func(key_func):
@@ -296,8 +296,8 @@ class BaseCache:
 def memcache_key_warnings(key):
     if len(key) > MEMCACHE_MAX_KEY_LENGTH:
         yield (
-            "Cache key will cause errors if used with memcached: %r "
-            "(longer than %s)" % (key, MEMCACHE_MAX_KEY_LENGTH)
+            "Cache key will cause errors if used with memcached: {!r} "
+            "(longer than {})".format(key, MEMCACHE_MAX_KEY_LENGTH)
         )
     for char in key:
         if ord(char) < 33 or ord(char) == 127:

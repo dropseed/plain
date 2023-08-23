@@ -119,7 +119,7 @@ class RawQuery:
         return iter(result)
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     @property
     def params_type(self):
@@ -1159,7 +1159,7 @@ class Query(BaseExpression):
                 reuse=can_reuse,
                 allow_joins=allow_joins,
             )
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, list | tuple):
             # The items of the iterable may be expressions and therefore need
             # to be resolved independently.
             values = (
@@ -1307,8 +1307,8 @@ class Query(BaseExpression):
             else:
                 suggestion = "."
             raise FieldError(
-                "Unsupported lookup '%s' for %s or join on the field not "
-                "permitted%s" % (name, output_field.__name__, suggestion)
+                "Unsupported lookup '{}' for {} or join on the field not "
+                "permitted{}".format(name, output_field.__name__, suggestion)
             )
 
     def build_filter(
@@ -1597,8 +1597,8 @@ class Query(BaseExpression):
                 else:
                     raise ValueError(
                         "FilteredRelation's condition doesn't support nested "
-                        "relations deeper than the relation_name (got %r for "
-                        "%r)." % (lookup, filtered_relation.relation_name)
+                        "relations deeper than the relation_name (got {!r} for "
+                        "{!r}).".format(lookup, filtered_relation.relation_name)
                     )
         self._filtered_relations[filtered_relation.alias] = filtered_relation
 
@@ -1675,8 +1675,8 @@ class Query(BaseExpression):
                         ]
                     )
                     raise FieldError(
-                        "Cannot resolve keyword '%s' into field. "
-                        "Choices are: %s" % (name, ", ".join(available))
+                        "Cannot resolve keyword '{}' into field. "
+                        "Choices are: {}".format(name, ", ".join(available))
                     )
                 break
             # Check if we need any joins for concrete inheritance cases (the
@@ -1712,8 +1712,8 @@ class Query(BaseExpression):
                 targets = (field,)
                 if fail_on_missing and pos + 1 != len(names):
                     raise FieldError(
-                        "Cannot resolve keyword %r into field. Join on '%s'"
-                        " not permitted." % (names[pos + 1], name)
+                        "Cannot resolve keyword {!r} into field. Join on '{}'"
+                        " not permitted.".format(names[pos + 1], name)
                     )
                 break
         return path, final_field, targets, names[pos + 1 :]
@@ -2145,8 +2145,8 @@ class Query(BaseExpression):
                     ]
                 )
                 raise FieldError(
-                    "Cannot resolve keyword %r into field. "
-                    "Choices are: %s" % (name, ", ".join(names))
+                    "Cannot resolve keyword {!r} into field. "
+                    "Choices are: {}".format(name, ", ".join(names))
                 )
 
     def add_ordering(self, *ordering):

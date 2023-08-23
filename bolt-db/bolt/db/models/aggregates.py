@@ -98,7 +98,7 @@ class Aggregate(Func):
     def default_alias(self):
         expressions = self.get_source_expressions()
         if len(expressions) == 1 and hasattr(expressions[0], "name"):
-            return "%s__%s" % (expressions[0].name, self.name.lower())
+            return f"{expressions[0].name}__{self.name.lower()}"
         raise TypeError("Complex expressions require an alias")
 
     def get_group_by_cols(self):

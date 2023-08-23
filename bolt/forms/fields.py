@@ -814,7 +814,7 @@ class ChoiceField(Field):
         """Check to see if the provided value is a valid choice."""
         text_value = str(value)
         for k, v in self.choices:
-            if isinstance(v, (list, tuple)):
+            if isinstance(v, list | tuple):
                 # This is an optgroup, so look inside the group for options
                 for k2, v2 in v:
                     if value == k2 or text_value == str(k2):
@@ -861,7 +861,7 @@ class MultipleChoiceField(ChoiceField):
     def to_python(self, value):
         if not value:
             return []
-        elif not isinstance(value, (list, tuple)):
+        elif not isinstance(value, list | tuple):
             raise ValidationError(
                 self.error_messages["invalid_list"], code="invalid_list"
             )
@@ -952,7 +952,7 @@ class JSONField(CharField):
             return value
         if value in self.empty_values:
             return None
-        elif isinstance(value, (list, dict, int, float, JSONString)):
+        elif isinstance(value, list | dict | int | float | JSONString):
             return value
         try:
             converted = json.loads(value, cls=self.decoder)

@@ -126,9 +126,9 @@ class CheckURLMixin:
         """
         Format the URL pattern for display in warning messages.
         """
-        description = "'{}'".format(self)
+        description = f"'{self}'"
         if self.name:
-            description += " [name='{}']".format(self.name)
+            description += f" [name='{self.name}']"
         return description
 
     def _check_pattern_startswith_slash(self):
@@ -208,7 +208,7 @@ class RegexPattern(CheckURLMixin):
             return re.compile(regex)
         except re.error as e:
             raise ImproperlyConfigured(
-                '"%s" is not a valid regular expression: %s' % (regex, e)
+                f'"{regex}" is not a valid regular expression: {e}'
             ) from e
 
     def __str__(self):
@@ -245,8 +245,8 @@ def _route_to_regex(route, is_endpoint=False):
         parameter = match["parameter"]
         if not parameter.isidentifier():
             raise ImproperlyConfigured(
-                "URL route '%s' uses parameter name %r which isn't a valid "
-                "Python identifier." % (original_route, parameter)
+                "URL route '{}' uses parameter name {!r} which isn't a valid "
+                "Python identifier.".format(original_route, parameter)
             )
         raw_converter = match["converter"]
         if raw_converter is None:
@@ -318,7 +318,7 @@ class URLPattern:
         self.name = name
 
     def __repr__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.pattern.describe())
+        return f"<{self.__class__.__name__} {self.pattern.describe()}>"
 
     def check(self):
         warnings = self._check_pattern_name()
@@ -419,7 +419,7 @@ class URLResolver:
             urlconf_repr = "<%s list>" % self.urlconf_name[0].__class__.__name__
         else:
             urlconf_repr = repr(self.urlconf_name)
-        return "<%s %s (%s:%s) %s>" % (
+        return "<{} {} ({}:{}) {}>".format(
             self.__class__.__name__,
             urlconf_repr,
             self.app_name,
@@ -719,7 +719,7 @@ class URLResolver:
 
                 candidate_pat = _prefix.replace("%", "%%") + result
                 if re.search(
-                    "^%s%s" % (re.escape(_prefix), pattern),
+                    f"^{re.escape(_prefix)}{pattern}",
                     candidate_pat % text_candidate_subs,
                 ):
                     # safe characters from `pchar` definition of RFC 3986
@@ -734,14 +734,14 @@ class URLResolver:
         m = getattr(lookup_view, "__module__", None)
         n = getattr(lookup_view, "__name__", None)
         if m is not None and n is not None:
-            lookup_view_s = "%s.%s" % (m, n)
+            lookup_view_s = f"{m}.{n}"
         else:
             lookup_view_s = lookup_view
 
         patterns = [pattern for (_, pattern, _, _) in possibilities]
         if patterns:
             if args:
-                arg_msg = "arguments '%s'" % (args,)
+                arg_msg = f"arguments '{args}'"
             elif kwargs:
                 arg_msg = "keyword arguments '%s'" % kwargs
             else:
@@ -754,7 +754,7 @@ class URLResolver:
             )
         else:
             msg = (
-                "Reverse for '%(view)s' not found. '%(view)s' is not "
-                "a valid view function or pattern name." % {"view": lookup_view_s}
+                "Reverse for '{view}' not found. '{view}' is not "
+                "a valid view function or pattern name.".format(view=lookup_view_s)
             )
         raise NoReverseMatch(msg)

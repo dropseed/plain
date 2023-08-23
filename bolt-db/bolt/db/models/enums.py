@@ -14,9 +14,9 @@ class ChoicesMeta(enum.EnumMeta):
         for key in classdict._member_names:
             value = classdict[key]
             if (
-                isinstance(value, (list, tuple))
+                isinstance(value, list | tuple)
                 and len(value) > 1
-                and isinstance(value[-1], (Promise, str))
+                and isinstance(value[-1], Promise | str)
             ):
                 *value, label = value
                 value = tuple(value)

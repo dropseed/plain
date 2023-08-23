@@ -13,7 +13,7 @@ class TestTemplate(TestCase):
         url = reverse("index")
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         self.assertTemplateUsed(response, "index.html")
         self.assertContains(response, "es-module-shims.js")
 
@@ -26,7 +26,7 @@ class TestTemplate(TestCase):
         response = self.client.get(url)
         # print(response.content.decode())
 
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         self.assertTemplateUsed(response, "index.html")
         self.assertContains(response, "es-module-shims.js")
 

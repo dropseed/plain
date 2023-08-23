@@ -91,7 +91,7 @@ class Extract(TimezoneMixin, Transform):
         field = getattr(copy.lhs, "output_field", None)
         if field is None:
             return copy
-        if not isinstance(field, (DateField, DateTimeField, TimeField, DurationField)):
+        if not isinstance(field, DateField | DateTimeField | TimeField | DurationField):
             raise ValueError(
                 "Extract input expression must be DateField, DateTimeField, "
                 "TimeField, or DurationField."
@@ -284,13 +284,13 @@ class TruncBase(TimezoneMixin, Transform):
         )
         field = copy.lhs.output_field
         # DateTimeField is a subclass of DateField so this works for both.
-        if not isinstance(field, (DateField, TimeField)):
+        if not isinstance(field, DateField | TimeField):
             raise TypeError(
                 "%r isn't a DateField, TimeField, or DateTimeField." % field.name
             )
         # If self.output_field was None, then accessing the field will trigger
         # the resolver to assign it to self.lhs.output_field.
-        if not isinstance(copy.output_field, (DateField, DateTimeField, TimeField)):
+        if not isinstance(copy.output_field, DateField | DateTimeField | TimeField):
             raise ValueError(
                 "output_field must be either DateField, TimeField, or DateTimeField"
             )

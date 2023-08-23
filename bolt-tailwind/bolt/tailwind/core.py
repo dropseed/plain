@@ -1,6 +1,5 @@
 import os
 import platform
-import re
 import subprocess
 import sys
 
@@ -86,7 +85,7 @@ class Tailwind:
         if not os.path.exists(pyproject_path):
             return ""
 
-        with open(pyproject_path, "r") as f:
+        with open(pyproject_path) as f:
             config = tomlkit.load(f)
             return (
                 config.get("tool", {})
@@ -100,7 +99,7 @@ class Tailwind:
             os.path.dirname(self.target_directory), "pyproject.toml"
         )
 
-        with open(pyproject_path, "r") as f:
+        with open(pyproject_path) as f:
             config = tomlkit.load(f)
 
         config.setdefault("tool", {}).setdefault("bolt", {}).setdefault("tailwind", {})[

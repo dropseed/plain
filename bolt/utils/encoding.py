@@ -14,7 +14,7 @@ class BoltUnicodeDecodeError(UnicodeDecodeError):
         super().__init__(*args)
 
     def __str__(self):
-        return "%s. You passed in %r (%s)" % (
+        return "{}. You passed in {!r} ({})".format(
             super().__str__(),
             self.obj,
             type(self.obj),

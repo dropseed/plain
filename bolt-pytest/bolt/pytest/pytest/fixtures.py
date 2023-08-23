@@ -1,7 +1,8 @@
 """All pytest-bolt fixtures"""
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Generator, Iterable, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import pytest
 
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 
     _DjangoDbDatabases = Optional[Union["Literal['__all__']", Iterable[str]]]
     # transaction, reset_sequences, databases, serialized_rollback
-    _DjangoDb = Tuple[bool, bool, _DjangoDbDatabases, bool]
+    _DjangoDb = tuple[bool, bool, _DjangoDbDatabases, bool]
 
 
 __all__ = [
@@ -72,8 +73,6 @@ def _bolt_db_helper(
     bolt_db_setup: None,
     bolt_db_blocker,
 ) -> None:
-    from bolt.runtime import VERSION
-
     marker = request.node.get_closest_marker("bolt_db")
     if marker:
         (
@@ -161,7 +160,7 @@ def validate_bolt_db(marker) -> "_DjangoDb":
 # ############### User visible fixtures ################
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def db(_bolt_db_helper: None) -> None:
     """Require a bolt test database.
 
@@ -178,7 +177,7 @@ def db(_bolt_db_helper: None) -> None:
     # The `_bolt_db_helper` fixture checks if `db` is requested.
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def transactional_db(_bolt_db_helper: None) -> None:
     """Require a bolt test database with transaction support.
 
@@ -194,7 +193,7 @@ def transactional_db(_bolt_db_helper: None) -> None:
     # The `_bolt_db_helper` fixture checks if `transactional_db` is requested.
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def bolt_db_reset_sequences(
     _bolt_db_helper: None,
     transactional_db: None,
@@ -210,7 +209,7 @@ def bolt_db_reset_sequences(
     # is requested.
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def bolt_db_serialized_rollback(
     _bolt_db_helper: None,
     db: None,
@@ -248,7 +247,7 @@ def rf() -> "bolt.test.client.RequestFactory":
 
 
 class SettingsWrapper:
-    _to_restore: List[Any] = []
+    _to_restore: list[Any] = []
 
     def __delattr__(self, attr: str) -> None:
         from bolt.test import override_settings
@@ -327,11 +326,11 @@ def _assert_num_queries(
             pytest.fail(msg)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def bolt_assert_num_queries(pytestconfig):
     return partial(_assert_num_queries, pytestconfig)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def bolt_assert_max_num_queries(pytestconfig):
     return partial(_assert_num_queries, pytestconfig, exact=False)

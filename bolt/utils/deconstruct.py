@@ -1,7 +1,5 @@
 from importlib import import_module
 
-from bolt.utils.version import get_docs_version
-
 
 def deconstructible(*args, path=None):
     """
@@ -33,10 +31,10 @@ def deconstructible(*args, path=None):
             module = import_module(module_name)
             if not hasattr(module, name):
                 raise ValueError(
-                    "Could not find object %s in %s.\n"
+                    "Could not find object {} in {}.\n"
                     "Please note that you cannot serialize things like inner "
                     "classes. Please move the object into the main module "
-                    "body to use migrations." % (name, module_name)
+                    "body to use migrations.".format(name, module_name)
                 )
             return (
                 path

@@ -112,9 +112,9 @@ def bolt_cli():
 
 @bolt_cli.command(
     "legacy",
-    context_settings=dict(
-        ignore_unknown_options=True,
-    ),
+    context_settings={
+        "ignore_unknown_options": True,
+    },
 )
 @click.argument("legacy_args", nargs=-1, type=click.UNPROCESSED)
 def legacy_alias(legacy_args):

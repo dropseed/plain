@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 from bolt.runtime import settings
 

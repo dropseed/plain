@@ -129,7 +129,7 @@ class TransactionTestCase(unittest.TestCase):
             connection = connections[alias]
             for name, operation in cls._disallowed_connection_methods:
                 message = cls._disallowed_database_msg % {
-                    "test": "%s.%s" % (cls.__module__, cls.__qualname__),
+                    "test": f"{cls.__module__}.{cls.__qualname__}",
                     "alias": alias,
                     "operation": operation,
                 }

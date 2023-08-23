@@ -10,7 +10,6 @@ from bolt.signals import setting_changed
 from bolt.signals.dispatch import Signal, receiver
 from bolt.utils import timezone
 from bolt.utils.functional import empty
-from bolt.utils.module_loading import import_string
 
 template_rendered = Signal()
 

@@ -644,10 +644,10 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
         self.rhs = rhs
 
     def __repr__(self):
-        return "<{}: {}>".format(self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self):
-        return "{} {} {}".format(self.lhs, self.connector, self.rhs)
+        return f"{self.lhs} {self.connector} {self.rhs}"
 
     def get_source_expressions(self):
         return [self.lhs, self.rhs]
@@ -695,7 +695,7 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
         rhs = self.rhs.resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
-        if not isinstance(self, (DurationExpression, TemporalSubtraction)):
+        if not isinstance(self, DurationExpression | TemporalSubtraction):
             try:
                 lhs_type = lhs.output_field.get_internal_type()
             except (AttributeError, FieldError):
@@ -812,7 +812,7 @@ class F(Combinable):
         self.name = name
 
     def __repr__(self):
-        return "{}({})".format(self.__class__.__name__, self.name)
+        return f"{self.__class__.__name__}({self.name})"
 
     def resolve_expression(
         self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False
@@ -918,8 +918,8 @@ class Func(SQLiteNumericMixin, Expression):
             extra = ", ".join(
                 str(key) + "=" + str(val) for key, val in sorted(extra.items())
             )
-            return "{}({}, {})".format(self.__class__.__name__, args, extra)
-        return "{}({})".format(self.__class__.__name__, args)
+            return f"{self.__class__.__name__}({args}, {extra})"
+        return f"{self.__class__.__name__}({args})"
 
     def _get_repr_options(self):
         """Return a dict of extra __init__() options to include in the repr."""
@@ -1076,7 +1076,7 @@ class RawSQL(Expression):
         super().__init__(output_field=output_field)
 
     def __repr__(self):
-        return "{}({}, {})".format(self.__class__.__name__, self.sql, self.params)
+        return f"{self.__class__.__name__}({self.sql}, {self.params})"
 
     def as_sql(self, compiler, connection):
         return "(%s)" % self.sql, self.params
@@ -1160,7 +1160,7 @@ class Ref(Expression):
         self.refs, self.source = refs, source
 
     def __repr__(self):
-        return "{}({}, {})".format(self.__class__.__name__, self.refs, self.source)
+        return f"{self.__class__.__name__}({self.refs}, {self.source})"
 
     def get_source_expressions(self):
         return [self.source]
@@ -1268,7 +1268,7 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
         return compiler.compile(self.expression)
 
     def __repr__(self):
-        return "{}({})".format(self.__class__.__name__, self.expression)
+        return f"{self.__class__.__name__}({self.expression})"
 
 
 class NegatedExpression(ExpressionWrapper):
@@ -1318,7 +1318,7 @@ class NegatedExpression(ExpressionWrapper):
             # Avoid double wrapping.
             and expression_supported_in_where_clause(self.expression)
         ):
-            sql = "CASE WHEN {} THEN 1 ELSE 0 END".format(sql)
+            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
         return sql, params
 
 
@@ -1346,10 +1346,10 @@ class When(Expression):
         self.result = self._parse_expressions(then)[0]
 
     def __str__(self):
-        return "WHEN %r THEN %r" % (self.condition, self.result)
+        return f"WHEN {self.condition!r} THEN {self.result!r}"
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     def get_source_expressions(self):
         return [self.condition, self.result]
@@ -1424,13 +1424,13 @@ class Case(SQLiteNumericMixin, Expression):
         self.extra = extra
 
     def __str__(self):
-        return "CASE %s, ELSE %r" % (
+        return "CASE {}, ELSE {!r}".format(
             ", ".join(str(c) for c in self.cases),
             self.default,
         )
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     def get_source_expressions(self):
         return self.cases + [self.default]
@@ -1561,7 +1561,7 @@ class Exists(Subquery):
         # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
         # BY list.
         if not compiler.connection.features.supports_boolean_expr_in_select_clause:
-            sql = "CASE WHEN {} THEN 1 ELSE 0 END".format(sql)
+            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
         return sql, params
 
 
@@ -1669,14 +1669,14 @@ class Window(SQLiteNumericMixin, Expression):
             )
 
         if self.partition_by is not None:
-            if not isinstance(self.partition_by, (tuple, list)):
+            if not isinstance(self.partition_by, tuple | list):
                 self.partition_by = (self.partition_by,)
             self.partition_by = ExpressionList(*self.partition_by)
 
         if self.order_by is not None:
-            if isinstance(self.order_by, (list, tuple)):
+            if isinstance(self.order_by, list | tuple):
                 self.order_by = OrderByList(*self.order_by)
-            elif isinstance(self.order_by, (BaseExpression, str)):
+            elif isinstance(self.order_by, BaseExpression | str):
                 self.order_by = OrderByList(self.order_by)
             else:
                 raise ValueError(
@@ -1747,7 +1747,7 @@ class Window(SQLiteNumericMixin, Expression):
         )
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     def get_group_by_cols(self):
         group_by_cols = []
@@ -1795,7 +1795,7 @@ class WindowFrame(Expression):
         )
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     def get_group_by_cols(self):
         return []

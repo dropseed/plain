@@ -406,9 +406,7 @@ class SQLCompiler:
                 table, col = col.split(".", 1)
                 yield (
                     OrderBy(
-                        RawSQL(
-                            "%s.%s" % (self.quote_name_unless_alias(table), col), []
-                        ),
+                        RawSQL(f"{self.quote_name_unless_alias(table)}.{col}", []),
                         descending=descending,
                     ),
                     False,
@@ -587,19 +585,19 @@ class SQLCompiler:
                     # Wrap in a subquery if wrapping in parentheses isn't
                     # supported.
                     if not features.supports_parentheses_in_compound:
-                        part_sql = "SELECT * FROM ({})".format(part_sql)
+                        part_sql = f"SELECT * FROM ({part_sql})"
                     # Add parentheses when combining with compound query if not
                     # already added for all compound queries.
                     elif (
                         self.query.subquery
                         or not features.supports_slicing_ordering_in_compound
                     ):
-                        part_sql = "({})".format(part_sql)
+                        part_sql = f"({part_sql})"
                 elif (
                     self.query.subquery
                     and features.supports_slicing_ordering_in_compound
                 ):
-                    part_sql = "({})".format(part_sql)
+                    part_sql = f"({part_sql})"
                 parts += ((part_sql, part_args),)
             except EmptyResultSet:
                 # Omit the empty queryset with UNION and with DIFFERENCE if the
@@ -618,7 +616,7 @@ class SQLCompiler:
         sql_parts, args_parts = zip(
             *((braces.format(sql), args) for sql, args in parts)
         )
-        result = [" {} ".format(combinator_sql).join(sql_parts)]
+        result = [f" {combinator_sql} ".join(sql_parts)]
         params = []
         for part in args_parts:
             params.extend(part)
@@ -740,7 +738,7 @@ class SQLCompiler:
             combinator = self.query.combinator
             features = self.connection.features
             if combinator:
-                if not getattr(features, "supports_select_{}".format(combinator)):
+                if not getattr(features, f"supports_select_{combinator}"):
                     raise NotSupportedError(
                         "{} is not supported on this database backend.".format(
                             combinator
@@ -790,7 +788,7 @@ class SQLCompiler:
                 out_cols = []
                 for _, (s_sql, s_params), alias in self.select + extra_select:
                     if alias:
-                        s_sql = "%s AS %s" % (
+                        s_sql = "{} AS {}".format(
                             s_sql,
                             self.connection.ops.quote_name(alias),
                         )
@@ -935,7 +933,7 @@ class SQLCompiler:
                         )
                         sub_selects.append(subselect)
                         sub_params.extend(subparams)
-                return "SELECT %s FROM (%s) subquery" % (
+                return "SELECT {} FROM ({}) subquery".format(
                     ", ".join(sub_selects),
                     " ".join(result),
                 ), tuple(sub_params + params)
@@ -1599,8 +1597,8 @@ class SQLCompiler:
 
         for index, select_col in enumerate(self.query.select):
             lhs_sql, lhs_params = self.compile(select_col)
-            rhs = "%s.%s" % (qn(alias), qn2(columns[index]))
-            self.query.where.add(RawSQL("%s = %s" % (lhs_sql, rhs), lhs_params), AND)
+            rhs = f"{qn(alias)}.{qn2(columns[index])}"
+            self.query.where.add(RawSQL(f"{lhs_sql} = {rhs}", lhs_params), AND)
 
         sql, params = self.as_sql()
         return "EXISTS (%s)" % sql, params
@@ -1668,13 +1666,13 @@ class SQLInsertCompiler(SQLCompiler):
             # doesn't exist yet.
             if value.contains_column_references:
                 raise ValueError(
-                    'Failed to insert expression "%s" on %s. F() expressions '
-                    "can only be used to update, not to insert." % (value, field)
+                    'Failed to insert expression "{}" on {}. F() expressions '
+                    "can only be used to update, not to insert.".format(value, field)
                 )
             if value.contains_aggregate:
                 raise FieldError(
                     "Aggregate functions are not allowed in this query "
-                    "(%s=%r)." % (field.name, value)
+                    "({}={!r}).".format(field.name, value)
                 )
             if value.contains_over_clause:
                 raise FieldError(
@@ -1735,7 +1733,7 @@ class SQLInsertCompiler(SQLCompiler):
         insert_statement = self.connection.ops.insert_statement(
             on_conflict=self.query.on_conflict,
         )
-        result = ["%s %s" % (insert_statement, qn(opts.db_table))]
+        result = [f"{insert_statement} {qn(opts.db_table)}"]
         fields = self.query.fields or [opts.pk]
         result.append("(%s)" % ", ".join(qn(f.column) for f in fields))
 
@@ -1926,12 +1924,12 @@ class SQLUpdateCompiler(SQLCompiler):
                 if val.contains_aggregate:
                     raise FieldError(
                         "Aggregate functions are not allowed in this query "
-                        "(%s=%r)." % (field.name, val)
+                        "({}={!r}).".format(field.name, val)
                     )
                 if val.contains_over_clause:
                     raise FieldError(
                         "Window expressions are not allowed in this query "
-                        "(%s=%r)." % (field.name, val)
+                        "({}={!r}).".format(field.name, val)
                     )
             elif hasattr(val, "prepare_database_save"):
                 if field.remote_field:
@@ -1952,10 +1950,10 @@ class SQLUpdateCompiler(SQLCompiler):
             name = field.column
             if hasattr(val, "as_sql"):
                 sql, params = self.compile(val)
-                values.append("%s = %s" % (qn(name), placeholder % sql))
+                values.append(f"{qn(name)} = {placeholder % sql}")
                 update_params.extend(params)
             elif val is not None:
-                values.append("%s = %s" % (qn(name), placeholder))
+                values.append(f"{qn(name)} = {placeholder}")
                 update_params.append(val)
             else:
                 values.append("%s = NULL" % qn(name))
@@ -2077,7 +2075,7 @@ class SQLAggregateCompiler(SQLCompiler):
             self.using,
             elide_empty=self.elide_empty,
         ).as_sql(with_col_aliases=True)
-        sql = "SELECT %s FROM (%s) subquery" % (sql, inner_query_sql)
+        sql = f"SELECT {sql} FROM ({inner_query_sql}) subquery"
         params += inner_query_params
         return sql, params
 

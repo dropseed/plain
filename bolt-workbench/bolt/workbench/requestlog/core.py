@@ -19,7 +19,7 @@ class RequestLog:
     @classmethod
     def replay_request(cls, name):
         path = os.path.join(cls.storage_path(), f"{name}.json")
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
 
         method = data["request"]["method"]
@@ -57,7 +57,7 @@ class RequestLog:
         sorted_filenames = sorted(filenames, reverse=True)
         for filename in sorted_filenames:
             path = os.path.join(storage_path, filename)
-            with open(path, "r") as f:
+            with open(path) as f:
                 log = json.load(f)
                 log["name"] = os.path.splitext(filename)[0]
                 # Convert timestamp back to datetime

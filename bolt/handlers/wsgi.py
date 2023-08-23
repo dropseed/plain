@@ -3,7 +3,6 @@ from io import IOBase
 from bolt import signals
 from bolt.handlers import base
 from bolt.http import HttpRequest, QueryDict, parse_cookie
-from bolt.runtime import settings
 from bolt.utils.encoding import repercent_broken_unicode
 from bolt.utils.functional import cached_property
 from bolt.utils.regex_helper import _lazy_re_compile
@@ -66,7 +65,9 @@ class WSGIRequest(HttpRequest):
         # be careful to only replace the first slash in the path because of
         # http://test/something and http://test//something being different as
         # stated in RFC 3986.
-        self.path = "%s/%s" % (script_name.rstrip("/"), path_info.replace("/", "", 1))
+        self.path = "{}/{}".format(
+            script_name.rstrip("/"), path_info.replace("/", "", 1)
+        )
         self.META = environ
         self.META["PATH_INFO"] = path_info
         self.META["SCRIPT_NAME"] = script_name

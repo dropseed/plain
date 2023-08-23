@@ -12,7 +12,7 @@ from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
 from bolt.db import close_old_connections
 from bolt.handlers.base import BaseHandler
-from bolt.handlers.wsgi import LimitedStream, WSGIRequest
+from bolt.handlers.wsgi import WSGIRequest
 from bolt.http import HttpHeaders, HttpRequest, QueryDict
 from bolt.json import BoltJSONEncoder
 from bolt.runtime import settings
@@ -278,7 +278,7 @@ def encode_file(boundary, key, file):
     return [
         to_bytes("--%s" % boundary),
         to_bytes(
-            'Content-Disposition: form-data; name="%s"; filename="%s"' % (key, filename)
+            f'Content-Disposition: form-data; name="{key}"; filename="{filename}"'
         ),
         to_bytes("Content-Type: %s" % content_type),
         b"",
@@ -319,7 +319,7 @@ class RequestFactory:
         return {
             "HTTP_COOKIE": "; ".join(
                 sorted(
-                    "%s=%s" % (morsel.key, morsel.coded_value)
+                    f"{morsel.key}={morsel.coded_value}"
                     for morsel in self.cookies.values()
                 )
             ),
@@ -363,7 +363,7 @@ class RequestFactory:
         is application/json.
         """
         should_encode = JSON_CONTENT_TYPE_RE.match(content_type) and isinstance(
-            data, (dict, list, tuple)
+            data, dict | list | tuple
         )
         return json.dumps(data, cls=self.json_encoder) if should_encode else data
 

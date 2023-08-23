@@ -76,7 +76,7 @@ def subclass_exception(name, bases, module, attached_to):
         bases,
         {
             "__module__": module,
-            "__qualname__": "%s.%s" % (attached_to.__qualname__, name),
+            "__qualname__": f"{attached_to.__qualname__}.{name}",
         },
     )
 
@@ -129,9 +129,9 @@ class ModelBase(type):
             if app_config is None:
                 if not abstract:
                     raise RuntimeError(
-                        "Model class %s.%s doesn't declare an explicit "
+                        "Model class {}.{} doesn't declare an explicit "
                         "app_label and isn't in an application in "
-                        "INSTALLED_APPS." % (module, name)
+                        "INSTALLED_APPS.".format(module, name)
                     )
 
             else:
@@ -182,7 +182,7 @@ class ModelBase(type):
         # hasn't been swapped out.
         if is_proxy and base_meta and base_meta.swapped:
             raise TypeError(
-                "%s cannot proxy the swapped model '%s'." % (name, base_meta.swapped)
+                f"{name} cannot proxy the swapped model '{base_meta.swapped}'."
             )
 
         # Add remaining attributes (those with a contribute_to_class() method)
@@ -394,7 +394,7 @@ class ModelBase(type):
 
         # Give the class a docstring -- its definition.
         if cls.__doc__ is None:
-            cls.__doc__ = "%s(%s)" % (
+            cls.__doc__ = "{}({})".format(
                 cls.__name__,
                 ", ".join(f.name for f in opts.fields),
             )
@@ -576,10 +576,10 @@ class Model(AltersData, metaclass=ModelBase):
         return new
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self):
-        return "%s object (%s)" % (self.__class__.__name__, self.pk)
+        return f"{self.__class__.__name__} object ({self.pk})"
 
     def __eq__(self, other):
         if not isinstance(other, Model):
@@ -1067,8 +1067,8 @@ class Model(AltersData, metaclass=ModelBase):
                     if not field.remote_field.multiple:
                         field.remote_field.delete_cached_value(obj)
                     raise ValueError(
-                        "%s() prohibited to prevent data loss due to unsaved "
-                        "related object '%s'." % (operation_name, field.name)
+                        "{}() prohibited to prevent data loss due to unsaved "
+                        "related object '{}'.".format(operation_name, field.name)
                     )
                 elif getattr(self, field.attname) in field.empty_values:
                     # Set related object if it has been saved after an
@@ -1099,8 +1099,8 @@ class Model(AltersData, metaclass=ModelBase):
     def delete(self, using=None, keep_parents=False):
         if self.pk is None:
             raise ValueError(
-                "%s object can't be deleted because its %s attribute is set "
-                "to None." % (self._meta.object_name, self._meta.pk.attname)
+                "{} object can't be deleted because its {} attribute is set "
+                "to None.".format(self._meta.object_name, self._meta.pk.attname)
             )
         using = using or router.db_for_write(self.__class__, instance=self)
         collector = Collector(using=using, origin=self)
@@ -1129,7 +1129,7 @@ class Model(AltersData, metaclass=ModelBase):
             self.__class__._default_manager.using(self._state.db)
             .filter(**kwargs)
             .filter(q)
-            .order_by("%s%s" % (order, field.name), "%spk" % order)
+            .order_by(f"{order}{field.name}", "%spk" % order)
         )
         try:
             return qs[0]
@@ -1329,7 +1329,7 @@ class Model(AltersData, metaclass=ModelBase):
                 lookup_kwargs["%s__month" % unique_for] = date.month
                 lookup_kwargs["%s__year" % unique_for] = date.year
             else:
-                lookup_kwargs["%s__%s" % (unique_for, lookup_type)] = getattr(
+                lookup_kwargs[f"{unique_for}__{lookup_type}"] = getattr(
                     date, lookup_type
                 )
             lookup_kwargs[field] = getattr(self, field)
@@ -1744,8 +1744,10 @@ class Model(AltersData, metaclass=ModelBase):
             if clash and not id_conflict:
                 errors.append(
                     checks.Error(
-                        "The field '%s' clashes with the field '%s' "
-                        "from model '%s'." % (f.name, clash.name, clash.model._meta),
+                        "The field '{}' clashes with the field '{}' "
+                        "from model '{}'.".format(
+                            f.name, clash.name, clash.model._meta
+                        ),
                         obj=f,
                         id="models.E006",
                     )
@@ -1768,8 +1770,8 @@ class Model(AltersData, metaclass=ModelBase):
             if column_name and column_name in used_column_names:
                 errors.append(
                     checks.Error(
-                        "Field '%s' has column name '%s' that is used by "
-                        "another field." % (f.name, column_name),
+                        "Field '{}' has column name '{}' that is used by "
+                        "another field.".format(f.name, column_name),
                         hint="Specify a 'db_column' for the field.",
                         obj=cls,
                         id="models.E007",
@@ -1843,7 +1845,7 @@ class Model(AltersData, metaclass=ModelBase):
     @classmethod
     def _check_index_together(cls):
         """Check the value of "index_together" option."""
-        if not isinstance(cls._meta.index_together, (tuple, list)):
+        if not isinstance(cls._meta.index_together, tuple | list):
             return [
                 checks.Error(
                     "'index_together' must be a list or tuple.",
@@ -1853,7 +1855,7 @@ class Model(AltersData, metaclass=ModelBase):
             ]
 
         elif any(
-            not isinstance(fields, (tuple, list)) for fields in cls._meta.index_together
+            not isinstance(fields, tuple | list) for fields in cls._meta.index_together
         ):
             return [
                 checks.Error(
@@ -1872,7 +1874,7 @@ class Model(AltersData, metaclass=ModelBase):
     @classmethod
     def _check_unique_together(cls):
         """Check the value of "unique_together" option."""
-        if not isinstance(cls._meta.unique_together, (tuple, list)):
+        if not isinstance(cls._meta.unique_together, tuple | list):
             return [
                 checks.Error(
                     "'unique_together' must be a list or tuple.",
@@ -1882,8 +1884,7 @@ class Model(AltersData, metaclass=ModelBase):
             ]
 
         elif any(
-            not isinstance(fields, (tuple, list))
-            for fields in cls._meta.unique_together
+            not isinstance(fields, tuple | list) for fields in cls._meta.unique_together
         ):
             return [
                 checks.Error(
@@ -2036,8 +2037,8 @@ class Model(AltersData, metaclass=ModelBase):
                 elif field not in cls._meta.local_fields:
                     errors.append(
                         checks.Error(
-                            "'%s' refers to field '%s' which is not local to model "
-                            "'%s'." % (option, field_name, cls._meta.object_name),
+                            "'{}' refers to field '{}' which is not local to model "
+                            "'{}'.".format(option, field_name, cls._meta.object_name),
                             hint="This issue may be caused by multi-table inheritance.",
                             obj=cls,
                             id="models.E016",
@@ -2063,7 +2064,7 @@ class Model(AltersData, metaclass=ModelBase):
         if cls._meta.order_with_respect_to or not cls._meta.ordering:
             return []
 
-        if not isinstance(cls._meta.ordering, (list, tuple)):
+        if not isinstance(cls._meta.ordering, list | tuple):
             return [
                 checks.Error(
                     "'ordering' must be a tuple or list (even if you want to order by "

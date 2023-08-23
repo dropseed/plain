@@ -6,7 +6,6 @@ from bolt import signing
 from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.crypto import get_random_string
-from bolt.utils.module_loading import import_string
 
 # session_key should not be case sensitive because some backends can store it
 # on case insensitive file systems.
@@ -201,7 +200,7 @@ class SessionBase:
 
         if not expiry:  # Checks both None and 0 cases
             return self.get_session_cookie_age()
-        if not isinstance(expiry, (datetime, str)):
+        if not isinstance(expiry, datetime | str):
             return expiry
         if isinstance(expiry, str):
             expiry = datetime.fromisoformat(expiry)

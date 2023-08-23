@@ -119,7 +119,7 @@ class Paginator:
                     self.object_list.model, self.object_list.__class__.__name__
                 )
                 if hasattr(self.object_list, "model")
-                else "{!r}".format(self.object_list)
+                else f"{self.object_list!r}"
             )
             warnings.warn(
                 "Pagination may yield inconsistent results with an unordered "
@@ -167,13 +167,13 @@ class Page(collections.abc.Sequence):
         self.paginator = paginator
 
     def __repr__(self):
-        return "<Page %s of %s>" % (self.number, self.paginator.num_pages)
+        return f"<Page {self.number} of {self.paginator.num_pages}>"
 
     def __len__(self):
         return len(self.object_list)
 
     def __getitem__(self, index):
-        if not isinstance(index, (int, slice)):
+        if not isinstance(index, int | slice):
             raise TypeError(
                 "Page indices must be integers or slices, not %s."
                 % type(index).__name__

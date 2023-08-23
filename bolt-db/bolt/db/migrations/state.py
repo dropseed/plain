@@ -16,7 +16,6 @@ from bolt.exceptions import FieldDoesNotExist
 from bolt.runtime import settings
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string
-from bolt.utils.version import get_docs_version
 
 from .exceptions import InvalidBasesError
 from .utils import resolve_relation
@@ -940,7 +939,7 @@ class ModelState:
             )
         except LookupError:
             raise InvalidBasesError(
-                "Cannot resolve one or more bases from %r" % (self.bases,)
+                f"Cannot resolve one or more bases from {self.bases!r}"
             )
         # Clone fields for the body, add other bits.
         body = {name: field.clone() for name, field in self.fields.items()}
@@ -956,16 +955,16 @@ class ModelState:
         for index in self.options["indexes"]:
             if index.name == name:
                 return index
-        raise ValueError("No index named %s on model %s" % (name, self.name))
+        raise ValueError(f"No index named {name} on model {self.name}")
 
     def get_constraint_by_name(self, name):
         for constraint in self.options["constraints"]:
             if constraint.name == name:
                 return constraint
-        raise ValueError("No constraint named %s on model %s" % (name, self.name))
+        raise ValueError(f"No constraint named {name} on model {self.name}")
 
     def __repr__(self):
-        return "<%s: '%s.%s'>" % (self.__class__.__name__, self.app_label, self.name)
+        return f"<{self.__class__.__name__}: '{self.app_label}.{self.name}'>"
 
     def __eq__(self, other):
         return (

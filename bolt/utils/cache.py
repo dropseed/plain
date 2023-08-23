@@ -51,7 +51,7 @@ def patch_cache_control(response, **kwargs):
         if t[1] is True:
             return t[0]
         else:
-            return "%s=%s" % (t[0], t[1])
+            return f"{t[0]}={t[1]}"
 
     cc = defaultdict(set)
     if response.get("Cache-Control"):

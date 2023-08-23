@@ -5,7 +5,6 @@ from importlib import import_module, reload
 from bolt.apps import apps
 from bolt.db.migrations.graph import MigrationGraph
 from bolt.db.migrations.recorder import MigrationRecorder
-from bolt.runtime import settings
 
 from .exceptions import (
     AmbiguityError,
@@ -69,7 +68,7 @@ class MigrationLoader:
         if app.migrations_module is None:
             return None, True
         explicit = app.migrations_module != MIGRATIONS_MODULE_NAME
-        return "%s.%s" % (app.name, app.migrations_module), explicit
+        return f"{app.name}.{app.migrations_module}", explicit
 
     def load_disk(self):
         """Load the migrations from all INSTALLED_APPS from disk."""
@@ -116,7 +115,7 @@ class MigrationLoader:
             }
             # Load migrations
             for migration_name in migration_names:
-                migration_path = "%s.%s" % (module_name, migration_name)
+                migration_path = f"{module_name}.{migration_name}"
                 try:
                     migration_module = import_module(migration_path)
                 except ImportError as e:
@@ -292,7 +291,7 @@ class MigrationLoader:
                     candidate in self.graph.nodes for candidate in candidates
                 )
                 if not is_replaced:
-                    tries = ", ".join("%s.%s" % c for c in candidates)
+                    tries = ", ".join("{}.{}".format(*c) for c in candidates)
                     raise NodeNotFoundError(
                         "Migration {0} depends on nonexistent node ('{1}', '{2}'). "
                         "Bolt tried to replace migration {1}.{2} with any of [{3}] "

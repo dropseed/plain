@@ -159,7 +159,7 @@ class Command(BaseCommand):
         def print_deps(node):
             out = []
             for parent in sorted(node.parents):
-                out.append("%s.%s" % parent.key)
+                out.append("{}.{}".format(*parent.key))
             if out:
                 return " ... (%s)" % ", ".join(out)
             return ""
@@ -169,8 +169,8 @@ class Command(BaseCommand):
             if self.verbosity >= 2:
                 deps = print_deps(node)
             if node.key in loader.applied_migrations:
-                self.stdout.write("[X]  %s.%s%s" % (node.key[0], node.key[1], deps))
+                self.stdout.write(f"[X]  {node.key[0]}.{node.key[1]}{deps}")
             else:
-                self.stdout.write("[ ]  %s.%s%s" % (node.key[0], node.key[1], deps))
+                self.stdout.write(f"[ ]  {node.key[0]}.{node.key[1]}{deps}")
         if not plan:
             self.stdout.write("(no migrations)", self.style.ERROR)

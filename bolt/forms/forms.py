@@ -88,12 +88,12 @@ class BaseForm:
             is_valid = "Unknown"
         else:
             is_valid = self.is_bound and not self._errors
-        return "<%(cls)s bound=%(bound)s, valid=%(valid)s, fields=(%(fields)s)>" % {
-            "cls": self.__class__.__name__,
-            "bound": self.is_bound,
-            "valid": is_valid,
-            "fields": ";".join(self.fields),
-        }
+        return "<{cls} bound={bound}, valid={valid}, fields=({fields})>".format(
+            cls=self.__class__.__name__,
+            bound=self.is_bound,
+            valid=is_valid,
+            fields=";".join(self.fields),
+        )
 
     def _bound_items(self):
         """Yield (name, bf) pairs, where bf is a BoundField object."""
@@ -140,7 +140,7 @@ class BaseForm:
 
         Subclasses may wish to override.
         """
-        return "%s-%s" % (self.prefix, field_name) if self.prefix else field_name
+        return f"{self.prefix}-{field_name}" if self.prefix else field_name
 
     @property
     def non_field_errors(self):
@@ -299,7 +299,7 @@ class BaseForm:
         # If this is an auto-generated default date, nix the microseconds
         # for standardized handling. See #22502.
         if (
-            isinstance(value, (datetime.datetime, datetime.time))
+            isinstance(value, datetime.datetime | datetime.time)
             and not field.widget.supports_microseconds
         ):
             value = value.replace(microsecond=0)

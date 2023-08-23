@@ -6,9 +6,9 @@ import click
 
 
 @click.command(
-    context_settings=dict(
-        ignore_unknown_options=True,
-    )
+    context_settings={
+        "ignore_unknown_options": True,
+    }
 )
 @click.argument("pytest_args", nargs=-1, type=click.UNPROCESSED)
 def cli(pytest_args):

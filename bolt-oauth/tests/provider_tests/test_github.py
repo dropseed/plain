@@ -19,7 +19,7 @@ class DummyGitHubOAuthProvider(GitHubOAuthProvider):
         )
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_github_provider(client, monkeypatch, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "github": {
@@ -65,4 +65,4 @@ def test_github_provider(client, monkeypatch, settings):
     assert connections[0].provider_user_id == "99"
     assert connections[0].access_token == "gho_key"
     assert connections[0].refresh_token == ""
-    assert connections[0].access_token_expires_at == None
+    assert connections[0].access_token_expires_at is None

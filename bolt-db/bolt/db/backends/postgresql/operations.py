@@ -372,7 +372,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             lhs_sql, lhs_params = lhs
             rhs_sql, rhs_params = rhs
             params = (*lhs_params, *rhs_params)
-            return "(interval '1 day' * (%s - %s))" % (lhs_sql, rhs_sql), params
+            return f"(interval '1 day' * ({lhs_sql} - {rhs_sql}))", params
         return super().subtract_temporals(internal_type, lhs, rhs)
 
     def explain_query_prefix(self, format=None, **options):
@@ -391,14 +391,14 @@ class DatabaseOperations(BaseDatabaseOperations):
         if format:
             extra["FORMAT"] = format
         if extra:
-            prefix += " (%s)" % ", ".join("%s %s" % i for i in extra.items())
+            prefix += " (%s)" % ", ".join("{} {}".format(*i) for i in extra.items())
         return prefix
 
     def on_conflict_suffix_sql(self, fields, on_conflict, update_fields, unique_fields):
         if on_conflict == OnConflict.IGNORE:
             return "ON CONFLICT DO NOTHING"
         if on_conflict == OnConflict.UPDATE:
-            return "ON CONFLICT(%s) DO UPDATE SET %s" % (
+            return "ON CONFLICT({}) DO UPDATE SET {}".format(
                 ", ".join(map(self.quote_name, unique_fields)),
                 ", ".join(
                     [

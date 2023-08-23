@@ -13,7 +13,7 @@ def _check_for_duplicates(arg_name, objs):
     for val in objs:
         if val in used_vals:
             raise ValueError(
-                "Found duplicate value %s in CreateModel %s argument." % (val, arg_name)
+                f"Found duplicate value {val} in CreateModel {arg_name} argument."
             )
         used_vals.add(val)
 
@@ -101,7 +101,7 @@ class CreateModel(ModelOperation):
             schema_editor.delete_model(model)
 
     def describe(self):
-        return "Create %smodel %s" % (
+        return "Create {}model {}".format(
             "proxy " if self.options.get("proxy", False) else "",
             self.name,
         )
@@ -120,7 +120,7 @@ class CreateModel(ModelOperation):
         for base in self.bases:
             if (
                 base is not models.Model
-                and isinstance(base, (models.base.ModelBase, str))
+                and isinstance(base, models.base.ModelBase | str)
                 and resolve_relation(base, app_label) == reference_model_tuple
             ):
                 return True
@@ -436,11 +436,11 @@ class RenameModel(ModelOperation):
         )
 
     def describe(self):
-        return "Rename model %s to %s" % (self.old_name, self.new_name)
+        return f"Rename model {self.old_name} to {self.new_name}"
 
     @property
     def migration_name_fragment(self):
-        return "rename_%s_%s" % (self.old_name_lower, self.new_name_lower)
+        return f"rename_{self.old_name_lower}_{self.new_name_lower}"
 
     def reduce(self, operation, app_label):
         if (
@@ -463,7 +463,7 @@ class RenameModel(ModelOperation):
 class ModelOptionOperation(ModelOperation):
     def reduce(self, operation, app_label):
         if (
-            isinstance(operation, (self.__class__, DeleteModel))
+            isinstance(operation, self.__class__ | DeleteModel)
             and self.name_lower == operation.name_lower
         ):
             return [operation]
@@ -511,7 +511,7 @@ class AlterModelTable(ModelOptionOperation):
         return self.database_forwards(app_label, schema_editor, from_state, to_state)
 
     def describe(self):
-        return "Rename table for %s to %s" % (
+        return "Rename table for {} to {}".format(
             self.name,
             self.table if self.table is not None else "(default)",
         )
@@ -607,7 +607,7 @@ class AlterTogetherOptionOperation(ModelOptionOperation):
         )
 
     def describe(self):
-        return "Alter %s for %s (%s constraint(s))" % (
+        return "Alter {} for {} ({} constraint(s))".format(
             self.option_name,
             self.name,
             len(self.option_value or ""),
@@ -615,7 +615,7 @@ class AlterTogetherOptionOperation(ModelOptionOperation):
 
     @property
     def migration_name_fragment(self):
-        return "alter_%s_%s" % (self.name_lower, self.option_name)
+        return f"alter_{self.name_lower}_{self.option_name}"
 
     def can_reduce_through(self, operation, app_label):
         return super().can_reduce_through(operation, app_label) or (
@@ -706,7 +706,7 @@ class AlterOrderWithRespectTo(ModelOptionOperation):
         )
 
     def describe(self):
-        return "Set order_with_respect_to on %s to %s" % (
+        return "Set order_with_respect_to on {} to {}".format(
             self.name,
             self.order_with_respect_to,
         )
@@ -844,12 +844,12 @@ class AddIndex(IndexOperation):
 
     def describe(self):
         if self.index.expressions:
-            return "Create index %s on %s on model %s" % (
+            return "Create index {} on {} on model {}".format(
                 self.index.name,
                 ", ".join([str(expression) for expression in self.index.expressions]),
                 self.model_name,
             )
-        return "Create index %s on field(s) %s of model %s" % (
+        return "Create index {} on field(s) {} of model {}".format(
             self.index.name,
             ", ".join(self.index.fields),
             self.model_name,
@@ -857,7 +857,7 @@ class AddIndex(IndexOperation):
 
     @property
     def migration_name_fragment(self):
-        return "%s_%s" % (self.model_name_lower, self.index.name.lower())
+        return f"{self.model_name_lower}_{self.index.name.lower()}"
 
 
 class RemoveIndex(IndexOperation):
@@ -896,11 +896,11 @@ class RemoveIndex(IndexOperation):
         )
 
     def describe(self):
-        return "Remove index %s from %s" % (self.name, self.model_name)
+        return f"Remove index {self.name} from {self.model_name}"
 
     @property
     def migration_name_fragment(self):
-        return "remove_%s_%s" % (self.model_name_lower, self.name.lower())
+        return f"remove_{self.model_name_lower}_{self.name.lower()}"
 
 
 class RenameIndex(IndexOperation):
@@ -1027,8 +1027,8 @@ class RenameIndex(IndexOperation):
     @property
     def migration_name_fragment(self):
         if self.old_name:
-            return "rename_%s_%s" % (self.old_name_lower, self.new_name_lower)
-        return "rename_%s_%s_%s" % (
+            return f"rename_{self.old_name_lower}_{self.new_name_lower}"
+        return "rename_{}_{}_{}".format(
             self.model_name_lower,
             "_".join(self.old_fields),
             self.new_name_lower,
@@ -1083,14 +1083,14 @@ class AddConstraint(IndexOperation):
         )
 
     def describe(self):
-        return "Create constraint %s on model %s" % (
+        return "Create constraint {} on model {}".format(
             self.constraint.name,
             self.model_name,
         )
 
     @property
     def migration_name_fragment(self):
-        return "%s_%s" % (self.model_name_lower, self.constraint.name.lower())
+        return f"{self.model_name_lower}_{self.constraint.name.lower()}"
 
 
 class RemoveConstraint(IndexOperation):
@@ -1128,8 +1128,8 @@ class RemoveConstraint(IndexOperation):
         )
 
     def describe(self):
-        return "Remove constraint %s from model %s" % (self.name, self.model_name)
+        return f"Remove constraint {self.name} from model {self.model_name}"
 
     @property
     def migration_name_fragment(self):
-        return "remove_%s_%s" % (self.model_name_lower, self.name.lower())
+        return f"remove_{self.model_name_lower}_{self.name.lower()}"

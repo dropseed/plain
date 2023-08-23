@@ -822,9 +822,9 @@ class BaseDatabaseSchemaEditor:
             return
         elif old_type is None or new_type is None:
             raise ValueError(
-                "Cannot alter field %s into %s - they are not compatible types "
+                "Cannot alter field {} into {} - they are not compatible types "
                 "(you cannot alter to or from M2M fields, or add or remove "
-                "through= on M2M fields)" % (old_field, new_field)
+                "through= on M2M fields)".format(old_field, new_field)
             )
 
         self._alter_field(
@@ -1364,20 +1364,22 @@ class BaseDatabaseSchemaEditor:
         and a unique digest and suffix.
         """
         _, table_name = split_identifier(table_name)
-        hash_suffix_part = "%s%s" % (
+        hash_suffix_part = "{}{}".format(
             names_digest(table_name, *column_names, length=8),
             suffix,
         )
         max_length = self.connection.ops.max_name_length() or 200
         # If everything fits into max_length, use that name.
-        index_name = "%s_%s_%s" % (table_name, "_".join(column_names), hash_suffix_part)
+        index_name = "{}_{}_{}".format(
+            table_name, "_".join(column_names), hash_suffix_part
+        )
         if len(index_name) <= max_length:
             return index_name
         # Shorten a long suffix.
         if len(hash_suffix_part) > max_length / 3:
             hash_suffix_part = hash_suffix_part[: max_length // 3]
         other_length = (max_length - len(hash_suffix_part)) // 2 - 1
-        index_name = "%s_%s_%s" % (
+        index_name = "{}_{}_{}".format(
             table_name[:other_length],
             "_".join(column_names)[:other_length],
             hash_suffix_part,

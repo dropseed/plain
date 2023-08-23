@@ -85,7 +85,7 @@ class Importmap:
             logger.warning(f"{self.config_filename} not found")
             return {}
 
-        with open(self.config_filename, "r") as f:
+        with open(self.config_filename) as f:
             # why doesn't tomli.load(f) work?
             toml_data = tomli.loads(f.read())
 
@@ -95,7 +95,7 @@ class Importmap:
         if not os.path.exists(self.lock_filename):
             return {}
 
-        with open(self.lock_filename, "r") as f:
+        with open(self.lock_filename) as f:
             json_data = json.load(f)
 
         return LockfileSchema().load(json_data)

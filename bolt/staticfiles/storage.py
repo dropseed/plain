@@ -114,7 +114,7 @@ class HashedFilesMixin:
         self.hashed_files = {}
         for extension, patterns in self.patterns:
             for pattern in patterns:
-                if isinstance(pattern, (tuple, list)):
+                if isinstance(pattern, tuple | list):
                     pattern, template = pattern
                 else:
                     template = self.default_template
@@ -142,7 +142,7 @@ class HashedFilesMixin:
         if opened:
             if not self.exists(filename):
                 raise ValueError(
-                    "The file '%s' could not be found with %r." % (filename, self)
+                    f"The file '{filename}' could not be found with {self!r}."
                 )
             try:
                 content = self.open(filename)
@@ -157,7 +157,7 @@ class HashedFilesMixin:
         path, filename = os.path.split(clean_name)
         root, ext = os.path.splitext(filename)
         file_hash = (".%s" % file_hash) if file_hash else ""
-        hashed_name = os.path.join(path, "%s%s%s" % (root, file_hash, ext))
+        hashed_name = os.path.join(path, f"{root}{file_hash}{ext}")
         unparsed_name = list(parsed_name)
         unparsed_name[2] = hashed_name
         # Special casing for a @font-face hack, like url(myfont.eot?#iefix")
@@ -447,7 +447,7 @@ class HashedFilesMixin:
                 intermediate_name = cache_name
         # If the cache name can't be determined after the max number of passes,
         # the intermediate files on disk may be corrupt; avoid an infinite loop.
-        raise ValueError("The name '%s' could not be hashed with %r." % (name, self))
+        raise ValueError(f"The name '{name}' could not be hashed with {self!r}.")
 
 
 class ManifestFilesMixin(HashedFilesMixin):

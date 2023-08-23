@@ -73,7 +73,7 @@ class MultiValueDict(dict):
         super().__init__(key_to_list_mapping)
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, super().__repr__())
+        return f"<{self.__class__.__name__}: {super().__repr__()}>"
 
     def __getitem__(self, key):
         """
@@ -319,7 +319,7 @@ class CaseInsensitiveMapping(Mapping):
         return (original_key for original_key, value in self._store.values())
 
     def __repr__(self):
-        return repr({key: value for key, value in self._store.values()})
+        return repr(dict(self._store.values()))
 
     def copy(self):
         return self
@@ -329,7 +329,7 @@ class CaseInsensitiveMapping(Mapping):
         # Explicitly test for dict first as the common case for performance,
         # avoiding abc's __instancecheck__ and _abc_instancecheck for the
         # general Mapping case.
-        if isinstance(data, (dict, Mapping)):
+        if isinstance(data, dict | Mapping):
             yield from data.items()
             return
         for i, elem in enumerate(data):

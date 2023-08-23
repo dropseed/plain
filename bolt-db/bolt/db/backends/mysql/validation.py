@@ -1,6 +1,5 @@
 from bolt import checks
 from bolt.db.backends.base.validation import BaseDatabaseValidation
-from bolt.utils.version import get_docs_version
 
 
 class DatabaseValidation(BaseDatabaseValidation):

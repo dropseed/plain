@@ -27,7 +27,6 @@ from bolt.utils.duration import duration_microseconds, duration_string
 from bolt.utils.functional import Promise, cached_property
 from bolt.utils.ipv6 import clean_ipv6_address
 from bolt.utils.itercompat import is_iterable
-from bolt.utils.text import capfirst
 
 __all__ = [
     "AutoField",
@@ -164,7 +163,7 @@ class Field(RegisterLookupMixin):
 
     # Generic field type description, usually overridden by subclasses
     def _description(self):
-        return "Field of type: %(field_type)s" % {"field_type": self.__class__.__name__}
+        return f"Field of type: {self.__class__.__name__}"
 
     description = property(_description)
 
@@ -240,14 +239,14 @@ class Field(RegisterLookupMixin):
         if not hasattr(self, "model"):
             return super().__str__()
         model = self.model
-        return "%s.%s" % (model._meta.label, self.name)
+        return f"{model._meta.label}.{self.name}"
 
     def __repr__(self):
         """Display the module, class, and name of the field."""
-        path = "%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)
+        path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         name = getattr(self, "name", None)
         if name is not None:
-            return "<%s: %s>" % (path, name)
+            return f"<{path}: {name}>"
         return "<%s>" % path
 
     def check(self, **kwargs):
@@ -296,7 +295,7 @@ class Field(RegisterLookupMixin):
 
     @classmethod
     def _choices_is_value(cls, value):
-        return isinstance(value, (str, Promise)) or not is_iterable(value)
+        return isinstance(value, str | Promise) or not is_iterable(value)
 
     def _check_choices(self):
         if not self.choices:
@@ -584,7 +583,7 @@ class Field(RegisterLookupMixin):
                 if value is not default:
                     keywords[name] = value
         # Work out path - we shorten it for known Bolt core fields
-        path = "%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)
+        path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         if path.startswith("bolt.db.models.fields.related"):
             path = path.replace("bolt.db.models.fields.related", "bolt.db.models")
         elif path.startswith("bolt.db.models.fields.files"):
@@ -741,7 +740,7 @@ class Field(RegisterLookupMixin):
 
         if self.choices is not None and value not in self.empty_values:
             for option_key, option_value in self.choices:
-                if isinstance(option_value, (list, tuple)):
+                if isinstance(option_value, list | tuple):
                     # This is an optgroup, so look inside the group for
                     # options.
                     for optgroup_key, optgroup_value in option_value:
@@ -1017,7 +1016,7 @@ class Field(RegisterLookupMixin):
             return []
         flat = []
         for choice, value in self.choices:
-            if isinstance(value, (list, tuple)):
+            if isinstance(value, list | tuple):
                 flat.extend(value)
             else:
                 flat.append((choice, value))
@@ -1410,7 +1409,7 @@ class DateTimeField(DateField):
             return []
 
         value = self.default
-        if isinstance(value, (datetime.datetime, datetime.date)):
+        if isinstance(value, datetime.datetime | datetime.date):
             return self._check_if_value_fixed(value)
         # No explicit date / datetime value -- no checks necessary.
         return []
@@ -1487,12 +1486,12 @@ class DateTimeField(DateField):
             # time. This won't work during DST change, but we can't do much
             # about it, so we let the exceptions percolate up the call stack.
             try:
-                name = "%s.%s" % (self.model.__name__, self.name)
+                name = f"{self.model.__name__}.{self.name}"
             except AttributeError:
                 name = "(unbound)"
             warnings.warn(
-                "DateTimeField %s received a naive datetime (%s)"
-                " while time zone support is active." % (name, value),
+                "DateTimeField {} received a naive datetime ({})"
+                " while time zone support is active.".format(name, value),
                 RuntimeWarning,
             )
             default_timezone = timezone.get_default_timezone()
@@ -1805,7 +1804,7 @@ class FloatField(Field):
             return float(value)
         except (TypeError, ValueError) as e:
             raise e.__class__(
-                "Field '%s' expected a number but got %r." % (self.name, value),
+                f"Field '{self.name}' expected a number but got {value!r}.",
             ) from e
 
     def get_internal_type(self):
@@ -1893,7 +1892,7 @@ class IntegerField(Field):
             return int(value)
         except (TypeError, ValueError) as e:
             raise e.__class__(
-                "Field '%s' expected a number but got %r." % (self.name, value),
+                f"Field '{self.name}' expected a number but got {value!r}.",
             ) from e
 
     def get_db_prep_value(self, value, connection, prepared=False):

@@ -1,8 +1,6 @@
-import inspect
-
 from bolt.runtime import settings
 
-from .. import Error, Tags, Warning, register
+from .. import Tags, Warning, register
 
 W003 = Warning(
     "You don't appear to be using Bolt's built-in "

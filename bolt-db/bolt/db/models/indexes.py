@@ -28,13 +28,13 @@ class Index:
     ):
         if opclasses and not name:
             raise ValueError("An index must be named to use opclasses.")
-        if not isinstance(condition, (NoneType, Q)):
+        if not isinstance(condition, NoneType | Q):
             raise ValueError("Index.condition must be a Q instance.")
         if condition and not name:
             raise ValueError("An index must be named to use condition.")
-        if not isinstance(fields, (list, tuple)):
+        if not isinstance(fields, list | tuple):
             raise ValueError("Index.fields must be a list or tuple.")
-        if not isinstance(opclasses, (list, tuple)):
+        if not isinstance(opclasses, list | tuple):
             raise ValueError("Index.opclasses must be a list or tuple.")
         if not expressions and not fields:
             raise ValueError(
@@ -60,7 +60,7 @@ class Index:
             raise ValueError("Index.fields must contain only strings with field names.")
         if include and not name:
             raise ValueError("A covering index must be named.")
-        if not isinstance(include, (NoneType, list, tuple)):
+        if not isinstance(include, NoneType | list | tuple):
             raise ValueError("Index.include must be a list or tuple.")
         self.fields = list(fields)
         # A list of 2-tuple with the field name and ordering ('' or 'DESC').
@@ -135,7 +135,7 @@ class Index:
         return schema_editor._delete_index_sql(model, self.name, **kwargs)
 
     def deconstruct(self):
-        path = "%s.%s" % (self.__class__.__module__, self.__class__.__name__)
+        path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         path = path.replace("bolt.db.models.indexes", "bolt.db.models")
         kwargs = {"name": self.name}
         if self.fields:
@@ -177,10 +177,10 @@ class Index:
         # The length of the parts of the name is based on the default max
         # length of 30 characters.
         hash_data = [table_name] + column_names_with_order + [self.suffix]
-        self.name = "%s_%s_%s" % (
+        self.name = "{}_{}_{}".format(
             table_name[:11],
             column_names[0][:7],
-            "%s_%s" % (names_digest(*hash_data, length=6), self.suffix),
+            "{}_{}".format(names_digest(*hash_data, length=6), self.suffix),
         )
         if len(self.name) > self.max_name_length:
             raise ValueError(
@@ -191,7 +191,7 @@ class Index:
             self.name = "D%s" % self.name[1:]
 
     def __repr__(self):
-        return "<%s:%s%s%s%s%s%s%s>" % (
+        return "<{}:{}{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
             "" if not self.fields else " fields=%s" % repr(self.fields),
             "" if not self.expressions else " expressions=%s" % repr(self.expressions),

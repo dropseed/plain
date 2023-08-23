@@ -30,9 +30,9 @@ __M = r"(?P<mon>\w{3})"
 __Y = r"(?P<year>[0-9]{4})"
 __Y2 = r"(?P<year>[0-9]{2})"
 __T = r"(?P<hour>[0-9]{2}):(?P<min>[0-9]{2}):(?P<sec>[0-9]{2})"
-RFC1123_DATE = _lazy_re_compile(r"^\w{3}, %s %s %s %s GMT$" % (__D, __M, __Y, __T))
-RFC850_DATE = _lazy_re_compile(r"^\w{6,9}, %s-%s-%s %s GMT$" % (__D, __M, __Y2, __T))
-ASCTIME_DATE = _lazy_re_compile(r"^\w{3} %s %s %s %s$" % (__M, __D2, __T, __Y))
+RFC1123_DATE = _lazy_re_compile(rf"^\w{{3}}, {__D} {__M} {__Y} {__T} GMT$")
+RFC850_DATE = _lazy_re_compile(rf"^\w{{6,9}}, {__D}-{__M}-{__Y2} {__T} GMT$")
+ASCTIME_DATE = _lazy_re_compile(rf"^\w{{3}} {__M} {__D2} {__T} {__Y}$")
 
 RFC3986_GENDELIMS = ":/?#[]@"
 RFC3986_SUBDELIMS = "!$&'()*+,;="
@@ -54,7 +54,7 @@ def urlencode(query, doseq=False):
                 "Cannot encode None for key '%s' in a query string. Did you "
                 "mean to pass an empty string or omit the value?" % key
             )
-        elif not doseq or isinstance(value, (str, bytes)):
+        elif not doseq or isinstance(value, str | bytes):
             query_val = value
         else:
             try:
@@ -366,7 +366,7 @@ def content_disposition_header(as_attachment, filename):
                 filename.replace("\\", "\\\\").replace('"', r"\"")
             )
         except UnicodeEncodeError:
-            file_expr = "filename*=utf-8''{}".format(quote(filename))
+            file_expr = f"filename*=utf-8''{quote(filename)}"
         return f"{disposition}; {file_expr}"
     elif as_attachment:
         return "attachment"

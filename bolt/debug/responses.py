@@ -19,7 +19,7 @@ from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.encoding import force_str
 from bolt.utils.module_loading import import_string
 from bolt.utils.regex_helper import _lazy_re_compile
-from bolt.utils.version import PY311, get_docs_version
+from bolt.utils.version import PY311
 
 
 # Minimal Jinja templates engine to render the error templates
@@ -232,7 +232,7 @@ class SafeExceptionReporterFilter:
             # MultiValueDicts will have a return value.
             is_multivalue_dict = isinstance(value, MultiValueDict)
         except Exception as e:
-            return "{!r} while evaluating {!r}".format(e, value)
+            return f"{e!r} while evaluating {value!r}"
 
         if is_multivalue_dict:
             # Cleanse MultiValueDicts (request.POST is the one we usually care about)

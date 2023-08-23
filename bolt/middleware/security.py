@@ -26,7 +26,7 @@ class SecurityMiddleware:
         ):
             host = self.redirect_host or request.get_host()
             return HttpResponsePermanentRedirect(
-                "https://%s%s" % (host, request.get_full_path())
+                f"https://{host}{request.get_full_path()}"
             )
 
         response = self.get_response(request)

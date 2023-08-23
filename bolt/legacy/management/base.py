@@ -269,7 +269,7 @@ class BaseCommand:
             self.style = color_style(force_color)
             self.stderr.style_func = self.style.ERROR
         if (
-            not isinstance(self.requires_system_checks, (list, tuple))
+            not isinstance(self.requires_system_checks, list | tuple)
             and self.requires_system_checks != ALL_CHECKS
         ):
             raise TypeError("requires_system_checks must be a list or tuple.")
@@ -289,7 +289,7 @@ class BaseCommand:
         """
         kwargs.setdefault("formatter_class", DjangoHelpFormatter)
         parser = CommandParser(
-            prog="%s %s" % (os.path.basename(prog_name), subcommand),
+            prog=f"{os.path.basename(prog_name)} {subcommand}",
             description=self.help or None,
             missing_args_message=getattr(self, "missing_args_message", None),
             called_from_command_line=getattr(self, "_called_from_command_line", None),
@@ -409,7 +409,7 @@ class BaseCommand:
             if isinstance(e, SystemCheckError):
                 self.stderr.write(str(e), lambda x: x)
             else:
-                self.stderr.write("%s: %s" % (e.__class__.__name__, e))
+                self.stderr.write(f"{e.__class__.__name__}: {e}")
             sys.exit(e.returncode)
         finally:
             try:
@@ -450,7 +450,7 @@ class BaseCommand:
         if output:
             if self.output_transaction:
                 connection = connections[options.get("database", DEFAULT_DB_ALIAS)]
-                output = "%s\n%s\n%s" % (
+                output = "{}\n{}\n{}".format(
                     self.style.SQL_KEYWORD(connection.ops.start_transaction_sql()),
                     output,
                     self.style.SQL_KEYWORD(connection.ops.end_transaction_sql()),
@@ -525,7 +525,7 @@ class BaseCommand:
                         for e in issues
                     )
                     formatted = "\n".join(sorted(formatted))
-                    body += "\n%s:\n%s\n" % (group_name, formatted)
+                    body += f"\n{group_name}:\n{formatted}\n"
 
         if visible_issue_count:
             header = "System check identified some issues:\n"
@@ -533,7 +533,7 @@ class BaseCommand:
         if display_num_errors:
             if visible_issue_count:
                 footer += "\n"
-            footer += "System check identified %s (%s silenced)." % (
+            footer += "System check identified {} ({} silenced).".format(
                 "no issues"
                 if visible_issue_count == 0
                 else "1 issue"

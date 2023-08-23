@@ -117,10 +117,10 @@ class RunSQL(Operation):
         return "Raw SQL operation"
 
     def _run_sql(self, schema_editor, sqls):
-        if isinstance(sqls, (list, tuple)):
+        if isinstance(sqls, list | tuple):
             for sql in sqls:
                 params = None
-                if isinstance(sql, (list, tuple)):
+                if isinstance(sql, list | tuple):
                     elements = len(sql)
                     if elements == 2:
                         sql, params = sql

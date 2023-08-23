@@ -140,7 +140,7 @@ class Q(tree.Node):
             return True
 
     def deconstruct(self):
-        path = "%s.%s" % (self.__class__.__module__, self.__class__.__name__)
+        path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         if path.startswith("bolt.db.models.query_utils"):
             path = path.replace("bolt.db.models.query_utils", "bolt.db.models")
         args = tuple(self.children)

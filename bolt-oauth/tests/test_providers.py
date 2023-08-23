@@ -45,7 +45,7 @@ class DummyProvider(OAuthProvider):
         )
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_signup(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -105,7 +105,7 @@ def test_dummy_signup(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_login_connection(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -125,7 +125,7 @@ def test_dummy_login_connection(client, settings):
     user = get_user_model().objects.create_user(
         username="dummy_username", email="dummy@example.com"
     )
-    connection = OAuthConnection.objects.create(
+    OAuthConnection.objects.create(
         user=user,
         provider_key="dummy",
         provider_user_id="dummy_id",
@@ -187,7 +187,7 @@ def test_dummy_login_connection(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_login_without_connection(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -204,7 +204,7 @@ def test_dummy_login_without_connection(client, settings):
     assert OAuthConnection.objects.count() == 0
 
     # Create a user
-    user = get_user_model().objects.create_user(
+    get_user_model().objects.create_user(
         username="dummy_username", email="dummy@example.com"
     )
 
@@ -230,7 +230,7 @@ def test_dummy_login_without_connection(client, settings):
     assert response.templates[0].name == "oauth/error.html"
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_connect(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -290,7 +290,7 @@ def test_dummy_connect(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_disconnect_to_password(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -310,7 +310,7 @@ def test_dummy_disconnect_to_password(client, settings):
     user = get_user_model().objects.create_user(
         username="dummy_username", email="dummy@example.com", password="dummy_password"
     )
-    connection = OAuthConnection.objects.create(
+    OAuthConnection.objects.create(
         user=user,
         provider_key="dummy",
         provider_user_id="dummy_id",
@@ -340,7 +340,7 @@ def test_dummy_disconnect_to_password(client, settings):
     assert OAuthConnection.objects.count() == 0
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_disconnect_to_connection(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -360,7 +360,7 @@ def test_dummy_disconnect_to_connection(client, settings):
     user = get_user_model().objects.create_user(
         username="dummy_username", email="dummy@example.com"
     )
-    connection = OAuthConnection.objects.create(
+    OAuthConnection.objects.create(
         user=user,
         provider_key="dummy",
         provider_user_id="dummy_id",
@@ -373,7 +373,7 @@ def test_dummy_disconnect_to_connection(client, settings):
             2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
         ),
     )
-    connection2 = OAuthConnection.objects.create(
+    OAuthConnection.objects.create(
         user=user,
         provider_key="dummy",
         provider_user_id="dummy_id2",
@@ -403,7 +403,7 @@ def test_dummy_disconnect_to_connection(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_disconnect_last(client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
@@ -423,7 +423,7 @@ def test_dummy_disconnect_last(client, settings):
     user = get_user_model().objects.create_user(
         username="dummy_username", email="dummy@example.com"
     )
-    connection = OAuthConnection.objects.create(
+    OAuthConnection.objects.create(
         user=user,
         provider_key="dummy",
         provider_user_id="dummy_id",
@@ -453,7 +453,7 @@ def test_dummy_disconnect_last(client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-@pytest.mark.bolt_db
+@pytest.mark.bolt_db()
 def test_dummy_refresh(settings, monkeypatch):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {

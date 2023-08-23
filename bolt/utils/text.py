@@ -81,7 +81,7 @@ class Truncator(SimpleLazyObject):
             # But don't append the truncation text if the current text already
             # ends in this.
             return text
-        return "%s%s" % (text, truncate)
+        return f"{text}{truncate}"
 
     def chars(self, num, truncate=None, html=False):
         """
@@ -264,7 +264,7 @@ def get_text_list(list_, last_word="or"):
         return ""
     if len(list_) == 1:
         return str(list_[0])
-    return "%s %s %s" % (
+    return "{} {} {}".format(
         # Translators: This string is used as a separator between list elements
         ", ".join(str(i) for i in list_[:-1]),
         str(last_word),

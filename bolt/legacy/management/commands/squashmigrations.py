@@ -105,11 +105,11 @@ class Command(BaseCommand):
                 migrations_to_squash = migrations_to_squash[start_index:]
             except ValueError:
                 raise CommandError(
-                    "The migration '%s' cannot be found. Maybe it comes after "
-                    "the migration '%s'?\n"
+                    "The migration '{}' cannot be found. Maybe it comes after "
+                    "the migration '{}'?\n"
                     "Have a look at:\n"
-                    "  python manage.py showmigrations %s\n"
-                    "to debug this issue." % (start_migration, migration, app_label)
+                    "  python manage.py showmigrations {}\n"
+                    "to debug this issue.".format(start_migration, migration, app_label)
                 )
 
         # Tell them what we're doing and optionally ask if we should proceed
@@ -203,10 +203,10 @@ class Command(BaseCommand):
             if squashed_name:
                 # Use the name from --squashed-name.
                 prefix, _ = start_migration.name.split("_", 1)
-                name = "%s_%s" % (prefix, squashed_name)
+                name = f"{prefix}_{squashed_name}"
             else:
                 # Generate a name.
-                name = "%s_squashed_%s" % (start_migration.name, migration.name)
+                name = f"{start_migration.name}_squashed_{migration.name}"
             new_migration = subclass(name, app_label)
         else:
             name = "0001_%s" % (squashed_name or "squashed_%s" % migration.name)
@@ -257,8 +257,8 @@ class Command(BaseCommand):
             return loader.get_migration_by_prefix(app_label, name)
         except AmbiguityError:
             raise CommandError(
-                "More than one migration matches '%s' in app '%s'. Please be "
-                "more specific." % (name, app_label)
+                "More than one migration matches '{}' in app '{}'. Please be "
+                "more specific.".format(name, app_label)
             )
         except KeyError:
             raise CommandError(

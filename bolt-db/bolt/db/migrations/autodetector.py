@@ -469,13 +469,13 @@ class MigrationAutodetector:
             return (
                 isinstance(
                     operation,
-                    (operations.AlterUniqueTogether, operations.AlterIndexTogether),
+                    operations.AlterUniqueTogether | operations.AlterIndexTogether,
                 )
                 and operation.name_lower == dependency[1].lower()
             )
         # Unknown dependency. Raise an error.
         else:
-            raise ValueError("Can't handle dependency %r" % (dependency,))
+            raise ValueError(f"Can't handle dependency {dependency!r}")
 
     def add_operation(self, app_label, operation, dependencies=None, beginning=False):
         # Dependencies are
@@ -497,7 +497,7 @@ class MigrationAutodetector:
                 base if isinstance(base, str) else base.__name__
                 for base in model_state.bases
             }
-            string_version = "%s.%s" % (item[0], item[1])
+            string_version = f"{item[0]}.{item[1]}"
             if (
                 model_state.options.get("swappable")
                 or "AbstractUser" in base_names
@@ -562,13 +562,13 @@ class MigrationAutodetector:
                                 dependencies=dependencies,
                             )
                             self.renamed_models[app_label, model_name] = rem_model_name
-                            renamed_models_rel_key = "%s.%s" % (
+                            renamed_models_rel_key = "{}.{}".format(
                                 rem_model_state.app_label,
                                 rem_model_state.name_lower,
                             )
                             self.renamed_models_rel[
                                 renamed_models_rel_key
-                            ] = "%s.%s" % (
+                            ] = "{}.{}".format(
                                 model_state.app_label,
                                 model_state.name_lower,
                             )

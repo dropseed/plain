@@ -316,7 +316,7 @@ def flatten_result(source):
             result[i] += piece
             if param:
                 result_args[i].append(param)
-        if isinstance(elt, (Choice, NonCapture)):
+        if isinstance(elt, Choice | NonCapture):
             if isinstance(elt, NonCapture):
                 elt = [elt]
             inner_result, inner_args = [], []
@@ -344,7 +344,7 @@ def _lazy_re_compile(regex, flags=0):
 
     def _compile():
         # Compile the regex if it was not passed pre-compiled.
-        if isinstance(regex, (str, bytes)):
+        if isinstance(regex, str | bytes):
             return re.compile(regex, flags)
         else:
             assert not flags, "flags must be empty if regex is passed pre-compiled"

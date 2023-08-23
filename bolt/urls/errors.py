@@ -10,7 +10,6 @@ from bolt.http import (
     HttpResponseNotFound,
     HttpResponseServerError,
 )
-from bolt.views import TemplateView
 
 ERROR_404_TEMPLATE_NAME = "404.html"
 ERROR_403_TEMPLATE_NAME = "403.html"

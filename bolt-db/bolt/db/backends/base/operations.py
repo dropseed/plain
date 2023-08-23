@@ -232,7 +232,7 @@ class BaseDatabaseOperations:
         """
         Return the FOR UPDATE SQL clause to lock rows for an update operation.
         """
-        return "FOR%s UPDATE%s%s%s" % (
+        return "FOR{} UPDATE{}{}{}".format(
             " NO KEY" if no_key else "",
             " OF %s" % ", ".join(of) if of else "",
             " NOWAIT" if nowait else "",
@@ -274,14 +274,14 @@ class BaseDatabaseOperations:
         def to_string(s):
             return force_str(s, strings_only=True, errors="replace")
 
-        if isinstance(params, (list, tuple)):
+        if isinstance(params, list | tuple):
             u_params = tuple(to_string(val) for val in params)
         elif params is None:
             u_params = ()
         else:
             u_params = {to_string(k): to_string(v) for k, v in params.items()}
 
-        return "QUERY = %r - PARAMS = %r" % (sql, u_params)
+        return f"QUERY = {sql!r} - PARAMS = {u_params!r}"
 
     def last_insert_id(self, cursor, table_name, pk_name):
         """
@@ -699,7 +699,7 @@ class BaseDatabaseOperations:
         if self.connection.features.supports_temporal_subtraction:
             lhs_sql, lhs_params = lhs
             rhs_sql, rhs_params = rhs
-            return "(%s - %s)" % (lhs_sql, rhs_sql), (*lhs_params, *rhs_params)
+            return f"({lhs_sql} - {rhs_sql})", (*lhs_params, *rhs_params)
         raise NotSupportedError(
             "This backend does not support %s subtraction." % internal_type
         )

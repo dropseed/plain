@@ -34,7 +34,7 @@ class BoltJSONEncoder(json.JSONEncoder):
             return r
         elif isinstance(o, datetime.timedelta):
             return duration_iso_string(o)
-        elif isinstance(o, (decimal.Decimal, uuid.UUID, Promise)):
+        elif isinstance(o, decimal.Decimal | uuid.UUID | Promise):
             return str(o)
         else:
             return super().default(o)

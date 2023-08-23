@@ -13,9 +13,9 @@ class DatabaseCreation(BaseDatabaseCreation):
     def _get_database_create_suffix(self, encoding=None, template=None):
         suffix = ""
         if encoding:
-            suffix += " ENCODING '{}'".format(encoding)
+            suffix += f" ENCODING '{encoding}'"
         if template:
-            suffix += " TEMPLATE {}".format(self._quote_name(template))
+            suffix += f" TEMPLATE {self._quote_name(template)}"
         return suffix and "WITH" + suffix
 
     def sql_table_creation_suffix(self):
@@ -80,7 +80,7 @@ class DatabaseCreation(BaseDatabaseCreation):
                                 ),
                             )
                         )
-                    cursor.execute("DROP DATABASE %(dbname)s" % test_db_params)
+                    cursor.execute("DROP DATABASE {dbname}".format(**test_db_params))
                     self._execute_create_test_db(cursor, test_db_params, keepdb)
                 except Exception as e:
                     self.log("Got an error cloning the test database: %s" % e)

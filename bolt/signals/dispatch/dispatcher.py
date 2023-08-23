@@ -310,7 +310,7 @@ def receiver(signal, **kwargs):
     """
 
     def _decorator(func):
-        if isinstance(signal, (list, tuple)):
+        if isinstance(signal, list | tuple):
             for s in signal:
                 s.connect(func, **kwargs)
         else:

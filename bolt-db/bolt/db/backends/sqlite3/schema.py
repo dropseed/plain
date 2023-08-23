@@ -54,20 +54,20 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Manual emulation of SQLite parameter quoting
         if isinstance(value, bool):
             return str(int(value))
-        elif isinstance(value, (Decimal, float, int)):
+        elif isinstance(value, Decimal | float | int):
             return str(value)
         elif isinstance(value, str):
             return "'%s'" % value.replace("'", "''")
         elif value is None:
             return "NULL"
-        elif isinstance(value, (bytes, bytearray, memoryview)):
+        elif isinstance(value, bytes | bytearray | memoryview):
             # Bytes are only allowed for BLOB fields, encoded as string
             # literals containing hexadecimal data and preceded by a single "X"
             # character.
             return "X'%s'" % value.hex()
         else:
             raise ValueError(
-                "Cannot quote parameter value %r of type %s" % (value, type(value))
+                f"Cannot quote parameter value {value!r} of type {type(value)}"
             )
 
     def prepare_default(self, value):
@@ -244,10 +244,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             mapping.pop(old_field.column, None)
             body[new_field.name] = new_field
             if old_field.null and not new_field.null:
-                case_sql = "coalesce(%(col)s, %(default)s)" % {
-                    "col": self.quote_name(old_field.column),
-                    "default": self.prepare_default(self.effective_default(new_field)),
-                }
+                case_sql = "coalesce({col}, {default})".format(
+                    col=self.quote_name(old_field.column),
+                    default=self.prepare_default(self.effective_default(new_field)),
+                )
                 mapping[new_field.column] = case_sql
             else:
                 mapping[new_field.column] = self.quote_name(old_field.column)

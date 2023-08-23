@@ -116,7 +116,7 @@ def pull(ctx, backup, anonymize):
     container = DBContainer()
 
     repo_root = get_repo_root()
-    app_dir = os.path.join(repo_root, "app")
+    os.path.join(repo_root, "app")
     dot_bolt_dir = os.path.join(repo_root, ".bolt")
 
     # Make sure Bolt works first

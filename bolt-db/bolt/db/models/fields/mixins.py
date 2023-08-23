@@ -43,8 +43,8 @@ class CheckFieldDefaultMixin:
                     "so that it's not shared between all field instances."
                     % (self.__class__.__name__,),
                     hint=(
-                        "Use a callable instead, e.g., use `%s` instead of "
-                        "`%s`." % self._default_hint
+                        "Use a callable instead, e.g., use `{}` instead of "
+                        "`{}`.".format(*self._default_hint)
                     ),
                     obj=self,
                     id="fields.E010",

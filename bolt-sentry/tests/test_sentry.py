@@ -1,7 +1,6 @@
 import sentry_sdk
 
 from bolt.auth import get_user_model
-from bolt.sentry.middleware import SentryFeedbackMiddleware
 from bolt.sentry.templatetags.sentry import sentry_js
 from bolt.views import TemplateView
 

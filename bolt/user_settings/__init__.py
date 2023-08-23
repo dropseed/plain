@@ -9,10 +9,8 @@ for a list of all possible variables.
 import importlib
 import os
 import time
-import traceback
 import types
 import typing
-import warnings
 from pathlib import Path
 
 from bolt.apps import AppConfig
@@ -58,9 +56,9 @@ class LazySettings(LazyObject):
         # Hardcode the class name as otherwise it yields 'Settings'.
         if self._wrapped is empty:
             return "<LazySettings [Unevaluated]>"
-        return '<LazySettings "%(settings_module)s">' % {
-            "settings_module": self._wrapped.SETTINGS_MODULE,
-        }
+        return '<LazySettings "{settings_module}">'.format(
+            settings_module=self._wrapped.SETTINGS_MODULE,
+        )
 
     def __getattr__(self, name):
         """Return the value of a setting and cache it in self.__dict__."""
@@ -117,7 +115,7 @@ class DefaultSetting:
 
         if not DefaultSetting._is_instance_of_type(obj, self.annotation):
             raise ValueError(
-                "The %s setting must be of type %s" % (self.name, self.annotation)
+                f"The {self.name} setting must be of type {self.annotation}"
             )
 
     @staticmethod
@@ -222,10 +220,10 @@ class Settings:
         return setting in self._explicit_settings
 
     def __repr__(self):
-        return '<%(cls)s "%(settings_module)s">' % {
-            "cls": self.__class__.__name__,
-            "settings_module": self.SETTINGS_MODULE,
-        }
+        return '<{cls} "{settings_module}">'.format(
+            cls=self.__class__.__name__,
+            settings_module=self.SETTINGS_MODULE,
+        )
 
 
 # Currently used for test settings override... nothing else
@@ -274,6 +272,6 @@ class UserSettingsHolder:
         return deleted or set_locally or set_on_default
 
     def __repr__(self):
-        return "<%(cls)s>" % {
-            "cls": self.__class__.__name__,
-        }
+        return "<{cls}>".format(
+            cls=self.__class__.__name__,
+        )

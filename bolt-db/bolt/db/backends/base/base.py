@@ -630,8 +630,10 @@ class BaseDatabaseWrapper:
             raise DatabaseError(
                 "DatabaseWrapper objects created in a "
                 "thread can only be used in that same thread. The object "
-                "with alias '%s' was created in thread id %s and this is "
-                "thread id %s." % (self.alias, self._thread_ident, _thread.get_ident())
+                "with alias '{}' was created in thread id {} and this is "
+                "thread id {}.".format(
+                    self.alias, self._thread_ident, _thread.get_ident()
+                )
             )
 
     # ##### Miscellaneous #####

@@ -45,7 +45,7 @@ class GitLabOAuthProvider(OAuthProvider):
         response = requests.get(
             "https://gitlab.com/api/v4/user",
             headers={
-                "Authorization": "Bearer {}".format(oauth_token.access_token),
+                "Authorization": f"Bearer {oauth_token.access_token}",
             },
         )
         response.raise_for_status()

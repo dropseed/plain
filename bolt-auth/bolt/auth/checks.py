@@ -1,5 +1,3 @@
-from types import MethodType
-
 from bolt import checks
 from bolt.apps import apps
 from bolt.runtime import settings
@@ -23,7 +21,7 @@ def check_user_model(app_configs=None, **kwargs):
     errors = []
 
     # Check that REQUIRED_FIELDS is a list
-    if not isinstance(cls.REQUIRED_FIELDS, (list, tuple)):
+    if not isinstance(cls.REQUIRED_FIELDS, list | tuple):
         errors.append(
             checks.Error(
                 "'REQUIRED_FIELDS' must be a list or tuple.",
@@ -56,8 +54,10 @@ def check_user_model(app_configs=None, **kwargs):
         if settings.AUTHENTICATION_BACKENDS == ["bolt.auth.backends.ModelBackend"]:
             errors.append(
                 checks.Error(
-                    "'%s.%s' must be unique because it is named as the "
-                    "'USERNAME_FIELD'." % (cls._meta.object_name, cls.USERNAME_FIELD),
+                    "'{}.{}' must be unique because it is named as the "
+                    "'USERNAME_FIELD'.".format(
+                        cls._meta.object_name, cls.USERNAME_FIELD
+                    ),
                     obj=cls,
                     id="auth.E003",
                 )

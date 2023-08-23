@@ -1,5 +1,3 @@
-import math
-
 from bolt.db.models.expressions import Func, Value
 from bolt.db.models.fields import FloatField, IntegerField
 from bolt.db.models.functions import Cast

@@ -44,9 +44,9 @@ def include(arg, namespace=None):
     namespace = namespace or app_name
     # Make sure the patterns can be iterated through (without this, some
     # testcases will break).
-    if isinstance(patterns, (list, tuple)):
+    if isinstance(patterns, list | tuple):
         for url_pattern in patterns:
-            pattern = getattr(url_pattern, "pattern", None)
+            getattr(url_pattern, "pattern", None)
     return (urlconf_module, app_name, namespace)
 
 
@@ -57,7 +57,7 @@ def _path(route, view, kwargs=None, name=None, Pattern=None):
         raise TypeError(
             f"kwargs argument must be a dict, but got {kwargs.__class__.__name__}."
         )
-    if isinstance(view, (list, tuple)):
+    if isinstance(view, list | tuple):
         # For include(...) processing.
         pattern = Pattern(route, is_endpoint=False)
         urlconf_module, app_name, namespace = view

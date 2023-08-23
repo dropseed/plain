@@ -191,9 +191,9 @@ class BaseHandler:
         """
         if not name:
             if isinstance(callback, types.FunctionType):  # FBV
-                name = "The view %s.%s" % (callback.__module__, callback.__name__)
+                name = f"The view {callback.__module__}.{callback.__name__}"
             else:  # CBV
-                name = "The view %s.%s.__call__" % (
+                name = "The view {}.{}.__call__".format(
                     callback.__module__,
                     callback.__class__.__name__,
                 )

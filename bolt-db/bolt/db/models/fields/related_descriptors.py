@@ -242,7 +242,7 @@ class ForwardManyToOneDescriptor:
 
         if rel_obj is None and not self.field.null:
             raise self.RelatedObjectDoesNotExist(
-                "%s has no %s." % (self.field.model.__name__, self.field.name)
+                f"{self.field.model.__name__} has no {self.field.name}."
             )
         else:
             return rel_obj
@@ -833,7 +833,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
                         old_ids.add(obj.pk)
                     else:
                         raise self.field.remote_field.model.DoesNotExist(
-                            "%r is not related to %r." % (obj, self.instance)
+                            f"{obj!r} is not related to {self.instance!r}."
                         )
                 self._clear(self.filter(pk__in=old_ids), bulk)
 
@@ -976,7 +976,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             self.core_filters = {}
             self.pk_field_names = {}
             for lh_field, rh_field in self.source_field.related_fields:
-                core_filter_key = "%s__%s" % (self.query_field_name, rh_field.name)
+                core_filter_key = f"{self.query_field_name}__{rh_field.name}"
                 self.core_filters[core_filter_key] = getattr(instance, rh_field.attname)
                 self.pk_field_names[lh_field.name] = rh_field.name
 

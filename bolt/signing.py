@@ -197,7 +197,7 @@ class Signer:
             else settings.SECRET_KEY_FALLBACKS
         )
         self.sep = sep
-        self.salt = salt or "%s.%s" % (
+        self.salt = salt or "{}.{}".format(
             self.__class__.__module__,
             self.__class__.__name__,
         )
@@ -226,7 +226,7 @@ class Signer:
         return base64_hmac(self.salt + "signer", value, key, algorithm=self.algorithm)
 
     def sign(self, value):
-        return "%s%s%s" % (value, self.sep, self.signature(value))
+        return f"{value}{self.sep}{self.signature(value)}"
 
     def unsign(self, signed_value):
         if self.sep not in signed_value:
@@ -281,7 +281,7 @@ class TimestampSigner(Signer):
         return b62_encode(int(time.time()))
 
     def sign(self, value):
-        value = "%s%s%s" % (value, self.sep, self.timestamp())
+        value = f"{value}{self.sep}{self.timestamp()}"
         return super().sign(value)
 
     def unsign(self, value, max_age=None):
@@ -298,5 +298,5 @@ class TimestampSigner(Signer):
             # Check timestamp is not older than max_age
             age = time.time() - timestamp
             if age > max_age:
-                raise SignatureExpired("Signature age %s > %s seconds" % (age, max_age))
+                raise SignatureExpired(f"Signature age {age} > {max_age} seconds")
         return value

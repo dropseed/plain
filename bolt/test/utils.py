@@ -1,5 +1,4 @@
 import collections
-import logging
 import os
 import re
 import sys
@@ -10,15 +9,13 @@ from functools import wraps
 from io import StringIO
 from itertools import chain
 from types import SimpleNamespace
-from unittest import TestCase, skipIf, skipUnless
+from unittest import TestCase
 from xml.dom.minidom import Node, parseString
 
 from jinja2 import Template
 
 from bolt.apps import apps
-from bolt.apps.registry import Apps
 from bolt.db import DEFAULT_DB_ALIAS, connections, reset_queries
-from bolt.db.models.options import Options
 from bolt.exceptions import ImproperlyConfigured
 from bolt.runtime import settings
 from bolt.signals import request_started, setting_changed
@@ -759,7 +756,7 @@ class TimeKeeper:
     def print_results(self):
         for name, end_times in self.records.items():
             for record_time in end_times:
-                record = "%s took %.3fs" % (name, record_time)
+                record = f"{name} took {record_time:.3f}s"
                 sys.stderr.write(record + os.linesep)
 
 

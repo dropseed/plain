@@ -135,7 +135,7 @@ def _check_lazy_references(apps, ignore=None):
     def app_model_error(model_key):
         try:
             apps.get_app_config(model_key[0])
-            model_error = "app '%s' doesn't provide model '%s'" % model_key
+            model_error = "app '{}' doesn't provide model '{}'".format(*model_key)
         except LookupError:
             model_error = "app '%s' isn't installed" % model_key[0]
         return model_error
@@ -169,7 +169,7 @@ def _check_lazy_references(apps, ignore=None):
         if isinstance(receiver, types.FunctionType):
             description = "The function '%s'" % receiver.__name__
         elif isinstance(receiver, types.MethodType):
-            description = "Bound method '%s.%s'" % (
+            description = "Bound method '{}.{}'".format(
                 receiver.__self__.__class__.__name__,
                 receiver.__name__,
             )

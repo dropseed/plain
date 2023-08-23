@@ -16,7 +16,6 @@ from bolt.http import HttpResponseRedirect, QueryDict
 from bolt.runtime import settings
 from bolt.urls import reverse_lazy
 from bolt.utils.cache import add_never_cache_headers
-from bolt.utils.decorators import method_decorator
 from bolt.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode
 from bolt.views import AuthViewMixin, FormView, TemplateView
 

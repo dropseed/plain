@@ -177,7 +177,7 @@ class DataContains(FieldGetDbPrepValueMixin, PostgresOperatorLookup):
         lhs, lhs_params = self.process_lhs(compiler, connection)
         rhs, rhs_params = self.process_rhs(compiler, connection)
         params = tuple(lhs_params) + tuple(rhs_params)
-        return "JSON_CONTAINS(%s, %s)" % (lhs, rhs), params
+        return f"JSON_CONTAINS({lhs}, {rhs})", params
 
 
 class ContainedBy(FieldGetDbPrepValueMixin, PostgresOperatorLookup):
@@ -192,7 +192,7 @@ class ContainedBy(FieldGetDbPrepValueMixin, PostgresOperatorLookup):
         lhs, lhs_params = self.process_lhs(compiler, connection)
         rhs, rhs_params = self.process_rhs(compiler, connection)
         params = tuple(rhs_params) + tuple(lhs_params)
-        return "JSON_CONTAINS(%s, %s)" % (rhs, lhs), params
+        return f"JSON_CONTAINS({rhs}, {lhs})", params
 
 
 class HasKeyLookup(PostgresOperatorLookup):
@@ -216,7 +216,7 @@ class HasKeyLookup(PostgresOperatorLookup):
         # Process JSON path from the right-hand side.
         rhs = self.rhs
         rhs_params = []
-        if not isinstance(rhs, (list, tuple)):
+        if not isinstance(rhs, list | tuple):
             rhs = [rhs]
         for key in rhs:
             if isinstance(key, KeyTransform):
@@ -350,13 +350,13 @@ class KeyTransform(Transform):
     def as_postgresql(self, compiler, connection):
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
         if len(key_transforms) > 1:
-            sql = "(%s %s %%s)" % (lhs, self.postgres_nested_operator)
+            sql = f"({lhs} {self.postgres_nested_operator} %s)"
             return sql, tuple(params) + (key_transforms,)
         try:
             lookup = int(self.key_name)
         except ValueError:
             lookup = self.key_name
-        return "(%s %s %%s)" % (lhs, self.postgres_operator), tuple(params) + (lookup,)
+        return f"({lhs} {self.postgres_operator} %s)", tuple(params) + (lookup,)
 
     def as_sqlite(self, compiler, connection):
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)

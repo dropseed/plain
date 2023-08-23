@@ -81,7 +81,7 @@ from .schema import DatabaseSchemaEditor  # NOQA isort:skip
 def _get_varchar_column(data):
     if data["max_length"] is None:
         return "varchar"
-    return "varchar(%(max_length)s)" % data
+    return "varchar({max_length})".format(**data)
 
 
 class DatabaseWrapper(BaseDatabaseWrapper):

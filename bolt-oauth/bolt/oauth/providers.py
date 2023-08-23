@@ -1,6 +1,6 @@
 import datetime
 import secrets
-from typing import Any, List
+from typing import Any
 from urllib.parse import urlencode
 
 from bolt.auth import login as auth_login
@@ -199,5 +199,5 @@ def get_oauth_provider_instance(*, provider_key: str) -> OAuthProvider:
     return provider_class(provider_key=provider_key, **provider_kwargs)
 
 
-def get_provider_keys() -> List[str]:
+def get_provider_keys() -> list[str]:
     return list(getattr(settings, "OAUTH_LOGIN_PROVIDERS", {}).keys())

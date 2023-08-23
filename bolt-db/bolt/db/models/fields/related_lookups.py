@@ -23,7 +23,7 @@ class MultiColSource:
         self.output_field = self.field
 
     def __repr__(self):
-        return "{}({}, {})".format(self.__class__.__name__, self.alias, self.field)
+        return f"{self.__class__.__name__}({self.alias}, {self.field})"
 
     def relabeled_clone(self, relabels):
         return self.__class__(

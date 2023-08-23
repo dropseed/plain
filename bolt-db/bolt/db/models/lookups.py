@@ -1,7 +1,7 @@
 import itertools
 import math
 
-from bolt.db.models.expressions import Case, Expression, Func, Value, When
+from bolt.db.models.expressions import Expression, Func, Value
 from bolt.db.models.fields import (
     BooleanField,
     CharField,
@@ -212,7 +212,7 @@ class BuiltinLookup(Lookup):
         rhs_sql, rhs_params = self.process_rhs(compiler, connection)
         params.extend(rhs_params)
         rhs_sql = self.get_rhs_op(connection, rhs_sql)
-        return "%s %s" % (lhs_sql, rhs_sql), params
+        return f"{lhs_sql} {rhs_sql}", params
 
     def get_rhs_op(self, connection, rhs):
         return connection.operators[self.lookup_name] % rhs
@@ -305,7 +305,7 @@ class PostgresOperatorLookup(Lookup):
         lhs, lhs_params = self.process_lhs(compiler, connection)
         rhs, rhs_params = self.process_rhs(compiler, connection)
         params = tuple(lhs_params) + tuple(rhs_params)
-        return "%s %s %s" % (lhs, self.postgres_operator, rhs), params
+        return f"{lhs} {self.postgres_operator} {rhs}", params
 
 
 @Field.register_lookup
@@ -577,7 +577,7 @@ class Range(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     lookup_name = "range"
 
     def get_rhs_op(self, connection, rhs):
-        return "BETWEEN %s AND %s" % (rhs[0], rhs[1])
+        return f"BETWEEN {rhs[0]} AND {rhs[1]}"
 
 
 @Field.register_lookup
@@ -646,7 +646,7 @@ class YearLookup(Lookup):
             rhs_sql = self.get_direct_rhs_sql(connection, rhs_sql)
             start, finish = self.year_lookup_bounds(connection, self.rhs)
             params.extend(self.get_bound_params(start, finish))
-            return "%s %s" % (lhs_sql, rhs_sql), params
+            return f"{lhs_sql} {rhs_sql}", params
         return super().as_sql(compiler, connection)
 
     def get_direct_rhs_sql(self, connection, rhs):

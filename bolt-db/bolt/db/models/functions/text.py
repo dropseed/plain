@@ -1,4 +1,3 @@
-from bolt.db import NotSupportedError
 from bolt.db.models.expressions import Func, Value
 from bolt.db.models.fields import CharField, IntegerField, TextField
 from bolt.db.models.functions import Cast, Coalesce

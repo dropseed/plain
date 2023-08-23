@@ -344,7 +344,7 @@ class QuerySet(AltersData):
         data = list(self[: REPR_OUTPUT_SIZE + 1])
         if len(data) > REPR_OUTPUT_SIZE:
             data[-1] = "...(remaining elements truncated)..."
-        return "<%s %r>" % (self.__class__.__name__, data)
+        return f"<{self.__class__.__name__} {data!r}>"
 
     def __len__(self):
         self._fetch_all()
@@ -374,7 +374,7 @@ class QuerySet(AltersData):
 
     def __getitem__(self, k):
         """Retrieve an item or slice from the set of results."""
-        if not isinstance(k, (int, slice)):
+        if not isinstance(k, int | slice):
             raise TypeError(
                 "QuerySet indices must be integers or slices, not %s."
                 % type(k).__name__
@@ -904,7 +904,7 @@ class QuerySet(AltersData):
             order_by = fields
         else:
             order_by = getattr(self.model._meta, "get_latest_by")
-            if order_by and not isinstance(order_by, (tuple, list)):
+            if order_by and not isinstance(order_by, tuple | list):
                 order_by = (order_by,)
         if order_by is None:
             raise ValueError(
@@ -977,7 +977,7 @@ class QuerySet(AltersData):
         if id_list is not None:
             if not id_list:
                 return {}
-            filter_key = "{}__in".format(field_name)
+            filter_key = f"{field_name}__in"
             batch_size = connections[self.db].features.max_query_params
             id_list = tuple(id_list)
             # If the database has a limit on the number of query parameters
@@ -1938,7 +1938,7 @@ class RawQuerySet:
         yield from RawModelIterable(self)
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self.query)
+        return f"<{self.__class__.__name__}: {self.query}>"
 
     def __getitem__(self, k):
         return list(self)[k]

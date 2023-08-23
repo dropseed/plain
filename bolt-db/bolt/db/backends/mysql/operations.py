@@ -306,7 +306,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return "CONVERT(%s, SIGNED)" % connector.join(sub_expressions)
         elif connector == ">>":
             lhs, rhs = sub_expressions
-            return "FLOOR(%(lhs)s / POW(2, %(rhs)s))" % {"lhs": lhs, "rhs": rhs}
+            return f"FLOOR({lhs} / POW(2, {rhs}))"
         return super().combine_expression(connector, sub_expressions)
 
     def get_db_converters(self, expression):
@@ -365,7 +365,7 @@ class DatabaseOperations(BaseDatabaseOperations):
                 rhs_params
             ) * 2
         params = (*rhs_params, *lhs_params)
-        return "TIMESTAMPDIFF(MICROSECOND, %s, %s)" % (rhs_sql, lhs_sql), params
+        return f"TIMESTAMPDIFF(MICROSECOND, {rhs_sql}, {lhs_sql})", params
 
     def explain_query_prefix(self, format=None, **options):
         # Alias MySQL's TRADITIONAL to TEXT for consistency with other backends.
@@ -423,7 +423,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def conditional_expression_supported_in_where_clause(self, expression):
         # MySQL ignores indexes with boolean fields unless they're compared
         # directly to a boolean value.
-        if isinstance(expression, (Exists, Lookup)):
+        if isinstance(expression, Exists | Lookup):
             return True
         if isinstance(expression, ExpressionWrapper) and expression.conditional:
             return self.conditional_expression_supported_in_where_clause(

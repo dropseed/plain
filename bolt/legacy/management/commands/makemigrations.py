@@ -157,7 +157,9 @@ class Command(BaseCommand):
                 except OperationalError as error:
                     warnings.warn(
                         "Got an error checking a consistent migration history "
-                        "performed for database connection '%s': %s" % (alias, error),
+                        "performed for database connection '{}': {}".format(
+                            alias, error
+                        ),
                         RuntimeWarning,
                     )
         # Before anything else, see if there's conflicting apps and drop out
@@ -175,7 +177,8 @@ class Command(BaseCommand):
 
         if conflicts and not self.merge:
             name_str = "; ".join(
-                "%s in %s" % (", ".join(names), app) for app, names in conflicts.items()
+                "{} in {}".format(", ".join(names), app)
+                for app, names in conflicts.items()
             )
             raise CommandError(
                 "Conflicting migrations detected; multiple leaf nodes in the "

@@ -34,7 +34,7 @@ class BaseManager:
 
     def __str__(self):
         """Return "app_label.model_label.manager_name"."""
-        return "%s.%s" % (self.model._meta.label, self.name)
+        return f"{self.model._meta.label}.{self.name}"
 
     def __class_getitem__(cls, *args, **kwargs):
         return cls
@@ -52,7 +52,7 @@ class BaseManager:
             return (
                 True,  # as_manager
                 None,  # manager_class
-                "%s.%s" % (qs_class.__module__, qs_class.__name__),  # qs_class
+                f"{qs_class.__module__}.{qs_class.__name__}",  # qs_class
                 None,  # args
                 None,  # kwargs
             )
@@ -70,7 +70,7 @@ class BaseManager:
                 )
             return (
                 False,  # as_manager
-                "%s.%s" % (module_name, name),  # manager_class
+                f"{module_name}.{name}",  # manager_class
                 None,  # qs_class
                 self._constructor_args[0],  # args
                 self._constructor_args[1],  # kwargs
@@ -107,7 +107,7 @@ class BaseManager:
     @classmethod
     def from_queryset(cls, queryset_class, class_name=None):
         if class_name is None:
-            class_name = "%sFrom%s" % (cls.__name__, queryset_class.__name__)
+            class_name = f"{cls.__name__}From{queryset_class.__name__}"
         return type(
             class_name,
             (cls,),
@@ -189,7 +189,7 @@ class ManagerDescriptor:
 
         if cls._meta.abstract:
             raise AttributeError(
-                "Manager isn't available; %s is abstract" % (cls._meta.object_name,)
+                f"Manager isn't available; {cls._meta.object_name} is abstract"
             )
 
         if cls._meta.swapped:

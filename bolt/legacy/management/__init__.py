@@ -44,7 +44,7 @@ def load_command_class(app_name, name):
     class instance. Allow all errors raised by the import process
     (ImportError, AttributeError) to propagate.
     """
-    module = import_module("%s.management.commands.%s" % (app_name, name))
+    module = import_module(f"{app_name}.management.commands.{name}")
     return module.Command()
 
 
@@ -127,7 +127,7 @@ def call_command(command_name, *args, **options):
     arg_options = {opt_mapping.get(key, key): value for key, value in options.items()}
     parse_args = []
     for arg in args:
-        if isinstance(arg, (list, tuple)):
+        if isinstance(arg, list | tuple):
             parse_args += map(str, arg)
         else:
             parse_args.append(str(arg))
@@ -161,10 +161,10 @@ def call_command(command_name, *args, **options):
                     f"arguments via **options."
                 )
             parse_args.append(min(opt.option_strings))
-            if isinstance(opt, (_AppendConstAction, _CountAction, _StoreConstAction)):
+            if isinstance(opt, _AppendConstAction | _CountAction | _StoreConstAction):
                 continue
             value = arg_options[opt.dest]
-            if isinstance(value, (list, tuple)):
+            if isinstance(value, list | tuple):
                 parse_args += map(str, value)
             else:
                 parse_args.append(str(value))

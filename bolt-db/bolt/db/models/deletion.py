@@ -349,7 +349,7 @@ class Collector:
                     try:
                         on_delete(self, field, sub_objs, self.using)
                     except ProtectedError as error:
-                        key = "'%s.%s'" % (field.model.__name__, field.name)
+                        key = f"'{field.model.__name__}.{field.name}'"
                         protected_objects[key] += error.protected_objects
         if protected_objects:
             raise ProtectedError(
@@ -386,7 +386,7 @@ class Collector:
                 for related_model, fields in self.restricted_objects.items():
                     for field, objs in fields.items():
                         if objs:
-                            key = "'%s.%s'" % (related_model.__name__, field.name)
+                            key = f"'{related_model.__name__}.{field.name}'"
                             restricted_objects[key] += objs
                 if restricted_objects:
                     raise RestrictedError(

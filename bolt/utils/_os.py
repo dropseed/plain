@@ -1,7 +1,6 @@
 import os
 import tempfile
 from os.path import abspath, dirname, join, normcase, sep
-from pathlib import Path
 
 from bolt.exceptions import SuspiciousFileOperation
 

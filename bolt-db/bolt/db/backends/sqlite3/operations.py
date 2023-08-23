@@ -172,7 +172,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Unfortunately there is no way to reach self->statement from Python,
         # so we quote and substitute parameters manually.
         if params:
-            if isinstance(params, (list, tuple)):
+            if isinstance(params, list | tuple):
                 params = self._quote_params_for_last_executed_query(params)
             else:
                 values = tuple(params.values())
@@ -397,8 +397,8 @@ class DatabaseOperations(BaseDatabaseOperations):
         rhs_sql, rhs_params = rhs
         params = (*lhs_params, *rhs_params)
         if internal_type == "TimeField":
-            return "bolt_time_diff(%s, %s)" % (lhs_sql, rhs_sql), params
-        return "bolt_timestamp_diff(%s, %s)" % (lhs_sql, rhs_sql), params
+            return f"bolt_time_diff({lhs_sql}, {rhs_sql})", params
+        return f"bolt_timestamp_diff({lhs_sql}, {rhs_sql})", params
 
     def insert_statement(self, on_conflict=None):
         if on_conflict == OnConflict.IGNORE:
@@ -424,7 +424,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             on_conflict == OnConflict.UPDATE
             and self.connection.features.supports_update_conflicts_with_target
         ):
-            return "ON CONFLICT(%s) DO UPDATE SET %s" % (
+            return "ON CONFLICT({}) DO UPDATE SET {}".format(
                 ", ".join(map(self.quote_name, unique_fields)),
                 ", ".join(
                     [

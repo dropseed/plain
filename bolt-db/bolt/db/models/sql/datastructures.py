@@ -119,7 +119,7 @@ class Join:
         alias_str = (
             "" if self.table_alias == self.table_name else (" %s" % self.table_alias)
         )
-        sql = "%s %s%s ON (%s)" % (
+        sql = "{} {}{} ON ({})".format(
             self.join_type,
             qn(self.table_name),
             alias_str,

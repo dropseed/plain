@@ -4,11 +4,6 @@ This plugin handles creating and destroying the test environment and
 test database and provides some useful text fixtures.
 """
 
-import contextlib
-import os
-import pathlib
-import sys
-from typing import Generator, List, Optional, Tuple, Union
 
 import pytest
 
@@ -74,9 +69,9 @@ def _setup_bolt() -> None:
 
 
 def _get_boolean_value(
-    x: Union[None, bool, str],
+    x: None | bool | str,
     name: str,
-    default: Optional[bool] = None,
+    default: bool | None = None,
 ) -> bool:
     if x is None:
         return bool(default)
@@ -96,7 +91,7 @@ def _get_boolean_value(
 def pytest_load_initial_conftests(
     early_config,
     parser,
-    args: List[str],
+    args: list[str],
 ) -> None:
     # Register the marks
     early_config.addinivalue_line(
@@ -142,7 +137,7 @@ def pytest_configure() -> None:
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_collection_modifyitems(items: List[pytest.Item]) -> None:
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     def get_order_number(test: pytest.Item) -> int:
         marker_db = test.get_closest_marker("bolt_db")
         if marker_db:
@@ -200,7 +195,7 @@ def bolt_test_environment(request) -> None:
 
 
 @pytest.fixture(scope="session")
-def bolt_db_blocker() -> "Optional[_DatabaseBlocker]":
+def bolt_db_blocker() -> "_DatabaseBlocker | None":
     """Wrapper around Bolt's database access.
 
     This object can be used to re-enable database access.  This fixture is used
@@ -224,7 +219,7 @@ def _bolt_db_marker(request) -> None:
         request.getfixturevalue("_bolt_db_helper")
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(autouse=True)
 def _dj_autoclear_mailbox() -> None:
     try:
         from bolt import mail
@@ -234,11 +229,11 @@ def _dj_autoclear_mailbox() -> None:
         pass
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def mailoutbox(
     bolt_mail_patch_dns: None,
     _dj_autoclear_mailbox: None,
-) -> "Optional[List[bolt.mail.EmailMessage]]":
+) -> "list[bolt.mail.EmailMessage] | None":
     try:
         from bolt import mail
 
@@ -247,7 +242,7 @@ def mailoutbox(
         pass
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def bolt_mail_patch_dns(
     monkeypatch,
     bolt_mail_dnsname: str,
@@ -260,7 +255,7 @@ def bolt_mail_patch_dns(
         pass
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def bolt_mail_dnsname() -> str:
     return "fake-tests.example.com"
 
@@ -331,14 +326,14 @@ class _DatabaseBlocker:
 _blocking_manager = _DatabaseBlocker()
 
 
-def validate_urls(marker) -> List[str]:
+def validate_urls(marker) -> list[str]:
     """Validate the urls marker.
 
     It checks the signature and creates the `urls` attribute on the
     marker which will have the correct value.
     """
 
-    def apifun(urls: List[str]) -> List[str]:
+    def apifun(urls: list[str]) -> list[str]:
         return urls
 
     return apifun(*marker.args, **marker.kwargs)

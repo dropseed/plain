@@ -124,7 +124,8 @@ class Command(BaseCommand):
         conflicts = executor.loader.detect_conflicts()
         if conflicts:
             name_str = "; ".join(
-                "%s in %s" % (", ".join(names), app) for app, names in conflicts.items()
+                "{} in {}".format(", ".join(names), app)
+                for app, names in conflicts.items()
             )
             raise CommandError(
                 "Conflicting migrations detected; multiple leaf nodes in the "
@@ -162,8 +163,8 @@ class Command(BaseCommand):
                     )
                 except AmbiguityError:
                     raise CommandError(
-                        "More than one migration matches '%s' in app '%s'. "
-                        "Please be more specific." % (migration_name, app_label)
+                        "More than one migration matches '{}' in app '{}'. "
+                        "Please be more specific.".format(migration_name, app_label)
                     )
                 except KeyError:
                     raise CommandError(
@@ -295,7 +296,7 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(
                         self.style.MIGRATE_LABEL("  Target specific migration: ")
-                        + "%s, from %s" % (targets[0][1], targets[0][0])
+                        + f"{targets[0][1]}, from {targets[0][0]}"
                     )
 
         pre_migrate_state = executor._create_project_state(with_applied_migrations=True)

@@ -58,7 +58,7 @@ class AppConfig:
         self.models = None
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self.label)
+        return f"<{self.__class__.__name__}: {self.label}>"
 
     @cached_property
     def default_auto_field(self):
@@ -86,9 +86,9 @@ class AppConfig:
                 paths = list(set(paths))
         if len(paths) > 1:
             raise ImproperlyConfigured(
-                "The app module %r has multiple filesystem locations (%r); "
+                "The app module {!r} has multiple filesystem locations ({!r}); "
                 "you must configure this app with an AppConfig subclass "
-                "with a 'path' class attribute." % (module, paths)
+                "with a 'path' class attribute.".format(module, paths)
             )
         elif not paths:
             raise ImproperlyConfigured(
@@ -121,7 +121,7 @@ class AppConfig:
             # If the apps module defines more than one AppConfig subclass,
             # the default one can declare default = True.
             if module_has_submodule(app_module, APPS_MODULE_NAME):
-                mod_path = "%s.%s" % (entry, APPS_MODULE_NAME)
+                mod_path = f"{entry}.{APPS_MODULE_NAME}"
                 mod = import_module(mod_path)
                 # Check if there's exactly one AppConfig candidate,
                 # excluding those that explicitly define default = False.
@@ -147,8 +147,8 @@ class AppConfig:
                     if len(app_configs) > 1:
                         candidates = [repr(name) for name, _ in app_configs]
                         raise RuntimeError(
-                            "%r declares more than one default AppConfig: "
-                            "%s." % (mod_path, ", ".join(candidates))
+                            "{!r} declares more than one default AppConfig: "
+                            "{}.".format(mod_path, ", ".join(candidates))
                         )
                     elif len(app_configs) == 1:
                         app_config_class = app_configs[0][1]
@@ -183,7 +183,7 @@ class AppConfig:
                     for name, candidate in inspect.getmembers(mod, inspect.isclass)
                     if issubclass(candidate, cls) and candidate is not cls
                 ]
-                msg = "Module '%s' does not contain a '%s' class." % (
+                msg = "Module '{}' does not contain a '{}' class.".format(
                     mod_path,
                     cls_name,
                 )
@@ -237,7 +237,7 @@ class AppConfig:
             return self.models[model_name.lower()]
         except KeyError:
             raise LookupError(
-                "App '%s' doesn't have a '%s' model." % (self.label, model_name)
+                f"App '{self.label}' doesn't have a '{model_name}' model."
             )
 
     def get_models(self, include_auto_created=False, include_swapped=False):
@@ -267,7 +267,7 @@ class AppConfig:
         self.models = self.apps.all_models[self.label]
 
         if module_has_submodule(self.module, MODELS_MODULE_NAME):
-            models_module_name = "%s.%s" % (self.name, MODELS_MODULE_NAME)
+            models_module_name = f"{self.name}.{MODELS_MODULE_NAME}"
             self.models_module = import_module(models_module_name)
 
     def ready(self):

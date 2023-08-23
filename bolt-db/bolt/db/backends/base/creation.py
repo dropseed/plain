@@ -1,13 +1,8 @@
 import os
 import sys
-from io import StringIO
 
 from bolt.apps import apps
-from bolt.db import router
-from bolt.db.transaction import atomic
-from bolt.json import BoltJSONEncoder
 from bolt.runtime import settings
-from bolt.utils.module_loading import import_string
 
 # The prefix to put on the default database name when creating
 # the test database.
@@ -164,7 +159,7 @@ class BaseDatabaseCreation:
         """
         Return display string for a database for use in various actions.
         """
-        return "'%s'%s" % (
+        return "'{}'{}".format(
             self.connection.alias,
             (" ('%s')" % database_name) if verbosity >= 2 else "",
         )
@@ -181,7 +176,7 @@ class BaseDatabaseCreation:
         return TEST_DATABASE_PREFIX + self.connection.settings_dict["NAME"]
 
     def _execute_create_test_db(self, cursor, parameters, keepdb=False):
-        cursor.execute("CREATE DATABASE %(dbname)s %(suffix)s" % parameters)
+        cursor.execute("CREATE DATABASE {dbname} {suffix}".format(**parameters))
 
     def _create_test_db(self, verbosity, autoclobber, keepdb=False):
         """
@@ -219,7 +214,9 @@ class BaseDatabaseCreation:
                                     ),
                                 )
                             )
-                        cursor.execute("DROP DATABASE %(dbname)s" % test_db_params)
+                        cursor.execute(
+                            "DROP DATABASE {dbname}".format(**test_db_params)
+                        )
                         self._execute_create_test_db(cursor, test_db_params, keepdb)
                     except Exception as e:
                         self.log("Got an error recreating the test database: %s" % e)
