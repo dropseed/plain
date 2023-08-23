@@ -3,7 +3,7 @@ import operator
 from django.db import DataError, InterfaceError
 from django.db.backends.base.features import BaseDatabaseFeatures
 from django.db.backends.postgresql.psycopg_any import is_psycopg3
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 
 
 class DatabaseFeatures(BaseDatabaseFeatures):

@@ -48,7 +48,7 @@ class Project(StripeModel):
     name = models.CharField(max_length=255)
 ```
 
-You will then get a `stripe_object` [cached property](https://docs.djangoproject.com/en/4.1/ref/utils/#django.utils.functional.cached_property) to make it easy to fetch the rest of the data from the Stripe API (the API key will be set for you by Bolt).
+You will then get a `stripe_object` [cached property](https://docs.djangoproject.com/en/4.1/ref/utils/#bolt.utils.functional.cached_property) to make it easy to fetch the rest of the data from the Stripe API (the API key will be set for you by Bolt).
 
 You can use this in Python code:
 

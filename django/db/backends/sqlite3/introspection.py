@@ -7,7 +7,7 @@ from django.db.backends.base.introspection import BaseDatabaseIntrospection
 from django.db.backends.base.introspection import FieldInfo as BaseFieldInfo
 from django.db.backends.base.introspection import TableInfo
 from django.db.models import Index
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.regex_helper import _lazy_re_compile
 
 FieldInfo = namedtuple(
     "FieldInfo", BaseFieldInfo._fields + ("pk", "has_json_constraint")

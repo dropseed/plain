@@ -8,8 +8,8 @@ import sqlparse
 from django.conf import settings
 from django.db import NotSupportedError, transaction
 from django.db.backends import utils
-from django.utils import timezone
-from django.utils.encoding import force_str
+from bolt.utils import timezone
+from bolt.utils.encoding import force_str
 
 
 class BaseDatabaseOperations:

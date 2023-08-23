@@ -19,10 +19,10 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from bolt.http import HttpResponseRedirect, QueryDict
 from .utils import resolve_url
 from bolt.urls import reverse_lazy
-from django.utils.decorators import method_decorator
-from django.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode
-from django.utils.translation import gettext_lazy as _
-from django.utils.cache import add_never_cache_headers
+from bolt.utils.decorators import method_decorator
+from bolt.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode
+from bolt.utils.translation import gettext_lazy as _
+from bolt.utils.cache import add_never_cache_headers
 from bolt.views import TemplateView, FormView
 
 UserModel = get_user_model()

@@ -182,7 +182,7 @@ def django_test_environment(request) -> None:
         we need to follow this model.
     """
     _setup_django()
-    from django.test.utils import (
+    from bolt.test.utils import (
         setup_test_environment, teardown_test_environment,
     )
 

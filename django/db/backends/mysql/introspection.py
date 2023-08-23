@@ -7,7 +7,7 @@ from django.db.backends.base.introspection import BaseDatabaseIntrospection
 from django.db.backends.base.introspection import FieldInfo as BaseFieldInfo
 from django.db.backends.base.introspection import TableInfo as BaseTableInfo
 from django.db.models import Index
-from django.utils.datastructures import OrderedSet
+from bolt.utils.datastructures import OrderedSet
 
 FieldInfo = namedtuple(
     "FieldInfo",

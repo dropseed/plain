@@ -5,8 +5,8 @@ from bolt.apps import apps as django_apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from bolt.csrf.middleware import rotate_token
-from django.utils.crypto import constant_time_compare
-from django.utils.module_loading import import_string
+from bolt.utils.crypto import constant_time_compare
+from bolt.utils.module_loading import import_string
 
 from .signals import user_logged_in, user_logged_out, user_login_failed
 

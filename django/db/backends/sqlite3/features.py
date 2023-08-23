@@ -3,7 +3,7 @@ import operator
 from django.db import transaction
 from django.db.backends.base.features import BaseDatabaseFeatures
 from django.db.utils import OperationalError
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 
 from .base import Database
 

@@ -1,7 +1,7 @@
 from functools import partial
 
 from django.db.models.utils import make_model_tuple
-from django.dispatch import Signal
+from bolt.signals.dispatch import Signal
 
 class_prepared = Signal()
 

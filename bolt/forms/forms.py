@@ -8,9 +8,9 @@ import datetime
 from django.core.exceptions import NON_FIELD_ERRORS
 from .exceptions import ValidationError
 from .fields import Field, FileField
-from django.utils.datastructures import MultiValueDict
-from django.utils.functional import cached_property
-from django.utils.translation import gettext as _
+from bolt.utils.datastructures import MultiValueDict
+from bolt.utils.functional import cached_property
+from bolt.utils.translation import gettext as _
 
 __all__ = ("BaseForm", "Form")
 

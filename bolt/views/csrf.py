@@ -1,4 +1,4 @@
-from django.utils.decorators import method_decorator
+from bolt.utils.decorators import method_decorator
 from functools import wraps
 
 def csrf_exempt(view_func):

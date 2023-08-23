@@ -5,28 +5,28 @@ from itertools import chain
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 from django.conf import settings
-from django.core import signing
+from bolt import signing
 from django.core.exceptions import (
     DisallowedHost,
     ImproperlyConfigured,
     RequestDataTooBig,
     TooManyFieldsSent,
 )
-from django.core.files import uploadhandler
+from bolt.files import uploadhandler
 from bolt.http.multipartparser import (
     MultiPartParser,
     MultiPartParserError,
     TooManyFilesSent,
 )
-from django.utils.datastructures import (
+from bolt.utils.datastructures import (
     CaseInsensitiveMapping,
     ImmutableList,
     MultiValueDict,
 )
-from django.utils.encoding import escape_uri_path, iri_to_uri
-from django.utils.functional import cached_property
-from django.utils.http import is_same_domain, parse_header_parameters
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.encoding import escape_uri_path, iri_to_uri
+from bolt.utils.functional import cached_property
+from bolt.utils.http import is_same_domain, parse_header_parameters
+from bolt.utils.regex_helper import _lazy_re_compile
 
 RAISE_ERROR = object()
 host_validation_re = _lazy_re_compile(
@@ -692,7 +692,7 @@ class MediaType:
 
 
 # It's neither necessary nor appropriate to use
-# django.utils.encoding.force_str() for parsing URLs and form inputs. Thus,
+# bolt.utils.encoding.force_str() for parsing URLs and form inputs. Thus,
 # this slightly more restricted function, used by QueryDict.
 def bytes_to_text(s, encoding):
     """

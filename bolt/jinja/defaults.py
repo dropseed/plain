@@ -5,7 +5,7 @@ from pathlib import Path
 import functools
 from bolt.apps import apps
 from django.conf import settings
-from django.utils.module_loading import module_has_submodule
+from bolt.utils.module_loading import module_has_submodule
 from importlib import import_module
 
 from .filters import default_filters

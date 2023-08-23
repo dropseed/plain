@@ -8,11 +8,11 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from bolt.mail import EmailMultiAlternatives
 from bolt import jinja
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
-from django.utils.text import capfirst
-from django.utils.translation import gettext
-from django.utils.translation import gettext_lazy as _
+from bolt.utils.encoding import force_bytes
+from bolt.utils.http import urlsafe_base64_encode
+from bolt.utils.text import capfirst
+from bolt.utils.translation import gettext
+from bolt.utils.translation import gettext_lazy as _
 
 UserModel = get_user_model()
 

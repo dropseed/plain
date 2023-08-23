@@ -3,7 +3,7 @@ import sys
 from functools import wraps
 
 from django.conf import settings
-from django.core import signals
+from bolt import signals
 from django.core.exceptions import (
     BadRequest,
     PermissionDenied,
@@ -15,7 +15,7 @@ from django.core.exceptions import (
 from bolt.http import Http404
 from bolt.http.multipartparser import MultiPartParserError
 from bolt.urls import get_resolver, get_urlconf
-from django.utils.log import log_response
+from bolt.utils.log import log_response
 from bolt.debug import responses as debug_responses
 
 

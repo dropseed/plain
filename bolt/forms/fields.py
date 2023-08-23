@@ -16,12 +16,12 @@ from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db.models.enums import ChoicesMeta
 from .boundfield import BoundField
-from django.utils import formats
-from django.utils.dateparse import parse_datetime, parse_duration
-from django.utils.duration import duration_string
-from django.utils.regex_helper import _lazy_re_compile
-from django.utils.translation import gettext_lazy as _
-from django.utils.translation import ngettext_lazy
+from bolt.utils import formats
+from bolt.utils.dateparse import parse_datetime, parse_duration
+from bolt.utils.duration import duration_string
+from bolt.utils.regex_helper import _lazy_re_compile
+from bolt.utils.translation import gettext_lazy as _
+from bolt.utils.translation import ngettext_lazy
 
 from .exceptions import FormFieldMissingError
 

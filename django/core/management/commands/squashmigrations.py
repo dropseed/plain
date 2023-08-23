@@ -10,7 +10,7 @@ from django.db.migrations.loader import AmbiguityError, MigrationLoader
 from django.db.migrations.migration import SwappableTuple
 from django.db.migrations.optimizer import MigrationOptimizer
 from django.db.migrations.writer import MigrationWriter
-from django.utils.version import get_docs_version
+from bolt.utils.version import get_docs_version
 
 
 class Command(BaseCommand):

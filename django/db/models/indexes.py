@@ -5,7 +5,7 @@ from django.db.models.expressions import Col, ExpressionList, F, Func, OrderBy
 from django.db.models.functions import Collate
 from django.db.models.query_utils import Q
 from django.db.models.sql import Query
-from django.utils.functional import partition
+from bolt.utils.functional import partition
 
 __all__ = ["Index"]
 

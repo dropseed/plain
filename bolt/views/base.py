@@ -6,7 +6,7 @@ from bolt.http import (
     HttpResponseNotAllowed,
     JsonResponse,
 )
-from django.utils.decorators import classonlymethod
+from bolt.utils.decorators import classonlymethod
 
 from .exceptions import HttpResponseException
 

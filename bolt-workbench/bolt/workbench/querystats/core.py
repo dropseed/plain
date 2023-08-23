@@ -3,7 +3,7 @@ import traceback
 from collections import Counter
 import sqlparse
 
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 
 IGNORE_STACK_FILES = [
     "threading",

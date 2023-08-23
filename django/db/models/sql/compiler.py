@@ -22,9 +22,9 @@ from django.db.models.sql.constants import (
 from django.db.models.sql.query import Query, get_order_dir
 from django.db.models.sql.where import AND
 from django.db.transaction import TransactionManagementError
-from django.utils.functional import cached_property
-from django.utils.hashable import make_hashable
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.functional import cached_property
+from bolt.utils.hashable import make_hashable
+from bolt.utils.regex_helper import _lazy_re_compile
 
 
 class PositionRef(Ref):

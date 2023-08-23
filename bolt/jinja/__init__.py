@@ -1,7 +1,7 @@
 from django.conf import settings
-from django.utils.module_loading import import_string
+from bolt.utils.module_loading import import_string
 from .defaults import create_default_environment, get_template_dirs
-from django.utils.functional import LazyObject
+from bolt.utils.functional import LazyObject
 
 
 class JinjaEnvironment(LazyObject):

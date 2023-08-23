@@ -1,7 +1,7 @@
 import enum
 from types import DynamicClassAttribute
 
-from django.utils.functional import Promise
+from bolt.utils.functional import Promise
 
 __all__ = ["Choices", "IntegerChoices", "TextChoices"]
 

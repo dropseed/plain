@@ -12,15 +12,15 @@ from http.client import responses
 from urllib.parse import urlparse
 
 from django.conf import settings
-from django.core import signals, signing
+from bolt import signals, signing
 from django.core.exceptions import DisallowedRedirect
 from bolt.json import BoltJSONEncoder
 from http.cookies import SimpleCookie
-from django.utils import timezone
-from django.utils.datastructures import CaseInsensitiveMapping
-from django.utils.encoding import iri_to_uri
-from django.utils.http import content_disposition_header, http_date
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils import timezone
+from bolt.utils.datastructures import CaseInsensitiveMapping
+from bolt.utils.encoding import iri_to_uri
+from bolt.utils.http import content_disposition_header, http_date
+from bolt.utils.regex_helper import _lazy_re_compile
 
 _charset_from_content_type_re = _lazy_re_compile(
     r";\s*charset=(?P<charset>[^\s;]+)", re.I

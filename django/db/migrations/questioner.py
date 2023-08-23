@@ -6,8 +6,8 @@ import sys
 from bolt.apps import apps
 from django.core.management.base import OutputWrapper
 from django.db.models import NOT_PROVIDED
-from django.utils import timezone
-from django.utils.version import get_docs_version
+from bolt.utils import timezone
+from bolt.utils.version import get_docs_version
 
 from .loader import MigrationLoader
 
@@ -138,7 +138,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 f"provide another value."
             )
         self.prompt_output.write(
-            "The datetime and django.utils.timezone modules are available, so "
+            "The datetime and bolt.utils.timezone modules are available, so "
             "it is possible to provide e.g. timezone.now as a value."
         )
         self.prompt_output.write("Type 'exit' to exit this prompt")

@@ -3,8 +3,8 @@ import logging
 from bolt.sessions.backends.base import CreateError, SessionBase, UpdateError
 from django.core.exceptions import SuspiciousOperation
 from django.db import DatabaseError, IntegrityError, router, transaction
-from django.utils import timezone
-from django.utils.functional import cached_property
+from bolt.utils import timezone
+from bolt.utils.functional import cached_property
 
 
 class SessionStore(SessionBase):

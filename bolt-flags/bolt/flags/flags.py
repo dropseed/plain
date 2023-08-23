@@ -2,8 +2,8 @@ import logging
 from typing import Any
 
 from django.conf import settings
-from django.utils import timezone
-from django.utils.functional import cached_property
+from bolt.utils import timezone
+from bolt.utils.functional import cached_property
 
 from . import exceptions
 from .utils import coerce_key

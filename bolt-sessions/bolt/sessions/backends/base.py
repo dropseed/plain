@@ -3,10 +3,10 @@ import string
 from datetime import datetime, timedelta
 
 from django.conf import settings
-from django.core import signing
-from django.utils import timezone
-from django.utils.crypto import get_random_string
-from django.utils.module_loading import import_string
+from bolt import signing
+from bolt.utils import timezone
+from bolt.utils.crypto import get_random_string
+from bolt.utils.module_loading import import_string
 
 # session_key should not be case sensitive because some backends can store it
 # on case insensitive file systems.

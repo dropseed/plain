@@ -1,4 +1,4 @@
-from django.core import signals
+from bolt import signals
 from django.db.utils import (
     DEFAULT_DB_ALIAS,
     DJANGO_VERSION_PICKLE_KEY,
@@ -14,7 +14,7 @@ from django.db.utils import (
     OperationalError,
     ProgrammingError,
 )
-from django.utils.connection import ConnectionProxy
+from bolt.utils.connection import ConnectionProxy
 
 __all__ = [
     "connection",

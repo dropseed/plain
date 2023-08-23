@@ -10,8 +10,8 @@ they're the closest concept currently available.
 """
 
 from django.core import exceptions
-from django.utils.functional import cached_property
-from django.utils.hashable import make_hashable
+from bolt.utils.functional import cached_property
+from bolt.utils.hashable import make_hashable
 
 from . import BLANK_CHOICE_DASH
 from .mixins import FieldCacheMixin

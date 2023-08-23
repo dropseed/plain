@@ -32,8 +32,8 @@ from django.db.backends.utils import (
     typecast_time,
     typecast_timestamp,
 )
-from django.utils import timezone
-from django.utils.duration import duration_microseconds
+from bolt.utils import timezone
+from bolt.utils.duration import duration_microseconds
 
 
 def register(connection):

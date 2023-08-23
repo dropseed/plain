@@ -7,8 +7,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends import utils as backend_utils
 from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils.functional import cached_property
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.functional import cached_property
+from bolt.utils.regex_helper import _lazy_re_compile
 
 try:
     import MySQLdb as Database

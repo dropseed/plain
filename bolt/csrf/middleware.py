@@ -12,12 +12,12 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import DisallowedHost, ImproperlyConfigured
 from bolt.http import HttpHeaders, UnreadablePostError
-from django.utils.cache import patch_vary_headers
-from django.utils.crypto import constant_time_compare, get_random_string
-from django.utils.functional import cached_property
-from django.utils.http import is_same_domain
-from django.utils.log import log_response
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.cache import patch_vary_headers
+from bolt.utils.crypto import constant_time_compare, get_random_string
+from bolt.utils.functional import cached_property
+from bolt.utils.http import is_same_domain
+from bolt.utils.log import log_response
+from bolt.utils.regex_helper import _lazy_re_compile
 
 
 logger = logging.getLogger("django.security.csrf")

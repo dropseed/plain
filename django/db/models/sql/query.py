@@ -40,9 +40,9 @@ from django.db.models.query_utils import (
 from django.db.models.sql.constants import INNER, LOUTER, ORDER_DIR, SINGLE
 from django.db.models.sql.datastructures import BaseTable, Empty, Join, MultiJoin
 from django.db.models.sql.where import AND, OR, ExtraWhere, NothingNode, WhereNode
-from django.utils.functional import cached_property
-from django.utils.regex_helper import _lazy_re_compile
-from django.utils.tree import Node
+from bolt.utils.functional import cached_property
+from bolt.utils.regex_helper import _lazy_re_compile
+from bolt.utils.tree import Node
 
 __all__ = ["Query", "RawQuery"]
 

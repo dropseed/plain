@@ -1,5 +1,5 @@
 from bolt.urls import NoReverseMatch, reverse
-from django.utils.functional import Promise
+from bolt.utils.functional import Promise
 
 
 def resolve_url(to, *args, **kwargs):

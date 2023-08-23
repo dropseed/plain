@@ -38,7 +38,7 @@ def django_db_setup(
     django_db_blocker,
 ) -> None:
     """Top level fixture to ensure test databases are available"""
-    from django.test.utils import setup_databases, teardown_databases
+    from bolt.test.utils import setup_databases, teardown_databases
 
     setup_databases_args = {}
 
@@ -105,12 +105,12 @@ def _django_db_helper(
     request.addfinalizer(django_db_blocker.restore)
 
     import django.db
-    import django.test
+    import bolt.test
 
     if transactional:
-        test_case_class = django.test.TransactionTestCase
+        test_case_class = bolt.test.TransactionTestCase
     else:
-        test_case_class = django.test.TestCase
+        test_case_class = bolt.test.TestCase
 
     _reset_sequences = reset_sequences
     _serialized_rollback = serialized_rollback
@@ -228,17 +228,17 @@ def django_db_serialized_rollback(
 
 
 @pytest.fixture()
-def client() -> "django.test.client.Client":
+def client() -> "bolt.test.client.Client":
     """A Django test client instance."""
-    from django.test.client import Client
+    from bolt.test.client import Client
 
     return Client()
 
 
 @pytest.fixture()
-def rf() -> "django.test.client.RequestFactory":
+def rf() -> "bolt.test.client.RequestFactory":
     """RequestFactory instance"""
-    from django.test.client import RequestFactory
+    from bolt.test.client import RequestFactory
 
     return RequestFactory()
 
@@ -247,7 +247,7 @@ class SettingsWrapper:
     _to_restore: List[Any] = []
 
     def __delattr__(self, attr: str) -> None:
-        from django.test import override_settings
+        from bolt.test import override_settings
 
         override = override_settings()
         override.enable()
@@ -258,7 +258,7 @@ class SettingsWrapper:
         self._to_restore.append(override)
 
     def __setattr__(self, attr: str, value) -> None:
-        from django.test import override_settings
+        from bolt.test import override_settings
 
         override = override_settings(**{attr: value})
         override.enable()
@@ -291,8 +291,8 @@ def _assert_num_queries(
     exact: bool = True,
     connection=None,
     info=None,
-) -> Generator["django.test.utils.CaptureQueriesContext", None, None]:
-    from django.test.utils import CaptureQueriesContext
+) -> Generator["bolt.test.utils.CaptureQueriesContext", None, None]:
+    from bolt.test.utils import CaptureQueriesContext
 
     if connection is None:
         from django.db import connection as conn

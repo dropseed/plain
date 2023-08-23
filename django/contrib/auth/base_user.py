@@ -13,9 +13,9 @@ from django.contrib.auth.hashers import (
     make_password,
 )
 from django.db import models
-from django.utils.crypto import get_random_string, salted_hmac
-from django.utils.deprecation import RemovedInDjango51Warning
-from django.utils.translation import gettext_lazy as _
+from bolt.utils.crypto import get_random_string, salted_hmac
+from bolt.utils.deprecation import RemovedInDjango51Warning
+from bolt.utils.translation import gettext_lazy as _
 
 
 class BaseUserManager(models.Manager):

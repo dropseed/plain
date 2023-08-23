@@ -77,7 +77,7 @@ from django.db.models.lookups import GreaterThan, LessThanOrEqual
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import DeferredAttribute
 from django.db.models.utils import AltersData, resolve_callables
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 
 
 class ForeignKeyDeferredAttribute(DeferredAttribute):

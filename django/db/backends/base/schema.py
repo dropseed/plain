@@ -15,7 +15,7 @@ from django.db.backends.utils import names_digest, split_identifier, truncate_na
 from django.db.models import Deferrable, Index
 from django.db.models.sql import Query
 from django.db.transaction import TransactionManagementError, atomic
-from django.utils import timezone
+from bolt.utils import timezone
 
 logger = logging.getLogger("django.db.backends.schema")
 

@@ -3,7 +3,7 @@ from django.db import NotSupportedError
 from django.db.models.expressions import Func, Value
 from django.db.models.fields import TextField
 from django.db.models.fields.json import JSONField
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.regex_helper import _lazy_re_compile
 
 
 class Cast(Func):

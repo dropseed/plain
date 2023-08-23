@@ -9,7 +9,7 @@ from django.db.migrations.exceptions import AmbiguityError
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.optimizer import MigrationOptimizer
 from django.db.migrations.writer import MigrationWriter
-from django.utils.version import get_docs_version
+from bolt.utils.version import get_docs_version
 
 
 class Command(BaseCommand):

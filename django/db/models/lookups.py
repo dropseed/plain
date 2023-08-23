@@ -12,9 +12,9 @@ from django.db.models.fields import (
     UUIDField,
 )
 from django.db.models.query_utils import RegisterLookupMixin
-from django.utils.datastructures import OrderedSet
-from django.utils.functional import cached_property
-from django.utils.hashable import make_hashable
+from bolt.utils.datastructures import OrderedSet
+from bolt.utils.functional import cached_property
+from bolt.utils.hashable import make_hashable
 
 
 class Lookup(Expression):

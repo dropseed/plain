@@ -12,9 +12,9 @@ from django.db import DatabaseError, NotSupportedError, connection
 from django.db.models import fields
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.query_utils import Q
-from django.utils.deconstruct import deconstructible
-from django.utils.functional import cached_property
-from django.utils.hashable import make_hashable
+from bolt.utils.deconstruct import deconstructible
+from bolt.utils.functional import cached_property
+from bolt.utils.hashable import make_hashable
 
 
 class SQLiteNumericMixin:

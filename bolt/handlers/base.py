@@ -3,11 +3,11 @@ import types
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, MiddlewareNotUsed
-from django.core.signals import request_finished
+from bolt.signals import request_finished
 from django.db import connections, transaction
 from bolt.urls import get_resolver, set_urlconf
-from django.utils.log import log_response
-from django.utils.module_loading import import_string
+from bolt.utils.log import log_response
+from bolt.utils.module_loading import import_string
 
 from .exception import convert_exception_to_response
 

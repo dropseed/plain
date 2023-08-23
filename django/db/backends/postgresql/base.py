@@ -14,9 +14,9 @@ from django.db import DatabaseError as WrappedDatabaseError
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
-from django.utils.functional import cached_property
-from django.utils.safestring import SafeString
-from django.utils.version import get_version_tuple
+from bolt.utils.functional import cached_property
+from bolt.utils.safestring import SafeString
+from bolt.utils.version import get_version_tuple
 
 try:
     try:

@@ -98,7 +98,7 @@ def no_translations(handle_func):
     """Decorator that forces a command to run with translations deactivated."""
 
     def wrapper(*args, **kwargs):
-        from django.utils import translation
+        from bolt.utils import translation
 
         saved_locale = translation.get_language()
         translation.deactivate_all()

@@ -1,6 +1,6 @@
 import stripe
 from django.db import models
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 
 
 class StripeModel(models.Model):

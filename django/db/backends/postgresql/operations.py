@@ -12,7 +12,7 @@ from django.db.backends.postgresql.psycopg_any import (
 )
 from django.db.backends.utils import split_tzname_delta
 from django.db.models.constants import OnConflict
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.regex_helper import _lazy_re_compile
 
 
 @lru_cache

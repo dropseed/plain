@@ -5,7 +5,7 @@ by the DJANGO_SETTINGS_MODULE environment variable.
 
 
 # This is defined here as a do-nothing function because we can't import
-# django.utils.translation -- that module depends on the settings.
+# bolt.utils.translation -- that module depends on the settings.
 def gettext_noop(s):
     return s
 
@@ -185,10 +185,10 @@ SECRET_KEY_FALLBACKS: list[str] = []
 
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "bolt.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        "BACKEND": "bolt.staticfiles.storage.StaticFilesStorage",
     },
 }
 
@@ -210,8 +210,8 @@ STATIC_URL = None
 
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [
-    "django.core.files.uploadhandler.MemoryFileUploadHandler",
-    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+    "bolt.files.uploadhandler.MemoryFileUploadHandler",
+    "bolt.files.uploadhandler.TemporaryFileUploadHandler",
 ]
 
 # Maximum size, in bytes, of a request before it will be streamed to the
@@ -409,7 +409,7 @@ AUTH_PASSWORD_VALIDATORS = []
 # SIGNING #
 ###########
 
-SIGNING_BACKEND = "django.core.signing.TimestampSigner"
+SIGNING_BACKEND = "bolt.signing.TimestampSigner"
 
 ########
 # CSRF #
@@ -455,9 +455,9 @@ STATICFILES_DIRS = []
 # List of finder classes that know how to find static files in
 # various locations.
 STATICFILES_FINDERS = [
-    "django.contrib.staticfiles.finders.FileSystemFinder",
-    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-    # 'django.contrib.staticfiles.finders.DefaultStorageFinder',
+    "bolt.staticfiles.finders.FileSystemFinder",
+    "bolt.staticfiles.finders.AppDirectoriesFinder",
+    # 'bolt.staticfiles.finders.DefaultStorageFinder',
 ]
 
 ##############

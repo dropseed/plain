@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.checks import Error
 from django.db import models, transaction
 from django.db.utils import IntegrityError, OperationalError, ProgrammingError
-from django.utils import timezone
+from bolt.utils import timezone
 
 from .exceptions import OAuthUserAlreadyExistsError
 

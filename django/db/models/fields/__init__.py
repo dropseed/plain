@@ -15,20 +15,20 @@ from django.db import connection, connections, router
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.enums import ChoicesMeta
 from django.db.models.query_utils import DeferredAttribute, RegisterLookupMixin
-from django.utils import timezone
-from django.utils.datastructures import DictWrapper
-from django.utils.dateparse import (
+from bolt.utils import timezone
+from bolt.utils.datastructures import DictWrapper
+from bolt.utils.dateparse import (
     parse_date,
     parse_datetime,
     parse_duration,
     parse_time,
 )
-from django.utils.duration import duration_microseconds, duration_string
-from django.utils.functional import Promise, cached_property
-from django.utils.ipv6 import clean_ipv6_address
-from django.utils.itercompat import is_iterable
-from django.utils.text import capfirst
-from django.utils.translation import gettext_lazy as _
+from bolt.utils.duration import duration_microseconds, duration_string
+from bolt.utils.functional import Promise, cached_property
+from bolt.utils.ipv6 import clean_ipv6_address
+from bolt.utils.itercompat import is_iterable
+from bolt.utils.text import capfirst
+from bolt.utils.translation import gettext_lazy as _
 
 __all__ = [
     "AutoField",
@@ -1268,7 +1268,7 @@ class DateTimeCheckMixin:
                         "It seems you set a fixed date / time / datetime "
                         "value as default for this field. This may not be "
                         "what you want. If you want to have the current date "
-                        "as default, use `django.utils.timezone.now`"
+                        "as default, use `bolt.utils.timezone.now`"
                     ),
                     obj=self,
                     id="fields.W161",

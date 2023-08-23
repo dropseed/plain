@@ -3,9 +3,9 @@ import decimal
 import json
 import uuid
 
-from django.utils.duration import duration_iso_string
-from django.utils.functional import Promise
-from django.utils.timezone import is_aware
+from bolt.utils.duration import duration_iso_string
+from bolt.utils.functional import Promise
+from bolt.utils.timezone import is_aware
 
 
 class BoltJSONEncoder(json.JSONEncoder):

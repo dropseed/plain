@@ -6,7 +6,7 @@ import functools
 import os
 import sys
 
-from django.utils import termcolors
+from bolt.utils import termcolors
 
 try:
     import colorama
@@ -68,7 +68,7 @@ def make_style(config_string=""):
     """
     Create a Style object from the given config_string.
 
-    If config_string is empty django.utils.termcolors.DEFAULT_PALETTE is used.
+    If config_string is empty bolt.utils.termcolors.DEFAULT_PALETTE is used.
     """
 
     style = Style()

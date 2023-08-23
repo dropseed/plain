@@ -1,6 +1,6 @@
-from django.utils.cache import patch_vary_headers
-from django.utils.regex_helper import _lazy_re_compile
-from django.utils.text import compress_sequence, compress_string
+from bolt.utils.cache import patch_vary_headers
+from bolt.utils.regex_helper import _lazy_re_compile
+from bolt.utils.text import compress_sequence, compress_string
 
 re_accepts_gzip = _lazy_re_compile(r"\bgzip\b")
 

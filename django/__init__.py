@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from django.utils.version import get_version
+from bolt.utils.version import get_version
 
 VERSION = (5, 0, 0, "alpha", 0)
 
@@ -14,7 +14,7 @@ def setup():
     """
     from bolt.apps import apps
     from django.conf import settings
-    from django.utils.log import configure_logging
+    from bolt.utils.log import configure_logging
 
     # Automatically put the app dir on the Python path for convenience
     app_dir = Path.cwd() / "app"

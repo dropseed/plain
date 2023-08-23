@@ -12,8 +12,8 @@ from django.db.models.constants import LOOKUP_SEP
 from django.db.models.deletion import CASCADE, SET_DEFAULT, SET_NULL
 from django.db.models.query_utils import PathInfo
 from django.db.models.utils import make_model_tuple
-from django.utils.functional import cached_property
-from django.utils.translation import gettext_lazy as _
+from bolt.utils.functional import cached_property
+from bolt.utils.translation import gettext_lazy as _
 
 from . import Field
 from .mixins import FieldCacheMixin

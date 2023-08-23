@@ -9,8 +9,8 @@ import zlib
 from hashlib import md5
 
 from bolt.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
-from django.core.files import locks
-from django.core.files.move import file_move_safe
+from bolt.files import locks
+from bolt.files.move import file_move_safe
 
 
 class FileBasedCache(BaseCache):

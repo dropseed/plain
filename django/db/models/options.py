@@ -10,12 +10,12 @@ from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import connections
 from django.db.models import AutoField, Manager, OrderWrt, UniqueConstraint
 from django.db.models.query_utils import PathInfo
-from django.utils.datastructures import ImmutableList, OrderedSet
-from django.utils.deprecation import RemovedInDjango51Warning
-from django.utils.functional import cached_property
-from django.utils.module_loading import import_string
-from django.utils.text import camel_case_to_spaces, format_lazy
-from django.utils.translation import override
+from bolt.utils.datastructures import ImmutableList, OrderedSet
+from bolt.utils.deprecation import RemovedInDjango51Warning
+from bolt.utils.functional import cached_property
+from bolt.utils.module_loading import import_string
+from bolt.utils.text import camel_case_to_spaces, format_lazy
+from bolt.utils.translation import override
 
 PROXY_PARENTS = object()
 

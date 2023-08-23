@@ -10,9 +10,9 @@ from django.db import DatabaseError, NotSupportedError, models
 from django.db.backends.base.operations import BaseDatabaseOperations
 from django.db.models.constants import OnConflict
 from django.db.models.expressions import Col
-from django.utils import timezone
-from django.utils.dateparse import parse_date, parse_datetime, parse_time
-from django.utils.functional import cached_property
+from bolt.utils import timezone
+from bolt.utils.dateparse import parse_date, parse_datetime, parse_time
+from bolt.utils.functional import cached_property
 
 
 class DatabaseOperations(BaseDatabaseOperations):

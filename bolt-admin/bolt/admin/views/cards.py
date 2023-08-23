@@ -2,8 +2,8 @@ import datetime
 from datetime import timedelta
 from enum import Enum
 
-from django.utils import timezone
-from django.utils.functional import cached_property
+from bolt.utils import timezone
+from bolt.utils.functional import cached_property
 
 from .base import BaseAdminView
 

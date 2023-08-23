@@ -1,5 +1,5 @@
 import re
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 import os
 from jinja2.loaders import FileSystemLoader
 from typing import TYPE_CHECKING

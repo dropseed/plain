@@ -10,11 +10,11 @@ from django.core.exceptions import (
     ImproperlyConfigured,
     ValidationError,
 )
-from django.utils.functional import cached_property, lazy
-from django.utils.html import format_html, format_html_join
-from django.utils.module_loading import import_string
-from django.utils.translation import gettext as _
-from django.utils.translation import ngettext
+from bolt.utils.functional import cached_property, lazy
+from bolt.utils.html import format_html, format_html_join
+from bolt.utils.module_loading import import_string
+from bolt.utils.translation import gettext as _
+from bolt.utils.translation import ngettext
 
 
 @functools.cache

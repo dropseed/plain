@@ -12,12 +12,12 @@ from bolt.http import Http404, HttpResponse, HttpResponseNotFound
 from bolt.jinja.defaults import create_default_environment
 from pprint import pformat
 from bolt.urls import resolve
-from django.utils import timezone
-from django.utils.datastructures import MultiValueDict
-from django.utils.encoding import force_str
-from django.utils.module_loading import import_string
-from django.utils.regex_helper import _lazy_re_compile
-from django.utils.version import PY311, get_docs_version
+from bolt.utils import timezone
+from bolt.utils.datastructures import MultiValueDict
+from bolt.utils.encoding import force_str
+from bolt.utils.module_loading import import_string
+from bolt.utils.regex_helper import _lazy_re_compile
+from bolt.utils.version import PY311, get_docs_version
 from jinja2.exceptions import TemplateNotFound
 
 # Minimal Django templates engine to render the error templates

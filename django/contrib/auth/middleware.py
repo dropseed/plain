@@ -1,6 +1,6 @@
 from django.contrib import auth
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.functional import SimpleLazyObject
+from bolt.utils.functional import SimpleLazyObject
 
 
 def get_user(request):

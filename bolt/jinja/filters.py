@@ -1,10 +1,10 @@
 from itertools import islice
-from django.utils.timesince import timeuntil, timesince
-from django.utils.formats import date_format, time_format
+from bolt.utils.timesince import timeuntil, timesince
+from bolt.utils.formats import date_format, time_format
 from jinja2.utils import htmlsafe_json_dumps
-from django.utils.timezone import localtime
+from bolt.utils.timezone import localtime
 import datetime
-from django.utils.html import format_html
+from bolt.utils.html import format_html
 
 
 def json_script(value, id):

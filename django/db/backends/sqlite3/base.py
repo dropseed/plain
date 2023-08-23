@@ -11,8 +11,8 @@ from sqlite3 import dbapi2 as Database
 from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils.dateparse import parse_date, parse_datetime, parse_time
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.dateparse import parse_date, parse_datetime, parse_time
+from bolt.utils.regex_helper import _lazy_re_compile
 
 from ._functions import register as register_functions
 from .client import DatabaseClient

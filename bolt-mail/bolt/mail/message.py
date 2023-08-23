@@ -16,7 +16,7 @@ from pathlib import Path
 
 from django.conf import settings
 from .utils import DNS_NAME
-from django.utils.encoding import force_str, punycode
+from bolt.utils.encoding import force_str, punycode
 
 # Don't BASE64-encode UTF-8 messages so that we avoid unwanted attention from
 # some spam filters.

@@ -4,8 +4,8 @@ from importlib import import_module
 from django.conf import settings
 from bolt.sessions.backends.base import UpdateError
 from bolt.sessions.exceptions import SessionInterrupted
-from django.utils.cache import patch_vary_headers
-from django.utils.http import http_date
+from bolt.utils.cache import patch_vary_headers
+from bolt.utils.http import http_date
 
 
 class SessionMiddleware:

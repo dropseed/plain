@@ -9,7 +9,7 @@ from bolt.cache.backends.base import (
     InvalidCacheKey,
     memcache_key_warnings,
 )
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 
 
 class BaseMemcachedCache(BaseCache):

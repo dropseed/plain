@@ -30,8 +30,8 @@ from django.db.models.utils import (
     create_namedtuple_class,
     resolve_callables,
 )
-from django.utils import timezone
-from django.utils.functional import cached_property, partition
+from bolt.utils import timezone
+from bolt.utils.functional import cached_property, partition
 
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21

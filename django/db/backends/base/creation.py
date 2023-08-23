@@ -7,7 +7,7 @@ from django.conf import settings
 from bolt.json import BoltJSONEncoder
 from django.db import router
 from django.db.transaction import atomic
-from django.utils.module_loading import import_string
+from bolt.utils.module_loading import import_string
 
 # The prefix to put on the default database name when creating
 # the test database.

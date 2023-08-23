@@ -11,8 +11,8 @@ from django.db.models.lookups import (
     PostgresOperatorLookup,
     Transform,
 )
-from django.utils.deprecation import RemovedInDjango51Warning
-from django.utils.translation import gettext_lazy as _
+from bolt.utils.deprecation import RemovedInDjango51Warning
+from bolt.utils.translation import gettext_lazy as _
 
 from . import Field
 from .mixins import CheckFieldDefaultMixin

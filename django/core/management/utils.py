@@ -6,8 +6,8 @@ from pathlib import Path
 from subprocess import run
 
 from bolt.apps import apps as installed_apps
-from django.utils.crypto import get_random_string
-from django.utils.encoding import DEFAULT_LOCALE_ENCODING
+from bolt.utils.crypto import get_random_string
+from bolt.utils.encoding import DEFAULT_LOCALE_ENCODING
 
 from .base import CommandError, CommandParser
 

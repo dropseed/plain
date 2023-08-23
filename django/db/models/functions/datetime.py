@@ -18,7 +18,7 @@ from django.db.models.lookups import (
     YearLt,
     YearLte,
 )
-from django.utils import timezone
+from bolt.utils import timezone
 
 
 class TimezoneMixin:

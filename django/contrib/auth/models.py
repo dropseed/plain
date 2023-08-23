@@ -4,9 +4,9 @@ from django.contrib.auth.hashers import make_password
 from bolt.mail import send_mail
 from django.db import models
 from django.db.models.manager import EmptyManager
-from django.utils import timezone
-from django.utils.itercompat import is_iterable
-from django.utils.translation import gettext_lazy as _
+from bolt.utils import timezone
+from bolt.utils.itercompat import is_iterable
+from bolt.utils.translation import gettext_lazy as _
 
 from .validators import UnicodeUsernameValidator
 

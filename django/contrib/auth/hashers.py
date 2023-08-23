@@ -8,16 +8,16 @@ import warnings
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.core.signals import setting_changed
-from django.dispatch import receiver
-from django.utils.crypto import (
+from bolt.signals import setting_changed
+from bolt.signals.dispatch import receiver
+from bolt.utils.crypto import (
     RANDOM_STRING_CHARS,
     constant_time_compare,
     get_random_string,
     pbkdf2,
 )
-from django.utils.module_loading import import_string
-from django.utils.translation import gettext_noop as _
+from bolt.utils.module_loading import import_string
+from bolt.utils.translation import gettext_noop as _
 
 UNUSABLE_PASSWORD_PREFIX = "!"  # This will never be a valid encoded hash
 UNUSABLE_PASSWORD_SUFFIX_LENGTH = (

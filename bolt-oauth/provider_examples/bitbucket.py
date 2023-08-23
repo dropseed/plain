@@ -1,7 +1,7 @@
 import datetime
 
 import requests
-from django.utils import timezone
+from bolt.utils import timezone
 
 from bolt.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 

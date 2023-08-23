@@ -201,7 +201,7 @@ def _check_lazy_references(apps, ignore=None):
     known_lazy = {
         ("django.db.models.fields.related", "resolve_related_class"): field_error,
         ("django.db.models.fields.related", "set_managed"): None,
-        ("django.dispatch.dispatcher", "connect"): signal_connect_error,
+        ("bolt.signals.dispatch.dispatcher", "connect"): signal_connect_error,
     }
 
     def build_error(model_key, func, args, keywords):

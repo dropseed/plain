@@ -2,15 +2,15 @@ import datetime
 import posixpath
 
 from django.core import checks
-from django.core.files.base import File
-from django.core.files.images import ImageFile
-from django.core.files.storage import Storage, default_storage
-from django.core.files.utils import validate_file_name
+from bolt.files.base import File
+from bolt.files.images import ImageFile
+from bolt.files.storage import Storage, default_storage
+from bolt.files.utils import validate_file_name
 from django.db.models import signals
 from django.db.models.fields import Field
 from django.db.models.query_utils import DeferredAttribute
 from django.db.models.utils import AltersData
-from django.utils.translation import gettext_lazy as _
+from bolt.utils.translation import gettext_lazy as _
 
 
 class FieldFile(File, AltersData):

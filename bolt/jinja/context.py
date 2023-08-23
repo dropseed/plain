@@ -1,7 +1,7 @@
 from bolt.csrf.middleware import get_token
-from django.utils.functional import lazy
-from django.utils.html import format_html
-from django.utils.safestring import SafeString
+from bolt.utils.functional import lazy
+from bolt.utils.html import format_html
+from bolt.utils.safestring import SafeString
 
 
 def csrf_input(request):

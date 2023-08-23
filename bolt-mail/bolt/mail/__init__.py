@@ -18,7 +18,7 @@ from .message import (
     make_msgid,
 )
 from .utils import DNS_NAME, CachedDnsName
-from django.utils.module_loading import import_string
+from bolt.utils.module_loading import import_string
 
 __all__ = [
     "CachedDnsName",

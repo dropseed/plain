@@ -1,7 +1,7 @@
 from bolt.apps import AppConfig
 from django.core import checks
 from django.db.models.query_utils import DeferredAttribute
-from django.utils.translation import gettext_lazy as _
+from bolt.utils.translation import gettext_lazy as _
 
 from . import get_user_model
 from .checks import check_user_model

@@ -1,5 +1,5 @@
 from django.core.paginator import Paginator
-from django.contrib.staticfiles.storage import staticfiles_storage
+from bolt.staticfiles.storage import staticfiles_storage
 
 
 def url(viewname, *args, **kwargs):

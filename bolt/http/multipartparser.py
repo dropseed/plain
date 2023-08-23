@@ -16,11 +16,11 @@ from django.core.exceptions import (
     TooManyFieldsSent,
     TooManyFilesSent,
 )
-from django.core.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
-from django.utils.datastructures import MultiValueDict
-from django.utils.encoding import force_str
-from django.utils.http import parse_header_parameters
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
+from bolt.utils.datastructures import MultiValueDict
+from bolt.utils.encoding import force_str
+from bolt.utils.http import parse_header_parameters
+from bolt.utils.regex_helper import _lazy_re_compile
 
 __all__ = ("MultiPartParser", "MultiPartParserError", "InputStreamExhausted")
 

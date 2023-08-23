@@ -15,7 +15,7 @@ DEBUG = True
 INSTALLED_APPS = [
     "django.contrib.auth",
     "bolt.sessions",
-    "django.contrib.staticfiles",
+    "bolt.staticfiles",
     "users",
     "bolt.oauth",
 ]

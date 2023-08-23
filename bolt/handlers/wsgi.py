@@ -1,12 +1,12 @@
 from io import IOBase
 
 from django.conf import settings
-from django.core import signals
+from bolt import signals
 from bolt.handlers import base
 from bolt.http import HttpRequest, QueryDict, parse_cookie
-from django.utils.encoding import repercent_broken_unicode
-from django.utils.functional import cached_property
-from django.utils.regex_helper import _lazy_re_compile
+from bolt.utils.encoding import repercent_broken_unicode
+from bolt.utils.functional import cached_property
+from bolt.utils.regex_helper import _lazy_re_compile
 
 _slashes_re = _lazy_re_compile(rb"/+")
 

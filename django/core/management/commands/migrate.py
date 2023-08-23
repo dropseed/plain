@@ -10,8 +10,8 @@ from django.db.migrations.autodetector import MigrationAutodetector
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import AmbiguityError
 from django.db.migrations.state import ModelState, ProjectState
-from django.utils.module_loading import module_has_submodule
-from django.utils.text import Truncator
+from bolt.utils.module_loading import module_has_submodule
+from bolt.utils.text import Truncator
 
 
 class Command(BaseCommand):

@@ -2,7 +2,7 @@
 
 import django.contrib.auth.models
 import django.contrib.auth.validators
-import django.utils.timezone
+import bolt.utils.timezone
 from django.db import migrations, models
 
 
@@ -88,7 +88,7 @@ class Migration(migrations.Migration):
                 (
                     "date_joined",
                     models.DateTimeField(
-                        default=django.utils.timezone.now, verbose_name="date joined"
+                        default=bolt.utils.timezone.now, verbose_name="date joined"
                     ),
                 ),
                 ("email", models.EmailField(max_length=254, unique=True)),

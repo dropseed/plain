@@ -7,7 +7,7 @@ from django.conf import settings
 from ..backends.base import BaseEmailBackend
 from ..message import sanitize_address
 from ..utils import DNS_NAME
-from django.utils.functional import cached_property
+from bolt.utils.functional import cached_property
 
 
 class EmailBackend(BaseEmailBackend):
