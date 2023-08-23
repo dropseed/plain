@@ -551,9 +551,7 @@ class ModelChoiceField(ChoiceField):
     # This class is a subclass of ChoiceField for purity, but it doesn't
     # actually use any of ChoiceField's implementation.
     default_error_messages = {
-        "invalid_choice": _(
-            "Select a valid choice. That choice is not one of the available choices."
-        ),
+        "invalid_choice": "Select a valid choice. That choice is not one of the available choices.",
     }
     iterator = ModelChoiceIterator
 
@@ -655,9 +653,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
 
     default_error_messages = {
         "invalid_list": "Enter a list of values.",
-        "invalid_choice": _(
-            "Select a valid choice. %(value)s is not one of the available choices."
-        ),
+        "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
         "invalid_pk_value": "“%(pk)s” is not a valid value.",
     }
 
