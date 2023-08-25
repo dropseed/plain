@@ -7,66 +7,60 @@ from bolt.runtime import settings
 
 request_logger = logging.getLogger("bolt.request")
 
-# Default logging for Bolt. This sends an email to the site admins on every
-# HTTP 500 error. Depending on DEBUG, all other log records are either sent to
-# the console (DEBUG=True) or discarded (DEBUG=False) by means of the
-# require_debug_true filter. This configuration is quoted in
-# docs/ref/logging.txt; please amend it there if edited here.
-DEFAULT_LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {
-        "require_debug_false": {
-            "()": "bolt.utils.log.RequireDebugFalse",
-        },
-        "require_debug_true": {
-            "()": "bolt.utils.log.RequireDebugTrue",
-        },
-    },
-    "formatters": {
-        "simple": {
-            "format": "[%(levelname)s] %(message)s",
-        },
-        "bolt.server": {
-            "()": "bolt.utils.log.ServerFormatter",
-            "format": "[{server_time}] {message}",
-            "style": "{",
-        }
-    },
-    "handlers": {
-        "console": {
-            "level": "INFO",
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
-        "bolt.server": {
-            "level": "INFO",
-            "class": "logging.StreamHandler",
-            "formatter": "bolt.server",
-        },
-    },
-    "loggers": {
-        "bolt": {
-            "handlers": ["console"],
-            "level": environ.get("BOLT_LOG_LEVEL", "INFO"),
-        },
-        "bolt.server": {
-            "handlers": ["bolt.server"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app": {
-            "handlers": ["console"],
-            "level": environ.get("APP_LOG_LEVEL", "INFO"),
-            "propagate": False,
-        },
-    },
-}
-
 
 def configure_logging(logging_settings):
     # Load the defaults
-    logging.config.dictConfig(DEFAULT_LOGGING)
+    default_logging = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {
+            "require_debug_false": {
+                "()": "bolt.utils.log.RequireDebugFalse",
+            },
+            "require_debug_true": {
+                "()": "bolt.utils.log.RequireDebugTrue",
+            },
+        },
+        "formatters": {
+            "simple": {
+                "format": "[%(levelname)s] %(message)s",
+            },
+            "bolt.server": {
+                "()": "bolt.utils.log.ServerFormatter",
+                "format": "[{server_time}] {message}",
+                "style": "{",
+            }
+        },
+        "handlers": {
+            "console": {
+                "level": "INFO",
+                "class": "logging.StreamHandler",
+                "formatter": "simple",
+            },
+            "bolt.server": {
+                "level": "INFO",
+                "class": "logging.StreamHandler",
+                "formatter": "bolt.server",
+            },
+        },
+        "loggers": {
+            "bolt": {
+                "handlers": ["console"],
+                "level": environ.get("BOLT_LOG_LEVEL", "INFO"),
+            },
+            "bolt.server": {
+                "handlers": ["bolt.server"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "app": {
+                "handlers": ["console"],
+                "level": environ.get("APP_LOG_LEVEL", "INFO"),
+                "propagate": False,
+            },
+        },
+    }
+    logging.config.dictConfig(default_logging)
 
     # Then customize it from settings
     if logging_settings:
