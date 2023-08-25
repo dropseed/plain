@@ -50,7 +50,6 @@
             {% endif %}
 
             <div class="items-center hidden space-x-3 transition-all group-hover:flex">
-                {% if requestlog_enabled|default(false) %}{% include "requestlog/stafftoolbar.html" %}{% endif %}
                 {% for text, url in stafftoolbar.links %}
                 <a href="{{ url }}" class="hover:underline">{{ text }}</a>
                 {% endfor %}
@@ -68,9 +67,6 @@
     <!-- <div>handle</div> -->
     <div class="flex items-center justify-between">
         <div>
-            <button type="button" class="px-4 py-2">
-                Requests
-            </button>
             <button type="button" class="px-4 py-2">
                 Queries
             </button>

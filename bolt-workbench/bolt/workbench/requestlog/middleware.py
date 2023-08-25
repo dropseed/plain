@@ -2,15 +2,24 @@ from bolt.runtime import settings as bolt_settings
 
 from . import settings
 from .core import RequestLog
-from .views import RequestLogView
 
 
-def requestlog_enabled(request):
-    return (
-        bolt_settings.DEBUG
-        and request.path not in settings.REQUESTLOG_IGNORE_URL_PATHS()
-        and "querystats" not in request.GET
-    )
+def should_capture_request(request):
+    if not bolt_settings.DEBUG:
+        return False
+
+    if request.resolver_match and request.resolver_match.app_name == "requestlog":
+        return False
+
+    if request.path in settings.REQUESTLOG_IGNORE_URL_PATHS():
+        return False
+
+    # This could be an attribute set on request or response
+    # or something more dynamic
+    if "querystats" in request.GET:
+        return False
+
+    return True
 
 
 class RequestLogMiddleware:
@@ -18,23 +27,10 @@ class RequestLogMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Exit early if not enabled
-        if not requestlog_enabled(request):
-            return self.get_response(request)
-
-        if (
-            request.GET.get("workbench") == "requestlog"
-            or request.POST.get("workbench") == "requestlog"
-        ):
-            return RequestLogView.as_view()(request).render()
-
-        # Save the request to the log
+        # Process it first, so we know the resolver_match
         response = self.get_response(request)
-        RequestLog(request=request, response=response).save()
-        return response
 
-    def process_template_response(self, request, response):
-        if requestlog_enabled(request):
-            response.context_data["requestlog_enabled"] = True
+        if should_capture_request(request):
+            RequestLog(request=request, response=response).save()
 
         return response

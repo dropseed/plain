@@ -37,12 +37,17 @@ class RequestLog:
         # they are passed through redirects
         data["request"]["headers"].pop("Cookie", None)
 
+        # TODO???
+        if data["request"]["headers"]["X-Forwarded-Proto"] == "https,https":
+            data["request"]["headers"]["X-Forwarded-Proto"] = "https"
+
         response = requests.request(
             method,
             data["request"]["absolute_uri"],
             headers=data["request"]["headers"],
             cookies=data["request"]["cookies"],
             data=request_data,
+            timeout=5,
         )
         print("Replayed request", response)
 
@@ -62,6 +67,10 @@ class RequestLog:
                 log["name"] = os.path.splitext(filename)[0]
                 # Convert timestamp back to datetime
                 log["timestamp"] = datetime.datetime.fromtimestamp(log["timestamp"])
+                try:
+                    log["request"]["body_json"] = json.dumps(json.loads(log["request"]["body"]), indent=2)
+                except json.JSONDecodeError:
+                    pass
                 logs.append(log)
 
         return logs
