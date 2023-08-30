@@ -7,6 +7,7 @@ from bolt.db import connection
 from bolt.http import HttpResponseRedirect
 from bolt.json import BoltJSONEncoder
 from bolt.runtime import settings
+from bolt.urls import reverse
 
 from .core import QueryStats
 
@@ -69,9 +70,7 @@ class QueryStatsMiddleware:
                     _local.querystats.as_context_dict(), cls=QueryStatsJSONEncoder
                 )
                 return HttpResponseRedirect(
-                    request.get_full_path().replace(
-                        "querystats=store", "querystats=show"
-                    )
+                    reverse("querystats:querystats")
                 )
 
             del _local.querystats
@@ -98,29 +97,5 @@ class QueryStatsMiddleware:
             and self.is_staff_request(request)
         ):
             response.context_data["querystats_enabled"] = True
-
-            # Load the previous querystats from the session and display them
-            if request.GET.get("querystats") == "show":
-                stored_querystats = request.session.get(
-                    "querystats"
-                )  # Not popping so page can be reloaded
-                if stored_querystats:
-                    # dates won't come back as Python dates...
-                    stored_querystats = json.loads(stored_querystats)
-                    response.context_data["querystats"] = stored_querystats
-
-                # Additional context for the view
-                response.context_data[
-                    "querystats_resolver_match"
-                ] = request.resolver_match
-
-                # Show full template debug info
-                response.context_data[
-                    "querystats_template_name"
-                ] = response.jinja_template.name
-
-                response.jinja_template = jinja.environment.get_template(
-                    "querystats/querystats.html"
-                )
 
         return response

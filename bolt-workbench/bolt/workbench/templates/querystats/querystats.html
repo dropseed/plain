@@ -1,3 +1,6 @@
+{% extends "bolt/base.html" %}
+
+{% block content %}
 <div class="px-6 py-4">
     <div class="flex items-center justify-between">
         <h2 class="text-xl font-medium">Query stats for {{ request.path }}</h2>
@@ -15,10 +18,12 @@
             </form>
         </div>
     </div>
+    {#
     <div class="mt-2 font-mono text-xs">
         {{ querystats_resolver_match }}
         and template {{ querystats_template_name }}
     </div>
+    #}
 
     <div class="flex w-full mt-5 overflow-auto rounded-sm">
         {% for query in querystats.queries %}
@@ -61,3 +66,4 @@
         {% endfor %}
     </div>
 </div>
+{% endblock %}

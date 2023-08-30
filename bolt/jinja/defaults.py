@@ -82,7 +82,9 @@ def finalize_callable_error(obj):
 
 
 def get_template_dirs():
-    return (settings.path.parent / "templates",) + _get_app_template_dirs()
+    jinja_templates = Path(__file__).parent / "templates"
+    app_templates = settings.path.parent / "templates"
+    return (jinja_templates, app_templates) + _get_app_template_dirs()
 
 
 def create_default_environment(include_apps=True, **environment_kwargs):
