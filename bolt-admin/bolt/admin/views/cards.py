@@ -27,15 +27,20 @@ class AdminCardView(BaseAdminView):
 
 class AdminTextCardView(AdminCardView):
     text: str = ""
+    link: str = ""
     template_name = "admin/cards/text.html"
 
     def get_context(self):
         context = super().get_context()
         context["text"] = self.get_text()
+        context["link"] = self.get_link()
         return context
 
     def get_text(self) -> str:
         return self.text
+
+    def get_link(self) -> str:
+        return self.link
 
 
 class AdminStatCardView(AdminCardView):

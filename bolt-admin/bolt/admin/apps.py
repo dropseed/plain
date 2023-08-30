@@ -16,3 +16,9 @@ class BoltAdminConfig(AppConfig):
                 import_module(f"{app_config.name}.{MODULE_NAME}")
             except ModuleNotFoundError:
                 pass
+
+        # Also trigger for the root app/admin.py module
+        try:
+            import_module(MODULE_NAME)
+        except ModuleNotFoundError:
+            pass

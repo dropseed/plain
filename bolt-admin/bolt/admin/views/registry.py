@@ -48,7 +48,7 @@ class AdminViewRegistry:
         #         self.children = children
 
         sorted_views = sorted(
-            [view for view in self.registered_views if view.show_in_nav],
+            [view for view in self.registered_views if view.should_show_in_nav()],
             key=lambda v: v.title,
         )
 

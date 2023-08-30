@@ -13,6 +13,8 @@
     <link href="{{ static('dist/tailwind.css') }}" rel="stylesheet">
     <link href="{{ static('admin/admin.css') }}" rel="stylesheet">
     <script src="{{ static('admin/chart.js') }}"></script>
+    <script src="{{ static('admin/jquery-3.6.1.slim.min.js') }}"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
 <body class="flex min-h-screen text-white bg-[#2b251f]">
     <div class="fixed flex flex-col justify-between flex-shrink-0 w-64 h-full px-6 pt-6 pb-3">
@@ -20,8 +22,20 @@
             <a class="font-bold text-[#eeede6]" href="{{ url('admin:index') }}">Bolt Admin</a>
             <div class="mt-4 space-y-2.5">
                 {% for view in admin_registry.get_nav_views() %}
-                <a class="block px-2 py-0.5 -mx-2 hover:text-white rounded text-[#dcd9cc] hover:bg-zinc-600" href="{{ url('admin:' + view.view_name() )}}">{{ view.title }}</a>
+                <a class="flex items-center px-2 py-0.5 -mx-2 hover:text-white rounded text-[#dcd9cc] hover:bg-zinc-600" href="{{ url('admin:' + view.view_name() )}}">
+                    {% if view.icon_name %}
+                    <span class="bi bi-{{ view.icon_name }} mr-2"></span>
+                    {% endif %}
+                    {{ view.title }}
+                </a>
                 {% endfor %}
+            </div>
+
+            <div class="mt-6 space-y-2.5">
+                <div class="text-xs tracking-wide text-gray-400">Pinned</div>
+            </div>
+            <div class="mt-6 space-y-2.5">
+                <div class="text-xs tracking-wide text-gray-400">Recent</div>
             </div>
         </div>
         <div class="flex items-center justify-between text-sm text-zinc-200">
@@ -54,7 +68,13 @@
         <div class="flex items-center justify-between px-8 mt-8">
             <div>
             {% block header %}
-                <h1 class="text-2xl font-semibold">{{ title }}</h1>
+                <h1 class="text-2xl font-semibold">
+                    {% if icon_name %}
+                    <span class="bi bi-{{ icon_name }} mr-1.5"></span>
+                    {% endif %}
+
+                    {{ title }}
+                </h1>
                 {% if description %}
                 <p class="mt-2 text-sm text-gray-600">{{ description }}</p>
                 {% elif object|default('') %}
@@ -64,6 +84,9 @@
             </div>
             <div class="flex space-x-2 text-sm actions">
                 {% block actions %}{% endblock %}
+                {% for link, url in links.items() %}
+                <a href="{{ url }}">{{ link }}</a>
+                {% endfor %}
             </div>
         </div>
 
@@ -96,5 +119,6 @@
     <!-- TODO only if installed -->
     {% stafftoolbar %}
 
+    {% block footer_scripts %}{% endblock %}
 </body>
 </html>

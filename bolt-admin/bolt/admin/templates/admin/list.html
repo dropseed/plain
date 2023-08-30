@@ -1,9 +1,27 @@
 {% extends "admin/base.html" %}
 
 {% block content %}
-<!-- <a href="#">New</a> -->
+
+{% set create_url = get_create_url() %}
+{% if create_url %}
+<a href="{{ create_url }}">New</a>
+{% endif %}
 
 <div class="card">
+
+    {% if list_actions %}
+    <form method="POST" data-actions-form>
+        {{ csrf_input }}
+        <select name="action_key">
+            <option value="">Actions</option>
+            {% for action in list_actions %}
+            <option>{{ action }}</option>
+            {% endfor %}
+        </select>
+        <input type="hidden" name="action_pks" value="" />
+        <button type="submit" disabled>Apply</button>
+    </form>
+    {% endif %}
 
     {% if show_search %}
     <div class="flex justify-end">
@@ -22,20 +40,25 @@
         <table class="w-full mt-4 text-sm table-auto">
             <thead>
                 <tr>
-                    <th></th>
+                    {% if list_actions %}<th></th>{% endif %}
+
                     {% for field in list_fields %}
-                    <th class="font-mono">
-                        <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
-                            {{ field }}
-                            {% if field == order_by_field %}
-                            {% if order_by_direction == "-" %}
-                            <span class="text-xs">▲</span>
-                            {% else %}
-                            <span class="text-xs">▼</span>
-                            {% endif %}
-                            {% endif %}
-                        </a>
-                    </th>
+                        {% if order_by_field is defined %}
+                        <th class="font-mono">
+                            <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                                {{ field }}
+                                {% if field == order_by_field %}
+                                {% if order_by_direction == "-" %}
+                                <span class="text-xs">▲</span>
+                                {% else %}
+                                <span class="text-xs">▼</span>
+                                {% endif %}
+                                {% endif %}
+                            </a>
+                        </th>
+                        {% else %}
+                        <th class="font-mono">{{ field }}</th>
+                        {% endif %}
                     {% endfor %}
                     <th></th>
                     <th></th>
@@ -44,9 +67,13 @@
             <tbody>
                 {% for object in objects %}
                 <tr>
+
+                    {% if list_actions %}
                     <td class="p-0 pl-1">
-                        <input class="rounded-sm" type="checkbox" />
+                        <input data-action-checkbox class="rounded-sm" type="checkbox" name="{{ get_object_pk(object) }}" />
                     </td>
+                    {% endif %}
+
                     {% for field in list_fields %}
                     <td>
                         <div class="flex">
@@ -69,7 +96,7 @@
                     {% set detail_url = get_detail_url(object) %}
                     {% if detail_url %}
                     <td>
-                        <a href="{{ detail_url }}">View</a>
+                        <a href="{{ detail_url }}">Detail</a>
                     </td>
                     {% else %}
                     <td>
@@ -79,7 +106,7 @@
                     {% set update_url = get_update_url(object) %}
                     {% if update_url %}
                     <td>
-                        <a href="{{ update_url }}">Edit</a>
+                        <a href="{{ update_url }}">Update</a>
                     </td>
                     {% else %}
                     <td>
@@ -130,4 +157,42 @@
 
 </div>
 
+{% endblock %}
+
+{% block footer_scripts %}
+<script>
+jQuery(function($) {
+    var $actionCheckbox = $('[data-action-checkbox]');
+    var $actionPks = $('[name="action_pks"]');
+    var $actionSelect = $('[name="action_key"]');
+    var $actionSubmit = $('[data-actions-form] [type="submit"]');
+
+    $actionCheckbox.on('change', function() {
+        var pks = [];
+        $actionCheckbox.each(function() {
+            if ($(this).is(':checked')) {
+                pks.push($(this).attr('name'));
+            }
+        });
+        $actionPks.val(pks.join(','));
+
+        updateActionSubmit();
+    });
+
+    $actionSelect.on('change', function() {
+        updateActionSubmit();
+    });
+
+    function updateActionSubmit() {
+        if ($actionPks.val() && $actionSelect.val()) {
+            // We've chosen an action
+            $actionSubmit.prop('disabled', false);
+        } else {
+            $actionSubmit.prop('disabled', true);
+        }
+    }
+
+    // TODO Enable shift-clicking to select a range of checkboxes
+})
+</script>
 {% endblock %}

@@ -1,4 +1,4 @@
-from .views.base import AdminPageView
+from .views.base import AdminPageView, AdminListView
 from .views.cards import (
     AdminCardView,
     AdminChartCardView,
@@ -11,6 +11,7 @@ from .views.registry import register_card, register_model, register_view
 
 __all__ = [
     "AdminPageView",
+    "AdminListView",
     "AdminModelViewset",
     "AdminCardView",
     "AdminTextCardView",

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from bolt.db.models import Q
 from bolt.urls import reverse_lazy
 
-from .base import URL_NAMESPACE, AdminDetailView, AdminObjectsView, AdminUpdateView
+from .base import URL_NAMESPACE, AdminDetailView, AdminListView, AdminUpdateView
 
 if TYPE_CHECKING:
     from bolt.db import models
@@ -34,7 +34,7 @@ def get_model_field(instance, field):
     return getattr(instance, field)
 
 
-class AdminModelListView(AdminObjectsView):
+class AdminModelListView(AdminListView):
     show_search = True
 
     model: "models.Model"
@@ -45,9 +45,6 @@ class AdminModelListView(AdminObjectsView):
 
     def get_context(self):
         context = super().get_context()
-
-        context["get_update_url"] = self.get_update_url
-        context["get_detail_url"] = self.get_detail_url
 
         order_by = self.request.GET.get("order_by", "")
         if order_by.startswith("-"):
@@ -91,18 +88,13 @@ class AdminModelListView(AdminObjectsView):
 
         return queryset
 
-    def get_update_url(self, object) -> str | None:
-        return None
-
-    def get_detail_url(self, object) -> str | None:
-        return None
-
     def get_object_field(self, object, field: str):
         return get_model_field(object, field)
 
 
 class AdminModelViewset:
     model: "models.Model"
+    icon_name = "database-fill"
     list_description = ""
     list_fields: list = ["pk"]
     list_order = []
@@ -121,6 +113,7 @@ class AdminModelViewset:
             title = cls.model._meta.verbose_name_plural.capitalize()
             description = cls.list_description
             slug = cls.model._meta.model_name
+            icon_name = cls.icon_name
             list_fields = cls.list_fields
             list_order = cls.list_order
             cards = cls.list_cards
@@ -162,6 +155,7 @@ class AdminModelViewset:
         class V(AdminUpdateView):
             title = f"Update {cls.model._meta.verbose_name}"
             slug = f"{cls.model._meta.model_name}_update"
+            icon_name = cls.icon_name
             form_class = cls.form_class
             path = f"{cls.model._meta.model_name}/<int:pk>/update/"
             cards = cls.form_cards
@@ -178,6 +172,7 @@ class AdminModelViewset:
         class V(AdminDetailView):
             title = cls.model._meta.verbose_name.capitalize()
             slug = f"{cls.model._meta.model_name}_detail"
+            icon_name = cls.icon_name
             path = f"{cls.model._meta.model_name}/<int:pk>/"
             parent_view_class = cls.get_list_view()
             fields = cls.detail_fields
@@ -194,7 +189,7 @@ class AdminModelViewset:
 
             def get_template_names(self) -> list[str]:
                 return super().get_template_names() + [
-                    "admin/object.html",
+                    "admin/detail.html",
                 ]
 
             def get_object_field(self, object, field: str):
