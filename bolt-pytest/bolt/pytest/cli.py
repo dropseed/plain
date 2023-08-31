@@ -44,9 +44,9 @@ def cli(pytest_args):
     #         pytest_args.append("-W")
     #         pytest_args.append("error::DeprecationWarning")
 
-    click.secho("Running pytest with coverage", bold=True)
-
     os.environ.setdefault("APP_ENV", "test")
+
+    click.secho(f"Running pytest with coverage and APP_ENV={os.environ['APP_ENV']}", bold=True)
 
     result = subprocess.run(
         [
