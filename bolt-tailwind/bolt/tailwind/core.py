@@ -50,6 +50,8 @@ class Tailwind:
             sys.exit(result.returncode)
 
     def is_installed(self) -> bool:
+        if not os.path.exists(self.target_directory):
+            os.mkdir(self.target_directory)
         return os.path.exists(os.path.join(self.target_directory, "tailwind"))
 
     def config_exists(self) -> bool:
