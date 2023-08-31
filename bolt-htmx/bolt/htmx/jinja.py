@@ -4,9 +4,9 @@ from jinja2.ext import Extension
 from bolt.jinja.extensions import InclusionTagExtension
 
 
-class HTMXScriptsExtension(InclusionTagExtension):
-    tags = {"htmx_scripts"}
-    template_name = "htmx/scripts.html"
+class HTMXJSExtension(InclusionTagExtension):
+    tags = {"htmx_js"}
+    template_name = "htmx/js.html"
 
     def get_context(self, context, *args, **kwargs):
         return {"csrf_token": context["csrf_token"]}
@@ -78,6 +78,6 @@ class HTMXFragmentExtension(Extension):
 
 
 extensions = [
-    HTMXScriptsExtension,
+    HTMXJSExtension,
     HTMXFragmentExtension,
 ]

@@ -3,9 +3,9 @@ from bolt.jinja.extensions import InclusionTagExtension
 from . import settings
 
 
-class SentryScriptsExtension(InclusionTagExtension):
-    tags = {"sentry_scripts"}
-    template_name = "sentry/scripts.html"
+class SentryJSExtension(InclusionTagExtension):
+    tags = {"sentry_js"}
+    template_name = "sentry/js.html"
 
     def get_context(self, context, *args, **kwargs):
         if not (settings.SENTRY_DSN() and settings.SENTRY_JS_ENABLED()):
@@ -46,5 +46,5 @@ class SentryScriptsExtension(InclusionTagExtension):
 
 
 extensions = [
-    SentryScriptsExtension,
+    SentryJSExtension,
 ]

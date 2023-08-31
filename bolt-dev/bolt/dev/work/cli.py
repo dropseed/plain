@@ -66,7 +66,7 @@ def cli():
             )
 
     if boltpackage_installed("tailwind"):
-        manager.add_process("tailwind", "bolt-tailwind compile --watch")
+        manager.add_process("tailwind", "bolt tailwind compile --watch")
 
     custom_env = {
         **bolt_env,

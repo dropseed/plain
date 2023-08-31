@@ -1,10 +1,10 @@
 import os
-import subprocess
 import sys
 
 import click
 
 from .core import Tailwind
+from bolt.runtime import settings
 
 
 @click.group("tailwind")
@@ -13,48 +13,11 @@ def cli():
     pass
 
 
-def get_default_paths():
-    """
-    Tailwind needs to work on Heroku/etc. where it may not be
-    inside a git repo, depending on the deployment method.
-    """
-    try:
-        repo_root = (
-            subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode("utf-8")
-            .strip()
-        )
-    except subprocess.CalledProcessError:
-        print("This is not a git repo, assuming current directory is repo root.")
-        repo_root = os.getcwd()
-
-    dot_bolt_dir = os.path.join(repo_root, ".bolt")
-    app_dir = os.path.join(repo_root, "app")
-
-    if not os.path.exists(app_dir):
-        click.secho(
-            f"Expected app directory {app_dir} does not exist, are you in the right directory?",
-            fg="red",
-        )
-        sys.exit(1)
-
-    if not os.path.exists(dot_bolt_dir):
-        os.makedirs(dot_bolt_dir)
-
-    return (
-        dot_bolt_dir,
-        app_dir,
-    )
-
 
 @cli.command()
 def init():
     """Install Tailwind, create a tailwind.config.js and app/static/src/tailwind.css"""
-    dot_bolt_dir, app_dir = get_default_paths()
-    tailwind = Tailwind(dot_bolt_dir, app_directory=app_dir)
+    tailwind = Tailwind()
 
     tailwind_installed = tailwind.is_installed()
 
@@ -83,8 +46,7 @@ def init():
 @click.option("--minify", is_flag=True)
 def compile(watch, minify):
     """Compile a Tailwind CSS file"""
-    dot_bolt_dir, app_dir = get_default_paths()
-    tailwind = Tailwind(dot_bolt_dir, app_directory=app_dir)
+    tailwind = Tailwind()
 
     if not tailwind.is_installed() or tailwind.needs_update():
         version_to_install = tailwind.get_version_from_config()
@@ -114,8 +76,8 @@ def compile(watch, minify):
     args.append("--content")
     content = ",".join(
         [
-            os.path.relpath(app_dir) + "/**/*.{html,js}",
-            os.path.relpath(app_dir)
+            os.path.relpath(settings.APP_PATH) + "/**/*.{html,js}",
+            os.path.relpath(settings.APP_PATH)
             + "/../bolt/**/*.{html,js}",  # TODO use INSTALLED_APPS?
             sys.exec_prefix + "/lib/python*/site-packages/bolt*/**/*.{html,js}",
         ]
@@ -129,14 +91,13 @@ def compile(watch, minify):
     if minify:
         args.append("--minify")
 
-    tailwind.invoke(*args, cwd=os.path.dirname(app_dir))
+    tailwind.invoke(*args, cwd=os.path.dirname(settings.APP_PATH))
 
 
 @cli.command()
 def update():
     """Update the Tailwind CSS version"""
-    dot_bolt_dir, app_dir = get_default_paths()
-    tailwind = Tailwind(dot_bolt_dir, app_directory=app_dir)
+    tailwind = Tailwind()
     click.secho("Installing Tailwind standalone...", bold=True, nl=True)
     version = tailwind.install()
     click.secho(f"Tailwind {version} installed", fg="green")

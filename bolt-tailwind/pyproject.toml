@@ -22,9 +22,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[tool.poetry.scripts]
-"bolt-tailwind" = "bolt.tailwind:cli"
-
 [tool.poetry.dependencies]
 python = "^3.8"
 click = ">=8.0.0"

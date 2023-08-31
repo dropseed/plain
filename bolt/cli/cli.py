@@ -12,6 +12,7 @@ from rich.table import Table
 from rich.text import Text
 
 import bolt.runtime
+from bolt.runtime import settings
 from bolt.apps import apps
 
 
@@ -19,12 +20,6 @@ class InstalledAppsGroup(click.Group):
     BOLT_APPS_PREFIX = "bolt."
 
     def list_commands(self, ctx):
-        try:
-            bolt.runtime.setup()
-        except Exception as e:
-            click.secho(f"Error in bolt.runtime.setup()\n{e}", fg="yellow")
-            return []
-
         apps_with_commands = []
 
         # Get installed apps with a cli.py module
@@ -192,14 +187,6 @@ def run(script):
 @click.option("--overridden", is_flag=True, help="Only show overridden settings")
 def settings(name_filter, overridden):
     """Print Bolt settings"""
-    try:
-        bolt.runtime.setup()
-    except Exception as e:
-        click.secho(f"Error in bolt.runtime.setup()\n{e}", fg="yellow")
-        return
-
-    from bolt.runtime import settings
-
     table = Table(box=box.MINIMAL)
     table.add_column("Setting")
     table.add_column("Default value")
@@ -265,6 +252,17 @@ def compile(ctx):
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
 
 
-cli = click.CommandCollection(
-    sources=[InstalledAppsGroup(), BinNamespaceGroup(), bolt_cli]
-)
+class BoltCommandCollection(click.CommandCollection):
+    def __init__(self, *args, **kwargs):
+        bolt.runtime.setup()
+
+        super().__init__(*args, **kwargs)
+
+        self.sources = [
+            InstalledAppsGroup(),
+            BinNamespaceGroup(),
+            bolt_cli,
+        ]
+
+
+cli = BoltCommandCollection()

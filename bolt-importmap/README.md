@@ -17,7 +17,7 @@ The TL;DR is:
 - Add "importmap" to `INSTALLED_APPS`
 - Create an `importmap.toml`
 - Run `python manage.py importmap_generate`
-- Use `{% importmap_scripts %}` in your template
+- Use `{% importmap_js %}` in your template
 
 ### 1. Install it
 
@@ -82,7 +82,7 @@ You don't need to look at this file yourself, but here is an example of what it 
 
 ### 4. Add the scripts to your template
 
-The import map itself gets added by using `{% load importmap %}` and then `{% importmap_scripts %}` in the head of your HTML. This will include the [es-module-shim](https://github.com/guybedford/es-module-shims).
+The import map itself gets added by using `{% load importmap %}` and then `{% importmap_js %}` in the head of your HTML. This will include the [es-module-shim](https://github.com/guybedford/es-module-shims).
 
 After that, you can include your own JavaScript!
 This could be inline or from `static`.
@@ -93,7 +93,7 @@ Just be sure to use `type="module"` and the "name" you provided when doing your 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    {% importmap_scripts %}
+    {% importmap_js %}
     <script type="module">
         import React from "react"
 

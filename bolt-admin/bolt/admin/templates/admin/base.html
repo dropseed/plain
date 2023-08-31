@@ -10,7 +10,7 @@
             Bolt Admin
         {%- endif -%}
     </title>
-    <link href="{{ static('dist/tailwind.css') }}" rel="stylesheet">
+    {% tailwind_css %}
     <link href="{{ static('admin/admin.css') }}" rel="stylesheet">
     <script src="{{ static('admin/chart.js') }}"></script>
     <script src="{{ static('admin/jquery-3.6.1.slim.min.js') }}"></script>

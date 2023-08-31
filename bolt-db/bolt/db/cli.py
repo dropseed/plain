@@ -3,7 +3,6 @@ import sys
 
 import click
 
-import bolt.runtime
 from bolt.db import DEFAULT_DB_ALIAS, connections
 
 
@@ -24,9 +23,6 @@ def cli():
 @click.argument("parameters", nargs=-1)
 def shell(database, parameters):
     """Runs the command-line client for specified database, or the default database if none is provided."""
-
-    bolt.runtime.setup()
-
     connection = connections[database]
     try:
         connection.client.runshell(parameters)

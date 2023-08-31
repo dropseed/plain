@@ -2,7 +2,6 @@ from importlib import import_module
 
 import click
 
-import bolt.runtime
 from bolt.runtime import settings
 
 
@@ -14,7 +13,6 @@ def cli():
 
 @cli.command()
 def clear_expired():
-    bolt.runtime.setup()
     engine = import_module(settings.SESSION_ENGINE)
     try:
         engine.SessionStore.clear_expired()

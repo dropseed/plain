@@ -6,9 +6,9 @@ from bolt.runtime import settings
 from .core import Importmap
 
 
-class ImportmapScriptsExtension(InclusionTagExtension):
-    tags = {"importmap_scripts"}
-    template_name = "importmap/scripts.html"
+class ImportmapJSExtension(InclusionTagExtension):
+    tags = {"importmap_js"}
+    template_name = "importmap/js.html"
 
     def get_context(self, context, *args, **kwargs):
         importmap = Importmap()
@@ -23,5 +23,5 @@ class ImportmapScriptsExtension(InclusionTagExtension):
 
 
 extensions = [
-    ImportmapScriptsExtension,
+    ImportmapJSExtension,
 ]

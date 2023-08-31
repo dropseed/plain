@@ -5,6 +5,7 @@ import sys
 
 import requests
 import tomlkit
+from bolt.runtime import settings
 
 DEFAULT_CSS = """@tailwind base;
 
@@ -17,9 +18,9 @@ DEFAULT_CSS = """@tailwind base;
 
 
 class Tailwind:
-    def __init__(self, target_directory, app_directory):
-        self.target_directory = target_directory
-        self.app_directory = app_directory
+    @property
+    def target_directory(self) -> str:
+        return str(settings.BOLT_TEMP_PATH)
 
     @property
     def standalone_path(self) -> str:
@@ -37,11 +38,11 @@ class Tailwind:
 
     @property
     def src_css_path(self) -> str:
-        return os.path.join(self.app_directory, "static", "src", "tailwind.css")
+        return settings.TAILWIND_SRC_PATH
 
     @property
     def dist_css_path(self) -> str:
-        return os.path.join(self.app_directory, "static", "dist", "tailwind.css")
+        return settings.TAILWIND_DIST_PATH
 
     def invoke(self, *args, cwd=None) -> None:
         result = subprocess.run([self.standalone_path] + list(args), cwd=cwd)

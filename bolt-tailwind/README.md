@@ -52,7 +52,7 @@ bolt tailwind compile --watch
 Then include the compiled CSS in your base template `<head>`:
 
 ```html
-<link rel="stylesheet" href="{% static 'dist/tailwind.css' %}">
+{% tailwind_css %}
 ```
 
 In your repo you will notice a new `.bolt` directory that contains `tailwind` (the standalone CLI binary) and `tailwind.version` (to track the version currently installed).

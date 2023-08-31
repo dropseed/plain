@@ -2,6 +2,7 @@
 Default Bolt settings. Override these with settings in the module pointed to
 by the BOLT_SETTINGS_MODULE environment variable.
 """
+from pathlib import Path
 
 
 ####################
@@ -9,6 +10,8 @@ by the BOLT_SETTINGS_MODULE environment variable.
 ####################
 
 DEBUG: bool = False
+
+BOLT_TEMP_PATH: Path
 
 # Hosts/domain names that are valid for this site.
 # "*" matches anything, ".example.com" matches example.com and all subdomains
