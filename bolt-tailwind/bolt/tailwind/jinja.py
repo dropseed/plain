@@ -8,7 +8,7 @@ class TailwindCSSExtension(InclusionTagExtension):
     template_name = "tailwind/css.html"
 
     def get_context(self, context, *args, **kwargs):
-        tailwind_static_path = str(settings.TAILWIND_DIST_PATH.relative_to(settings.STATIC_ROOT))
+        tailwind_static_path = str(settings.TAILWIND_DIST_PATH.relative_to(settings.STATICFILES_DIRS[0]))
         return {"tailwind_static_path": tailwind_static_path}
 
 
