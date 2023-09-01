@@ -14,6 +14,7 @@ from rich.text import Text
 import bolt.runtime
 from bolt.runtime import settings
 from bolt.apps import apps
+from bolt.env.cli import cli as env_cli
 
 
 class InstalledAppsGroup(click.Group):
@@ -250,6 +251,10 @@ def compile(ctx):
 
     # Run the regular collectstatic
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
+
+
+# Add other internal packages that don't need to be in INSTALLED_APPS
+bolt_cli.add_command(env_cli)
 
 
 class BoltCommandCollection(click.CommandCollection):

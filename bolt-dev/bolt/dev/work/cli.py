@@ -44,6 +44,10 @@ def cli():
         click.secho("Bolt check failed!", fg="red")
         sys.exit(1)
 
+    # if subprocess.run(["bolt", "env", "check"], env=bolt_env).returncode:
+    #     click.secho("Bolt env check failed!", fg="red")
+    #     sys.exit(1)
+
     manager = HonchoManager()
 
     # env var to switch wsgi app, if necessary...
