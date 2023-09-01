@@ -121,7 +121,7 @@ def decrypt(files, force, diff):
 
         if env.env_file.exists():
             if diff:
-                if diff_str := env.diff():
+                if diff_str := env.diff(reverse=True):
                     print(diff_str)
                 else:
                     print("No changes")

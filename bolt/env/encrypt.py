@@ -1,3 +1,4 @@
+import datetime
 import difflib
 import os
 
@@ -28,28 +29,34 @@ class Env:
                     f = f[: -len(".key")]
                 env_paths.add(f)
 
-        return list(env_paths)
+        return sorted(env_paths)
 
     def check(self) -> None:
         if self.encrypted_file.exists() and not self.key_file.exists():
             raise ValidationError(
-                f'File "{self.path}" is already encrypted, but no key exists. You need a copy of {self.key_path}.'
+                f"{self.env_file} is already encrypted, but no key exists. You need a copy of {self.key_file}."
             )
 
     def diff(self, reverse=False) -> str:
         if reverse:
             diff_lines = difflib.unified_diff(
-                self.encrypted_file.decrypted_contents.splitlines(),
                 self.env_file.content.splitlines(),
-                fromfile=self.env_file.path,
-                tofile=self.encrypted_file.path,
+                self.encrypted_file.decrypted_contents.splitlines(),
+                n=0,
+                fromfile=self.encrypted_file.path,
+                tofile=self.env_file.path,
+                fromfiledate=self.encrypted_file.last_modified(),
+                tofiledate=self.env_file.last_modified(),
             )
         else:
             diff_lines = difflib.unified_diff(
-                self.env_file.content.splitlines(),
                 self.encrypted_file.decrypted_contents.splitlines(),
-                fromfile=self.encrypted_file.path,
-                tofile=self.env_file.path,
+                self.env_file.content.splitlines(),
+                n=0,
+                fromfile=self.env_file.path,
+                tofile=self.encrypted_file.path,
+                fromfiledate=self.env_file.last_modified(),
+                tofiledate=self.encrypted_file.last_modified(),
             )
         return "\n".join(diff_lines)
 
@@ -68,7 +75,12 @@ class EnvFile:
         self.path = path
 
     def __str__(self) -> str:
-        return f"Env {self.path}"
+        return self.path
+
+    def last_modified(self) -> str:
+        return datetime.datetime.fromtimestamp(os.path.getmtime(self.path)).strftime(
+            "%Y-%m-%d %I:%M %p UTC"
+        )
 
     def exists(self) -> bool:
         return os.path.exists(self.path)
@@ -92,7 +104,12 @@ class EncryptedEnvFile:
         self.key_file = key_file
 
     def __str__(self) -> str:
-        return f"Encrypted env {self.path}"
+        return self.path
+
+    def last_modified(self) -> datetime.datetime:
+        return datetime.datetime.fromtimestamp(os.path.getmtime(self.path)).strftime(
+            "%Y-%m-%d %I:%M %p UTC"
+        )
 
     def exists(self) -> bool:
         return os.path.exists(self.path)
@@ -117,7 +134,7 @@ class EnvKeyFile:
         self.path = path
 
     def __str__(self) -> str:
-        return f"Env key {self.path}"
+        return self.path
 
     @property
     def key(self) -> str:

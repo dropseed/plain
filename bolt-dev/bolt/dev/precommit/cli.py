@@ -38,6 +38,8 @@ def cli(install):
             if result.returncode != 0:
                 sys.exit(result.returncode)
 
+    check_short("Checking .env files for changes", "bolt", "env", "check")
+
     if repo_root and is_using_poetry(repo_root):
         check_short("Checking poetry.lock", "poetry", "lock", "--check")
 

@@ -55,15 +55,6 @@ This is an easy place to run your own custom JavaScript watch process.
 
 If a `STRIPE_WEBHOOK_PATH` env variable is set then this will add a `STRIPE_WEBHOOK_SECRET` to `.env` (using `stripe listen --print-secret`) and it will then run `stripe listen --forward-to <runserver:port/stripe-webhook-path>`.
 
-### Ngrok
-
-If an `NGROK_SUBDOMAIN` env variable is set then this will run `ngrok http <runserver_port> --subdomain <subdomain>`.
-Note that [ngrok](https://ngrok.com/download) will need to be installed on your system already (however you prefer to do that).
-
-### Celery
-
-If a `CELERY_APP` env variable is set, then an autoreloading celery worker will be started automatically.
-
 ## Debugging
 
 [View on YouTube →](https://www.youtube.com/watch?v=pG0KaJSVyBw)
