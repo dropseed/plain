@@ -12,7 +12,7 @@ from bolt.db.models.deletion import CASCADE, SET_DEFAULT, SET_NULL
 from bolt.db.models.query_utils import PathInfo
 from bolt.db.models.utils import make_model_tuple
 from bolt.runtime import settings
-from bolt.user_settings import SettingsReference
+from bolt.runtime.user_settings import SettingsReference
 from bolt.utils.functional import cached_property
 
 from . import Field

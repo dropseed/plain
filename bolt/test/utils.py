@@ -20,7 +20,7 @@ from bolt.exceptions import ImproperlyConfigured
 from bolt.runtime import settings
 from bolt.signals import request_started, setting_changed
 from bolt.test.signals import template_rendered
-from bolt.user_settings import UserSettingsHolder
+from bolt.runtime.user_settings import UserSettingsHolder
 
 try:
     import jinja2

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from bolt.apps import AppConfig
 from bolt.exceptions import ImproperlyConfigured
-from bolt.user_settings import global_settings
+from . import global_settings
 from bolt.utils.functional import LazyObject, empty
 
 ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"

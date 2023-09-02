@@ -14,7 +14,7 @@ import uuid
 from bolt.db import models
 from bolt.db.migrations.operations.base import Operation
 from bolt.db.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
-from bolt.user_settings import SettingsReference
+from bolt.runtime.user_settings import SettingsReference
 from bolt.utils.functional import LazyObject, Promise
 from bolt.utils.version import PY311
 

@@ -1,4 +1,4 @@
-from bolt.user_settings import DEFAULT_STORAGE_ALIAS
+from bolt.runtime.user_settings import DEFAULT_STORAGE_ALIAS
 from bolt.utils.functional import LazyObject
 
 from .base import Storage
