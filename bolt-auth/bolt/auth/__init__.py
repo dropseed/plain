@@ -1,7 +1,7 @@
 import inspect
 import re
 
-from bolt.apps import apps as bolt_apps
+from bolt.packages import packages as bolt_packages
 from bolt.csrf.middleware import rotate_token
 from bolt.exceptions import ImproperlyConfigured, PermissionDenied
 from bolt.runtime import settings
@@ -160,10 +160,10 @@ def get_user_model():
     Return the User model that is active in this project.
     """
     try:
-        return bolt_apps.get_model(settings.AUTH_USER_MODEL, require_ready=False)
+        return bolt_packages.get_model(settings.AUTH_USER_MODEL, require_ready=False)
     except ValueError:
         raise ImproperlyConfigured(
-            "AUTH_USER_MODEL must be of the form 'app_label.model_name'"
+            "AUTH_USER_MODEL must be of the form 'package_label.model_name'"
         )
     except LookupError:
         raise ImproperlyConfigured(

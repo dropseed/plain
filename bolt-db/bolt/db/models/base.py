@@ -6,7 +6,7 @@ from itertools import chain
 
 import bolt.runtime
 from bolt import checks
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import (
     BOLT_VERSION_PICKLE_KEY,
     DatabaseError,
@@ -120,24 +120,24 @@ class ModelBase(type):
         meta = attr_meta or getattr(new_class, "Meta", None)
         base_meta = getattr(new_class, "_meta", None)
 
-        app_label = None
+        package_label = None
 
         # Look for an application configuration to attach the model to.
-        app_config = apps.get_containing_app_config(module)
+        package_config = packages.get_containing_package_config(module)
 
-        if getattr(meta, "app_label", None) is None:
-            if app_config is None:
+        if getattr(meta, "package_label", None) is None:
+            if package_config is None:
                 if not abstract:
                     raise RuntimeError(
                         "Model class {}.{} doesn't declare an explicit "
-                        "app_label and isn't in an application in "
-                        "INSTALLED_APPS.".format(module, name)
+                        "package_label and isn't in an application in "
+                        "INSTALLED_PACKAGES.".format(module, name)
                     )
 
             else:
-                app_label = app_config.label
+                package_label = package_config.label
 
-        new_class.add_to_class("_meta", Options(meta, app_label))
+        new_class.add_to_class("_meta", Options(meta, package_label))
         if not abstract:
             new_class.add_to_class(
                 "DoesNotExist",
@@ -360,7 +360,7 @@ class ModelBase(type):
             return new_class
 
         new_class._prepare()
-        new_class._meta.apps.register_model(new_class._meta.app_label, new_class)
+        new_class._meta.packages.register_model(new_class._meta.package_label, new_class)
         return new_class
 
     def add_to_class(cls, name, value):
@@ -599,7 +599,7 @@ class Model(AltersData, metaclass=ModelBase):
     def __reduce__(self):
         data = self.__getstate__()
         data[BOLT_VERSION_PICKLE_KEY] = bolt.runtime.__version__
-        class_id = self._meta.app_label, self._meta.object_name
+        class_id = self._meta.package_label, self._meta.object_name
         return model_unpickle, (class_id,), data
 
     def __getstate__(self):
@@ -1544,8 +1544,8 @@ class Model(AltersData, metaclass=ModelBase):
                 and cls._meta.pk.remote_field.parent_link
             )
             and not settings.is_overridden("DEFAULT_AUTO_FIELD")
-            and cls._meta.app_config
-            and not cls._meta.app_config._is_default_auto_field_overridden
+            and cls._meta.package_config
+            and not cls._meta.package_config._is_default_auto_field_overridden
         ):
             return [
                 checks.Warning(
@@ -1554,7 +1554,7 @@ class Model(AltersData, metaclass=ModelBase):
                     f"'{settings.DEFAULT_AUTO_FIELD}'.",
                     hint=(
                         f"Configure the DEFAULT_AUTO_FIELD setting or the "
-                        f"{cls._meta.app_config.__class__.__qualname__}."
+                        f"{cls._meta.package_config.__class__.__qualname__}."
                         f"default_auto_field attribute to point to a subclass "
                         f"of AutoField, e.g. 'bolt.db.models.BigAutoField'."
                     ),
@@ -1593,22 +1593,22 @@ class Model(AltersData, metaclass=ModelBase):
         errors = []
         if cls._meta.swapped:
             try:
-                apps.get_model(cls._meta.swapped)
+                packages.get_model(cls._meta.swapped)
             except ValueError:
                 errors.append(
                     checks.Error(
-                        "'%s' is not of the form 'app_label.app_name'."
+                        "'%s' is not of the form 'package_label.package_name'."
                         % cls._meta.swappable,
                         id="models.E001",
                     )
                 )
             except LookupError:
-                app_label, model_name = cls._meta.swapped.split(".")
+                package_label, model_name = cls._meta.swapped.split(".")
                 errors.append(
                     checks.Error(
                         "'%s' references '%s.%s', which has not been "
                         "installed, or is abstract."
-                        % (cls._meta.swappable, app_label, model_name),
+                        % (cls._meta.swappable, package_label, model_name),
                         id="models.E002",
                     )
                 )
@@ -2490,7 +2490,7 @@ def make_foreign_order_accessors(model, related_model):
 def model_unpickle(model_id):
     """Used to unpickle Model subclasses with deferred fields."""
     if isinstance(model_id, tuple):
-        model = apps.get_model(*model_id)
+        model = packages.get_model(*model_id)
     else:
         # Backwards compat - the model was cached directly in earlier versions.
         model = model_id

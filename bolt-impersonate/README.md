@@ -15,7 +15,7 @@ To impersonate users, you need the app, middleware, and URLs:
 
 ```python
 # settings.py
-INSTALLED_APPS = INSTALLED_APPS + [
+INSTALLED_PACKAGES = INSTALLED_PACKAGES + [
   "bolt.impersonate",
 ]
 

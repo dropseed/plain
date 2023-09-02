@@ -3,7 +3,7 @@ import importlib
 import os
 import sys
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db.models import NOT_PROVIDED
 from bolt.legacy.management.base import OutputWrapper
 from bolt.utils import timezone
@@ -19,25 +19,25 @@ class MigrationQuestioner:
     interactive subclass is what the command-line arguments will use.
     """
 
-    def __init__(self, defaults=None, specified_apps=None, dry_run=None):
+    def __init__(self, defaults=None, specified_packages=None, dry_run=None):
         self.defaults = defaults or {}
-        self.specified_apps = specified_apps or set()
+        self.specified_packages = specified_packages or set()
         self.dry_run = dry_run
 
-    def ask_initial(self, app_label):
+    def ask_initial(self, package_label):
         """Should we create an initial migration for the app?"""
         # If it was specified on the command line, definitely true
-        if app_label in self.specified_apps:
+        if package_label in self.specified_packages:
             return True
         # Otherwise, we look to see if it has a migrations module
         # without any Python files in it, apart from __init__.py.
-        # Apps from the new app template will have these; the Python
+        # Packages from the new app template will have these; the Python
         # file check will ensure we skip South ones.
         try:
-            app_config = apps.get_app_config(app_label)
+            package_config = packages.get_package_config(package_label)
         except LookupError:  # It's a fake app.
             return self.defaults.get("ask_initial", False)
-        migrations_import_path, _ = MigrationLoader.migrations_module(app_config.label)
+        migrations_import_path, _ = MigrationLoader.migrations_module(package_config.label)
         if migrations_import_path is None:
             # It's an application with migrations disabled.
             return self.defaults.get("ask_initial", False)
@@ -72,7 +72,7 @@ class MigrationQuestioner:
         """Was this model really renamed?"""
         return self.defaults.get("ask_rename_model", False)
 
-    def ask_merge(self, app_label):
+    def ask_merge(self, package_label):
         """Should these migrations really be merged?"""
         return self.defaults.get("ask_merge", False)
 
@@ -89,10 +89,10 @@ class MigrationQuestioner:
 
 class InteractiveMigrationQuestioner(MigrationQuestioner):
     def __init__(
-        self, defaults=None, specified_apps=None, dry_run=None, prompt_output=None
+        self, defaults=None, specified_packages=None, dry_run=None, prompt_output=None
     ):
         super().__init__(
-            defaults=defaults, specified_apps=specified_apps, dry_run=dry_run
+            defaults=defaults, specified_packages=specified_packages, dry_run=dry_run
         )
         self.prompt_output = prompt_output or OutputWrapper(sys.stdout)
 
@@ -234,11 +234,11 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         msg = "Was the model %s.%s renamed to %s? [y/N]"
         return self._boolean_input(
             msg
-            % (old_model_state.app_label, old_model_state.name, new_model_state.name),
+            % (old_model_state.package_label, old_model_state.name, new_model_state.name),
             False,
         )
 
-    def ask_merge(self, app_label):
+    def ask_merge(self, package_label):
         return self._boolean_input(
             "\nMerging will only work if the operations printed above do not conflict\n"
             + "with each other (working on different fields or models)\n"
@@ -292,7 +292,7 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
     def __init__(
         self,
         defaults=None,
-        specified_apps=None,
+        specified_packages=None,
         dry_run=None,
         verbosity=1,
         log=None,
@@ -301,7 +301,7 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
         self.log = log
         super().__init__(
             defaults=defaults,
-            specified_apps=specified_apps,
+            specified_packages=specified_packages,
             dry_run=dry_run,
         )
 

@@ -1,6 +1,6 @@
 import os
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.checks import Tags
 from bolt.files.storage import FileSystemStorage
 from bolt.legacy.management.base import BaseCommand, CommandError
@@ -100,7 +100,7 @@ class Command(BaseCommand):
         self.dry_run = options["dry_run"]
         ignore_patterns = options["ignore_patterns"]
         if options["use_default_ignore_patterns"]:
-            ignore_patterns += apps.get_app_config("staticfiles").ignore_patterns
+            ignore_patterns += packages.get_package_config("staticfiles").ignore_patterns
         self.ignore_patterns = list({os.path.normpath(p) for p in ignore_patterns})
         self.post_process = options["post_process"]
 

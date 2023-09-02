@@ -9,7 +9,7 @@ It allows you to debug production errors and also has some performance monitorin
 
 ```python
 # settings.py
-INSTALLED_APPS = INSTALLED_APPS + [
+INSTALLED_PACKAGES = INSTALLED_PACKAGES + [
   "bolt.sentry",
 ]
 

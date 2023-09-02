@@ -6,7 +6,7 @@ There is a default set of globals, filters, and extensions.
 
 ## Templates
 
-Templates can be stored inside `INSTALLED_APPS` or in the `templates` directory at the root of your project.
+Templates can be stored inside `INSTALLED_PACKAGES` or in the `templates` directory at the root of your project.
 
 ## Default globals
 
@@ -43,12 +43,12 @@ as well as a `csrf_input` (and `csrf_token`) to be used in forms.
 ## Extending with a root `jinja.py`
 
 You can customize the Jinja environment by adding a `jinja.py` module to your app root.
-This works just like [extending with apps](#extending-with-apps),
+This works just like [extending with packages](#extending-with-packages),
 where you can define `filters`, `globals`, and `extensions`.
 
-## Extending with Apps
+## Extending with Packages
 
-Any of your `INSTALLED_APPS` can customize Jinja by adding a `jinja.py` module.
+Any of your `INSTALLED_PACKAGES` can customize Jinja by adding a `jinja.py` module.
 
 To put it simply, the three things you can "export" from this module are:
 - `filters` - functions that can be used in templates
@@ -97,7 +97,7 @@ TODO - example middleware, `|localtime` filter
 
 ## Settings
 
-Most Jinja customization happens in `jinja.py` at the root of your app or in `INSTALLED_APPS`.
+Most Jinja customization happens in `jinja.py` at the root of your app or in `INSTALLED_PACKAGES`.
 But if you need to further customize the environment,
 you can define your own callable which will be used to create the Jinja environment.
 

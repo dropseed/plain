@@ -6,7 +6,7 @@ SECRET_KEY = "secret"
 
 DEBUG = True
 
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     "bolt.auth",
     "bolt.sessions",
     # "bolt.staticfiles",

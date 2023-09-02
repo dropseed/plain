@@ -2,7 +2,7 @@ from bolt.urls import include, path
 
 from . import views
 
-app_name = "oauth"
+default_namespace = "oauth"
 
 urlpatterns = [
     path(

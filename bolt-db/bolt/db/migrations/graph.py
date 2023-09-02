@@ -80,7 +80,7 @@ class MigrationGraph:
 
     A node should be a tuple: (app_path, migration_name). The tree special-cases
     things within an app - namely, root nodes and leaf nodes ignore dependencies
-    to other apps.
+    to other packages.
     """
 
     def __init__(self):
@@ -311,7 +311,7 @@ class MigrationGraph:
                     plan.append(migration)
         return plan
 
-    def make_state(self, nodes=None, at_end=True, real_apps=None):
+    def make_state(self, nodes=None, at_end=True, real_packages=None):
         """
         Given a migration node or nodes, return a complete ProjectState for it.
         If at_end is False, return the state before the migration has run.
@@ -324,7 +324,7 @@ class MigrationGraph:
         if not isinstance(nodes[0], tuple):
             nodes = [nodes]
         plan = self._generate_plan(nodes, at_end)
-        project_state = ProjectState(real_apps=real_apps)
+        project_state = ProjectState(real_packages=real_packages)
         for node in plan:
             project_state = self.nodes[node].mutate_state(project_state, preserve=False)
         return project_state

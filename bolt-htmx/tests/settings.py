@@ -1,4 +1,4 @@
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     "bolt.htmx",
 ]
 

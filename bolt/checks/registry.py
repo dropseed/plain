@@ -39,7 +39,7 @@ class CheckRegistry:
 
             registry = CheckRegistry()
             @registry.register('mytag', 'anothertag')
-            def my_check(app_configs, **kwargs):
+            def my_check(package_configs, **kwargs):
                 # ... perform checks and collect `errors` ...
                 return errors
             # or
@@ -69,7 +69,7 @@ class CheckRegistry:
 
     def run_checks(
         self,
-        app_configs=None,
+        package_configs=None,
         tags=None,
         include_deployment_checks=False,
         databases=None,
@@ -84,7 +84,7 @@ class CheckRegistry:
             checks = [check for check in checks if not set(check.tags).isdisjoint(tags)]
 
         for check in checks:
-            new_errors = check(app_configs=app_configs, databases=databases)
+            new_errors = check(package_configs=package_configs, databases=databases)
             if not is_iterable(new_errors):
                 raise TypeError(
                     "The function %r did not return a list. All functions "

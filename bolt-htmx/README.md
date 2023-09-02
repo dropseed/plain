@@ -48,7 +48,7 @@ pip install bolt-htmx
 Then add `bolt.htmx` to `settings.py`:
 
 ```python
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     # ...
     "bolt.htmx",
 ]
@@ -328,7 +328,7 @@ And then subsequent HTMX requests/actions on individual items can be handled by 
 ```python
 # urls.py and views.py
 # urls.py
-app_name = "pullrequests"
+default_namespace = "pullrequests"
 
 urlpatterns = [
   path("<uuid:uuid>/", views.PullRequestDetailView.as_view(), name="detail"),

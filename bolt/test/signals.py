@@ -2,7 +2,7 @@ import os
 import time
 import warnings
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import connections, router
 from bolt.db.utils import ConnectionRouter
 from bolt.exceptions import ImproperlyConfigured
@@ -34,9 +34,9 @@ def clear_cache_handlers(*, setting, **kwargs):
 
 
 @receiver(setting_changed)
-def update_installed_apps(*, setting, **kwargs):
-    if setting == "INSTALLED_APPS":
-        # Rebuild any AppDirectoriesFinder instance.
+def update_installed_packages(*, setting, **kwargs):
+    if setting == "INSTALLED_PACKAGES":
+        # Rebuild any PackageDirectoriesFinder instance.
         from bolt.staticfiles.finders import get_finder
 
         get_finder.cache_clear()
@@ -156,7 +156,7 @@ def auth_password_validators_changed(*, setting, **kwargs):
 @receiver(setting_changed)
 def user_model_swapped(*, setting, **kwargs):
     if setting == "AUTH_USER_MODEL":
-        apps.clear_cache()
+        packages.clear_cache()
         try:
             from bolt.auth import get_user_model
 

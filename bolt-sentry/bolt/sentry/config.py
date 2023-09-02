@@ -1,11 +1,11 @@
 import sentry_sdk
 
-from bolt.apps import AppConfig
+from bolt.packages import PackageConfig
 
 from . import settings
 
 
-class BoltsentryConfig(AppConfig):
+class BoltsentryConfig(PackageConfig):
     default_auto_field = "bolt.db.models.BigAutoField"
     name = "bolt.sentry"
 

@@ -44,7 +44,7 @@ class Release:
         if "HEROKU_APP_NAME" in os.environ:
             self.metadata["App name"] = os.environ["HEROKU_APP_NAME"]
 
-        # Review apps - https://devcenter.heroku.com/articles/github-integration-review-apps#injected-environment-variables
+        # Review packages - https://devcenter.heroku.com/articles/github-integration-review-packages#injected-environment-variables
         if "HEROKU_PR_NUMBER" in os.environ:
             self.metadata["PR"] = "#" + os.environ["HEROKU_PR_NUMBER"]
             self.summary = "PR #" + os.environ["HEROKU_PR_NUMBER"] + " " + self.summary

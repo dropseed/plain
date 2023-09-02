@@ -3,9 +3,9 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 
-from bolt.apps import AppConfig
-from bolt.apps.registry import Apps
-from bolt.apps.registry import apps as global_apps
+from bolt.packages import PackageConfig
+from bolt.packages.registry import Packages
+from bolt.packages.registry import packages as global_packages
 from bolt.db import models
 from bolt.db.migrations.utils import field_is_referenced, get_references
 from bolt.db.models import NOT_PROVIDED
@@ -21,12 +21,12 @@ from .exceptions import InvalidBasesError
 from .utils import resolve_relation
 
 
-def _get_app_label_and_model_name(model, app_label=""):
+def _get_package_label_and_model_name(model, package_label=""):
     if isinstance(model, str):
         split = model.split(".", 1)
-        return tuple(split) if len(split) == 2 else (app_label, split[0])
+        return tuple(split) if len(split) == 2 else (package_label, split[0])
     else:
-        return model._meta.app_label, model._meta.model_name
+        return model._meta.package_label, model._meta.model_name
 
 
 def _get_related_models(m):
@@ -55,11 +55,11 @@ def _get_related_models(m):
 
 def get_related_models_tuples(model):
     """
-    Return a list of typical (app_label, model_name) tuples for all related
+    Return a list of typical (package_label, model_name) tuples for all related
     models for the given model.
     """
     return {
-        (rel_mod._meta.app_label, rel_mod._meta.model_name)
+        (rel_mod._meta.package_label, rel_mod._meta.model_name)
         for rel_mod in _get_related_models(model)
     }
 
@@ -78,15 +78,15 @@ def get_related_models_recursive(model):
     seen = set()
     queue = _get_related_models(model)
     for rel_mod in queue:
-        rel_app_label, rel_model_name = (
-            rel_mod._meta.app_label,
+        rel_package_label, rel_model_name = (
+            rel_mod._meta.package_label,
             rel_mod._meta.model_name,
         )
-        if (rel_app_label, rel_model_name) in seen:
+        if (rel_package_label, rel_model_name) in seen:
             continue
-        seen.add((rel_app_label, rel_model_name))
+        seen.add((rel_package_label, rel_model_name))
         queue.extend(_get_related_models(rel_mod))
-    return seen - {(model._meta.app_label, model._meta.model_name)}
+    return seen - {(model._meta.package_label, model._meta.model_name)}
 
 
 class ProjectState:
@@ -96,14 +96,14 @@ class ProjectState:
     FKs/etc. resolve properly.
     """
 
-    def __init__(self, models=None, real_apps=None):
+    def __init__(self, models=None, real_packages=None):
         self.models = models or {}
-        # Apps to include from main registry, usually unmigrated ones
-        if real_apps is None:
-            real_apps = set()
+        # Packages to include from main registry, usually unmigrated ones
+        if real_packages is None:
+            real_packages = set()
         else:
-            assert isinstance(real_apps, set)
-        self.real_apps = real_apps
+            assert isinstance(real_packages, set)
+        self.real_packages = real_packages
         self.is_delayed = False
         # {remote_model_key: {model_key: {field_name: field}}}
         self._relations = None
@@ -115,15 +115,15 @@ class ProjectState:
         return self._relations
 
     def add_model(self, model_state):
-        model_key = model_state.app_label, model_state.name_lower
+        model_key = model_state.package_label, model_state.name_lower
         self.models[model_key] = model_state
         if self._relations is not None:
             self.resolve_model_relations(model_key)
-        if "apps" in self.__dict__:  # hasattr would cache the property
+        if "packages" in self.__dict__:  # hasattr would cache the property
             self.reload_model(*model_key)
 
-    def remove_model(self, app_label, model_name):
-        model_key = app_label, model_name
+    def remove_model(self, package_label, model_name):
+        model_key = package_label, model_name
         del self.models[model_key]
         if self._relations is not None:
             self._relations.pop(model_key, None)
@@ -132,22 +132,22 @@ class ProjectState:
                 model_relations.pop(model_key, None)
                 if not model_relations:
                     del self._relations[related_model_key]
-        if "apps" in self.__dict__:  # hasattr would cache the property
-            self.apps.unregister_model(*model_key)
+        if "packages" in self.__dict__:  # hasattr would cache the property
+            self.packages.unregister_model(*model_key)
             # Need to do this explicitly since unregister_model() doesn't clear
             # the cache automatically (#24513)
-            self.apps.clear_cache()
+            self.packages.clear_cache()
 
-    def rename_model(self, app_label, old_name, new_name):
+    def rename_model(self, package_label, old_name, new_name):
         # Add a new model.
         old_name_lower = old_name.lower()
         new_name_lower = new_name.lower()
-        renamed_model = self.models[app_label, old_name_lower].clone()
+        renamed_model = self.models[package_label, old_name_lower].clone()
         renamed_model.name = new_name
-        self.models[app_label, new_name_lower] = renamed_model
+        self.models[package_label, new_name_lower] = renamed_model
         # Repoint all fields pointing to the old model to the new one.
-        old_model_tuple = (app_label, old_name_lower)
-        new_remote_model = f"{app_label}.{new_name}"
+        old_model_tuple = (package_label, old_name_lower)
+        new_remote_model = f"{package_label}.{new_name}"
         to_reload = set()
         for model_state, name, field, reference in get_references(
             self, old_model_tuple
@@ -162,10 +162,10 @@ class ProjectState:
                 changed_field.remote_field.through = new_remote_model
             if changed_field:
                 model_state.fields[name] = changed_field
-                to_reload.add((model_state.app_label, model_state.name_lower))
+                to_reload.add((model_state.package_label, model_state.name_lower))
         if self._relations is not None:
-            old_name_key = app_label, old_name_lower
-            new_name_key = app_label, new_name_lower
+            old_name_key = package_label, old_name_lower
+            new_name_key = package_label, new_name_lower
             if old_name_key in self._relations:
                 self._relations[new_name_key] = self._relations.pop(old_name_key)
             for model_relations in self._relations.values():
@@ -174,50 +174,50 @@ class ProjectState:
         # Reload models related to old model before removing the old model.
         self.reload_models(to_reload, delay=True)
         # Remove the old model.
-        self.remove_model(app_label, old_name_lower)
-        self.reload_model(app_label, new_name_lower, delay=True)
+        self.remove_model(package_label, old_name_lower)
+        self.reload_model(package_label, new_name_lower, delay=True)
 
-    def alter_model_options(self, app_label, model_name, options, option_keys=None):
-        model_state = self.models[app_label, model_name]
+    def alter_model_options(self, package_label, model_name, options, option_keys=None):
+        model_state = self.models[package_label, model_name]
         model_state.options = {**model_state.options, **options}
         if option_keys:
             for key in option_keys:
                 if key not in options:
                     model_state.options.pop(key, False)
-        self.reload_model(app_label, model_name, delay=True)
+        self.reload_model(package_label, model_name, delay=True)
 
-    def remove_model_options(self, app_label, model_name, option_name, value_to_remove):
-        model_state = self.models[app_label, model_name]
+    def remove_model_options(self, package_label, model_name, option_name, value_to_remove):
+        model_state = self.models[package_label, model_name]
         if objs := model_state.options.get(option_name):
             model_state.options[option_name] = [
                 obj for obj in objs if tuple(obj) != tuple(value_to_remove)
             ]
-        self.reload_model(app_label, model_name, delay=True)
+        self.reload_model(package_label, model_name, delay=True)
 
-    def alter_model_managers(self, app_label, model_name, managers):
-        model_state = self.models[app_label, model_name]
+    def alter_model_managers(self, package_label, model_name, managers):
+        model_state = self.models[package_label, model_name]
         model_state.managers = list(managers)
-        self.reload_model(app_label, model_name, delay=True)
+        self.reload_model(package_label, model_name, delay=True)
 
-    def _append_option(self, app_label, model_name, option_name, obj):
-        model_state = self.models[app_label, model_name]
+    def _append_option(self, package_label, model_name, option_name, obj):
+        model_state = self.models[package_label, model_name]
         model_state.options[option_name] = [*model_state.options[option_name], obj]
-        self.reload_model(app_label, model_name, delay=True)
+        self.reload_model(package_label, model_name, delay=True)
 
-    def _remove_option(self, app_label, model_name, option_name, obj_name):
-        model_state = self.models[app_label, model_name]
+    def _remove_option(self, package_label, model_name, option_name, obj_name):
+        model_state = self.models[package_label, model_name]
         objs = model_state.options[option_name]
         model_state.options[option_name] = [obj for obj in objs if obj.name != obj_name]
-        self.reload_model(app_label, model_name, delay=True)
+        self.reload_model(package_label, model_name, delay=True)
 
-    def add_index(self, app_label, model_name, index):
-        self._append_option(app_label, model_name, "indexes", index)
+    def add_index(self, package_label, model_name, index):
+        self._append_option(package_label, model_name, "indexes", index)
 
-    def remove_index(self, app_label, model_name, index_name):
-        self._remove_option(app_label, model_name, "indexes", index_name)
+    def remove_index(self, package_label, model_name, index_name):
+        self._remove_option(package_label, model_name, "indexes", index_name)
 
-    def rename_index(self, app_label, model_name, old_index_name, new_index_name):
-        model_state = self.models[app_label, model_name]
+    def rename_index(self, package_label, model_name, old_index_name, new_index_name):
+        model_state = self.models[package_label, model_name]
         objs = model_state.options["indexes"]
 
         new_indexes = []
@@ -228,22 +228,22 @@ class ProjectState:
             new_indexes.append(obj)
 
         model_state.options["indexes"] = new_indexes
-        self.reload_model(app_label, model_name, delay=True)
+        self.reload_model(package_label, model_name, delay=True)
 
-    def add_constraint(self, app_label, model_name, constraint):
-        self._append_option(app_label, model_name, "constraints", constraint)
+    def add_constraint(self, package_label, model_name, constraint):
+        self._append_option(package_label, model_name, "constraints", constraint)
 
-    def remove_constraint(self, app_label, model_name, constraint_name):
-        self._remove_option(app_label, model_name, "constraints", constraint_name)
+    def remove_constraint(self, package_label, model_name, constraint_name):
+        self._remove_option(package_label, model_name, "constraints", constraint_name)
 
-    def add_field(self, app_label, model_name, name, field, preserve_default):
+    def add_field(self, package_label, model_name, name, field, preserve_default):
         # If preserve default is off, don't use the default for future state.
         if not preserve_default:
             field = field.clone()
             field.default = NOT_PROVIDED
         else:
             field = field
-        model_key = app_label, model_name
+        model_key = package_label, model_name
         self.models[model_key].fields[name] = field
         if self._relations is not None:
             self.resolve_model_field_relations(model_key, name, field)
@@ -251,8 +251,8 @@ class ProjectState:
         delay = not field.is_relation
         self.reload_model(*model_key, delay=delay)
 
-    def remove_field(self, app_label, model_name, name):
-        model_key = app_label, model_name
+    def remove_field(self, package_label, model_name, name):
+        model_key = package_label, model_name
         model_state = self.models[model_key]
         old_field = model_state.fields.pop(name)
         if self._relations is not None:
@@ -261,13 +261,13 @@ class ProjectState:
         delay = not old_field.is_relation
         self.reload_model(*model_key, delay=delay)
 
-    def alter_field(self, app_label, model_name, name, field, preserve_default):
+    def alter_field(self, package_label, model_name, name, field, preserve_default):
         if not preserve_default:
             field = field.clone()
             field.default = NOT_PROVIDED
         else:
             field = field
-        model_key = app_label, model_name
+        model_key = package_label, model_name
         fields = self.models[model_key].fields
         if self._relations is not None:
             old_field = fields.pop(name)
@@ -287,8 +287,8 @@ class ProjectState:
         )
         self.reload_model(*model_key, delay=delay)
 
-    def rename_field(self, app_label, model_name, old_name, new_name):
-        model_key = app_label, model_name
+    def rename_field(self, package_label, model_name, old_name, new_name):
+        model_key = package_label, model_name
         model_state = self.models[model_key]
         # Rename the field.
         fields = model_state.fields
@@ -296,7 +296,7 @@ class ProjectState:
             found = fields.pop(old_name)
         except KeyError:
             raise FieldDoesNotExist(
-                f"{app_label}.{model_name} has no field named '{old_name}'"
+                f"{package_label}.{model_name} has no field named '{old_name}'"
             )
         fields[new_name] = found
         for field in fields.values():
@@ -343,26 +343,26 @@ class ProjectState:
                     to_model[model_key][new_name_lower] = field
         self.reload_model(*model_key, delay=delay)
 
-    def _find_reload_model(self, app_label, model_name, delay=False):
+    def _find_reload_model(self, package_label, model_name, delay=False):
         if delay:
             self.is_delayed = True
 
         related_models = set()
 
         try:
-            old_model = self.apps.get_model(app_label, model_name)
+            old_model = self.packages.get_model(package_label, model_name)
         except LookupError:
             pass
         else:
             # Get all relations to and from the old model before reloading,
-            # as _meta.apps may change
+            # as _meta.packages may change
             if delay:
                 related_models = get_related_models_tuples(old_model)
             else:
                 related_models = get_related_models_recursive(old_model)
 
         # Get all outgoing references from the model to be rendered
-        model_state = self.models[(app_label, model_name)]
+        model_state = self.models[(package_label, model_name)]
         # Directly related models are the models pointed to by ForeignKeys,
         # OneToOneFields, and ManyToManyFields.
         direct_related_models = set()
@@ -370,16 +370,16 @@ class ProjectState:
             if field.is_relation:
                 if field.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT:
                     continue
-                rel_app_label, rel_model_name = _get_app_label_and_model_name(
-                    field.related_model, app_label
+                rel_package_label, rel_model_name = _get_package_label_and_model_name(
+                    field.related_model, package_label
                 )
-                direct_related_models.add((rel_app_label, rel_model_name.lower()))
+                direct_related_models.add((rel_package_label, rel_model_name.lower()))
 
         # For all direct related models recursively get all related models.
         related_models.update(direct_related_models)
-        for rel_app_label, rel_model_name in direct_related_models:
+        for rel_package_label, rel_model_name in direct_related_models:
             try:
-                rel_model = self.apps.get_model(rel_app_label, rel_model_name)
+                rel_model = self.packages.get_model(rel_package_label, rel_model_name)
             except LookupError:
                 pass
             else:
@@ -389,49 +389,49 @@ class ProjectState:
                     related_models.update(get_related_models_recursive(rel_model))
 
         # Include the model itself
-        related_models.add((app_label, model_name))
+        related_models.add((package_label, model_name))
 
         return related_models
 
-    def reload_model(self, app_label, model_name, delay=False):
-        if "apps" in self.__dict__:  # hasattr would cache the property
-            related_models = self._find_reload_model(app_label, model_name, delay)
+    def reload_model(self, package_label, model_name, delay=False):
+        if "packages" in self.__dict__:  # hasattr would cache the property
+            related_models = self._find_reload_model(package_label, model_name, delay)
             self._reload(related_models)
 
     def reload_models(self, models, delay=True):
-        if "apps" in self.__dict__:  # hasattr would cache the property
+        if "packages" in self.__dict__:  # hasattr would cache the property
             related_models = set()
-            for app_label, model_name in models:
+            for package_label, model_name in models:
                 related_models.update(
-                    self._find_reload_model(app_label, model_name, delay)
+                    self._find_reload_model(package_label, model_name, delay)
                 )
             self._reload(related_models)
 
     def _reload(self, related_models):
         # Unregister all related models
-        with self.apps.bulk_update():
-            for rel_app_label, rel_model_name in related_models:
-                self.apps.unregister_model(rel_app_label, rel_model_name)
+        with self.packages.bulk_update():
+            for rel_package_label, rel_model_name in related_models:
+                self.packages.unregister_model(rel_package_label, rel_model_name)
 
         states_to_be_rendered = []
         # Gather all models states of those models that will be rerendered.
         # This includes:
-        # 1. All related models of unmigrated apps
-        for model_state in self.apps.real_models:
-            if (model_state.app_label, model_state.name_lower) in related_models:
+        # 1. All related models of unmigrated packages
+        for model_state in self.packages.real_models:
+            if (model_state.package_label, model_state.name_lower) in related_models:
                 states_to_be_rendered.append(model_state)
 
-        # 2. All related models of migrated apps
-        for rel_app_label, rel_model_name in related_models:
+        # 2. All related models of migrated packages
+        for rel_package_label, rel_model_name in related_models:
             try:
-                model_state = self.models[rel_app_label, rel_model_name]
+                model_state = self.models[rel_package_label, rel_model_name]
             except KeyError:
                 pass
             else:
                 states_to_be_rendered.append(model_state)
 
         # Render all models
-        self.apps.render_multiple(states_to_be_rendered)
+        self.packages.render_multiple(states_to_be_rendered)
 
     def update_model_field_relation(
         self,
@@ -442,7 +442,7 @@ class ProjectState:
         concretes,
     ):
         remote_model_key = resolve_relation(model, *model_key)
-        if remote_model_key[0] not in self.real_apps and remote_model_key in concretes:
+        if remote_model_key[0] not in self.real_packages and remote_model_key in concretes:
             remote_model_key = concretes[remote_model_key]
         relations_to_remote_model = self._relations[remote_model_key]
         if field_name in self.models[model_key].fields:
@@ -549,76 +549,76 @@ class ProjectState:
         """Return an exact copy of this ProjectState."""
         new_state = ProjectState(
             models={k: v.clone() for k, v in self.models.items()},
-            real_apps=self.real_apps,
+            real_packages=self.real_packages,
         )
-        if "apps" in self.__dict__:
-            new_state.apps = self.apps.clone()
+        if "packages" in self.__dict__:
+            new_state.packages = self.packages.clone()
         new_state.is_delayed = self.is_delayed
         return new_state
 
-    def clear_delayed_apps_cache(self):
-        if self.is_delayed and "apps" in self.__dict__:
-            del self.__dict__["apps"]
+    def clear_delayed_packages_cache(self):
+        if self.is_delayed and "packages" in self.__dict__:
+            del self.__dict__["packages"]
 
     @cached_property
-    def apps(self):
-        return StateApps(self.real_apps, self.models)
+    def packages(self):
+        return StatePackages(self.real_packages, self.models)
 
     @classmethod
-    def from_apps(cls, apps):
-        """Take an Apps and return a ProjectState matching it."""
+    def from_packages(cls, packages):
+        """Take an Packages and return a ProjectState matching it."""
         app_models = {}
-        for model in apps.get_models(include_swapped=True):
+        for model in packages.get_models(include_swapped=True):
             model_state = ModelState.from_model(model)
-            app_models[(model_state.app_label, model_state.name_lower)] = model_state
+            app_models[(model_state.package_label, model_state.name_lower)] = model_state
         return cls(app_models)
 
     def __eq__(self, other):
-        return self.models == other.models and self.real_apps == other.real_apps
+        return self.models == other.models and self.real_packages == other.real_packages
 
 
-class AppConfigStub(AppConfig):
-    """Stub of an AppConfig. Only provides a label and a dict of models."""
+class PackageConfigStub(PackageConfig):
+    """Stub of an PackageConfig. Only provides a label and a dict of models."""
 
     def __init__(self, label):
-        self.apps = None
+        self.packages = None
         self.models = {}
-        # App-label and app-name are not the same thing, so technically passing
+        # Package-label and package-name are not the same thing, so technically passing
         # in the label here is wrong. In practice, migrations don't care about
-        # the app name, but we need something unique, and the label works fine.
+        # the package name, but we need something unique, and the label works fine.
         self.label = label
         self.name = label
 
     def import_models(self):
-        self.models = self.apps.all_models[self.label]
+        self.models = self.packages.all_models[self.label]
 
 
-class StateApps(Apps):
+class StatePackages(Packages):
     """
-    Subclass of the global Apps registry class to better handle dynamic model
+    Subclass of the global Packages registry class to better handle dynamic model
     additions and removals.
     """
 
-    def __init__(self, real_apps, models, ignore_swappable=False):
-        # Any apps in self.real_apps should have all their models included
+    def __init__(self, real_packages, models, ignore_swappable=False):
+        # Any packages in self.real_packages should have all their models included
         # in the render. We don't use the original model instances as there
-        # are some variables that refer to the Apps object.
-        # FKs/M2Ms from real apps are also not included as they just
+        # are some variables that refer to the Packages object.
+        # FKs/M2Ms from real packages are also not included as they just
         # mess things up with partial states (due to lack of dependencies)
         self.real_models = []
-        for app_label in real_apps:
-            app = global_apps.get_app_config(app_label)
+        for package_label in real_packages:
+            app = global_packages.get_package_config(package_label)
             for model in app.get_models():
                 self.real_models.append(ModelState.from_model(model, exclude_rels=True))
         # Populate the app registry with a stub for each application.
-        app_labels = {model_state.app_label for model_state in models.values()}
-        app_configs = [
-            AppConfigStub(label) for label in sorted([*real_apps, *app_labels])
+        package_labels = {model_state.package_label for model_state in models.values()}
+        package_configs = [
+            PackageConfigStub(label) for label in sorted([*real_packages, *package_labels])
         ]
-        super().__init__(app_configs)
+        super().__init__(package_configs)
 
         # These locks get in the way of copying as implemented in clone(),
-        # which is called whenever Bolt duplicates a StateApps before
+        # which is called whenever Bolt duplicates a StatePackages before
         # updating it.
         self._lock = None
 
@@ -674,32 +674,32 @@ class StateApps(Apps):
 
     def clone(self):
         """Return a clone of this registry."""
-        clone = StateApps([], {})
+        clone = StatePackages([], {})
         clone.all_models = copy.deepcopy(self.all_models)
 
-        for app_label in self.app_configs:
-            app_config = AppConfigStub(app_label)
-            app_config.apps = clone
-            app_config.import_models()
-            clone.app_configs[app_label] = app_config
+        for package_label in self.package_configs:
+            package_config = PackageConfigStub(package_label)
+            package_config.packages = clone
+            package_config.import_models()
+            clone.package_configs[package_label] = package_config
 
         # No need to actually clone them, they'll never change
         clone.real_models = self.real_models
         return clone
 
-    def register_model(self, app_label, model):
-        self.all_models[app_label][model._meta.model_name] = model
-        if app_label not in self.app_configs:
-            self.app_configs[app_label] = AppConfigStub(app_label)
-            self.app_configs[app_label].apps = self
-        self.app_configs[app_label].models[model._meta.model_name] = model
+    def register_model(self, package_label, model):
+        self.all_models[package_label][model._meta.model_name] = model
+        if package_label not in self.package_configs:
+            self.package_configs[package_label] = PackageConfigStub(package_label)
+            self.package_configs[package_label].packages = self
+        self.package_configs[package_label].models[model._meta.model_name] = model
         self.do_pending_operations(model)
         self.clear_cache()
 
-    def unregister_model(self, app_label, model_name):
+    def unregister_model(self, package_label, model_name):
         try:
-            del self.all_models[app_label][model_name]
-            del self.app_configs[app_label].models[model_name]
+            del self.all_models[package_label][model_name]
+            del self.package_configs[package_label].models[model_name]
         except KeyError:
             pass
 
@@ -716,9 +716,9 @@ class ModelState:
     """
 
     def __init__(
-        self, app_label, name, fields, options=None, bases=None, managers=None
+        self, package_label, name, fields, options=None, bases=None, managers=None
     ):
-        self.app_label = app_label
+        self.package_label = package_label
         self.name = name
         self.fields = dict(fields)
         self.options = options or {}
@@ -800,7 +800,7 @@ class ModelState:
         options = {}
         for name in DEFAULT_NAMES:
             # Ignore some special options
-            if name in ["apps", "app_label"]:
+            if name in ["packages", "package_label"]:
                 continue
             elif name in model._meta.original_attrs:
                 if name == "unique_together":
@@ -891,7 +891,7 @@ class ModelState:
 
         # Construct the new ModelState
         return cls(
-            model._meta.app_label,
+            model._meta.package_label,
             model._meta.object_name,
             fields,
             options,
@@ -915,7 +915,7 @@ class ModelState:
     def clone(self):
         """Return an exact copy of this ModelState."""
         return self.__class__(
-            app_label=self.app_label,
+            package_label=self.package_label,
             name=self.name,
             fields=dict(self.fields),
             # Since options are shallow-copied here, operations such as
@@ -926,15 +926,15 @@ class ModelState:
             managers=list(self.managers),
         )
 
-    def render(self, apps):
-        """Create a Model object from our current state into the given apps."""
+    def render(self, packages):
+        """Create a Model object from our current state into the given packages."""
         # First, make a Meta object
-        meta_contents = {"app_label": self.app_label, "apps": apps, **self.options}
+        meta_contents = {"package_label": self.package_label, "packages": packages, **self.options}
         meta = type("Meta", (), meta_contents)
         # Then, work out our bases
         try:
             bases = tuple(
-                (apps.get_model(base) if isinstance(base, str) else base)
+                (packages.get_model(base) if isinstance(base, str) else base)
                 for base in self.bases
             )
         except LookupError:
@@ -948,7 +948,7 @@ class ModelState:
 
         # Restore managers
         body.update(self.construct_managers())
-        # Then, make a Model object (apps.register_model is called in __new__)
+        # Then, make a Model object (packages.register_model is called in __new__)
         return type(self.name, bases, body)
 
     def get_index_by_name(self, name):
@@ -964,11 +964,11 @@ class ModelState:
         raise ValueError(f"No constraint named {name} on model {self.name}")
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}: '{self.app_label}.{self.name}'>"
+        return f"<{self.__class__.__name__}: '{self.package_label}.{self.name}'>"
 
     def __eq__(self, other):
         return (
-            (self.app_label == other.app_label)
+            (self.package_label == other.package_label)
             and (self.name == other.name)
             and (len(self.fields) == len(other.fields))
             and all(

@@ -13,7 +13,7 @@ import types
 import typing
 from pathlib import Path
 
-from bolt.apps import AppConfig
+from bolt.packages import PackageConfig
 from bolt.exceptions import ImproperlyConfigured
 from . import global_settings
 from bolt.utils.functional import LazyObject, empty
@@ -158,12 +158,12 @@ class Settings:
         # so we can find files next to it (assume it's at the app root)
         self.path = Path(mod.__file__).resolve()
 
-        # Get INSTALLED_APPS from mod,
-        # then (without populating apps) do a check for default_settings in each
+        # Get INSTALLED_PACKAGES from mod,
+        # then (without populating packages) do a check for default_settings in each
         # app and load those now too.
-        for entry in getattr(mod, "INSTALLED_APPS", []):
+        for entry in getattr(mod, "INSTALLED_PACKAGES", []):
             try:
-                if isinstance(entry, AppConfig):
+                if isinstance(entry, PackageConfig):
                     app_settings = entry.module.default_settings
                 else:
                     app_settings = importlib.import_module(f"{entry}.default_settings")

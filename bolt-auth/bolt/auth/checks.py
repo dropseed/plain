@@ -1,16 +1,16 @@
 from bolt import checks
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.runtime import settings
 
 
-def check_user_model(app_configs=None, **kwargs):
-    if app_configs is None:
-        cls = apps.get_model(settings.AUTH_USER_MODEL)
+def check_user_model(package_configs=None, **kwargs):
+    if package_configs is None:
+        cls = packages.get_model(settings.AUTH_USER_MODEL)
     else:
-        app_label, model_name = settings.AUTH_USER_MODEL.split(".")
-        for app_config in app_configs:
-            if app_config.label == app_label:
-                cls = app_config.get_model(model_name)
+        package_label, model_name = settings.AUTH_USER_MODEL.split(".")
+        for package_config in package_configs:
+            if package_config.label == package_label:
+                cls = package_config.get_model(model_name)
                 break
         else:
             # Checks might be run against a set of app configs that don't

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from jinja2 import Environment, StrictUndefined
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.utils.module_loading import module_has_submodule
 
@@ -23,23 +23,23 @@ def _get_app_template_dirs():
     """
     dirname = "templates"
     template_dirs = [
-        Path(app_config.path) / dirname
-        for app_config in apps.get_app_configs()
-        if app_config.path and (Path(app_config.path) / dirname).is_dir()
+        Path(package_config.path) / dirname
+        for package_config in packages.get_package_configs()
+        if package_config.path and (Path(package_config.path) / dirname).is_dir()
     ]
     # Immutable return value because it will be cached and shared by callers.
     return tuple(template_dirs)
 
 
 def _get_installed_extensions() -> tuple[list, dict, dict]:
-    """Automatically load extensions, globals, filters from INSTALLED_APPS jinja module and root jinja module"""
+    """Automatically load extensions, globals, filters from INSTALLED_PACKAGES jinja module and root jinja module"""
     extensions = []
     globals = {}
     filters = {}
 
-    for app_config in apps.get_app_configs():
-        if module_has_submodule(app_config.module, "jinja"):
-            module = import_module(f"{app_config.name}.jinja")
+    for package_config in packages.get_package_configs():
+        if module_has_submodule(package_config.module, "jinja"):
+            module = import_module(f"{package_config.name}.jinja")
         else:
             continue
 
@@ -87,7 +87,7 @@ def get_template_dirs():
     return (jinja_templates, app_templates) + _get_app_template_dirs()
 
 
-def create_default_environment(include_apps=True, **environment_kwargs):
+def create_default_environment(include_packages=True, **environment_kwargs):
     """
     This default jinja environment, also used by the error rendering and internal views so
     customization needs to happen by using this function, not settings that hook in internally.
@@ -107,7 +107,7 @@ def create_default_environment(include_apps=True, **environment_kwargs):
     env.globals.update(default_globals)
     env.filters.update(default_filters)
 
-    if include_apps:
+    if include_packages:
         app_extensions, app_globals, app_filters = _get_installed_extensions()
 
         for extension in app_extensions:

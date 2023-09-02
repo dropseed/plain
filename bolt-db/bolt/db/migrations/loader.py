@@ -2,7 +2,7 @@ import pkgutil
 import sys
 from importlib import import_module, reload
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db.migrations.graph import MigrationGraph
 from bolt.db.migrations.recorder import MigrationRecorder
 
@@ -57,29 +57,29 @@ class MigrationLoader:
             self.build_graph()
 
     @classmethod
-    def migrations_module(cls, app_label):
+    def migrations_module(cls, package_label):
         """
-        Return the path to the migrations module for the specified app_label
+        Return the path to the migrations module for the specified package_label
         and a boolean indicating if the module is specified in
         settings.MIGRATION_MODULE.
         """
 
-        app = apps.get_app_config(app_label)
+        app = packages.get_package_config(package_label)
         if app.migrations_module is None:
             return None, True
         explicit = app.migrations_module != MIGRATIONS_MODULE_NAME
         return f"{app.name}.{app.migrations_module}", explicit
 
     def load_disk(self):
-        """Load the migrations from all INSTALLED_APPS from disk."""
+        """Load the migrations from all INSTALLED_PACKAGES from disk."""
         self.disk_migrations = {}
-        self.unmigrated_apps = set()
-        self.migrated_apps = set()
-        for app_config in apps.get_app_configs():
+        self.unmigrated_packages = set()
+        self.migrated_packages = set()
+        for package_config in packages.get_package_configs():
             # Get the migrations module directory
-            module_name, explicit = self.migrations_module(app_config.label)
+            module_name, explicit = self.migrations_module(package_config.label)
             if module_name is None:
-                self.unmigrated_apps.add(app_config.label)
+                self.unmigrated_packages.add(package_config.label)
                 continue
             was_loaded = module_name in sys.modules
             try:
@@ -88,13 +88,13 @@ class MigrationLoader:
                 if (explicit and self.ignore_no_migrations) or (
                     not explicit and MIGRATIONS_MODULE_NAME in e.name.split(".")
                 ):
-                    self.unmigrated_apps.add(app_config.label)
+                    self.unmigrated_packages.add(package_config.label)
                     continue
                 raise
             else:
                 # Module is not a package (e.g. migrations.py).
                 if not hasattr(module, "__path__"):
-                    self.unmigrated_apps.add(app_config.label)
+                    self.unmigrated_packages.add(package_config.label)
                     continue
                 # Empty directories are namespaces. Namespace packages have no
                 # __file__ and don't use a list for __path__. See
@@ -102,12 +102,12 @@ class MigrationLoader:
                 if getattr(module, "__file__", None) is None and not isinstance(
                     module.__path__, list
                 ):
-                    self.unmigrated_apps.add(app_config.label)
+                    self.unmigrated_packages.add(package_config.label)
                     continue
                 # Force a reload if it's already loaded (tests need this)
                 if was_loaded:
                     reload(module)
-            self.migrated_apps.add(app_config.label)
+            self.migrated_packages.add(package_config.label)
             migration_names = {
                 name
                 for _, name, is_pkg in pkgutil.iter_modules(module.__path__)
@@ -129,59 +129,59 @@ class MigrationLoader:
                 if not hasattr(migration_module, "Migration"):
                     raise BadMigrationError(
                         "Migration %s in app %s has no Migration class"
-                        % (migration_name, app_config.label)
+                        % (migration_name, package_config.label)
                     )
                 self.disk_migrations[
-                    app_config.label, migration_name
+                    package_config.label, migration_name
                 ] = migration_module.Migration(
                     migration_name,
-                    app_config.label,
+                    package_config.label,
                 )
 
-    def get_migration(self, app_label, name_prefix):
+    def get_migration(self, package_label, name_prefix):
         """Return the named migration or raise NodeNotFoundError."""
-        return self.graph.nodes[app_label, name_prefix]
+        return self.graph.nodes[package_label, name_prefix]
 
-    def get_migration_by_prefix(self, app_label, name_prefix):
+    def get_migration_by_prefix(self, package_label, name_prefix):
         """
         Return the migration(s) which match the given app label and name_prefix.
         """
         # Do the search
         results = []
-        for migration_app_label, migration_name in self.disk_migrations:
-            if migration_app_label == app_label and migration_name.startswith(
+        for migration_package_label, migration_name in self.disk_migrations:
+            if migration_package_label == package_label and migration_name.startswith(
                 name_prefix
             ):
-                results.append((migration_app_label, migration_name))
+                results.append((migration_package_label, migration_name))
         if len(results) > 1:
             raise AmbiguityError(
                 "There is more than one migration for '%s' with the prefix '%s'"
-                % (app_label, name_prefix)
+                % (package_label, name_prefix)
             )
         elif not results:
             raise KeyError(
-                f"There is no migration for '{app_label}' with the prefix "
+                f"There is no migration for '{package_label}' with the prefix "
                 f"'{name_prefix}'"
             )
         else:
             return self.disk_migrations[results[0]]
 
-    def check_key(self, key, current_app):
+    def check_key(self, key, current_package):
         if (key[1] != "__first__" and key[1] != "__latest__") or key in self.graph:
             return key
         # Special-case __first__, which means "the first migration" for
-        # migrated apps, and is ignored for unmigrated apps. It allows
-        # makemigrations to declare dependencies on apps before they even have
+        # migrated packages, and is ignored for unmigrated packages. It allows
+        # makemigrations to declare dependencies on packages before they even have
         # migrations.
-        if key[0] == current_app:
+        if key[0] == current_package:
             # Ignore __first__ references to the same app (#22325)
             return
-        if key[0] in self.unmigrated_apps:
+        if key[0] in self.unmigrated_packages:
             # This app isn't migrated, but something depends on it.
             # The models will get auto-added into the state, though
             # so we're fine.
             return
-        if key[0] in self.migrated_apps:
+        if key[0] in self.migrated_packages:
             try:
                 if key[1] == "__first__":
                     return self.graph.root_nodes(key[0])[0]
@@ -337,18 +337,18 @@ class MigrationLoader:
 
     def detect_conflicts(self):
         """
-        Look through the loaded graph and detect any conflicts - apps
+        Look through the loaded graph and detect any conflicts - packages
         with more than one leaf migration. Return a dict of the app labels
         that conflict with the migration names that conflict.
         """
-        seen_apps = {}
-        conflicting_apps = set()
-        for app_label, migration_name in self.graph.leaf_nodes():
-            if app_label in seen_apps:
-                conflicting_apps.add(app_label)
-            seen_apps.setdefault(app_label, set()).add(migration_name)
+        seen_packages = {}
+        conflicting_packages = set()
+        for package_label, migration_name in self.graph.leaf_nodes():
+            if package_label in seen_packages:
+                conflicting_packages.add(package_label)
+            seen_packages.setdefault(package_label, set()).add(migration_name)
         return {
-            app_label: sorted(seen_apps[app_label]) for app_label in conflicting_apps
+            package_label: sorted(seen_packages[package_label]) for package_label in conflicting_packages
         }
 
     def project_state(self, nodes=None, at_end=True):
@@ -359,7 +359,7 @@ class MigrationLoader:
         See graph.make_state() for the meaning of "nodes" and "at_end".
         """
         return self.graph.make_state(
-            nodes=nodes, at_end=at_end, real_apps=self.unmigrated_apps
+            nodes=nodes, at_end=at_end, real_packages=self.unmigrated_packages
         )
 
     def collect_sql(self, plan):
@@ -375,7 +375,7 @@ class MigrationLoader:
             ) as schema_editor:
                 if state is None:
                     state = self.project_state(
-                        (migration.app_label, migration.name), at_end=False
+                        (migration.package_label, migration.name), at_end=False
                     )
                 if not backwards:
                     state = migration.apply(state, schema_editor, collect_sql=True)

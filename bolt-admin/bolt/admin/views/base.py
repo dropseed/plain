@@ -196,7 +196,7 @@ class AdminDetailView(AdminPageView, DetailView):
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [
-                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"admin/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             ]
 
         return super().get_template_names()
@@ -212,7 +212,7 @@ class AdminUpdateView(AdminPageView, UpdateView):
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [
-                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"admin/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             ]
 
         return super().get_template_names()
@@ -225,7 +225,7 @@ class AdminCreateView(AdminPageView, CreateView):
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [
-                f"admin/{object_meta.app_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"admin/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             ]
 
         return super().get_template_names()

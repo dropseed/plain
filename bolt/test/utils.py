@@ -14,7 +14,7 @@ from xml.dom.minidom import Node, parseString
 
 from jinja2 import Template
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections, reset_queries
 from bolt.exceptions import ImproperlyConfigured
 from bolt.runtime import settings
@@ -428,12 +428,12 @@ class override_settings(TestContextDecorator):
 
     def enable(self):
         # Keep this code at the beginning to leave the settings unchanged
-        # in case it raises an exception because INSTALLED_APPS is invalid.
-        if "INSTALLED_APPS" in self.options:
+        # in case it raises an exception because INSTALLED_PACKAGES is invalid.
+        if "INSTALLED_PACKAGES" in self.options:
             try:
-                apps.set_installed_apps(self.options["INSTALLED_APPS"])
+                packages.set_installed_packages(self.options["INSTALLED_PACKAGES"])
             except Exception:
-                apps.unset_installed_apps()
+                packages.unset_installed_packages()
                 raise
         override = UserSettingsHolder(settings._wrapped)
         for key, new_value in self.options.items():
@@ -453,8 +453,8 @@ class override_settings(TestContextDecorator):
                 self.disable()
 
     def disable(self):
-        if "INSTALLED_APPS" in self.options:
-            apps.unset_installed_apps()
+        if "INSTALLED_PACKAGES" in self.options:
+            packages.unset_installed_packages()
         settings._wrapped = self.wrapped
         del self.wrapped
         responses = []

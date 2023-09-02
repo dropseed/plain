@@ -3,7 +3,7 @@ from bolt.urls import include, path
 from .views.default import AdminIndexView
 from .views.registry import registry
 
-app_name = "admin"
+default_namespace = "admin"
 
 
 urlpatterns = [

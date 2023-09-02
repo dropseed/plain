@@ -1,7 +1,7 @@
 import shutil
 import sys
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import migrations
 from bolt.db.migrations.exceptions import AmbiguityError
 from bolt.db.migrations.loader import MigrationLoader
@@ -17,8 +17,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "app_label",
-            help="App label of the application to optimize the migration for.",
+            "package_label",
+            help="Package label of the application to optimize the migration for.",
         )
         parser.add_argument(
             "migration_name", help="Migration name to optimize the operations for."
@@ -31,37 +31,37 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         verbosity = options["verbosity"]
-        app_label = options["app_label"]
+        package_label = options["package_label"]
         migration_name = options["migration_name"]
         check = options["check"]
 
-        # Validate app_label.
+        # Validate package_label.
         try:
-            apps.get_app_config(app_label)
+            packages.get_package_config(package_label)
         except LookupError as err:
             raise CommandError(str(err))
 
         # Load the current graph state.
         loader = MigrationLoader(None)
-        if app_label not in loader.migrated_apps:
-            raise CommandError(f"App '{app_label}' does not have migrations.")
+        if package_label not in loader.migrated_packages:
+            raise CommandError(f"Package '{package_label}' does not have migrations.")
         # Find a migration.
         try:
-            migration = loader.get_migration_by_prefix(app_label, migration_name)
+            migration = loader.get_migration_by_prefix(package_label, migration_name)
         except AmbiguityError:
             raise CommandError(
                 f"More than one migration matches '{migration_name}' in app "
-                f"'{app_label}'. Please be more specific."
+                f"'{package_label}'. Please be more specific."
             )
         except KeyError:
             raise CommandError(
                 f"Cannot find a migration matching '{migration_name}' from app "
-                f"'{app_label}'."
+                f"'{package_label}'."
             )
 
         # Optimize the migration.
         optimizer = MigrationOptimizer()
-        new_operations = optimizer.optimize(migration.operations, migration.app_label)
+        new_operations = optimizer.optimize(migration.operations, migration.package_label)
         if len(migration.operations) == len(new_operations):
             if verbosity > 0:
                 self.stdout.write("No optimizations possible.")
@@ -96,11 +96,11 @@ class Command(BaseCommand):
                 {
                     "dependencies": migration.dependencies,
                     "operations": new_operations,
-                    "replaces": [(migration.app_label, migration.name)],
+                    "replaces": [(migration.package_label, migration.name)],
                 },
             )
             optimized_migration_name = "%s_optimized" % migration.name
-            optimized_migration = subclass(optimized_migration_name, app_label)
+            optimized_migration = subclass(optimized_migration_name, package_label)
             writer = MigrationWriter(optimized_migration)
             migration_file_string = writer.as_string()
             if verbosity > 0:

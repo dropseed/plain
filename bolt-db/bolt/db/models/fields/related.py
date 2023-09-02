@@ -3,7 +3,7 @@ import inspect
 from functools import partial
 
 from bolt import checks, exceptions
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import connection, router
 from bolt.db.backends import utils
 from bolt.db.models import Q
@@ -42,14 +42,14 @@ RECURSIVE_RELATIONSHIP_CONSTANT = "self"
 def resolve_relation(scope_model, relation):
     """
     Transform relation into a model or fully-qualified model string of the form
-    "app_label.ModelName", relative to scope_model.
+    "package_label.ModelName", relative to scope_model.
 
     The relation argument can be:
       * RECURSIVE_RELATIONSHIP_CONSTANT, i.e. the string "self", in which case
         the model argument will be returned.
-      * A bare model name without an app_label, in which case scope_model's
-        app_label will be prepended.
-      * An "app_label.ModelName" string.
+      * A bare model name without an package_label, in which case scope_model's
+        package_label will be prepended.
+      * An "package_label.ModelName" string.
       * A model class, which will be returned unchanged.
     """
     # Check for recursive relations
@@ -59,7 +59,7 @@ def resolve_relation(scope_model, relation):
     # Look for an "app.Model" relation
     if isinstance(relation, str):
         if "." not in relation:
-            relation = f"{scope_model._meta.app_label}.{relation}"
+            relation = f"{scope_model._meta.package_label}.{relation}"
 
     return relation
 
@@ -76,13 +76,13 @@ def lazy_related_operation(function, model, *related_models, **kwargs):
     `resolve_relation()` for the various forms these may take. Any relative
     references will be resolved relative to `model`.
 
-    This is a convenience wrapper for `Apps.lazy_model_operation` - the app
-    registry model used is the one found in `model._meta.apps`.
+    This is a convenience wrapper for `Packages.lazy_model_operation` - the app
+    registry model used is the one found in `model._meta.packages`.
     """
     models = [model] + [resolve_relation(model, rel) for rel in related_models]
     model_keys = (make_model_tuple(m) for m in models)
-    apps = model._meta.apps
-    return apps.lazy_model_operation(partial(function, **kwargs), *model_keys)
+    packages = model._meta.packages
+    return packages.lazy_model_operation(partial(function, **kwargs), *model_keys)
 
 
 class RelatedField(FieldCacheMixin, Field):
@@ -109,7 +109,7 @@ class RelatedField(FieldCacheMixin, Field):
     @cached_property
     def related_model(self):
         # Can't cache this property until all the models are loaded.
-        apps.check_models_ready()
+        packages.check_models_ready()
         return self.remote_field.model
 
     def check(self, **kwargs):
@@ -184,7 +184,7 @@ class RelatedField(FieldCacheMixin, Field):
         return errors
 
     def _check_relation_model_exists(self):
-        rel_is_missing = self.remote_field.model not in self.opts.apps.get_models()
+        rel_is_missing = self.remote_field.model not in self.opts.packages.get_models()
         rel_is_string = isinstance(self.remote_field.model, str)
         model_name = (
             self.remote_field.model
@@ -206,7 +206,7 @@ class RelatedField(FieldCacheMixin, Field):
 
     def _check_referencing_to_swapped_model(self):
         if (
-            self.remote_field.model not in self.opts.apps.get_models()
+            self.remote_field.model not in self.opts.packages.get_models()
             and not isinstance(self.remote_field.model, str)
             and self.remote_field.model._meta.swapped
         ):
@@ -253,7 +253,7 @@ class RelatedField(FieldCacheMixin, Field):
         rel_is_hidden = self.remote_field.is_hidden()
         rel_name = self.remote_field.get_accessor_name()  # i. e. "model_set"
         rel_query_name = self.related_query_name()  # i. e. "model"
-        # i.e. "app_label.Model.field".
+        # i.e. "package_label.Model.field".
         field_name = f"{opts.label}.{self.name}"
 
         # Check clashes between accessor or reverse query name of `field`
@@ -261,7 +261,7 @@ class RelatedField(FieldCacheMixin, Field):
         # model_set and it clashes with Target.model_set.
         potential_clashes = rel_opts.fields + rel_opts.many_to_many
         for clash_field in potential_clashes:
-            # i.e. "app_label.Target.model_set".
+            # i.e. "package_label.Target.model_set".
             clash_name = f"{rel_opts.label}.{clash_field.name}"
             if not rel_is_hidden and clash_field.name == rel_name:
                 errors.append(
@@ -299,7 +299,7 @@ class RelatedField(FieldCacheMixin, Field):
         # Model.m2m accessor.
         potential_clashes = (r for r in rel_opts.related_objects if r.field is not self)
         for clash_field in potential_clashes:
-            # i.e. "app_label.Model.m2m".
+            # i.e. "package_label.Model.m2m".
             clash_name = "{}.{}".format(
                 clash_field.related_model._meta.label,
                 clash_field.field.name,
@@ -356,14 +356,14 @@ class RelatedField(FieldCacheMixin, Field):
                 related_name %= {
                     "class": cls.__name__.lower(),
                     "model_name": cls._meta.model_name.lower(),
-                    "app_label": cls._meta.app_label.lower(),
+                    "package_label": cls._meta.package_label.lower(),
                 }
                 self.remote_field.related_name = related_name
 
             if self.remote_field.related_query_name:
                 related_query_name = self.remote_field.related_query_name % {
                     "class": cls.__name__.lower(),
-                    "app_label": cls._meta.app_label.lower(),
+                    "package_label": cls._meta.package_label.lower(),
                 }
                 self.remote_field.related_query_name = related_query_name
 
@@ -430,7 +430,7 @@ class RelatedField(FieldCacheMixin, Field):
                 to_string = self.remote_field.model
             else:
                 to_string = self.remote_field.model._meta.label
-            return apps.get_swappable_settings_name(to_string)
+            return packages.get_swappable_settings_name(to_string)
         return None
 
     def set_attributes_from_rel(self):
@@ -654,8 +654,8 @@ class ForeignObject(RelatedField):
             kwargs["parent_link"] = self.remote_field.parent_link
         if isinstance(self.remote_field.model, str):
             if "." in self.remote_field.model:
-                app_label, model_name = self.remote_field.model.split(".")
-                kwargs["to"] = f"{app_label}.{model_name.lower()}"
+                package_label, model_name = self.remote_field.model.split(".")
+                kwargs["to"] = f"{package_label}.{model_name.lower()}"
             else:
                 kwargs["to"] = self.remote_field.model.lower()
         else:
@@ -1221,13 +1221,13 @@ def create_many_to_many_intermediary_model(field, klass):
         {
             "db_table": field._get_m2m_db_table(klass._meta),
             "auto_created": klass,
-            "app_label": klass._meta.app_label,
+            "package_label": klass._meta.package_label,
             "db_tablespace": klass._meta.db_tablespace,
             "unique_together": (from_, to),
             "verbose_name": "%(from)s-%(to)s relationship" % {"from": from_, "to": to},
             "verbose_name_plural": "%(from)s-%(to)s relationships"
             % {"from": from_, "to": to},
-            "apps": field.model._meta.apps,
+            "packages": field.model._meta.packages,
         },
     )
     # Construct and return the new class.
@@ -1397,7 +1397,7 @@ class ManyToManyField(RelatedField):
     def _check_relationship_model(self, from_model=None, **kwargs):
         if hasattr(self.remote_field.through, "_meta"):
             qualified_model_name = "{}.{}".format(
-                self.remote_field.through._meta.app_label,
+                self.remote_field.through._meta.package_label,
                 self.remote_field.through.__name__,
             )
         else:
@@ -1405,7 +1405,7 @@ class ManyToManyField(RelatedField):
 
         errors = []
 
-        if self.remote_field.through not in self.opts.apps.get_models(
+        if self.remote_field.through not in self.opts.packages.get_models(
             include_auto_created=True
         ):
             # The relationship model is not installed.
@@ -1634,7 +1634,7 @@ class ManyToManyField(RelatedField):
             return []
         registered_tables = {
             model._meta.db_table: model
-            for model in self.opts.apps.get_models(include_auto_created=True)
+            for model in self.opts.packages.get_models(include_auto_created=True)
             if model != self.remote_field.through and model._meta.managed
         }
         m2m_db_table = self.m2m_db_table()
@@ -1688,8 +1688,8 @@ class ManyToManyField(RelatedField):
         # Lowercase model names as they should be treated as case-insensitive.
         if isinstance(self.remote_field.model, str):
             if "." in self.remote_field.model:
-                app_label, model_name = self.remote_field.model.split(".")
-                kwargs["to"] = f"{app_label}.{model_name.lower()}"
+                package_label, model_name = self.remote_field.model.split(".")
+                kwargs["to"] = f"{package_label}.{model_name.lower()}"
             else:
                 kwargs["to"] = self.remote_field.model.lower()
         else:
@@ -1847,7 +1847,7 @@ class ManyToManyField(RelatedField):
             # still uses backwards relations internally and we need to avoid
             # clashes between multiple m2m fields with related_name == '+'.
             self.remote_field.related_name = "_{}_{}_{}_+".format(
-                cls._meta.app_label,
+                cls._meta.package_label,
                 cls.__name__.lower(),
                 name,
             )

@@ -33,7 +33,7 @@ class BaseManager:
         self._hints = {}
 
     def __str__(self):
-        """Return "app_label.model_label.manager_name"."""
+        """Return "package_label.model_label.manager_name"."""
         return f"{self.model._meta.label}.{self.name}"
 
     def __class_getitem__(cls, *args, **kwargs):

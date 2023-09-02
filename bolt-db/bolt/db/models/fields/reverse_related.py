@@ -124,7 +124,7 @@ class ForeignObjectRel(FieldCacheMixin):
     def __repr__(self):
         return "<{}: {}.{}>".format(
             type(self).__name__,
-            self.related_model._meta.app_label,
+            self.related_model._meta.package_label,
             self.related_model._meta.model_name,
         )
 

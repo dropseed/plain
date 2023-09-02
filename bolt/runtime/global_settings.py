@@ -30,8 +30,8 @@ USE_TZ = True
 # manually specified. It's used to construct the Content-Type header.
 DEFAULT_CHARSET = "utf-8"
 
-# List of strings representing installed apps.
-INSTALLED_APPS: list = []
+# List of strings representing installed packages.
+INSTALLED_PACKAGES: list = []
 
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
@@ -182,7 +182,7 @@ STATICFILES_DIRS = []
 # various locations.
 STATICFILES_FINDERS = [
     "bolt.staticfiles.finders.FileSystemFinder",
-    "bolt.staticfiles.finders.AppDirectoriesFinder",
+    "bolt.staticfiles.finders.PackageDirectoriesFinder",
     # 'bolt.staticfiles.finders.DefaultStorageFinder',
 ]
 

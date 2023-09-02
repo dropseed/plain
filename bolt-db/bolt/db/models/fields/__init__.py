@@ -9,7 +9,7 @@ from base64 import b64decode, b64encode
 from functools import partialmethod, total_ordering
 
 from bolt import checks, exceptions, validators
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import connection, connections, router
 from bolt.db.models.constants import LOOKUP_SEP
 from bolt.db.models.enums import ChoicesMeta
@@ -77,8 +77,8 @@ class NOT_PROVIDED:
 BLANK_CHOICE_DASH = [("", "---------")]
 
 
-def _load_field(app_label, model_name, field_name):
-    return apps.get_model(app_label, model_name)._meta.get_field(field_name)
+def _load_field(package_label, model_name, field_name):
+    return packages.get_model(package_label, model_name)._meta.get_field(field_name)
 
 
 # A guide to Field parameters:
@@ -233,7 +233,7 @@ class Field(RegisterLookupMixin):
 
     def __str__(self):
         """
-        Return "app_label.model_label.field_name" for fields attached to
+        Return "package_label.model_label.field_name" for fields attached to
         models.
         """
         if not hasattr(self, "model"):
@@ -627,8 +627,8 @@ class Field(RegisterLookupMixin):
                 return not hasattr(self, "model")  # Order no-model fields first
             else:
                 # creation_counter's are equal, compare only models.
-                return (self.model._meta.app_label, self.model._meta.model_name) < (
-                    other.model._meta.app_label,
+                return (self.model._meta.package_label, self.model._meta.model_name) < (
+                    other.model._meta.package_label,
                     other.model._meta.model_name,
                 )
         return NotImplemented
@@ -673,7 +673,7 @@ class Field(RegisterLookupMixin):
             state.pop("_get_default", None)
             return _empty, (self.__class__,), state
         return _load_field, (
-            self.model._meta.app_label,
+            self.model._meta.package_label,
             self.model._meta.object_name,
             self.name,
         )

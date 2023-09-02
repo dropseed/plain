@@ -18,7 +18,7 @@ class SessionStore(SessionBase):
     @classmethod
     def get_model_class(cls):
         # Avoids a circular import and allows importing SessionStore when
-        # bolt.sessions is not in INSTALLED_APPS.
+        # bolt.sessions is not in INSTALLED_PACKAGES.
         from bolt.sessions.models import Session
 
         return Session

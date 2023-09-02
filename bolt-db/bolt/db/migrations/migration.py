@@ -33,7 +33,7 @@ class Migration:
 
     # Other migrations that should be run after this one (i.e. have
     # this migration added to their dependencies). Useful to make third-party
-    # apps' migrations run after your AUTH_USER replacement, for example.
+    # packages' migrations run after your AUTH_USER replacement, for example.
     run_before = []
 
     # Migration names in this app that this migration replaces. If this is
@@ -52,9 +52,9 @@ class Migration:
     # on database backends which support transactional DDL.
     atomic = True
 
-    def __init__(self, name, app_label):
+    def __init__(self, name, package_label):
         self.name = name
-        self.app_label = app_label
+        self.package_label = package_label
         # Copy dependencies & other attrs as we might mutate them at runtime
         self.operations = list(self.__class__.operations)
         self.dependencies = list(self.__class__.dependencies)
@@ -65,17 +65,17 @@ class Migration:
         return (
             isinstance(other, Migration)
             and self.name == other.name
-            and self.app_label == other.app_label
+            and self.package_label == other.package_label
         )
 
     def __repr__(self):
-        return f"<Migration {self.app_label}.{self.name}>"
+        return f"<Migration {self.package_label}.{self.name}>"
 
     def __str__(self):
-        return f"{self.app_label}.{self.name}"
+        return f"{self.package_label}.{self.name}"
 
     def __hash__(self):
-        return hash(f"{self.app_label}.{self.name}")
+        return hash(f"{self.package_label}.{self.name}")
 
     def mutate_state(self, project_state, preserve=True):
         """
@@ -88,7 +88,7 @@ class Migration:
             new_state = project_state.clone()
 
         for operation in self.operations:
-            operation.state_forwards(self.app_label, new_state)
+            operation.state_forwards(self.package_label, new_state)
         return new_state
 
     def apply(self, project_state, schema_editor, collect_sql=False):
@@ -115,7 +115,7 @@ class Migration:
                 collected_sql_before = len(schema_editor.collected_sql)
             # Save the state before the operation has run
             old_state = project_state.clone()
-            operation.state_forwards(self.app_label, project_state)
+            operation.state_forwards(self.package_label, project_state)
             # Run the operation
             atomic_operation = operation.atomic or (
                 self.atomic and operation.atomic is not False
@@ -125,12 +125,12 @@ class Migration:
                 # atomic operation inside a non-atomic migration.
                 with atomic(schema_editor.connection.alias):
                     operation.database_forwards(
-                        self.app_label, schema_editor, old_state, project_state
+                        self.package_label, schema_editor, old_state, project_state
                     )
             else:
                 # Normal behaviour
                 operation.database_forwards(
-                    self.app_label, schema_editor, old_state, project_state
+                    self.package_label, schema_editor, old_state, project_state
                 )
             if collect_sql and collected_sql_before == len(schema_editor.collected_sql):
                 schema_editor.collected_sql.append("-- (no-op)")
@@ -163,7 +163,7 @@ class Migration:
             # over all operations
             new_state = new_state.clone()
             old_state = new_state.clone()
-            operation.state_forwards(self.app_label, new_state)
+            operation.state_forwards(self.package_label, new_state)
             to_run.insert(0, (operation, old_state, new_state))
 
         # Phase 2
@@ -186,12 +186,12 @@ class Migration:
                 # atomic operation inside a non-atomic migration.
                 with atomic(schema_editor.connection.alias):
                     operation.database_backwards(
-                        self.app_label, schema_editor, from_state, to_state
+                        self.package_label, schema_editor, from_state, to_state
                     )
             else:
                 # Normal behaviour
                 operation.database_backwards(
-                    self.app_label, schema_editor, from_state, to_state
+                    self.package_label, schema_editor, from_state, to_state
                 )
             if collect_sql and collected_sql_before == len(schema_editor.collected_sql):
                 schema_editor.collected_sql.append("-- (no-op)")

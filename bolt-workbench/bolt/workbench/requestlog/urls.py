@@ -1,7 +1,7 @@
 from bolt.urls import path
 from .views import RequestLogView
 
-app_name = "requestlog"
+default_namespace = "requestlog"
 
 urlpatterns = [
     path("", RequestLogView.as_view(), name="list"),

@@ -35,18 +35,18 @@ class MigrationAutodetector:
         self.from_state = from_state
         self.to_state = to_state
         self.questioner = questioner or MigrationQuestioner()
-        self.existing_apps = {app for app, model in from_state.models}
+        self.existing_packages = {app for app, model in from_state.models}
 
-    def changes(self, graph, trim_to_apps=None, convert_apps=None, migration_name=None):
+    def changes(self, graph, trim_to_packages=None, convert_packages=None, migration_name=None):
         """
         Main entry point to produce a list of applicable changes.
-        Take a graph to base names on and an optional set of apps
+        Take a graph to base names on and an optional set of packages
         to try and restrict to (restriction is not guaranteed)
         """
-        changes = self._detect_changes(convert_apps, graph)
+        changes = self._detect_changes(convert_packages, graph)
         changes = self.arrange_for_graph(changes, graph, migration_name)
-        if trim_to_apps:
-            changes = self._trim_to_apps(changes, trim_to_apps)
+        if trim_to_packages:
+            changes = self._trim_to_packages(changes, trim_to_packages)
         return changes
 
     def deep_deconstruct(self, obj):
@@ -101,7 +101,7 @@ class MigrationAutodetector:
             fields_def.append(deconstruction)
         return fields_def
 
-    def _detect_changes(self, convert_apps=None, graph=None):
+    def _detect_changes(self, convert_packages=None, graph=None):
         """
         Return a dict of migration plans which will achieve the
         change from from_state to to_state. The dict has app labels
@@ -110,7 +110,7 @@ class MigrationAutodetector:
         The resulting migrations aren't specially named, but the names
         do matter for dependencies inside the set.
 
-        convert_apps is the list of apps to convert to use migrations
+        convert_packages is the list of packages to convert to use migrations
         (i.e. to make initial migrations for, in the usual case)
 
         graph is an optional argument that, if provided, can help improve
@@ -126,32 +126,32 @@ class MigrationAutodetector:
         self.renamed_fields = {}
 
         # Prepare some old/new state and model lists, separating
-        # proxy models and ignoring unmigrated apps.
+        # proxy models and ignoring unmigrated packages.
         self.old_model_keys = set()
         self.old_proxy_keys = set()
         self.old_unmanaged_keys = set()
         self.new_model_keys = set()
         self.new_proxy_keys = set()
         self.new_unmanaged_keys = set()
-        for (app_label, model_name), model_state in self.from_state.models.items():
+        for (package_label, model_name), model_state in self.from_state.models.items():
             if not model_state.options.get("managed", True):
-                self.old_unmanaged_keys.add((app_label, model_name))
-            elif app_label not in self.from_state.real_apps:
+                self.old_unmanaged_keys.add((package_label, model_name))
+            elif package_label not in self.from_state.real_packages:
                 if model_state.options.get("proxy"):
-                    self.old_proxy_keys.add((app_label, model_name))
+                    self.old_proxy_keys.add((package_label, model_name))
                 else:
-                    self.old_model_keys.add((app_label, model_name))
+                    self.old_model_keys.add((package_label, model_name))
 
-        for (app_label, model_name), model_state in self.to_state.models.items():
+        for (package_label, model_name), model_state in self.to_state.models.items():
             if not model_state.options.get("managed", True):
-                self.new_unmanaged_keys.add((app_label, model_name))
-            elif app_label not in self.from_state.real_apps or (
-                convert_apps and app_label in convert_apps
+                self.new_unmanaged_keys.add((package_label, model_name))
+            elif package_label not in self.from_state.real_packages or (
+                convert_packages and package_label in convert_packages
             ):
                 if model_state.options.get("proxy"):
-                    self.new_proxy_keys.add((app_label, model_name))
+                    self.new_proxy_keys.add((package_label, model_name))
                 else:
-                    self.new_model_keys.add((app_label, model_name))
+                    self.new_model_keys.add((package_label, model_name))
 
         self.from_state.resolve_fields_and_relations()
         self.to_state.resolve_fields_and_relations()
@@ -219,34 +219,34 @@ class MigrationAutodetector:
         self.kept_unmanaged_keys = self.old_unmanaged_keys & self.new_unmanaged_keys
         self.through_users = {}
         self.old_field_keys = {
-            (app_label, model_name, field_name)
-            for app_label, model_name in self.kept_model_keys
+            (package_label, model_name, field_name)
+            for package_label, model_name in self.kept_model_keys
             for field_name in self.from_state.models[
-                app_label, self.renamed_models.get((app_label, model_name), model_name)
+                package_label, self.renamed_models.get((package_label, model_name), model_name)
             ].fields
         }
         self.new_field_keys = {
-            (app_label, model_name, field_name)
-            for app_label, model_name in self.kept_model_keys
-            for field_name in self.to_state.models[app_label, model_name].fields
+            (package_label, model_name, field_name)
+            for package_label, model_name in self.kept_model_keys
+            for field_name in self.to_state.models[package_label, model_name].fields
         }
 
     def _generate_through_model_map(self):
         """Through model map generation."""
-        for app_label, model_name in sorted(self.old_model_keys):
+        for package_label, model_name in sorted(self.old_model_keys):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
             for field_name, field in old_model_state.fields.items():
                 if hasattr(field, "remote_field") and getattr(
                     field.remote_field, "through", None
                 ):
                     through_key = resolve_relation(
-                        field.remote_field.through, app_label, model_name
+                        field.remote_field.through, package_label, model_name
                     )
                     self.through_users[through_key] = (
-                        app_label,
+                        package_label,
                         old_model_name,
                         field_name,
                     )
@@ -259,10 +259,10 @@ class MigrationAutodetector:
         """
         if dependency[0] != "__setting__":
             return dependency, False
-        resolved_app_label, resolved_object_name = getattr(
+        resolved_package_label, resolved_object_name = getattr(
             settings, dependency[1]
         ).split(".")
-        return (resolved_app_label, resolved_object_name.lower()) + dependency[2:], True
+        return (resolved_package_label, resolved_object_name.lower()) + dependency[2:], True
 
     def _build_migration_list(self, graph=None):
         """
@@ -279,16 +279,16 @@ class MigrationAutodetector:
         num_ops = sum(len(x) for x in self.generated_operations.values())
         chop_mode = False
         while num_ops:
-            # On every iteration, we step through all the apps and see if there
+            # On every iteration, we step through all the packages and see if there
             # is a completed set of operations.
             # If we find that a subset of the operations are complete we can
             # try to chop it off from the rest and continue, but we only
             # do this if we've already been through the list once before
             # without any chopping and nothing has changed.
-            for app_label in sorted(self.generated_operations):
+            for package_label in sorted(self.generated_operations):
                 chopped = []
                 dependencies = set()
-                for operation in list(self.generated_operations[app_label]):
+                for operation in list(self.generated_operations[package_label]):
                     deps_satisfied = True
                     operation_dependencies = set()
                     for dep in operation._auto_deps:
@@ -298,7 +298,7 @@ class MigrationAutodetector:
                         # swappable dependencies.
                         original_dep = dep
                         dep, is_swappable_dep = self._resolve_dependency(dep)
-                        if dep[0] != app_label:
+                        if dep[0] != package_label:
                             # External app dependency. See if it's not yet
                             # satisfied.
                             for other_operation in self.generated_operations.get(
@@ -343,29 +343,29 @@ class MigrationAutodetector:
                     if deps_satisfied:
                         chopped.append(operation)
                         dependencies.update(operation_dependencies)
-                        del self.generated_operations[app_label][0]
+                        del self.generated_operations[package_label][0]
                     else:
                         break
                 # Make a migration! Well, only if there's stuff to put in it
                 if dependencies or chopped:
-                    if not self.generated_operations[app_label] or chop_mode:
+                    if not self.generated_operations[package_label] or chop_mode:
                         subclass = type(
                             "Migration",
                             (Migration,),
                             {"operations": [], "dependencies": []},
                         )
                         instance = subclass(
-                            "auto_%i" % (len(self.migrations.get(app_label, [])) + 1),
-                            app_label,
+                            "auto_%i" % (len(self.migrations.get(package_label, [])) + 1),
+                            package_label,
                         )
                         instance.dependencies = list(dependencies)
                         instance.operations = chopped
-                        instance.initial = app_label not in self.existing_apps
-                        self.migrations.setdefault(app_label, []).append(instance)
+                        instance.initial = package_label not in self.existing_packages
+                        self.migrations.setdefault(package_label, []).append(instance)
                         chop_mode = False
                     else:
-                        self.generated_operations[app_label] = (
-                            chopped + self.generated_operations[app_label]
+                        self.generated_operations[package_label] = (
+                            chopped + self.generated_operations[package_label]
                         )
             new_num_ops = sum(len(x) for x in self.generated_operations.values())
             if new_num_ops == num_ops:
@@ -383,7 +383,7 @@ class MigrationAutodetector:
         Reorder to make things possible. Reordering may be needed so FKs work
         nicely inside the same app.
         """
-        for app_label, ops in sorted(self.generated_operations.items()):
+        for package_label, ops in sorted(self.generated_operations.items()):
             ts = TopologicalSorter()
             for op in ops:
                 ts.add(op)
@@ -391,16 +391,16 @@ class MigrationAutodetector:
                     # Resolve intra-app dependencies to handle circular
                     # references involving a swappable model.
                     dep = self._resolve_dependency(dep)[0]
-                    if dep[0] != app_label:
+                    if dep[0] != package_label:
                         continue
                     ts.add(op, *(x for x in ops if self.check_dependency(x, dep)))
-            self.generated_operations[app_label] = list(ts.static_order())
+            self.generated_operations[package_label] = list(ts.static_order())
 
     def _optimize_migrations(self):
         # Add in internal dependencies among the migrations
-        for app_label, migrations in self.migrations.items():
+        for package_label, migrations in self.migrations.items():
             for m1, m2 in zip(migrations, migrations[1:]):
-                m2.dependencies.append((app_label, m1.name))
+                m2.dependencies.append((package_label, m1.name))
 
         # De-dupe dependencies
         for migrations in self.migrations.values():
@@ -408,10 +408,10 @@ class MigrationAutodetector:
                 migration.dependencies = list(set(migration.dependencies))
 
         # Optimize migrations
-        for app_label, migrations in self.migrations.items():
+        for package_label, migrations in self.migrations.items():
             for migration in migrations:
                 migration.operations = MigrationOptimizer().optimize(
-                    migration.operations, app_label
+                    migration.operations, package_label
                 )
 
     def check_dependency(self, operation, dependency):
@@ -477,14 +477,14 @@ class MigrationAutodetector:
         else:
             raise ValueError(f"Can't handle dependency {dependency!r}")
 
-    def add_operation(self, app_label, operation, dependencies=None, beginning=False):
+    def add_operation(self, package_label, operation, dependencies=None, beginning=False):
         # Dependencies are
-        # (app_label, model_name, field_name, create/delete as True/False)
+        # (package_label, model_name, field_name, create/delete as True/False)
         operation._auto_deps = dependencies or []
         if beginning:
-            self.generated_operations.setdefault(app_label, []).insert(0, operation)
+            self.generated_operations.setdefault(package_label, []).insert(0, operation)
         else:
-            self.generated_operations.setdefault(app_label, []).append(operation)
+            self.generated_operations.setdefault(package_label, []).append(operation)
 
     def swappable_first_key(self, item):
         """
@@ -518,15 +518,15 @@ class MigrationAutodetector:
         self.renamed_models = {}
         self.renamed_models_rel = {}
         added_models = self.new_model_keys - self.old_model_keys
-        for app_label, model_name in sorted(added_models):
-            model_state = self.to_state.models[app_label, model_name]
+        for package_label, model_name in sorted(added_models):
+            model_state = self.to_state.models[package_label, model_name]
             model_fields_def = self.only_relation_agnostic_fields(model_state.fields)
 
             removed_models = self.old_model_keys - self.new_model_keys
-            for rem_app_label, rem_model_name in removed_models:
-                if rem_app_label == app_label:
+            for rem_package_label, rem_model_name in removed_models:
+                if rem_package_label == package_label:
                     rem_model_state = self.from_state.models[
-                        rem_app_label, rem_model_name
+                        rem_package_label, rem_model_name
                     ]
                     rem_model_fields_def = self.only_relation_agnostic_fields(
                         rem_model_state.fields
@@ -539,7 +539,7 @@ class MigrationAutodetector:
                             fields = list(model_state.fields.values()) + [
                                 field.remote_field
                                 for relations in self.to_state.relations[
-                                    app_label, model_name
+                                    package_label, model_name
                                 ].values()
                                 for field in relations.values()
                             ]
@@ -547,33 +547,33 @@ class MigrationAutodetector:
                                 if field.is_relation:
                                     dependencies.extend(
                                         self._get_dependencies_for_foreign_key(
-                                            app_label,
+                                            package_label,
                                             model_name,
                                             field,
                                             self.to_state,
                                         )
                                     )
                             self.add_operation(
-                                app_label,
+                                package_label,
                                 operations.RenameModel(
                                     old_name=rem_model_state.name,
                                     new_name=model_state.name,
                                 ),
                                 dependencies=dependencies,
                             )
-                            self.renamed_models[app_label, model_name] = rem_model_name
+                            self.renamed_models[package_label, model_name] = rem_model_name
                             renamed_models_rel_key = "{}.{}".format(
-                                rem_model_state.app_label,
+                                rem_model_state.package_label,
                                 rem_model_state.name_lower,
                             )
                             self.renamed_models_rel[
                                 renamed_models_rel_key
                             ] = "{}.{}".format(
-                                model_state.app_label,
+                                model_state.package_label,
                                 model_state.name_lower,
                             )
-                            self.old_model_keys.remove((rem_app_label, rem_model_name))
-                            self.old_model_keys.add((app_label, model_name))
+                            self.old_model_keys.remove((rem_package_label, rem_model_name))
+                            self.old_model_keys.add((package_label, model_name))
                             break
 
     def generate_created_models(self):
@@ -593,8 +593,8 @@ class MigrationAutodetector:
             sorted(added_models, key=self.swappable_first_key, reverse=True),
             sorted(added_unmanaged_models, key=self.swappable_first_key, reverse=True),
         )
-        for app_label, model_name in all_added_models:
-            model_state = self.to_state.models[app_label, model_name]
+        for package_label, model_name in all_added_models:
+            model_state = self.to_state.models[package_label, model_name]
             # Gather related fields
             related_fields = {}
             primary_key_rel = None
@@ -619,20 +619,20 @@ class MigrationAutodetector:
             )
             # Depend on the deletion of any possible proxy version of us
             dependencies = [
-                (app_label, model_name, None, False),
+                (package_label, model_name, None, False),
             ]
             # Depend on all bases
             for base in model_state.bases:
                 if isinstance(base, str) and "." in base:
-                    base_app_label, base_name = base.split(".", 1)
-                    dependencies.append((base_app_label, base_name, None, True))
+                    base_package_label, base_name = base.split(".", 1)
+                    dependencies.append((base_package_label, base_name, None, True))
                     # Depend on the removal of base fields if the new model has
                     # a field with the same name.
                     old_base_model_state = self.from_state.models.get(
-                        (base_app_label, base_name)
+                        (base_package_label, base_name)
                     )
                     new_base_model_state = self.to_state.models.get(
-                        (base_app_label, base_name)
+                        (base_package_label, base_name)
                     )
                     if old_base_model_state and new_base_model_state:
                         removed_base_fields = (
@@ -644,21 +644,21 @@ class MigrationAutodetector:
                         )
                         for removed_base_field in removed_base_fields:
                             dependencies.append(
-                                (base_app_label, base_name, removed_base_field, False)
+                                (base_package_label, base_name, removed_base_field, False)
                             )
             # Depend on the other end of the primary key if it's a relation
             if primary_key_rel:
                 dependencies.append(
                     resolve_relation(
                         primary_key_rel,
-                        app_label,
+                        package_label,
                         model_name,
                     )
                     + (None, True)
                 )
             # Generate creation operation
             self.add_operation(
-                app_label,
+                package_label,
                 operations.CreateModel(
                     name=model_state.name,
                     fields=[
@@ -681,16 +681,16 @@ class MigrationAutodetector:
             # Generate operations for each related field
             for name, field in sorted(related_fields.items()):
                 dependencies = self._get_dependencies_for_foreign_key(
-                    app_label,
+                    package_label,
                     model_name,
                     field,
                     self.to_state,
                 )
                 # Depend on our own model being created
-                dependencies.append((app_label, model_name, None, True))
+                dependencies.append((package_label, model_name, None, True))
                 # Make operation
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AddField(
                         model_name=model_name,
                         name=name,
@@ -701,23 +701,23 @@ class MigrationAutodetector:
             # Generate other opns
             if order_with_respect_to:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterOrderWithRespectTo(
                         name=model_name,
                         order_with_respect_to=order_with_respect_to,
                     ),
                     dependencies=[
-                        (app_label, model_name, order_with_respect_to, True),
-                        (app_label, model_name, None, True),
+                        (package_label, model_name, order_with_respect_to, True),
+                        (package_label, model_name, None, True),
                     ],
                 )
             related_dependencies = [
-                (app_label, model_name, name, True) for name in sorted(related_fields)
+                (package_label, model_name, name, True) for name in sorted(related_fields)
             ]
-            related_dependencies.append((app_label, model_name, None, True))
+            related_dependencies.append((package_label, model_name, None, True))
             for index in indexes:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AddIndex(
                         model_name=model_name,
                         index=index,
@@ -726,7 +726,7 @@ class MigrationAutodetector:
                 )
             for constraint in constraints:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AddConstraint(
                         model_name=model_name,
                         constraint=constraint,
@@ -735,7 +735,7 @@ class MigrationAutodetector:
                 )
             if unique_together:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterUniqueTogether(
                         name=model_name,
                         unique_together=unique_together,
@@ -745,7 +745,7 @@ class MigrationAutodetector:
             # RemovedInDjango51Warning.
             if index_together:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterIndexTogether(
                         name=model_name,
                         index_together=index_together,
@@ -755,20 +755,20 @@ class MigrationAutodetector:
             # Fix relationships if the model changed from a proxy model to a
             # concrete model.
             relations = self.to_state.relations
-            if (app_label, model_name) in self.old_proxy_keys:
+            if (package_label, model_name) in self.old_proxy_keys:
                 for related_model_key, related_fields in relations[
-                    app_label, model_name
+                    package_label, model_name
                 ].items():
                     related_model_state = self.to_state.models[related_model_key]
                     for related_field_name, related_field in related_fields.items():
                         self.add_operation(
-                            related_model_state.app_label,
+                            related_model_state.package_label,
                             operations.AlterField(
                                 model_name=related_model_state.name,
                                 name=related_field_name,
                                 field=related_field,
                             ),
-                            dependencies=[(app_label, model_name, None, True)],
+                            dependencies=[(package_label, model_name, None, True)],
                         )
 
     def generate_created_proxies(self):
@@ -778,21 +778,21 @@ class MigrationAutodetector:
         safe to skip all the pointless field stuff and chuck out an operation.
         """
         added = self.new_proxy_keys - self.old_proxy_keys
-        for app_label, model_name in sorted(added):
-            model_state = self.to_state.models[app_label, model_name]
+        for package_label, model_name in sorted(added):
+            model_state = self.to_state.models[package_label, model_name]
             assert model_state.options.get("proxy")
             # Depend on the deletion of any possible non-proxy version of us
             dependencies = [
-                (app_label, model_name, None, False),
+                (package_label, model_name, None, False),
             ]
             # Depend on all bases
             for base in model_state.bases:
                 if isinstance(base, str) and "." in base:
-                    base_app_label, base_name = base.split(".", 1)
-                    dependencies.append((base_app_label, base_name, None, True))
+                    base_package_label, base_name = base.split(".", 1)
+                    dependencies.append((base_package_label, base_name, None, True))
             # Generate creation operation
             self.add_operation(
-                app_label,
+                package_label,
                 operations.CreateModel(
                     name=model_state.name,
                     fields=[],
@@ -820,8 +820,8 @@ class MigrationAutodetector:
         all_deleted_models = chain(
             sorted(deleted_models), sorted(deleted_unmanaged_models)
         )
-        for app_label, model_name in all_deleted_models:
-            model_state = self.from_state.models[app_label, model_name]
+        for package_label, model_name in all_deleted_models:
+            model_state = self.from_state.models[package_label, model_name]
             # Gather related fields
             related_fields = {}
             for field_name, field in model_state.fields.items():
@@ -836,7 +836,7 @@ class MigrationAutodetector:
             index_together = model_state.options.pop("index_together", None)
             if unique_together:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterUniqueTogether(
                         name=model_name,
                         unique_together=None,
@@ -845,7 +845,7 @@ class MigrationAutodetector:
             # RemovedInDjango51Warning.
             if index_together:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterIndexTogether(
                         name=model_name,
                         index_together=None,
@@ -854,7 +854,7 @@ class MigrationAutodetector:
             # Then remove each related field
             for name in sorted(related_fields):
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.RemoveField(
                         model_name=model_name,
                         name=name,
@@ -867,17 +867,17 @@ class MigrationAutodetector:
             dependencies = []
             relations = self.from_state.relations
             for (
-                related_object_app_label,
+                related_object_package_label,
                 object_name,
-            ), relation_related_fields in relations[app_label, model_name].items():
+            ), relation_related_fields in relations[package_label, model_name].items():
                 for field_name, field in relation_related_fields.items():
                     dependencies.append(
-                        (related_object_app_label, object_name, field_name, False),
+                        (related_object_package_label, object_name, field_name, False),
                     )
                     if not field.many_to_many:
                         dependencies.append(
                             (
-                                related_object_app_label,
+                                related_object_package_label,
                                 object_name,
                                 field_name,
                                 "alter",
@@ -885,16 +885,16 @@ class MigrationAutodetector:
                         )
 
             for name in sorted(related_fields):
-                dependencies.append((app_label, model_name, name, False))
+                dependencies.append((package_label, model_name, name, False))
             # We're referenced in another field's through=
-            through_user = self.through_users.get((app_label, model_state.name_lower))
+            through_user = self.through_users.get((package_label, model_state.name_lower))
             if through_user:
                 dependencies.append(
                     (through_user[0], through_user[1], through_user[2], False)
                 )
             # Finally, make the operation, deduping any dependencies
             self.add_operation(
-                app_label,
+                package_label,
                 operations.DeleteModel(
                     name=model_state.name,
                 ),
@@ -904,11 +904,11 @@ class MigrationAutodetector:
     def generate_deleted_proxies(self):
         """Make DeleteModel options for proxy models."""
         deleted = self.old_proxy_keys - self.new_proxy_keys
-        for app_label, model_name in sorted(deleted):
-            model_state = self.from_state.models[app_label, model_name]
+        for package_label, model_name in sorted(deleted):
+            model_state = self.from_state.models[package_label, model_name]
             assert model_state.options.get("proxy")
             self.add_operation(
-                app_label,
+                package_label,
                 operations.DeleteModel(
                     name=model_state.name,
                 ),
@@ -918,21 +918,21 @@ class MigrationAutodetector:
         """Work out renamed fields."""
         self.renamed_operations = []
         old_field_keys = self.old_field_keys.copy()
-        for app_label, model_name, field_name in sorted(
+        for package_label, model_name, field_name in sorted(
             self.new_field_keys - old_field_keys
         ):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
             field = new_model_state.get_field(field_name)
             # Scan to see if this is actually a rename!
             field_dec = self.deep_deconstruct(field)
-            for rem_app_label, rem_model_name, rem_field_name in sorted(
+            for rem_package_label, rem_model_name, rem_field_name in sorted(
                 old_field_keys - self.new_field_keys
             ):
-                if rem_app_label == app_label and rem_model_name == model_name:
+                if rem_package_label == package_label and rem_model_name == model_name:
                     old_field = old_model_state.get_field(rem_field_name)
                     old_field_dec = self.deep_deconstruct(old_field)
                     if (
@@ -957,33 +957,33 @@ class MigrationAutodetector:
                         ):
                             self.renamed_operations.append(
                                 (
-                                    rem_app_label,
+                                    rem_package_label,
                                     rem_model_name,
                                     old_field.db_column,
                                     rem_field_name,
-                                    app_label,
+                                    package_label,
                                     model_name,
                                     field,
                                     field_name,
                                 )
                             )
                             old_field_keys.remove(
-                                (rem_app_label, rem_model_name, rem_field_name)
+                                (rem_package_label, rem_model_name, rem_field_name)
                             )
-                            old_field_keys.add((app_label, model_name, field_name))
+                            old_field_keys.add((package_label, model_name, field_name))
                             self.renamed_fields[
-                                app_label, model_name, field_name
+                                package_label, model_name, field_name
                             ] = rem_field_name
                             break
 
     def generate_renamed_fields(self):
         """Generate RenameField operations."""
         for (
-            rem_app_label,
+            rem_package_label,
             rem_model_name,
             rem_db_column,
             rem_field_name,
-            app_label,
+            package_label,
             model_name,
             field,
             field_name,
@@ -995,7 +995,7 @@ class MigrationAutodetector:
                 altered_field = field.clone()
                 altered_field.name = rem_field_name
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterField(
                         model_name=model_name,
                         name=rem_field_name,
@@ -1003,32 +1003,32 @@ class MigrationAutodetector:
                     ),
                 )
             self.add_operation(
-                app_label,
+                package_label,
                 operations.RenameField(
                     model_name=model_name,
                     old_name=rem_field_name,
                     new_name=field_name,
                 ),
             )
-            self.old_field_keys.remove((rem_app_label, rem_model_name, rem_field_name))
-            self.old_field_keys.add((app_label, model_name, field_name))
+            self.old_field_keys.remove((rem_package_label, rem_model_name, rem_field_name))
+            self.old_field_keys.add((package_label, model_name, field_name))
 
     def generate_added_fields(self):
         """Make AddField operations."""
-        for app_label, model_name, field_name in sorted(
+        for package_label, model_name, field_name in sorted(
             self.new_field_keys - self.old_field_keys
         ):
-            self._generate_added_field(app_label, model_name, field_name)
+            self._generate_added_field(package_label, model_name, field_name)
 
-    def _generate_added_field(self, app_label, model_name, field_name):
-        field = self.to_state.models[app_label, model_name].get_field(field_name)
+    def _generate_added_field(self, package_label, model_name, field_name):
+        field = self.to_state.models[package_label, model_name].get_field(field_name)
         # Adding a field always depends at least on its removal.
-        dependencies = [(app_label, model_name, field_name, False)]
+        dependencies = [(package_label, model_name, field_name, False)]
         # Fields that are foreignkeys/m2ms depend on stuff.
         if field.remote_field and field.remote_field.model:
             dependencies.extend(
                 self._get_dependencies_for_foreign_key(
-                    app_label,
+                    package_label,
                     model_name,
                     field,
                     self.to_state,
@@ -1061,7 +1061,7 @@ class MigrationAutodetector:
         ):
             self.questioner.ask_unique_callable_default_addition(field_name, model_name)
         self.add_operation(
-            app_label,
+            package_label,
             operations.AddField(
                 model_name=model_name,
                 name=field_name,
@@ -1073,14 +1073,14 @@ class MigrationAutodetector:
 
     def generate_removed_fields(self):
         """Make RemoveField operations."""
-        for app_label, model_name, field_name in sorted(
+        for package_label, model_name, field_name in sorted(
             self.old_field_keys - self.new_field_keys
         ):
-            self._generate_removed_field(app_label, model_name, field_name)
+            self._generate_removed_field(package_label, model_name, field_name)
 
-    def _generate_removed_field(self, app_label, model_name, field_name):
+    def _generate_removed_field(self, package_label, model_name, field_name):
         self.add_operation(
-            app_label,
+            package_label,
             operations.RemoveField(
                 model_name=model_name,
                 name=field_name,
@@ -1089,8 +1089,8 @@ class MigrationAutodetector:
             # order_with_respect_to or index/unique_together operation;
             # this is safely ignored if there isn't one
             dependencies=[
-                (app_label, model_name, field_name, "order_wrt_unset"),
-                (app_label, model_name, field_name, "foo_together_change"),
+                (package_label, model_name, field_name, "order_wrt_unset"),
+                (package_label, model_name, field_name, "foo_together_change"),
             ],
         )
 
@@ -1099,20 +1099,20 @@ class MigrationAutodetector:
         Make AlterField operations, or possibly RemovedField/AddField if alter
         isn't possible.
         """
-        for app_label, model_name, field_name in sorted(
+        for package_label, model_name, field_name in sorted(
             self.old_field_keys & self.new_field_keys
         ):
             # Did the field change?
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
             old_field_name = self.renamed_fields.get(
-                (app_label, model_name, field_name), field_name
+                (package_label, model_name, field_name), field_name
             )
-            old_field = self.from_state.models[app_label, old_model_name].get_field(
+            old_field = self.from_state.models[package_label, old_model_name].get_field(
                 old_field_name
             )
-            new_field = self.to_state.models[app_label, model_name].get_field(
+            new_field = self.to_state.models[package_label, model_name].get_field(
                 field_name
             )
             dependencies = []
@@ -1122,7 +1122,7 @@ class MigrationAutodetector:
                 new_field.remote_field, "model", None
             ):
                 rename_key = resolve_relation(
-                    new_field.remote_field.model, app_label, model_name
+                    new_field.remote_field.model, package_label, model_name
                 )
                 if rename_key in self.renamed_models:
                     new_field.remote_field.model = old_field.remote_field.model
@@ -1141,7 +1141,7 @@ class MigrationAutodetector:
                 # Handle ForeignObjects which can have multiple from_fields/to_fields.
                 from_fields = getattr(new_field, "from_fields", None)
                 if from_fields:
-                    from_rename_key = (app_label, model_name)
+                    from_rename_key = (package_label, model_name)
                     new_field.from_fields = tuple(
                         [
                             self.renamed_fields.get(
@@ -1158,7 +1158,7 @@ class MigrationAutodetector:
                     )
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
-                        app_label,
+                        package_label,
                         model_name,
                         new_field,
                         self.to_state,
@@ -1168,7 +1168,7 @@ class MigrationAutodetector:
                 new_field.remote_field, "through", None
             ):
                 rename_key = resolve_relation(
-                    new_field.remote_field.through, app_label, model_name
+                    new_field.remote_field.through, package_label, model_name
                 )
                 if rename_key in self.renamed_models:
                     new_field.remote_field.through = old_field.remote_field.through
@@ -1199,7 +1199,7 @@ class MigrationAutodetector:
                     else:
                         field = new_field
                     self.add_operation(
-                        app_label,
+                        package_label,
                         operations.AlterField(
                             model_name=model_name,
                             name=field_name,
@@ -1210,19 +1210,19 @@ class MigrationAutodetector:
                     )
                 else:
                     # We cannot alter between m2m and concrete fields
-                    self._generate_removed_field(app_label, model_name, field_name)
-                    self._generate_added_field(app_label, model_name, field_name)
+                    self._generate_removed_field(package_label, model_name, field_name)
+                    self._generate_added_field(package_label, model_name, field_name)
 
     def create_altered_indexes(self):
         option_name = operations.AddIndex.option_name
         self.renamed_index_together_values = defaultdict(list)
 
-        for app_label, model_name in sorted(self.kept_model_keys):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
 
             old_indexes = old_model_state.options[option_name]
             new_indexes = new_model_state.options[option_name]
@@ -1250,14 +1250,14 @@ class MigrationAutodetector:
             for (
                 old_value,
                 new_value,
-                index_together_app_label,
+                index_together_package_label,
                 index_together_model_name,
                 dependencies,
             ) in self._get_altered_foo_together_operations(
                 operations.AlterIndexTogether.option_name
             ):
                 if (
-                    app_label != index_together_app_label
+                    package_label != index_together_package_label
                     or model_name != index_together_model_name
                 ):
                     continue
@@ -1281,7 +1281,7 @@ class MigrationAutodetector:
                             (None, renamed_index.name, removed_index_together)
                         )
                         self.renamed_index_together_values[
-                            index_together_app_label, index_together_model_name
+                            index_together_package_label, index_together_model_name
                         ].append(removed_index_together)
             # Remove renamed indexes from the lists of added and removed
             # indexes.
@@ -1294,7 +1294,7 @@ class MigrationAutodetector:
 
             self.altered_indexes.update(
                 {
-                    (app_label, model_name): {
+                    (package_label, model_name): {
                         "added_indexes": added_indexes,
                         "removed_indexes": removed_indexes,
                         "renamed_indexes": renamed_indexes,
@@ -1303,11 +1303,11 @@ class MigrationAutodetector:
             )
 
     def generate_added_indexes(self):
-        for (app_label, model_name), alt_indexes in self.altered_indexes.items():
-            dependencies = self._get_dependencies_for_model(app_label, model_name)
+        for (package_label, model_name), alt_indexes in self.altered_indexes.items():
+            dependencies = self._get_dependencies_for_model(package_label, model_name)
             for index in alt_indexes["added_indexes"]:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AddIndex(
                         model_name=model_name,
                         index=index,
@@ -1316,10 +1316,10 @@ class MigrationAutodetector:
                 )
 
     def generate_removed_indexes(self):
-        for (app_label, model_name), alt_indexes in self.altered_indexes.items():
+        for (package_label, model_name), alt_indexes in self.altered_indexes.items():
             for index in alt_indexes["removed_indexes"]:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.RemoveIndex(
                         model_name=model_name,
                         name=index.name,
@@ -1327,12 +1327,12 @@ class MigrationAutodetector:
                 )
 
     def generate_renamed_indexes(self):
-        for (app_label, model_name), alt_indexes in self.altered_indexes.items():
+        for (package_label, model_name), alt_indexes in self.altered_indexes.items():
             for old_index_name, new_index_name, old_fields in alt_indexes[
                 "renamed_indexes"
             ]:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.RenameIndex(
                         model_name=model_name,
                         new_name=new_index_name,
@@ -1343,12 +1343,12 @@ class MigrationAutodetector:
 
     def create_altered_constraints(self):
         option_name = operations.AddConstraint.option_name
-        for app_label, model_name in sorted(self.kept_model_keys):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
 
             old_constraints = old_model_state.options[option_name]
             new_constraints = new_model_state.options[option_name]
@@ -1357,7 +1357,7 @@ class MigrationAutodetector:
 
             self.altered_constraints.update(
                 {
-                    (app_label, model_name): {
+                    (package_label, model_name): {
                         "added_constraints": add_constraints,
                         "removed_constraints": rem_constraints,
                     }
@@ -1366,13 +1366,13 @@ class MigrationAutodetector:
 
     def generate_added_constraints(self):
         for (
-            app_label,
+            package_label,
             model_name,
         ), alt_constraints in self.altered_constraints.items():
-            dependencies = self._get_dependencies_for_model(app_label, model_name)
+            dependencies = self._get_dependencies_for_model(package_label, model_name)
             for constraint in alt_constraints["added_constraints"]:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AddConstraint(
                         model_name=model_name,
                         constraint=constraint,
@@ -1382,12 +1382,12 @@ class MigrationAutodetector:
 
     def generate_removed_constraints(self):
         for (
-            app_label,
+            package_label,
             model_name,
         ), alt_constraints in self.altered_constraints.items():
             for constraint in alt_constraints["removed_constraints"]:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.RemoveConstraint(
                         model_name=model_name,
                         name=constraint.name,
@@ -1395,49 +1395,49 @@ class MigrationAutodetector:
                 )
 
     @staticmethod
-    def _get_dependencies_for_foreign_key(app_label, model_name, field, project_state):
+    def _get_dependencies_for_foreign_key(package_label, model_name, field, project_state):
         remote_field_model = None
         if hasattr(field.remote_field, "model"):
             remote_field_model = field.remote_field.model
         else:
-            relations = project_state.relations[app_label, model_name]
-            for (remote_app_label, remote_model_name), fields in relations.items():
+            relations = project_state.relations[package_label, model_name]
+            for (remote_package_label, remote_model_name), fields in relations.items():
                 if any(
                     field == related_field.remote_field
                     for related_field in fields.values()
                 ):
-                    remote_field_model = f"{remote_app_label}.{remote_model_name}"
+                    remote_field_model = f"{remote_package_label}.{remote_model_name}"
                     break
         # Account for FKs to swappable models
         swappable_setting = getattr(field, "swappable_setting", None)
         if swappable_setting is not None:
-            dep_app_label = "__setting__"
+            dep_package_label = "__setting__"
             dep_object_name = swappable_setting
         else:
-            dep_app_label, dep_object_name = resolve_relation(
+            dep_package_label, dep_object_name = resolve_relation(
                 remote_field_model,
-                app_label,
+                package_label,
                 model_name,
             )
-        dependencies = [(dep_app_label, dep_object_name, None, True)]
+        dependencies = [(dep_package_label, dep_object_name, None, True)]
         if getattr(field.remote_field, "through", None):
-            through_app_label, through_object_name = resolve_relation(
+            through_package_label, through_object_name = resolve_relation(
                 field.remote_field.through,
-                app_label,
+                package_label,
                 model_name,
             )
-            dependencies.append((through_app_label, through_object_name, None, True))
+            dependencies.append((through_package_label, through_object_name, None, True))
         return dependencies
 
-    def _get_dependencies_for_model(self, app_label, model_name):
+    def _get_dependencies_for_model(self, package_label, model_name):
         """Return foreign key dependencies of the given model."""
         dependencies = []
-        model_state = self.to_state.models[app_label, model_name]
+        model_state = self.to_state.models[package_label, model_name]
         for field in model_state.fields.values():
             if field.is_relation:
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
-                        app_label,
+                        package_label,
                         model_name,
                         field,
                         self.to_state,
@@ -1446,19 +1446,19 @@ class MigrationAutodetector:
         return dependencies
 
     def _get_altered_foo_together_operations(self, option_name):
-        for app_label, model_name in sorted(self.kept_model_keys):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
 
             # We run the old version through the field renames to account for those
             old_value = old_model_state.options.get(option_name)
             old_value = (
                 {
                     tuple(
-                        self.renamed_fields.get((app_label, model_name, n), n)
+                        self.renamed_fields.get((package_label, model_name, n), n)
                         for n in unique
                     )
                     for unique in old_value
@@ -1478,7 +1478,7 @@ class MigrationAutodetector:
                         if field.remote_field and field.remote_field.model:
                             dependencies.extend(
                                 self._get_dependencies_for_foreign_key(
-                                    app_label,
+                                    package_label,
                                     model_name,
                                     field,
                                     self.to_state,
@@ -1487,7 +1487,7 @@ class MigrationAutodetector:
                 yield (
                     old_value,
                     new_value,
-                    app_label,
+                    package_label,
                     model_name,
                     dependencies,
                 )
@@ -1496,7 +1496,7 @@ class MigrationAutodetector:
         for (
             old_value,
             new_value,
-            app_label,
+            package_label,
             model_name,
             dependencies,
         ) in self._get_altered_foo_together_operations(operation.option_name):
@@ -1505,12 +1505,12 @@ class MigrationAutodetector:
                     value
                     for value in old_value
                     if value
-                    not in self.renamed_index_together_values[app_label, model_name]
+                    not in self.renamed_index_together_values[package_label, model_name]
                 }
             removal_value = new_value.intersection(old_value)
             if removal_value or old_value:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operation(
                         name=model_name, **{operation.option_name: removal_value}
                     ),
@@ -1528,14 +1528,14 @@ class MigrationAutodetector:
         for (
             old_value,
             new_value,
-            app_label,
+            package_label,
             model_name,
             dependencies,
         ) in self._get_altered_foo_together_operations(operation.option_name):
             removal_value = new_value.intersection(old_value)
             if new_value != removal_value:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operation(name=model_name, **{operation.option_name: new_value}),
                     dependencies=dependencies,
                 )
@@ -1551,17 +1551,17 @@ class MigrationAutodetector:
         models_to_check = self.kept_model_keys.union(
             self.kept_proxy_keys, self.kept_unmanaged_keys
         )
-        for app_label, model_name in sorted(models_to_check):
+        for package_label, model_name in sorted(models_to_check):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
             old_db_table_name = old_model_state.options.get("db_table")
             new_db_table_name = new_model_state.options.get("db_table")
             if old_db_table_name != new_db_table_name:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterModelTable(
                         name=model_name,
                         table=new_db_table_name,
@@ -1572,18 +1572,18 @@ class MigrationAutodetector:
         models_to_check = self.kept_model_keys.union(
             self.kept_proxy_keys, self.kept_unmanaged_keys
         )
-        for app_label, model_name in sorted(models_to_check):
+        for package_label, model_name in sorted(models_to_check):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
 
             old_db_table_comment = old_model_state.options.get("db_table_comment")
             new_db_table_comment = new_model_state.options.get("db_table_comment")
             if old_db_table_comment != new_db_table_comment:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterModelTableComment(
                         name=model_name,
                         table_comment=new_db_table_comment,
@@ -1605,12 +1605,12 @@ class MigrationAutodetector:
             self.old_model_keys & self.new_unmanaged_keys,
         )
 
-        for app_label, model_name in sorted(models_to_check):
+        for package_label, model_name in sorted(models_to_check):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
             old_options = {
                 key: value
                 for key, value in old_model_state.options.items()
@@ -1623,7 +1623,7 @@ class MigrationAutodetector:
             }
             if old_options != new_options:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterModelOptions(
                         name=model_name,
                         options=new_options,
@@ -1631,12 +1631,12 @@ class MigrationAutodetector:
                 )
 
     def generate_altered_order_with_respect_to(self):
-        for app_label, model_name in sorted(self.kept_model_keys):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
             if old_model_state.options.get(
                 "order_with_respect_to"
             ) != new_model_state.options.get("order_with_respect_to"):
@@ -1646,7 +1646,7 @@ class MigrationAutodetector:
                 if new_model_state.options.get("order_with_respect_to"):
                     dependencies.append(
                         (
-                            app_label,
+                            package_label,
                             model_name,
                             new_model_state.options["order_with_respect_to"],
                             True,
@@ -1654,7 +1654,7 @@ class MigrationAutodetector:
                     )
                 # Actually generate the operation
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterOrderWithRespectTo(
                         name=model_name,
                         order_with_respect_to=new_model_state.options.get(
@@ -1665,15 +1665,15 @@ class MigrationAutodetector:
                 )
 
     def generate_altered_managers(self):
-        for app_label, model_name in sorted(self.kept_model_keys):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
-                (app_label, model_name), model_name
+                (package_label, model_name), model_name
             )
-            old_model_state = self.from_state.models[app_label, old_model_name]
-            new_model_state = self.to_state.models[app_label, model_name]
+            old_model_state = self.from_state.models[package_label, old_model_name]
+            new_model_state = self.to_state.models[package_label, model_name]
             if old_model_state.managers != new_model_state.managers:
                 self.add_operation(
-                    app_label,
+                    package_label,
                     operations.AlterModelManagers(
                         name=model_name,
                         managers=new_model_state.managers,
@@ -1688,21 +1688,21 @@ class MigrationAutodetector:
         """
         leaves = graph.leaf_nodes()
         name_map = {}
-        for app_label, migrations in list(changes.items()):
+        for package_label, migrations in list(changes.items()):
             if not migrations:
                 continue
             # Find the app label's current leaf node
             app_leaf = None
             for leaf in leaves:
-                if leaf[0] == app_label:
+                if leaf[0] == package_label:
                     app_leaf = leaf
                     break
             # Do they want an initial migration for this app?
-            if app_leaf is None and not self.questioner.ask_initial(app_label):
+            if app_leaf is None and not self.questioner.ask_initial(package_label):
                 # They don't.
                 for migration in migrations:
-                    name_map[(app_label, migration.name)] = (app_label, "__first__")
-                del changes[app_label]
+                    name_map[(package_label, migration.name)] = (package_label, "__first__")
+                del changes[package_label]
                 continue
             # Work out the next number in the sequence
             if app_leaf is None:
@@ -1721,7 +1721,7 @@ class MigrationAutodetector:
                 else:
                     new_name_parts.append(migration.suggest_name()[:100])
                 new_name = "_".join(new_name_parts)
-                name_map[(app_label, migration.name)] = (app_label, new_name)
+                name_map[(package_label, migration.name)] = (package_label, new_name)
                 next_number += 1
                 migration.name = new_name
         # Now fix dependencies
@@ -1732,31 +1732,31 @@ class MigrationAutodetector:
                 ]
         return changes
 
-    def _trim_to_apps(self, changes, app_labels):
+    def _trim_to_packages(self, changes, package_labels):
         """
         Take changes from arrange_for_graph() and set of app labels, and return
         a modified set of changes which trims out as many migrations that are
-        not in app_labels as possible. Note that some other migrations may
+        not in package_labels as possible. Note that some other migrations may
         still be present as they may be required dependencies.
         """
         # Gather other app dependencies in a first pass
         app_dependencies = {}
-        for app_label, migrations in changes.items():
+        for package_label, migrations in changes.items():
             for migration in migrations:
-                for dep_app_label, name in migration.dependencies:
-                    app_dependencies.setdefault(app_label, set()).add(dep_app_label)
-        required_apps = set(app_labels)
+                for dep_package_label, name in migration.dependencies:
+                    app_dependencies.setdefault(package_label, set()).add(dep_package_label)
+        required_packages = set(package_labels)
         # Keep resolving till there's no change
-        old_required_apps = None
-        while old_required_apps != required_apps:
-            old_required_apps = set(required_apps)
-            required_apps.update(
-                *[app_dependencies.get(app_label, ()) for app_label in required_apps]
+        old_required_packages = None
+        while old_required_packages != required_packages:
+            old_required_packages = set(required_packages)
+            required_packages.update(
+                *[app_dependencies.get(package_label, ()) for package_label in required_packages]
             )
         # Remove all migrations that aren't needed
-        for app_label in list(changes):
-            if app_label not in required_apps:
-                del changes[app_label]
+        for package_label in list(changes):
+            if package_label not in required_packages:
+                del changes[package_label]
         return changes
 
     @classmethod

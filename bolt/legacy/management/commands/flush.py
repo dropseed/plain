@@ -1,6 +1,6 @@
 from importlib import import_module
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.color import no_style
@@ -42,9 +42,9 @@ class Command(BaseCommand):
 
         # Import the 'management' module within each installed app, to register
         # dispatcher events.
-        for app_config in apps.get_app_configs():
+        for package_config in packages.get_package_configs():
             try:
-                import_module(".management", app_config.name)
+                import_module(".management", package_config.name)
             except ImportError:
                 pass
 

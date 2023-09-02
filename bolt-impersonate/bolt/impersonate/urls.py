@@ -2,7 +2,7 @@ from bolt.urls import path
 
 from .views import ImpersonateStartView, ImpersonateStopView
 
-app_name = "impersonate"
+default_namespace = "impersonate"
 
 urlpatterns = [
     path("stop/", ImpersonateStopView.as_view(), name="stop"),

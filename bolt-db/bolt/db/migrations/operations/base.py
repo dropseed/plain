@@ -51,7 +51,7 @@ class Operation:
             self._constructor_args[1],
         )
 
-    def state_forwards(self, app_label, state):
+    def state_forwards(self, package_label, state):
         """
         Take the state from the previous migration, and mutate it
         so that it matches what this migration would perform.
@@ -60,7 +60,7 @@ class Operation:
             "subclasses of Operation must provide a state_forwards() method"
         )
 
-    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+    def database_forwards(self, package_label, schema_editor, from_state, to_state):
         """
         Perform the mutation on the database schema in the normal
         (forwards) direction.
@@ -69,7 +69,7 @@ class Operation:
             "subclasses of Operation must provide a database_forwards() method"
         )
 
-    def database_backwards(self, app_label, schema_editor, from_state, to_state):
+    def database_backwards(self, package_label, schema_editor, from_state, to_state):
         """
         Perform the mutation on the database schema in the reverse
         direction - e.g. if this were CreateModel, it would in fact
@@ -93,7 +93,7 @@ class Operation:
         """
         return None
 
-    def references_model(self, name, app_label):
+    def references_model(self, name, package_label):
         """
         Return True if there is a chance this operation references the given
         model name (as a string), with an app label for accuracy.
@@ -105,14 +105,14 @@ class Operation:
         """
         return True
 
-    def references_field(self, model_name, name, app_label):
+    def references_field(self, model_name, name, package_label):
         """
         Return True if there is a chance this operation references the given
         field name, with an app label for accuracy.
 
         Used for optimization. If in doubt, return True.
         """
-        return self.references_model(model_name, app_label)
+        return self.references_model(model_name, package_label)
 
     def allow_migrate_model(self, connection_alias, model):
         """
@@ -126,7 +126,7 @@ class Operation:
 
         return router.allow_migrate_model(connection_alias, model)
 
-    def reduce(self, operation, app_label):
+    def reduce(self, operation, package_label):
         """
         Return either a list of operations the actual operation should be
         replaced with or a boolean that indicates whether or not the specified

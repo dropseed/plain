@@ -24,10 +24,10 @@ Install the package from PyPi:
 pip install bolt-oauth
 ```
 
-Add `bolt.oauth` to your `INSTALLED_APPS` in `settings.py`:
+Add `bolt.oauth` to your `INSTALLED_PACKAGES` in `settings.py`:
 
 ```python
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     ...
     "bolt.oauth",
 ]

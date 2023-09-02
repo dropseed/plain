@@ -78,7 +78,7 @@ def compile(watch, minify):
         [
             os.path.relpath(settings.APP_PATH) + "/**/*.{html,js}",
             os.path.relpath(settings.APP_PATH)
-            + "/../bolt/**/*.{html,js}",  # TODO use INSTALLED_APPS?
+            + "/../bolt/**/*.{html,js}",  # TODO use INSTALLED_PACKAGES?
             sys.exec_prefix + "/lib/python*/site-packages/bolt*/**/*.{html,js}",
         ]
     )

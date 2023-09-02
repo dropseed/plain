@@ -1,7 +1,7 @@
 import os
 import sys
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.runtime import settings
 
 # The prefix to put on the default database name when creating
@@ -62,8 +62,8 @@ class BaseDatabaseCreation:
 
         try:
             if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
-                # Disable migrations for all apps.
-                for app in apps.get_app_configs():
+                # Disable migrations for all packages.
+                for app in packages.get_package_configs():
                     app._old_migrations_module = app.migrations_module
                     app.migrations_module = None
             # We report migrate messages at one level lower than that
@@ -78,7 +78,7 @@ class BaseDatabaseCreation:
             )
         finally:
             if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
-                for app in apps.get_app_configs():
+                for app in packages.get_package_configs():
                     app.migrations_module = app._old_migrations_module
                     del app._old_migrations_module
 
@@ -115,12 +115,12 @@ class BaseDatabaseCreation:
     #         from bolt.db.migrations.loader import MigrationLoader
 
     #         loader = MigrationLoader(self.connection)
-    #         for app_config in apps.get_app_configs():
+    #         for package_config in packages.get_package_configs():
     #             if (
-    #                 app_config.models_module is not None
-    #                 and app_config.label in loader.migrated_apps
+    #                 package_config.models_module is not None
+    #                 and package_config.label in loader.migrated_packages
     #             ):
-    #                 for model in app_config.get_models():
+    #                 for model in package_config.get_models():
     #                     if model._meta.can_migrate(
     #                         self.connection
     #                     ) and router.allow_migrate_model(self.connection.alias, model):

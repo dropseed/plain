@@ -166,8 +166,8 @@ def pull(ctx, backup, anonymize):
 
     container.start()
 
-    heroku_app_name = json.loads(
-        subprocess.check_output(["heroku", "apps:info", "--json"]).decode().strip()
+    heroku_package_name = json.loads(
+        subprocess.check_output(["heroku", "packages:info", "--json"]).decode().strip()
     )["app"]["name"]
 
     # TODO way to check if container ready?
@@ -181,14 +181,14 @@ def pull(ctx, backup, anonymize):
     )
 
     if not anonymize:
-        dump_path = os.path.join(dot_bolt_dir, f"{heroku_app_name}.dump")
+        dump_path = os.path.join(dot_bolt_dir, f"{heroku_package_name}.dump")
         dump_compressed = True
         click.secho(
             f"Downloading Heroku backup to {os.path.relpath(dump_path)}", bold=True
         )
         subprocess.check_call(["curl", "-o", dump_path, backup_url])
     else:
-        dump_path = os.path.join(dot_bolt_dir, f"{heroku_app_name}.anonymized.dump")
+        dump_path = os.path.join(dot_bolt_dir, f"{heroku_package_name}.anonymized.dump")
         dump_compressed = False
         click.secho(
             f"Anonymizing Heroku backup and saving to {os.path.relpath(dump_path)}",

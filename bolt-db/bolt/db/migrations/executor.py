@@ -1,4 +1,4 @@
-from bolt.apps.registry import apps as global_apps
+from bolt.packages.registry import packages as global_packages
 from bolt.db import migrations, router
 
 from .exceptions import InvalidMigrationPlan
@@ -29,7 +29,7 @@ class MigrationExecutor:
         else:
             applied = dict(self.loader.applied_migrations)
         for target in targets:
-            # If the target is (app_label, None), that means unmigrate everything
+            # If the target is (package_label, None), that means unmigrate everything
             if target[1] is None:
                 for root in self.loader.graph.root_nodes():
                     if root[0] == target[0]:
@@ -50,7 +50,7 @@ class MigrationExecutor:
                     self.loader.build_graph()
                     return self.migration_plan(targets, clean_start=clean_start)
                 # Don't migrate backwards all the way to the target node (that
-                # may roll back dependencies in other apps that don't need to
+                # may roll back dependencies in other packages that don't need to
                 # be rolled back); instead roll back through target's immediate
                 # child(ren) in the same app, and no further.
                 next_in_app = sorted(
@@ -75,7 +75,7 @@ class MigrationExecutor:
         Create a project state including all the applications without
         migrations and applied migrations if with_applied_migrations=True.
         """
-        state = ProjectState(real_apps=self.loader.unmigrated_apps)
+        state = ProjectState(real_packages=self.loader.unmigrated_packages)
         if with_applied_migrations:
             # Create the forwards plan Bolt would follow on an empty database
             full_plan = self.migration_plan(
@@ -158,10 +158,10 @@ class MigrationExecutor:
                 # process.
                 break
             if migration in migrations_to_run:
-                if "apps" not in state.__dict__:
+                if "packages" not in state.__dict__:
                     if self.progress_callback:
                         self.progress_callback("render_start")
-                    state.apps  # Render all -- performance critical
+                    state.packages  # Render all -- performance critical
                     if self.progress_callback:
                         self.progress_callback("render_success")
                 state = self.apply_migration(
@@ -200,8 +200,8 @@ class MigrationExecutor:
                 # process.
                 break
             if migration in migrations_to_run:
-                if "apps" not in state.__dict__:
-                    state.apps  # Render all -- performance critical
+                if "packages" not in state.__dict__:
+                    state.packages  # Render all -- performance critical
                 # The state before this migration
                 states[migration] = state
                 # The old state keeps as-is, we continue with the new state
@@ -263,10 +263,10 @@ class MigrationExecutor:
     def record_migration(self, migration):
         # For replacement migrations, record individual statuses
         if migration.replaces:
-            for app_label, name in migration.replaces:
-                self.recorder.record_applied(app_label, name)
+            for package_label, name in migration.replaces:
+                self.recorder.record_applied(package_label, name)
         else:
-            self.recorder.record_applied(migration.app_label, migration.name)
+            self.recorder.record_applied(migration.package_label, migration.name)
 
     def unapply_migration(self, state, migration, fake=False):
         """Run a migration backwards."""
@@ -279,9 +279,9 @@ class MigrationExecutor:
                 state = migration.unapply(state, schema_editor)
         # For replacement migrations, also record individual statuses.
         if migration.replaces:
-            for app_label, name in migration.replaces:
-                self.recorder.record_unapplied(app_label, name)
-        self.recorder.record_unapplied(migration.app_label, migration.name)
+            for package_label, name in migration.replaces:
+                self.recorder.record_unapplied(package_label, name)
+        self.recorder.record_unapplied(migration.package_label, migration.name)
         # Report progress
         if self.progress_callback:
             self.progress_callback("unapply_success", migration, fake)
@@ -321,14 +321,14 @@ class MigrationExecutor:
                 or not model._meta.managed
                 or not router.allow_migrate(
                     self.connection.alias,
-                    migration.app_label,
+                    migration.package_label,
                     model_name=model._meta.model_name,
                 )
             )
 
         if migration.initial is None:
             # Bail if the migration isn't the first one in its app
-            if any(app == migration.app_label for app, name in migration.dependencies):
+            if any(app == migration.package_label for app, name in migration.dependencies):
                 return False, project_state
         elif migration.initial is False:
             # Bail if it's NOT an initial migration
@@ -336,11 +336,11 @@ class MigrationExecutor:
 
         if project_state is None:
             after_state = self.loader.project_state(
-                (migration.app_label, migration.name), at_end=True
+                (migration.package_label, migration.name), at_end=True
             )
         else:
             after_state = migration.mutate_state(project_state)
-        apps = after_state.apps
+        packages = after_state.packages
         found_create_model_migration = False
         found_add_field_migration = False
         fold_identifier_case = self.connection.features.ignores_table_name_case
@@ -355,11 +355,11 @@ class MigrationExecutor:
         # Make sure all create model and add field operations are done
         for operation in migration.operations:
             if isinstance(operation, migrations.CreateModel):
-                model = apps.get_model(migration.app_label, operation.name)
+                model = packages.get_model(migration.package_label, operation.name)
                 if model._meta.swapped:
                     # We have to fetch the model to test with from the
                     # main app cache, as it's not a direct dependency.
-                    model = global_apps.get_model(model._meta.swapped)
+                    model = global_packages.get_model(model._meta.swapped)
                 if should_skip_detecting_model(migration, model):
                     continue
                 db_table = model._meta.db_table
@@ -369,11 +369,11 @@ class MigrationExecutor:
                     return False, project_state
                 found_create_model_migration = True
             elif isinstance(operation, migrations.AddField):
-                model = apps.get_model(migration.app_label, operation.model_name)
+                model = packages.get_model(migration.package_label, operation.model_name)
                 if model._meta.swapped:
                     # We have to fetch the model to test with from the
                     # main app cache, as it's not a direct dependency.
-                    model = global_apps.get_model(model._meta.swapped)
+                    model = global_packages.get_model(model._meta.swapped)
                 if should_skip_detecting_model(migration, model):
                     continue
 

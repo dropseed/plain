@@ -7,7 +7,7 @@ import sys
 from bolt.utils.regex_helper import _lazy_re_compile
 
 # Private, stable API for detecting the Python version. PYXY means "Python X.Y
-# or later". So that third-party apps can use these values, each constant
+# or later". So that third-party packages can use these values, each constant
 # should remain as long as the oldest supported Bolt version supports that
 # Python version.
 PY311 = sys.version_info >= (3, 11)

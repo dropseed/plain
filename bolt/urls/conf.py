@@ -12,11 +12,11 @@ from .resolvers import (
 
 
 def include(arg, namespace=None):
-    app_name = None
+    default_namespace = None
     if isinstance(arg, tuple):
         # Callable returning a namespace hint.
         try:
-            urlconf_module, app_name = arg
+            urlconf_module, default_namespace = arg
         except ValueError:
             if namespace:
                 raise ImproperlyConfigured(
@@ -25,7 +25,7 @@ def include(arg, namespace=None):
                 )
             raise ImproperlyConfigured(
                 "Passing a %d-tuple to include() is not supported. Pass a "
-                "2-tuple containing the list of patterns and app_name, and "
+                "2-tuple containing the list of patterns and default_namespace, and "
                 "provide the namespace argument to include() instead." % len(arg)
             )
     else:
@@ -33,21 +33,21 @@ def include(arg, namespace=None):
         urlconf_module = arg
 
     patterns = getattr(urlconf_module, "urlpatterns", urlconf_module)
-    app_name = getattr(urlconf_module, "app_name", app_name)
-    if namespace and not app_name:
+    default_namespace = getattr(urlconf_module, "default_namespace", default_namespace)
+    if namespace and not default_namespace:
         raise ImproperlyConfigured(
-            "Specifying a namespace in include() without providing an app_name "
-            "is not supported. Set the app_name attribute in the included "
+            "Specifying a namespace in include() without providing an default_namespace "
+            "is not supported. Set the default_namespace attribute in the included "
             "module, or pass a 2-tuple containing the list of patterns and "
-            "app_name instead.",
+            "default_namespace instead.",
         )
-    namespace = namespace or app_name
+    namespace = namespace or default_namespace
     # Make sure the patterns can be iterated through (without this, some
     # testcases will break).
     if isinstance(patterns, list | tuple):
         for url_pattern in patterns:
             getattr(url_pattern, "pattern", None)
-    return (urlconf_module, app_name, namespace)
+    return (urlconf_module, default_namespace, namespace)
 
 
 def _path(route, view, kwargs=None, name=None, Pattern=None):
@@ -60,12 +60,12 @@ def _path(route, view, kwargs=None, name=None, Pattern=None):
     if isinstance(view, list | tuple):
         # For include(...) processing.
         pattern = Pattern(route, is_endpoint=False)
-        urlconf_module, app_name, namespace = view
+        urlconf_module, default_namespace, namespace = view
         return URLResolver(
             pattern,
             urlconf_module,
             kwargs,
-            app_name=app_name,
+            default_namespace=default_namespace,
             namespace=namespace,
         )
     elif callable(view):

@@ -18,7 +18,7 @@ which can typically be removed by using `select_related`,
 
 ```python
 # settings.py
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     # ...
     "boltquerystats",
 ]
@@ -80,12 +80,12 @@ The staff toolbar is enabled for every user who `is_staff`.
 
 ## Installation
 
-Add `boltstafftoolbar` to your `INSTALLED_APPS`,
+Add `boltstafftoolbar` to your `INSTALLED_PACKAGES`,
 and the `{% stafftoolbar %}` to your base template:
 
 ```python
 # settings.py
-INSTALLED_APPS += [
+INSTALLED_PACKAGES += [
     "boltstafftoolbar",
 ]
 ```
@@ -175,7 +175,7 @@ Requests can be re-submitted by clicking the "replay" button.
 
 ```python
 # settings.py
-INSTALLED_APPS += [
+INSTALLED_PACKAGES += [
     "boltrequestlog",
 ]
 

@@ -1,3 +1,3 @@
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     "bolt.work",
 ]

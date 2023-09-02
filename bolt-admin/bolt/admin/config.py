@@ -1,19 +1,19 @@
 from importlib import import_module
 
-from bolt.apps import AppConfig, apps
+from bolt.packages import PackageConfig, packages
 
 MODULE_NAME = "admin"
 
 
-class BoltAdminConfig(AppConfig):
+class BoltAdminConfig(PackageConfig):
     name = "bolt.admin"
     label = "admin"
 
     def ready(self):
         # Trigger register calls to fire by importing the modules
-        for app_config in apps.get_app_configs():
+        for package_config in packages.get_package_configs():
             try:
-                import_module(f"{app_config.name}.{MODULE_NAME}")
+                import_module(f"{package_config.name}.{MODULE_NAME}")
             except ModuleNotFoundError:
                 pass
 

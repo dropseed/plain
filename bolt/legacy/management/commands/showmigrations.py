@@ -1,6 +1,6 @@
 import sys
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections
 from bolt.db.migrations.loader import MigrationLoader
 from bolt.db.migrations.recorder import MigrationRecorder
@@ -12,9 +12,9 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "app_label",
+            "package_label",
             nargs="*",
-            help="App labels of applications to limit the output to.",
+            help="Package labels of applications to limit the output to.",
         )
         parser.add_argument(
             "--database",
@@ -61,45 +61,45 @@ class Command(BaseCommand):
         connection = connections[db]
 
         if options["format"] == "plan":
-            return self.show_plan(connection, options["app_label"])
+            return self.show_plan(connection, options["package_label"])
         else:
-            return self.show_list(connection, options["app_label"])
+            return self.show_list(connection, options["package_label"])
 
-    def _validate_app_names(self, loader, app_names):
+    def _validate_package_names(self, loader, package_names):
         has_bad_names = False
-        for app_name in app_names:
+        for package_name in package_names:
             try:
-                apps.get_app_config(app_name)
+                packages.get_package_config(package_name)
             except LookupError as err:
                 self.stderr.write(str(err))
                 has_bad_names = True
         if has_bad_names:
             sys.exit(2)
 
-    def show_list(self, connection, app_names=None):
+    def show_list(self, connection, package_names=None):
         """
         Show a list of all migrations on the system, or only those of
-        some named apps.
+        some named packages.
         """
         # Load migrations from disk/DB
         loader = MigrationLoader(connection, ignore_no_migrations=True)
         recorder = MigrationRecorder(connection)
         recorded_migrations = recorder.applied_migrations()
         graph = loader.graph
-        # If we were passed a list of apps, validate it
-        if app_names:
-            self._validate_app_names(loader, app_names)
-        # Otherwise, show all apps in alphabetic order
+        # If we were passed a list of packages, validate it
+        if package_names:
+            self._validate_package_names(loader, package_names)
+        # Otherwise, show all packages in alphabetic order
         else:
-            app_names = sorted(loader.migrated_apps)
+            package_names = sorted(loader.migrated_packages)
         # For each app, print its migrations in order from oldest (roots) to
         # newest (leaves).
-        for app_name in app_names:
-            self.stdout.write(app_name, self.style.MIGRATE_LABEL)
+        for package_name in package_names:
+            self.stdout.write(package_name, self.style.MIGRATE_LABEL)
             shown = set()
-            for node in graph.leaf_nodes(app_name):
+            for node in graph.leaf_nodes(package_name):
                 for plan_node in graph.forwards_plan(node):
-                    if plan_node not in shown and plan_node[0] == app_name:
+                    if plan_node not in shown and plan_node[0] == package_name:
                         # Give it a nice title if it's a squashed one
                         title = plan_node[1]
                         if graph.nodes[plan_node].replaces:
@@ -131,17 +131,17 @@ class Command(BaseCommand):
             if not shown:
                 self.stdout.write(" (no migrations)", self.style.ERROR)
 
-    def show_plan(self, connection, app_names=None):
+    def show_plan(self, connection, package_names=None):
         """
-        Show all known migrations (or only those of the specified app_names)
+        Show all known migrations (or only those of the specified package_names)
         in the order they will be applied.
         """
         # Load migrations from disk/DB
         loader = MigrationLoader(connection)
         graph = loader.graph
-        if app_names:
-            self._validate_app_names(loader, app_names)
-            targets = [key for key in graph.leaf_nodes() if key[0] in app_names]
+        if package_names:
+            self._validate_package_names(loader, package_names)
+            targets = [key for key in graph.leaf_nodes() if key[0] in package_names]
         else:
             targets = graph.leaf_nodes()
         plan = []

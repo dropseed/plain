@@ -6,7 +6,7 @@ from . import Error, Tags, Warning, register
 
 
 @register(Tags.urls)
-def check_url_config(app_configs, **kwargs):
+def check_url_config(package_configs, **kwargs):
     if getattr(settings, "ROOT_URLCONF", None):
         from bolt.urls import get_resolver
 
@@ -29,7 +29,7 @@ def check_resolver(resolver):
 
 
 @register(Tags.urls)
-def check_url_namespaces_unique(app_configs, **kwargs):
+def check_url_namespaces_unique(package_configs, **kwargs):
     """
     Warn if URL namespaces used in applications aren't unique.
     """
@@ -101,7 +101,7 @@ def get_warning_for_invalid_pattern(pattern):
 
 
 @register(Tags.urls)
-def check_url_settings(app_configs, **kwargs):
+def check_url_settings(package_configs, **kwargs):
     errors = []
     for name in ("STATIC_URL", "MEDIA_URL"):
         value = getattr(settings, name)

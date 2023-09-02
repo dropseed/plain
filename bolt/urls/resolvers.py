@@ -34,7 +34,7 @@ class ResolverMatch:
         args,
         kwargs,
         url_name=None,
-        app_names=None,
+        default_namespaces=None,
         namespaces=None,
         route=None,
         tried=None,
@@ -50,10 +50,10 @@ class ResolverMatch:
         self.captured_kwargs = captured_kwargs
         self.extra_kwargs = extra_kwargs
 
-        # If a URLRegexResolver doesn't have a namespace or app_name, it passes
+        # If a URLRegexResolver doesn't have a namespace or default_namespace, it passes
         # in an empty value.
-        self.app_names = [x for x in app_names if x] if app_names else []
-        self.app_name = ":".join(self.app_names)
+        self.default_namespaces = [x for x in default_namespaces if x] if default_namespaces else []
+        self.default_namespace = ":".join(self.default_namespaces)
         self.namespaces = [x for x in namespaces if x] if namespaces else []
         self.namespace = ":".join(self.namespaces)
 
@@ -79,13 +79,13 @@ class ResolverMatch:
             func = self._func_path
         return (
             "ResolverMatch(func=%s, args=%r, kwargs=%r, url_name=%r, "
-            "app_names=%r, namespaces=%r, route=%r%s%s)"
+            "default_namespaces=%r, namespaces=%r, route=%r%s%s)"
             % (
                 func,
                 self.args,
                 self.kwargs,
                 self.url_name,
-                self.app_names,
+                self.default_namespaces,
                 self.namespaces,
                 self.route,
                 f", captured_kwargs={self.captured_kwargs!r}"
@@ -393,7 +393,7 @@ class URLPattern:
 
 class URLResolver:
     def __init__(
-        self, pattern, urlconf_name, default_kwargs=None, app_name=None, namespace=None
+        self, pattern, urlconf_name, default_kwargs=None, default_namespace=None, namespace=None
     ):
         self.pattern = pattern
         # urlconf_name is the dotted Python path to the module defining
@@ -403,7 +403,7 @@ class URLResolver:
         self.callback = None
         self.default_kwargs = default_kwargs or {}
         self.namespace = namespace
-        self.app_name = app_name
+        self.default_namespace = default_namespace
         self._reverse_dict = {}
         self._namespace_dict = {}
         self._app_dict = {}
@@ -422,7 +422,7 @@ class URLResolver:
         return "<{} {} ({}:{}) {}>".format(
             self.__class__.__name__,
             urlconf_repr,
-            self.app_name,
+            self.default_namespace,
             self.namespace,
             self.pattern.describe(),
         )
@@ -476,7 +476,7 @@ class URLResolver:
             self._local.populating = True
             lookups = MultiValueDict()
             namespaces = {}
-            apps = {}
+            packages = {}
             for url_pattern in reversed(self.url_patterns):
                 p_pattern = url_pattern.pattern.regex.pattern
                 p_pattern = p_pattern.removeprefix("^")
@@ -504,8 +504,8 @@ class URLResolver:
                         )
                 else:  # url_pattern is a URLResolver.
                     url_pattern._populate()
-                    if url_pattern.app_name:
-                        apps.setdefault(url_pattern.app_name, []).append(
+                    if url_pattern.default_namespace:
+                        packages.setdefault(url_pattern.default_namespace, []).append(
                             url_pattern.namespace
                         )
                         namespaces[url_pattern.namespace] = (p_pattern, url_pattern)
@@ -538,11 +538,11 @@ class URLResolver:
                             current_converters = url_pattern.pattern.converters
                             sub_pattern.pattern.converters.update(current_converters)
                             namespaces[namespace] = (p_pattern + prefix, sub_pattern)
-                        for app_name, namespace_list in url_pattern.app_dict.items():
-                            apps.setdefault(app_name, []).extend(namespace_list)
+                        for default_namespace, namespace_list in url_pattern.app_dict.items():
+                            packages.setdefault(default_namespace, []).extend(namespace_list)
                     self._callback_strs.update(url_pattern._callback_strs)
             self._namespace_dict = namespaces
-            self._app_dict = apps
+            self._app_dict = packages
             self._reverse_dict = lookups
             self._populated = True
         finally:
@@ -620,7 +620,7 @@ class URLResolver:
                             sub_match_args,
                             sub_match_dict,
                             sub_match.url_name,
-                            [self.app_name] + sub_match.app_names,
+                            [self.default_namespace] + sub_match.default_namespaces,
                             [self.namespace] + sub_match.namespaces,
                             self._join_route(current_route, sub_match.route),
                             tried,

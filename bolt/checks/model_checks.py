@@ -3,22 +3,22 @@ import types
 from collections import defaultdict
 from itertools import chain
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.checks import Error, Tags, Warning, register
 from bolt.runtime import settings
 
 
 @register(Tags.models)
-def check_all_models(app_configs=None, **kwargs):
+def check_all_models(package_configs=None, **kwargs):
     db_table_models = defaultdict(list)
     indexes = defaultdict(list)
     constraints = defaultdict(list)
     errors = []
-    if app_configs is None:
-        models = apps.get_models()
+    if package_configs is None:
+        models = packages.get_models()
     else:
         models = chain.from_iterable(
-            app_config.get_models() for app_config in app_configs
+            package_config.get_models() for package_config in package_configs
         )
     for model in models:
         if model._meta.managed and not model._meta.proxy:
@@ -90,7 +90,7 @@ def check_all_models(app_configs=None, **kwargs):
     return errors
 
 
-def _check_lazy_references(apps, ignore=None):
+def _check_lazy_references(packages, ignore=None):
     """
     Ensure all lazy (i.e. string) model references have been resolved.
 
@@ -98,10 +98,10 @@ def _check_lazy_references(apps, ignore=None):
     related fields and model signals. Identify those common cases and provide
     more helpful error messages for them.
 
-    The ignore parameter is used by StateApps to exclude swappable models from
+    The ignore parameter is used by StatePackages to exclude swappable models from
     this check.
     """
-    pending_models = set(apps._pending_operations) - (ignore or set())
+    pending_models = set(packages._pending_operations) - (ignore or set())
 
     # Short circuit if there aren't any errors.
     if not pending_models:
@@ -117,12 +117,12 @@ def _check_lazy_references(apps, ignore=None):
 
     def extract_operation(obj):
         """
-        Take a callable found in Apps._pending_operations and identify the
-        original callable passed to Apps.lazy_model_operation(). If that
+        Take a callable found in Packages._pending_operations and identify the
+        original callable passed to Packages.lazy_model_operation(). If that
         callable was a partial, return the inner, non-partial function and
         any arguments and keyword arguments that were supplied with it.
 
-        obj is a callback defined locally in Apps.lazy_model_operation() and
+        obj is a callback defined locally in Packages.lazy_model_operation() and
         annotated there with a `func` attribute so as to imitate a partial.
         """
         operation, args, keywords = obj, [], {}
@@ -134,7 +134,7 @@ def _check_lazy_references(apps, ignore=None):
 
     def app_model_error(model_key):
         try:
-            apps.get_app_config(model_key[0])
+            packages.get_package_config(model_key[0])
             model_error = "app '{}' doesn't provide model '{}'".format(*model_key)
         except LookupError:
             model_error = "app '%s' isn't installed" % model_key[0]
@@ -142,7 +142,7 @@ def _check_lazy_references(apps, ignore=None):
 
     # Here are several functions which return CheckMessage instances for the
     # most common usages of lazy operations throughout Bolt. These functions
-    # take the model that was being waited on as an (app_label, modelname)
+    # take the model that was being waited on as an (package_label, modelname)
     # pair, the original lazy function, and its positional and keyword args as
     # determined by extract_operation().
 
@@ -215,7 +215,7 @@ def _check_lazy_references(apps, ignore=None):
             (
                 build_error(model_key, *extract_operation(func))
                 for model_key in pending_models
-                for func in apps._pending_operations[model_key]
+                for func in packages._pending_operations[model_key]
             ),
         ),
         key=lambda error: error.msg,
@@ -223,5 +223,5 @@ def _check_lazy_references(apps, ignore=None):
 
 
 @register(Tags.models)
-def check_lazy_references(app_configs=None, **kwargs):
-    return _check_lazy_references(apps)
+def check_lazy_references(package_configs=None, **kwargs):
+    return _check_lazy_references(packages)

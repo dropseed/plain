@@ -8,18 +8,18 @@ import click
 
 import bolt.runtime
 from bolt.runtime import settings
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.env.cli import cli as env_cli
 
 
-class InstalledAppsGroup(click.Group):
+class InstalledPackagesGroup(click.Group):
     BOLT_APPS_PREFIX = "bolt."
 
     def list_commands(self, ctx):
-        apps_with_commands = []
+        packages_with_commands = []
 
-        # Get installed apps with a cli.py module
-        for app in apps.get_app_configs():
+        # Get installed packages with a cli.py module
+        for app in packages.get_package_configs():
             cli_module = app.name + ".cli"
             try:
                 importlib.import_module(cli_module)
@@ -31,9 +31,9 @@ class InstalledAppsGroup(click.Group):
             if cli_name.startswith(self.BOLT_APPS_PREFIX):
                 cli_name = cli_name[len(self.BOLT_APPS_PREFIX) :]
 
-            apps_with_commands.append(cli_name)
+            packages_with_commands.append(cli_name)
 
-        return apps_with_commands
+        return packages_with_commands
 
     def get_command(self, ctx, name):
         # Try it as bolt.x and just x (we don't know ahead of time which it is, but prefer bolt.x)
@@ -248,7 +248,7 @@ def compile(ctx):
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
 
 
-# Add other internal packages that don't need to be in INSTALLED_APPS
+# Add other internal packages that don't need to be in INSTALLED_PACKAGES
 bolt_cli.add_command(env_cli)
 
 
@@ -259,7 +259,7 @@ class BoltCommandCollection(click.CommandCollection):
         super().__init__(*args, **kwargs)
 
         self.sources = [
-            InstalledAppsGroup(),
+            InstalledPackagesGroup(),
             BinNamespaceGroup(),
             bolt_cli,
         ]

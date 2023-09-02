@@ -28,21 +28,21 @@ class FieldOperation(Operation):
             and self.name_lower == operation.name_lower
         )
 
-    def references_model(self, name, app_label):
+    def references_model(self, name, package_label):
         name_lower = name.lower()
         if name_lower == self.model_name_lower:
             return True
         if self.field:
             return bool(
                 field_references(
-                    (app_label, self.model_name_lower),
+                    (package_label, self.model_name_lower),
                     self.field,
-                    (app_label, name_lower),
+                    (package_label, name_lower),
                 )
             )
         return False
 
-    def references_field(self, model_name, name, app_label):
+    def references_field(self, model_name, name, package_label):
         model_name_lower = model_name.lower()
         # Check if this operation locally references the field.
         if model_name_lower == self.model_name_lower:
@@ -59,16 +59,16 @@ class FieldOperation(Operation):
             return False
         return bool(
             field_references(
-                (app_label, self.model_name_lower),
+                (package_label, self.model_name_lower),
                 self.field,
-                (app_label, model_name_lower),
+                (package_label, model_name_lower),
                 name,
             )
         )
 
-    def reduce(self, operation, app_label):
-        return super().reduce(operation, app_label) or not operation.references_field(
-            self.model_name, self.name, app_label
+    def reduce(self, operation, package_label):
+        return super().reduce(operation, package_label) or not operation.references_field(
+            self.model_name, self.name, package_label
         )
 
 
@@ -89,19 +89,19 @@ class AddField(FieldOperation):
             kwargs["preserve_default"] = self.preserve_default
         return (self.__class__.__name__, [], kwargs)
 
-    def state_forwards(self, app_label, state):
+    def state_forwards(self, package_label, state):
         state.add_field(
-            app_label,
+            package_label,
             self.model_name_lower,
             self.name,
             self.field,
             self.preserve_default,
         )
 
-    def database_forwards(self, app_label, schema_editor, from_state, to_state):
-        to_model = to_state.apps.get_model(app_label, self.model_name)
+    def database_forwards(self, package_label, schema_editor, from_state, to_state):
+        to_model = to_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.apps.get_model(app_label, self.model_name)
+            from_model = from_state.packages.get_model(package_label, self.model_name)
             field = to_model._meta.get_field(self.name)
             if not self.preserve_default:
                 field.default = self.field.default
@@ -112,8 +112,8 @@ class AddField(FieldOperation):
             if not self.preserve_default:
                 field.default = NOT_PROVIDED
 
-    def database_backwards(self, app_label, schema_editor, from_state, to_state):
-        from_model = from_state.apps.get_model(app_label, self.model_name)
+    def database_backwards(self, package_label, schema_editor, from_state, to_state):
+        from_model = from_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, from_model):
             schema_editor.remove_field(
                 from_model, from_model._meta.get_field(self.name)
@@ -126,7 +126,7 @@ class AddField(FieldOperation):
     def migration_name_fragment(self):
         return f"{self.model_name_lower}_{self.name_lower}"
 
-    def reduce(self, operation, app_label):
+    def reduce(self, operation, package_label):
         if isinstance(operation, FieldOperation) and self.is_same_field_operation(
             operation
         ):
@@ -148,7 +148,7 @@ class AddField(FieldOperation):
                         field=self.field,
                     ),
                 ]
-        return super().reduce(operation, app_label)
+        return super().reduce(operation, package_label)
 
 
 class RemoveField(FieldOperation):
@@ -161,20 +161,20 @@ class RemoveField(FieldOperation):
         }
         return (self.__class__.__name__, [], kwargs)
 
-    def state_forwards(self, app_label, state):
-        state.remove_field(app_label, self.model_name_lower, self.name)
+    def state_forwards(self, package_label, state):
+        state.remove_field(package_label, self.model_name_lower, self.name)
 
-    def database_forwards(self, app_label, schema_editor, from_state, to_state):
-        from_model = from_state.apps.get_model(app_label, self.model_name)
+    def database_forwards(self, package_label, schema_editor, from_state, to_state):
+        from_model = from_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, from_model):
             schema_editor.remove_field(
                 from_model, from_model._meta.get_field(self.name)
             )
 
-    def database_backwards(self, app_label, schema_editor, from_state, to_state):
-        to_model = to_state.apps.get_model(app_label, self.model_name)
+    def database_backwards(self, package_label, schema_editor, from_state, to_state):
+        to_model = to_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.apps.get_model(app_label, self.model_name)
+            from_model = from_state.packages.get_model(package_label, self.model_name)
             schema_editor.add_field(from_model, to_model._meta.get_field(self.name))
 
     def describe(self):
@@ -184,7 +184,7 @@ class RemoveField(FieldOperation):
     def migration_name_fragment(self):
         return f"remove_{self.model_name_lower}_{self.name_lower}"
 
-    def reduce(self, operation, app_label):
+    def reduce(self, operation, package_label):
         from .models import DeleteModel
 
         if (
@@ -192,7 +192,7 @@ class RemoveField(FieldOperation):
             and operation.name_lower == self.model_name_lower
         ):
             return [operation]
-        return super().reduce(operation, app_label)
+        return super().reduce(operation, package_label)
 
 
 class AlterField(FieldOperation):
@@ -215,19 +215,19 @@ class AlterField(FieldOperation):
             kwargs["preserve_default"] = self.preserve_default
         return (self.__class__.__name__, [], kwargs)
 
-    def state_forwards(self, app_label, state):
+    def state_forwards(self, package_label, state):
         state.alter_field(
-            app_label,
+            package_label,
             self.model_name_lower,
             self.name,
             self.field,
             self.preserve_default,
         )
 
-    def database_forwards(self, app_label, schema_editor, from_state, to_state):
-        to_model = to_state.apps.get_model(app_label, self.model_name)
+    def database_forwards(self, package_label, schema_editor, from_state, to_state):
+        to_model = to_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.apps.get_model(app_label, self.model_name)
+            from_model = from_state.packages.get_model(package_label, self.model_name)
             from_field = from_model._meta.get_field(self.name)
             to_field = to_model._meta.get_field(self.name)
             if not self.preserve_default:
@@ -236,8 +236,8 @@ class AlterField(FieldOperation):
             if not self.preserve_default:
                 to_field.default = NOT_PROVIDED
 
-    def database_backwards(self, app_label, schema_editor, from_state, to_state):
-        self.database_forwards(app_label, schema_editor, from_state, to_state)
+    def database_backwards(self, package_label, schema_editor, from_state, to_state):
+        self.database_forwards(package_label, schema_editor, from_state, to_state)
 
     def describe(self):
         return f"Alter field {self.name} on {self.model_name}"
@@ -246,7 +246,7 @@ class AlterField(FieldOperation):
     def migration_name_fragment(self):
         return f"alter_{self.model_name_lower}_{self.name_lower}"
 
-    def reduce(self, operation, app_label):
+    def reduce(self, operation, package_label):
         if isinstance(
             operation, AlterField | RemoveField
         ) and self.is_same_field_operation(operation):
@@ -264,7 +264,7 @@ class AlterField(FieldOperation):
                     field=self.field,
                 ),
             ]
-        return super().reduce(operation, app_label)
+        return super().reduce(operation, package_label)
 
 
 class RenameField(FieldOperation):
@@ -291,25 +291,25 @@ class RenameField(FieldOperation):
         }
         return (self.__class__.__name__, [], kwargs)
 
-    def state_forwards(self, app_label, state):
+    def state_forwards(self, package_label, state):
         state.rename_field(
-            app_label, self.model_name_lower, self.old_name, self.new_name
+            package_label, self.model_name_lower, self.old_name, self.new_name
         )
 
-    def database_forwards(self, app_label, schema_editor, from_state, to_state):
-        to_model = to_state.apps.get_model(app_label, self.model_name)
+    def database_forwards(self, package_label, schema_editor, from_state, to_state):
+        to_model = to_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.apps.get_model(app_label, self.model_name)
+            from_model = from_state.packages.get_model(package_label, self.model_name)
             schema_editor.alter_field(
                 from_model,
                 from_model._meta.get_field(self.old_name),
                 to_model._meta.get_field(self.new_name),
             )
 
-    def database_backwards(self, app_label, schema_editor, from_state, to_state):
-        to_model = to_state.apps.get_model(app_label, self.model_name)
+    def database_backwards(self, package_label, schema_editor, from_state, to_state):
+        to_model = to_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.apps.get_model(app_label, self.model_name)
+            from_model = from_state.packages.get_model(package_label, self.model_name)
             schema_editor.alter_field(
                 from_model,
                 from_model._meta.get_field(self.new_name),
@@ -331,12 +331,12 @@ class RenameField(FieldOperation):
             self.new_name_lower,
         )
 
-    def references_field(self, model_name, name, app_label):
-        return self.references_model(model_name, app_label) and (
+    def references_field(self, model_name, name, package_label):
+        return self.references_model(model_name, package_label) and (
             name.lower() == self.old_name_lower or name.lower() == self.new_name_lower
         )
 
-    def reduce(self, operation, app_label):
+    def reduce(self, operation, package_label):
         if (
             isinstance(operation, RenameField)
             and self.is_same_model_operation(operation)
@@ -351,7 +351,7 @@ class RenameField(FieldOperation):
             ]
         # Skip `FieldOperation.reduce` as we want to run `references_field`
         # against self.old_name and self.new_name.
-        return super(FieldOperation, self).reduce(operation, app_label) or not (
-            operation.references_field(self.model_name, self.old_name, app_label)
-            or operation.references_field(self.model_name, self.new_name, app_label)
+        return super(FieldOperation, self).reduce(operation, package_label) or not (
+            operation.references_field(self.model_name, self.old_name, package_label)
+            or operation.references_field(self.model_name, self.new_name, package_label)
         )

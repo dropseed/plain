@@ -27,7 +27,7 @@ from bolt.utils.version import PY311
 # read directly from the filesystem so that the error handler
 # works even if the template loader is broken.
 def create_debug_environment():
-    return create_default_environment(include_apps=False)
+    return create_default_environment(include_packages=False)
 
 
 logger = logging.getLogger(__file__)

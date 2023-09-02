@@ -2,7 +2,7 @@ import sys
 import time
 from importlib import import_module
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections, router
 from bolt.db.migrations.autodetector import MigrationAutodetector
 from bolt.db.migrations.executor import MigrationExecutor
@@ -16,7 +16,7 @@ from bolt.utils.text import Truncator
 
 class Command(BaseCommand):
     help = (
-        "Updates database schema. Manages both apps with migrations and those without."
+        "Updates database schema. Manages both packages with migrations and those without."
     )
     requires_system_checks = []
 
@@ -27,9 +27,9 @@ class Command(BaseCommand):
             help="Skip system checks.",
         )
         parser.add_argument(
-            "app_label",
+            "package_label",
             nargs="?",
-            help="App label of an application to synchronize the state.",
+            help="Package label of an application to synchronize the state.",
         )
         parser.add_argument(
             "migration_name",
@@ -75,7 +75,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--run-syncdb",
             action="store_true",
-            help="Creates tables for apps without migrations.",
+            help="Creates tables for packages without migrations.",
         )
         parser.add_argument(
             "--check",
@@ -104,22 +104,22 @@ class Command(BaseCommand):
 
         # Import the 'management' module within each installed app, to register
         # dispatcher events.
-        for app_config in apps.get_app_configs():
-            if module_has_submodule(app_config.module, "management"):
-                import_module(".management", app_config.name)
+        for package_config in packages.get_package_configs():
+            if module_has_submodule(package_config.module, "management"):
+                import_module(".management", package_config.name)
 
         # Get the database we're operating from
         connection = connections[database]
 
         # Hook for backends needing any database preparation
         connection.prepare_database()
-        # Work out which apps have migrations and which do not
+        # Work out which packages have migrations and which do not
         executor = MigrationExecutor(connection, self.migration_progress_callback)
 
         # Raise an error if any migrations are applied before their dependencies.
         executor.loader.check_consistent_history(connection)
 
-        # Before anything else, see if there's conflicting apps and drop out
+        # Before anything else, see if there's conflicting packages and drop out
         # hard if there are any
         conflicts = executor.loader.detect_conflicts()
         if conflicts:
@@ -135,43 +135,43 @@ class Command(BaseCommand):
 
         # If they supplied command line arguments, work out what they mean.
         run_syncdb = options["run_syncdb"]
-        target_app_labels_only = True
-        if options["app_label"]:
-            # Validate app_label.
-            app_label = options["app_label"]
+        target_package_labels_only = True
+        if options["package_label"]:
+            # Validate package_label.
+            package_label = options["package_label"]
             try:
-                apps.get_app_config(app_label)
+                packages.get_package_config(package_label)
             except LookupError as err:
                 raise CommandError(str(err))
             if run_syncdb:
-                if app_label in executor.loader.migrated_apps:
+                if package_label in executor.loader.migrated_packages:
                     raise CommandError(
                         "Can't use run_syncdb with app '%s' as it has migrations."
-                        % app_label
+                        % package_label
                     )
-            elif app_label not in executor.loader.migrated_apps:
-                raise CommandError("App '%s' does not have migrations." % app_label)
+            elif package_label not in executor.loader.migrated_packages:
+                raise CommandError("Package '%s' does not have migrations." % package_label)
 
-        if options["app_label"] and options["migration_name"]:
+        if options["package_label"] and options["migration_name"]:
             migration_name = options["migration_name"]
             if migration_name == "zero":
-                targets = [(app_label, None)]
+                targets = [(package_label, None)]
             else:
                 try:
                     migration = executor.loader.get_migration_by_prefix(
-                        app_label, migration_name
+                        package_label, migration_name
                     )
                 except AmbiguityError:
                     raise CommandError(
                         "More than one migration matches '{}' in app '{}'. "
-                        "Please be more specific.".format(migration_name, app_label)
+                        "Please be more specific.".format(migration_name, package_label)
                     )
                 except KeyError:
                     raise CommandError(
                         "Cannot find a migration matching '%s' from app '%s'."
-                        % (migration_name, app_label)
+                        % (migration_name, package_label)
                     )
-                target = (app_label, migration.name)
+                target = (package_label, migration.name)
                 # Partially applied squashed migrations are not included in the
                 # graph, use the last replacement instead.
                 if (
@@ -181,16 +181,16 @@ class Command(BaseCommand):
                     incomplete_migration = executor.loader.replacements[target]
                     target = incomplete_migration.replaces[-1]
                 targets = [target]
-            target_app_labels_only = False
-        elif options["app_label"]:
+            target_package_labels_only = False
+        elif options["package_label"]:
             targets = [
-                key for key in executor.loader.graph.leaf_nodes() if key[0] == app_label
+                key for key in executor.loader.graph.leaf_nodes() if key[0] == package_label
             ]
         else:
             targets = executor.loader.graph.leaf_nodes()
 
         if options["prune"]:
-            if not options["app_label"]:
+            if not options["package_label"]:
                 raise CommandError(
                     "Migrations can be pruned only when an app is specified."
                 )
@@ -224,7 +224,7 @@ class Command(BaseCommand):
                 )
             else:
                 to_prune = sorted(
-                    migration for migration in to_prune if migration[0] == app_label
+                    migration for migration in to_prune if migration[0] == package_label
                 )
                 if to_prune:
                     for migration in to_prune:
@@ -265,24 +265,24 @@ class Command(BaseCommand):
         if options["prune"]:
             return
 
-        # At this point, ignore run_syncdb if there aren't any apps to sync.
-        run_syncdb = options["run_syncdb"] and executor.loader.unmigrated_apps
+        # At this point, ignore run_syncdb if there aren't any packages to sync.
+        run_syncdb = options["run_syncdb"] and executor.loader.unmigrated_packages
         # Print some useful info
         if self.verbosity >= 1:
             self.stdout.write(self.style.MIGRATE_HEADING("Operations to perform:"))
             if run_syncdb:
-                if options["app_label"]:
+                if options["package_label"]:
                     self.stdout.write(
                         self.style.MIGRATE_LABEL(
-                            "  Synchronize unmigrated app: %s" % app_label
+                            "  Synchronize unmigrated app: %s" % package_label
                         )
                     )
                 else:
                     self.stdout.write(
-                        self.style.MIGRATE_LABEL("  Synchronize unmigrated apps: ")
-                        + (", ".join(sorted(executor.loader.unmigrated_apps)))
+                        self.style.MIGRATE_LABEL("  Synchronize unmigrated packages: ")
+                        + (", ".join(sorted(executor.loader.unmigrated_packages)))
                     )
-            if target_app_labels_only:
+            if target_package_labels_only:
                 self.stdout.write(
                     self.style.MIGRATE_LABEL("  Apply all migrations: ")
                     + (", ".join(sorted({a for a, n in targets})) or "(none)")
@@ -300,13 +300,13 @@ class Command(BaseCommand):
                     )
 
         pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
-        pre_migrate_apps = pre_migrate_state.apps
+        pre_migrate_packages = pre_migrate_state.packages
         emit_pre_migrate_signal(
             self.verbosity,
             self.interactive,
             connection.alias,
             stdout=self.stdout,
-            apps=pre_migrate_apps,
+            packages=pre_migrate_packages,
             plan=plan,
         )
 
@@ -314,12 +314,12 @@ class Command(BaseCommand):
         if run_syncdb:
             if self.verbosity >= 1:
                 self.stdout.write(
-                    self.style.MIGRATE_HEADING("Synchronizing apps without migrations:")
+                    self.style.MIGRATE_HEADING("Synchronizing packages without migrations:")
                 )
-            if options["app_label"]:
-                self.sync_apps(connection, [app_label])
+            if options["package_label"]:
+                self.sync_packages(connection, [package_label])
             else:
-                self.sync_apps(connection, executor.loader.unmigrated_apps)
+                self.sync_packages(connection, executor.loader.unmigrated_packages)
 
         # Migrate!
         if self.verbosity >= 1:
@@ -331,7 +331,7 @@ class Command(BaseCommand):
                 # how to fix it.
                 autodetector = MigrationAutodetector(
                     executor.loader.project_state(),
-                    ProjectState.from_apps(apps),
+                    ProjectState.from_packages(packages),
                 )
                 changes = autodetector.changes(graph=executor.loader.graph)
                 if changes:
@@ -363,30 +363,30 @@ class Command(BaseCommand):
         )
         # post_migrate signals have access to all models. Ensure that all models
         # are reloaded in case any are delayed.
-        post_migrate_state.clear_delayed_apps_cache()
-        post_migrate_apps = post_migrate_state.apps
+        post_migrate_state.clear_delayed_packages_cache()
+        post_migrate_packages = post_migrate_state.packages
 
-        # Re-render models of real apps to include relationships now that
-        # we've got a final state. This wouldn't be necessary if real apps
+        # Re-render models of real packages to include relationships now that
+        # we've got a final state. This wouldn't be necessary if real packages
         # models were rendered with relationships in the first place.
-        with post_migrate_apps.bulk_update():
+        with post_migrate_packages.bulk_update():
             model_keys = []
-            for model_state in post_migrate_apps.real_models:
-                model_key = model_state.app_label, model_state.name_lower
+            for model_state in post_migrate_packages.real_models:
+                model_key = model_state.package_label, model_state.name_lower
                 model_keys.append(model_key)
-                post_migrate_apps.unregister_model(*model_key)
-        post_migrate_apps.render_multiple(
-            [ModelState.from_model(apps.get_model(*model)) for model in model_keys]
+                post_migrate_packages.unregister_model(*model_key)
+        post_migrate_packages.render_multiple(
+            [ModelState.from_model(packages.get_model(*model)) for model in model_keys]
         )
 
-        # Send the post_migrate signal, so individual apps can do whatever they need
+        # Send the post_migrate signal, so individual packages can do whatever they need
         # to do at this point.
         emit_post_migrate_signal(
             self.verbosity,
             self.interactive,
             connection.alias,
             stdout=self.stdout,
-            apps=post_migrate_apps,
+            packages=post_migrate_packages,
             plan=plan,
         )
 
@@ -430,21 +430,21 @@ class Command(BaseCommand):
                 )
                 self.stdout.write(self.style.SUCCESS(" DONE" + elapsed))
 
-    def sync_apps(self, connection, app_labels):
-        """Run the old syncdb-style operation on a list of app_labels."""
+    def sync_packages(self, connection, package_labels):
+        """Run the old syncdb-style operation on a list of package_labels."""
         with connection.cursor() as cursor:
             tables = connection.introspection.table_names(cursor)
 
-        # Build the manifest of apps and models that are to be synchronized.
+        # Build the manifest of packages and models that are to be synchronized.
         all_models = [
             (
-                app_config.label,
+                package_config.label,
                 router.get_migratable_models(
-                    app_config, connection.alias, include_auto_created=False
+                    package_config, connection.alias, include_auto_created=False
                 ),
             )
-            for app_config in apps.get_app_configs()
-            if app_config.models_module is not None and app_config.label in app_labels
+            for package_config in packages.get_package_configs()
+            if package_config.models_module is not None and package_config.label in package_labels
         ]
 
         def model_installed(model):
@@ -459,15 +459,15 @@ class Command(BaseCommand):
             )
 
         manifest = {
-            app_name: list(filter(model_installed, model_list))
-            for app_name, model_list in all_models
+            package_name: list(filter(model_installed, model_list))
+            for package_name, model_list in all_models
         }
 
         # Create the tables for each model
         if self.verbosity >= 1:
             self.stdout.write("  Creating tables...")
         with connection.schema_editor() as editor:
-            for app_name, model_list in manifest.items():
+            for package_name, model_list in manifest.items():
                 for model in model_list:
                     # Never install unmanaged models, etc.
                     if not model._meta.can_migrate(connection):
@@ -475,7 +475,7 @@ class Command(BaseCommand):
                     if self.verbosity >= 3:
                         self.stdout.write(
                             "    Processing %s.%s model"
-                            % (app_name, model._meta.object_name)
+                            % (package_name, model._meta.object_name)
                         )
                     if self.verbosity >= 1:
                         self.stdout.write(

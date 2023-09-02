@@ -12,8 +12,8 @@ class FieldDoesNotExist(Exception):
     pass
 
 
-class AppRegistryNotReady(Exception):
-    """The bolt.apps registry is not populated yet"""
+class PackageRegistryNotReady(Exception):
+    """The bolt.packages registry is not populated yet"""
 
     pass
 

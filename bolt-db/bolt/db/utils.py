@@ -237,7 +237,7 @@ class ConnectionRouter:
                     return allow
         return obj1._state.db == obj2._state.db
 
-    def allow_migrate(self, db, app_label, **hints):
+    def allow_migrate(self, db, package_label, **hints):
         for router in self.routers:
             try:
                 method = router.allow_migrate
@@ -245,7 +245,7 @@ class ConnectionRouter:
                 # If the router doesn't have a method, skip to the next one.
                 continue
 
-            allow = method(db, app_label, **hints)
+            allow = method(db, package_label, **hints)
 
             if allow is not None:
                 return allow
@@ -254,12 +254,12 @@ class ConnectionRouter:
     def allow_migrate_model(self, db, model):
         return self.allow_migrate(
             db,
-            model._meta.app_label,
+            model._meta.package_label,
             model_name=model._meta.model_name,
             model=model,
         )
 
-    def get_migratable_models(self, app_config, db, include_auto_created=False):
+    def get_migratable_models(self, package_config, db, include_auto_created=False):
         """Return app models allowed to be migrated on provided db."""
-        models = app_config.get_models(include_auto_created=include_auto_created)
+        models = package_config.get_models(include_auto_created=include_auto_created)
         return [model for model in models if self.allow_migrate_model(db, model)]

@@ -1,7 +1,7 @@
 from bolt.staticfiles.finders import get_finders
 
 
-def check_finders(app_configs=None, **kwargs):
+def check_finders(package_configs=None, **kwargs):
     """Check all registered staticfiles finders."""
     errors = []
     for finder in get_finders():

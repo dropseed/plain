@@ -13,11 +13,11 @@ Bolt makes this even easier by providing classes you can extend.
 
 ## Installation
 
-Add `bolt.stripe` to the `INSTALLED_APPS`:
+Add `bolt.stripe` to the `INSTALLED_PACKAGES`:
 
 ```python
 # settings.py
-INSTALLED_APPS = INSTALLED_APPS + [
+INSTALLED_PACKAGES = INSTALLED_PACKAGES + [
     "bolt.stripe",
 ]
 ```
@@ -88,7 +88,7 @@ from bolt.urls import path
 
 from . import views
 
-app_name = "projects"
+default_namespace = "projects"
 
 urlpatterns = [
     path(

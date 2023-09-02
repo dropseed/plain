@@ -151,25 +151,25 @@ def _xframe_middleware():
 
 
 @register(Tags.security, deploy=True)
-def check_security_middleware(app_configs, **kwargs):
+def check_security_middleware(package_configs, **kwargs):
     passed_check = _security_middleware()
     return [] if passed_check else [W001]
 
 
 @register(Tags.security, deploy=True)
-def check_xframe_options_middleware(app_configs, **kwargs):
+def check_xframe_options_middleware(package_configs, **kwargs):
     passed_check = _xframe_middleware()
     return [] if passed_check else [W002]
 
 
 @register(Tags.security, deploy=True)
-def check_sts(app_configs, **kwargs):
+def check_sts(package_configs, **kwargs):
     passed_check = not _security_middleware() or settings.SECURE_HSTS_SECONDS
     return [] if passed_check else [W004]
 
 
 @register(Tags.security, deploy=True)
-def check_sts_include_subdomains(app_configs, **kwargs):
+def check_sts_include_subdomains(package_configs, **kwargs):
     passed_check = (
         not _security_middleware()
         or not settings.SECURE_HSTS_SECONDS
@@ -179,7 +179,7 @@ def check_sts_include_subdomains(app_configs, **kwargs):
 
 
 @register(Tags.security, deploy=True)
-def check_sts_preload(app_configs, **kwargs):
+def check_sts_preload(package_configs, **kwargs):
     passed_check = (
         not _security_middleware()
         or not settings.SECURE_HSTS_SECONDS
@@ -189,7 +189,7 @@ def check_sts_preload(app_configs, **kwargs):
 
 
 @register(Tags.security, deploy=True)
-def check_content_type_nosniff(app_configs, **kwargs):
+def check_content_type_nosniff(package_configs, **kwargs):
     passed_check = (
         not _security_middleware() or settings.SECURE_CONTENT_TYPE_NOSNIFF is True
     )
@@ -197,7 +197,7 @@ def check_content_type_nosniff(app_configs, **kwargs):
 
 
 @register(Tags.security, deploy=True)
-def check_ssl_redirect(app_configs, **kwargs):
+def check_ssl_redirect(package_configs, **kwargs):
     passed_check = not _security_middleware() or settings.SECURE_SSL_REDIRECT is True
     return [] if passed_check else [W008]
 
@@ -211,7 +211,7 @@ def _check_secret_key(secret_key):
 
 
 @register(Tags.security, deploy=True)
-def check_secret_key(app_configs, **kwargs):
+def check_secret_key(package_configs, **kwargs):
     try:
         secret_key = settings.SECRET_KEY
     except (ImproperlyConfigured, AttributeError):
@@ -222,7 +222,7 @@ def check_secret_key(app_configs, **kwargs):
 
 
 @register(Tags.security, deploy=True)
-def check_secret_key_fallbacks(app_configs, **kwargs):
+def check_secret_key_fallbacks(package_configs, **kwargs):
     warnings = []
     try:
         fallbacks = settings.SECRET_KEY_FALLBACKS
@@ -238,24 +238,24 @@ def check_secret_key_fallbacks(app_configs, **kwargs):
 
 
 @register(Tags.security, deploy=True)
-def check_debug(app_configs, **kwargs):
+def check_debug(package_configs, **kwargs):
     passed_check = not settings.DEBUG
     return [] if passed_check else [W018]
 
 
 @register(Tags.security, deploy=True)
-def check_xframe_deny(app_configs, **kwargs):
+def check_xframe_deny(package_configs, **kwargs):
     passed_check = not _xframe_middleware() or settings.X_FRAME_OPTIONS == "DENY"
     return [] if passed_check else [W019]
 
 
 @register(Tags.security, deploy=True)
-def check_allowed_hosts(app_configs, **kwargs):
+def check_allowed_hosts(package_configs, **kwargs):
     return [] if settings.ALLOWED_HOSTS else [W020]
 
 
 @register(Tags.security, deploy=True)
-def check_referrer_policy(app_configs, **kwargs):
+def check_referrer_policy(package_configs, **kwargs):
     if _security_middleware():
         if settings.SECURE_REFERRER_POLICY is None:
             return [W022]
@@ -270,7 +270,7 @@ def check_referrer_policy(app_configs, **kwargs):
 
 
 @register(Tags.security, deploy=True)
-def check_cross_origin_opener_policy(app_configs, **kwargs):
+def check_cross_origin_opener_policy(package_configs, **kwargs):
     if (
         _security_middleware()
         and settings.SECURE_CROSS_ORIGIN_OPENER_POLICY is not None

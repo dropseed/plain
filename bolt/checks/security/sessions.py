@@ -12,7 +12,7 @@ def add_session_cookie_message(message):
 
 W010 = Warning(
     add_session_cookie_message(
-        "You have 'bolt.sessions' in your INSTALLED_APPS, "
+        "You have 'bolt.sessions' in your INSTALLED_PACKAGES, "
         "but you have not set SESSION_COOKIE_SECURE to True."
     ),
     id="security.W010",
@@ -42,7 +42,7 @@ def add_httponly_message(message):
 
 W013 = Warning(
     add_httponly_message(
-        "You have 'bolt.sessions' in your INSTALLED_APPS, "
+        "You have 'bolt.sessions' in your INSTALLED_PACKAGES, "
         "but you have not set SESSION_COOKIE_HTTPONLY to True.",
     ),
     id="security.W013",
@@ -64,7 +64,7 @@ W015 = Warning(
 
 
 @register(Tags.security, deploy=True)
-def check_session_cookie_secure(app_configs, **kwargs):
+def check_session_cookie_secure(package_configs, **kwargs):
     if settings.SESSION_COOKIE_SECURE is True:
         return []
     errors = []
@@ -78,7 +78,7 @@ def check_session_cookie_secure(app_configs, **kwargs):
 
 
 @register(Tags.security, deploy=True)
-def check_session_cookie_httponly(app_configs, **kwargs):
+def check_session_cookie_httponly(package_configs, **kwargs):
     if settings.SESSION_COOKIE_HTTPONLY is True:
         return []
     errors = []
@@ -96,4 +96,4 @@ def _session_middleware():
 
 
 def _session_app():
-    return "bolt.sessions" in settings.INSTALLED_APPS
+    return "bolt.sessions" in settings.INSTALLED_PACKAGES

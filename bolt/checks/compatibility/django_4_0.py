@@ -4,7 +4,7 @@ from .. import Error, Tags, register
 
 
 @register(Tags.compatibility)
-def check_csrf_trusted_origins(app_configs, **kwargs):
+def check_csrf_trusted_origins(package_configs, **kwargs):
     errors = []
     for origin in settings.CSRF_TRUSTED_ORIGINS:
         if "://" not in origin:

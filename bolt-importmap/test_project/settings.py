@@ -17,7 +17,7 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     "bolt.auth",
     "bolt.sessions",
     "bolt.staticfiles",

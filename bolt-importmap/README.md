@@ -14,18 +14,18 @@ You'll need to do four things to use bolt-importmap.
 
 The TL;DR is:
 
-- Add "importmap" to `INSTALLED_APPS`
+- Add "importmap" to `INSTALLED_PACKAGES`
 - Create an `importmap.toml`
 - Run `python manage.py importmap_generate`
 - Use `{% importmap_js %}` in your template
 
 ### 1. Install it
 
-Do the equivalent of `pip install bolt-importmap` and add it to your `INSTALLED_APPS` list in your `settings.py` file.
+Do the equivalent of `pip install bolt-importmap` and add it to your `INSTALLED_PACKAGES` list in your `settings.py` file.
 
 ```python
 # settings.py
-INSTALLED_APPS = [
+INSTALLED_PACKAGES = [
     ...
     "importmap",
 ]

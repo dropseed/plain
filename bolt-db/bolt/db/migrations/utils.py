@@ -24,30 +24,30 @@ def get_migration_name_timestamp():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
 
-def resolve_relation(model, app_label=None, model_name=None):
+def resolve_relation(model, package_label=None, model_name=None):
     """
     Turn a model class or model reference string and return a model tuple.
 
-    app_label and model_name are used to resolve the scope of recursive and
+    package_label and model_name are used to resolve the scope of recursive and
     unscoped model relationship.
     """
     if isinstance(model, str):
         if model == RECURSIVE_RELATIONSHIP_CONSTANT:
-            if app_label is None or model_name is None:
+            if package_label is None or model_name is None:
                 raise TypeError(
-                    "app_label and model_name must be provided to resolve "
+                    "package_label and model_name must be provided to resolve "
                     "recursive relationships."
                 )
-            return app_label, model_name
+            return package_label, model_name
         if "." in model:
-            app_label, model_name = model.split(".", 1)
-            return app_label, model_name.lower()
-        if app_label is None:
+            package_label, model_name = model.split(".", 1)
+            return package_label, model_name.lower()
+        if package_label is None:
             raise TypeError(
-                "app_label must be provided to resolve unscoped model relationships."
+                "package_label must be provided to resolve unscoped model relationships."
             )
-        return app_label, model.lower()
-    return model._meta.app_label, model._meta.model_name
+        return package_label, model.lower()
+    return model._meta.package_label, model._meta.model_name
 
 
 def field_references(

@@ -4,7 +4,7 @@ from bolt.runtime import settings
 
 
 @register("boltdb", Tags.database)
-def check_database_tables(app_configs, **kwargs):
+def check_database_tables(package_configs, **kwargs):
     databases = kwargs.get("databases", None)
     if not databases:
         return []
@@ -33,7 +33,7 @@ def check_database_tables(app_configs, **kwargs):
                 Error(
                     f"Unknown tables in {database} database: {table_names}",
                     hint=(
-                        "Tables may be from apps/models that have been uninstalled. "
+                        "Tables may be from packages/models that have been uninstalled. "
                         + "Make sure you have a backup and delete the tables manually "
                         + f"(ex. `{specific_hint}`)."
                     ),

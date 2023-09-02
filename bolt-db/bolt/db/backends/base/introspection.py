@@ -78,20 +78,20 @@ class BaseDatabaseIntrospection:
         )
 
     def get_migratable_models(self):
-        from bolt.apps import apps
+        from bolt.packages import packages
         from bolt.db import router
 
         return (
             model
-            for app_config in apps.get_app_configs()
-            for model in router.get_migratable_models(app_config, self.connection.alias)
+            for package_config in packages.get_package_configs()
+            for model in router.get_migratable_models(package_config, self.connection.alias)
             if model._meta.can_migrate(self.connection)
         )
 
     def bolt_table_names(self, only_existing=False, include_views=True):
         """
         Return a list of all table names that have associated Bolt models and
-        are in INSTALLED_APPS.
+        are in INSTALLED_PACKAGES.
 
         If only_existing is True, include only the tables in the database.
         """
@@ -128,7 +128,7 @@ class BaseDatabaseIntrospection:
     def sequence_list(self):
         """
         Return a list of information about all DB sequences for all models in
-        all apps.
+        all packages.
         """
         sequence_list = []
         with self.connection.cursor() as cursor:

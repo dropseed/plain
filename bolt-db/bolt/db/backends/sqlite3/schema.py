@@ -1,7 +1,7 @@
 import copy
 from decimal import Decimal
 
-from bolt.apps.registry import Apps
+from bolt.packages.registry import Packages
 from bolt.db import NotSupportedError
 from bolt.db.backends.base.schema import BaseDatabaseSchemaEditor
 from bolt.db.backends.ddl_references import Statement
@@ -263,7 +263,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             ):
                 return self.delete_model(delete_field.remote_field.through)
         # Work inside a new app registry
-        apps = Apps()
+        packages = Packages()
 
         # Work out the new value of unique_together, taking renames into
         # account
@@ -298,13 +298,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # This wouldn't be required if the schema editor was operating on model
         # states instead of rendered models.
         meta_contents = {
-            "app_label": model._meta.app_label,
+            "package_label": model._meta.package_label,
             "db_table": model._meta.db_table,
             "unique_together": unique_together,
             "index_together": index_together,
             "indexes": indexes,
             "constraints": constraints,
-            "apps": apps,
+            "packages": packages,
         }
         meta = type("Meta", (), meta_contents)
         body_copy["Meta"] = meta
@@ -314,13 +314,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Construct a model with a renamed table name.
         body_copy = copy.deepcopy(body)
         meta_contents = {
-            "app_label": model._meta.app_label,
+            "package_label": model._meta.package_label,
             "db_table": "new__%s" % strip_quotes(model._meta.db_table),
             "unique_together": unique_together,
             "index_together": index_together,
             "indexes": indexes,
             "constraints": constraints,
-            "apps": apps,
+            "packages": packages,
         }
         meta = type("Meta", (), meta_contents)
         body_copy["Meta"] = meta

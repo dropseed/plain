@@ -1,9 +1,9 @@
 from bolt import checks
-from bolt.apps import AppConfig
+from bolt.packages import PackageConfig
 from bolt.staticfiles.checks import check_finders
 
 
-class StaticFilesConfig(AppConfig):
+class StaticFilesConfig(PackageConfig):
     name = "bolt.staticfiles"
     verbose_name = "Static Files"
     ignore_patterns = ["CVS", ".*", "*~"]

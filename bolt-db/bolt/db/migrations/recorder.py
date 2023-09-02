@@ -1,4 +1,4 @@
-from bolt.apps.registry import Apps
+from bolt.packages.registry import Packages
 from bolt.db import DatabaseError, models
 from bolt.utils.functional import classproperty
 from bolt.utils.timezone import now
@@ -24,7 +24,7 @@ class MigrationRecorder:
     @classproperty
     def Migration(cls):
         """
-        Lazy load to avoid AppRegistryNotReady if installed apps import
+        Lazy load to avoid PackageRegistryNotReady if installed packages import
         MigrationRecorder.
         """
         if cls._migration_class is None:
@@ -35,8 +35,8 @@ class MigrationRecorder:
                 applied = models.DateTimeField(default=now)
 
                 class Meta:
-                    apps = Apps()
-                    app_label = "migrations"
+                    packages = Packages()
+                    package_label = "migrations"
                     db_table = "django_migrations"
 
                 def __str__(self):
@@ -75,7 +75,7 @@ class MigrationRecorder:
 
     def applied_migrations(self):
         """
-        Return a dict mapping (app_name, migration_name) to Migration instances
+        Return a dict mapping (package_name, migration_name) to Migration instances
         for all applied migrations.
         """
         if self.has_table():

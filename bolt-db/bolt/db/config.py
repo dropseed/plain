@@ -1,7 +1,7 @@
-from bolt.apps import AppConfig
+from bolt.packages import PackageConfig
 
 
-class BoltDBConfig(AppConfig):
+class BoltDBConfig(PackageConfig):
     name = "bolt.db"
     # We wan to use the "migrations" module
     # in this package but not for the standard purpose

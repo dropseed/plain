@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections, migrations
 from bolt.db.migrations.loader import AmbiguityError, MigrationLoader
 from bolt.db.migrations.migration import SwappableTuple
@@ -21,8 +21,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "app_label",
-            help="App label of the application to squash migrations for.",
+            "package_label",
+            help="Package label of the application to squash migrations for.",
         )
         parser.add_argument(
             "start_migration_name",
@@ -62,43 +62,43 @@ class Command(BaseCommand):
     def handle(self, **options):
         self.verbosity = options["verbosity"]
         self.interactive = options["interactive"]
-        app_label = options["app_label"]
+        package_label = options["package_label"]
         start_migration_name = options["start_migration_name"]
         migration_name = options["migration_name"]
         no_optimize = options["no_optimize"]
         squashed_name = options["squashed_name"]
         include_header = options["include_header"]
-        # Validate app_label.
+        # Validate package_label.
         try:
-            apps.get_app_config(app_label)
+            packages.get_package_config(package_label)
         except LookupError as err:
             raise CommandError(str(err))
         # Load the current graph state, check the app and migration they asked
         # for exists.
         loader = MigrationLoader(connections[DEFAULT_DB_ALIAS])
-        if app_label not in loader.migrated_apps:
+        if package_label not in loader.migrated_packages:
             raise CommandError(
-                "App '%s' does not have migrations (so squashmigrations on "
-                "it makes no sense)" % app_label
+                "Package '%s' does not have migrations (so squashmigrations on "
+                "it makes no sense)" % package_label
             )
 
-        migration = self.find_migration(loader, app_label, migration_name)
+        migration = self.find_migration(loader, package_label, migration_name)
 
         # Work out the list of predecessor migrations
         migrations_to_squash = [
             loader.get_migration(al, mn)
             for al, mn in loader.graph.forwards_plan(
-                (migration.app_label, migration.name)
+                (migration.package_label, migration.name)
             )
-            if al == migration.app_label
+            if al == migration.package_label
         ]
 
         if start_migration_name:
             start_migration = self.find_migration(
-                loader, app_label, start_migration_name
+                loader, package_label, start_migration_name
             )
             start = loader.get_migration(
-                start_migration.app_label, start_migration.name
+                start_migration.package_label, start_migration.name
             )
             try:
                 start_index = migrations_to_squash.index(start)
@@ -109,7 +109,7 @@ class Command(BaseCommand):
                     "the migration '{}'?\n"
                     "Have a look at:\n"
                     "  python manage.py showmigrations {}\n"
-                    "to debug this issue.".format(start_migration, migration, app_label)
+                    "to debug this issue.".format(start_migration, migration, package_label)
                 )
 
         # Tell them what we're doing and optionally ask if we should proceed
@@ -154,7 +154,7 @@ class Command(BaseCommand):
                         dependencies.add(("__setting__", "AUTH_USER_MODEL"))
                     else:
                         dependencies.add(dependency)
-                elif dependency[0] != smigration.app_label or first_migration:
+                elif dependency[0] != smigration.package_label or first_migration:
                     dependencies.add(dependency)
             first_migration = False
 
@@ -169,7 +169,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.MIGRATE_HEADING("Optimizing..."))
 
             optimizer = MigrationOptimizer()
-            new_operations = optimizer.optimize(operations, migration.app_label)
+            new_operations = optimizer.optimize(operations, migration.package_label)
 
             if self.verbosity > 0:
                 if len(new_operations) == len(operations):
@@ -187,7 +187,7 @@ class Command(BaseCommand):
             if migration.replaces:
                 replaces.extend(migration.replaces)
             else:
-                replaces.append((migration.app_label, migration.name))
+                replaces.append((migration.package_label, migration.name))
 
         # Make a new migration with those operations
         subclass = type(
@@ -207,10 +207,10 @@ class Command(BaseCommand):
             else:
                 # Generate a name.
                 name = f"{start_migration.name}_squashed_{migration.name}"
-            new_migration = subclass(name, app_label)
+            new_migration = subclass(name, package_label)
         else:
             name = "0001_%s" % (squashed_name or "squashed_%s" % migration.name)
-            new_migration = subclass(name, app_label)
+            new_migration = subclass(name, package_label)
             new_migration.initial = True
 
         # Write out the new migration file
@@ -252,16 +252,16 @@ class Command(BaseCommand):
                         )
                     )
 
-    def find_migration(self, loader, app_label, name):
+    def find_migration(self, loader, package_label, name):
         try:
-            return loader.get_migration_by_prefix(app_label, name)
+            return loader.get_migration_by_prefix(package_label, name)
         except AmbiguityError:
             raise CommandError(
                 "More than one migration matches '{}' in app '{}'. Please be "
-                "more specific.".format(name, app_label)
+                "more specific.".format(name, package_label)
             )
         except KeyError:
             raise CommandError(
                 "Cannot find a migration matching '%s' from app '%s'."
-                % (name, app_label)
+                % (name, package_label)
             )

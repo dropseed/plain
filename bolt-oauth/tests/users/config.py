@@ -1,6 +1,6 @@
-from bolt.apps import AppConfig
+from bolt.packages import PackageConfig
 
 
-class UsersConfig(AppConfig):
+class UsersConfig(PackageConfig):
     default_auto_field = "bolt.db.models.BigAutoField"
     name = "users"

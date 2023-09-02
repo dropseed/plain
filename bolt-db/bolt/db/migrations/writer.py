@@ -2,7 +2,7 @@ import os
 import re
 from importlib import import_module
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import migrations
 from bolt.db.migrations.loader import MigrationLoader
 from bolt.db.migrations.serializer import Serializer, serializer_factory
@@ -206,14 +206,14 @@ class MigrationWriter:
     @property
     def basedir(self):
         migrations_package_name, _ = MigrationLoader.migrations_module(
-            self.migration.app_label
+            self.migration.package_label
         )
 
         if migrations_package_name is None:
             raise ValueError(
                 "Bolt can't create migrations for app '%s' because "
                 "migrations have been disabled via the MIGRATION_MODULES "
-                "setting." % self.migration.app_label
+                "setting." % self.migration.package_label
             )
 
         # See if we can import the migrations module directly
@@ -228,14 +228,14 @@ class MigrationWriter:
                 pass
 
         # Alright, see if it's a direct submodule of the app
-        app_config = apps.get_app_config(self.migration.app_label)
+        package_config = packages.get_package_config(self.migration.package_label)
         (
-            maybe_app_name,
+            maybe_package_name,
             _,
             migrations_package_basename,
         ) = migrations_package_name.rpartition(".")
-        if app_config.name == maybe_app_name:
-            return os.path.join(app_config.path, migrations_package_basename)
+        if package_config.name == maybe_package_name:
+            return os.path.join(package_config.path, migrations_package_basename)
 
         # In case of using MIGRATION_MODULES setting and the custom package
         # doesn't exist, create one, starting from an existing package

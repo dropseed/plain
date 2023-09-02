@@ -25,13 +25,13 @@ def _csrf_middleware():
 
 
 @register(Tags.security, deploy=True)
-def check_csrf_middleware(app_configs, **kwargs):
+def check_csrf_middleware(package_configs, **kwargs):
     passed_check = _csrf_middleware()
     return [] if passed_check else [W003]
 
 
 @register(Tags.security, deploy=True)
-def check_csrf_cookie_secure(app_configs, **kwargs):
+def check_csrf_cookie_secure(package_configs, **kwargs):
     passed_check = (
         settings.CSRF_USE_SESSIONS
         or not _csrf_middleware()

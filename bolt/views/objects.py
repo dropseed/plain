@@ -45,7 +45,7 @@ class ObjectTemplateViewMixin:
 
         * the value of ``template_name`` on the view (if provided)
           object instance that the view is operating upon (if available)
-        * ``<app_label>/<model_name><template_name_suffix>.html``
+        * ``<package_label>/<model_name><template_name_suffix>.html``
         """
         if self.template_name:  # type: ignore
             return [self.template_name]  # type: ignore
@@ -61,7 +61,7 @@ class ObjectTemplateViewMixin:
             names.append(
                 "%s/%s%s.html"
                 % (
-                    object_meta.app_label,
+                    object_meta.package_label,
                     object_meta.model_name,
                     self.template_name_suffix,  # type: ignore
                 )

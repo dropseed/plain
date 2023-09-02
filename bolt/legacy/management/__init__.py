@@ -13,7 +13,7 @@ from difflib import get_close_matches
 from importlib import import_module
 
 import bolt.runtime
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.exceptions import ImproperlyConfigured
 from bolt.legacy.management.base import (
     BaseCommand,
@@ -38,13 +38,13 @@ def find_commands(management_dir):
     ]
 
 
-def load_command_class(app_name, name):
+def load_command_class(package_name, name):
     """
     Given a command name and an application name, return the Command
     class instance. Allow all errors raised by the import process
     (ImportError, AttributeError) to propagate.
     """
-    module = import_module(f"{app_name}.management.commands.{name}")
+    module = import_module(f"{package_name}.management.commands.{name}")
     return module.Command()
 
 
@@ -60,9 +60,9 @@ def get_commands():
     Core commands are always included. If a settings module has been
     specified, also include user-defined commands.
 
-    The dictionary is in the format {command_name: app_name}. Key-value
+    The dictionary is in the format {command_name: package_name}. Key-value
     pairs from this dictionary can then be used in calls to
-    load_command_class(app_name, command_name)
+    load_command_class(package_name, command_name)
 
     The dictionary is cached on the first call and reused on subsequent
     calls.
@@ -72,9 +72,9 @@ def get_commands():
     if not settings.configured:
         return commands
 
-    for app_config in reversed(apps.get_app_configs()):
-        path = os.path.join(app_config.path, "management")
-        commands.update({name: app_config.name for name in find_commands(path)})
+    for package_config in reversed(packages.get_package_configs()):
+        path = os.path.join(package_config.path, "management")
+        commands.update({name: package_config.name for name in find_commands(path)})
 
     return commands
 
@@ -106,15 +106,15 @@ def call_command(command_name, *args, **options):
     else:
         # Load the command object by name.
         try:
-            app_name = get_commands()[command_name]
+            package_name = get_commands()[command_name]
         except KeyError:
             raise CommandError("Unknown command: %r" % command_name)
 
-        if isinstance(app_name, BaseCommand):
+        if isinstance(package_name, BaseCommand):
             # If the command is already loaded, use it directly.
-            command = app_name
+            command = package_name
         else:
-            command = load_command_class(app_name, command_name)
+            command = load_command_class(package_name, command_name)
 
     # Simulate argument parsing to get the option defaults (see #10080 for details).
     parser = command.create_parser("", command_name)
@@ -251,14 +251,14 @@ class ManagementUtility:
         # Get commands outside of try block to prevent swallowing exceptions
         commands = get_commands()
         try:
-            app_name = commands[subcommand]
+            package_name = commands[subcommand]
         except KeyError:
             if os.environ.get("BOLT_SETTINGS_MODULE"):
                 # If `subcommand` is missing due to misconfigured settings, the
                 # following line will retrigger an ImproperlyConfigured exception
                 # (get_commands() swallows the original one) so the user is
                 # informed about it.
-                settings.INSTALLED_APPS
+                settings.INSTALLED_PACKAGES
             elif not settings.configured:
                 sys.stderr.write("No Bolt settings specified.\n")
             possible_matches = get_close_matches(subcommand, commands)
@@ -267,11 +267,11 @@ class ManagementUtility:
                 sys.stderr.write(". Did you mean %s?" % possible_matches[0])
             sys.stderr.write("\nType '%s help' for usage.\n" % self.prog_name)
             sys.exit(1)
-        if isinstance(app_name, BaseCommand):
+        if isinstance(package_name, BaseCommand):
             # If the command is already loaded, use it directly.
-            klass = app_name
+            klass = package_name
         else:
-            klass = load_command_class(app_name, subcommand)
+            klass = load_command_class(package_name, subcommand)
         return klass
 
     def autocomplete(self):
@@ -317,12 +317,12 @@ class ManagementUtility:
         # special case: the 'help' subcommand has no options
         elif cwords[0] in subcommands and cwords[0] != "help":
             subcommand_cls = self.fetch_command(cwords[0])
-            # special case: add the names of installed apps to options
+            # special case: add the names of installed packages to options
             if cwords[0] in ("dumpdata", "sqlmigrate", "sqlsequencereset", "test"):
                 try:
-                    app_configs = apps.get_app_configs()
+                    package_configs = packages.get_package_configs()
                     # Get the last part of the dotted path as the app name.
-                    options.extend((app_config.label, 0) for app_config in app_configs)
+                    options.extend((package_config.label, 0) for package_config in package_configs)
                 except ImportError:
                     # Fail silently if BOLT_SETTINGS_MODULE isn't set. The
                     # user will find out once they execute the command.
@@ -378,7 +378,7 @@ class ManagementUtility:
             pass  # Ignore any option errors at this point.
 
         try:
-            settings.INSTALLED_APPS
+            settings.INSTALLED_PACKAGES
         except ImproperlyConfigured as exc:
             self.settings_exception = exc
         except ImportError as exc:

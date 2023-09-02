@@ -1,7 +1,7 @@
 import functools
 import os
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.checks import Error, Warning
 from bolt.exceptions import ImproperlyConfigured
 from bolt.files.storage import FileSystemStorage, Storage, default_storage
@@ -53,7 +53,7 @@ class FileSystemFinder(BaseFinder):
     to locate files.
     """
 
-    def __init__(self, app_names=None, *args, **kwargs):
+    def __init__(self, package_names=None, *args, **kwargs):
         # List of locations with static files
         self.locations = []
         # Maps dir paths to an appropriate storage instance
@@ -154,7 +154,7 @@ class FileSystemFinder(BaseFinder):
                     yield path, storage
 
 
-class AppDirectoriesFinder(BaseFinder):
+class PackageDirectoriesFinder(BaseFinder):
     """
     A static files finder that looks in the directory of each app as
     specified in the source_dir attribute.
@@ -163,23 +163,23 @@ class AppDirectoriesFinder(BaseFinder):
     storage_class = FileSystemStorage
     source_dir = "static"
 
-    def __init__(self, app_names=None, *args, **kwargs):
-        # The list of apps that are handled
-        self.apps = []
+    def __init__(self, package_names=None, *args, **kwargs):
+        # The list of packages that are handled
+        self.packages = []
         # Mapping of app names to storage instances
         self.storages = {}
-        app_configs = apps.get_app_configs()
-        if app_names:
-            app_names = set(app_names)
-            app_configs = [ac for ac in app_configs if ac.name in app_names]
-        for app_config in app_configs:
+        package_configs = packages.get_package_configs()
+        if package_names:
+            package_names = set(package_names)
+            package_configs = [ac for ac in package_configs if ac.name in package_names]
+        for package_config in package_configs:
             app_storage = self.storage_class(
-                os.path.join(app_config.path, self.source_dir)
+                os.path.join(package_config.path, self.source_dir)
             )
             if os.path.isdir(app_storage.location):
-                self.storages[app_config.name] = app_storage
-                if app_config.name not in self.apps:
-                    self.apps.append(app_config.name)
+                self.storages[package_config.name] = app_storage
+                if package_config.name not in self.packages:
+                    self.packages.append(package_config.name)
         super().__init__(*args, **kwargs)
 
     def list(self, ignore_patterns):
@@ -196,7 +196,7 @@ class AppDirectoriesFinder(BaseFinder):
         Look for files in the app directories.
         """
         matches = []
-        for app in self.apps:
+        for app in self.packages:
             app_location = self.storages[app].location
             if app_location not in searched_locations:
                 searched_locations.append(app_location)

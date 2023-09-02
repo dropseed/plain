@@ -9,7 +9,7 @@ class MigrationOptimizer:
     nothing.
     """
 
-    def optimize(self, operations, app_label):
+    def optimize(self, operations, package_label):
         """
         Main optimization entry point. Pass in a list of Operation instances,
         get out a new list of Operation instances.
@@ -27,30 +27,30 @@ class MigrationOptimizer:
         optimization must be stable and always return an equal or shorter list.
         """
         # Internal tracking variable for test assertions about # of loops
-        if app_label is None:
-            raise TypeError("app_label must be a str.")
+        if package_label is None:
+            raise TypeError("package_label must be a str.")
         self._iterations = 0
         while True:
-            result = self.optimize_inner(operations, app_label)
+            result = self.optimize_inner(operations, package_label)
             self._iterations += 1
             if result == operations:
                 return result
             operations = result
 
-    def optimize_inner(self, operations, app_label):
+    def optimize_inner(self, operations, package_label):
         """Inner optimization loop."""
         new_operations = []
         for i, operation in enumerate(operations):
             right = True  # Should we reduce on the right or on the left.
             # Compare it to each operation after it
             for j, other in enumerate(operations[i + 1 :]):
-                result = operation.reduce(other, app_label)
+                result = operation.reduce(other, package_label)
                 if isinstance(result, list):
                     in_between = operations[i + 1 : i + j + 1]
                     if right:
                         new_operations.extend(in_between)
                         new_operations.extend(result)
-                    elif all(op.reduce(other, app_label) is True for op in in_between):
+                    elif all(op.reduce(other, package_label) is True for op in in_between):
                         # Perform a left reduction if all of the in-between
                         # operations can optimize through other.
                         new_operations.extend(result)

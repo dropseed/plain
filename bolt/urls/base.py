@@ -15,7 +15,7 @@ def resolve(path, urlconf=None):
     return get_resolver(urlconf).resolve(path)
 
 
-def reverse(viewname, urlconf=None, args=None, kwargs=None, current_app=None):
+def reverse(viewname, urlconf=None, args=None, kwargs=None, using_namespace=None):
     if urlconf is None:
         urlconf = get_urlconf()
     resolver = get_resolver(urlconf)
@@ -27,8 +27,8 @@ def reverse(viewname, urlconf=None, args=None, kwargs=None, current_app=None):
     else:
         *path, view = viewname.split(":")
 
-        if current_app:
-            current_path = current_app.split(":")
+        if using_namespace:
+            current_path = using_namespace.split(":")
             current_path.reverse()
         else:
             current_path = None

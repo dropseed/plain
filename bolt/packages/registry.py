@@ -5,27 +5,27 @@ import warnings
 from collections import Counter, defaultdict
 from functools import partial
 
-from bolt.exceptions import AppRegistryNotReady, ImproperlyConfigured
+from bolt.exceptions import PackageRegistryNotReady, ImproperlyConfigured
 
-from .config import AppConfig
+from .config import PackageConfig
 
 
-class Apps:
+class Packages:
     """
     A registry that stores the configuration of installed applications.
 
     It also keeps track of models, e.g. to provide reverse relations.
     """
 
-    def __init__(self, installed_apps=()):
-        # installed_apps is set to None when creating the main registry
+    def __init__(self, installed_packages=()):
+        # installed_packages is set to None when creating the main registry
         # because it cannot be populated at that point. Other registries must
-        # provide a list of installed apps and are populated immediately.
-        if installed_apps is None and hasattr(sys.modules[__name__], "apps"):
-            raise RuntimeError("You must supply an installed_apps argument.")
+        # provide a list of installed packages and are populated immediately.
+        if installed_packages is None and hasattr(sys.modules[__name__], "packages"):
+            raise RuntimeError("You must supply an installed_packages argument.")
 
         # Mapping of app labels => model names => model classes. Every time a
-        # model is imported, ModelBase.__new__ calls apps.register_model which
+        # model is imported, ModelBase.__new__ calls packages.register_model which
         # creates an entry in all_models. All imported models are registered,
         # regardless of whether they're defined in an installed application
         # and whether the registry has been populated. Since it isn't possible
@@ -33,30 +33,30 @@ class Apps:
         # all_models is never overridden or reset.
         self.all_models = defaultdict(dict)
 
-        # Mapping of labels to AppConfig instances for installed apps.
-        self.app_configs = {}
+        # Mapping of labels to PackageConfig instances for installed packages.
+        self.package_configs = {}
 
-        # Stack of app_configs. Used to store the current state in
-        # set_available_apps and set_installed_apps.
-        self.stored_app_configs = []
+        # Stack of package_configs. Used to store the current state in
+        # set_available_packages and set_installed_packages.
+        self.stored_package_configs = []
 
         # Whether the registry is populated.
-        self.apps_ready = self.models_ready = self.ready = False
+        self.packages_ready = self.models_ready = self.ready = False
 
         # Lock for thread-safe population.
         self._lock = threading.RLock()
         self.loading = False
 
-        # Maps ("app_label", "modelname") tuples to lists of functions to be
+        # Maps ("package_label", "modelname") tuples to lists of functions to be
         # called when the corresponding model is ready. Used by this class's
         # `lazy_model_operation()` and `do_pending_operations()` methods.
         self._pending_operations = defaultdict(list)
 
-        # Populate apps and models, unless it's the main registry.
-        if installed_apps is not None:
-            self.populate(installed_apps)
+        # Populate packages and models, unless it's the main registry.
+        if installed_packages is not None:
+            self.populate(installed_packages)
 
-    def populate(self, installed_apps=None):
+    def populate(self, installed_packages=None):
         """
         Load application configurations and models.
 
@@ -76,88 +76,88 @@ class Apps:
             # An RLock prevents other threads from entering this section. The
             # compare and set operation below is atomic.
             if self.loading:
-                # Prevent reentrant calls to avoid running AppConfig.ready()
+                # Prevent reentrant calls to avoid running PackageConfig.ready()
                 # methods twice.
                 raise RuntimeError("populate() isn't reentrant")
             self.loading = True
 
             # Phase 1: initialize app configs and import app modules.
-            for entry in installed_apps:
-                if isinstance(entry, AppConfig):
-                    app_config = entry
+            for entry in installed_packages:
+                if isinstance(entry, PackageConfig):
+                    package_config = entry
                 else:
-                    app_config = AppConfig.create(entry)
-                if app_config.label in self.app_configs:
+                    package_config = PackageConfig.create(entry)
+                if package_config.label in self.package_configs:
                     raise ImproperlyConfigured(
-                        "Application labels aren't unique, "
-                        "duplicates: %s" % app_config.label
+                        "Package labels aren't unique, "
+                        "duplicates: %s" % package_config.label
                     )
 
-                self.app_configs[app_config.label] = app_config
-                app_config.apps = self
+                self.package_configs[package_config.label] = package_config
+                package_config.packages = self
 
             # Check for duplicate app names.
             counts = Counter(
-                app_config.name for app_config in self.app_configs.values()
+                package_config.name for package_config in self.package_configs.values()
             )
             duplicates = [name for name, count in counts.most_common() if count > 1]
             if duplicates:
                 raise ImproperlyConfigured(
-                    "Application names aren't unique, "
+                    "Package names aren't unique, "
                     "duplicates: %s" % ", ".join(duplicates)
                 )
 
-            self.apps_ready = True
+            self.packages_ready = True
 
             # Phase 2: import models modules.
-            for app_config in self.app_configs.values():
-                app_config.import_models()
+            for package_config in self.package_configs.values():
+                package_config.import_models()
 
             self.clear_cache()
 
             self.models_ready = True
 
             # Phase 3: run ready() methods of app configs.
-            for app_config in self.get_app_configs():
-                app_config.ready()
+            for package_config in self.get_package_configs():
+                package_config.ready()
 
             self.ready = True
 
-    def check_apps_ready(self):
-        """Raise an exception if all apps haven't been imported yet."""
-        if not self.apps_ready:
+    def check_packages_ready(self):
+        """Raise an exception if all packages haven't been imported yet."""
+        if not self.packages_ready:
             from bolt.runtime import settings
 
             # If "not ready" is due to unconfigured settings, accessing
-            # INSTALLED_APPS raises a more helpful ImproperlyConfigured
+            # INSTALLED_PACKAGES raises a more helpful ImproperlyConfigured
             # exception.
-            settings.INSTALLED_APPS
-            raise AppRegistryNotReady("Apps aren't loaded yet.")
+            settings.INSTALLED_PACKAGES
+            raise PackageRegistryNotReady("Packages aren't loaded yet.")
 
     def check_models_ready(self):
         """Raise an exception if all models haven't been imported yet."""
         if not self.models_ready:
-            raise AppRegistryNotReady("Models aren't loaded yet.")
+            raise PackageRegistryNotReady("Models aren't loaded yet.")
 
-    def get_app_configs(self):
+    def get_package_configs(self):
         """Import applications and return an iterable of app configs."""
-        self.check_apps_ready()
-        return self.app_configs.values()
+        self.check_packages_ready()
+        return self.package_configs.values()
 
-    def get_app_config(self, app_label):
+    def get_package_config(self, package_label):
         """
         Import applications and returns an app config for the given label.
 
         Raise LookupError if no application exists with this label.
         """
-        self.check_apps_ready()
+        self.check_packages_ready()
         try:
-            return self.app_configs[app_label]
+            return self.package_configs[package_label]
         except KeyError:
-            message = "No installed app with label '%s'." % app_label
-            for app_config in self.get_app_configs():
-                if app_config.name == app_label:
-                    message += " Did you mean '%s'?" % app_config.label
+            message = "No installed app with label '%s'." % package_label
+            for package_config in self.get_package_configs():
+                if package_config.name == package_label:
+                    message += " Did you mean '%s'?" % package_config.label
                     break
             raise LookupError(message)
 
@@ -178,15 +178,15 @@ class Apps:
         self.check_models_ready()
 
         result = []
-        for app_config in self.app_configs.values():
-            result.extend(app_config.get_models(include_auto_created, include_swapped))
+        for package_config in self.package_configs.values():
+            result.extend(package_config.get_models(include_auto_created, include_swapped))
         return result
 
-    def get_model(self, app_label, model_name=None, require_ready=True):
+    def get_model(self, package_label, model_name=None, require_ready=True):
         """
-        Return the model matching the given app_label and model_name.
+        Return the model matching the given package_label and model_name.
 
-        As a shortcut, app_label may be in the form <app_label>.<model_name>.
+        As a shortcut, package_label may be in the form <package_label>.<model_name>.
 
         model_name is case-insensitive.
 
@@ -197,24 +197,24 @@ class Apps:
         if require_ready:
             self.check_models_ready()
         else:
-            self.check_apps_ready()
+            self.check_packages_ready()
 
         if model_name is None:
-            app_label, model_name = app_label.split(".")
+            package_label, model_name = package_label.split(".")
 
-        app_config = self.get_app_config(app_label)
+        package_config = self.get_package_config(package_label)
 
-        if not require_ready and app_config.models is None:
-            app_config.import_models()
+        if not require_ready and package_config.models is None:
+            package_config.import_models()
 
-        return app_config.get_model(model_name, require_ready=require_ready)
+        return package_config.get_model(model_name, require_ready=require_ready)
 
-    def register_model(self, app_label, model):
+    def register_model(self, package_label, model):
         # Since this method is called when models are imported, it cannot
         # perform imports because of the risk of import loops. It mustn't
-        # call get_app_config().
+        # call get_package_config().
         model_name = model._meta.model_name
-        app_models = self.all_models[app_label]
+        app_models = self.all_models[package_label]
         if model_name in app_models:
             if (
                 model.__name__ == app_models[model_name].__name__
@@ -223,29 +223,29 @@ class Apps:
                 warnings.warn(
                     "Model '{}.{}' was already registered. Reloading models is not "
                     "advised as it can lead to inconsistencies, most notably with "
-                    "related models.".format(app_label, model_name),
+                    "related models.".format(package_label, model_name),
                     RuntimeWarning,
                     stacklevel=2,
                 )
             else:
                 raise RuntimeError(
                     "Conflicting '%s' models in application '%s': %s and %s."
-                    % (model_name, app_label, app_models[model_name], model)
+                    % (model_name, package_label, app_models[model_name], model)
                 )
         app_models[model_name] = model
         self.do_pending_operations(model)
         self.clear_cache()
 
-    def is_installed(self, app_name):
+    def is_installed(self, package_name):
         """
         Check whether an application with this name exists in the registry.
 
-        app_name is the full name of the app e.g. 'bolt.admin'.
+        package_name is the full name of the app e.g. 'bolt.admin'.
         """
-        self.check_apps_ready()
-        return any(ac.name == app_name for ac in self.app_configs.values())
+        self.check_packages_ready()
+        return any(ac.name == package_name for ac in self.package_configs.values())
 
-    def get_containing_app_config(self, object_name):
+    def get_containing_package_config(self, object_name):
         """
         Look for an app config containing a given object.
 
@@ -254,27 +254,27 @@ class Apps:
         Return the app config for the inner application in case of nesting.
         Return None if the object isn't in any registered app config.
         """
-        self.check_apps_ready()
+        self.check_packages_ready()
         candidates = []
-        for app_config in self.app_configs.values():
-            if object_name.startswith(app_config.name):
-                subpath = object_name.removeprefix(app_config.name)
+        for package_config in self.package_configs.values():
+            if object_name.startswith(package_config.name):
+                subpath = object_name.removeprefix(package_config.name)
                 if subpath == "" or subpath[0] == ".":
-                    candidates.append(app_config)
+                    candidates.append(package_config)
         if candidates:
             return sorted(candidates, key=lambda ac: -len(ac.name))[0]
 
-    def get_registered_model(self, app_label, model_name):
+    def get_registered_model(self, package_label, model_name):
         """
         Similar to get_model(), but doesn't require that an app exists with
-        the given app_label.
+        the given package_label.
 
         It's safe to call this method at import time, even while the registry
         is being populated.
         """
-        model = self.all_models[app_label].get(model_name.lower())
+        model = self.all_models[package_label].get(model_name.lower())
         if model is None:
-            raise LookupError(f"Model '{app_label}.{model_name}' not registered.")
+            raise LookupError(f"Model '{package_label}.{model_name}' not registered.")
         return model
 
     @functools.cache
@@ -300,68 +300,68 @@ class Apps:
                 return model._meta.swappable
         return None
 
-    def set_available_apps(self, available):
+    def set_available_packages(self, available):
         """
-        Restrict the set of installed apps used by get_app_config[s].
+        Restrict the set of installed packages used by get_package_config[s].
 
         available must be an iterable of application names.
 
-        set_available_apps() must be balanced with unset_available_apps().
+        set_available_packages() must be balanced with unset_available_packages().
 
         Primarily used for performance optimization in TransactionTestCase.
 
         This method is safe in the sense that it doesn't trigger any imports.
         """
         available = set(available)
-        installed = {app_config.name for app_config in self.get_app_configs()}
+        installed = {package_config.name for package_config in self.get_package_configs()}
         if not available.issubset(installed):
             raise ValueError(
-                "Available apps isn't a subset of installed apps, extra apps: %s"
+                "Available packages isn't a subset of installed packages, extra packages: %s"
                 % ", ".join(available - installed)
             )
 
-        self.stored_app_configs.append(self.app_configs)
-        self.app_configs = {
-            label: app_config
-            for label, app_config in self.app_configs.items()
-            if app_config.name in available
+        self.stored_package_configs.append(self.package_configs)
+        self.package_configs = {
+            label: package_config
+            for label, package_config in self.package_configs.items()
+            if package_config.name in available
         }
         self.clear_cache()
 
-    def unset_available_apps(self):
-        """Cancel a previous call to set_available_apps()."""
-        self.app_configs = self.stored_app_configs.pop()
+    def unset_available_packages(self):
+        """Cancel a previous call to set_available_packages()."""
+        self.package_configs = self.stored_package_configs.pop()
         self.clear_cache()
 
-    def set_installed_apps(self, installed):
+    def set_installed_packages(self, installed):
         """
-        Enable a different set of installed apps for get_app_config[s].
+        Enable a different set of installed packages for get_package_config[s].
 
-        installed must be an iterable in the same format as INSTALLED_APPS.
+        installed must be an iterable in the same format as INSTALLED_PACKAGES.
 
-        set_installed_apps() must be balanced with unset_installed_apps(),
+        set_installed_packages() must be balanced with unset_installed_packages(),
         even if it exits with an exception.
 
         Primarily used as a receiver of the setting_changed signal in tests.
 
         This method may trigger new imports, which may add new models to the
         registry of all imported models. They will stay in the registry even
-        after unset_installed_apps(). Since it isn't possible to replay
+        after unset_installed_packages(). Since it isn't possible to replay
         imports safely (e.g. that could lead to registering listeners twice),
         models are registered when they're imported and never removed.
         """
         if not self.ready:
-            raise AppRegistryNotReady("App registry isn't ready yet.")
-        self.stored_app_configs.append(self.app_configs)
-        self.app_configs = {}
-        self.apps_ready = self.models_ready = self.loading = self.ready = False
+            raise PackageRegistryNotReady("Package registry isn't ready yet.")
+        self.stored_package_configs.append(self.package_configs)
+        self.package_configs = {}
+        self.packages_ready = self.models_ready = self.loading = self.ready = False
         self.clear_cache()
         self.populate(installed)
 
-    def unset_installed_apps(self):
-        """Cancel a previous call to set_installed_apps()."""
-        self.app_configs = self.stored_app_configs.pop()
-        self.apps_ready = self.models_ready = self.ready = True
+    def unset_installed_packages(self):
+        """Cancel a previous call to set_installed_packages()."""
+        self.package_configs = self.stored_package_configs.pop()
+        self.packages_ready = self.models_ready = self.ready = True
         self.clear_cache()
 
     def clear_cache(self):
@@ -376,13 +376,13 @@ class Apps:
         if self.ready:
             # Circumvent self.get_models() to prevent that the cache is refilled.
             # This particularly prevents that an empty value is cached while cloning.
-            for app_config in self.app_configs.values():
-                for model in app_config.get_models(include_auto_created=True):
+            for package_config in self.package_configs.values():
+                for model in package_config.get_models(include_auto_created=True):
                     model._meta._expire_cache()
 
     def lazy_model_operation(self, function, *model_keys):
         """
-        Take a function and a number of ("app_label", "modelname") tuples, and
+        Take a function and a number of ("package_label", "modelname") tuples, and
         when all the corresponding models have been imported and registered,
         call the function with the model classes as its arguments.
 
@@ -423,11 +423,11 @@ class Apps:
     def do_pending_operations(self, model):
         """
         Take a newly-prepared model and pass it to each function waiting for
-        it. This is called at the very end of Apps.register_model().
+        it. This is called at the very end of Packages.register_model().
         """
-        key = model._meta.app_label, model._meta.model_name
+        key = model._meta.package_label, model._meta.model_name
         for function in self._pending_operations.pop(key, []):
             function(model)
 
 
-apps = Apps(installed_apps=None)
+packages = Packages(installed_packages=None)

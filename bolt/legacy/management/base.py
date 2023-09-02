@@ -234,7 +234,7 @@ class BaseCommand:
 
         To validate an individual application's models
         rather than all applications' models, call
-        ``self.check(app_configs)`` from ``handle()``, where ``app_configs``
+        ``self.check(package_configs)`` from ``handle()``, where ``package_configs``
         is the list of application's configuration provided by the
         app registry.
 
@@ -460,7 +460,7 @@ class BaseCommand:
 
     def check(
         self,
-        app_configs=None,
+        package_configs=None,
         tags=None,
         display_num_errors=False,
         include_deployment_checks=False,
@@ -474,7 +474,7 @@ class BaseCommand:
         and don't raise an exception.
         """
         all_issues = checks.run_checks(
-            app_configs=app_configs,
+            package_configs=package_configs,
             tags=tags,
             include_deployment_checks=include_deployment_checks,
             databases=databases,
@@ -569,17 +569,17 @@ class BaseCommand:
 
         plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
         if plan:
-            apps_waiting_migration = sorted(
-                {migration.app_label for migration, backwards in plan}
+            packages_waiting_migration = sorted(
+                {migration.package_label for migration, backwards in plan}
             )
             self.stdout.write(
                 self.style.NOTICE(
                     "\nYou have %(unapplied_migration_count)s unapplied migration(s). "
                     "Your project may not work properly until you apply the "
-                    "migrations for app(s): %(apps_waiting_migration)s."
+                    "migrations for app(s): %(packages_waiting_migration)s."
                     % {
                         "unapplied_migration_count": len(plan),
-                        "apps_waiting_migration": ", ".join(apps_waiting_migration),
+                        "packages_waiting_migration": ", ".join(packages_waiting_migration),
                     }
                 )
             )
@@ -603,7 +603,7 @@ class AppCommand(BaseCommand):
     as arguments, and does something with each of them.
 
     Rather than implementing ``handle()``, subclasses must implement
-    ``handle_app_config()``, which will be called once for each application.
+    ``handle_package_config()``, which will be called once for each application.
     """
 
     missing_args_message = "Enter at least one application label."
@@ -611,34 +611,34 @@ class AppCommand(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "args",
-            metavar="app_label",
+            metavar="package_label",
             nargs="+",
             help="One or more application label.",
         )
 
-    def handle(self, *app_labels, **options):
-        from bolt.apps import apps
+    def handle(self, *package_labels, **options):
+        from bolt.packages import packages
 
         try:
-            app_configs = [apps.get_app_config(app_label) for app_label in app_labels]
+            package_configs = [packages.get_package_config(package_label) for package_label in package_labels]
         except (LookupError, ImportError) as e:
             raise CommandError(
-                "%s. Are you sure your INSTALLED_APPS setting is correct?" % e
+                "%s. Are you sure your INSTALLED_PACKAGES setting is correct?" % e
             )
         output = []
-        for app_config in app_configs:
-            app_output = self.handle_app_config(app_config, **options)
+        for package_config in package_configs:
+            app_output = self.handle_package_config(package_config, **options)
             if app_output:
                 output.append(app_output)
         return "\n".join(output)
 
-    def handle_app_config(self, app_config, **options):
+    def handle_package_config(self, package_config, **options):
         """
-        Perform the command's actions for app_config, an AppConfig instance
+        Perform the command's actions for package_config, an PackageConfig instance
         corresponding to an application label given on the command line.
         """
         raise NotImplementedError(
-            "Subclasses of AppCommand must provide a handle_app_config() method."
+            "Subclasses of AppCommand must provide a handle_package_config() method."
         )
 
 

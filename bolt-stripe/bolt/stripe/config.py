@@ -1,10 +1,10 @@
 import stripe
-from bolt.apps import AppConfig
+from bolt.packages import PackageConfig
 
 from . import settings
 
 
-class BoltstripeConfig(AppConfig):
+class BoltstripeConfig(PackageConfig):
     default_auto_field = "bolt.db.models.BigAutoField"
     name = "bolt.stripe"
 

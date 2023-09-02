@@ -1,5 +1,5 @@
 from bolt import checks
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.checks.registry import registry
 from bolt.legacy.management.base import BaseCommand, CommandError
 
@@ -10,7 +10,7 @@ class Command(BaseCommand):
     requires_system_checks = []
 
     def add_arguments(self, parser):
-        parser.add_argument("args", metavar="app_label", nargs="*")
+        parser.add_argument("args", metavar="package_label", nargs="*")
         parser.add_argument(
             "--tag",
             "-t",
@@ -44,7 +44,7 @@ class Command(BaseCommand):
             help="Run database related checks against these aliases.",
         )
 
-    def handle(self, *app_labels, **options):
+    def handle(self, *package_labels, **options):
         include_deployment_checks = options["deploy"]
         if options["list_tags"]:
             self.stdout.write(
@@ -52,10 +52,10 @@ class Command(BaseCommand):
             )
             return
 
-        if app_labels:
-            app_configs = [apps.get_app_config(app_label) for app_label in app_labels]
+        if package_labels:
+            package_configs = [packages.get_package_config(package_label) for package_label in package_labels]
         else:
-            app_configs = None
+            package_configs = None
 
         tags = options["tags"]
         if tags:
@@ -74,7 +74,7 @@ class Command(BaseCommand):
                 )
 
         self.check(
-            app_configs=app_configs,
+            package_configs=package_configs,
             tags=tags,
             display_num_errors=True,
             include_deployment_checks=include_deployment_checks,

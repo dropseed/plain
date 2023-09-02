@@ -13,14 +13,14 @@ E001 = Error(
 
 
 @register(Tags.caches)
-def check_default_cache_is_configured(app_configs, **kwargs):
+def check_default_cache_is_configured(package_configs, **kwargs):
     if DEFAULT_CACHE_ALIAS not in settings.CACHES:
         return [E001]
     return []
 
 
 @register(Tags.caches, deploy=True)
-def check_cache_location_not_exposed(app_configs, **kwargs):
+def check_cache_location_not_exposed(package_configs, **kwargs):
     from bolt.cache import caches
 
     errors = []
@@ -61,7 +61,7 @@ def check_cache_location_not_exposed(app_configs, **kwargs):
 
 
 @register(Tags.caches)
-def check_file_based_cache_is_absolute(app_configs, **kwargs):
+def check_file_based_cache_is_absolute(package_configs, **kwargs):
     from bolt.cache import caches
 
     errors = []

@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from difflib import get_close_matches
 from unittest.suite import _DebugResult
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections, transaction
 from bolt.exceptions import ImproperlyConfigured
 from bolt.legacy.management import call_command
@@ -66,8 +66,8 @@ class TransactionTestCase(unittest.TestCase):
     # test case
     reset_sequences = False
 
-    # Subclasses can enable only a subset of apps for faster tests
-    available_apps = None
+    # Subclasses can enable only a subset of packages for faster tests
+    available_packages = None
 
     # Subclasses can define fixtures which will be automatically installed.
     fixtures = None
@@ -208,12 +208,12 @@ class TransactionTestCase(unittest.TestCase):
         except ImportError:
             pass
 
-        if self.available_apps is not None:
-            apps.set_available_apps(self.available_apps)
+        if self.available_packages is not None:
+            packages.set_available_packages(self.available_packages)
             setting_changed.send(
                 sender=settings._wrapped.__class__,
-                setting="INSTALLED_APPS",
-                value=self.available_apps,
+                setting="INSTALLED_PACKAGES",
+                value=self.available_packages,
                 enter=True,
             )
             for db_name in self._databases_names(include_mirrors=False):
@@ -221,12 +221,12 @@ class TransactionTestCase(unittest.TestCase):
         try:
             self._fixture_setup()
         except Exception:
-            if self.available_apps is not None:
-                apps.unset_available_apps()
+            if self.available_packages is not None:
+                packages.unset_available_packages()
                 setting_changed.send(
                     sender=settings._wrapped.__class__,
-                    setting="INSTALLED_APPS",
-                    value=settings.INSTALLED_APPS,
+                    setting="INSTALLED_PACKAGES",
+                    value=settings.INSTALLED_PACKAGES,
                     enter=False,
                 )
             raise
@@ -240,7 +240,7 @@ class TransactionTestCase(unittest.TestCase):
         """
         Perform post-test things:
         * Flush the contents of the database to leave a clean slate. If the
-          class has an 'available_apps' attribute, don't fire post_migrate.
+          class has an 'available_packages' attribute, don't fire post_migrate.
         * Force-close the connection so the next test gets a clean cursor.
         """
         try:
@@ -255,12 +255,12 @@ class TransactionTestCase(unittest.TestCase):
                 for conn in connections.all(initialized_only=True):
                     conn.close()
         finally:
-            if self.available_apps is not None:
-                apps.unset_available_apps()
+            if self.available_packages is not None:
+                packages.unset_available_packages()
                 setting_changed.send(
                     sender=settings._wrapped.__class__,
-                    setting="INSTALLED_APPS",
-                    value=settings.INSTALLED_APPS,
+                    setting="INSTALLED_PACKAGES",
+                    value=settings.INSTALLED_PACKAGES,
                     enter=False,
                 )
 
@@ -309,17 +309,17 @@ class TransactionTestCase(unittest.TestCase):
             if self.reset_sequences:
                 self._reset_sequences(db_name)
 
-            # Provide replica initial data from migrated apps, if needed.
+            # Provide replica initial data from migrated packages, if needed.
             # if self.serialized_rollback and hasattr(
             #     connections[db_name], "_test_serialized_contents"
             # ):
-            #     if self.available_apps is not None:
-            #         apps.unset_available_apps()
+            #     if self.available_packages is not None:
+            #         packages.unset_available_packages()
             #     connections[db_name].creation.deserialize_db_from_string(
             #         connections[db_name]._test_serialized_contents
             #     )
-            #     if self.available_apps is not None:
-            #         apps.set_available_apps(self.available_apps)
+            #     if self.available_packages is not None:
+            #         packages.set_available_packages(self.available_packages)
 
             if self.fixtures:
                 # We have to use this slightly awkward syntax due to the fact
@@ -333,11 +333,11 @@ class TransactionTestCase(unittest.TestCase):
 
     def _fixture_teardown(self):
         # Allow TRUNCATE ... CASCADE and don't emit the post_migrate signal
-        # when flushing only a subset of the apps
+        # when flushing only a subset of the packages
         for db_name in self._databases_names(include_mirrors=False):
             # Flush the database
             inhibit_post_migrate = (
-                self.available_apps is not None
+                self.available_packages is not None
                 or (  # Inhibit the post_migrate signal when using serialized
                     # rollback to avoid trying to recreate the serialized data.
                     self.serialized_rollback
@@ -350,7 +350,7 @@ class TransactionTestCase(unittest.TestCase):
                 interactive=False,
                 database=db_name,
                 reset_sequences=False,
-                allow_cascade=self.available_apps is not None,
+                allow_cascade=self.available_packages is not None,
                 inhibit_post_migrate=inhibit_post_migrate,
             )
 

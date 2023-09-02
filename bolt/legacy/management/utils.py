@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from subprocess import run
 
-from bolt.apps import apps as installed_apps
+from bolt.packages import packages as installed_packages
 from bolt.utils.crypto import get_random_string
 from bolt.utils.encoding import DEFAULT_LOCALE_ENCODING
 
@@ -84,31 +84,31 @@ def get_random_secret_key():
     return get_random_string(50, chars)
 
 
-def parse_apps_and_model_labels(labels):
+def parse_packages_and_model_labels(labels):
     """
-    Parse a list of "app_label.ModelName" or "app_label" strings into actual
+    Parse a list of "package_label.ModelName" or "package_label" strings into actual
     objects and return a two-element tuple:
-        (set of model classes, set of app_configs).
-    Raise a CommandError if some specified models or apps don't exist.
+        (set of model classes, set of package_configs).
+    Raise a CommandError if some specified models or packages don't exist.
     """
-    apps = set()
+    packages = set()
     models = set()
 
     for label in labels:
         if "." in label:
             try:
-                model = installed_apps.get_model(label)
+                model = installed_packages.get_model(label)
             except LookupError:
                 raise CommandError("Unknown model: %s" % label)
             models.add(model)
         else:
             try:
-                app_config = installed_apps.get_app_config(label)
+                package_config = installed_packages.get_package_config(label)
             except LookupError as e:
                 raise CommandError(str(e))
-            apps.add(app_config)
+            packages.add(package_config)
 
-    return models, apps
+    return models, packages
 
 
 def get_command_line_option(argv, option):

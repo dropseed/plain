@@ -1,6 +1,6 @@
 """
 This module allows importing AbstractBaseUser even when bolt.auth is
-not in INSTALLED_APPS.
+not in INSTALLED_PACKAGES.
 """
 import unicodedata
 import warnings

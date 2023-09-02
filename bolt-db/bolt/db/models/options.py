@@ -4,7 +4,7 @@ import inspect
 import warnings
 from collections import defaultdict
 
-from bolt.apps import apps
+from bolt.packages import packages
 from bolt.db import connections
 from bolt.db.models import AutoField, Manager, OrderWrt, UniqueConstraint
 from bolt.db.models.query_utils import PathInfo
@@ -34,7 +34,7 @@ DEFAULT_NAMES = (
     "unique_together",
     "get_latest_by",
     "order_with_respect_to",
-    "app_label",
+    "package_label",
     "db_tablespace",
     "abstract",
     "managed",
@@ -43,7 +43,7 @@ DEFAULT_NAMES = (
     "auto_created",
     # Must be kept for backward compatibility with old migrations.
     "index_together",
-    "apps",
+    "packages",
     "select_on_save",
     "default_related_name",
     "required_db_features",
@@ -96,9 +96,9 @@ class Options:
     }
     REVERSE_PROPERTIES = {"related_objects", "fields_map", "_relation_tree"}
 
-    default_apps = apps
+    default_packages = packages
 
-    def __init__(self, meta, app_label=None):
+    def __init__(self, meta, package_label=None):
         self._get_fields_cache = {}
         self.local_fields = []
         self.local_many_to_many = []
@@ -119,7 +119,7 @@ class Options:
         self.index_together = []  # RemovedInDjango51Warning.
         self.select_on_save = False
         self.object_name = None
-        self.app_label = app_label
+        self.package_label = package_label
         self.get_latest_by = None
         self.order_with_respect_to = None
         self.db_tablespace = settings.DEFAULT_TABLESPACE
@@ -150,22 +150,22 @@ class Options:
         self.related_fkey_lookups = []
 
         # A custom app registry to use, if you're making a separate model set.
-        self.apps = self.default_apps
+        self.packages = self.default_packages
 
         self.default_related_name = None
 
     @property
     def label(self):
-        return f"{self.app_label}.{self.object_name}"
+        return f"{self.package_label}.{self.object_name}"
 
     @property
     def label_lower(self):
-        return f"{self.app_label}.{self.model_name}"
+        return f"{self.package_label}.{self.model_name}"
 
     @property
-    def app_config(self):
-        # Don't go through get_app_config to avoid triggering imports.
-        return self.apps.app_configs.get(self.app_label)
+    def package_config(self):
+        # Don't go through get_package_config to avoid triggering imports.
+        return self.packages.package_configs.get(self.package_label)
 
     def contribute_to_class(self, cls, name):
         from bolt.db import connection
@@ -207,7 +207,7 @@ class Options:
                     f"{self.label!r} instead.",
                     RemovedInDjango51Warning,
                 )
-            # App label/class name interpolation for names of constraints and
+            # Package label/class name interpolation for names of constraints and
             # indexes.
             if not getattr(cls._meta, "abstract", False):
                 for attr_name in {"constraints", "indexes"}:
@@ -231,20 +231,20 @@ class Options:
             self.verbose_name_plural = format_lazy("{}s", self.verbose_name)
         del self.meta
 
-        # If the db_table wasn't provided, use the app_label + model_name.
+        # If the db_table wasn't provided, use the package_label + model_name.
         if not self.db_table:
-            self.db_table = f"{self.app_label}_{self.model_name}"
+            self.db_table = f"{self.package_label}_{self.model_name}"
             self.db_table = truncate_name(
                 self.db_table, connection.ops.max_name_length()
             )
 
     def _format_names_with_class(self, cls, objs):
-        """App label/class name interpolation for object names."""
+        """Package label/class name interpolation for object names."""
         new_objs = []
         for obj in objs:
             obj = obj.clone()
             obj.name = obj.name % {
-                "app_label": cls._meta.app_label.lower(),
+                "package_label": cls._meta.package_label.lower(),
                 "class": cls.__name__.lower(),
             }
             new_objs.append(obj)
@@ -252,15 +252,15 @@ class Options:
 
     def _get_default_pk_class(self):
         pk_class_path = getattr(
-            self.app_config,
+            self.package_config,
             "default_auto_field",
             settings.DEFAULT_AUTO_FIELD,
         )
-        if self.app_config and self.app_config._is_default_auto_field_overridden:
-            app_config_class = type(self.app_config)
+        if self.package_config and self.package_config._is_default_auto_field_overridden:
+            package_config_class = type(self.package_config)
             source = (
-                f"{app_config_class.__module__}."
-                f"{app_config_class.__qualname__}.default_auto_field"
+                f"{package_config_class.__module__}."
+                f"{package_config_class.__qualname__}.default_auto_field"
             )
         else:
             source = "DEFAULT_AUTO_FIELD"
@@ -416,7 +416,7 @@ class Options:
                 try:
                     swapped_label, swapped_object = swapped_for.split(".")
                 except ValueError:
-                    # setting not in the format app_label.model_name
+                    # setting not in the format package_label.model_name
                     # raising ImproperlyConfigured here causes problems with
                     # test cleanup code - instead it is raised in get_user_model
                     # or as part of validation.
@@ -654,7 +654,7 @@ class Options:
         except KeyError:
             # If the app registry is not ready, reverse fields are
             # unavailable, therefore we throw a FieldDoesNotExist exception.
-            if not self.apps.models_ready:
+            if not self.packages.models_ready:
                 raise FieldDoesNotExist(
                     "{} has no field named '{}'. The app cache isn't ready yet, "
                     "so if this is an auto-created related field, it won't "
@@ -781,7 +781,7 @@ class Options:
         """
         related_objects_graph = defaultdict(list)
 
-        all_models = self.apps.get_models(include_auto_created=True)
+        all_models = self.packages.get_models(include_auto_created=True)
         for model in all_models:
             opts = model._meta
             # Abstract model's fields are copied to child models, hence we will
@@ -817,7 +817,7 @@ class Options:
         return self._populate_directed_relation_graph()
 
     def _expire_cache(self, forward=True, reverse=True):
-        # This method is usually called by apps.cache_clear(), when the
+        # This method is usually called by packages.cache_clear(), when the
         # registry is finalized, or when a new field is added.
         if forward:
             for cache_key in self.FORWARD_PROPERTIES:

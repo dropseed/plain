@@ -15,7 +15,7 @@ def setup():
     Configure the settings (this happens as a side effect of accessing the
     first setting), configure logging and populate the app registry.
     """
-    from bolt.apps import apps
+    from bolt.packages import packages
     from bolt.runtime import settings
     from bolt.utils.log import configure_logging
 
@@ -26,7 +26,7 @@ def setup():
 
     configure_logging(settings.LOGGING)
 
-    apps.populate(settings.INSTALLED_APPS)
+    packages.populate(settings.INSTALLED_PACKAGES)
 
 
 # from bolt.runtime import settings
