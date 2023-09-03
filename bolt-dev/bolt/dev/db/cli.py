@@ -6,7 +6,8 @@ import sys
 import click
 import requests
 
-from ..utils import get_repo_root
+from bolt.runtime import settings
+
 from .container import DBContainer
 
 
@@ -115,10 +116,6 @@ def snapshot_delete(ctx, name):
 def pull(ctx, backup, anonymize):
     container = DBContainer()
 
-    repo_root = get_repo_root()
-    os.path.join(repo_root, "app")
-    dot_bolt_dir = os.path.join(repo_root, ".bolt")
-
     # Make sure Bolt works first
     if subprocess.run(["bolt", "legacy", "check"]).returncode:
         click.secho("Bolt check failed!", fg="red")
@@ -181,14 +178,16 @@ def pull(ctx, backup, anonymize):
     )
 
     if not anonymize:
-        dump_path = os.path.join(dot_bolt_dir, f"{heroku_package_name}.dump")
+        dump_path = os.path.join(settings.BOLT_TEMP_PATH, f"{heroku_package_name}.dump")
         dump_compressed = True
         click.secho(
             f"Downloading Heroku backup to {os.path.relpath(dump_path)}", bold=True
         )
         subprocess.check_call(["curl", "-o", dump_path, backup_url])
     else:
-        dump_path = os.path.join(dot_bolt_dir, f"{heroku_package_name}.anonymized.dump")
+        dump_path = os.path.join(
+            settings.BOLT_TEMP_PATH, f"{heroku_package_name}.anonymized.dump"
+        )
         dump_compressed = False
         click.secho(
             f"Anonymizing Heroku backup and saving to {os.path.relpath(dump_path)}",

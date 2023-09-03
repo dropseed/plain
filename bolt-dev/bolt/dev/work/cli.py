@@ -12,22 +12,23 @@ import click
 from dotenv import load_dotenv
 from honcho.manager import Manager as HonchoManager
 
-from ..utils import boltpackage_installed, get_repo_root, has_pyproject_toml
+from bolt.runtime import settings
+
+from ..utils import boltpackage_installed, has_pyproject_toml
 
 
 @click.command()
 def cli():
     """Start local development"""
     # TODO check docker is available first
-    repo_root = get_repo_root()
-    dot_bolt_dir = os.path.join(repo_root, ".bolt")
+    project_root = settings.APP_PATH.parent
 
     bolt_env = {
         **os.environ,  # Make a copy before load_dotenv, since Bolt will do it's own version of that
         "PYTHONUNBUFFERED": "true",
     }
 
-    dotenv_path = os.path.join(repo_root, ".env")
+    dotenv_path = os.path.join(project_root, ".env")
     load_dotenv(dotenv_path)
 
     runserver_port = os.environ.get("PORT", "8000")
@@ -49,7 +50,6 @@ def cli():
     #     sys.exit(1)
 
     try:
-        from bolt import db
         bolt_db_installed = True
     except ImportError:
         bolt_db_installed = False
@@ -69,12 +69,12 @@ def cli():
     if "REDIS_URL" in os.environ:
         redis_url = os.environ["REDIS_URL"]
         if "localhost" in redis_url or "127.0.0.1" in redis_url:
-            redis_name = os.path.basename(repo_root) + "-redis"
+            redis_name = os.path.basename(project_root) + "-redis"
             redis_version = os.environ.get("REDIS_VERSION", "7")
             redis_port = redis_url.split(":")[-1]  # Assume no db index or anything
             manager.add_process(
                 "redis",
-                f"docker run --name {redis_name} --rm -p {redis_port}:6379 -v {dot_bolt_dir}/redis:/data redis:{redis_version} redis-server --save 60 1 --loglevel warning",
+                f"docker run --name {redis_name} --rm -p {redis_port}:6379 -v {settings.BOLT_TEMP_PATH}/redis:/data redis:{redis_version} redis-server --save 60 1 --loglevel warning",
             )
 
     if boltpackage_installed("tailwind"):
@@ -83,11 +83,11 @@ def cli():
     custom_env = {
         **bolt_env,
         "PORT": runserver_port,
-        "PYTHONPATH": os.path.join(repo_root, "app"),
+        "PYTHONPATH": os.path.join(project_root, "app"),
     }
 
-    if repo_root and has_pyproject_toml(repo_root):
-        with open(Path(repo_root, "pyproject.toml"), "rb") as f:
+    if project_root and has_pyproject_toml(project_root):
+        with open(Path(project_root, "pyproject.toml"), "rb") as f:
             pyproject = tomllib.load(f)
         for name, data in (
             pyproject.get("tool", {}).get("bolt", {}).get("work", {}).get("run", {})

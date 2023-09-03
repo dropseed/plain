@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 
 import click
 
-from ..utils import boltpackage_installed, get_repo_root, has_pyproject_toml
+from ..utils import boltpackage_installed, has_pyproject_toml
 from .install import install_git_hook
 
 
@@ -110,3 +110,21 @@ def check_short(message, *args):
         sys.exit(1)
     else:
         click.secho("✔", fg="green")
+
+
+def get_repo_root():
+    try:
+        return (
+            subprocess.check_output(
+                ["git", "rev-parse", "--show-toplevel"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode("utf-8")
+            .strip()
+        )
+    except subprocess.CalledProcessError:
+        click.secho(
+            "All bolt projects are expected to be in a git repo and we couldn't find one.",
+            fg="red",
+        )
+        exit(1)

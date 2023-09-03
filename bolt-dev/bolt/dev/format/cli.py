@@ -3,7 +3,7 @@ import subprocess
 
 import click
 
-from ..utils import get_repo_root
+from bolt.runtime import settings
 
 
 @click.command("format")  # format is a keyword
@@ -12,9 +12,8 @@ from ..utils import get_repo_root
 def cli(check, files):
     """Format Python code with black and ruff"""
     if not files:
-        repo_root = get_repo_root()
         # Make relative for nicer output
-        files = [os.path.relpath(os.path.join(repo_root, "app"))]
+        files = [os.path.relpath(settings.APP_PATH)]
 
     if check:
         fmt_check(files)

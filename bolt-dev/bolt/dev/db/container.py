@@ -7,18 +7,17 @@ import time
 from dotenv import dotenv_values
 
 from bolt.db import database_url
-
-from ..utils import get_repo_root
+from bolt.runtime import settings
 
 SNAPSHOT_DB_PREFIX = "boltdb_snapshot_"
 
 
 class DBContainer:
     def __init__(self):
-        repo_root = get_repo_root()
-        tmp_dir = os.path.join(repo_root, ".bolt")
+        project_root = settings.APP_PATH.parent
+        tmp_dir = settings.BOLT_TEMP_PATH
 
-        name = os.path.basename(repo_root) + "-postgres"
+        name = os.path.basename(project_root) + "-postgres"
 
         if "DATABASE_URL" in os.environ:
             postgres_version = os.environ.get("POSTGRES_VERSION")
