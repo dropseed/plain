@@ -50,6 +50,7 @@ def cli():
     #     sys.exit(1)
 
     try:
+        import bolt.db  # noqa
         bolt_db_installed = True
     except ImportError:
         bolt_db_installed = False
