@@ -48,13 +48,21 @@ def cli():
     #     click.secho("Bolt env check failed!", fg="red")
     #     sys.exit(1)
 
+    try:
+        from bolt import db
+        bolt_db_installed = True
+    except ImportError:
+        bolt_db_installed = False
+
     manager = HonchoManager()
 
-    # env var to switch wsgi app, if necessary...
-    runserver_cmd = f"bolt legacy migrate && gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+    gunicorn = f"gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
-    manager.add_process("postgres", "bolt dev db start --logs")
-    runserver_cmd = "bolt dev db wait && " + runserver_cmd
+    if bolt_db_installed:
+        runserver_cmd = f"bolt dev db wait && bolt legacy migrate && {gunicorn}"
+        manager.add_process("postgres", "bolt dev db start --logs")
+    else:
+        runserver_cmd = gunicorn
 
     manager.add_process("bolt", runserver_cmd, env=bolt_env)
 
