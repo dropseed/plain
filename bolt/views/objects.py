@@ -1,4 +1,3 @@
-from bolt.db import models
 from bolt.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from bolt.http import Http404, HttpResponse, HttpResponseRedirect
 
@@ -34,7 +33,7 @@ class ObjectTemplateViewMixin:
         context["object"] = self.object
         if self.context_object_name:
             context[self.context_object_name] = self.object
-        elif isinstance(self.object, models.Model):
+        elif hasattr(self.object, "_meta"):
             context[self.object._meta.model_name] = self.object
         return context
 
@@ -56,7 +55,7 @@ class ObjectTemplateViewMixin:
 
         # The least-specific option is the default <app>/<model>_detail.html;
         # only use this if the object in question is a model.
-        if isinstance(self.object, models.Model):
+        if hasattr(self.object, "_meta"):
             object_meta = self.object._meta
             names.append(
                 "%s/%s%s.html"

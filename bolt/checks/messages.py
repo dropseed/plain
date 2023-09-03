@@ -23,11 +23,17 @@ class CheckMessage:
         )
 
     def __str__(self):
-        from bolt.db import models
+        try:
+            from bolt.db import models
+            ModelBase = models.base.ModelBase
+            using_db = True
+        except ImportError:
+            using_db = False
+            ModelBase = object
 
         if self.obj is None:
             obj = "?"
-        elif isinstance(self.obj, models.base.ModelBase):
+        elif using_db and isinstance(self.obj, ModelBase):
             # We need to hardcode ModelBase and Field cases because its __str__
             # method doesn't return "applabel.modellabel" and cannot be changed.
             obj = self.obj._meta.label

@@ -13,7 +13,6 @@ from io import BytesIO
 from urllib.parse import urlsplit, urlunsplit
 
 from bolt import validators
-from bolt.db.models.enums import ChoicesMeta
 from bolt.exceptions import ValidationError
 from bolt.utils.dateparse import parse_datetime, parse_duration
 from bolt.utils.duration import duration_string
@@ -769,7 +768,7 @@ class ChoiceField(Field):
 
     def __init__(self, *, choices=(), **kwargs):
         super().__init__(**kwargs)
-        if isinstance(choices, ChoicesMeta):
+        if hasattr(choices, "choices"):
             choices = choices.choices
         self.choices = choices
 

@@ -1,7 +1,6 @@
 import logging
 import types
 
-from bolt.db import connections, transaction
 from bolt.exceptions import ImproperlyConfigured, MiddlewareNotUsed
 from bolt.runtime import settings
 from bolt.signals import request_finished
@@ -206,6 +205,10 @@ class BaseHandler:
     # Other utility methods.
 
     def make_view_atomic(self, view):
+        try:
+            from bolt.db import connections, transaction
+        except ImportError:
+            return view
         non_atomic_requests = getattr(view, "_non_atomic_requests", set())
         for alias, settings_dict in connections.settings.items():
             if settings_dict["ATOMIC_REQUESTS"] and alias not in non_atomic_requests:

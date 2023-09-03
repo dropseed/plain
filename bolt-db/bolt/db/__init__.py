@@ -1,4 +1,5 @@
 from bolt import signals
+from . import checks  # noqa
 from bolt.db.utils import (
     BOLT_VERSION_PICKLE_KEY,
     DEFAULT_DB_ALIAS,

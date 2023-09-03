@@ -107,9 +107,6 @@ FILE_UPLOAD_PERMISSIONS = 0o644
 # see https://docs.python.org/library/os.html#files-and-directories.
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = None
 
-# Default primary key field type.
-DEFAULT_AUTO_FIELD = "bolt.db.models.AutoField"
-
 # Default X-Frame-Options header value
 X_FRAME_OPTIONS = "DENY"
 

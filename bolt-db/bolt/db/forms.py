@@ -12,9 +12,9 @@ from bolt.exceptions import (
     ValidationError,
 )
 
-from . import fields
-from .fields import ChoiceField, Field
-from .forms import BaseForm, DeclarativeFieldsMetaclass
+from bolt.forms import fields
+from bolt.forms.fields import ChoiceField, Field
+from bolt.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 
 __all__ = (
     "ModelForm",

@@ -1,8 +1,7 @@
-from bolt import forms
 from bolt.admin import AdminModelViewset, register_model
+from bolt.db.forms import ModelForm
 
 from .models import Flag, FlagResult
-
 
 @register_model
 class FlagAdmin(AdminModelViewset):
@@ -12,7 +11,7 @@ class FlagAdmin(AdminModelViewset):
     search_fields = ["name", "description"]
 
 
-class FlagResultForm(forms.ModelForm):
+class FlagResultForm(ModelForm):
     class Meta:
         model = FlagResult
         fields = ["key", "value"]

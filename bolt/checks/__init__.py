@@ -15,9 +15,7 @@ from .registry import Tags, register, run_checks, tag_exists
 
 # Import these to force registration of checks
 import bolt.checks.compatibility.django_4_0  # NOQA isort:skip
-import bolt.checks.database  # NOQA isort:skip
 import bolt.checks.files  # NOQA isort:skip
-import bolt.checks.model_checks  # NOQA isort:skip
 import bolt.checks.security.base  # NOQA isort:skip
 import bolt.checks.security.csrf  # NOQA isort:skip
 import bolt.checks.security.sessions  # NOQA isort:skip

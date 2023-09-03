@@ -15,3 +15,6 @@ DATABASE_ROUTERS = []
 # The tablespaces to use for each model when not specified otherwise.
 DEFAULT_TABLESPACE = ""
 DEFAULT_INDEX_TABLESPACE = ""
+
+# Default primary key field type.
+DEFAULT_AUTO_FIELD = "bolt.db.models.AutoField"

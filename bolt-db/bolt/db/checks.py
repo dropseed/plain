@@ -1,3 +1,4 @@
+from bolt.checks import Tags, register
 import inspect
 import types
 from collections import defaultdict
@@ -6,6 +7,20 @@ from itertools import chain
 from bolt.packages import packages
 from bolt.checks import Error, Tags, Warning, register
 from bolt.runtime import settings
+
+
+@register(Tags.database)
+def check_database_backends(databases=None, **kwargs):
+    if databases is None:
+        return []
+
+    from bolt.db import connections
+
+    issues = []
+    for alias in databases:
+        conn = connections[alias]
+        issues.extend(conn.validation.check(**kwargs))
+    return issues
 
 
 @register(Tags.models)

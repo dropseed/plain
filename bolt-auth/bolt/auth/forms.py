@@ -4,6 +4,7 @@ from bolt import forms, jinja
 from bolt.auth import authenticate, get_user_model, password_validation
 from bolt.auth.models import User
 from bolt.auth.tokens import default_token_generator
+from bolt.db.forms import ModelForm
 from bolt.exceptions import ValidationError
 from bolt.mail import EmailMultiAlternatives
 from bolt.utils.encoding import force_bytes
@@ -76,7 +77,7 @@ class UsernameField(forms.CharField):
         }
 
 
-class BaseUserCreationForm(forms.ModelForm):
+class BaseUserCreationForm(ModelForm):
     """
     A form that creates a user, with no privileges, from the given username and
     password.
@@ -156,7 +157,7 @@ class UserCreationForm(BaseUserCreationForm):
             return username
 
 
-class UserChangeForm(forms.ModelForm):
+class UserChangeForm(ModelForm):
     password = ReadOnlyPasswordHashField(
         # label="Password",
         # help_text=_(

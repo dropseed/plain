@@ -625,7 +625,7 @@ class StatePackages(Packages):
         self.render_multiple([*models.values(), *self.real_models])
 
         # There shouldn't be any operations pending at this point.
-        from bolt.checks.model_checks import _check_lazy_references
+        from bolt.db.checks import _check_lazy_references
 
         ignore = (
             {make_model_tuple(settings.AUTH_USER_MODEL)} if ignore_swappable else set()
