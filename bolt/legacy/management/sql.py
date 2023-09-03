@@ -1,7 +1,6 @@
 import sys
 
 from bolt.packages import packages
-from bolt.db import models
 
 
 def sql_flush(style, connection, reset_sequences=True, allow_cascade=False):
@@ -29,6 +28,10 @@ def emit_pre_migrate_signal(verbosity, interactive, db, **kwargs):
             stdout.write(
                 "Running pre-migrate handlers for application %s" % package_config.label
             )
+        try:
+            from bolt.db import models
+        except ImportError:
+            continue
         models.signals.pre_migrate.send(
             sender=package_config,
             package_config=package_config,
@@ -49,6 +52,10 @@ def emit_post_migrate_signal(verbosity, interactive, db, **kwargs):
             stdout.write(
                 "Running post-migrate handlers for application %s" % package_config.label
             )
+        try:
+            from bolt.db import models
+        except ImportError:
+            continue
         models.signals.post_migrate.send(
             sender=package_config,
             package_config=package_config,

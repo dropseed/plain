@@ -3,8 +3,6 @@ import time
 import warnings
 
 from bolt.packages import packages
-from bolt.db import connections, router
-from bolt.db.utils import ConnectionRouter
 from bolt.exceptions import ImproperlyConfigured
 from bolt.signals import setting_changed
 from bolt.signals.dispatch import Signal, receiver
@@ -60,6 +58,11 @@ def update_connections_time_zone(*, setting, **kwargs):
         # Reset local time zone cache
         timezone.get_default_timezone.cache_clear()
 
+    try:
+        from bolt.db import connections
+    except ImportError:
+        return
+
     # Reset the database connections' time zone
     if setting in {"TIME_ZONE", "USE_TZ"}:
         for conn in connections.all(initialized_only=True):
@@ -72,12 +75,6 @@ def update_connections_time_zone(*, setting, **kwargs):
             except AttributeError:
                 pass
             conn.ensure_timezone()
-
-
-@receiver(setting_changed)
-def clear_routers_cache(*, setting, **kwargs):
-    if setting == "DATABASE_ROUTERS":
-        router.routers = ConnectionRouter().routers
 
 
 @receiver(setting_changed)

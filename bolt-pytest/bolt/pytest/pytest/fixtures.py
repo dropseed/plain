@@ -5,6 +5,7 @@ from functools import partial
 from typing import Any, Optional, Union
 
 import pytest
+from ..testcases import TestCase, TransactionTestCase
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
@@ -107,13 +108,10 @@ def _bolt_db_helper(
     bolt_db_blocker.unblock()
     request.addfinalizer(bolt_db_blocker.restore)
 
-    import bolt.db
-    import bolt.test
-
     if transactional:
-        test_case_class = bolt.test.TransactionTestCase
+        test_case_class = TransactionTestCase
     else:
-        test_case_class = bolt.test.TestCase
+        test_case_class = TestCase
 
     _reset_sequences = reset_sequences
     _serialized_rollback = serialized_rollback

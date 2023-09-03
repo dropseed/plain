@@ -11,7 +11,6 @@ from io import TextIOBase
 
 import bolt.runtime
 from bolt import checks
-from bolt.db import DEFAULT_DB_ALIAS, connections
 from bolt.exceptions import ImproperlyConfigured
 from bolt.legacy.management.color import color_style, no_style
 
@@ -413,8 +412,9 @@ class BaseCommand:
             sys.exit(e.returncode)
         finally:
             try:
+                from bolt.db import connections
                 connections.close_all()
-            except ImproperlyConfigured:
+            except (ImproperlyConfigured, ImportError):
                 # Ignore if connections aren't setup at this point (e.g. no
                 # configured settings).
                 pass
@@ -449,6 +449,11 @@ class BaseCommand:
         output = self.handle(*args, **options)
         if output:
             if self.output_transaction:
+                try:
+                    from bolt.db import DEFAULT_DB_ALIAS, connections
+                except ImportError:
+                    self.stdout.write(output)
+                    return output
                 connection = connections[options.get("database", DEFAULT_DB_ALIAS)]
                 output = "{}\n{}\n{}".format(
                     self.style.SQL_KEYWORD(connection.ops.start_transaction_sql()),
@@ -559,7 +564,11 @@ class BaseCommand:
         Print a warning if the set of migrations on disk don't match the
         migrations in the database.
         """
-        from bolt.db.migrations.executor import MigrationExecutor
+        try:
+            from bolt.db.migrations.executor import MigrationExecutor
+            from bolt.db import DEFAULT_DB_ALIAS, connections
+        except ImportError:
+            return
 
         try:
             executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])

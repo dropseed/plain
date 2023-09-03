@@ -10,7 +10,6 @@ from importlib import import_module
 from io import BytesIO, IOBase
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
-from bolt.db import close_old_connections
 from bolt.handlers.base import BaseHandler
 from bolt.handlers.wsgi import WSGIRequest
 from bolt.http import HttpHeaders, HttpRequest, QueryDict
@@ -25,6 +24,12 @@ from bolt.utils.functional import SimpleLazyObject
 from bolt.utils.http import urlencode
 from bolt.utils.itercompat import is_iterable
 from bolt.utils.regex_helper import _lazy_re_compile
+
+try:
+    from bolt.db import close_old_connections
+except ImportError:
+    close_old_connections = lambda **kwargs: None
+
 
 __all__ = (
     "Client",
