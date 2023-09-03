@@ -9,7 +9,6 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 import click
-from dotenv import load_dotenv
 from honcho.manager import Manager as HonchoManager
 
 from bolt.runtime import settings
@@ -24,12 +23,9 @@ def cli():
     project_root = settings.APP_PATH.parent
 
     bolt_env = {
-        **os.environ,  # Make a copy before load_dotenv, since Bolt will do it's own version of that
+        **os.environ,
         "PYTHONUNBUFFERED": "true",
     }
-
-    dotenv_path = os.path.join(project_root, ".env")
-    load_dotenv(dotenv_path)
 
     runserver_port = os.environ.get("PORT", "8000")
 
@@ -57,7 +53,9 @@ def cli():
 
     manager = HonchoManager()
 
-    gunicorn = f"gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - --reload-extra-file {dotenv_path} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+    # TODO not necessarily watching the right .env...
+    # could return path from env.load?
+    gunicorn = f"gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - --reload-extra-file .env --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
     if bolt_db_installed:
         runserver_cmd = f"bolt dev db wait && bolt legacy migrate && {gunicorn}"

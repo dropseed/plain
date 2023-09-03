@@ -4,8 +4,6 @@ import shlex
 import subprocess
 import time
 
-from dotenv import dotenv_values
-
 from bolt.db import database_url
 from bolt.runtime import settings
 
@@ -22,13 +20,6 @@ class DBContainer:
         if "DATABASE_URL" in os.environ:
             postgres_version = os.environ.get("POSTGRES_VERSION")
             parsed_db_url = database_url.parse(os.environ.get("DATABASE_URL"))
-        else:
-            # Read from a .env file if we don't see the DATABASE_URL
-            values = dotenv_values()
-            postgres_version = values.get(
-                "POSTGRES_VERSION", os.environ.get("POSTGRES_VERSION")
-            )
-            parsed_db_url = database_url.parse(values.get("DATABASE_URL"))
 
         self.name = name
         self.tmp_dir = os.path.abspath(tmp_dir)
