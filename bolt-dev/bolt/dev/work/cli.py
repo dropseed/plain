@@ -47,6 +47,7 @@ def cli():
 
     try:
         import bolt.db  # noqa
+
         bolt_db_installed = True
     except ImportError:
         bolt_db_installed = False
@@ -55,7 +56,14 @@ def cli():
 
     # TODO not necessarily watching the right .env...
     # could return path from env.load?
-    gunicorn = f"gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - --reload-extra-file .env --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+    extra_watch_files = []
+    for f in os.listdir(project_root):
+        if f.startswith(".env"):
+            # Will include some extra, but good enough for now
+            extra_watch_files.append(f)
+
+    reload_extra = " ".join(f"--reload-extra-file {f}" for f in extra_watch_files)
+    gunicorn = f"gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - {reload_extra} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
     if bolt_db_installed:
         runserver_cmd = f"bolt dev db wait && bolt legacy migrate && {gunicorn}"
