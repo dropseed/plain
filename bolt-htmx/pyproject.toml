@@ -5,18 +5,13 @@ packages = [
     { include = "bolt" },
 ]
 
-version = "0.3.2"
+version = "0.1.0"
 description = "HTMX integration for Bolt"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/dropseed/bolt"
 keywords = []
-classifiers = [
-    "Environment :: Web Environment",
-    "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
-]
 
 [tool.poetry.dependencies]
 python = "^3.8"
