@@ -606,39 +606,3 @@ class ExceptionReporter:
                 "tb_area_colno": tb_area_colno,
             }
             tb = tb.tb_next
-
-
-def technical_404_response(request, exception):
-    """Create a technical 404 error response. `exception` is the Http404."""
-    try:
-        error_url = exception.args[0]["path"]
-    except (IndexError, TypeError, KeyError):
-        error_url = request.path_info[1:]  # Trim leading slash
-
-    try:
-        tried = exception.args[0]["tried"]
-    except (IndexError, TypeError, KeyError):
-        resolved = True
-        tried = request.resolver_match.tried if request.resolver_match else None
-    else:
-        resolved = False
-
-    urlconf = getattr(request, "urlconf", settings.ROOT_URLCONF)
-    if isinstance(urlconf, types.ModuleType):
-        urlconf = urlconf.__name__
-
-    with builtin_template_path("technical_404.html").open(encoding="utf-8") as fh:
-        t = create_debug_environment().from_string(fh.read())
-    reporter_filter = get_default_exception_reporter_filter()
-    c = {
-        "urlconf": urlconf,
-        "root_urlconf": settings.ROOT_URLCONF,
-        "request_path": error_url,
-        "urlpatterns": tried,
-        "resolved": resolved,
-        "reason": str(exception),
-        "request": request,
-        "settings": reporter_filter.get_safe_settings(),
-        "raising_view_name": get_caller(request),
-    }
-    return HttpResponseNotFound(t.render(c))
