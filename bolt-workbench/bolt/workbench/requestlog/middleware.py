@@ -1,11 +1,10 @@
-from bolt.runtime import settings as bolt_settings
+from bolt.runtime import settings
 
-from . import settings
 from .core import RequestLog
 
 
 def should_capture_request(request):
-    if not bolt_settings.DEBUG:
+    if not settings.DEBUG:
         return False
 
     if (
@@ -14,7 +13,7 @@ def should_capture_request(request):
     ):
         return False
 
-    if request.path in settings.REQUESTLOG_IGNORE_URL_PATHS():
+    if request.path in settings.REQUESTLOG_IGNORE_URL_PATHS:
         return False
 
     # This could be an attribute set on request or response

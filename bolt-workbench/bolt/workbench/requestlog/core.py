@@ -6,8 +6,6 @@ import requests
 
 from bolt.runtime import settings
 
-from . import settings
-
 
 class RequestLog:
     def __init__(self, *, request, response):
@@ -87,7 +85,7 @@ class RequestLog:
 
         filenames = os.listdir(storage_path)
         sorted_filenames = sorted(filenames, reverse=True)
-        for filename in sorted_filenames[settings.REQUESTLOG_KEEP_LATEST() :]:
+        for filename in sorted_filenames[settings.REQUESTLOG_KEEP_LATEST :]:
             path = os.path.join(storage_path, filename)
             try:
                 os.remove(path)
