@@ -1,6 +1,6 @@
 from bolt.jinja.extensions import InclusionTagExtension
 
-from .stafftoolbar.core import StaffToolbar
+from .core import StaffToolbar
 
 
 class StaffToolbarExtension(InclusionTagExtension):
