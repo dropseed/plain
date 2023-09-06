@@ -12,6 +12,8 @@ from decimal import Decimal, DecimalException
 from io import BytesIO
 from urllib.parse import urlsplit, urlunsplit
 
+from bolt.runtime import settings
+from bolt.utils import timezone
 from bolt import validators
 from bolt.exceptions import ValidationError
 from bolt.utils.dateparse import parse_datetime, parse_duration
@@ -989,3 +991,37 @@ class JSONField(CharField):
         return json.dumps(initial, sort_keys=True, cls=self.encoder) != json.dumps(
             self.to_python(data), sort_keys=True, cls=self.encoder
         )
+
+
+def from_current_timezone(value):
+    """
+    When time zone support is enabled, convert naive datetimes
+    entered in the current time zone to aware datetimes.
+    """
+    if settings.USE_TZ and value is not None and timezone.is_naive(value):
+        current_timezone = timezone.get_current_timezone()
+        try:
+            if timezone._datetime_ambiguous_or_imaginary(value, current_timezone):
+                raise ValueError("Ambiguous or non-existent time.")
+            return timezone.make_aware(value, current_timezone)
+        except Exception as exc:
+            raise ValidationError(
+                _(
+                    "%(datetime)s couldn’t be interpreted "
+                    "in time zone %(current_timezone)s; it "
+                    "may be ambiguous or it may not exist."
+                ),
+                code="ambiguous_timezone",
+                params={"datetime": value, "current_timezone": current_timezone},
+            ) from exc
+    return value
+
+
+def to_current_timezone(value):
+    """
+    When time zone support is enabled, convert aware datetimes
+    to naive datetimes in the current time zone for display.
+    """
+    if settings.USE_TZ and value is not None and timezone.is_aware(value):
+        return timezone.make_naive(value)
+    return value
