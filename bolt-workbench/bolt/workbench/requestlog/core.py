@@ -5,6 +5,7 @@ import os
 import requests
 
 from . import settings
+from bolt.runtime import settings
 
 
 class RequestLog:
@@ -14,7 +15,7 @@ class RequestLog:
 
     @staticmethod
     def storage_path():
-        return os.path.join(".bolt", "requestlog")
+        return str(settings.BOLT_TEMP_PATH / "requestlog")
 
     @classmethod
     def replay_request(cls, name):

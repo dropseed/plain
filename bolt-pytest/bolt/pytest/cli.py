@@ -2,7 +2,9 @@ import os
 import subprocess
 import sys
 
+from bolt.runtime import settings
 import click
+
 
 
 @click.command(
@@ -14,23 +16,8 @@ import click
 def cli(pytest_args):
     """Run tests with pytest"""
 
-    try:
-        repo_root = (
-            subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode("utf-8")
-            .strip()
-        )
-    except subprocess.CalledProcessError:
-        click.secho(
-            "All bolt projects are expected to be in a git repo and we couldn't find one.",
-            fg="red",
-        )
-        sys.exit(1)
+    bolt_tmp_dir = str(settings.BOLT_TEMP_PATH)
 
-    bolt_tmp_dir = os.path.join(repo_root, ".bolt")
     if not os.path.exists(os.path.join(bolt_tmp_dir, ".gitignore")):
         os.makedirs(bolt_tmp_dir, exist_ok=True)
         with open(os.path.join(bolt_tmp_dir, ".gitignore"), "w") as f:
