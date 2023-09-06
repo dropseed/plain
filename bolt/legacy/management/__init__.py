@@ -13,7 +13,6 @@ from difflib import get_close_matches
 from importlib import import_module
 
 import bolt.runtime
-from bolt.packages import packages
 from bolt.exceptions import ImproperlyConfigured
 from bolt.legacy.management.base import (
     BaseCommand,
@@ -22,6 +21,7 @@ from bolt.legacy.management.base import (
     handle_default_options,
 )
 from bolt.legacy.management.color import color_style
+from bolt.packages import packages
 from bolt.runtime import settings
 
 
@@ -322,7 +322,9 @@ class ManagementUtility:
                 try:
                     package_configs = packages.get_package_configs()
                     # Get the last part of the dotted path as the app name.
-                    options.extend((package_config.label, 0) for package_config in package_configs)
+                    options.extend(
+                        (package_config.label, 0) for package_config in package_configs
+                    )
                 except ImportError:
                     # Fail silently if BOLT_SETTINGS_MODULE isn't set. The
                     # user will find out once they execute the command.

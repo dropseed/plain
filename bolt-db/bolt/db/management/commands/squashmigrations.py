@@ -1,7 +1,6 @@
 import os
 import shutil
 
-from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections, migrations
 from bolt.db.migrations.loader import AmbiguityError, MigrationLoader
 from bolt.db.migrations.migration import SwappableTuple
@@ -9,6 +8,7 @@ from bolt.db.migrations.optimizer import MigrationOptimizer
 from bolt.db.migrations.writer import MigrationWriter
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.utils import run_formatters
+from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.utils.version import get_docs_version
 
@@ -109,7 +109,9 @@ class Command(BaseCommand):
                     "the migration '{}'?\n"
                     "Have a look at:\n"
                     "  python manage.py showmigrations {}\n"
-                    "to debug this issue.".format(start_migration, migration, package_label)
+                    "to debug this issue.".format(
+                        start_migration, migration, package_label
+                    )
                 )
 
         # Tell them what we're doing and optionally ask if we should proceed

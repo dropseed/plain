@@ -4,8 +4,9 @@ import os
 
 import requests
 
-from . import settings
 from bolt.runtime import settings
+
+from . import settings
 
 
 class RequestLog:
@@ -69,7 +70,9 @@ class RequestLog:
                 # Convert timestamp back to datetime
                 log["timestamp"] = datetime.datetime.fromtimestamp(log["timestamp"])
                 try:
-                    log["request"]["body_json"] = json.dumps(json.loads(log["request"]["body"]), indent=2)
+                    log["request"]["body_json"] = json.dumps(
+                        json.loads(log["request"]["body"]), indent=2
+                    )
                 except json.JSONDecodeError:
                     pass
                 logs.append(log)

@@ -4,11 +4,11 @@ import inspect
 import warnings
 from collections import defaultdict
 
-from bolt.packages import packages
 from bolt.db import connections
 from bolt.db.models import AutoField, Manager, OrderWrt, UniqueConstraint
 from bolt.db.models.query_utils import PathInfo
 from bolt.exceptions import FieldDoesNotExist, ImproperlyConfigured
+from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.utils.datastructures import ImmutableList, OrderedSet
 from bolt.utils.deprecation import RemovedInDjango51Warning
@@ -256,7 +256,10 @@ class Options:
             "default_auto_field",
             settings.DEFAULT_AUTO_FIELD,
         )
-        if self.package_config and self.package_config._is_default_auto_field_overridden:
+        if (
+            self.package_config
+            and self.package_config._is_default_auto_field_overridden
+        ):
             package_config_class = type(self.package_config)
             source = (
                 f"{package_config_class.__module__}."

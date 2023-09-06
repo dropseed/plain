@@ -3,9 +3,6 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 
-from bolt.packages import PackageConfig
-from bolt.packages.registry import Packages
-from bolt.packages.registry import packages as global_packages
 from bolt.db import models
 from bolt.db.migrations.utils import field_is_referenced, get_references
 from bolt.db.models import NOT_PROVIDED
@@ -13,6 +10,9 @@ from bolt.db.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from bolt.db.models.options import DEFAULT_NAMES, normalize_together
 from bolt.db.models.utils import make_model_tuple
 from bolt.exceptions import FieldDoesNotExist
+from bolt.packages import PackageConfig
+from bolt.packages.registry import Packages
+from bolt.packages.registry import packages as global_packages
 from bolt.runtime import settings
 from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string
@@ -186,7 +186,9 @@ class ProjectState:
                     model_state.options.pop(key, False)
         self.reload_model(package_label, model_name, delay=True)
 
-    def remove_model_options(self, package_label, model_name, option_name, value_to_remove):
+    def remove_model_options(
+        self, package_label, model_name, option_name, value_to_remove
+    ):
         model_state = self.models[package_label, model_name]
         if objs := model_state.options.get(option_name):
             model_state.options[option_name] = [
@@ -442,7 +444,10 @@ class ProjectState:
         concretes,
     ):
         remote_model_key = resolve_relation(model, *model_key)
-        if remote_model_key[0] not in self.real_packages and remote_model_key in concretes:
+        if (
+            remote_model_key[0] not in self.real_packages
+            and remote_model_key in concretes
+        ):
             remote_model_key = concretes[remote_model_key]
         relations_to_remote_model = self._relations[remote_model_key]
         if field_name in self.models[model_key].fields:
@@ -570,7 +575,9 @@ class ProjectState:
         app_models = {}
         for model in packages.get_models(include_swapped=True):
             model_state = ModelState.from_model(model)
-            app_models[(model_state.package_label, model_state.name_lower)] = model_state
+            app_models[
+                (model_state.package_label, model_state.name_lower)
+            ] = model_state
         return cls(app_models)
 
     def __eq__(self, other):
@@ -613,7 +620,8 @@ class StatePackages(Packages):
         # Populate the app registry with a stub for each application.
         package_labels = {model_state.package_label for model_state in models.values()}
         package_configs = [
-            PackageConfigStub(label) for label in sorted([*real_packages, *package_labels])
+            PackageConfigStub(label)
+            for label in sorted([*real_packages, *package_labels])
         ]
         super().__init__(package_configs)
 
@@ -929,7 +937,11 @@ class ModelState:
     def render(self, packages):
         """Create a Model object from our current state into the given packages."""
         # First, make a Meta object
-        meta_contents = {"package_label": self.package_label, "packages": packages, **self.options}
+        meta_contents = {
+            "package_label": self.package_label,
+            "packages": packages,
+            **self.options,
+        }
         meta = type("Meta", (), meta_contents)
         # Then, work out our bases
         try:

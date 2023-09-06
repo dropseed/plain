@@ -1,6 +1,6 @@
 from bolt import checks
-from bolt.packages import PackageConfig
 from bolt.db.models.query_utils import DeferredAttribute
+from bolt.packages import PackageConfig
 
 from . import get_user_model
 from .checks import check_user_model

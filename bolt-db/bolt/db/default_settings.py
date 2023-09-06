@@ -1,4 +1,5 @@
 from os import environ
+
 from . import database_url
 
 # Database connection info. If left empty, will default to the dummy backend.

@@ -1,6 +1,6 @@
-from os import environ
 import logging
 import logging.config
+from os import environ
 
 from bolt.legacy.management.color import color_style
 from bolt.runtime import settings
@@ -29,7 +29,7 @@ def configure_logging(logging_settings):
                 "()": "bolt.utils.log.ServerFormatter",
                 "format": "[{server_time}] {message}",
                 "style": "{",
-            }
+            },
         },
         "handlers": {
             "console": {

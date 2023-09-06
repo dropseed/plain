@@ -1,4 +1,5 @@
 import json
+
 from bolt.views import AuthViewMixin, TemplateView
 
 

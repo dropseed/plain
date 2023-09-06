@@ -5,7 +5,7 @@ import warnings
 from collections import Counter, defaultdict
 from functools import partial
 
-from bolt.exceptions import PackageRegistryNotReady, ImproperlyConfigured
+from bolt.exceptions import ImproperlyConfigured, PackageRegistryNotReady
 
 from .config import PackageConfig
 
@@ -179,7 +179,9 @@ class Packages:
 
         result = []
         for package_config in self.package_configs.values():
-            result.extend(package_config.get_models(include_auto_created, include_swapped))
+            result.extend(
+                package_config.get_models(include_auto_created, include_swapped)
+            )
         return result
 
     def get_model(self, package_label, model_name=None, require_ready=True):
@@ -313,7 +315,9 @@ class Packages:
         This method is safe in the sense that it doesn't trigger any imports.
         """
         available = set(available)
-        installed = {package_config.name for package_config in self.get_package_configs()}
+        installed = {
+            package_config.name for package_config in self.get_package_configs()
+        }
         if not available.issubset(installed):
             raise ValueError(
                 "Available packages isn't a subset of installed packages, extra packages: %s"

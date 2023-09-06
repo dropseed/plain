@@ -37,7 +37,9 @@ class MigrationAutodetector:
         self.questioner = questioner or MigrationQuestioner()
         self.existing_packages = {app for app, model in from_state.models}
 
-    def changes(self, graph, trim_to_packages=None, convert_packages=None, migration_name=None):
+    def changes(
+        self, graph, trim_to_packages=None, convert_packages=None, migration_name=None
+    ):
         """
         Main entry point to produce a list of applicable changes.
         Take a graph to base names on and an optional set of packages
@@ -222,7 +224,8 @@ class MigrationAutodetector:
             (package_label, model_name, field_name)
             for package_label, model_name in self.kept_model_keys
             for field_name in self.from_state.models[
-                package_label, self.renamed_models.get((package_label, model_name), model_name)
+                package_label,
+                self.renamed_models.get((package_label, model_name), model_name),
             ].fields
         }
         self.new_field_keys = {
@@ -262,7 +265,9 @@ class MigrationAutodetector:
         resolved_package_label, resolved_object_name = getattr(
             settings, dependency[1]
         ).split(".")
-        return (resolved_package_label, resolved_object_name.lower()) + dependency[2:], True
+        return (resolved_package_label, resolved_object_name.lower()) + dependency[
+            2:
+        ], True
 
     def _build_migration_list(self, graph=None):
         """
@@ -355,7 +360,8 @@ class MigrationAutodetector:
                             {"operations": [], "dependencies": []},
                         )
                         instance = subclass(
-                            "auto_%i" % (len(self.migrations.get(package_label, [])) + 1),
+                            "auto_%i"
+                            % (len(self.migrations.get(package_label, [])) + 1),
                             package_label,
                         )
                         instance.dependencies = list(dependencies)
@@ -477,7 +483,9 @@ class MigrationAutodetector:
         else:
             raise ValueError(f"Can't handle dependency {dependency!r}")
 
-    def add_operation(self, package_label, operation, dependencies=None, beginning=False):
+    def add_operation(
+        self, package_label, operation, dependencies=None, beginning=False
+    ):
         # Dependencies are
         # (package_label, model_name, field_name, create/delete as True/False)
         operation._auto_deps = dependencies or []
@@ -561,7 +569,9 @@ class MigrationAutodetector:
                                 ),
                                 dependencies=dependencies,
                             )
-                            self.renamed_models[package_label, model_name] = rem_model_name
+                            self.renamed_models[
+                                package_label, model_name
+                            ] = rem_model_name
                             renamed_models_rel_key = "{}.{}".format(
                                 rem_model_state.package_label,
                                 rem_model_state.name_lower,
@@ -572,7 +582,9 @@ class MigrationAutodetector:
                                 model_state.package_label,
                                 model_state.name_lower,
                             )
-                            self.old_model_keys.remove((rem_package_label, rem_model_name))
+                            self.old_model_keys.remove(
+                                (rem_package_label, rem_model_name)
+                            )
                             self.old_model_keys.add((package_label, model_name))
                             break
 
@@ -644,7 +656,12 @@ class MigrationAutodetector:
                         )
                         for removed_base_field in removed_base_fields:
                             dependencies.append(
-                                (base_package_label, base_name, removed_base_field, False)
+                                (
+                                    base_package_label,
+                                    base_name,
+                                    removed_base_field,
+                                    False,
+                                )
                             )
             # Depend on the other end of the primary key if it's a relation
             if primary_key_rel:
@@ -712,7 +729,8 @@ class MigrationAutodetector:
                     ],
                 )
             related_dependencies = [
-                (package_label, model_name, name, True) for name in sorted(related_fields)
+                (package_label, model_name, name, True)
+                for name in sorted(related_fields)
             ]
             related_dependencies.append((package_label, model_name, None, True))
             for index in indexes:
@@ -887,7 +905,9 @@ class MigrationAutodetector:
             for name in sorted(related_fields):
                 dependencies.append((package_label, model_name, name, False))
             # We're referenced in another field's through=
-            through_user = self.through_users.get((package_label, model_state.name_lower))
+            through_user = self.through_users.get(
+                (package_label, model_state.name_lower)
+            )
             if through_user:
                 dependencies.append(
                     (through_user[0], through_user[1], through_user[2], False)
@@ -1010,7 +1030,9 @@ class MigrationAutodetector:
                     new_name=field_name,
                 ),
             )
-            self.old_field_keys.remove((rem_package_label, rem_model_name, rem_field_name))
+            self.old_field_keys.remove(
+                (rem_package_label, rem_model_name, rem_field_name)
+            )
             self.old_field_keys.add((package_label, model_name, field_name))
 
     def generate_added_fields(self):
@@ -1395,7 +1417,9 @@ class MigrationAutodetector:
                 )
 
     @staticmethod
-    def _get_dependencies_for_foreign_key(package_label, model_name, field, project_state):
+    def _get_dependencies_for_foreign_key(
+        package_label, model_name, field, project_state
+    ):
         remote_field_model = None
         if hasattr(field.remote_field, "model"):
             remote_field_model = field.remote_field.model
@@ -1426,7 +1450,9 @@ class MigrationAutodetector:
                 package_label,
                 model_name,
             )
-            dependencies.append((through_package_label, through_object_name, None, True))
+            dependencies.append(
+                (through_package_label, through_object_name, None, True)
+            )
         return dependencies
 
     def _get_dependencies_for_model(self, package_label, model_name):
@@ -1701,7 +1727,10 @@ class MigrationAutodetector:
             if app_leaf is None and not self.questioner.ask_initial(package_label):
                 # They don't.
                 for migration in migrations:
-                    name_map[(package_label, migration.name)] = (package_label, "__first__")
+                    name_map[(package_label, migration.name)] = (
+                        package_label,
+                        "__first__",
+                    )
                 del changes[package_label]
                 continue
             # Work out the next number in the sequence
@@ -1744,14 +1773,19 @@ class MigrationAutodetector:
         for package_label, migrations in changes.items():
             for migration in migrations:
                 for dep_package_label, name in migration.dependencies:
-                    app_dependencies.setdefault(package_label, set()).add(dep_package_label)
+                    app_dependencies.setdefault(package_label, set()).add(
+                        dep_package_label
+                    )
         required_packages = set(package_labels)
         # Keep resolving till there's no change
         old_required_packages = None
         while old_required_packages != required_packages:
             old_required_packages = set(required_packages)
             required_packages.update(
-                *[app_dependencies.get(package_label, ()) for package_label in required_packages]
+                *[
+                    app_dependencies.get(package_label, ())
+                    for package_label in required_packages
+                ]
             )
         # Remove all migrations that aren't needed
         for package_label in list(changes):

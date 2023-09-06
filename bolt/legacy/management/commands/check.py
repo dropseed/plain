@@ -1,7 +1,7 @@
 from bolt import checks
-from bolt.packages import packages
 from bolt.checks.registry import registry
 from bolt.legacy.management.base import BaseCommand, CommandError
+from bolt.packages import packages
 
 
 class Command(BaseCommand):
@@ -53,7 +53,10 @@ class Command(BaseCommand):
             return
 
         if package_labels:
-            package_configs = [packages.get_package_config(package_label) for package_label in package_labels]
+            package_configs = [
+                packages.get_package_config(package_label)
+                for package_label in package_labels
+            ]
         else:
             package_configs = None
 

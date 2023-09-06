@@ -1,10 +1,10 @@
 import functools
 import os
 
-from bolt.packages import packages
 from bolt.checks import Error, Warning
 from bolt.exceptions import ImproperlyConfigured
 from bolt.files.storage import FileSystemStorage, Storage, default_storage
+from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.staticfiles import utils
 from bolt.utils._os import safe_join

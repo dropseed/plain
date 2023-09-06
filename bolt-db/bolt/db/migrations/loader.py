@@ -2,9 +2,9 @@ import pkgutil
 import sys
 from importlib import import_module, reload
 
-from bolt.packages import packages
 from bolt.db.migrations.graph import MigrationGraph
 from bolt.db.migrations.recorder import MigrationRecorder
+from bolt.packages import packages
 
 from .exceptions import (
     AmbiguityError,
@@ -348,7 +348,8 @@ class MigrationLoader:
                 conflicting_packages.add(package_label)
             seen_packages.setdefault(package_label, set()).add(migration_name)
         return {
-            package_label: sorted(seen_packages[package_label]) for package_label in conflicting_packages
+            package_label: sorted(seen_packages[package_label])
+            for package_label in conflicting_packages
         }
 
     def project_state(self, nodes=None, at_end=True):

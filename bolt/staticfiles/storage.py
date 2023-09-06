@@ -9,8 +9,8 @@ from bolt.exceptions import ImproperlyConfigured
 from bolt.files.base import ContentFile
 from bolt.files.storage import FileSystemStorage, storages
 from bolt.runtime import settings
-from bolt.staticfiles.utils import check_settings, matches_patterns
 from bolt.runtime.user_settings import STATICFILES_STORAGE_ALIAS
+from bolt.staticfiles.utils import check_settings, matches_patterns
 from bolt.utils.functional import LazyObject
 
 

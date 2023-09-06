@@ -3,7 +3,6 @@ import sys
 import warnings
 from itertools import takewhile
 
-from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, OperationalError, connections, router
 from bolt.db.migrations import Migration
 from bolt.db.migrations.autodetector import MigrationAutodetector
@@ -20,6 +19,7 @@ from bolt.db.migrations.utils import get_migration_name_timestamp
 from bolt.db.migrations.writer import MigrationWriter
 from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
 from bolt.legacy.management.utils import run_formatters
+from bolt.packages import packages
 from bolt.runtime import settings
 
 
@@ -137,7 +137,9 @@ class Command(BaseCommand):
         loader = MigrationLoader(None, ignore_no_migrations=True)
 
         # Raise an error if any migrations are applied before their dependencies.
-        consistency_check_labels = {config.label for config in packages.get_package_configs()}
+        consistency_check_labels = {
+            config.label for config in packages.get_package_configs()
+        }
         # Non-default databases are only checked if database routers used.
         aliases_to_check = (
             connections if settings.DATABASE_ROUTERS else [DEFAULT_DB_ALIAS]
@@ -245,7 +247,9 @@ class Command(BaseCommand):
             if self.verbosity >= 1:
                 if package_labels:
                     if len(package_labels) == 1:
-                        self.log("No changes detected in app '%s'" % package_labels.pop())
+                        self.log(
+                            "No changes detected in app '%s'" % package_labels.pop()
+                        )
                     else:
                         self.log(
                             "No changes detected in packages '%s'"
@@ -340,7 +344,9 @@ class Command(BaseCommand):
         directory_created = {}
         for package_label, app_migrations in changes.items():
             if self.verbosity >= 1:
-                self.log(self.style.MIGRATE_HEADING("Migrations for '%s':" % package_label))
+                self.log(
+                    self.style.MIGRATE_HEADING("Migrations for '%s':" % package_label)
+                )
             for migration in app_migrations:
                 # Describe the migration
                 writer = MigrationWriter(migration, self.include_header)
@@ -423,7 +429,9 @@ class Command(BaseCommand):
                 migration = loader.get_migration(package_label, migration_name)
                 migration.ancestry = [
                     mig
-                    for mig in loader.graph.forwards_plan((package_label, migration_name))
+                    for mig in loader.graph.forwards_plan(
+                        (package_label, migration_name)
+                    )
                     if mig[0] == migration.package_label
                 ]
                 merge_migrations.append(migration)

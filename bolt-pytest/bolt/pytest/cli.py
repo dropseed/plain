@@ -2,9 +2,9 @@ import os
 import subprocess
 import sys
 
-from bolt.runtime import settings
 import click
 
+from bolt.runtime import settings
 
 
 @click.command(
@@ -33,7 +33,9 @@ def cli(pytest_args):
 
     os.environ.setdefault("APP_ENV", "test")
 
-    click.secho(f"Running pytest with coverage and APP_ENV={os.environ['APP_ENV']}", bold=True)
+    click.secho(
+        f"Running pytest with coverage and APP_ENV={os.environ['APP_ENV']}", bold=True
+    )
 
     result = subprocess.run(
         [

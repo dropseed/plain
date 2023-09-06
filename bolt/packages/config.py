@@ -197,7 +197,9 @@ class PackageConfig:
         # Check for obvious errors. (This check prevents duck typing, but
         # it could be removed if it became a problem in practice.)
         if not issubclass(package_config_class, PackageConfig):
-            raise ImproperlyConfigured("'%s' isn't a subclass of PackageConfig." % entry)
+            raise ImproperlyConfigured(
+                "'%s' isn't a subclass of PackageConfig." % entry
+            )
 
         # Obtain package name here rather than in PackageClass.__init__ to keep
         # all error checking for entries in INSTALLED_PACKAGES in one place.

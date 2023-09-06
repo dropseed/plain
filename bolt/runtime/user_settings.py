@@ -13,10 +13,11 @@ import types
 import typing
 from pathlib import Path
 
-from bolt.packages import PackageConfig
 from bolt.exceptions import ImproperlyConfigured
-from . import global_settings
+from bolt.packages import PackageConfig
 from bolt.utils.functional import LazyObject, empty
+
+from . import global_settings
 
 ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"
 DEFAULT_STORAGE_ALIAS = "default"

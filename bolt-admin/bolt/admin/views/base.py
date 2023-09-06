@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
-from bolt.http import HttpResponse, HttpResponseNotAllowed
 from bolt.db import models
+from bolt.http import HttpResponse
 from bolt.paginator import Paginator
 from bolt.utils.text import slugify
 from bolt.views import (

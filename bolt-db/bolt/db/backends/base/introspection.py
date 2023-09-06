@@ -78,13 +78,15 @@ class BaseDatabaseIntrospection:
         )
 
     def get_migratable_models(self):
-        from bolt.packages import packages
         from bolt.db import router
+        from bolt.packages import packages
 
         return (
             model
             for package_config in packages.get_package_configs()
-            for model in router.get_migratable_models(package_config, self.connection.alias)
+            for model in router.get_migratable_models(
+                package_config, self.connection.alias
+            )
             if model._meta.can_migrate(self.connection)
         )
 

@@ -67,9 +67,9 @@ class FieldOperation(Operation):
         )
 
     def reduce(self, operation, package_label):
-        return super().reduce(operation, package_label) or not operation.references_field(
-            self.model_name, self.name, package_label
-        )
+        return super().reduce(
+            operation, package_label
+        ) or not operation.references_field(self.model_name, self.name, package_label)
 
 
 class AddField(FieldOperation):

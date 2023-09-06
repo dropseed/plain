@@ -11,7 +11,6 @@ from bolt.exceptions import (
     ImproperlyConfigured,
     ValidationError,
 )
-
 from bolt.forms import fields
 from bolt.forms.fields import ChoiceField, Field
 from bolt.forms.forms import BaseForm, DeclarativeFieldsMetaclass

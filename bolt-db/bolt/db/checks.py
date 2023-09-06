@@ -1,11 +1,10 @@
-from bolt.checks import Tags, register
 import inspect
 import types
 from collections import defaultdict
 from itertools import chain
 
-from bolt.packages import packages
 from bolt.checks import Error, Tags, Warning, register
+from bolt.packages import packages
 from bolt.runtime import settings
 
 

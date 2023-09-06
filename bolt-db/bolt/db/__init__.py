@@ -1,5 +1,4 @@
 from bolt import signals
-from . import checks  # noqa
 from bolt.db.utils import (
     BOLT_VERSION_PICKLE_KEY,
     DEFAULT_DB_ALIAS,
@@ -16,6 +15,8 @@ from bolt.db.utils import (
     ProgrammingError,
 )
 from bolt.utils.connection import ConnectionProxy
+
+from . import checks  # noqa
 
 __all__ = [
     "connection",

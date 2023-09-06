@@ -485,7 +485,9 @@ class AlterModelTable(ModelOptionOperation):
         return (self.__class__.__qualname__, [], kwargs)
 
     def state_forwards(self, package_label, state):
-        state.alter_model_options(package_label, self.name_lower, {"db_table": self.table})
+        state.alter_model_options(
+            package_label, self.name_lower, {"db_table": self.table}
+        )
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         new_model = to_state.packages.get_model(package_label, self.name)
@@ -508,7 +510,9 @@ class AlterModelTable(ModelOptionOperation):
                     )
 
     def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        return self.database_forwards(package_label, schema_editor, from_state, to_state)
+        return self.database_forwards(
+            package_label, schema_editor, from_state, to_state
+        )
 
     def describe(self):
         return "Rename table for {} to {}".format(
@@ -549,7 +553,9 @@ class AlterModelTableComment(ModelOptionOperation):
             )
 
     def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        return self.database_forwards(package_label, schema_editor, from_state, to_state)
+        return self.database_forwards(
+            package_label, schema_editor, from_state, to_state
+        )
 
     def describe(self):
         return f"Alter {self.name} table comment"
@@ -598,7 +604,9 @@ class AlterTogetherOptionOperation(ModelOptionOperation):
             )
 
     def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        return self.database_forwards(package_label, schema_editor, from_state, to_state)
+        return self.database_forwards(
+            package_label, schema_editor, from_state, to_state
+        )
 
     def references_field(self, model_name, name, package_label):
         return self.references_model(model_name, package_label) and (

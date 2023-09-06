@@ -3,9 +3,9 @@ import importlib
 import os
 import sys
 
-from bolt.packages import packages
 from bolt.db.models import NOT_PROVIDED
 from bolt.legacy.management.base import OutputWrapper
+from bolt.packages import packages
 from bolt.utils import timezone
 from bolt.utils.version import get_docs_version
 
@@ -37,7 +37,9 @@ class MigrationQuestioner:
             package_config = packages.get_package_config(package_label)
         except LookupError:  # It's a fake app.
             return self.defaults.get("ask_initial", False)
-        migrations_import_path, _ = MigrationLoader.migrations_module(package_config.label)
+        migrations_import_path, _ = MigrationLoader.migrations_module(
+            package_config.label
+        )
         if migrations_import_path is None:
             # It's an application with migrations disabled.
             return self.defaults.get("ask_initial", False)
@@ -234,7 +236,11 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         msg = "Was the model %s.%s renamed to %s? [y/N]"
         return self._boolean_input(
             msg
-            % (old_model_state.package_label, old_model_state.name, new_model_state.name),
+            % (
+                old_model_state.package_label,
+                old_model_state.name,
+                new_model_state.name,
+            ),
             False,
         )
 

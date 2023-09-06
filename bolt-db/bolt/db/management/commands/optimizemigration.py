@@ -1,7 +1,6 @@
 import shutil
 import sys
 
-from bolt.packages import packages
 from bolt.db import migrations
 from bolt.db.migrations.exceptions import AmbiguityError
 from bolt.db.migrations.loader import MigrationLoader
@@ -9,6 +8,7 @@ from bolt.db.migrations.optimizer import MigrationOptimizer
 from bolt.db.migrations.writer import MigrationWriter
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.utils import run_formatters
+from bolt.packages import packages
 from bolt.utils.version import get_docs_version
 
 
@@ -61,7 +61,9 @@ class Command(BaseCommand):
 
         # Optimize the migration.
         optimizer = MigrationOptimizer()
-        new_operations = optimizer.optimize(migration.operations, migration.package_label)
+        new_operations = optimizer.optimize(
+            migration.operations, migration.package_label
+        )
         if len(migration.operations) == len(new_operations):
             if verbosity > 0:
                 self.stdout.write("No optimizations possible.")

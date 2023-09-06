@@ -14,13 +14,13 @@ from xml.dom.minidom import Node, parseString
 
 from jinja2 import Template
 
-from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections, reset_queries
 from bolt.exceptions import ImproperlyConfigured
+from bolt.packages import packages
 from bolt.runtime import settings
+from bolt.runtime.user_settings import UserSettingsHolder
 from bolt.signals import request_started, setting_changed
 from bolt.test.signals import template_rendered
-from bolt.runtime.user_settings import UserSettingsHolder
 
 try:
     import jinja2

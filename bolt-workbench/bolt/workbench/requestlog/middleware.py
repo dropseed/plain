@@ -8,7 +8,10 @@ def should_capture_request(request):
     if not bolt_settings.DEBUG:
         return False
 
-    if request.resolver_match and request.resolver_match.default_namespace == "requestlog":
+    if (
+        request.resolver_match
+        and request.resolver_match.default_namespace == "requestlog"
+    ):
         return False
 
     if request.path in settings.REQUESTLOG_IGNORE_URL_PATHS():

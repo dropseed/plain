@@ -1,4 +1,4 @@
-from .views.base import AdminPageView, AdminListView
+from .views.base import AdminListView, AdminPageView
 from .views.cards import (
     AdminCardView,
     AdminChartCardView,

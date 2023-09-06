@@ -3,6 +3,7 @@ from bolt.db.forms import ModelForm
 
 from .models import Flag, FlagResult
 
+
 @register_model
 class FlagAdmin(AdminModelViewset):
     model = Flag

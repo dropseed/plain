@@ -50,7 +50,8 @@ def emit_post_migrate_signal(verbosity, interactive, db, **kwargs):
         if verbosity >= 2:
             stdout = kwargs.get("stdout", sys.stdout)
             stdout.write(
-                "Running post-migrate handlers for application %s" % package_config.label
+                "Running post-migrate handlers for application %s"
+                % package_config.label
             )
         try:
             from bolt.db import models

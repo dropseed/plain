@@ -52,7 +52,9 @@ class ResolverMatch:
 
         # If a URLRegexResolver doesn't have a namespace or default_namespace, it passes
         # in an empty value.
-        self.default_namespaces = [x for x in default_namespaces if x] if default_namespaces else []
+        self.default_namespaces = (
+            [x for x in default_namespaces if x] if default_namespaces else []
+        )
         self.default_namespace = ":".join(self.default_namespaces)
         self.namespaces = [x for x in namespaces if x] if namespaces else []
         self.namespace = ":".join(self.namespaces)
@@ -393,7 +395,12 @@ class URLPattern:
 
 class URLResolver:
     def __init__(
-        self, pattern, urlconf_name, default_kwargs=None, default_namespace=None, namespace=None
+        self,
+        pattern,
+        urlconf_name,
+        default_kwargs=None,
+        default_namespace=None,
+        namespace=None,
     ):
         self.pattern = pattern
         # urlconf_name is the dotted Python path to the module defining
@@ -538,8 +545,13 @@ class URLResolver:
                             current_converters = url_pattern.pattern.converters
                             sub_pattern.pattern.converters.update(current_converters)
                             namespaces[namespace] = (p_pattern + prefix, sub_pattern)
-                        for default_namespace, namespace_list in url_pattern.app_dict.items():
-                            packages.setdefault(default_namespace, []).extend(namespace_list)
+                        for (
+                            default_namespace,
+                            namespace_list,
+                        ) in url_pattern.app_dict.items():
+                            packages.setdefault(default_namespace, []).extend(
+                                namespace_list
+                            )
                     self._callback_strs.update(url_pattern._callback_strs)
             self._namespace_dict = namespaces
             self._app_dict = packages

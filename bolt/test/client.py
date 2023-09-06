@@ -28,7 +28,9 @@ from bolt.utils.regex_helper import _lazy_re_compile
 try:
     from bolt.db import close_old_connections
 except ImportError:
-    close_old_connections = lambda **kwargs: None
+
+    def close_old_connections(**kwargs):
+        return None
 
 
 __all__ = (

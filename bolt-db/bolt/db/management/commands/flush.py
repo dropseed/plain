@@ -1,10 +1,10 @@
 from importlib import import_module
 
-from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.color import no_style
 from bolt.legacy.management.sql import emit_post_migrate_signal, sql_flush
+from bolt.packages import packages
 
 
 class Command(BaseCommand):

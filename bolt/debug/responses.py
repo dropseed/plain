@@ -3,14 +3,13 @@ import itertools
 import logging
 import re
 import sys
-import types
 import warnings
 from pathlib import Path
 from pprint import pformat
 
 from jinja2.exceptions import TemplateNotFound
 
-from bolt.http import Http404, HttpResponse, HttpResponseNotFound
+from bolt.http import Http404, HttpResponse
 from bolt.jinja.defaults import create_default_environment
 from bolt.runtime import settings
 from bolt.urls import resolve

@@ -2,8 +2,8 @@ import os
 import time
 import warnings
 
-from bolt.packages import packages
 from bolt.exceptions import ImproperlyConfigured
+from bolt.packages import packages
 from bolt.signals import setting_changed
 from bolt.signals.dispatch import Signal, receiver
 from bolt.utils import timezone

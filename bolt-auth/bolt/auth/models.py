@@ -1,7 +1,7 @@
-from bolt.packages import packages
 from bolt.auth.base_user import AbstractBaseUser, BaseUserManager
 from bolt.auth.hashers import make_password
 from bolt.db import models
+from bolt.packages import packages
 from bolt.utils import timezone
 
 from .validators import UnicodeUsernameValidator

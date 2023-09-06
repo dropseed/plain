@@ -1,13 +1,13 @@
 import copy
 from decimal import Decimal
 
-from bolt.packages.registry import Packages
 from bolt.db import NotSupportedError
 from bolt.db.backends.base.schema import BaseDatabaseSchemaEditor
 from bolt.db.backends.ddl_references import Statement
 from bolt.db.backends.utils import strip_quotes
 from bolt.db.models import UniqueConstraint
 from bolt.db.transaction import atomic
+from bolt.packages.registry import Packages
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):

@@ -7,9 +7,8 @@ import sys
 import click
 
 import bolt.runtime
-from bolt.runtime import settings
-from bolt.packages import packages
 from bolt.env.cli import cli as env_cli
+from bolt.packages import packages
 
 
 class InstalledPackagesGroup(click.Group):

@@ -1,9 +1,9 @@
 import inspect
 import re
 
-from bolt.packages import packages as bolt_packages
 from bolt.csrf.middleware import rotate_token
 from bolt.exceptions import ImproperlyConfigured, PermissionDenied
+from bolt.packages import packages as bolt_packages
 from bolt.runtime import settings
 from bolt.utils.crypto import constant_time_compare
 from bolt.utils.module_loading import import_string

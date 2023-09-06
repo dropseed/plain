@@ -1,4 +1,5 @@
 from bolt.urls import path
+
 from .views import RequestLogView
 
 default_namespace = "requestlog"

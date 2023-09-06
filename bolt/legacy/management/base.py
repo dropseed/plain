@@ -413,6 +413,7 @@ class BaseCommand:
         finally:
             try:
                 from bolt.db import connections
+
                 connections.close_all()
             except (ImproperlyConfigured, ImportError):
                 # Ignore if connections aren't setup at this point (e.g. no
@@ -565,8 +566,8 @@ class BaseCommand:
         migrations in the database.
         """
         try:
-            from bolt.db.migrations.executor import MigrationExecutor
             from bolt.db import DEFAULT_DB_ALIAS, connections
+            from bolt.db.migrations.executor import MigrationExecutor
         except ImportError:
             return
 
@@ -588,7 +589,9 @@ class BaseCommand:
                     "migrations for app(s): %(packages_waiting_migration)s."
                     % {
                         "unapplied_migration_count": len(plan),
-                        "packages_waiting_migration": ", ".join(packages_waiting_migration),
+                        "packages_waiting_migration": ", ".join(
+                            packages_waiting_migration
+                        ),
                     }
                 )
             )
@@ -629,7 +632,10 @@ class AppCommand(BaseCommand):
         from bolt.packages import packages
 
         try:
-            package_configs = [packages.get_package_config(package_label) for package_label in package_labels]
+            package_configs = [
+                packages.get_package_config(package_label)
+                for package_label in package_labels
+            ]
         except (LookupError, ImportError) as e:
             raise CommandError(
                 "%s. Are you sure your INSTALLED_PACKAGES setting is correct?" % e

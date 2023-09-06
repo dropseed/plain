@@ -1,5 +1,5 @@
-from bolt.packages.registry import packages as global_packages
 from bolt.db import migrations, router
+from bolt.packages.registry import packages as global_packages
 
 from .exceptions import InvalidMigrationPlan
 from .loader import MigrationLoader
@@ -328,7 +328,9 @@ class MigrationExecutor:
 
         if migration.initial is None:
             # Bail if the migration isn't the first one in its app
-            if any(app == migration.package_label for app, name in migration.dependencies):
+            if any(
+                app == migration.package_label for app, name in migration.dependencies
+            ):
                 return False, project_state
         elif migration.initial is False:
             # Bail if it's NOT an initial migration
@@ -369,7 +371,9 @@ class MigrationExecutor:
                     return False, project_state
                 found_create_model_migration = True
             elif isinstance(operation, migrations.AddField):
-                model = packages.get_model(migration.package_label, operation.model_name)
+                model = packages.get_model(
+                    migration.package_label, operation.model_name
+                )
                 if model._meta.swapped:
                     # We have to fetch the model to test with from the
                     # main app cache, as it's not a direct dependency.

@@ -5,6 +5,7 @@ import sys
 
 import requests
 import tomlkit
+
 from bolt.runtime import settings
 
 DEFAULT_CSS = """@tailwind base;

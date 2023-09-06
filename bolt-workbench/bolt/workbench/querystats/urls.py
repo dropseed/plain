@@ -1,4 +1,5 @@
 from bolt.urls import path
+
 from . import views
 
 default_namespace = "querystats"

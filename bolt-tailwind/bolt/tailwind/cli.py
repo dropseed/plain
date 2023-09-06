@@ -3,15 +3,15 @@ import sys
 
 import click
 
-from .core import Tailwind
 from bolt.runtime import settings
+
+from .core import Tailwind
 
 
 @click.group("tailwind")
 def cli():
     """Tailwind CSS"""
     pass
-
 
 
 @cli.command()

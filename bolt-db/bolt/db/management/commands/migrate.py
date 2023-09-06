@@ -2,7 +2,6 @@ import sys
 import time
 from importlib import import_module
 
-from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections, router
 from bolt.db.migrations.autodetector import MigrationAutodetector
 from bolt.db.migrations.executor import MigrationExecutor
@@ -10,14 +9,13 @@ from bolt.db.migrations.loader import AmbiguityError
 from bolt.db.migrations.state import ModelState, ProjectState
 from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
 from bolt.legacy.management.sql import emit_post_migrate_signal, emit_pre_migrate_signal
+from bolt.packages import packages
 from bolt.utils.module_loading import module_has_submodule
 from bolt.utils.text import Truncator
 
 
 class Command(BaseCommand):
-    help = (
-        "Updates database schema. Manages both packages with migrations and those without."
-    )
+    help = "Updates database schema. Manages both packages with migrations and those without."
     requires_system_checks = []
 
     def add_arguments(self, parser):
@@ -150,7 +148,9 @@ class Command(BaseCommand):
                         % package_label
                     )
             elif package_label not in executor.loader.migrated_packages:
-                raise CommandError("Package '%s' does not have migrations." % package_label)
+                raise CommandError(
+                    "Package '%s' does not have migrations." % package_label
+                )
 
         if options["package_label"] and options["migration_name"]:
             migration_name = options["migration_name"]
@@ -184,7 +184,9 @@ class Command(BaseCommand):
             target_package_labels_only = False
         elif options["package_label"]:
             targets = [
-                key for key in executor.loader.graph.leaf_nodes() if key[0] == package_label
+                key
+                for key in executor.loader.graph.leaf_nodes()
+                if key[0] == package_label
             ]
         else:
             targets = executor.loader.graph.leaf_nodes()
@@ -314,7 +316,9 @@ class Command(BaseCommand):
         if run_syncdb:
             if self.verbosity >= 1:
                 self.stdout.write(
-                    self.style.MIGRATE_HEADING("Synchronizing packages without migrations:")
+                    self.style.MIGRATE_HEADING(
+                        "Synchronizing packages without migrations:"
+                    )
                 )
             if options["package_label"]:
                 self.sync_packages(connection, [package_label])
@@ -444,7 +448,8 @@ class Command(BaseCommand):
                 ),
             )
             for package_config in packages.get_package_configs()
-            if package_config.models_module is not None and package_config.label in package_labels
+            if package_config.models_module is not None
+            and package_config.label in package_labels
         ]
 
         def model_installed(model):

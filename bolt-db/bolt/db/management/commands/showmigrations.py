@@ -1,10 +1,10 @@
 import sys
 
-from bolt.packages import packages
 from bolt.db import DEFAULT_DB_ALIAS, connections
 from bolt.db.migrations.loader import MigrationLoader
 from bolt.db.migrations.recorder import MigrationRecorder
 from bolt.legacy.management.base import BaseCommand
+from bolt.packages import packages
 
 
 class Command(BaseCommand):

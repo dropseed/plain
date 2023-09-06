@@ -1,5 +1,5 @@
-from bolt.packages.registry import Packages
 from bolt.db import DatabaseError, models
+from bolt.packages.registry import Packages
 from bolt.utils.functional import classproperty
 from bolt.utils.timezone import now
 

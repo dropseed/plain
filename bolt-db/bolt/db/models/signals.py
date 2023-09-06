@@ -23,7 +23,9 @@ class ModelSignal(Signal):
         else:
             return partial_method(sender)
 
-    def connect(self, receiver, sender=None, weak=True, dispatch_uid=None, packages=None):
+    def connect(
+        self, receiver, sender=None, weak=True, dispatch_uid=None, packages=None
+    ):
         self._lazy_method(
             super().connect,
             packages,

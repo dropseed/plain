@@ -2,7 +2,6 @@ import json
 import logging
 import threading
 
-from bolt import jinja
 from bolt.db import connection
 from bolt.http import HttpResponseRedirect
 from bolt.json import BoltJSONEncoder
@@ -69,9 +68,7 @@ class QueryStatsMiddleware:
                 request.session["querystats"] = json.dumps(
                     _local.querystats.as_context_dict(), cls=QueryStatsJSONEncoder
                 )
-                return HttpResponseRedirect(
-                    reverse("querystats:querystats")
-                )
+                return HttpResponseRedirect(reverse("querystats:querystats"))
 
             del _local.querystats
 

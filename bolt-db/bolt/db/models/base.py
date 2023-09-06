@@ -6,7 +6,6 @@ from itertools import chain
 
 import bolt.runtime
 from bolt import checks
-from bolt.packages import packages
 from bolt.db import (
     BOLT_VERSION_PICKLE_KEY,
     DatabaseError,
@@ -46,6 +45,7 @@ from bolt.exceptions import (
     ObjectDoesNotExist,
     ValidationError,
 )
+from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.utils.encoding import force_str
 from bolt.utils.hashable import make_hashable
@@ -360,7 +360,9 @@ class ModelBase(type):
             return new_class
 
         new_class._prepare()
-        new_class._meta.packages.register_model(new_class._meta.package_label, new_class)
+        new_class._meta.packages.register_model(
+            new_class._meta.package_label, new_class
+        )
         return new_class
 
     def add_to_class(cls, name, value):

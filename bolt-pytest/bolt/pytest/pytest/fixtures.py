@@ -5,6 +5,7 @@ from functools import partial
 from typing import Any, Optional, Union
 
 import pytest
+
 from ..testcases import TestCase, TransactionTestCase
 
 TYPE_CHECKING = False

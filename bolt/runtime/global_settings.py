@@ -4,7 +4,6 @@ by the BOLT_SETTINGS_MODULE environment variable.
 """
 from pathlib import Path
 
-
 ####################
 # CORE             #
 ####################
