@@ -1,53 +1,71 @@
 import os
 import subprocess
+from pathlib import Path
 
 import click
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 from bolt.runtime import settings
 
 
 @click.command("format")  # format is a keyword
 @click.option("--check", is_flag=True, help="Check formatting instead of fixing")
-@click.argument("files", nargs=-1)
-def cli(check, files):
+@click.argument("paths", nargs=-1)
+def cli(check, paths):
     """Format Python code with black and ruff"""
-    if not files:
+
+    if not paths:
+        if Path("pyproject.toml").exists():
+            with open("pyproject.toml", "rb") as f:
+                pyproject = tomllib.load(f)
+            paths = (
+                pyproject.get("tool", {})
+                .get("bolt", {})
+                .get("format", {})
+                .get("paths", paths)
+            )
+
+    if not paths:
         # Make relative for nicer output
-        files = [os.path.relpath(settings.APP_PATH)]
+        paths = [os.path.relpath(settings.APP_PATH)]
 
     if check:
-        fmt_check(files)
+        fmt_check(paths)
     else:
-        fmt(files)
+        fmt(paths)
 
 
-def fmt(files):
+def fmt(paths):
     # If we're fixing, we do ruff first so black can re-format any ruff fixes
-    print_event(f"Fixing {', '.join(files)} with ruff")
+    print_event(f"Fixing {', '.join(paths)} with ruff")
     subprocess.check_call(
         [
             "ruff",
             "--fix-only",
             "--exit-zero",
-            *files,
+            *paths,
         ]
     )
 
-    print_event(f"Formatting {', '.join(files)} with black")
+    print_event(f"Formatting {', '.join(paths)} with black")
     subprocess.check_call(
         [
             "black",
-            *files,
+            *paths,
         ]
     )
 
 
-def fmt_check(files):
-    print_event(f"Checking {', '.join(files)} with black")
-    subprocess.check_call(["black", "--check", *files])
+def fmt_check(paths):
+    print_event(f"Checking {', '.join(paths)} with black")
+    subprocess.check_call(["black", "--check", *paths])
 
-    print_event(f"Checking {', '.join(files)} with ruff")
-    subprocess.check_call(["ruff", *files])
+    print_event(f"Checking {', '.join(paths)} with ruff")
+    subprocess.check_call(["ruff", *paths])
 
 
 def print_event(msg, newline=True):
