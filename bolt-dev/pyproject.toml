@@ -14,11 +14,12 @@ homepage = "https://www.boltpackages.com/"
 documentation = "https://www.boltpackages.com/docs/"
 repository = "https://github.com/boltpackages/bolt-dev"
 
-[tool.poetry.scripts]
-"bolt-dev" = "bolt.dev:cli"
-"bolt-work" = "bolt.dev.work:cli"
-"bolt-format" = "bolt.dev.format:cli"
-"bolt-pre-commit" = "bolt.dev.precommit:cli"
+# Make the CLI available without adding to INSTALLED_APPS
+[tool.poetry.plugins.bolt_cli]
+"dev" = "bolt.dev:cli"
+"work" = "bolt.dev.work:cli"
+"format" = "bolt.dev.format:cli"
+"pre-commit" = "bolt.dev.precommit:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"
