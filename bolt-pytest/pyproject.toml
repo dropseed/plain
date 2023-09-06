@@ -22,8 +22,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[tool.poetry.scripts]
-"bolt-test" = "bolt.pytest:cli"
+# Make the CLI available without adding to INSTALLED_APPS
+[tool.poetry.plugins.bolt_cli]
+"test" = "bolt.pytest:cli"
 
 # Automatically sets this up with pytest
 [tool.poetry.plugins."pytest11"]

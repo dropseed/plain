@@ -13,9 +13,6 @@ packages = [
     { include = "bolt" },
 ]
 
-[tool.poetry.scripts]
-"bolt-importmap" = "bolt.importmap:cli"
-
 [tool.poetry.dependencies]
 python = "^3.8"
 tomli = "*"

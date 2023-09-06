@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 import click
+import pkg_resources
 
 import bolt.runtime
 from bolt.env.cli import cli as env_cli
@@ -49,50 +50,20 @@ class InstalledPackagesGroup(click.Group):
                 return
 
 
-class BinNamespaceGroup(click.Group):
-    COMMAND_PREFIX = "bolt-"
-
+class EntryPointGroup(click.Group):
     def list_commands(self, ctx):
-        bin_dir = os.path.dirname(sys.executable)
         rv = []
-        for filename in os.listdir(bin_dir):
-            if filename.startswith(self.COMMAND_PREFIX):
-                rv.append(filename[len(self.COMMAND_PREFIX) :])
+
+        for entry_point in pkg_resources.iter_entry_points("bolt_cli"):
+            rv.append(entry_point.name)
 
         rv.sort()
         return rv
 
     def get_command(self, ctx, name):
-        # Remove hyphens and prepend w/ "bolt"
-        # so "pre-commit" becomes "forgeprecommit" as an import
-        imported = self.import_module_cli("bolt." + name.replace("-", ""))
-        if imported:
-            return imported
-
-        # Re-create the bin path and make sure it exists
-        bin_path = os.path.join(
-            os.path.dirname(sys.executable), self.COMMAND_PREFIX + name
-        )
-        if not os.path.exists(bin_path):
-            return
-
-        # Support multiple CLIs that came from the same package
-        # by looking at the contents of the bin command itself
-        with open(bin_path) as f:
-            for line in f:
-                if "from bolt." in line and "from bolt.cli" not in line:
-                    module = re.search(r"from (bolt\.([\w\.]+))", line).group(1)
-                    if module:
-                        imported = self.import_module_cli(module)
-                        if imported:
-                            return imported
-
-    def import_module_cli(self, name):
-        try:
-            i = importlib.import_module(name)
-            return i.cli
-        except (ImportError, AttributeError):
-            pass
+        for entry_point in pkg_resources.iter_entry_points("bolt_cli"):
+            if entry_point.name == name:
+                return entry_point.load()
 
 
 @click.group()
@@ -259,7 +230,7 @@ class BoltCommandCollection(click.CommandCollection):
 
         self.sources = [
             InstalledPackagesGroup(),
-            BinNamespaceGroup(),
+            EntryPointGroup(),
             bolt_cli,
         ]
 
