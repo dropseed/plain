@@ -16,13 +16,13 @@
     <script src="{{ static('admin/jquery-3.6.1.slim.min.js') }}"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
-<body class="flex min-h-screen text-white bg-[#2b251f]">
+<body class="flex min-h-screen text-black bg-stone-100">
     <div class="fixed flex flex-col justify-between flex-shrink-0 w-64 h-full px-6 pt-6 pb-3">
         <div>
-            <a class="font-bold text-[#eeede6]" href="{{ url('admin:index') }}">Bolt Admin</a>
-            <div class="mt-4 space-y-2.5">
+            <a class="font-bold text-stone-800" href="{{ url('admin:index') }}">Bolt Admin</a>
+            <div class="mt-4">
                 {% for view in admin_registry.get_nav_views() %}
-                <a class="flex items-center px-2 py-0.5 -mx-2 hover:text-white rounded text-[#dcd9cc] hover:bg-zinc-600" href="{{ url('admin:' + view.view_name() )}}">
+                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-stone-200" href="{{ url('admin:' + view.view_name() )}}">
                     {% if view.icon_name %}
                     <span class="bi bi-{{ view.icon_name }} mr-2"></span>
                     {% endif %}
@@ -32,13 +32,13 @@
             </div>
 
             <div class="mt-6 space-y-2.5">
-                <div class="text-xs tracking-wide text-gray-400">Pinned</div>
+                <div class="text-xs tracking-wide text-gray-500">Pinned</div>
             </div>
             <div class="mt-6 space-y-2.5">
-                <div class="text-xs tracking-wide text-gray-400">Recent</div>
+                <div class="text-xs tracking-wide text-gray-500">Recent</div>
             </div>
         </div>
-        <div class="flex items-center justify-between text-sm text-zinc-200">
+        <div class="flex items-center justify-between text-sm text-stone-700">
             <div class="flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-person-circle" viewBox="0 0 16 16">
                     <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
@@ -49,7 +49,7 @@
             <a class="hover:text-white hover:underline" href="{{ url('logout') }}">Log out</a>
         </div>
     </div>
-    <div class="flex-grow ml-64 overflow-auto text-black rounded-l-lg bg-stone-100">
+    <div class="flex-grow ml-64 overflow-auto text-black bg-white rounded-l-lg shadow-sm shadow-stone-400">
         <div class="flex justify-between px-8 py-4 text-sm border-b border-gray-200">
             <div class="flex items-center space-x-2">
                 <a class="text-gray-700" href="{{ url ('admin:index') }}">Admin</a>
@@ -68,7 +68,7 @@
         <div class="flex items-center justify-between px-8 mt-8">
             <div>
             {% block header %}
-                <h1 class="text-2xl font-semibold">
+                <h1 class="text-2xl font-semibold text-stone-700">
                     {% if icon_name %}
                     <span class="bi bi-{{ icon_name }} mr-1.5"></span>
                     {% endif %}
@@ -76,9 +76,9 @@
                     {{ title }}
                 </h1>
                 {% if description %}
-                <p class="mt-2 text-sm text-gray-600">{{ description }}</p>
+                <p class="mt-2 text-sm text-gray-500">{{ description }}</p>
                 {% elif object|default('') %}
-                <p class="mt-2 text-sm text-gray-600">{{ object.__repr__() }}</p>
+                <p class="mt-2 text-sm text-gray-500">{{ object.__repr__() }}</p>
                 {% endif %}
             {% endblock %}
             </div>
@@ -94,8 +94,8 @@
             {% if cards %}
             <div class="grid grid-cols-4 gap-6 mb-6">
             {% for card in cards %}
-                <div class="card
-                    {% if card.size.value == 1 -%}
+                <admin.Card class="
+                    {%- if card.size.value == 1 -%}
                     col-span-1
                     {%- elif card.size.value == 2 -%}
                     col-span-2
@@ -107,7 +107,7 @@
 
                     {{ render_card(card)|safe }}
 
-                </div>
+                </admin.Card>
             {% endfor %}
             </div>
             {% endif %}
