@@ -1,5 +1,5 @@
 {% if request.user.is_staff or (request.impersonator is defined and request.impersonator.is_staff) %}
-<div id="stafftoolbar" class="{{ stafftoolbar_outer_class or 'text-sm py-2 text-zinc-200 bg-zinc-800 fixed bottom-0 overflow-hidden max-w-full drop-shadow-md ring-2 ring-white/10 z-30 mx-4 rounded-t-lg overflow-x-auto hidden lg:flex -translate-x-1/2 left-1/2 group' }}">
+<div id="stafftoolbar" class="{{ stafftoolbar_outer_class or 'text-sm py-2 text-zinc-200 bg-zinc-800 fixed bottom-0 max-w-full drop-shadow-md ring-2 ring-white/10 z-30 mx-4 rounded-t-lg hidden lg:flex -translate-x-1/2 left-1/2 group' }}">
     <div class="{{ stafftoolbar_inner_class or 'container px-4 space-x-4 mx-auto flex justify-between' }}">
         <div class="flex items-center flex-shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-1 bi bi-person-badge" viewBox="0 0 16 16">
@@ -24,12 +24,12 @@
         <div class="flex items-center flex-shrink-0 space-x-4">
 
             <div class="relative group/release">
-                <code class="text-xs text-mono cursor-help">{{ stafftoolbar.release }}</code>
-                <div class="absolute top-0 left-0 hidden pt-6 -translate-y-full group/release-hover:block -translate-x-3/4">
+                <code class="text-xs text-mono cursor-help">{{ stafftoolbar.version }}</code>
+                <div class="absolute top-0 left-0 hidden pt-6 -translate-y-full group-hover/release:block">
                     <div class="p-2 text-xs border rounded shadow-md bg-zinc-900 border-zinc-700">
                         <table>
                             <tbody>
-                            {% for k, v in stafftoolbar.release.metadata %}
+                            {% for k, v in stafftoolbar.metadata.items() %}
                             <tr>
                                 <td class="pr-2 font-medium whitespace-nowrap">{{ k }}</td>
                                 <td class="whitespace-nowrap">{{ v }}</td>
