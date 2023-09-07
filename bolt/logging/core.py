@@ -6,9 +6,14 @@ app_logger = logging.getLogger("app")
 class KVLogger:
     def __init__(self, logger):
         self.logger = logger
+        self.context = {}  # A dict that will be output in every log message
 
     def log(self, level, message, **kwargs):
-        self.logger.log(level, f"{message} {self._format_kwargs(kwargs)}")
+        msg_kwargs = {
+            **kwargs,
+            **self.context,  # Put these last so they're at the end of the line
+        }
+        self.logger.log(level, f"{message} {self._format_kwargs(msg_kwargs)}")
 
     def _format_kwargs(self, kwargs):
         outputs = []
