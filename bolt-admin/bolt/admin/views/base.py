@@ -29,7 +29,6 @@ class BaseAdminView(AuthViewMixin, TemplateView):
     slug: str = ""
     path: str = ""
     description: str = ""
-    icon_name = "dot"
 
     # An explicit disabling of showing this url/page in the nav
     # which importantly effects the (future) recent pages list
@@ -45,7 +44,6 @@ class BaseAdminView(AuthViewMixin, TemplateView):
         context["title"] = self.title
         context["slug"] = self.get_slug()
         context["description"] = self.description
-        context["icon_name"] = self.icon_name
         context["links"] = self.get_links()
         context["parent_view_classes"] = self.get_parent_view_classes()
         return context

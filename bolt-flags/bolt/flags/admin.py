@@ -7,7 +7,6 @@ from .models import Flag, FlagResult
 @register_model
 class FlagAdmin(AdminModelViewset):
     model = Flag
-    icon_name = "flag-fill"
     list_fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
     search_fields = ["name", "description"]
 

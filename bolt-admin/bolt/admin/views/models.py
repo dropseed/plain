@@ -94,7 +94,6 @@ class AdminModelListView(AdminListView):
 
 class AdminModelViewset:
     model: "models.Model"
-    icon_name = "database-fill"
     list_description = ""
     list_fields: list = ["pk"]
     list_order = []
@@ -113,7 +112,6 @@ class AdminModelViewset:
             title = cls.model._meta.verbose_name_plural.capitalize()
             description = cls.list_description
             slug = cls.model._meta.model_name
-            icon_name = cls.icon_name
             list_fields = cls.list_fields
             list_order = cls.list_order
             cards = cls.list_cards
@@ -155,7 +153,6 @@ class AdminModelViewset:
         class V(AdminUpdateView):
             title = f"Update {cls.model._meta.verbose_name}"
             slug = f"{cls.model._meta.model_name}_update"
-            icon_name = cls.icon_name
             form_class = cls.form_class
             path = f"{cls.model._meta.model_name}/<int:pk>/update/"
             cards = cls.form_cards
@@ -172,7 +169,6 @@ class AdminModelViewset:
         class V(AdminDetailView):
             title = cls.model._meta.verbose_name.capitalize()
             slug = f"{cls.model._meta.model_name}_detail"
-            icon_name = cls.icon_name
             path = f"{cls.model._meta.model_name}/<int:pk>/"
             parent_view_class = cls.get_list_view()
             fields = cls.detail_fields
