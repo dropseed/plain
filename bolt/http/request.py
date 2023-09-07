@@ -1,5 +1,6 @@
 import codecs
 import copy
+import uuid
 from io import BytesIO
 from itertools import chain
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
@@ -61,6 +62,9 @@ class HttpRequest:
         # WARNING: The `WSGIRequest` subclass doesn't call `super`.
         # Any variable assignment made here should also happen in
         # `WSGIRequest.__init__()`.
+
+        # A unique ID we can use to trace this request
+        self.unique_id = uuid.uuid4()
 
         self.GET = QueryDict(mutable=True)
         self.POST = QueryDict(mutable=True)
