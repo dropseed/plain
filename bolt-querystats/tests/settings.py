@@ -33,5 +33,3 @@ DATABASES = {
 ROOT_URLCONF = "urls"
 
 USE_TZ = True
-
-STAFFTOOLBAR_LINKS = []

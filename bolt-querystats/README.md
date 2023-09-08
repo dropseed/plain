@@ -107,21 +107,6 @@ INSTALLED_PACKAGES += [
 More specific settings can be found below.
 
 
-## Custom links
-
-Staff links are shown on the right-hand side of the toolbar and can be customzed.
-By default, it shows a link back to the Django admin:
-
-```python
-# settings.py
-from bolt.urls import reverse_lazy
-
-
-STAFFTOOLBAR_LINKS = [
-    ("Admin", reverse_lazy("admin:index")),
-]
-```
-
 ## Container class
 
 To make the toolbar better match your layout,
