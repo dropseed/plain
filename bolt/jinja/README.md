@@ -1,12 +1,19 @@
-# Jinja
+# Templates
 
 Bolt uses [Jinja2](https://jinja.palletsprojects.com/en/latest/) for rendering templates.
 
+Templates can be stored inside `INSTALLED_PACKAGES` (ex. `app/<pkg>/templates`) or in the `templates` directory at the root of your project (ex. `app/templates`).
+
+### App templates
+
+You `app/templates` will typically have things like `base.html`,
+which the whole app depends on.
+
+### Package templates
+
+## Jinja
+
 There is a default set of globals, filters, and extensions.
-
-## Templates
-
-Templates can be stored inside `INSTALLED_PACKAGES` or in the `templates` directory at the root of your project.
 
 ## Default globals
 
