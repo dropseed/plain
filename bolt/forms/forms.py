@@ -56,7 +56,6 @@ class BaseForm:
 
     field_order = None
     prefix = None
-    use_required_attribute = True
 
     def __init__(
         self,
