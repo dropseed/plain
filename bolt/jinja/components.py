@@ -6,6 +6,7 @@ from jinja2 import nodes
 from jinja2.ext import Extension
 from jinja2.loaders import FileSystemLoader
 
+from bolt.runtime import settings
 from bolt.utils.functional import cached_property
 
 if TYPE_CHECKING:
@@ -82,11 +83,20 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                     call = self.call_method(
                         "_render", args=args, kwargs=kwargs, lineno=lineno
                     )
+
+                    self.source_ref = f"{parser.name}:{lineno}"
+
                     return nodes.CallBlock(call, [], [], body).set_lineno(lineno)
 
                 def _render(self, context, **kwargs):
                     template = self.environment.get_template(self.template_name)
-                    return template.render({**context, **kwargs})
+                    rendered = template.render({**context, **kwargs})
+
+                    if settings.DEBUG:
+                        # Add an HTML comment in dev to help identify components in output
+                        return f"<!-- <{self.html_name}>\n{self.source_ref} -->\n{rendered}\n<!-- </{self.html_name}> -->"
+                    else:
+                        return rendered
 
             # Create a new class on the fly
             NamedComponentExtension = type(
@@ -96,6 +106,7 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                     "tags": {jinja_tag_name, f"end{jinja_tag_name}"},
                     "template_name": f"components/{component_relative_path}",
                     "jinja_tag_name": jinja_tag_name,
+                    "html_name": component_name,
                 },
             )
             self._template_components_environment.add_extension(NamedComponentExtension)
