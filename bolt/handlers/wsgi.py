@@ -58,7 +58,7 @@ class WSGIRequest(HttpRequest):
 
     def __init__(self, environ):
         # A unique ID we can use to trace this request
-        self.unique_id = uuid.uuid4()
+        self.unique_id = str(uuid.uuid4())
 
         script_name = get_script_name(environ)
         # If PATH_INFO is empty (e.g. accessing the SCRIPT_NAME URL without a

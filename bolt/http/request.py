@@ -64,7 +64,7 @@ class HttpRequest:
         # `WSGIRequest.__init__()`.
 
         # A unique ID we can use to trace this request
-        self.unique_id = uuid.uuid4()
+        self.unique_id = str(uuid.uuid4())
 
         self.GET = QueryDict(mutable=True)
         self.POST = QueryDict(mutable=True)
