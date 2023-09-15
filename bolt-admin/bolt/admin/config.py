@@ -7,7 +7,7 @@ MODULE_NAME = "admin"
 
 class BoltAdminConfig(PackageConfig):
     name = "bolt.admin"
-    label = "admin"
+    label = "boltadmin"
 
     def ready(self):
         # Trigger register calls to fire by importing the modules

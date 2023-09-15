@@ -12,6 +12,8 @@ class AdminViewRegistry:
             self.registered_views.add(view)
             # TODO do this somewhere else...
             # self.registered_views = set(self.registered_views, key=lambda v: v.title)
+            for card in view.cards:
+                self.register_card(card)
             return view
 
         if callable(view):
@@ -33,7 +35,7 @@ class AdminViewRegistry:
     def register_model(self, viewset=None):
         def inner(viewset):
             for view in viewset.get_views():
-                self.registered_views.add(view)
+                self.register_view(view)
             return viewset
 
         if callable(viewset):
