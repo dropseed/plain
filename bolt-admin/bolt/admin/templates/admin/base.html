@@ -21,16 +21,27 @@
             <a class="font-bold text-stone-800" href="{{ url('admin:index') }}">Bolt Admin</a>
             <div class="mt-4">
                 {% for view in admin_registry.get_nav_views() %}
-                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-stone-200" href="{{ url('admin:' + view.view_name() )}}">
+                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-stone-200" href="{{ view.get_absolute_url() }}">
                     {{ view.title }}
                 </a>
                 {% endfor %}
             </div>
 
-            <div class="mt-6 space-y-2.5">
+            {% if admin_registry.registered_dashboards|length > 1 %}
+            <div class="mt-6">
+                <div class="text-xs tracking-wide text-gray-500">Dashboards</div>
+                {% for view in admin_registry.registered_dashboards %}
+                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-stone-200" href="{{ view.get_absolute_url() }}">
+                    {{ view.title }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mt-6">
                 <div class="text-xs tracking-wide text-gray-500">Pinned</div>
             </div>
-            <div class="mt-6 space-y-2.5">
+            <div class="mt-6">
                 <div class="text-xs tracking-wide text-gray-500">Recent</div>
             </div>
         </div>
@@ -51,7 +62,7 @@
                 <a class="text-gray-700" href="{{ url ('admin:index') }}">Admin</a>
                 {% for parent in parent_view_classes %}
                 <span class="text-gray-600">/</span>
-                <a class="text-gray-700" href="{{ url('admin:' + parent.view_name()) }}">{{ parent.title }}</a>
+                <a class="text-gray-700" href="{{ parent.get_absolute_url() }}">{{ parent.title }}</a>
                 {% endfor %}
                 <span class="text-gray-600">/</span>
                 <a href="{{ request.path }}">{{ title }}</a>

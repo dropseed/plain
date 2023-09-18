@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from bolt.db import models
 from bolt.http import HttpResponse
 from bolt.paginator import Paginator
+from bolt.urls import reverse
 from bolt.utils.text import slugify
 from bolt.views import (
     AuthViewMixin,
@@ -79,6 +80,10 @@ class BaseAdminView(AuthViewMixin, TemplateView):
             return False
 
         return True
+
+    @classmethod
+    def get_absolute_url(cls) -> str:
+        return reverse(f"{URL_NAMESPACE}:" + cls.view_name())
 
     def get_links(self) -> dict[str]:
         return self.links

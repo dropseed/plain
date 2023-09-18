@@ -7,7 +7,12 @@ from .views.cards import (
     AdminTrendCardView,
 )
 from .views.models import AdminModelViewset
-from .views.registry import register_card, register_model, register_view
+from .views.registry import (
+    register_card,
+    register_dashboard,
+    register_model,
+    register_view,
+)
 
 __all__ = [
     "AdminPageView",
@@ -21,4 +26,5 @@ __all__ = [
     "register_model",
     "register_card",
     "register_view",
+    "register_dashboard",
 ]
