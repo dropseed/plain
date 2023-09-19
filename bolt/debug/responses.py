@@ -416,6 +416,7 @@ class ExceptionReporter:
             return t.render(c)
         except Exception as e:
             logger.exception("Error rendering 500 template", e)
+            print(e)
             return HttpResponse(
                 f"Error rendering 500 template: {e}",
                 content_type="text/plain",

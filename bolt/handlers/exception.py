@@ -3,7 +3,6 @@ import sys
 from functools import wraps
 
 from bolt import signals
-from bolt.debug import responses as debug_responses
 from bolt.exceptions import (
     BadRequest,
     PermissionDenied,
@@ -14,7 +13,6 @@ from bolt.exceptions import (
 )
 from bolt.http import Http404
 from bolt.http.multipartparser import MultiPartParserError
-from bolt.runtime import settings
 from bolt.urls import get_resolver, get_urlconf
 from bolt.utils.log import log_response
 
@@ -75,14 +73,14 @@ def response_for_exception(request, exc):
         )
 
     elif isinstance(exc, BadRequest):
-        if settings.DEBUG:
-            response = debug_responses.technical_500_response(
-                request, *sys.exc_info(), status_code=400
-            )
-        else:
-            response = get_exception_response(
-                request, get_resolver(get_urlconf()), 400, exc
-            )
+        # if settings.DEBUG:
+        #     response = debug_responses.technical_500_response(
+        #         request, *sys.exc_info(), status_code=400
+        #     )
+        # else:
+        response = get_exception_response(
+            request, get_resolver(get_urlconf()), 400, exc
+        )
         log_response(
             "%s: %s",
             str(exc),
@@ -105,14 +103,14 @@ def response_for_exception(request, exc):
             exc_info=exc,
             extra={"status_code": 400, "request": request},
         )
-        if settings.DEBUG:
-            response = debug_responses.technical_500_response(
-                request, *sys.exc_info(), status_code=400
-            )
-        else:
-            response = get_exception_response(
-                request, get_resolver(get_urlconf()), 400, exc
-            )
+        # if settings.DEBUG:
+        #     response = debug_responses.technical_500_response(
+        #         request, *sys.exc_info(), status_code=400
+        #     )
+        # else:
+        response = get_exception_response(
+            request, get_resolver(get_urlconf()), 400, exc
+        )
 
     else:
         signals.got_request_exception.send(sender=None, request=request)
@@ -153,8 +151,8 @@ def handle_uncaught_exception(request, resolver, exc_info):
     Processing for any otherwise uncaught exceptions (those that will
     generate HTTP 500 responses).
     """
-    if settings.DEBUG:
-        return debug_responses.technical_500_response(request, *exc_info)
+    # if settings.DEBUG:
+    #     return debug_responses.technical_500_response(request, *exc_info)
 
     # Return an HttpResponse that displays a friendly error message.
     callback = resolver.resolve_error_handler(500)

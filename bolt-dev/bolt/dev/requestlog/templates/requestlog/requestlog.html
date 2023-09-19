@@ -79,6 +79,21 @@
             </form>
         </div>
 
+        {% if requestlog.exception %}
+        <div class="p-2 mt-4 bg-red-600 rounded text-zinc-100">
+            <h3 class="text-sm font-medium">{{ requestlog.exception.type }} Exception</h3>
+            <pre class="mt-2 overflow-auto text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>
+            {{- requestlog.exception.str -}}
+            </code></pre>
+            <pre class="mt-2 overflow-auto text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>
+            {{- requestlog.exception.args -}}
+            </code></pre>
+            <pre class="mt-2 overflow-auto text-xs rounded bg-zinc-800 text-zinc-200"><code>
+            {{- requestlog.exception.traceback -}}
+            </code></pre>
+        </div>
+        {% endif %}
+
         {% if request.querydict %}
         <dl class="px-2 pt-1 pb-2 mt-4 rounded bg-zinc-800">
         {% for key, value in request.querydict.items() %}

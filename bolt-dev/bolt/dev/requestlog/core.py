@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import traceback
 
 import requests
 
@@ -8,9 +9,10 @@ from bolt.runtime import settings
 
 
 class RequestLog:
-    def __init__(self, *, request, response):
+    def __init__(self, *, request, response, exception=None):
         self.request = request
         self.response = response
+        self.exception = exception
 
     @staticmethod
     def storage_path():
@@ -124,6 +126,7 @@ class RequestLog:
             "timestamp": datetime.datetime.now().timestamp(),
             "request": self.request_as_dict(self.request),
             "response": self.response_as_dict(self.response),
+            "exception": self.exception_as_dict(self.exception),
         }
 
     @staticmethod
@@ -153,4 +156,18 @@ class RequestLog:
             "status_code": response.status_code,
             "headers": dict(response.headers),
             "content": content,
+        }
+
+    @staticmethod
+    def exception_as_dict(exception):
+        if not exception:
+            return None
+
+        tb_string = "".join(traceback.format_tb(exception.__traceback__))
+
+        return {
+            "type": type(exception).__name__,
+            "str": str(exception),
+            "args": exception.args,
+            "traceback": tb_string,
         }
