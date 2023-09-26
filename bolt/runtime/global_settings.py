@@ -4,13 +4,17 @@ by the BOLT_SETTINGS_MODULE environment variable.
 """
 from pathlib import Path
 
+from bolt.runtime import APP_PATH as default_app_path
+
 ####################
 # CORE             #
 ####################
 
-DEBUG: bool = False
+DEBUG: bool
 
-BOLT_TEMP_PATH: Path
+APP_PATH: Path = default_app_path
+
+BOLT_TEMP_PATH: Path = APP_PATH.parent / ".bolt"
 
 # Hosts/domain names that are valid for this site.
 # "*" matches anything, ".example.com" matches example.com and all subdomains
@@ -49,7 +53,7 @@ STORAGES = {
         "BACKEND": "bolt.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "bolt.staticfiles.storage.StaticFilesStorage",
+        "BACKEND": "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
@@ -65,11 +69,11 @@ MEDIA_URL = ""
 
 # Absolute path to the directory static files should be collected to.
 # Example: "/var/www/example.com/static/"
-STATIC_ROOT = None
+STATIC_ROOT = APP_PATH / "staticfiles"
 
 # URL that handles the static files served from STATIC_ROOT.
 # Example: "http://example.com/static/", "http://static.example.com/"
-STATIC_URL = None
+STATIC_URL = "/static/"
 
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [
@@ -174,7 +178,7 @@ DEFAULT_EXCEPTION_REPORTER_FILTER = "bolt.debug.responses.SafeExceptionReporterF
 ###############
 
 # A list of locations of additional static files
-STATICFILES_DIRS = []
+STATICFILES_DIRS = [APP_PATH / "static"]
 
 # List of finder classes that know how to find static files in
 # various locations.

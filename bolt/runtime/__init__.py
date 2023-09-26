@@ -34,3 +34,18 @@ def setup():
 
 # from bolt.runtime import settings
 settings = LazySettings()
+
+
+if (Path.cwd() / "app").exists():
+    APP_PATH = Path.cwd() / "app"
+else:
+    APP_PATH = None
+
+
+__all__ = [
+    "setup",
+    "settings",
+    "APP_PATH",
+    "VERSION",
+    "__version__",
+]

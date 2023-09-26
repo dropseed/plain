@@ -17,8 +17,6 @@ from bolt.exceptions import ImproperlyConfigured
 from bolt.packages import PackageConfig
 from bolt.utils.functional import LazyObject, empty
 
-from . import global_settings
-
 ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"
 DEFAULT_STORAGE_ALIAS = "default"
 STATICFILES_STORAGE_ALIAS = "staticfiles"
@@ -148,7 +146,9 @@ class DefaultSetting:
 class Settings:
     def __init__(self, settings_module):
         self._default_settings = {}
-        self._load_module_settings(global_settings)
+        self._load_module_settings(
+            importlib.import_module("bolt.runtime.global_settings")
+        )
 
         # store the settings module in case someone later cares
         self.SETTINGS_MODULE = settings_module

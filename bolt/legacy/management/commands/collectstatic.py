@@ -4,7 +4,6 @@ from bolt.checks import Tags
 from bolt.files.storage import FileSystemStorage
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.color import no_style
-from bolt.packages import packages
 from bolt.staticfiles.finders import get_finders
 from bolt.staticfiles.storage import staticfiles_storage
 from bolt.utils.functional import cached_property
@@ -100,9 +99,7 @@ class Command(BaseCommand):
         self.dry_run = options["dry_run"]
         ignore_patterns = options["ignore_patterns"]
         if options["use_default_ignore_patterns"]:
-            ignore_patterns += packages.get_package_config(
-                "staticfiles"
-            ).ignore_patterns
+            ignore_patterns += ["CVS", ".*", "*~"]
         self.ignore_patterns = list({os.path.normpath(p) for p in ignore_patterns})
         self.post_process = options["post_process"]
 
