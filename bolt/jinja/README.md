@@ -1,6 +1,6 @@
 # Templates
 
-Bolt uses [Jinja2](https://jinja.palletsprojects.com/en/latest/) for rendering templates.
+Render templates using Jinja2.
 
 Templates can be stored inside `INSTALLED_PACKAGES` (ex. `app/<pkg>/templates`) or in the `templates` directory at the root of your project (ex. `app/templates`).
 

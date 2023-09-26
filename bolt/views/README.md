@@ -1,5 +1,7 @@
 # Views
 
+Take a request, return a response.
+
 Class-based vs function-based views is a well-known debate in Django.
 
 My take is that class-based views are the way to go,

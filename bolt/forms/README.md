@@ -1,5 +1,7 @@
 # Forms
 
+Handle user input.
+
 - forms don't render themselves
 - registered scripts vs media?
 - move model save logic into form.save() - disconnect them

@@ -1,5 +1,7 @@
 # Env
 
+Manage settings via environment variables.
+
 It's common
 (and typically best practice)
 to use environment variables to configure your app.

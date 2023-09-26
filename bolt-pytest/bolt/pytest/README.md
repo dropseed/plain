@@ -1,5 +1,7 @@
 ## Testing - pytest
 
+Write and run tests with pytest.
+
 Django includes its own test runner and [unittest](https://docs.python.org/3/library/unittest.html#module-unittest) classes.
 But a lot of people (myself included) prefer [pytest](https://docs.pytest.org/en/latest/contents.html).
 

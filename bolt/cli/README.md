@@ -1,7 +1,6 @@
 # CLI
 
-The `bolt` CLI loads commands from Bolt itself,
-and any `INSTALLED_PACKAGES`.
+The `bolt` CLI loads commands from Bolt itself, and any `INSTALLED_PACKAGES`.
 
 Commands are written using [Click]((https://click.palletsprojects.com/en/8.1.x/))
 (one of Bolt's few dependencies),
