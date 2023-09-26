@@ -165,14 +165,6 @@ CSRF_USE_SESSIONS = False
 # Custom logging configuration.
 LOGGING = {}
 
-# Default exception reporter class used in case none has been
-# specifically assigned to the HttpRequest instance.
-DEFAULT_EXCEPTION_REPORTER = "bolt.debug.responses.ExceptionReporter"
-
-# Default exception reporter filter class used in case none has been
-# specifically assigned to the HttpRequest instance.
-DEFAULT_EXCEPTION_REPORTER_FILTER = "bolt.debug.responses.SafeExceptionReporterFilter"
-
 ###############
 # STATICFILES #
 ###############
