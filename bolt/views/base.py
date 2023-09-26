@@ -3,6 +3,7 @@ import logging
 from bolt.http import (
     HttpRequest,
     HttpResponse,
+    HttpResponseBase,
     HttpResponseNotAllowed,
     JsonResponse,
 )
@@ -56,10 +57,10 @@ class View:
 
         return view
 
-    def get_response(self) -> HttpResponse:
+    def get_response(self) -> HttpResponseBase:
         return self.dispatch()
 
-    def dispatch(self, *args, **kwargs) -> HttpResponse:
+    def dispatch(self, *args, **kwargs) -> HttpResponseBase:
         """Compatible with Bolt's dispatch, but we disregard the args/kwargs"""
         # Warning?
 
@@ -77,7 +78,7 @@ class View:
         except HttpResponseException as e:
             return e.response
 
-        if isinstance(result, HttpResponse):
+        if isinstance(result, HttpResponseBase):
             return result
 
         # Allow return of an int (status code)
