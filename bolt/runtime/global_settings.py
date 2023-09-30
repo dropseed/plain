@@ -66,10 +66,6 @@ STATIC_ROOT = APP_PATH / "staticfiles"
 # Example: "http://example.com/static/", "http://static.example.com/"
 STATIC_URL = "/static/"
 
-STATIC_BACKEND = (
-    "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage"
-)
-
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [
     "bolt.files.uploadhandler.MemoryFileUploadHandler",
@@ -166,6 +162,10 @@ LOGGING = {}
 
 # A list of locations of additional static files
 STATICFILES_DIR = APP_PATH / "static"
+
+STATICFILES_BACKEND = (
+    "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage"
+)
 
 # List of finder classes that know how to find static files in
 # various locations.
