@@ -50,14 +50,6 @@ SECRET_KEY_FALLBACKS: list[str] = []
 
 ROOT_URLCONF = "urls"
 
-# Absolute path to the directory static files should be collected to.
-# Example: "/var/www/example.com/static/"
-STATIC_ROOT = APP_PATH / "staticfiles"
-
-# URL that handles the static files served from STATIC_ROOT.
-# Example: "http://example.com/static/", "http://static.example.com/"
-STATIC_URL = "/static/"
-
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [
     "bolt.files.uploadhandler.MemoryFileUploadHandler",
@@ -152,9 +144,6 @@ LOGGING = {}
 # STATICFILES #
 ###############
 
-# A list of locations of additional static files
-STATICFILES_DIR = APP_PATH / "static"
-
 STATICFILES_BACKEND = (
     "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage"
 )
@@ -165,6 +154,14 @@ STATICFILES_FINDERS = [
     "bolt.staticfiles.finders.FileSystemFinder",
     "bolt.staticfiles.finders.PackageDirectoriesFinder",
 ]
+
+# Absolute path to the directory static files should be collected to.
+# Example: "/var/www/example.com/static/"
+STATIC_ROOT = APP_PATH / "staticfiles"
+
+# URL that handles the static files served from STATIC_ROOT.
+# Example: "http://example.com/static/", "http://static.example.com/"
+STATIC_URL = "/static/"
 
 #################
 # SYSTEM CHECKS #

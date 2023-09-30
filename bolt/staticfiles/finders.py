@@ -1,18 +1,19 @@
 import functools
 import os
 
-from bolt.checks import Error, Warning
 from bolt.exceptions import ImproperlyConfigured
 from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.staticfiles import utils
-from bolt.staticfiles.storage import FileSystemStorage, Storage
+from bolt.staticfiles.storage import FileSystemStorage
 from bolt.utils._os import safe_join
-from bolt.utils.functional import LazyObject
 from bolt.utils.module_loading import import_string
 
 # To keep track on which directories the finder has searched the static files.
 searched_locations = []
+
+
+APP_STATIC_DIR = settings.APP_PATH / "static"
 
 
 class BaseFinder:
@@ -49,8 +50,7 @@ class BaseFinder:
 
 class FileSystemFinder(BaseFinder):
     """
-    A static files finder that uses the ``STATICFILES_DIR`` setting
-    to locate files.
+    A static files finder that looks in "static"
     """
 
     def __init__(self, package_names=None, *args, **kwargs):
@@ -58,7 +58,9 @@ class FileSystemFinder(BaseFinder):
         self.locations = []
         # Maps dir paths to an appropriate storage instance
         self.storages = {}
-        root = settings.STATICFILES_DIR
+
+        root = APP_STATIC_DIR
+
         if isinstance(root, list | tuple):
             prefix, root = root
         else:
@@ -71,52 +73,21 @@ class FileSystemFinder(BaseFinder):
             self.storages[root] = filesystem_storage
         super().__init__(*args, **kwargs)
 
-    def check(self, **kwargs):
-        errors = []
-        if not isinstance(settings.STATICFILES_DIR, str):
-            errors.append(
-                Error(
-                    "The STATICFILES_DIR setting is not a tuple or list.",
-                    hint="Perhaps you forgot a trailing comma?",
-                    id="staticfiles.E001",
-                )
-            )
-            return errors
-        root = settings.STATICFILES_DIR
-        if isinstance(root, list | tuple):
-            prefix, root = root
-            if prefix.endswith("/"):
-                errors.append(
-                    Error(
-                        "The prefix %r in the STATICFILES_DIR setting must "
-                        "not end with a slash." % prefix,
-                        id="staticfiles.E003",
-                    )
-                )
-        if settings.STATIC_ROOT and os.path.abspath(
-            settings.STATIC_ROOT
-        ) == os.path.abspath(root):
-            errors.append(
-                Error(
-                    "The STATICFILES_DIR setting should not contain the "
-                    "STATIC_ROOT setting.",
-                    id="staticfiles.E002",
-                )
-            )
-        if not os.path.isdir(root):
-            errors.append(
-                Warning(
-                    f"The directory '{root}' in the STATICFILES_DIR setting "
-                    f"does not exist.",
-                    id="staticfiles.W004",
-                )
-            )
-        return errors
+    # def check(self, **kwargs):
+    #     errors = []
+    #     if settings.STATIC_ROOT and os.path.abspath(
+    #         settings.STATIC_ROOT
+    #     ) == os.path.abspath(self.path):
+    #         errors.append(
+    #             Error(
+    #                 "The STATICFILES_DIR setting should not contain the "
+    #                 "STATIC_ROOT setting.",
+    #                 id="staticfiles.E002",
+    #             )
+    #         )
+    #     return errors
 
     def find(self, path, all=False):
-        """
-        Look for files in the extra locations as defined in STATICFILES_DIR.
-        """
         matches = []
         for prefix, root in self.locations:
             if root not in searched_locations:
@@ -217,54 +188,6 @@ class PackageDirectoriesFinder(BaseFinder):
             matched_path = storage.path(path)
             if matched_path:
                 return matched_path
-
-
-class BaseStorageFinder(BaseFinder):
-    """
-    A base static files finder to be used to extended
-    with an own storage class.
-    """
-
-    storage = None
-
-    def __init__(self, storage=None, *args, **kwargs):
-        if storage is not None:
-            self.storage = storage
-        if self.storage is None:
-            raise ImproperlyConfigured(
-                "The staticfiles storage finder %r "
-                "doesn't have a storage class "
-                "assigned." % self.__class__
-            )
-        # Make sure we have a storage instance here.
-        if not isinstance(self.storage, Storage | LazyObject):
-            self.storage = self.storage()
-        super().__init__(*args, **kwargs)
-
-    def find(self, path, all=False):
-        """
-        Look for files in the default file storage, if it's local.
-        """
-        try:
-            self.storage.path("")
-        except NotImplementedError:
-            pass
-        else:
-            if self.storage.location not in searched_locations:
-                searched_locations.append(self.storage.location)
-            if self.storage.exists(path):
-                match = self.storage.path(path)
-                if all:
-                    match = [match]
-                return match
-        return []
-
-    def list(self, ignore_patterns):
-        """
-        List all files of the storage.
-        """
-        for path in utils.get_files(self.storage, ignore_patterns):
-            yield path, self.storage
 
 
 def find(path, all=False):
