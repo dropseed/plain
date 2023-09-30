@@ -100,7 +100,7 @@ def root_urlconf_changed(*, setting, **kwargs):
 @receiver(setting_changed)
 def static_storage_changed(*, setting, **kwargs):
     if setting in {
-        "STATICFILES_BACKEND",
+        "STATIC_BACKEND",
         "STATIC_ROOT",
         "STATIC_URL",
     }:

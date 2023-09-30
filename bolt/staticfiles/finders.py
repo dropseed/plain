@@ -213,7 +213,7 @@ def find(path, all=False):
 
 
 def get_finders():
-    for finder_path in settings.STATICFILES_FINDERS:
+    for finder_path in settings.STATIC_FINDERS:
         yield get_finder(finder_path)
 
 

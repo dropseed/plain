@@ -144,13 +144,13 @@ LOGGING = {}
 # STATICFILES #
 ###############
 
-STATICFILES_BACKEND = (
+STATIC_BACKEND = (
     "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage"
 )
 
 # List of finder classes that know how to find static files in
 # various locations.
-STATICFILES_FINDERS = [
+STATIC_FINDERS = [
     "bolt.staticfiles.finders.FileSystemFinder",
     "bolt.staticfiles.finders.PackageDirectoriesFinder",
 ]

@@ -912,7 +912,7 @@ class ManifestStaticFilesStorage(ManifestFilesMixin, StaticFilesStorage):
 
 class ConfiguredStorage(LazyObject):
     def _setup(self):
-        backend_class = import_string(settings.STATICFILES_BACKEND)
+        backend_class = import_string(settings.STATIC_BACKEND)
         self._wrapped = backend_class()
 
 
