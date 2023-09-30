@@ -103,7 +103,7 @@ def get_warning_for_invalid_pattern(pattern):
 @register(Tags.urls)
 def check_url_settings(package_configs, **kwargs):
     errors = []
-    for name in ("STATIC_URL", "MEDIA_URL"):
+    for name in ("STATIC_URL",):
         value = getattr(settings, name)
         if value and not value.endswith("/"):
             errors.append(E006(name))

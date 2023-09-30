@@ -50,14 +50,6 @@ SECRET_KEY_FALLBACKS: list[str] = []
 
 ROOT_URLCONF = "urls"
 
-# Absolute filesystem path to the directory that will hold user-uploaded files.
-# Example: "/var/www/example.com/media/"
-MEDIA_ROOT = ""
-
-# URL that handles the media served from MEDIA_ROOT.
-# Examples: "http://example.com/media/", "http://media.example.com/"
-MEDIA_URL = ""
-
 # Absolute path to the directory static files should be collected to.
 # Example: "/var/www/example.com/static/"
 STATIC_ROOT = APP_PATH / "staticfiles"

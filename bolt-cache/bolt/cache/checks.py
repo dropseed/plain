@@ -24,7 +24,7 @@ def check_cache_location_not_exposed(package_configs, **kwargs):
     from bolt.cache import caches
 
     errors = []
-    for name in ("MEDIA_ROOT", "STATIC_ROOT", "STATICFILES_DIR"):
+    for name in ("STATIC_ROOT", "STATICFILES_DIR"):
         setting = getattr(settings, name, None)
         if not setting:
             continue

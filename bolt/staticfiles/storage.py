@@ -195,12 +195,7 @@ class Storage:
 class StorageSettingsMixin:
     def _clear_cached_properties(self, setting, **kwargs):
         """Reset setting based property values."""
-        if setting == "MEDIA_ROOT":
-            self.__dict__.pop("base_location", None)
-            self.__dict__.pop("location", None)
-        elif setting == "MEDIA_URL":
-            self.__dict__.pop("base_url", None)
-        elif setting == "FILE_UPLOAD_PERMISSIONS":
+        if setting == "FILE_UPLOAD_PERMISSIONS":
             self.__dict__.pop("file_permissions_mode", None)
         elif setting == "FILE_UPLOAD_DIRECTORY_PERMISSIONS":
             self.__dict__.pop("directory_permissions_mode", None)
@@ -226,25 +221,17 @@ class FileSystemStorage(Storage, StorageSettingsMixin):
         file_permissions_mode=None,
         directory_permissions_mode=None,
     ):
-        self._location = location
-        self._base_url = base_url
+        self.base_location = location
+        self.base_url = base_url
+        if self.base_url and not self.base_url.endswith("/"):
+            self.base_url += "/"
         self._file_permissions_mode = file_permissions_mode
         self._directory_permissions_mode = directory_permissions_mode
         setting_changed.connect(self._clear_cached_properties)
 
     @cached_property
-    def base_location(self):
-        return self._value_or_setting(self._location, settings.MEDIA_ROOT)
-
-    @cached_property
     def location(self):
         return os.path.abspath(self.base_location)
-
-    @cached_property
-    def base_url(self):
-        if self._base_url is not None and not self._base_url.endswith("/"):
-            self._base_url += "/"
-        return self._value_or_setting(self._base_url, settings.MEDIA_URL)
 
     @cached_property
     def file_permissions_mode(self):
