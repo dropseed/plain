@@ -18,7 +18,6 @@ from bolt.packages import PackageConfig
 from bolt.utils.functional import LazyObject, empty
 
 ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"
-STATICFILES_STORAGE_ALIAS = "staticfiles"
 
 
 class SettingsReference(str):

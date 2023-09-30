@@ -48,12 +48,6 @@ SECRET_KEY: str = ""
 # secret key rotation.
 SECRET_KEY_FALLBACKS: list[str] = []
 
-STORAGES = {
-    "staticfiles": {
-        "BACKEND": "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
-
 ROOT_URLCONF = "urls"
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
@@ -71,6 +65,10 @@ STATIC_ROOT = APP_PATH / "staticfiles"
 # URL that handles the static files served from STATIC_ROOT.
 # Example: "http://example.com/static/", "http://static.example.com/"
 STATIC_URL = "/static/"
+
+STATIC_BACKEND = (
+    "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage"
+)
 
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [

@@ -78,26 +78,6 @@ def update_connections_time_zone(*, setting, **kwargs):
 
 
 @receiver(setting_changed)
-def storages_changed(*, setting, **kwargs):
-    from bolt.files.storage import storages
-    from bolt.staticfiles.storage import staticfiles_storage
-
-    if setting in (
-        "STORAGES",
-        "STATIC_ROOT",
-        "STATIC_URL",
-    ):
-        try:
-            del storages.backends
-        except AttributeError:
-            pass
-        storages._backends = None
-        storages._storages = {}
-
-        staticfiles_storage._wrapped = empty
-
-
-@receiver(setting_changed)
 def complex_setting_changed(*, enter, setting, **kwargs):
     if enter and setting in COMPLEX_OVERRIDE_SETTINGS:
         # Considering the current implementation of the signals framework,
@@ -120,6 +100,7 @@ def root_urlconf_changed(*, setting, **kwargs):
 @receiver(setting_changed)
 def static_storage_changed(*, setting, **kwargs):
     if setting in {
+        "STATIC_BACKEND",
         "STATIC_ROOT",
         "STATIC_URL",
     }:

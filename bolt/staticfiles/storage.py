@@ -7,11 +7,11 @@ from urllib.parse import unquote, urldefrag, urlsplit, urlunsplit
 
 from bolt.exceptions import ImproperlyConfigured
 from bolt.files.base import ContentFile
-from bolt.files.storage import FileSystemStorage, storages
+from bolt.files.storage import FileSystemStorage
 from bolt.runtime import settings
-from bolt.runtime.user_settings import STATICFILES_STORAGE_ALIAS
 from bolt.staticfiles.utils import check_settings, matches_patterns
 from bolt.utils.functional import LazyObject
+from bolt.utils.module_loading import import_string
 
 
 class StaticFilesStorage(FileSystemStorage):
@@ -538,7 +538,8 @@ class ManifestStaticFilesStorage(ManifestFilesMixin, StaticFilesStorage):
 
 class ConfiguredStorage(LazyObject):
     def _setup(self):
-        self._wrapped = storages[STATICFILES_STORAGE_ALIAS]
+        backend_class = import_string(settings.STATIC_BACKEND)
+        self._wrapped = backend_class()
 
 
 staticfiles_storage = ConfiguredStorage()
