@@ -18,7 +18,7 @@ class Tags:
     security = "security"
     signals = "signals"
     sites = "sites"
-    staticfiles = "staticfiles"
+    assets = "assets"
     templates = "templates"
     translation = "translation"
     urls = "urls"

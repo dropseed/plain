@@ -1,5 +1,5 @@
 from bolt.paginator import Paginator
-from bolt.staticfiles.storage import staticfiles_storage
+from bolt.assets.storage import assets_storage
 
 
 def url(viewname, *args, **kwargs):
@@ -9,12 +9,12 @@ def url(viewname, *args, **kwargs):
     return reverse(viewname, args=args, kwargs=kwargs)
 
 
-def static(path):
-    return staticfiles_storage.url(path)
+def asset(path):
+    return assets_storage.url(path)
 
 
 default_globals = {
-    "static": static,
+    "asset": asset,
     "url": url,
     "Paginator": Paginator,
 }

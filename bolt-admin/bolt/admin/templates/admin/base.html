@@ -11,9 +11,9 @@
         {%- endif -%}
     </title>
     {% tailwind_css %}
-    <link href="{{ static('admin/admin.css') }}" rel="stylesheet">
-    <script src="{{ static('admin/chart.js') }}"></script>
-    <script src="{{ static('admin/jquery-3.6.1.slim.min.js') }}"></script>
+    <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
+    <script src="{{ asset('admin/chart.js') }}"></script>
+    <script src="{{ asset('admin/jquery-3.6.1.slim.min.js') }}"></script>
 </head>
 <body class="flex min-h-screen text-black bg-stone-100">
     <div class="fixed flex flex-col justify-between flex-shrink-0 w-64 h-full px-6 pt-6 pb-3">

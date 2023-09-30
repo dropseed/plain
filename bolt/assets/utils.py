@@ -41,12 +41,12 @@ def get_files(storage, ignore_patterns=None, location=""):
 
 def check_settings(base_url=None):
     """
-    Check if the staticfiles settings have sane values.
+    Check if the assets settings have sane values.
     """
     if base_url is None:
-        base_url = settings.STATIC_URL
+        base_url = settings.ASSETS_URL
     if not base_url:
         raise ImproperlyConfigured(
-            "You're using the staticfiles app "
-            "without having set the required STATIC_URL setting."
+            "You're using the assets app "
+            "without having set the required ASSETS_URL setting."
         )

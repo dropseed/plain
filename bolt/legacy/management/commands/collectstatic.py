@@ -3,19 +3,19 @@ import os
 from bolt.checks import Tags
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.color import no_style
-from bolt.staticfiles.finders import get_finders
-from bolt.staticfiles.storage import FileSystemStorage, staticfiles_storage
+from bolt.assets.finders import get_finders
+from bolt.assets.storage import FileSystemStorage, assets_storage
 from bolt.utils.functional import cached_property
 
 
 class Command(BaseCommand):
     """
     Copies or symlinks static files from different locations to the
-    settings.STATIC_ROOT.
+    settings.ASSETS_ROOT.
     """
 
     help = "Collect static files in a single location."
-    requires_system_checks = [Tags.staticfiles]
+    requires_system_checks = [Tags.assets]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -23,7 +23,7 @@ class Command(BaseCommand):
         self.symlinked_files = []
         self.unmodified_files = []
         self.post_processed_files = []
-        self.storage = staticfiles_storage
+        self.storage = assets_storage
         self.style = no_style()
 
     @cached_property

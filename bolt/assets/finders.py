@@ -4,8 +4,8 @@ import os
 from bolt.exceptions import ImproperlyConfigured
 from bolt.packages import packages
 from bolt.runtime import settings
-from bolt.staticfiles import utils
-from bolt.staticfiles.storage import FileSystemStorage
+from bolt.assets import utils
+from bolt.assets.storage import FileSystemStorage
 from bolt.utils._os import safe_join
 from bolt.utils.module_loading import import_string
 
@@ -13,12 +13,12 @@ from bolt.utils.module_loading import import_string
 searched_locations = []
 
 
-APP_STATIC_DIR = settings.APP_PATH / "static"
+APP_ASSETS_DIR = settings.APP_PATH / "assets"
 
 
 class BaseFinder:
     """
-    A base file finder to be used for custom staticfiles finder classes.
+    A base file finder to be used for custom assets finder classes.
     """
 
     def check(self, **kwargs):
@@ -59,7 +59,7 @@ class FileSystemFinder(BaseFinder):
         # Maps dir paths to an appropriate storage instance
         self.storages = {}
 
-        root = APP_STATIC_DIR
+        root = APP_ASSETS_DIR
 
         if isinstance(root, list | tuple):
             prefix, root = root
@@ -75,14 +75,14 @@ class FileSystemFinder(BaseFinder):
 
     # def check(self, **kwargs):
     #     errors = []
-    #     if settings.STATIC_ROOT and os.path.abspath(
-    #         settings.STATIC_ROOT
+    #     if settings.ASSETS_ROOT and os.path.abspath(
+    #         settings.ASSETS_ROOT
     #     ) == os.path.abspath(self.path):
     #         errors.append(
     #             Error(
     #                 "The STATICFILES_DIR setting should not contain the "
-    #                 "STATIC_ROOT setting.",
-    #                 id="staticfiles.E002",
+    #                 "ASSETS_ROOT setting.",
+    #                 id="assets.E002",
     #             )
     #         )
     #     return errors
@@ -132,7 +132,7 @@ class PackageDirectoriesFinder(BaseFinder):
     """
 
     storage_class = FileSystemStorage
-    source_dir = "static"
+    source_dir = "assets"
 
     def __init__(self, package_names=None, *args, **kwargs):
         # The list of packages that are handled
@@ -213,14 +213,14 @@ def find(path, all=False):
 
 
 def get_finders():
-    for finder_path in settings.STATIC_FINDERS:
+    for finder_path in settings.ASSETS_FINDERS:
         yield get_finder(finder_path)
 
 
 @functools.cache
 def get_finder(import_path):
     """
-    Import the staticfiles finder class described by import_path, where
+    Import the assets finder class described by import_path, where
     import_path is the full Python path to the class.
     """
     Finder = import_string(import_path)

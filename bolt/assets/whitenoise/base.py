@@ -70,17 +70,17 @@ class WhiteNoise:
     def __call__(self, environ, start_response):
         path = decode_path_info(environ.get("PATH_INFO", ""))
         if self.autorefresh:
-            static_file = self.find_file(path)
+            asset_file = self.find_file(path)
         else:
-            static_file = self.files.get(path)
-        if static_file is None:
+            asset_file = self.files.get(path)
+        if asset_file is None:
             return self.application(environ, start_response)
         else:
-            return self.serve(static_file, environ, start_response)
+            return self.serve(asset_file, environ, start_response)
 
     @staticmethod
-    def serve(static_file, environ, start_response):
-        response = static_file.get_response(environ["REQUEST_METHOD"], environ)
+    def serve(asset_file, environ, start_response):
+        response = asset_file.get_response(environ["REQUEST_METHOD"], environ)
         status_line = f"{response.status} {response.status.phrase}"
         start_response(status_line, list(response.headers))
         if response.file is not None:
@@ -123,8 +123,8 @@ class WhiteNoise:
             self.files[url] = self.redirect(url, index_url)
             self.files[index_no_slash] = self.redirect(index_no_slash, index_url)
             url = index_url
-        static_file = self.get_static_file(path, url, stat_cache=stat_cache)
-        self.files[url] = static_file
+        asset_file = self.get_asset_file(path, url, stat_cache=stat_cache)
+        self.files[url] = asset_file
 
     def find_file(self, url):
         # Optimization: bail early if the URL can never match a file
@@ -152,19 +152,19 @@ class WhiteNoise:
         if self.index_file is not None:
             if url.endswith("/"):
                 path = os.path.join(path, self.index_file)
-                return self.get_static_file(path, url)
+                return self.get_asset_file(path, url)
             elif url.endswith("/" + self.index_file):
                 if os.path.isfile(path):
                     return self.redirect(url, url[: -len(self.index_file)])
             else:
                 try:
-                    return self.get_static_file(path, url)
+                    return self.get_asset_file(path, url)
                 except IsDirectoryError:
                     if os.path.isfile(os.path.join(path, self.index_file)):
                         return self.redirect(url, url + "/")
             raise MissingFileError(path)
 
-        return self.get_static_file(path, url)
+        return self.get_asset_file(path, url)
 
     @staticmethod
     def url_is_canonical(url):
@@ -189,7 +189,7 @@ class WhiteNoise:
                 return uncompressed_path in stat_cache
         return False
 
-    def get_static_file(self, path, url, stat_cache=None):
+    def get_asset_file(self, path, url, stat_cache=None):
         # Optimization: bail early if file does not exist
         if stat_cache is None and not os.path.exists(path):
             raise MissingFileError(path)

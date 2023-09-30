@@ -6,8 +6,8 @@ from urllib.parse import urlparse
 
 from bolt.http import FileResponse
 from bolt.runtime import settings
-from bolt.staticfiles import finders
-from bolt.staticfiles.storage import staticfiles_storage
+from bolt.assets import finders
+from bolt.assets.storage import assets_storage
 
 from .base import WhiteNoise
 from .string_utils import ensure_leading_trailing_slash
@@ -92,10 +92,10 @@ class WhiteNoiseMiddleware(WhiteNoise):
         try:
             self.static_prefix = settings.WHITENOISE_STATIC_PREFIX
         except AttributeError:
-            self.static_prefix = urlparse(settings.STATIC_URL or "").path
+            self.static_prefix = urlparse(settings.ASSETS_URL or "").path
         self.static_prefix = ensure_leading_trailing_slash(self.static_prefix)
 
-        self.static_root = settings.STATIC_ROOT
+        self.static_root = settings.ASSETS_ROOT
         if self.static_root:
             self.add_files(self.static_root, prefix=self.static_prefix)
 
@@ -111,16 +111,16 @@ class WhiteNoiseMiddleware(WhiteNoise):
 
     def __call__(self, request):
         if self.autorefresh:
-            static_file = self.find_file(request.path_info)
+            asset_file = self.find_file(request.path_info)
         else:
-            static_file = self.files.get(request.path_info)
-        if static_file is not None:
-            return self.serve(static_file, request)
+            asset_file = self.files.get(request.path_info)
+        if asset_file is not None:
+            return self.serve(asset_file, request)
         return self.get_response(request)
 
     @staticmethod
-    def serve(static_file, request):
-        response = static_file.get_response(request.method, request.META)
+    def serve(asset_file, request):
+        response = asset_file.get_response(request.method, request.META)
         status = int(response.status)
         http_response = WhiteNoiseFileResponse(response.file or (), status=status)
         # Remove default content-type
@@ -169,11 +169,11 @@ class WhiteNoiseMiddleware(WhiteNoise):
         name_without_hash = self.get_name_without_hash(name)
         if name == name_without_hash:
             return False
-        static_url = self.get_static_url(name_without_hash)
-        # If the static_url function maps the name without hash
+        asset_url = self.get_asset_url(name_without_hash)
+        # If the asset_url function maps the name without hash
         # back to the original name, then we know we've got a
         # versioned filename
-        if static_url and basename(static_url) == basename(url):
+        if asset_url and basename(asset_url) == basename(url):
             return True
         return False
 
@@ -190,8 +190,8 @@ class WhiteNoiseMiddleware(WhiteNoise):
         name = os.path.splitext(name_with_hash)[0]
         return name + ext
 
-    def get_static_url(self, name):
+    def get_asset_url(self, name):
         try:
-            return staticfiles_storage.url(name)
+            return assets_storage.url(name)
         except ValueError:
             return None

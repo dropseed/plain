@@ -226,7 +226,7 @@ class BaseCommand:
         migrations on disk don't match the migrations in the database.
 
     ``requires_system_checks``
-        A list or tuple of tags, e.g. [Tags.staticfiles, Tags.models]. System
+        A list or tuple of tags, e.g. [Tags.assets, Tags.models]. System
         checks registered in the chosen tags will be checked for errors prior
         to executing the command. The value '__all__' can be used to specify
         that all system checks should be performed. Default value is '__all__'.

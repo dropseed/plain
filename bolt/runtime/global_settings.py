@@ -141,27 +141,27 @@ CSRF_USE_SESSIONS = False
 LOGGING = {}
 
 ###############
-# STATICFILES #
+# ASSETS #
 ###############
 
-STATIC_BACKEND = (
-    "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage"
+ASSETS_BACKEND = (
+    "bolt.assets.whitenoise.storage.CompressedManifestStaticFilesStorage"
 )
 
-# List of finder classes that know how to find static files in
+# List of finder classes that know how to find assets files in
 # various locations.
-STATIC_FINDERS = [
-    "bolt.staticfiles.finders.FileSystemFinder",
-    "bolt.staticfiles.finders.PackageDirectoriesFinder",
+ASSETS_FINDERS = [
+    "bolt.assets.finders.FileSystemFinder",
+    "bolt.assets.finders.PackageDirectoriesFinder",
 ]
 
-# Absolute path to the directory static files should be collected to.
-# Example: "/var/www/example.com/static/"
-STATIC_ROOT = APP_PATH / "staticfiles"
+# Absolute path to the directory assets files should be collected to.
+# Example: "/var/www/example.com/assets/"
+ASSETS_ROOT = APP_PATH / "assets_collected"
 
-# URL that handles the static files served from STATIC_ROOT.
-# Example: "http://example.com/static/", "http://static.example.com/"
-STATIC_URL = "/static/"
+# URL that handles the assets files served from ASSETS_ROOT.
+# Example: "http://example.com/assets/", "http://assets.example.com/"
+ASSETS_URL = "/assets/"
 
 #################
 # SYSTEM CHECKS #

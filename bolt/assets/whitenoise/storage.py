@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from bolt.runtime import settings
-from bolt.staticfiles.storage import (
+from bolt.assets.storage import (
     ManifestStaticFilesStorage,
     StaticFilesStorage,
 )

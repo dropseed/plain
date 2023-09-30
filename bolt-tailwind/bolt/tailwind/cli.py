@@ -16,7 +16,7 @@ def cli():
 
 @cli.command()
 def init():
-    """Install Tailwind, create a tailwind.config.js and app/static/src/tailwind.css"""
+    """Install Tailwind, create a tailwind.config.js and app/assets/src/tailwind.css"""
     tailwind = Tailwind()
 
     tailwind_installed = tailwind.is_installed()

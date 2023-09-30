@@ -35,7 +35,7 @@ def clear_cache_handlers(*, setting, **kwargs):
 def update_installed_packages(*, setting, **kwargs):
     if setting == "INSTALLED_PACKAGES":
         # Rebuild any PackageDirectoriesFinder instance.
-        from bolt.staticfiles.finders import get_finder
+        from bolt.assets.finders import get_finder
 
         get_finder.cache_clear()
         # Rebuild management commands cache
@@ -98,23 +98,23 @@ def root_urlconf_changed(*, setting, **kwargs):
 
 
 @receiver(setting_changed)
-def static_storage_changed(*, setting, **kwargs):
+def asset_storage_changed(*, setting, **kwargs):
     if setting in {
-        "STATIC_BACKEND",
-        "STATIC_ROOT",
-        "STATIC_URL",
+        "ASSETS_BACKEND",
+        "ASSETS_ROOT",
+        "ASSETS_URL",
     }:
-        from bolt.staticfiles.storage import staticfiles_storage
+        from bolt.assets.storage import assets_storage
 
-        staticfiles_storage._wrapped = empty
+        assets_storage._wrapped = empty
 
 
 @receiver(setting_changed)
-def static_finders_changed(*, setting, **kwargs):
+def asset_finders_changed(*, setting, **kwargs):
     if setting in {
-        "STATIC_ROOT",
+        "ASSETS_ROOT",
     }:
-        from bolt.staticfiles.finders import get_finder
+        from bolt.assets.finders import get_finder
 
         get_finder.cache_clear()
 

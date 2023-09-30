@@ -14,7 +14,7 @@ from bolt.files.move import file_move_safe
 from bolt.files.utils import validate_file_name
 from bolt.runtime import settings
 from bolt.signals import setting_changed
-from bolt.staticfiles.utils import check_settings, matches_patterns
+from bolt.assets.utils import check_settings, matches_patterns
 from bolt.utils._os import safe_join
 from bolt.utils.crypto import get_random_string
 from bolt.utils.deconstruct import deconstructible
@@ -204,7 +204,7 @@ class StorageSettingsMixin:
         return setting if value is None else value
 
 
-@deconstructible(path="bolt.staticfiles.storage.FileSystemStorage")
+@deconstructible(path="bolt.assets.storage.FileSystemStorage")
 class FileSystemStorage(Storage, StorageSettingsMixin):
     """
     Standard filesystem storage
@@ -393,14 +393,14 @@ class StaticFilesStorage(FileSystemStorage):
     Standard file system storage for static files.
 
     The defaults for ``location`` and ``base_url`` are
-    ``STATIC_ROOT`` and ``STATIC_URL``.
+    ``ASSETS_ROOT`` and ``ASSETS_URL``.
     """
 
     def __init__(self, location=None, base_url=None, *args, **kwargs):
         if location is None:
-            location = settings.STATIC_ROOT
+            location = settings.ASSETS_ROOT
         if base_url is None:
-            base_url = settings.STATIC_URL
+            base_url = settings.ASSETS_URL
         check_settings(base_url)
         super().__init__(location, base_url, *args, **kwargs)
         # FileSystemStorage fallbacks to MEDIA_ROOT when location
@@ -412,8 +412,8 @@ class StaticFilesStorage(FileSystemStorage):
     def path(self, name):
         if not self.location:
             raise ImproperlyConfigured(
-                "You're using the staticfiles app "
-                "without having set the STATIC_ROOT "
+                "You're using the assets app "
+                "without having set the ASSETS_ROOT "
                 "setting to a filesystem path."
             )
         return super().path(name)
@@ -600,8 +600,8 @@ class HashedFilesMixin:
                 return matched
 
             # Ignore absolute URLs that don't point to a static file (dynamic
-            # CSS / JS?). Note that STATIC_URL cannot be empty.
-            if url.startswith("/") and not url.startswith(settings.STATIC_URL):
+            # CSS / JS?). Note that ASSETS_URL cannot be empty.
+            if url.startswith("/") and not url.startswith(settings.ASSETS_URL):
                 return matched
 
             # Strip off the fragment so a path-like fragment won't interfere.
@@ -613,8 +613,8 @@ class HashedFilesMixin:
 
             if url_path.startswith("/"):
                 # Otherwise the condition above would have returned prematurely.
-                assert url_path.startswith(settings.STATIC_URL)
-                target_name = url_path.removeprefix(settings.STATIC_URL)
+                assert url_path.startswith(settings.ASSETS_URL)
+                target_name = url_path.removeprefix(settings.ASSETS_URL)
             else:
                 # We're using the posixpath module to mix paths and URLs conveniently.
                 source_name = name if os.sep == "/" else name.replace(os.sep, "/")
@@ -826,7 +826,7 @@ class HashedFilesMixin:
 
 class ManifestFilesMixin(HashedFilesMixin):
     manifest_version = "1.1"  # the manifest format standard
-    manifest_name = "staticfiles.json"
+    manifest_name = "assets.json"
     manifest_strict = True
     keep_intermediate_files = False
 
@@ -889,7 +889,7 @@ class ManifestFilesMixin(HashedFilesMixin):
         if cache_name is None:
             if self.manifest_strict:
                 raise ValueError(
-                    "Missing staticfiles manifest entry for '%s'" % clean_name
+                    "Missing assets manifest entry for '%s'" % clean_name
                 )
             cache_name = self.clean_name(self.hashed_name(name))
         unparsed_name = list(parsed_name)
@@ -912,8 +912,8 @@ class ManifestStaticFilesStorage(ManifestFilesMixin, StaticFilesStorage):
 
 class ConfiguredStorage(LazyObject):
     def _setup(self):
-        backend_class = import_string(settings.STATIC_BACKEND)
+        backend_class = import_string(settings.ASSETS_BACKEND)
         self._wrapped = backend_class()
 
 
-staticfiles_storage = ConfiguredStorage()
+assets_storage = ConfiguredStorage()

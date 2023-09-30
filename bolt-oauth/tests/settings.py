@@ -40,7 +40,7 @@ DATABASES = {
 USE_TZ = True
 TIME_ZONE = "UTC"
 
-STATIC_URL = "/static/"
+ASSETS_URL = "/assets/"
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "/"

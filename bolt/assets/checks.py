@@ -1,8 +1,8 @@
-from bolt.staticfiles.finders import get_finders
+from bolt.assets.finders import get_finders
 
 
 def check_finders(package_configs=None, **kwargs):
-    """Check all registered staticfiles finders."""
+    """Check all registered assets finders."""
     errors = []
     for finder in get_finders():
         try:

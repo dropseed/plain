@@ -24,16 +24,16 @@ def check_default_cache_is_configured(package_configs, **kwargs):
 #     from bolt.cache import caches
 
 #     errors = []
-#     for name in ("STATIC_ROOT", "STATICFILES_DIR"):
+#     for name in ("ASSETS_ROOT", "STATICFILES_DIR"):
 #         setting = getattr(settings, name, None)
 #         if not setting:
 #             continue
 #         if name == "STATICFILES_DIR":
 #             paths = set()
-#             staticfiles_dir = setting
-#             if isinstance(staticfiles_dir, list | tuple):
-#                 _, staticfiles_dir = staticfiles_dir
-#             paths.add(pathlib.Path(staticfiles_dir).resolve())
+#             assets_dir = setting
+#             if isinstance(assets_dir, list | tuple):
+#                 _, assets_dir = assets_dir
+#             paths.add(pathlib.Path(assets_dir).resolve())
 #         else:
 #             paths = {pathlib.Path(setting).resolve()}
 #         for alias in settings.CACHES:
