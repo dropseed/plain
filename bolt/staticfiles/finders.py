@@ -3,10 +3,10 @@ import os
 
 from bolt.checks import Error, Warning
 from bolt.exceptions import ImproperlyConfigured
-from bolt.files.storage import FileSystemStorage, Storage
 from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.staticfiles import utils
+from bolt.staticfiles.storage import FileSystemStorage, Storage
 from bolt.utils._os import safe_join
 from bolt.utils.functional import LazyObject
 from bolt.utils.module_loading import import_string
