@@ -101,8 +101,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "DateTimeField": "timestamp with time zone",
         "DecimalField": "numeric(%(max_digits)s, %(decimal_places)s)",
         "DurationField": "interval",
-        "FileField": "varchar(%(max_length)s)",
-        "FilePathField": "varchar(%(max_length)s)",
         "FloatField": "double precision",
         "IntegerField": "integer",
         "BigIntegerField": "bigint",

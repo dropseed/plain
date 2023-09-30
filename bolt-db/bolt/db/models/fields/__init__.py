@@ -44,7 +44,6 @@ __all__ = [
     "EmailField",
     "Empty",
     "Field",
-    "FilePathField",
     "FloatField",
     "GenericIPAddressField",
     "IPAddressField",
@@ -586,8 +585,6 @@ class Field(RegisterLookupMixin):
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         if path.startswith("bolt.db.models.fields.related"):
             path = path.replace("bolt.db.models.fields.related", "bolt.db.models")
-        elif path.startswith("bolt.db.models.fields.files"):
-            path = path.replace("bolt.db.models.fields.files", "bolt.db.models")
         elif path.startswith("bolt.db.models.fields.json"):
             path = path.replace("bolt.db.models.fields.json", "bolt.db.models")
         elif path.startswith("bolt.db.models.fields.proxy"):
@@ -1724,69 +1721,6 @@ class EmailField(CharField):
         # We do not exclude max_length if it matches default as we want to change
         # the default in future.
         return name, path, args, kwargs
-
-
-class FilePathField(Field):
-    description = "File path"
-
-    def __init__(
-        self,
-        verbose_name=None,
-        name=None,
-        path="",
-        match=None,
-        recursive=False,
-        allow_files=True,
-        allow_folders=False,
-        **kwargs,
-    ):
-        self.path, self.match, self.recursive = path, match, recursive
-        self.allow_files, self.allow_folders = allow_files, allow_folders
-        kwargs.setdefault("max_length", 100)
-        super().__init__(verbose_name, name, **kwargs)
-
-    def check(self, **kwargs):
-        return [
-            *super().check(**kwargs),
-            *self._check_allowing_files_or_folders(**kwargs),
-        ]
-
-    def _check_allowing_files_or_folders(self, **kwargs):
-        if not self.allow_files and not self.allow_folders:
-            return [
-                checks.Error(
-                    "FilePathFields must have either 'allow_files' or 'allow_folders' "
-                    "set to True.",
-                    obj=self,
-                    id="fields.E140",
-                )
-            ]
-        return []
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        if self.path != "":
-            kwargs["path"] = self.path
-        if self.match is not None:
-            kwargs["match"] = self.match
-        if self.recursive is not False:
-            kwargs["recursive"] = self.recursive
-        if self.allow_files is not True:
-            kwargs["allow_files"] = self.allow_files
-        if self.allow_folders is not False:
-            kwargs["allow_folders"] = self.allow_folders
-        if kwargs.get("max_length") == 100:
-            del kwargs["max_length"]
-        return name, path, args, kwargs
-
-    def get_prep_value(self, value):
-        value = super().get_prep_value(value)
-        if value is None:
-            return None
-        return str(value)
-
-    def get_internal_type(self):
-        return "FilePathField"
 
 
 class FloatField(Field):

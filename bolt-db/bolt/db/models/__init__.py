@@ -36,7 +36,6 @@ from bolt.db.models.expressions import (
 )
 from bolt.db.models.fields import *  # NOQA
 from bolt.db.models.fields import __all__ as fields_all
-from bolt.db.models.fields.files import FileField, ImageField
 from bolt.db.models.fields.json import JSONField
 from bolt.db.models.fields.proxy import OrderWrt
 from bolt.db.models.indexes import *  # NOQA
@@ -90,8 +89,6 @@ __all__ += [
     "When",
     "Window",
     "WindowFrame",
-    "FileField",
-    "ImageField",
     "JSONField",
     "OrderWrt",
     "Lookup",

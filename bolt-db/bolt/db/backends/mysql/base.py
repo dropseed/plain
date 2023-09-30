@@ -112,8 +112,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "DateTimeField": "datetime(6)",
         "DecimalField": "numeric(%(max_digits)s, %(decimal_places)s)",
         "DurationField": "bigint",
-        "FileField": "varchar(%(max_length)s)",
-        "FilePathField": "varchar(%(max_length)s)",
         "FloatField": "double precision",
         "IntegerField": "integer",
         "BigIntegerField": "bigint",

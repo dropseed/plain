@@ -65,8 +65,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "DateTimeField": "datetime",
         "DecimalField": "decimal",
         "DurationField": "bigint",
-        "FileField": "varchar(%(max_length)s)",
-        "FilePathField": "varchar(%(max_length)s)",
         "FloatField": "real",
         "IntegerField": "integer",
         "BigIntegerField": "bigint",

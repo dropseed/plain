@@ -60,12 +60,8 @@ def construct_instance(form, instance, fields=None):
             and cleaned_data.get(f.name) in form[f.name].field.empty_values
         ):
             continue
-        # Defer saving file-type fields until after the other fields, so a
-        # callable upload_to can use the values from other fields.
-        if isinstance(f, models.FileField):
-            file_field_list.append(f)
-        else:
-            f.save_form_data(instance, cleaned_data[f.name])
+
+        f.save_form_data(instance, cleaned_data[f.name])
 
     for f in file_field_list:
         f.save_form_data(instance, cleaned_data[f.name])
@@ -849,7 +845,7 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    # TODO files (FileField, ImageField), related (OneToOne, m2m)
+    # TODO related (OneToOne, m2m)
 
     # If there's a form field of the exact same name, use it
     # (models.URLField -> forms.URLField)
