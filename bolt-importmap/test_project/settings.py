@@ -20,7 +20,6 @@ ALLOWED_HOSTS = []
 INSTALLED_PACKAGES = [
     "bolt.auth",
     "bolt.sessions",
-    "bolt.staticfiles",
     "bolt.importmap",
     "app",
 ]

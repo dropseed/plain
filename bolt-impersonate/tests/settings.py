@@ -9,7 +9,6 @@ DEBUG = True
 INSTALLED_PACKAGES = [
     "bolt.auth",
     "bolt.sessions",
-    # "bolt.staticfiles",
     "bolt.impersonate",
 ]
 
