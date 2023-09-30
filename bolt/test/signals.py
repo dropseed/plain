@@ -79,7 +79,7 @@ def update_connections_time_zone(*, setting, **kwargs):
 
 @receiver(setting_changed)
 def storages_changed(*, setting, **kwargs):
-    from bolt.files.storage import default_storage, storages
+    from bolt.files.storage import storages
     from bolt.staticfiles.storage import staticfiles_storage
 
     if setting in (
@@ -94,7 +94,6 @@ def storages_changed(*, setting, **kwargs):
         storages._backends = None
         storages._storages = {}
 
-        default_storage._wrapped = empty
         staticfiles_storage._wrapped = empty
 
 

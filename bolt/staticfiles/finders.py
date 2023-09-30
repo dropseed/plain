@@ -3,12 +3,12 @@ import os
 
 from bolt.checks import Error, Warning
 from bolt.exceptions import ImproperlyConfigured
-from bolt.files.storage import FileSystemStorage, Storage, default_storage
+from bolt.files.storage import FileSystemStorage, Storage
 from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.staticfiles import utils
 from bolt.utils._os import safe_join
-from bolt.utils.functional import LazyObject, empty
+from bolt.utils.functional import LazyObject
 from bolt.utils.module_loading import import_string
 
 # To keep track on which directories the finder has searched the static files.
@@ -265,24 +265,6 @@ class BaseStorageFinder(BaseFinder):
         """
         for path in utils.get_files(self.storage, ignore_patterns):
             yield path, self.storage
-
-
-class DefaultStorageFinder(BaseStorageFinder):
-    """
-    A static files finder that uses the default storage backend.
-    """
-
-    storage = default_storage
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        base_location = getattr(self.storage, "base_location", empty)
-        if not base_location:
-            raise ImproperlyConfigured(
-                "The storage backend of the "
-                "staticfiles finder %r doesn't have "
-                "a valid location." % self.__class__
-            )
 
 
 def find(path, all=False):

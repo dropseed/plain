@@ -49,9 +49,6 @@ SECRET_KEY: str = ""
 SECRET_KEY_FALLBACKS: list[str] = []
 
 STORAGES = {
-    "default": {
-        "BACKEND": "bolt.files.storage.FileSystemStorage",
-    },
     "staticfiles": {
         "BACKEND": "bolt.staticfiles.whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
@@ -177,7 +174,6 @@ STATICFILES_DIRS = [APP_PATH / "static"]
 STATICFILES_FINDERS = [
     "bolt.staticfiles.finders.FileSystemFinder",
     "bolt.staticfiles.finders.PackageDirectoriesFinder",
-    # 'bolt.staticfiles.finders.DefaultStorageFinder',
 ]
 
 #################
