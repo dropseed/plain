@@ -37,7 +37,7 @@ bolt tailwind init
 
 This will also create a `tailwind.css` file at `static/src/tailwind.css` where additional CSS can be added.
 You can customize where these files are located if you need to,
-but this is the default (requires `STATICFILES_DIRS = [BASE_DIR / "static"]`).
+but this is the default (requires `STATICFILES_DIR = BASE_DIR / "static"`).
 
 The `src/tailwind.css` file is then compiled into `dist/tailwind.css` by running `tailwind compile`:
 

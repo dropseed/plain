@@ -112,7 +112,7 @@ def static_storage_changed(*, setting, **kwargs):
 @receiver(setting_changed)
 def static_finders_changed(*, setting, **kwargs):
     if setting in {
-        "STATICFILES_DIRS",
+        "STATICFILES_DIR",
         "STATIC_ROOT",
     }:
         from bolt.staticfiles.finders import get_finder

@@ -49,7 +49,7 @@ class BaseFinder:
 
 class FileSystemFinder(BaseFinder):
     """
-    A static files finder that uses the ``STATICFILES_DIRS`` setting
+    A static files finder that uses the ``STATICFILES_DIR`` setting
     to locate files.
     """
 
@@ -58,13 +58,13 @@ class FileSystemFinder(BaseFinder):
         self.locations = []
         # Maps dir paths to an appropriate storage instance
         self.storages = {}
-        for root in settings.STATICFILES_DIRS:
-            if isinstance(root, list | tuple):
-                prefix, root = root
-            else:
-                prefix = ""
-            if (prefix, root) not in self.locations:
-                self.locations.append((prefix, root))
+        root = settings.STATICFILES_DIR
+        if isinstance(root, list | tuple):
+            prefix, root = root
+        else:
+            prefix = ""
+        if (prefix, root) not in self.locations:
+            self.locations.append((prefix, root))
         for prefix, root in self.locations:
             filesystem_storage = FileSystemStorage(location=root)
             filesystem_storage.prefix = prefix
@@ -73,49 +73,49 @@ class FileSystemFinder(BaseFinder):
 
     def check(self, **kwargs):
         errors = []
-        if not isinstance(settings.STATICFILES_DIRS, list | tuple):
+        if not isinstance(settings.STATICFILES_DIR, str):
             errors.append(
                 Error(
-                    "The STATICFILES_DIRS setting is not a tuple or list.",
+                    "The STATICFILES_DIR setting is not a tuple or list.",
                     hint="Perhaps you forgot a trailing comma?",
                     id="staticfiles.E001",
                 )
             )
             return errors
-        for root in settings.STATICFILES_DIRS:
-            if isinstance(root, list | tuple):
-                prefix, root = root
-                if prefix.endswith("/"):
-                    errors.append(
-                        Error(
-                            "The prefix %r in the STATICFILES_DIRS setting must "
-                            "not end with a slash." % prefix,
-                            id="staticfiles.E003",
-                        )
-                    )
-            if settings.STATIC_ROOT and os.path.abspath(
-                settings.STATIC_ROOT
-            ) == os.path.abspath(root):
+        root = settings.STATICFILES_DIR
+        if isinstance(root, list | tuple):
+            prefix, root = root
+            if prefix.endswith("/"):
                 errors.append(
                     Error(
-                        "The STATICFILES_DIRS setting should not contain the "
-                        "STATIC_ROOT setting.",
-                        id="staticfiles.E002",
+                        "The prefix %r in the STATICFILES_DIR setting must "
+                        "not end with a slash." % prefix,
+                        id="staticfiles.E003",
                     )
                 )
-            if not os.path.isdir(root):
-                errors.append(
-                    Warning(
-                        f"The directory '{root}' in the STATICFILES_DIRS setting "
-                        f"does not exist.",
-                        id="staticfiles.W004",
-                    )
+        if settings.STATIC_ROOT and os.path.abspath(
+            settings.STATIC_ROOT
+        ) == os.path.abspath(root):
+            errors.append(
+                Error(
+                    "The STATICFILES_DIR setting should not contain the "
+                    "STATIC_ROOT setting.",
+                    id="staticfiles.E002",
                 )
+            )
+        if not os.path.isdir(root):
+            errors.append(
+                Warning(
+                    f"The directory '{root}' in the STATICFILES_DIR setting "
+                    f"does not exist.",
+                    id="staticfiles.W004",
+                )
+            )
         return errors
 
     def find(self, path, all=False):
         """
-        Look for files in the extra locations as defined in STATICFILES_DIRS.
+        Look for files in the extra locations as defined in STATICFILES_DIR.
         """
         matches = []
         for prefix, root in self.locations:

@@ -24,16 +24,16 @@ def check_cache_location_not_exposed(package_configs, **kwargs):
     from bolt.cache import caches
 
     errors = []
-    for name in ("MEDIA_ROOT", "STATIC_ROOT", "STATICFILES_DIRS"):
+    for name in ("MEDIA_ROOT", "STATIC_ROOT", "STATICFILES_DIR"):
         setting = getattr(settings, name, None)
         if not setting:
             continue
-        if name == "STATICFILES_DIRS":
+        if name == "STATICFILES_DIR":
             paths = set()
-            for staticfiles_dir in setting:
-                if isinstance(staticfiles_dir, list | tuple):
-                    _, staticfiles_dir = staticfiles_dir
-                paths.add(pathlib.Path(staticfiles_dir).resolve())
+            staticfiles_dir = setting
+            if isinstance(staticfiles_dir, list | tuple):
+                _, staticfiles_dir = staticfiles_dir
+            paths.add(pathlib.Path(staticfiles_dir).resolve())
         else:
             paths = {pathlib.Path(setting).resolve()}
         for alias in settings.CACHES:
