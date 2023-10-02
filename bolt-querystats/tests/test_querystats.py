@@ -53,9 +53,9 @@ def test_tidy_stack():
     return f(*args, **kwargs)
   File "/app/.heroku/python/lib/python3.9/site-packages/sentry_sdk/integrations/bolt/middleware.py", line 175, in __call__
     return f(*args, **kwargs)
-  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 34, in __call__
+  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/toolbar/querystats/middleware.py", line 34, in __call__
     is_staff = self.is_staff_request(request)
-  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 72, in is_staff_request
+  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/toolbar/querystats/middleware.py", line 72, in is_staff_request
     and request.user
   File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/middleware.py", line 25, in <lambda>
     request.user = SimpleLazyObject(lambda: get_user(request))
@@ -80,9 +80,9 @@ def test_tidy_stack():
     # so joining here is not exactly the same as get_stack
     assert (
         "\n".join(tidy_stack(stack.splitlines()))
-        == """  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 34, in __call__
+        == """  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/toolbar/querystats/middleware.py", line 34, in __call__
     is_staff = self.is_staff_request(request)
-  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/stafftoolbar/querystats/middleware.py", line 72, in is_staff_request
+  File "/app/.heroku/python/lib/python3.9/site-packages/boltpro/toolbar/querystats/middleware.py", line 72, in is_staff_request
     and request.user
   File "/app/.heroku/python/lib/python3.9/site-packages/bolt/contrib/auth/middleware.py", line 25, in <lambda>
     request.user = SimpleLazyObject(lambda: get_user(request))

@@ -1,4 +1,4 @@
-class StaffToolbar:
+class Toolbar:
     def __init__(self, request):
         self.request = request
         self.version = "dev"

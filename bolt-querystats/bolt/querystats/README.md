@@ -39,7 +39,7 @@ MIDDLEWARE = [
 ]
 ```
 
-We strongly recommend using the bolt-stafftoolbar along with this,
+We strongly recommend using the bolt-toolbar along with this,
 but if you aren't,
 you can add the querystats to your frontend templates with this include:
 
@@ -74,7 +74,7 @@ module.exports = {
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
 
 
-# bolt-stafftoolbar
+# bolt-toolbar
 
 The staff toolbar is enabled for every user who `is_staff`.
 
@@ -82,26 +82,26 @@ The staff toolbar is enabled for every user who `is_staff`.
 
 ## Installation
 
-Add `boltstafftoolbar` to your `INSTALLED_PACKAGES`,
-and the `{% stafftoolbar %}` to your base template:
+Add `bolttoolbar` to your `INSTALLED_PACKAGES`,
+and the `{% toolbar %}` to your base template:
 
 ```python
 # settings.py
 INSTALLED_PACKAGES += [
-    "boltstafftoolbar",
+    "bolttoolbar",
 ]
 ```
 
 ```html
 <!-- base.template.html -->
-{% load stafftoolbar %}
+{% load toolbar %}
 <!doctype html>
 <html lang="en">
   <head>
     ...
   </head>
   <body>
-    {% stafftoolbar %}
+    {% toolbar %}
     ...
   </body>
 ```
@@ -116,7 +116,7 @@ you can change the classes via the template tag:
 
 ```html
 <!-- base.html -->
-{% stafftoolbar outer_class="fixed bottom-0 w-full" inner_class="max-w-4xl mx-auto" %}
+{% toolbar outer_class="fixed bottom-0 w-full" inner_class="max-w-4xl mx-auto" %}
 ```
 
 ## Tailwind CSS

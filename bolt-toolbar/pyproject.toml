@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "bolt-stafftoolbar"
+name = "bolt-toolbar"
 packages = [
     { include = "bolt" },
 ]

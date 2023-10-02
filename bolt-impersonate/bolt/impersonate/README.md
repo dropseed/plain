@@ -7,7 +7,7 @@ With `impersonate` installed, you can impersonate a user by finding them in the 
 
 ![](/docs/img/impersonate-admin.png)
 
-Then with the [staff toolbar](/docs/bolt-stafftoolbar/) enabled, you'll get a notice of the impersonation and a button to exit:
+Then with the [staff toolbar](/docs/bolt-toolbar/) enabled, you'll get a notice of the impersonation and a button to exit:
 
 ![](/docs/img/impersonate-bar.png)
 
