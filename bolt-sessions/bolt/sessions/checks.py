@@ -1,6 +1,5 @@
+from bolt.checks import Tags, Warning, register
 from bolt.runtime import settings
-
-from .. import Tags, Warning, register
 
 
 def add_session_cookie_message(message):

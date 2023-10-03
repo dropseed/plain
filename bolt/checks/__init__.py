@@ -18,7 +18,6 @@ import bolt.checks.compatibility.django_4_0  # NOQA isort:skip
 import bolt.checks.files  # NOQA isort:skip
 import bolt.checks.security.base  # NOQA isort:skip
 import bolt.checks.security.csrf  # NOQA isort:skip
-import bolt.checks.security.sessions  # NOQA isort:skip
 import bolt.checks.urls  # NOQA isort:skip
 
 
