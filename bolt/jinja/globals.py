@@ -1,5 +1,5 @@
-from bolt.paginator import Paginator
 from bolt.assets.storage import assets_storage
+from bolt.paginator import Paginator
 
 
 def url(viewname, *args, **kwargs):

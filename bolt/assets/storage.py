@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from hashlib import md5
 from urllib.parse import unquote, urldefrag, urljoin, urlsplit, urlunsplit
 
+from bolt.assets.utils import check_settings, matches_patterns
 from bolt.exceptions import ImproperlyConfigured, SuspiciousFileOperation
 from bolt.files import File, locks
 from bolt.files.base import ContentFile
@@ -14,7 +15,6 @@ from bolt.files.move import file_move_safe
 from bolt.files.utils import validate_file_name
 from bolt.runtime import settings
 from bolt.signals import setting_changed
-from bolt.assets.utils import check_settings, matches_patterns
 from bolt.utils._os import safe_join
 from bolt.utils.crypto import get_random_string
 from bolt.utils.deconstruct import deconstructible
@@ -888,9 +888,7 @@ class ManifestFilesMixin(HashedFilesMixin):
         cache_name = self.hashed_files.get(hash_key)
         if cache_name is None:
             if self.manifest_strict:
-                raise ValueError(
-                    "Missing assets manifest entry for '%s'" % clean_name
-                )
+                raise ValueError("Missing assets manifest entry for '%s'" % clean_name)
             cache_name = self.clean_name(self.hashed_name(name))
         unparsed_name = list(parsed_name)
         unparsed_name[2] = cache_name

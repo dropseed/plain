@@ -7,11 +7,11 @@ import textwrap
 from collections.abc import Iterator
 from typing import Any
 
-from bolt.runtime import settings
 from bolt.assets.storage import (
     ManifestStaticFilesStorage,
     StaticFilesStorage,
 )
+from bolt.runtime import settings
 
 from .compress import Compressor
 

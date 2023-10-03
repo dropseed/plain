@@ -65,7 +65,7 @@ class LoginView(RedirectURLMixin, FormView):
     redirect_authenticated_user = False
     extra_context = None
 
-    def dispatch(self):
+    def get_response(self):
         if self.redirect_authenticated_user and self.request.user:
             redirect_to = self.get_success_url()
             if redirect_to == self.request.path:
@@ -74,7 +74,7 @@ class LoginView(RedirectURLMixin, FormView):
                     "your LOGIN_REDIRECT_URL doesn't point to a login page."
                 )
             return HttpResponseRedirect(redirect_to)
-        response = super().dispatch()
+        response = super().get_response()
         add_never_cache_headers(response)
         return response
 
@@ -118,8 +118,8 @@ class LogoutView(RedirectURLMixin, TemplateView):
     template_name = "registration/logged_out.html"
     extra_context = None
 
-    def dispatch(self):
-        response = super().dispatch()
+    def get_response(self):
+        response = super().get_response()
         add_never_cache_headers(response)
         return response
 
@@ -199,9 +199,6 @@ class PasswordResetView(PasswordContextMixin, FormView):
     title = "Password reset"
     token_generator = default_token_generator
 
-    def dispatch(self):
-        return super().dispatch()
-
     def form_valid(self, form):
         opts = {
             "use_https": self.request.is_secure(),
@@ -234,7 +231,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
     title = "Enter new password"
     token_generator = default_token_generator
 
-    def dispatch(self):
+    def get_response(self):
         if "uidb64" not in self.url_kwargs or "token" not in self.url_kwargs:
             raise ImproperlyConfigured(
                 "The URL path must contain 'uidb64' and 'token' parameters."
@@ -250,7 +247,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
                 if self.token_generator.check_token(self.user, session_token):
                     # If the token is valid, display the password reset form.
                     self.validlink = True
-                    response = super().dispatch()
+                    response = super().get_response()
                     add_never_cache_headers(response)
                     return response
             else:

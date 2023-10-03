@@ -13,8 +13,10 @@ from bolt.exceptions import (
 )
 from bolt.http import Http404
 from bolt.http.multipartparser import MultiPartParserError
+from bolt.runtime import settings
 from bolt.urls import get_resolver, get_urlconf
 from bolt.utils.log import log_response
+from bolt.views.errors import ErrorView
 
 
 def convert_exception_to_response(get_response):
@@ -127,8 +129,7 @@ def response_for_exception(request, exc):
 
 def get_exception_response(request, resolver, status_code, exception):
     try:
-        callback = resolver.resolve_error_handler(status_code)
-        response = callback(request, exception=exception)
+        response = get_error_view(status_code)(request)
     except Exception:
         signals.got_request_exception.send(sender=None, request=request)
         response = handle_uncaught_exception(request, resolver, sys.exc_info())
@@ -141,6 +142,13 @@ def handle_uncaught_exception(request, resolver, exc_info):
     Processing for any otherwise uncaught exceptions (those that will
     generate HTTP 500 responses).
     """
-    # Return an HttpResponse that displays a friendly error message.
-    callback = resolver.resolve_error_handler(500)
-    return callback(request)
+    return get_error_view(500)(request)
+
+
+def get_error_view(status_code):
+    views_by_status = settings.HTTP_ERROR_VIEWS
+    if status_code in views_by_status:
+        return views_by_status[status_code].as_view()
+
+    # Create a standard view for any other status code
+    return ErrorView.as_view(status_code=status_code)

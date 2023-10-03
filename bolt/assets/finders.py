@@ -1,11 +1,11 @@
 import functools
 import os
 
+from bolt.assets import utils
+from bolt.assets.storage import FileSystemStorage
 from bolt.exceptions import ImproperlyConfigured
 from bolt.packages import packages
 from bolt.runtime import settings
-from bolt.assets import utils
-from bolt.assets.storage import FileSystemStorage
 from bolt.utils._os import safe_join
 from bolt.utils.module_loading import import_string
 

@@ -26,7 +26,12 @@ class View:
         "trace",
     ]
 
-    def __init__(self, request: HttpRequest, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
+        # Views can customize their init, which receives
+        # the args and kwargs from as_view()
+        pass
+
+    def setup(self, request: HttpRequest, *args, **kwargs) -> None:
         if hasattr(self, "get") and not hasattr(self, "head"):
             self.head = self.get
 
@@ -34,20 +39,11 @@ class View:
         self.url_args = args
         self.url_kwargs = kwargs
 
-    @property
-    def args(self) -> tuple:
-        # Warning - old name
-        return self.url_args
-
-    @property
-    def kwargs(self) -> dict:
-        # Warning - old name
-        return self.url_kwargs
-
     @classonlymethod
-    def as_view(cls):
+    def as_view(cls, *init_args, **init_kwargs):
         def view(request, *args, **kwargs):
-            v = cls(request, *args, **kwargs)
+            v = cls(*init_args, **init_kwargs)
+            v.setup(request, *args, **kwargs)
             return v.get_response()
 
         # Copy possible attributes set by decorators, e.g. @csrf_exempt, from
@@ -58,12 +54,6 @@ class View:
         return view
 
     def get_response(self) -> HttpResponseBase:
-        return self.dispatch()
-
-    def dispatch(self, *args, **kwargs) -> HttpResponseBase:
-        """Compatible with Bolt's dispatch, but we disregard the args/kwargs"""
-        # Warning?
-
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
 

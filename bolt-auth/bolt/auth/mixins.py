@@ -68,7 +68,7 @@ class AccessMixin:
 class LoginRequiredMixin(AccessMixin):
     """Verify that the current user is authenticated."""
 
-    def dispatch(self):
+    def get_response(self):
         if not self.request.user:
             return self.handle_no_permission()
-        return super().dispatch()
+        return super().get_response()

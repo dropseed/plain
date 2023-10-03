@@ -93,6 +93,9 @@ X_FRAME_OPTIONS = "DENY"
 USE_X_FORWARDED_HOST = False
 USE_X_FORWARDED_PORT = False
 
+# User-defined overrides for error views by status code
+HTTP_ERROR_VIEWS: dict[int] = {}
+
 # If your Bolt app is behind a proxy that sets a header to specify secure
 # connections, AND that proxy ensures that user-submitted headers with the
 # same name are ignored (so that people can't spoof it), set this value to
@@ -144,9 +147,7 @@ LOGGING = {}
 # ASSETS #
 ###############
 
-ASSETS_BACKEND = (
-    "bolt.assets.whitenoise.storage.CompressedManifestStaticFilesStorage"
-)
+ASSETS_BACKEND = "bolt.assets.whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # List of finder classes that know how to find assets files in
 # various locations.

@@ -4,10 +4,10 @@ import os
 from posixpath import basename
 from urllib.parse import urlparse
 
-from bolt.http import FileResponse
-from bolt.runtime import settings
 from bolt.assets import finders
 from bolt.assets.storage import assets_storage
+from bolt.http import FileResponse
+from bolt.runtime import settings
 
 from .base import WhiteNoise
 from .string_utils import ensure_leading_trailing_slash
