@@ -1,8 +1,8 @@
-from bolt.http import Http404
+from bolt.http import Http404, HttpResponsePermanentRedirect, HttpResponseRedirect
 from bolt.utils.functional import cached_property
 from bolt.views import TemplateView
 
-from .exceptions import PageNotFoundError
+from .exceptions import PageNotFoundError, RedirectPageError
 from .registry import registry
 
 
@@ -31,3 +31,19 @@ class PageView(TemplateView):
         context = super().get_context()
         context["page"] = self.page
         return context
+
+    def get(self):
+        if self.page.content_type == "redirect":
+            url = self.page.vars.get("url")
+
+            if not url:
+                raise RedirectPageError(
+                    f"Redirect page {self.page.url_path} is missing a url"
+                )
+
+            if self.page.vars.get("temporary", True):
+                return HttpResponseRedirect(url)
+            else:
+                return HttpResponsePermanentRedirect(url)
+
+        return super().get()
