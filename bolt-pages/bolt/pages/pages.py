@@ -32,15 +32,15 @@ class Page:
     def html_content(self):
         content = self._frontmatter.content
 
+        if self.vars.get("use_jinja", True):
+            content = environment.from_string(content).render()
+
         if self.content_type == "markdown":
-            # option to use jinja first? or yes by default? or by file extension?
             content = pycmarkgfm.markdown_to_html(
                 content,
                 options=settings.PYCMARKGFM_OPTIONS,
                 extensions=settings.PYCMARKGFM_EXTENSIONS,
             )
-        elif self.content_type == "html":
-            content = environment.from_string(content).render()
 
         return content
 
