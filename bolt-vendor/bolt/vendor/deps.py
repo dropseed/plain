@@ -16,15 +16,16 @@ VENDOR_DIR = APP_ASSETS_DIR / "vendor"
 class Dependency:
     def __init__(self, name, **config):
         self.name = name
-        self.url = config.get("url")
-        self.installed = config.get("installed")
-        self.filename = config.get("filename")
+        self.url = config.get("url", "")
+        self.installed = config.get("installed", "")
+        self.filename = config.get("filename", "")
 
     @staticmethod
     def parse_version_from_url(url):
-        match = re.search(r"(v|/|@)(\d+\.\d+\.\d+)", url)
+        match = re.search(r"\d+\.\d+\.\d+", url)
         if match:
-            return match.group(2)
+            return match.group(0)
+        return ""
 
     def __str__(self):
         return f"{self.name} -> {self.url}"
@@ -69,7 +70,7 @@ class Dependency:
                 version, response = self.download(v)
                 return version, response
             except requests.RequestException:
-                return None, None
+                return "", None
 
         if not self.installed:
             # If we don't know the installed version yet,
