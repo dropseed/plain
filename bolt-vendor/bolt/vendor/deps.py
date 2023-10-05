@@ -27,7 +27,10 @@ class Dependency:
         return f"{self.name} -> {self.url}"
 
     def download(self):
-        response = requests.get(self.url)
+        # If the string contains a {version} placeholder, replace it
+        download_url = self.url.replace("{version}", self.installed)
+
+        response = requests.get(download_url)
         response.raise_for_status()
 
         content_type = response.headers.get("content-type")
@@ -61,6 +64,8 @@ class Dependency:
         version, response = self.download()
         vendored_path = self.vendor(response)
         self.installed = version
+        # If the exact version was in the string, replace it with {version} placeholder
+        self.url = self.url.replace(self.installed, "{version}")
         self.save_config()
         return vendored_path
 
