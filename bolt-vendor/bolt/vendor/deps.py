@@ -33,6 +33,7 @@ class Dependency:
         content_type = response.headers.get("content-type")
         if content_type not in (
             "application/javascript; charset=utf-8",
+            "application/json; charset=utf-8",
             "text/css; charset=utf-8",
         ):
             raise UnknownContentTypeError(
