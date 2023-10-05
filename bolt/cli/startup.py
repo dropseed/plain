@@ -8,6 +8,7 @@ def _print_bold(s):
     print(s)
     print("\033[0m", end="")
 
+
 def _print_italic(s):
     print("\x1B[3m", end="")
     print(s)

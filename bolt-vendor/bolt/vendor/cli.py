@@ -66,14 +66,13 @@ def update():
         click.secho(f"Updating {dep.name} {dep.installed}...", bold=True, nl=False)
         try:
             vendored_path = dep.update()
+            vendored_path = vendored_path.relative_to(Path.cwd())
+
+            click.secho(f" {dep.installed}", fg="green", nl=False)
+            click.secho(f" -> {vendored_path}")
         except DependencyError as e:
             click.secho(f"  {e}", fg="red")
             errors.append(e)
-
-        vendored_path = vendored_path.relative_to(Path.cwd())
-
-        click.secho(f" {dep.installed}", fg="green", nl=False)
-        click.secho(f" -> {vendored_path}")
 
     if errors:
         click.secho("Failed to install some dependencies.", fg="red")
