@@ -11,6 +11,10 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 # readme = "README.md"
 
+# Make the CLI available without adding to INSTALLED_APPS
+[tool.poetry.plugins.bolt_cli]
+"vendor" = "bolt.vendor:cli"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 tomlkit = "^0.12.1"
