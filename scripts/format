@@ -1,3 +1,3 @@
 #!/bin/sh -e
-ruff --fix-only bolt* tests
-black bolt* tests
+poetry run ruff --fix-only bolt* tests
+poetry run black bolt* tests
