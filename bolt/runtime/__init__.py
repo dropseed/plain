@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import os
 
 from bolt.utils.version import get_version
 
@@ -8,6 +9,14 @@ from .user_settings import LazySettings
 VERSION = (5, 0, 0, "alpha", 0)
 
 __version__ = get_version(VERSION)
+
+
+# Made available without setup or settings
+APP_PATH = Path.cwd() / "app"
+
+
+class AppPathNotFound(RuntimeError):
+    pass
 
 
 def setup():
@@ -20,11 +29,16 @@ def setup():
     from bolt.runtime import settings
     from bolt.utils.log import configure_logging
 
-    # Automatically put the app dir on the Python path for convenience
-    app_dir = Path.cwd() / "app"
-    if app_dir.exists() and app_dir not in sys.path:
-        sys.path.insert(0, app_dir.as_posix())
+    if not APP_PATH.exists():
+        raise AppPathNotFound(
+            "No app directory found. Are you sure you're in a Bolt project?"
+        )
 
+    # Automatically put the app dir on the Python path for convenience
+    if APP_PATH not in sys.path:
+        sys.path.insert(0, APP_PATH.as_posix())
+
+    # Load .env files automatically before settings
     dotenv.load()
 
     configure_logging(settings.LOGGING)
@@ -34,12 +48,6 @@ def setup():
 
 # from bolt.runtime import settings
 settings = LazySettings()
-
-
-if (Path.cwd() / "app").exists():
-    APP_PATH = Path.cwd() / "app"
-else:
-    APP_PATH = None
 
 
 __all__ = [
