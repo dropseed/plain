@@ -1,6 +1,5 @@
 import sys
 from pathlib import Path
-import os
 
 from bolt.utils.version import get_version
 
