@@ -16,5 +16,13 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: poetry
+
     - run: poetry install
-    - run: ./scripts/test
+
+    - working-directory: tests
+      run: poetry run coverage run -m pytest "$@"
+
+    - working-directory: tests
+      run: |
+        echo "## Pytest coverage" >> $GITHUB_STEP_SUMMARY
+        poetry run coverage report --skip-empty --format markdown >> $GITHUB_STEP_SUMMARY
