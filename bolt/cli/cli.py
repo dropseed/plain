@@ -204,14 +204,21 @@ def compile(ctx):
 
     # maybe also user customization in pyproject.toml (like bolt work)
 
+    try:
+        from bolt import tailwind
+
+        tailwind_installed = True
+    except ImportError:
+        tailwind_installed = False
+
     # Compile our Tailwind CSS (including templates in bolt itself)
-    # TODO not necessarily installed
-    result = subprocess.run(["bolt", "tailwind", "compile", "--minify"])
-    if result.returncode:
-        click.secho(
-            f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red"
-        )
-        sys.exit(result.returncode)
+    if tailwind_installed:
+        result = subprocess.run(["bolt", "tailwind", "compile", "--minify"])
+        if result.returncode:
+            click.secho(
+                f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red"
+            )
+            sys.exit(result.returncode)
 
     # Run the regular collectstatic
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
