@@ -60,7 +60,7 @@ class CheckMessage:
     def is_silenced(self):
         from bolt.runtime import settings
 
-        return self.id in settings.SILENCED_SYSTEM_CHECKS
+        return self.id in settings.SILENCED_PREFLIGHT_CHECKS
 
 
 class Debug(CheckMessage):
