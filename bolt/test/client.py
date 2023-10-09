@@ -10,8 +10,8 @@ from importlib import import_module
 from io import BytesIO, IOBase
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
-from bolt.handlers.base import BaseHandler
-from bolt.handlers.wsgi import WSGIRequest
+from bolt.internal.handlers.base import BaseHandler
+from bolt.internal.handlers.wsgi import WSGIRequest
 from bolt.http import HttpHeaders, HttpRequest, QueryDict
 from bolt.json import BoltJSONEncoder
 from bolt.runtime import settings
