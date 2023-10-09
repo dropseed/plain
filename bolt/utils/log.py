@@ -25,11 +25,6 @@ def configure_logging(logging_settings):
             "simple": {
                 "format": "[%(levelname)s] %(message)s",
             },
-            "bolt.server": {
-                "()": "bolt.utils.log.ServerFormatter",
-                "format": "[{server_time}] {message}",
-                "style": "{",
-            },
         },
         "handlers": {
             "console": {
@@ -37,21 +32,11 @@ def configure_logging(logging_settings):
                 "class": "logging.StreamHandler",
                 "formatter": "simple",
             },
-            "bolt.server": {
-                "level": "INFO",
-                "class": "logging.StreamHandler",
-                "formatter": "bolt.server",
-            },
         },
         "loggers": {
             "bolt": {
                 "handlers": ["console"],
                 "level": environ.get("BOLT_LOG_LEVEL", "INFO"),
-            },
-            "bolt.server": {
-                "handlers": ["bolt.server"],
-                "level": "INFO",
-                "propagate": False,
             },
             "app": {
                 "handlers": ["console"],
