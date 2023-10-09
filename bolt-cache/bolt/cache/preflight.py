@@ -1,6 +1,6 @@
 import pathlib
 
-from bolt.checks import Error, Tags, Warning, register
+from bolt.preflight import Error, Tags, Warning, register
 from bolt.runtime import settings
 
 from .backends.filebased import FileBasedCache

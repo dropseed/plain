@@ -2,7 +2,7 @@ import functools
 import inspect
 from functools import partial
 
-from bolt import checks, exceptions
+from bolt import preflight, exceptions
 from bolt.db import connection, router
 from bolt.db.backends import utils
 from bolt.db.models import Q
@@ -133,7 +133,7 @@ class RelatedField(FieldCacheMixin, Field):
         )
         if not (is_valid_id or related_name.endswith("+")):
             return [
-                checks.Error(
+                preflight.Error(
                     "The name '%s' is invalid related_name for field %s.%s"
                     % (
                         self.remote_field.related_name,
@@ -157,7 +157,7 @@ class RelatedField(FieldCacheMixin, Field):
         errors = []
         if rel_query_name.endswith("_"):
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "Reverse query name '%s' must not end with an underscore."
                     % rel_query_name,
                     hint=(
@@ -170,7 +170,7 @@ class RelatedField(FieldCacheMixin, Field):
             )
         if LOOKUP_SEP in rel_query_name:
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "Reverse query name '%s' must not contain '%s'."
                     % (rel_query_name, LOOKUP_SEP),
                     hint=(
@@ -195,7 +195,7 @@ class RelatedField(FieldCacheMixin, Field):
             rel_is_string or not self.remote_field.model._meta.swapped
         ):
             return [
-                checks.Error(
+                preflight.Error(
                     "Field defines a relation with model '%s', which is either "
                     "not installed, or is abstract." % model_name,
                     obj=self,
@@ -211,7 +211,7 @@ class RelatedField(FieldCacheMixin, Field):
             and self.remote_field.model._meta.swapped
         ):
             return [
-                checks.Error(
+                preflight.Error(
                     "Field defines a relation with the model '%s', which has "
                     "been swapped out." % self.remote_field.model._meta.label,
                     hint="Update the relation to point at 'settings.%s'."
@@ -265,7 +265,7 @@ class RelatedField(FieldCacheMixin, Field):
             clash_name = f"{rel_opts.label}.{clash_field.name}"
             if not rel_is_hidden and clash_field.name == rel_name:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         f"Reverse accessor '{rel_opts.object_name}.{rel_name}' "
                         f"for '{field_name}' clashes with field name "
                         f"'{clash_name}'.",
@@ -281,7 +281,7 @@ class RelatedField(FieldCacheMixin, Field):
 
             if clash_field.name == rel_query_name:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "Reverse query name for '%s' clashes with field name '%s'."
                         % (field_name, clash_name),
                         hint=(
@@ -306,7 +306,7 @@ class RelatedField(FieldCacheMixin, Field):
             )
             if not rel_is_hidden and clash_field.get_accessor_name() == rel_name:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         f"Reverse accessor '{rel_opts.object_name}.{rel_name}' "
                         f"for '{field_name}' clashes with reverse accessor for "
                         f"'{clash_name}'.",
@@ -322,7 +322,7 @@ class RelatedField(FieldCacheMixin, Field):
 
             if clash_field.get_accessor_name() == rel_query_name:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "Reverse query name for '{}' clashes with reverse query name "
                         "for '{}'.".format(field_name, clash_name),
                         hint=(
@@ -566,7 +566,7 @@ class ForeignObject(RelatedField):
                     self.remote_field.model._meta.get_field(to_field)
                 except exceptions.FieldDoesNotExist:
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "The to_field '%s' doesn't exist on the related "
                             "model '%s'."
                             % (to_field, self.remote_field.model._meta.label),
@@ -612,7 +612,7 @@ class ForeignObject(RelatedField):
             )
             model_name = self.remote_field.model.__name__
             return [
-                checks.Error(
+                preflight.Error(
                     "No subset of the fields %s on model '%s' is unique."
                     % (field_combination, model_name),
                     hint=(
@@ -629,7 +629,7 @@ class ForeignObject(RelatedField):
             field_name = self.foreign_related_fields[0].name
             model_name = self.remote_field.model.__name__
             return [
-                checks.Error(
+                preflight.Error(
                     "'{}.{}' must be unique because it is referenced by "
                     "a foreign key.".format(model_name, field_name),
                     hint=(
@@ -968,7 +968,7 @@ class ForeignKey(ForeignObject):
         on_delete = getattr(self.remote_field, "on_delete", None)
         if on_delete == SET_NULL and not self.null:
             return [
-                checks.Error(
+                preflight.Error(
                     "Field specifies on_delete=SET_NULL, but cannot be null.",
                     hint=(
                         "Set null=True argument on the field, or change the on_delete "
@@ -980,7 +980,7 @@ class ForeignKey(ForeignObject):
             ]
         elif on_delete == SET_DEFAULT and not self.has_default():
             return [
-                checks.Error(
+                preflight.Error(
                     "Field specifies on_delete=SET_DEFAULT, but has no default value.",
                     hint="Set a default value, or change the on_delete rule.",
                     obj=self,
@@ -993,7 +993,7 @@ class ForeignKey(ForeignObject):
     def _check_unique(self, **kwargs):
         return (
             [
-                checks.Warning(
+                preflight.Warning(
                     "Setting unique=True on a ForeignKey has the same effect as using "
                     "a OneToOneField.",
                     hint=(
@@ -1346,7 +1346,7 @@ class ManyToManyField(RelatedField):
     def _check_unique(self, **kwargs):
         if self.unique:
             return [
-                checks.Error(
+                preflight.Error(
                     "ManyToManyFields cannot be unique.",
                     obj=self,
                     id="fields.E330",
@@ -1359,7 +1359,7 @@ class ManyToManyField(RelatedField):
 
         if self.has_null_arg:
             warnings.append(
-                checks.Warning(
+                preflight.Warning(
                     "null has no effect on ManyToManyField.",
                     obj=self,
                     id="fields.W340",
@@ -1368,7 +1368,7 @@ class ManyToManyField(RelatedField):
 
         if self._validators:
             warnings.append(
-                checks.Warning(
+                preflight.Warning(
                     "ManyToManyField does not support validators.",
                     obj=self,
                     id="fields.W341",
@@ -1376,7 +1376,7 @@ class ManyToManyField(RelatedField):
             )
         if self.remote_field.symmetrical and self._related_name:
             warnings.append(
-                checks.Warning(
+                preflight.Warning(
                     "related_name has no effect on ManyToManyField "
                     'with a symmetrical relationship, e.g. to "self".',
                     obj=self,
@@ -1385,7 +1385,7 @@ class ManyToManyField(RelatedField):
             )
         if self.db_comment:
             warnings.append(
-                checks.Warning(
+                preflight.Warning(
                     "db_comment has no effect on ManyToManyField.",
                     obj=self,
                     id="fields.W346",
@@ -1410,7 +1410,7 @@ class ManyToManyField(RelatedField):
         ):
             # The relationship model is not installed.
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "Field specifies a many-to-many relation through model "
                     "'%s', which has not been installed." % qualified_model_name,
                     obj=self,
@@ -1442,7 +1442,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_self > 2 and not self.remote_field.through_fields:
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "The model is used as an intermediate model by "
                             "'%s', but it has more than two foreign keys "
                             "to '%s', which is ambiguous. You must specify "
@@ -1471,7 +1471,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_from > 1 and not self.remote_field.through_fields:
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             (
                                 "The model is used as an intermediate model by "
                                 "'%s', but it has more than one foreign key "
@@ -1495,7 +1495,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_to > 1 and not self.remote_field.through_fields:
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "The model is used as an intermediate model by "
                             "'{}', but it has more than one foreign key "
                             "to '{}', which is ambiguous. You must specify "
@@ -1518,7 +1518,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_from == 0 or seen_to == 0:
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "The model is used as an intermediate model by "
                             "'%s', but it does not have a foreign key to '%s' or '%s'."
                             % (self, from_model_name, to_model_name),
@@ -1537,7 +1537,7 @@ class ManyToManyField(RelatedField):
                 and self.remote_field.through_fields[1]
             ):
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "Field specifies 'through_fields' but does not provide "
                         "the names of the two link fields that should be used "
                         "for the relation through model '%s'." % qualified_model_name,
@@ -1596,7 +1596,7 @@ class ManyToManyField(RelatedField):
                         field = through._meta.get_field(field_name)
                     except exceptions.FieldDoesNotExist:
                         errors.append(
-                            checks.Error(
+                            preflight.Error(
                                 "The intermediary model '%s' has no field '%s'."
                                 % (qualified_model_name, field_name),
                                 hint=hint,
@@ -1611,7 +1611,7 @@ class ManyToManyField(RelatedField):
                             == related_model
                         ):
                             errors.append(
-                                checks.Error(
+                                preflight.Error(
                                     "'%s.%s' is not a foreign key to '%s'."
                                     % (
                                         through._meta.object_name,
@@ -1658,14 +1658,14 @@ class ManyToManyField(RelatedField):
             else:
                 clashing_obj = model._meta.label
             if settings.DATABASE_ROUTERS:
-                error_class, error_id = checks.Warning, "fields.W344"
+                error_class, error_id = preflight.Warning, "fields.W344"
                 error_hint = (
                     "You have configured settings.DATABASE_ROUTERS. Verify "
                     "that the table of %r is correctly routed to a separate "
                     "database." % clashing_obj
                 )
             else:
-                error_class, error_id = checks.Error, "fields.E340"
+                error_class, error_id = preflight.Error, "fields.E340"
                 error_hint = None
             return [
                 error_class(

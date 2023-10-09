@@ -3,7 +3,7 @@ import types
 from collections import defaultdict
 from itertools import chain
 
-from bolt.checks import Error, Tags, Warning, register
+from bolt.preflight import Error, Tags, Warning, register
 from bolt.packages import packages
 from bolt.runtime import settings
 

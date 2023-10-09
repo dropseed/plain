@@ -5,7 +5,7 @@ from functools import partialmethod
 from itertools import chain
 
 import bolt.runtime
-from bolt import checks
+from bolt import preflight
 from bolt.db import (
     BOLT_VERSION_PICKLE_KEY,
     DatabaseError,
@@ -1550,7 +1550,7 @@ class Model(AltersData, metaclass=ModelBase):
             and not cls._meta.package_config._is_default_auto_field_overridden
         ):
             return [
-                checks.Warning(
+                preflight.Warning(
                     f"Auto-created primary key used when not defining a "
                     f"primary key type, by default "
                     f"'{settings.DEFAULT_AUTO_FIELD}'.",
@@ -1580,7 +1580,7 @@ class Model(AltersData, metaclass=ModelBase):
                 or "supports_comments" in cls._meta.required_db_features
             ):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         f"{connection.display_name} does not support comments on "
                         f"tables (db_table_comment).",
                         obj=cls,
@@ -1598,7 +1598,7 @@ class Model(AltersData, metaclass=ModelBase):
                 packages.get_model(cls._meta.swapped)
             except ValueError:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "'%s' is not of the form 'package_label.package_name'."
                         % cls._meta.swappable,
                         id="models.E001",
@@ -1607,7 +1607,7 @@ class Model(AltersData, metaclass=ModelBase):
             except LookupError:
                 package_label, model_name = cls._meta.swapped.split(".")
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "'%s' references '%s.%s', which has not been "
                         "installed, or is abstract."
                         % (cls._meta.swappable, package_label, model_name),
@@ -1622,7 +1622,7 @@ class Model(AltersData, metaclass=ModelBase):
         if cls._meta.proxy:
             if cls._meta.local_fields or cls._meta.local_many_to_many:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "Proxy model '%s' contains model fields." % cls.__name__,
                         id="models.E017",
                     )
@@ -1671,7 +1671,7 @@ class Model(AltersData, metaclass=ModelBase):
             )
             if signature in seen_intermediary_signatures:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "The model has two identical many-to-many relations "
                         "through the intermediate model '%s'."
                         % f.remote_field.through._meta.label,
@@ -1692,7 +1692,7 @@ class Model(AltersData, metaclass=ModelBase):
         # fields is empty or consists of the invalid "id" field
         if fields and not fields[0].primary_key and cls._meta.pk.name == "id":
             return [
-                checks.Error(
+                preflight.Error(
                     "'id' can only be used as a field name if the field also "
                     "sets 'primary_key=True'.",
                     obj=cls,
@@ -1714,7 +1714,7 @@ class Model(AltersData, metaclass=ModelBase):
                 clash = used_fields.get(f.name) or used_fields.get(f.attname) or None
                 if clash:
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "The field '%s' from parent model "
                             "'%s' clashes with the field '%s' "
                             "from parent model '%s'."
@@ -1745,7 +1745,7 @@ class Model(AltersData, metaclass=ModelBase):
             )
             if clash and not id_conflict:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "The field '{}' clashes with the field '{}' "
                         "from model '{}'.".format(
                             f.name, clash.name, clash.model._meta
@@ -1771,7 +1771,7 @@ class Model(AltersData, metaclass=ModelBase):
             # Ensure the column name is not already in use.
             if column_name and column_name in used_column_names:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "Field '{}' has column name '{}' that is used by "
                         "another field.".format(f.name, column_name),
                         hint="Specify a 'db_column' for the field.",
@@ -1790,7 +1790,7 @@ class Model(AltersData, metaclass=ModelBase):
         model_name = cls.__name__
         if model_name.startswith("_") or model_name.endswith("_"):
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "The model name '%s' cannot start or end with an underscore "
                     "as it collides with the query lookup syntax." % model_name,
                     obj=cls,
@@ -1799,7 +1799,7 @@ class Model(AltersData, metaclass=ModelBase):
             )
         elif LOOKUP_SEP in model_name:
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "The model name '%s' cannot contain double underscores as "
                     "it collides with the query lookup syntax." % model_name,
                     obj=cls,
@@ -1820,7 +1820,7 @@ class Model(AltersData, metaclass=ModelBase):
         for accessor in related_field_accessors:
             if accessor in property_names:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "The property '%s' clashes with a related field "
                         "accessor." % accessor,
                         obj=cls,
@@ -1834,7 +1834,7 @@ class Model(AltersData, metaclass=ModelBase):
         errors = []
         if sum(1 for f in cls._meta.local_fields if f.primary_key) > 1:
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "The model cannot have more than one field with "
                     "'primary_key=True'.",
                     obj=cls,
@@ -1849,7 +1849,7 @@ class Model(AltersData, metaclass=ModelBase):
         """Check the value of "index_together" option."""
         if not isinstance(cls._meta.index_together, tuple | list):
             return [
-                checks.Error(
+                preflight.Error(
                     "'index_together' must be a list or tuple.",
                     obj=cls,
                     id="models.E008",
@@ -1860,7 +1860,7 @@ class Model(AltersData, metaclass=ModelBase):
             not isinstance(fields, tuple | list) for fields in cls._meta.index_together
         ):
             return [
-                checks.Error(
+                preflight.Error(
                     "All 'index_together' elements must be lists or tuples.",
                     obj=cls,
                     id="models.E009",
@@ -1878,7 +1878,7 @@ class Model(AltersData, metaclass=ModelBase):
         """Check the value of "unique_together" option."""
         if not isinstance(cls._meta.unique_together, tuple | list):
             return [
-                checks.Error(
+                preflight.Error(
                     "'unique_together' must be a list or tuple.",
                     obj=cls,
                     id="models.E010",
@@ -1889,7 +1889,7 @@ class Model(AltersData, metaclass=ModelBase):
             not isinstance(fields, tuple | list) for fields in cls._meta.unique_together
         ):
             return [
-                checks.Error(
+                preflight.Error(
                     "All 'unique_together' elements must be lists or tuples.",
                     obj=cls,
                     id="models.E011",
@@ -1912,7 +1912,7 @@ class Model(AltersData, metaclass=ModelBase):
             # for cross-database compatibility with Oracle.
             if index.name[0] == "_" or index.name[0].isdigit():
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "The index name '%s' cannot start with an underscore "
                         "or a number." % index.name,
                         obj=cls,
@@ -1921,7 +1921,7 @@ class Model(AltersData, metaclass=ModelBase):
                 )
             if len(index.name) > index.max_name_length:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "The index name '%s' cannot be longer than %d "
                         "characters." % (index.name, index.max_name_length),
                         obj=cls,
@@ -1942,7 +1942,7 @@ class Model(AltersData, metaclass=ModelBase):
                 or "supports_partial_indexes" in cls._meta.required_db_features
             ) and any(index.condition is not None for index in cls._meta.indexes):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support indexes with conditions."
                         % connection.display_name,
                         hint=(
@@ -1958,7 +1958,7 @@ class Model(AltersData, metaclass=ModelBase):
                 or "supports_covering_indexes" in cls._meta.required_db_features
             ) and any(index.include for index in cls._meta.indexes):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support indexes with non-key columns."
                         % connection.display_name,
                         hint=(
@@ -1974,7 +1974,7 @@ class Model(AltersData, metaclass=ModelBase):
                 or "supports_expression_indexes" in cls._meta.required_db_features
             ) and any(index.contains_expressions for index in cls._meta.indexes):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support indexes on expressions."
                         % connection.display_name,
                         hint=(
@@ -2011,7 +2011,7 @@ class Model(AltersData, metaclass=ModelBase):
                 field = forward_fields_map[field_name]
             except KeyError:
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "'%s' refers to the nonexistent field '%s'."
                         % (
                             option,
@@ -2024,7 +2024,7 @@ class Model(AltersData, metaclass=ModelBase):
             else:
                 if isinstance(field.remote_field, models.ManyToManyRel):
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "'%s' refers to a ManyToManyField '%s', but "
                             "ManyToManyFields are not permitted in '%s'."
                             % (
@@ -2038,7 +2038,7 @@ class Model(AltersData, metaclass=ModelBase):
                     )
                 elif field not in cls._meta.local_fields:
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "'{}' refers to field '{}' which is not local to model "
                             "'{}'.".format(option, field_name, cls._meta.object_name),
                             hint="This issue may be caused by multi-table inheritance.",
@@ -2056,7 +2056,7 @@ class Model(AltersData, metaclass=ModelBase):
         """
         if cls._meta._ordering_clash:
             return [
-                checks.Error(
+                preflight.Error(
                     "'ordering' and 'order_with_respect_to' cannot be used together.",
                     obj=cls,
                     id="models.E021",
@@ -2068,7 +2068,7 @@ class Model(AltersData, metaclass=ModelBase):
 
         if not isinstance(cls._meta.ordering, list | tuple):
             return [
-                checks.Error(
+                preflight.Error(
                     "'ordering' must be a tuple or list (even if you want to order by "
                     "only one field).",
                     obj=cls,
@@ -2115,7 +2115,7 @@ class Model(AltersData, metaclass=ModelBase):
                         fld.get_transform(part) is None and fld.get_lookup(part) is None
                     ):
                         errors.append(
-                            checks.Error(
+                            preflight.Error(
                                 "'ordering' refers to the nonexistent field, "
                                 "related field, or lookup '%s'." % field,
                                 obj=cls,
@@ -2146,7 +2146,7 @@ class Model(AltersData, metaclass=ModelBase):
 
         for invalid_field in invalid_fields:
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "'ordering' refers to the nonexistent field, related "
                     "field, or lookup '%s'." % invalid_field,
                     obj=cls,
@@ -2198,7 +2198,7 @@ class Model(AltersData, metaclass=ModelBase):
                 and len(column_name) > allowed_len
             ):
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         'Autogenerated column name too long for field "%s". '
                         'Maximum length is "%s" for database "%s".'
                         % (column_name, allowed_len, db_alias),
@@ -2223,7 +2223,7 @@ class Model(AltersData, metaclass=ModelBase):
                     and len(rel_name) > allowed_len
                 ):
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "Autogenerated column name too long for M2M field "
                             '"%s". Maximum length is "%s" for database "%s".'
                             % (rel_name, allowed_len, db_alias),
@@ -2269,7 +2269,7 @@ class Model(AltersData, metaclass=ModelBase):
                 for constraint in cls._meta.constraints
             ):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support check constraints."
                         % connection.display_name,
                         hint=(
@@ -2289,7 +2289,7 @@ class Model(AltersData, metaclass=ModelBase):
                 for constraint in cls._meta.constraints
             ):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support unique constraints with "
                         "conditions." % connection.display_name,
                         hint=(
@@ -2310,7 +2310,7 @@ class Model(AltersData, metaclass=ModelBase):
                 for constraint in cls._meta.constraints
             ):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support deferrable unique constraints."
                         % connection.display_name,
                         hint=(
@@ -2329,7 +2329,7 @@ class Model(AltersData, metaclass=ModelBase):
                 for constraint in cls._meta.constraints
             ):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support unique constraints with non-key "
                         "columns." % connection.display_name,
                         hint=(
@@ -2349,7 +2349,7 @@ class Model(AltersData, metaclass=ModelBase):
                 for constraint in cls._meta.constraints
             ):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         "%s does not support unique constraints on "
                         "expressions." % connection.display_name,
                         hint=(
@@ -2400,7 +2400,7 @@ class Model(AltersData, metaclass=ModelBase):
                             for expr in constraint.check.flatten()
                         ):
                             errors.append(
-                                checks.Warning(
+                                preflight.Warning(
                                     f"Check constraint {constraint.name!r} contains "
                                     f"RawSQL() expression and won't be validated "
                                     f"during the model full_clean().",
@@ -2437,7 +2437,7 @@ class Model(AltersData, metaclass=ModelBase):
                     and field.get_lookup(first_lookup) is None
                 ):
                     errors.append(
-                        checks.Error(
+                        preflight.Error(
                             "'constraints' refers to the joined field '%s'."
                             % LOOKUP_SEP.join([field_name] + lookups),
                             obj=cls,

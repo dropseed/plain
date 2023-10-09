@@ -1,9 +1,9 @@
-from bolt import checks
+from bolt import preflight
 from bolt.db.models.query_utils import DeferredAttribute
 from bolt.packages import PackageConfig
 
 from . import get_user_model
-from .checks import check_user_model
+from .preflight import check_user_model
 from .signals import user_logged_in
 
 
@@ -19,4 +19,4 @@ class AuthConfig(PackageConfig):
             from .models import update_last_login
 
             user_logged_in.connect(update_last_login, dispatch_uid="update_last_login")
-        checks.register(check_user_model, checks.Tags.models)
+        preflight.register(check_user_model, preflight.Tags.models)

@@ -1,4 +1,4 @@
-from bolt import checks
+from bolt import preflight
 
 NOT_PROVIDED = object()
 
@@ -38,7 +38,7 @@ class CheckFieldDefaultMixin:
             and not callable(self.default)
         ):
             return [
-                checks.Warning(
+                preflight.Warning(
                     "%s default should be a callable instead of an instance "
                     "so that it's not shared between all field instances."
                     % (self.__class__.__name__,),

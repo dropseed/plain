@@ -14,11 +14,11 @@ from .messages import (
 from .registry import Tags, register, run_checks, tag_exists
 
 # Import these to force registration of checks
-import bolt.checks.compatibility.django_4_0  # NOQA isort:skip
-import bolt.checks.files  # NOQA isort:skip
-import bolt.checks.security.base  # NOQA isort:skip
-import bolt.checks.security.csrf  # NOQA isort:skip
-import bolt.checks.urls  # NOQA isort:skip
+import bolt.preflight.compatibility.django_4_0  # NOQA isort:skip
+import bolt.preflight.files  # NOQA isort:skip
+import bolt.preflight.security.base  # NOQA isort:skip
+import bolt.preflight.security.csrf  # NOQA isort:skip
+import bolt.preflight.urls  # NOQA isort:skip
 
 
 __all__ = [
