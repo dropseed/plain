@@ -213,6 +213,8 @@ def find(path, all=False):
 
 
 def get_finders():
+    from bolt.runtime import settings
+
     for finder_path in settings.ASSETS_FINDERS:
         yield get_finder(finder_path)
 
