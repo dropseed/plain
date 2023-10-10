@@ -110,9 +110,9 @@
         {% endfor %}
         </dl>
         {% if "body_json" in request %}
-        <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200"><code>{{ request.body_json }}</code></pre>
+        <pre class="p-2 mt-4 overflow-y-auto text-xs rounded bg-zinc-800 text-zinc-200"><code>{{ request.body_json }}</code></pre>
         {% else %}
-        <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ request.body or "(Empty)" }}</code></pre>
+        <pre class="p-2 mt-4 overflow-y-auto text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ request.body or "(Empty)" }}</code></pre>
         {% endif %}
         {% endwith %}
 
@@ -124,7 +124,7 @@
             <dd class="text-xs break-all text-zinc-300"><code>{{ value or "(Empty)" }}</code></dd>
         {% endfor %}
         </dl>
-        <pre class="p-2 mt-4 overflow-y-scroll text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ response.content or "(Empty)" }}</code></pre>
+        <pre class="p-2 mt-4 overflow-y-auto text-xs rounded bg-zinc-800 text-zinc-200 max-h-96"><code>{{ response.content or "(Empty)" }}</code></pre>
         {% endwith %}
     </div>
     {% endif %}
