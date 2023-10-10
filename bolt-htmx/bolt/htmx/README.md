@@ -408,3 +408,9 @@ module.exports = {
   ],
 }
 ```
+
+## CSP
+
+```
+<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+```

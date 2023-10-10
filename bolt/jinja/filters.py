@@ -1,20 +1,9 @@
 import datetime
 from itertools import islice
 
-from jinja2.utils import htmlsafe_json_dumps
-
-from bolt.utils.html import format_html
+from bolt.utils.html import json_script
 from bolt.utils.timesince import timesince, timeuntil
 from bolt.utils.timezone import localtime
-
-
-def json_script(value, id):
-    return format_html(
-        '<script type="application/json" id="{}">{}</script>',
-        id,
-        htmlsafe_json_dumps(value),
-    )
-
 
 default_filters = {
     # The standard Python ones
