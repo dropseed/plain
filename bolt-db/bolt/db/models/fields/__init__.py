@@ -8,7 +8,7 @@ import warnings
 from base64 import b64decode, b64encode
 from functools import partialmethod, total_ordering
 
-from bolt import checks, exceptions, validators
+from bolt import preflight, exceptions, validators
 from bolt.db import connection, connections, router
 from bolt.db.models.constants import LOOKUP_SEP
 from bolt.db.models.enums import ChoicesMeta
@@ -267,7 +267,7 @@ class Field(RegisterLookupMixin):
         """
         if self.name.endswith("_"):
             return [
-                checks.Error(
+                preflight.Error(
                     "Field names must not end with an underscore.",
                     obj=self,
                     id="fields.E001",
@@ -275,7 +275,7 @@ class Field(RegisterLookupMixin):
             ]
         elif LOOKUP_SEP in self.name:
             return [
-                checks.Error(
+                preflight.Error(
                     'Field names must not contain "%s".' % LOOKUP_SEP,
                     obj=self,
                     id="fields.E002",
@@ -283,7 +283,7 @@ class Field(RegisterLookupMixin):
             ]
         elif self.name == "pk":
             return [
-                checks.Error(
+                preflight.Error(
                     "'pk' is a reserved word that cannot be used as a field name.",
                     obj=self,
                     id="fields.E003",
@@ -302,7 +302,7 @@ class Field(RegisterLookupMixin):
 
         if not is_iterable(self.choices) or isinstance(self.choices, str):
             return [
-                checks.Error(
+                preflight.Error(
                     "'choices' must be an iterable (e.g., a list or tuple).",
                     obj=self,
                     id="fields.E004",
@@ -350,7 +350,7 @@ class Field(RegisterLookupMixin):
         else:
             if self.max_length is not None and choice_max_length > self.max_length:
                 return [
-                    checks.Error(
+                    preflight.Error(
                         "'max_length' is too small to fit the longest value "
                         "in 'choices' (%d characters)." % choice_max_length,
                         obj=self,
@@ -360,7 +360,7 @@ class Field(RegisterLookupMixin):
             return []
 
         return [
-            checks.Error(
+            preflight.Error(
                 "'choices' must be an iterable containing "
                 "(actual value, human readable name) tuples.",
                 obj=self,
@@ -371,7 +371,7 @@ class Field(RegisterLookupMixin):
     def _check_db_index(self):
         if self.db_index not in (None, True, False):
             return [
-                checks.Error(
+                preflight.Error(
                     "'db_index' must be None, True or False.",
                     obj=self,
                     id="fields.E006",
@@ -393,7 +393,7 @@ class Field(RegisterLookupMixin):
                 or "supports_comments" in self.model._meta.required_db_features
             ):
                 errors.append(
-                    checks.Warning(
+                    preflight.Warning(
                         f"{connection.display_name} does not support comments on "
                         f"columns (db_comment).",
                         obj=self,
@@ -412,7 +412,7 @@ class Field(RegisterLookupMixin):
             # consider NULL and '' to be equal (and thus set up
             # character-based fields a little differently).
             return [
-                checks.Error(
+                preflight.Error(
                     "Primary keys must not have null=True.",
                     hint=(
                         "Set null=False on the field, or "
@@ -439,7 +439,7 @@ class Field(RegisterLookupMixin):
         for i, validator in enumerate(self.validators):
             if not callable(validator):
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "All 'validators' must be callable.",
                         hint=(
                             "validators[{i}] ({repr}) isn't a function or "
@@ -457,7 +457,7 @@ class Field(RegisterLookupMixin):
     def _check_deprecation_details(self):
         if self.system_check_removed_details is not None:
             return [
-                checks.Error(
+                preflight.Error(
                     self.system_check_removed_details.get(
                         "msg",
                         "%s has been removed except for support in historical "
@@ -470,7 +470,7 @@ class Field(RegisterLookupMixin):
             ]
         elif self.system_check_deprecated_details is not None:
             return [
-                checks.Warning(
+                preflight.Warning(
                     self.system_check_deprecated_details.get(
                         "msg", "%s has been deprecated." % self.__class__.__name__
                     ),
@@ -1094,7 +1094,7 @@ class CharField(Field):
             ):
                 return []
             return [
-                checks.Error(
+                preflight.Error(
                     "CharFields must define a 'max_length' attribute.",
                     obj=self,
                     id="fields.E120",
@@ -1106,7 +1106,7 @@ class CharField(Field):
             or self.max_length <= 0
         ):
             return [
-                checks.Error(
+                preflight.Error(
                     "'max_length' must be a positive integer.",
                     obj=self,
                     id="fields.E121",
@@ -1128,7 +1128,7 @@ class CharField(Field):
                 or connection.features.supports_collation_on_charfield
             ):
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "%s does not support a database collation on "
                         "CharFields." % connection.display_name,
                         obj=self,
@@ -1214,7 +1214,7 @@ class DateTimeCheckMixin:
         ].count(True)
         if enabled_options > 1:
             return [
-                checks.Error(
+                preflight.Error(
                     "The options auto_now, auto_now_add, and default "
                     "are mutually exclusive. Only one of these options "
                     "may be present.",
@@ -1250,7 +1250,7 @@ class DateTimeCheckMixin:
             upper = upper.date()
         if lower <= value <= upper:
             return [
-                checks.Warning(
+                preflight.Warning(
                     "Fixed default value provided.",
                     hint=(
                         "It seems you set a fixed date / time / datetime "
@@ -1544,7 +1544,7 @@ class DecimalField(Field):
                 raise ValueError()
         except TypeError:
             return [
-                checks.Error(
+                preflight.Error(
                     "DecimalFields must define a 'decimal_places' attribute.",
                     obj=self,
                     id="fields.E130",
@@ -1552,7 +1552,7 @@ class DecimalField(Field):
             ]
         except ValueError:
             return [
-                checks.Error(
+                preflight.Error(
                     "'decimal_places' must be a non-negative integer.",
                     obj=self,
                     id="fields.E131",
@@ -1568,7 +1568,7 @@ class DecimalField(Field):
                 raise ValueError()
         except TypeError:
             return [
-                checks.Error(
+                preflight.Error(
                     "DecimalFields must define a 'max_digits' attribute.",
                     obj=self,
                     id="fields.E132",
@@ -1576,7 +1576,7 @@ class DecimalField(Field):
             ]
         except ValueError:
             return [
-                checks.Error(
+                preflight.Error(
                     "'max_digits' must be a positive integer.",
                     obj=self,
                     id="fields.E133",
@@ -1588,7 +1588,7 @@ class DecimalField(Field):
     def _check_decimal_places_and_max_digits(self, **kwargs):
         if int(self.decimal_places) > int(self.max_digits):
             return [
-                checks.Error(
+                preflight.Error(
                     "'max_digits' must be greater or equal to 'decimal_places'.",
                     obj=self,
                     id="fields.E134",
@@ -1773,7 +1773,7 @@ class IntegerField(Field):
     def _check_max_length_warning(self):
         if self.max_length is not None:
             return [
-                checks.Warning(
+                preflight.Warning(
                     "'max_length' is ignored when used with %s."
                     % self.__class__.__name__,
                     hint="Remove 'max_length' from field",
@@ -1928,7 +1928,7 @@ class GenericIPAddressField(Field):
     def _check_blank_and_null_values(self, **kwargs):
         if not getattr(self, "null", False) and getattr(self, "blank", False):
             return [
-                checks.Error(
+                preflight.Error(
                     "GenericIPAddressFields cannot have blank=True if null=False, "
                     "as blank values are stored as nulls.",
                     obj=self,
@@ -2110,7 +2110,7 @@ class TextField(Field):
                 or connection.features.supports_collation_on_textfield
             ):
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "%s does not support a database collation on "
                         "TextFields." % connection.display_name,
                         obj=self,
@@ -2278,7 +2278,7 @@ class BinaryField(Field):
     def _check_str_default_value(self):
         if self.has_default() and isinstance(self.default, str):
             return [
-                checks.Error(
+                preflight.Error(
                     "BinaryField's default cannot be a string. Use bytes "
                     "content instead.",
                     obj=self,
@@ -2389,7 +2389,7 @@ class AutoFieldMixin:
     def _check_primary_key(self):
         if not self.primary_key:
             return [
-                checks.Error(
+                preflight.Error(
                     "AutoFields must set primary_key=True.",
                     obj=self,
                     id="fields.E100",

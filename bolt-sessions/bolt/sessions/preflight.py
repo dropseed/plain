@@ -1,4 +1,4 @@
-from bolt.checks import Tags, Warning, register
+from bolt.preflight import Tags, Warning, register
 from bolt.runtime import settings
 
 

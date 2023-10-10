@@ -1,7 +1,7 @@
 import re
 import uuid
 
-from bolt.checks import Info
+from bolt.preflight import Info
 from bolt.db import ProgrammingError, models
 from bolt.exceptions import ValidationError
 

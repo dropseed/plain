@@ -10,7 +10,7 @@ from functools import partial
 from io import TextIOBase
 
 import bolt.runtime
-from bolt import checks
+from bolt import preflight
 from bolt.exceptions import ImproperlyConfigured
 from bolt.legacy.management.color import color_style, no_style
 
@@ -470,7 +470,7 @@ class BaseCommand:
         tags=None,
         display_num_errors=False,
         include_deployment_checks=False,
-        fail_level=checks.ERROR,
+        fail_level=preflight.ERROR,
         databases=None,
     ):
         """
@@ -479,7 +479,7 @@ class BaseCommand:
         If there are only light messages (like warnings), print them to stderr
         and don't raise an exception.
         """
-        all_issues = checks.run_checks(
+        all_issues = preflight.run_checks(
             package_configs=package_configs,
             tags=tags,
             include_deployment_checks=include_deployment_checks,
@@ -491,27 +491,31 @@ class BaseCommand:
 
         if all_issues:
             debugs = [
-                e for e in all_issues if e.level < checks.INFO and not e.is_silenced()
+                e
+                for e in all_issues
+                if e.level < preflight.INFO and not e.is_silenced()
             ]
             infos = [
                 e
                 for e in all_issues
-                if checks.INFO <= e.level < checks.WARNING and not e.is_silenced()
+                if preflight.INFO <= e.level < preflight.WARNING and not e.is_silenced()
             ]
             warnings = [
                 e
                 for e in all_issues
-                if checks.WARNING <= e.level < checks.ERROR and not e.is_silenced()
+                if preflight.WARNING <= e.level < preflight.ERROR
+                and not e.is_silenced()
             ]
             errors = [
                 e
                 for e in all_issues
-                if checks.ERROR <= e.level < checks.CRITICAL and not e.is_silenced()
+                if preflight.ERROR <= e.level < preflight.CRITICAL
+                and not e.is_silenced()
             ]
             criticals = [
                 e
                 for e in all_issues
-                if checks.CRITICAL <= e.level and not e.is_silenced()
+                if preflight.CRITICAL <= e.level and not e.is_silenced()
             ]
             sorted_issues = [
                 (criticals, "CRITICALS"),

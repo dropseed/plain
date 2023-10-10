@@ -16,7 +16,7 @@ from bolt import signals
 from bolt.utils.connection import BaseConnectionHandler, ConnectionProxy
 from bolt.utils.module_loading import import_string
 
-from . import checks  # noqa
+from . import preflight  # noqa
 from .backends.base import (
     BaseCache,
     CacheKeyWarning,

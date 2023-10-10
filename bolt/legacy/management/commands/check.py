@@ -1,5 +1,5 @@
-from bolt import checks
-from bolt.checks.registry import registry
+from bolt import preflight
+from bolt.preflight.registry import registry
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.packages import packages
 
@@ -66,7 +66,7 @@ class Command(BaseCommand):
                 invalid_tag = next(
                     tag
                     for tag in tags
-                    if not checks.tag_exists(tag, include_deployment_checks)
+                    if not preflight.tag_exists(tag, include_deployment_checks)
                 )
             except StopIteration:
                 # no invalid tags
@@ -81,6 +81,6 @@ class Command(BaseCommand):
             tags=tags,
             display_num_errors=True,
             include_deployment_checks=include_deployment_checks,
-            fail_level=getattr(checks, options["fail_level"]),
+            fail_level=getattr(preflight, options["fail_level"]),
             databases=options["databases"],
         )

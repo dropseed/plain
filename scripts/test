@@ -1,0 +1,4 @@
+#!/bin/sh -e
+cd tests
+poetry run coverage run -m pytest "$@"
+poetry run coverage html --skip-empty

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from bolt.auth import get_user_model
-from bolt.checks import Error
+from bolt.preflight import Error
 from bolt.db import models, transaction
 from bolt.db.utils import IntegrityError, OperationalError, ProgrammingError
 from bolt.runtime import settings

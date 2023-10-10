@@ -5,7 +5,7 @@ from bolt.assets import utils
 from bolt.assets.storage import FileSystemStorage
 from bolt.exceptions import ImproperlyConfigured
 from bolt.packages import packages
-from bolt.runtime import settings
+from bolt.runtime import APP_PATH
 from bolt.utils._os import safe_join
 from bolt.utils.module_loading import import_string
 
@@ -13,7 +13,7 @@ from bolt.utils.module_loading import import_string
 searched_locations = []
 
 
-APP_ASSETS_DIR = settings.APP_PATH / "assets"
+APP_ASSETS_DIR = APP_PATH / "assets"
 
 
 class BaseFinder:
@@ -213,6 +213,8 @@ def find(path, all=False):
 
 
 def get_finders():
+    from bolt.runtime import settings
+
     for finder_path in settings.ASSETS_FINDERS:
         yield get_finder(finder_path)
 

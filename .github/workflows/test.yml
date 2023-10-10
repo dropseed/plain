@@ -1,0 +1,34 @@
+name: test
+on:
+  push: {}
+  pull_request: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+    - uses: actions/checkout@v3
+    - run: pipx install poetry
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: poetry
+
+    - run: poetry install
+
+    - working-directory: tests
+      run: poetry run coverage run -m pytest "$@"
+
+    - working-directory: tests
+      run: |
+        echo "## Pytest coverage" >> $GITHUB_STEP_SUMMARY
+        poetry run coverage report --skip-empty --format markdown >> $GITHUB_STEP_SUMMARY
+
+    # - working-directory: tests
+    #   shell: bash
+    #   run: |
+    #     poetry run black --check bolt* tests
+    #     poetry run ruff bolt* tests

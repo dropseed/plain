@@ -2,7 +2,7 @@ import os
 
 from bolt.assets.finders import get_finders
 from bolt.assets.storage import FileSystemStorage, assets_storage
-from bolt.checks import Tags
+from bolt.preflight import Tags
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.color import no_style
 from bolt.utils.functional import cached_property

@@ -1,4 +1,4 @@
-from bolt import checks
+from bolt import preflight
 from bolt.packages import packages
 from bolt.runtime import settings
 
@@ -23,7 +23,7 @@ def check_user_model(package_configs=None, **kwargs):
     # Check that REQUIRED_FIELDS is a list
     if not isinstance(cls.REQUIRED_FIELDS, list | tuple):
         errors.append(
-            checks.Error(
+            preflight.Error(
                 "'REQUIRED_FIELDS' must be a list or tuple.",
                 obj=cls,
                 id="auth.E001",
@@ -33,7 +33,7 @@ def check_user_model(package_configs=None, **kwargs):
     # Check that the USERNAME FIELD isn't included in REQUIRED_FIELDS.
     if cls.USERNAME_FIELD in cls.REQUIRED_FIELDS:
         errors.append(
-            checks.Error(
+            preflight.Error(
                 "The field named as the 'USERNAME_FIELD' "
                 "for a custom user model must not be included in 'REQUIRED_FIELDS'.",
                 hint=(
@@ -53,7 +53,7 @@ def check_user_model(package_configs=None, **kwargs):
     ):
         if settings.AUTHENTICATION_BACKENDS == ["bolt.auth.backends.ModelBackend"]:
             errors.append(
-                checks.Error(
+                preflight.Error(
                     "'{}.{}' must be unique because it is named as the "
                     "'USERNAME_FIELD'.".format(
                         cls._meta.object_name, cls.USERNAME_FIELD
@@ -64,7 +64,7 @@ def check_user_model(package_configs=None, **kwargs):
             )
         else:
             errors.append(
-                checks.Warning(
+                preflight.Warning(
                     "'%s.%s' is named as the 'USERNAME_FIELD', but it is not unique."
                     % (cls._meta.object_name, cls.USERNAME_FIELD),
                     hint=(

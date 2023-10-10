@@ -1,4 +1,4 @@
-from bolt import checks
+from bolt import preflight
 from bolt.db.backends.base.validation import BaseDatabaseValidation
 
 
@@ -13,7 +13,7 @@ class DatabaseValidation(BaseDatabaseValidation):
             self.connection.sql_mode & {"STRICT_TRANS_TABLES", "STRICT_ALL_TABLES"}
         ):
             return [
-                checks.Warning(
+                preflight.Warning(
                     "%s Strict Mode is not set for database connection '%s'"
                     % (self.connection.display_name, self.connection.alias),
                     hint=(
@@ -45,7 +45,7 @@ class DatabaseValidation(BaseDatabaseValidation):
             and (field.max_length is None or int(field.max_length) > 255)
         ):
             errors.append(
-                checks.Warning(
+                preflight.Warning(
                     "%s may not allow unique CharFields to have a max_length "
                     "> 255." % self.connection.display_name,
                     obj=field,
@@ -55,7 +55,7 @@ class DatabaseValidation(BaseDatabaseValidation):
 
         if field.db_index and field_type.lower() in self.connection._limited_data_types:
             errors.append(
-                checks.Warning(
+                preflight.Warning(
                     "%s does not support a database index on %s columns."
                     % (self.connection.display_name, field_type),
                     hint=(

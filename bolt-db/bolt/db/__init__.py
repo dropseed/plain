@@ -16,7 +16,7 @@ from bolt.db.utils import (
 )
 from bolt.utils.connection import ConnectionProxy
 
-from . import checks  # noqa
+from . import preflight  # noqa
 
 __all__ = [
     "connection",

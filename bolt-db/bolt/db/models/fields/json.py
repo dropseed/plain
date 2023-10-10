@@ -1,7 +1,7 @@
 import json
 import warnings
 
-from bolt import checks, exceptions
+from bolt import preflight, exceptions
 from bolt.db import NotSupportedError, connections, router
 from bolt.db.models import expressions, lookups
 from bolt.db.models.constants import LOOKUP_SEP
@@ -65,7 +65,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
                 or connection.features.supports_json_field
             ):
                 errors.append(
-                    checks.Error(
+                    preflight.Error(
                         "%s does not support JSONFields." % connection.display_name,
                         obj=self.model,
                         id="fields.E180",

@@ -21,7 +21,13 @@ cryptography = "^41.0.3"
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.3.0"
+# Testing
+pytest = "^7.4.2"
+coverage = "^7.3.2"
+
+# Formatting and linting
+black = "^23.9.1"
+ruff = "^0.0.292"
 
 [build-system]
 requires = ["poetry-core"]
