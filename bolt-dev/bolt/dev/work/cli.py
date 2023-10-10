@@ -73,17 +73,6 @@ def cli():
 
     manager.add_process("bolt", runserver_cmd, env=bolt_env)
 
-    if "REDIS_URL" in os.environ:
-        redis_url = os.environ["REDIS_URL"]
-        if "localhost" in redis_url or "127.0.0.1" in redis_url:
-            redis_name = os.path.basename(project_root) + "-redis"
-            redis_version = os.environ.get("REDIS_VERSION", "7")
-            redis_port = redis_url.split(":")[-1]  # Assume no db index or anything
-            manager.add_process(
-                "redis",
-                f"docker run --name {redis_name} --rm -p {redis_port}:6379 -v {settings.BOLT_TEMP_PATH}/redis:/data redis:{redis_version} redis-server --save 60 1 --loglevel warning",
-            )
-
     if boltpackage_installed("tailwind"):
         manager.add_process("tailwind", "bolt tailwind compile --watch")
 
