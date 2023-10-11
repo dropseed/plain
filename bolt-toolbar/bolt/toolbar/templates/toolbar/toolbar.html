@@ -1,12 +1,14 @@
 {% if toolbar.should_render() %}
 <script src="{{ asset('toolbar/toolbar.js') }}"></script>
-<div id="bolttoolbar" class="{{ toolbar_outer_class or 'text-sm py-2 text-zinc-200 bg-zinc-800 fixed bottom-0 max-w-full drop-shadow-md ring-2 ring-white/10 z-30 mx-4 rounded-t-lg hidden lg:flex lg:flex-col -translate-x-1/2 left-1/2' }}">
+<div id="bolttoolbar" class="{{ toolbar_outer_class or 'text-sm py-1.5 text-stone-600 bg-[#fbf7f0] fixed bottom-0 max-w-full drop-shadow-md z-30 mx-4 rounded-t-lg hidden lg:flex lg:flex-col -translate-x-1/2 left-1/2' }}">
     <div class="{{ toolbar_inner_class or 'container px-4 space-x-4 mx-auto flex justify-between' }}">
         <div class="flex items-center flex-shrink-0">
             <svg class="w-4 h-4 width="237" height="237" viewBox="0 0 237 237" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M163.316 15.876C172.248 15.876 180.501 20.641 184.967 28.376L229.783 106C234.249 113.735 234.249 123.265 229.783 131L184.967 208.624C180.501 216.359 172.248 221.124 163.316 221.124L73.6837 221.124C64.7521 221.124 56.4989 216.359 52.0331 208.624L7.21686 131C2.75105 123.265 2.75105 113.735 7.21687 106L52.0331 28.376C56.4989 20.6409 64.7521 15.876 73.6837 15.876L163.316 15.876Z" fill="#8B8276"/>
                 <circle cx="118.5" cy="118.5" r="64.5" fill="#CDC8C2"/>
             </svg>
+            <code class="ml-2 text-xs text-mono">{{ toolbar.version }}</code>
+
             {% if request.impersonator is defined %}
             <div class="flex items-center ml-1 font-light">
                 Impersonating&nbsp;<span class="font-medium">{{ request.user }}</span>
@@ -20,8 +22,6 @@
             {% endif %}
         </div>
         <div class="flex items-center flex-shrink-0 space-x-4">
-            <code class="text-xs text-mono cursor-help">{{ toolbar.version }}</code>
-
             {% if querystats_enabled|default(false) %}{% include "querystats/toolbar.html" %}{% endif %}
 
             <div class="flex items-center space-x-3 transition-all">
