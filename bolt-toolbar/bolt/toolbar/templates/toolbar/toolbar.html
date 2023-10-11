@@ -1,6 +1,6 @@
 {% if toolbar.should_render() %}
 <script src="{{ asset('toolbar/toolbar.js') }}"></script>
-<div id="bolttoolbar" class="{{ toolbar_outer_class or 'text-sm py-2 text-zinc-200 bg-zinc-800 fixed bottom-0 max-w-full drop-shadow-md ring-2 ring-white/10 z-30 mx-4 rounded-t-lg hidden lg:flex -translate-x-1/2 left-1/2 group' }}">
+<div id="bolttoolbar" class="{{ toolbar_outer_class or 'text-sm py-2 text-zinc-200 bg-zinc-800 fixed bottom-0 max-w-full drop-shadow-md ring-2 ring-white/10 z-30 mx-4 rounded-t-lg hidden lg:flex lg:flex-col -translate-x-1/2 left-1/2' }}">
     <div class="{{ toolbar_inner_class or 'container px-4 space-x-4 mx-auto flex justify-between' }}">
         <div class="flex items-center flex-shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-1 bi bi-person-badge" viewBox="0 0 16 16">
@@ -19,46 +19,48 @@
                 </a>
             </div>
             {% else %}
-            <span class="hidden font-medium group-hover:inline">{{ request.user }}</span>
+            <span class="font-medium">{{ request.user }}</span>
             {% endif %}
         </div>
         <div class="flex items-center flex-shrink-0 space-x-4">
-
-            <div class="relative group/release">
-                <code class="text-xs text-mono cursor-help">{{ toolbar.version }}</code>
-                <div class="absolute top-0 left-0 hidden pt-6 -translate-y-full group-hover/release:block">
-                    <div class="p-2 text-xs border rounded shadow-md bg-zinc-900 border-zinc-700">
-                        <table>
-                            <tbody>
-                            {% for k, v in toolbar.metadata.items() %}
-                            <tr>
-                                <td class="pr-2 font-medium whitespace-nowrap">{{ k }}</td>
-                                <td class="whitespace-nowrap">{{ v }}</td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            <code class="text-xs text-mono cursor-help">{{ toolbar.version }}</code>
 
             {% if querystats_enabled|default(false) %}{% include "querystats/toolbar.html" %}{% endif %}
 
-            {% if object|default(false) %}
-            <div class="max-w-xs font-mono text-xs truncate whitespace-nowrap group-hover:max-w-full" title="PK: {{ object.pk }}">
-                {{ object.__repr__() }}
-            </div>
-            {% endif %}
-
-            <div class="items-center hidden space-x-3 transition-all group-hover:flex">
+            <div class="flex items-center space-x-3 transition-all">
                 {% include "toolbar/links.html" %}
-                <button data-bolttoolbar-hide class="hover:text-red-500" type="button">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 bi bi-x-circle-fill" viewBox="0 0 16 16">
-                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
+                <button data-bolttoolbar-expand class="hover:text-orange-500" type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M3.646 9.146a.5.5 0 0 1 .708 0L8 12.793l3.646-3.647a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 0-.708zm0-2.292a.5.5 0 0 0 .708 0L8 3.207l3.646 3.647a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 0 0 0 .708z"/>
                     </svg>
                 </button>
             </div>
         </div>
+    </div>
+    <div id="bolttoolbar-details" class="hidden p-4 text-sm">
+        <table>
+            <tbody>
+            {% for k, v in toolbar.metadata.items() %}
+            <tr>
+                <td class="pr-2 font-medium whitespace-nowrap">{{ k }}</td>
+                <td class="whitespace-nowrap">{{ v }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if object|default(false) %}
+        <div class="font-mono" title="PK: {{ object.pk }}">
+            {{ object.__repr__() }}
+        </div>
+        {% endif %}
+
+        <button data-bolttoolbar-hide class="hover:text-red-500" type="button">
+            Hide for 1 hour
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 bi bi-x-circle-fill" viewBox="0 0 16 16">
+                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
+            </svg>
+        </button>
     </div>
 </div>
 {% endif %}

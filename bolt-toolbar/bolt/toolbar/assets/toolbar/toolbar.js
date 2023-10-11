@@ -29,6 +29,10 @@ var boltToolbar = {
     localStorage.setItem("bolttoolbar.hidden_until", until);
     this.hide();
   },
+  toggleExpand: function () {
+    this.expanded = !this.expanded;
+    document.querySelector("#bolttoolbar-details").classList.toggle("hidden");
+  },
 };
 
 // Render it hidden immediately if the user has hidden it before
@@ -40,5 +44,8 @@ window.addEventListener("load", function () {
     document.querySelector('[data-bolttoolbar-hide]').addEventListener('click', function() {
         console.log("Hiding staff toolbar for 1 hour");
         boltToolbar.hideUntil(Date.now() + 3600000);
+    });
+    document.querySelector('[data-bolttoolbar-expand]').addEventListener('click', function() {
+        boltToolbar.toggleExpand();
     });
 });
