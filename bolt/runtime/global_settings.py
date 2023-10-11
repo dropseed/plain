@@ -12,10 +12,7 @@ from bolt.runtime import APP_PATH as default_app_path
 
 DEBUG: bool
 
-# TODO remove this?
-APP_PATH: Path = default_app_path
-
-BOLT_TEMP_PATH: Path = APP_PATH.parent / ".bolt"
+BOLT_TEMP_PATH: Path = default_app_path.parent / ".bolt"
 
 # Hosts/domain names that are valid for this site.
 # "*" matches anything, ".example.com" matches example.com and all subdomains

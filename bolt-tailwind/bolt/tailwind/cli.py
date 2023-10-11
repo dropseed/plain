@@ -3,7 +3,7 @@ import sys
 
 import click
 
-from bolt.runtime import settings
+from bolt.runtime import APP_PATH
 
 from .core import Tailwind
 
@@ -76,8 +76,8 @@ def compile(watch, minify):
     args.append("--content")
     content = ",".join(
         [
-            os.path.relpath(settings.APP_PATH) + "/**/*.{html,js}",
-            os.path.relpath(settings.APP_PATH)
+            os.path.relpath(APP_PATH) + "/**/*.{html,js}",
+            os.path.relpath(APP_PATH)
             + "/../bolt/**/*.{html,js}",  # TODO use INSTALLED_PACKAGES?
             sys.exec_prefix + "/lib/python*/site-packages/bolt*/**/*.{html,js}",
         ]
@@ -91,7 +91,7 @@ def compile(watch, minify):
     if minify:
         args.append("--minify")
 
-    tailwind.invoke(*args, cwd=os.path.dirname(settings.APP_PATH))
+    tailwind.invoke(*args, cwd=os.path.dirname(APP_PATH))
 
 
 @cli.command()

@@ -9,7 +9,7 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib
 
-from bolt.runtime import settings
+from bolt.runtime import APP_PATH
 
 
 @click.command("format")  # format is a keyword
@@ -31,7 +31,7 @@ def cli(check, paths):
 
     if not paths:
         # Make relative for nicer output
-        paths = [os.path.relpath(settings.APP_PATH)]
+        paths = [os.path.relpath(APP_PATH)]
 
     if check:
         fmt_check(paths)

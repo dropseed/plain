@@ -1,7 +1,7 @@
 import os
 
 from bolt.packages import PackageConfig, packages
-from bolt.runtime import settings
+from bolt.runtime import APP_PATH
 
 from .registry import registry
 
@@ -13,4 +13,4 @@ class BoltPagesConfig(PackageConfig):
         for pacakge_config in packages.get_package_configs():
             registry.discover_pages(os.path.join(pacakge_config.path, "pages"))
 
-        registry.discover_pages(os.path.join(settings.APP_PATH, "pages"))
+        registry.discover_pages(os.path.join(APP_PATH, "pages"))

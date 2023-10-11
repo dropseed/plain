@@ -3,14 +3,14 @@ import shlex
 import subprocess
 
 from bolt.db import database_url
-from bolt.runtime import settings
+from bolt.runtime import APP_PATH, settings
 
 SNAPSHOT_DB_PREFIX = "boltdb_snapshot_"
 
 
 class DBContainer:
     def __init__(self):
-        project_root = settings.APP_PATH.parent
+        project_root = APP_PATH.parent
         tmp_dir = settings.BOLT_TEMP_PATH
 
         name = os.path.basename(project_root) + "-postgres"

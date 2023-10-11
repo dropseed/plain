@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 from honcho.manager import Manager as HonchoManager
 
-from bolt.runtime import settings
+from bolt.runtime import APP_PATH
 
 from .db import cli as db_cli
 from .utils import boltpackage_installed, has_pyproject_toml
@@ -27,7 +27,7 @@ def cli(ctx):
         return
 
     # TODO check docker is available first
-    project_root = settings.APP_PATH.parent
+    project_root = APP_PATH.parent
 
     bolt_env = {
         **os.environ,
