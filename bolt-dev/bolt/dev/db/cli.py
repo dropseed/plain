@@ -1,12 +1,6 @@
-import json
-import os
-import subprocess
 import sys
 
 import click
-import requests
-
-from bolt.runtime import settings
 
 from .container import DBContainer
 
