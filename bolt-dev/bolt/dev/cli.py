@@ -44,8 +44,8 @@ def cli(ctx):
         )
         bolt_env["BASE_URL"] = codespace_base_url
 
-    if subprocess.run(["bolt", "legacy", "check"], env=bolt_env).returncode:
-        click.secho("Bolt check failed!", fg="red")
+    if subprocess.run(["bolt", "preflight"], env=bolt_env).returncode:
+        click.secho("Preflight check failed!", fg="red")
         sys.exit(1)
 
     # if subprocess.run(["bolt", "env", "check"], env=bolt_env).returncode:

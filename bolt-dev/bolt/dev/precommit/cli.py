@@ -47,10 +47,9 @@ def cli(install):
 
     if bolt_db_connected():
         check_short(
-            "Running Bolt system checks",
+            "Running preflight checks",
             "bolt",
-            "legacy",
-            "check",
+            "preflight",
             "--database",
             "default",
         )
@@ -64,7 +63,7 @@ def cli(install):
             "--check",
         )
     else:
-        check_short("Running Bolt checks (without database)", "bolt", "legacy", "check")
+        check_short("Running Bolt checks (without database)", "bolt", "preflight")
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
     print_event("Running bolt compile")
