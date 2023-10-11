@@ -138,51 +138,6 @@ class DBContainer:
                 stderr=subprocess.PIPE,
             )
 
-    def restore_dump(self, dump_path, compressed=False):
-        """Imports a dump into {name}_import, then renames to {name} to prevent Bolt connections during process"""
-        maintenance_db = "template1"
-        import_db = f"{self.postgres_db}_import"
-
-        self.execute(
-            f"dropdb {import_db} --if-exists -U {self.postgres_user}",
-            stdout=subprocess.DEVNULL,
-        )
-        self.execute(
-            f"createdb {import_db} -U {self.postgres_user}", stdout=subprocess.DEVNULL
-        )
-
-        if compressed:
-            restore_command = (
-                f"pg_restore --no-owner --dbname {import_db} -U {self.postgres_user}"
-            )
-        else:
-            # Text format can to straight in (has already gone through pg_restore to get text format)
-            restore_command = f"psql {import_db} -U {self.postgres_user}"
-
-        result = self.execute(
-            restore_command,
-            stdin=open(dump_path),
-            docker_flags="-i",
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
-        if result.stderr:
-            # Print errors except for role does not exist (can't ignore this in psql-style import)
-            role_error_re = re.compile(r"^ERROR:  role \".+\" does not exist")
-            for line in result.stderr.decode().splitlines():
-                if not role_error_re.match(line):
-                    print(line)
-
-        # Get rid of the main database
-        self.reset(create=False)
-
-        # Connect to template1 (which should exist as "maintenance db") so we can rename the others
-        self.execute(
-            f"psql -U {self.postgres_user} {maintenance_db} -c",
-            f"ALTER DATABASE {import_db} RENAME TO {self.postgres_db}",
-            stdout=subprocess.DEVNULL,
-        )
-
     def terminate_connections(self):
         self.execute(
             f"psql -U {self.postgres_user} {self.postgres_db} -c",
