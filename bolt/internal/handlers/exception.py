@@ -13,9 +13,9 @@ from bolt.exceptions import (
 )
 from bolt.http import Http404
 from bolt.http.multipartparser import MultiPartParserError
+from bolt.logging import log_response
 from bolt.runtime import settings
 from bolt.urls import get_resolver, get_urlconf
-from bolt.utils.log import log_response
 from bolt.views.errors import ErrorView
 
 

@@ -24,9 +24,9 @@ def setup():
     first setting), configure logging and populate the app registry.
     """
     from bolt.env import dotenv
+    from bolt.logging import configure_logging
     from bolt.packages import packages
     from bolt.runtime import settings
-    from bolt.utils.log import configure_logging
 
     if not APP_PATH.exists():
         raise AppPathNotFound(
