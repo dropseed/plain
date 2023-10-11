@@ -38,7 +38,7 @@ psycopg2-binary = "^2.9.3"
 
 # format
 black = "^23.9.1"
-ruff = "^0.0.292"
+ruff = "<1.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
