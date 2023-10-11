@@ -26,9 +26,11 @@ def clear_cache_handlers(*, setting, **kwargs):
         except ImportError:
             return
 
+        from threading import local
+
         close_caches()
         caches._settings = caches.settings = caches.configure_settings(None)
-        caches._connections = local()  # noqa: F821
+        caches._connections = local()
 
 
 @receiver(setting_changed)
