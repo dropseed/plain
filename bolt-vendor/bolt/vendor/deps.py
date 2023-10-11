@@ -141,7 +141,7 @@ def get_deps():
     with open("pyproject.toml") as f:
         pyproject = tomlkit.load(f)
 
-    config = pyproject.get("tool", {}).get("bolt", {}).get("vendor", {}).get("deps", {})
+    config = pyproject.get("tool", {}).get("bolt", {}).get("vendor", {}).get("dependencies", {})
 
     deps = []
 

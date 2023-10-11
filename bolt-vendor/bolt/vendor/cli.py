@@ -27,7 +27,7 @@ def install(clear):
     deps = get_deps()
     if not deps:
         click.echo(
-            "No vendored dependencies found in pyproject.toml. Use [tool.bolt.vendor.deps]"
+            "No vendored dependencies found in pyproject.toml. Use [tool.bolt.vendor.dependencies]"
         )
         return
 
@@ -56,7 +56,7 @@ def update():
     deps = get_deps()
     if not deps:
         click.echo(
-            "No vendored dependencies found in pyproject.toml. Use [tool.bolt.vendor.deps]"
+            "No vendored dependencies found in pyproject.toml. Use [tool.bolt.vendor.dependencies]"
         )
         return
 
