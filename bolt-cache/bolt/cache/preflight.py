@@ -1,9 +1,6 @@
-import pathlib
-
-from bolt.preflight import Error, Warning, register
+from bolt.preflight import Error, register
 from bolt.runtime import settings
 
-from .backends.filebased import FileBasedCache
 from .constants import DEFAULT_CACHE_ALIAS
 
 E001 = Error(
@@ -17,64 +14,3 @@ def check_default_cache_is_configured(package_configs, **kwargs):
     if DEFAULT_CACHE_ALIAS not in settings.CACHES:
         return [E001]
     return []
-
-
-# @register(deploy=True)
-# def check_cache_location_not_exposed(package_configs, **kwargs):
-#     from bolt.cache import caches
-
-#     errors = []
-#     for name in ("ASSETS_ROOT", "STATICFILES_DIR"):
-#         setting = getattr(settings, name, None)
-#         if not setting:
-#             continue
-#         if name == "STATICFILES_DIR":
-#             paths = set()
-#             assets_dir = setting
-#             if isinstance(assets_dir, list | tuple):
-#                 _, assets_dir = assets_dir
-#             paths.add(pathlib.Path(assets_dir).resolve())
-#         else:
-#             paths = {pathlib.Path(setting).resolve()}
-#         for alias in settings.CACHES:
-#             cache = caches[alias]
-#             if not isinstance(cache, FileBasedCache):
-#                 continue
-#             cache_path = pathlib.Path(cache._dir).resolve()
-#             if any(path == cache_path for path in paths):
-#                 relation = "matches"
-#             elif any(path in cache_path.parents for path in paths):
-#                 relation = "is inside"
-#             elif any(cache_path in path.parents for path in paths):
-#                 relation = "contains"
-#             else:
-#                 continue
-#             errors.append(
-#                 Warning(
-#                     f"Your '{alias}' cache configuration might expose your cache "
-#                     f"or lead to corruption of your data because its LOCATION "
-#                     f"{relation} {name}.",
-#                     id="caches.W002",
-#                 )
-#             )
-#     return errors
-
-
-@register
-def check_file_based_cache_is_absolute(package_configs, **kwargs):
-    from bolt.cache import caches
-
-    errors = []
-    for alias, config in settings.CACHES.items():
-        cache = caches[alias]
-        if not isinstance(cache, FileBasedCache):
-            continue
-        if not pathlib.Path(config["LOCATION"]).is_absolute():
-            errors.append(
-                Warning(
-                    f"Your '{alias}' cache LOCATION path is relative. Use an "
-                    f"absolute path instead.",
-                    id="caches.W003",
-                )
-            )
-    return errors
