@@ -1,9 +1,10 @@
+import time
 import subprocess
 import sys
 
 import click
 
-from bolt.db import DEFAULT_DB_ALIAS, connections
+from bolt.db import DEFAULT_DB_ALIAS, connections, OperationalError
 
 
 @click.group()
@@ -49,3 +50,25 @@ def shell(database, parameters):
             err=True,
         )
         sys.exit(e.returncode)
+
+
+@cli.command()
+def wait():
+    """Wait for the database to be ready"""
+    attempts = 0
+    while True:
+        attempts += 1
+        waiting_for = []
+
+        for conn in connections.all():
+            try:
+                conn.ensure_connection()
+            except OperationalError:
+                waiting_for.append(conn.alias)
+
+        if waiting_for:
+            click.secho(f"Waiting for database (attempt {attempts}): {', '.join(waiting_for)}", fg="yellow")
+            time.sleep(1.5)
+        else:
+            click.secho(f"Database ready: {', '.join(connections)}", fg="green")
+            break

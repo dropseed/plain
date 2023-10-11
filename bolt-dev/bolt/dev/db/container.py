@@ -78,37 +78,6 @@ class DBContainer:
                 print(e.stderr.decode())
                 raise
 
-    def wait(self):
-        print("Waiting for database...")
-        print(f"  Name: {self.name}")
-        print(f"  Port: {self.postgres_port}")
-        print(f"  DB: {self.postgres_db}")
-        print(f"  User: {self.postgres_user}")
-
-        attempts = 1
-
-        while True:
-            if self.is_connected():
-                print("Database connected")
-                break
-            else:
-                print(f"Database unavailable, waiting 1 second... (attempt {attempts})")
-                time.sleep(1)
-                attempts += 1
-
-    def is_connected(self):
-        result = subprocess.run(
-            [
-                "bolt",
-                "legacy",
-                "showmigrations",
-                "--skip-checks",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return result.returncode == 0
-
     def logs(self):
         subprocess.check_call(
             [

@@ -66,7 +66,7 @@ def cli():
     gunicorn = f"gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - {reload_extra} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
     if bolt_db_installed:
-        runserver_cmd = f"bolt dev db wait && bolt legacy migrate && {gunicorn}"
+        runserver_cmd = f"bolt db wait && bolt legacy migrate && {gunicorn}"
         manager.add_process("postgres", "bolt dev db start --logs")
     else:
         runserver_cmd = gunicorn
