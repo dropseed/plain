@@ -441,10 +441,7 @@ class BaseCommand:
             self.stderr = OutputWrapper(options["stderr"])
 
         if self.requires_system_checks and not options["skip_checks"]:
-            if self.requires_system_checks == ALL_CHECKS:
-                self.check()
-            else:
-                self.check(tags=self.requires_system_checks)
+            self.check()
         if self.requires_migrations_checks:
             self.check_migrations()
         output = self.handle(*args, **options)
@@ -467,7 +464,6 @@ class BaseCommand:
     def check(
         self,
         package_configs=None,
-        tags=None,
         display_num_errors=False,
         include_deployment_checks=False,
         fail_level=preflight.ERROR,
@@ -481,7 +477,6 @@ class BaseCommand:
         """
         all_issues = preflight.run_checks(
             package_configs=package_configs,
-            tags=tags,
             include_deployment_checks=include_deployment_checks,
             databases=databases,
         )

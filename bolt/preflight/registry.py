@@ -1,27 +1,5 @@
-from itertools import chain
-
 from bolt.utils.inspect import func_accepts_kwargs
 from bolt.utils.itercompat import is_iterable
-
-
-class Tags:
-    """
-    Built-in tags for internal checks.
-    """
-
-    admin = "admin"
-    caches = "caches"
-    compatibility = "compatibility"
-    database = "database"
-    files = "files"
-    models = "models"
-    security = "security"
-    signals = "signals"
-    sites = "sites"
-    assets = "assets"
-    templates = "templates"
-    translation = "translation"
-    urls = "urls"
 
 
 class CheckRegistry:
@@ -29,10 +7,10 @@ class CheckRegistry:
         self.registered_checks = set()
         self.deployment_checks = set()
 
-    def register(self, check=None, *tags, **kwargs):
+    def register(self, check=None, deploy=False):
         """
         Can be used as a function or a decorator. Register given function
-        `f` labeled with given `tags`. The function should receive **kwargs
+        `f`. The function should receive **kwargs
         and return list of Errors and Warnings.
 
         Example::
@@ -51,26 +29,18 @@ class CheckRegistry:
                 raise TypeError(
                     "Check functions must accept keyword arguments (**kwargs)."
                 )
-            check.tags = tags
-            checks = (
-                self.deployment_checks
-                if kwargs.get("deploy")
-                else self.registered_checks
-            )
+            checks = self.deployment_checks if deploy else self.registered_checks
             checks.add(check)
             return check
 
         if callable(check):
             return inner(check)
         else:
-            if check:
-                tags += (check,)
             return inner
 
     def run_checks(
         self,
         package_configs=None,
-        tags=None,
         include_deployment_checks=False,
         databases=None,
     ):
@@ -79,9 +49,6 @@ class CheckRegistry:
         """
         errors = []
         checks = self.get_checks(include_deployment_checks)
-
-        if tags is not None:
-            checks = [check for check in checks if not set(check.tags).isdisjoint(tags)]
 
         for check in checks:
             new_errors = check(package_configs=package_configs, databases=databases)
@@ -93,16 +60,6 @@ class CheckRegistry:
             errors.extend(new_errors)
         return errors
 
-    def tag_exists(self, tag, include_deployment_checks=False):
-        return tag in self.tags_available(include_deployment_checks)
-
-    def tags_available(self, deployment_checks=False):
-        return set(
-            chain.from_iterable(
-                check.tags for check in self.get_checks(deployment_checks)
-            )
-        )
-
     def get_checks(self, include_deployment_checks=False):
         checks = list(self.registered_checks)
         if include_deployment_checks:
@@ -113,4 +70,3 @@ class CheckRegistry:
 registry = CheckRegistry()
 register = registry.register
 run_checks = registry.run_checks
-tag_exists = registry.tag_exists

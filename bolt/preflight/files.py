@@ -2,10 +2,10 @@ from pathlib import Path
 
 from bolt.runtime import settings
 
-from . import Error, Tags, register
+from . import Error, register
 
 
-@register(Tags.files)
+@register
 def check_setting_file_upload_temp_dir(package_configs, **kwargs):
     setting = getattr(settings, "FILE_UPLOAD_TEMP_DIR", None)
     if setting and not Path(setting).is_dir():

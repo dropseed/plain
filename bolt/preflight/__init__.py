@@ -11,7 +11,7 @@ from .messages import (
     Info,
     Warning,
 )
-from .registry import Tags, register, run_checks, tag_exists
+from .registry import register, run_checks
 
 # Import these to force registration of checks
 import bolt.preflight.compatibility.django_4_0  # NOQA isort:skip
@@ -35,6 +35,4 @@ __all__ = [
     "CRITICAL",
     "register",
     "run_checks",
-    "tag_exists",
-    "Tags",
 ]

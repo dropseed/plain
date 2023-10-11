@@ -1,7 +1,7 @@
 from bolt.exceptions import ImproperlyConfigured
 from bolt.runtime import settings
 
-from .. import Error, Tags, Warning, register
+from .. import Error, Warning, register
 
 CROSS_ORIGIN_OPENER_POLICY_VALUES = {
     "same-origin",
@@ -150,25 +150,25 @@ def _xframe_middleware():
     return "bolt.middleware.clickjacking.XFrameOptionsMiddleware" in settings.MIDDLEWARE
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_security_middleware(package_configs, **kwargs):
     passed_check = _security_middleware()
     return [] if passed_check else [W001]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_xframe_options_middleware(package_configs, **kwargs):
     passed_check = _xframe_middleware()
     return [] if passed_check else [W002]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_sts(package_configs, **kwargs):
     passed_check = not _security_middleware() or settings.SECURE_HSTS_SECONDS
     return [] if passed_check else [W004]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_sts_include_subdomains(package_configs, **kwargs):
     passed_check = (
         not _security_middleware()
@@ -178,7 +178,7 @@ def check_sts_include_subdomains(package_configs, **kwargs):
     return [] if passed_check else [W005]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_sts_preload(package_configs, **kwargs):
     passed_check = (
         not _security_middleware()
@@ -188,7 +188,7 @@ def check_sts_preload(package_configs, **kwargs):
     return [] if passed_check else [W021]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_content_type_nosniff(package_configs, **kwargs):
     passed_check = (
         not _security_middleware() or settings.SECURE_CONTENT_TYPE_NOSNIFF is True
@@ -196,7 +196,7 @@ def check_content_type_nosniff(package_configs, **kwargs):
     return [] if passed_check else [W006]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_ssl_redirect(package_configs, **kwargs):
     passed_check = not _security_middleware() or settings.SECURE_SSL_REDIRECT is True
     return [] if passed_check else [W008]
@@ -210,7 +210,7 @@ def _check_secret_key(secret_key):
     )
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_secret_key(package_configs, **kwargs):
     try:
         secret_key = settings.SECRET_KEY
@@ -221,7 +221,7 @@ def check_secret_key(package_configs, **kwargs):
     return [] if passed_check else [W009]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_secret_key_fallbacks(package_configs, **kwargs):
     warnings = []
     try:
@@ -237,24 +237,24 @@ def check_secret_key_fallbacks(package_configs, **kwargs):
     return warnings
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_debug(package_configs, **kwargs):
     passed_check = not settings.DEBUG
     return [] if passed_check else [W018]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_xframe_deny(package_configs, **kwargs):
     passed_check = not _xframe_middleware() or settings.X_FRAME_OPTIONS == "DENY"
     return [] if passed_check else [W019]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_allowed_hosts(package_configs, **kwargs):
     return [] if settings.ALLOWED_HOSTS else [W020]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_referrer_policy(package_configs, **kwargs):
     if _security_middleware():
         if settings.SECURE_REFERRER_POLICY is None:
@@ -269,7 +269,7 @@ def check_referrer_policy(package_configs, **kwargs):
     return []
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_cross_origin_opener_policy(package_configs, **kwargs):
     if (
         _security_middleware()

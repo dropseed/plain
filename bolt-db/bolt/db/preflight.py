@@ -4,11 +4,11 @@ from collections import defaultdict
 from itertools import chain
 
 from bolt.packages import packages
-from bolt.preflight import Error, Tags, Warning, register
+from bolt.preflight import Error, Warning, register
 from bolt.runtime import settings
 
 
-@register(Tags.database)
+@register
 def check_database_backends(databases=None, **kwargs):
     if databases is None:
         return []
@@ -22,7 +22,7 @@ def check_database_backends(databases=None, **kwargs):
     return issues
 
 
-@register(Tags.models)
+@register
 def check_all_models(package_configs=None, **kwargs):
     db_table_models = defaultdict(list)
     indexes = defaultdict(list)
@@ -236,12 +236,12 @@ def _check_lazy_references(packages, ignore=None):
     )
 
 
-@register(Tags.models)
+@register
 def check_lazy_references(package_configs=None, **kwargs):
     return _check_lazy_references(packages)
 
 
-@register(Tags.database)
+@register
 def check_database_tables(package_configs, **kwargs):
     from bolt.db import connection
 

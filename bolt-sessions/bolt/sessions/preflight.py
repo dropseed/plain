@@ -1,4 +1,4 @@
-from bolt.preflight import Tags, Warning, register
+from bolt.preflight import Warning, register
 from bolt.runtime import settings
 
 
@@ -62,7 +62,7 @@ W015 = Warning(
 )
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_session_cookie_secure(package_configs, **kwargs):
     if settings.SESSION_COOKIE_SECURE is True:
         return []
@@ -76,7 +76,7 @@ def check_session_cookie_secure(package_configs, **kwargs):
     return errors
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_session_cookie_httponly(package_configs, **kwargs):
     if settings.SESSION_COOKIE_HTTPONLY is True:
         return []

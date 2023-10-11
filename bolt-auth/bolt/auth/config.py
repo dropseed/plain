@@ -19,4 +19,4 @@ class AuthConfig(PackageConfig):
             from .models import update_last_login
 
             user_logged_in.connect(update_last_login, dispatch_uid="update_last_login")
-        preflight.register(check_user_model, preflight.Tags.models)
+        preflight.register(check_user_model)

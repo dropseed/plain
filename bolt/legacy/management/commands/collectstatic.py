@@ -4,7 +4,6 @@ from bolt.assets.finders import get_finders
 from bolt.assets.storage import FileSystemStorage, assets_storage
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.color import no_style
-from bolt.preflight import Tags
 from bolt.utils.functional import cached_property
 
 
@@ -15,7 +14,7 @@ class Command(BaseCommand):
     """
 
     help = "Collect static files in a single location."
-    requires_system_checks = [Tags.assets]
+    # requires_system_checks = [Tags.assets]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -1,6 +1,6 @@
 from bolt.runtime import settings
 
-from .. import Tags, Warning, register
+from .. import Warning, register
 
 W003 = Warning(
     "You don't appear to be using Bolt's built-in "
@@ -24,13 +24,13 @@ def _csrf_middleware():
     return "bolt.csrf.middleware.CsrfViewMiddleware" in settings.MIDDLEWARE
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_csrf_middleware(package_configs, **kwargs):
     passed_check = _csrf_middleware()
     return [] if passed_check else [W003]
 
 
-@register(Tags.security, deploy=True)
+@register(deploy=True)
 def check_csrf_cookie_secure(package_configs, **kwargs):
     passed_check = (
         settings.CSRF_USE_SESSIONS

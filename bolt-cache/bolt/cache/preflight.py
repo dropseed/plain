@@ -1,6 +1,6 @@
 import pathlib
 
-from bolt.preflight import Error, Tags, Warning, register
+from bolt.preflight import Error, Warning, register
 from bolt.runtime import settings
 
 from .backends.filebased import FileBasedCache
@@ -12,14 +12,14 @@ E001 = Error(
 )
 
 
-@register(Tags.caches)
+@register
 def check_default_cache_is_configured(package_configs, **kwargs):
     if DEFAULT_CACHE_ALIAS not in settings.CACHES:
         return [E001]
     return []
 
 
-# @register(Tags.caches, deploy=True)
+# @register(deploy=True)
 # def check_cache_location_not_exposed(package_configs, **kwargs):
 #     from bolt.cache import caches
 
@@ -60,7 +60,7 @@ def check_default_cache_is_configured(package_configs, **kwargs):
 #     return errors
 
 
-@register(Tags.caches)
+@register
 def check_file_based_cache_is_absolute(package_configs, **kwargs):
     from bolt.cache import caches
 

@@ -2,10 +2,10 @@ from collections import Counter
 
 from bolt.runtime import settings
 
-from . import Error, Tags, Warning, register
+from . import Error, Warning, register
 
 
-@register(Tags.urls)
+@register
 def check_url_config(package_configs, **kwargs):
     if getattr(settings, "ROOT_URLCONF", None):
         from bolt.urls import get_resolver
@@ -28,7 +28,7 @@ def check_resolver(resolver):
         return []
 
 
-@register(Tags.urls)
+@register
 def check_url_namespaces_unique(package_configs, **kwargs):
     """
     Warn if URL namespaces used in applications aren't unique.
@@ -100,7 +100,7 @@ def get_warning_for_invalid_pattern(pattern):
     ]
 
 
-@register(Tags.urls)
+@register
 def check_url_settings(package_configs, **kwargs):
     errors = []
     for name in ("ASSETS_URL",):

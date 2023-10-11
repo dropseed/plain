@@ -1,9 +1,9 @@
 from bolt.runtime import settings
 
-from .. import Error, Tags, register
+from .. import Error, register
 
 
-@register(Tags.compatibility)
+@register
 def check_csrf_trusted_origins(package_configs, **kwargs):
     errors = []
     for origin in settings.CSRF_TRUSTED_ORIGINS:
