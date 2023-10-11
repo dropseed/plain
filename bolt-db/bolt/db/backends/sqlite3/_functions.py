@@ -4,6 +4,7 @@ Implementations of SQL functions for SQLite.
 import functools
 import random
 import statistics
+import zoneinfo
 from datetime import timedelta
 from hashlib import md5, sha1, sha224, sha256, sha384, sha512
 from math import (
@@ -25,8 +26,6 @@ from math import (
     tan,
 )
 from re import search as re_search
-
-import zoneinfo
 
 from bolt.db.backends.utils import (
     split_tzname_delta,
