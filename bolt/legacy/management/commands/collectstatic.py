@@ -9,7 +9,7 @@ from bolt.utils.functional import cached_property
 
 class Command(BaseCommand):
     """
-    Copies or symlinks static files from different locations to the
+    Copies static files from different locations to the
     settings.ASSETS_ROOT.
     """
 
@@ -19,7 +19,6 @@ class Command(BaseCommand):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.copied_files = []
-        self.symlinked_files = []
         self.unmodified_files = []
         self.post_processed_files = []
         self.storage = assets_storage
@@ -71,12 +70,6 @@ class Command(BaseCommand):
             "before trying to copy or link the original file.",
         )
         parser.add_argument(
-            "-l",
-            "--link",
-            action="store_true",
-            help="Create a symbolic link to each file instead of copying.",
-        )
-        parser.add_argument(
             "--no-default-ignore",
             action="store_false",
             dest="use_default_ignore_patterns",
@@ -92,7 +85,6 @@ class Command(BaseCommand):
         """
         self.interactive = options["interactive"]
         self.verbosity = options["verbosity"]
-        self.symlink = options["link"]
         self.clear = options["clear"]
         self.dry_run = options["dry_run"]
         ignore_patterns = options["ignore_patterns"]
@@ -107,16 +99,8 @@ class Command(BaseCommand):
 
         Split off from handle() to facilitate testing.
         """
-        if self.symlink and not self.local:
-            raise CommandError("Can't symlink to a remote destination.")
-
         if self.clear:
             self.clear_dir("")
-
-        if self.symlink:
-            handler = self.link_file
-        else:
-            handler = self.copy_file
 
         found_files = {}
         for finder in get_finders():
@@ -129,7 +113,7 @@ class Command(BaseCommand):
 
                 if prefixed_path not in found_files:
                     found_files[prefixed_path] = (storage, path)
-                    handler(path, prefixed_path, storage)
+                    self.copy_file(path, prefixed_path, storage)
                 else:
                     self.log(
                         "Found another file with the destination path '%s'. It "
@@ -159,7 +143,7 @@ class Command(BaseCommand):
                     self.log("Skipped post-processing '%s'" % original_path)
 
         return {
-            "modified": self.copied_files + self.symlinked_files,
+            "modified": self.copied_files,
             "unmodified": self.unmodified_files,
             "post_processed": self.post_processed_files,
         }
@@ -215,7 +199,7 @@ class Command(BaseCommand):
             ) % {
                 "modified_count": modified_count,
                 "identifier": "static file" + ("" if modified_count == 1 else "s"),
-                "action": "symlinked" if self.symlink else "copied",
+                "action": "copied",
                 "destination": (
                     " to '%s'" % destination_path if destination_path else ""
                 ),
@@ -255,16 +239,7 @@ class Command(BaseCommand):
                 self.log("Pretending to delete '%s'" % fpath, level=1)
             else:
                 self.log("Deleting '%s'" % fpath, level=1)
-                try:
-                    full_path = self.storage.path(fpath)
-                except NotImplementedError:
-                    self.storage.delete(fpath)
-                else:
-                    if not os.path.exists(full_path) and os.path.lexists(full_path):
-                        # Delete broken symlinks
-                        os.unlink(full_path)
-                    else:
-                        self.storage.delete(fpath)
+                self.storage.delete(fpath)
         for d in dirs:
             self.clear_dir(os.path.join(path, d))
 
@@ -286,22 +261,9 @@ class Command(BaseCommand):
                 except (OSError, NotImplementedError, AttributeError):
                     pass
                 else:
-                    # The full path of the target file
-                    if self.local:
-                        full_path = self.storage.path(prefixed_path)
-                        # If it's --link mode and the path isn't a link (i.e.
-                        # the previous collectstatic wasn't with --link) or if
-                        # it's non-link mode and the path is a link (i.e. the
-                        # previous collectstatic was with --link), the old
-                        # links/files must be deleted so it's not safe to skip
-                        # unmodified files.
-                        can_skip_unmodified_files = not (
-                            self.symlink ^ os.path.islink(full_path)
-                        )
-                    else:
-                        # In remote storages, skipping is only based on the
-                        # modified times since symlinks aren't relevant.
-                        can_skip_unmodified_files = True
+                    # In remote storages, skipping is only based on the
+                    # modified times since symlinks aren't relevant.
+                    can_skip_unmodified_files = not self.local
                     # Avoid sub-second precision (see #14665, #19540)
                     file_is_unmodified = target_last_modified.replace(
                         microsecond=0
@@ -318,41 +280,6 @@ class Command(BaseCommand):
                 self.log("Deleting '%s'" % path)
                 self.storage.delete(prefixed_path)
         return True
-
-    def link_file(self, path, prefixed_path, source_storage):
-        """
-        Attempt to link ``path``
-        """
-        # Skip this file if it was already copied earlier
-        if prefixed_path in self.symlinked_files:
-            return self.log("Skipping '%s' (already linked earlier)" % path)
-        # Delete the target file if needed or break
-        if not self.delete_file(path, prefixed_path, source_storage):
-            return
-        # The full path of the source file
-        source_path = source_storage.path(path)
-        # Finally link the file
-        if self.dry_run:
-            self.log("Pretending to link '%s'" % source_path, level=1)
-        else:
-            self.log("Linking '%s'" % source_path, level=2)
-            full_path = self.storage.path(prefixed_path)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            try:
-                if os.path.lexists(full_path):
-                    os.unlink(full_path)
-                os.symlink(source_path, full_path)
-            except NotImplementedError:
-                import platform
-
-                raise CommandError(
-                    "Symlinking is not supported in this "
-                    "platform (%s)." % platform.platform()
-                )
-            except OSError as e:
-                raise CommandError(e)
-        if prefixed_path not in self.symlinked_files:
-            self.symlinked_files.append(prefixed_path)
 
     def copy_file(self, path, prefixed_path, source_storage):
         """
