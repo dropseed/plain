@@ -17,7 +17,6 @@ repository = "https://github.com/boltpackages/bolt-dev"
 # Make the CLI available without adding to INSTALLED_APPS
 [tool.poetry.plugins.bolt_cli]
 "dev" = "bolt.dev:cli"
-"work" = "bolt.dev.work:cli"
 "format" = "bolt.dev.format:cli"
 "pre-commit" = "bolt.dev.precommit:cli"
 
