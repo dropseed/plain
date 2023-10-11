@@ -1,11 +1,11 @@
 from bolt.http import HttpResponseRedirect
 from bolt.views import TemplateView
 
-from .core import RequestLog
+from .requests import RequestLog
 
 
-class RequestLogView(TemplateView):
-    template_name = "requestlog/requestlog.html"
+class RequestsView(TemplateView):
+    template_name = "dev/requests.html"
 
     def get_context(self):
         ctx = super().get_context()

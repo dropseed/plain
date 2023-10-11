@@ -1,7 +1,7 @@
-REQUESTLOG_IGNORE_URL_PATHS = [
+DEV_REQUESTS_IGNORE_PATHS = [
     "/favicon.ico",
     "/favicon.ico/",
     "/admin/jsi18n/",
 ]
 
-REQUESTLOG_KEEP_LATEST = 50
+DEV_REQUESTS_MAX = 50

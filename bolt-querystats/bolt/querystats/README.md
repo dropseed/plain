@@ -176,12 +176,12 @@ The default settings can be customized if needed:
 
 ```python
 # settings.py
-REQUESTLOG_IGNORE_URL_PATHS = [
+DEV_REQUESTS_IGNORE_PATHS = [
     "/sw.js",
     "/favicon.ico",
     "/admin/jsi18n/",
 ]
-REQUESTLOG_KEEP_LATEST = 50
+DEV_REQUESTS_MAX = 50
 ```
 
 ## Tailwind CSS

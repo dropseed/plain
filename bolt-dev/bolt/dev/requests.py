@@ -1,11 +1,13 @@
 import datetime
 import json
 import os
+import sys
 import traceback
 
 import requests
 
 from bolt.runtime import settings
+from bolt.signals import got_request_exception
 
 
 class RequestLog:
@@ -87,7 +89,7 @@ class RequestLog:
 
         filenames = os.listdir(storage_path)
         sorted_filenames = sorted(filenames, reverse=True)
-        for filename in sorted_filenames[settings.REQUESTLOG_KEEP_LATEST :]:
+        for filename in sorted_filenames[settings.DEV_REQUESTS_MAX :]:
             path = os.path.join(storage_path, filename)
             try:
                 os.remove(path)
@@ -171,3 +173,47 @@ class RequestLog:
             "args": exception.args,
             "traceback": tb_string,
         }
+
+
+def should_capture_request(request):
+    if not settings.DEBUG:
+        return False
+
+    if request.resolver_match and request.resolver_match.default_namespace == "dev":
+        return False
+
+    if request.path in settings.DEV_REQUESTS_IGNORE_PATHS:
+        return False
+
+    # This could be an attribute set on request or response
+    # or something more dynamic
+    if "querystats" in request.GET:
+        return False
+
+    return True
+
+
+class RequestsMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.exception = None  # If an exception occurs, we want to remember it
+
+        got_request_exception.connect(self.store_exception)
+
+    def __call__(self, request):
+        # Process it first, so we know the resolver_match
+        response = self.get_response(request)
+
+        if should_capture_request(request):
+            RequestLog(
+                request=request, response=response, exception=self.exception
+            ).save()
+
+        return response
+
+    def store_exception(self, **kwargs):
+        """
+        The signal calls this at the right time,
+        so we can use sys.exxception to capture.
+        """
+        self.exception = sys.exception()
