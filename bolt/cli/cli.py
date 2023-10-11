@@ -2,6 +2,7 @@ import importlib
 import os
 import subprocess
 import sys
+from importlib.util import find_spec
 
 import click
 import pkg_resources
@@ -204,12 +205,7 @@ def compile(ctx):
 
     # maybe also user customization in pyproject.toml (like bolt work)
 
-    try:
-        from bolt import tailwind
-
-        tailwind_installed = True
-    except ImportError:
-        tailwind_installed = False
+    tailwind_installed = find_spec("bolt.tailwind") is not None
 
     # Compile our Tailwind CSS (including templates in bolt itself)
     if tailwind_installed:

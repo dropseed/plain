@@ -28,7 +28,7 @@ def clear_cache_handlers(*, setting, **kwargs):
 
         close_caches()
         caches._settings = caches.settings = caches.configure_settings(None)
-        caches._connections = local()
+        caches._connections = local()  # noqa: F821
 
 
 @receiver(setting_changed)

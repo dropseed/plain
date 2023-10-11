@@ -71,5 +71,5 @@ def fmt_check(paths):
 def print_event(msg, newline=True):
     arrow = click.style("-->", fg=214, bold=True)
     if not newline:
-        message += " "
+        msg += " "
     click.secho(f"{arrow} {msg}", nl=newline)

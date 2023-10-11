@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 try:
@@ -45,12 +46,7 @@ def cli():
     #     click.secho("Bolt env check failed!", fg="red")
     #     sys.exit(1)
 
-    try:
-        from bolt import db
-
-        bolt_db_installed = True
-    except ImportError:
-        bolt_db_installed = False
+    bolt_db_installed = find_spec("bolt.db") is not None
 
     manager = HonchoManager()
 

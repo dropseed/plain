@@ -16,7 +16,7 @@ class RedisSerializer:
     def dumps(self, obj):
         # Only skip pickling for integers, a int subclasses as bool should be
         # pickled.
-        if type(obj) is int:
+        if type(obj) is int:  # noqa: E721
             return obj
         return pickle.dumps(obj, self.protocol)
 
