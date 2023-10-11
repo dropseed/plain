@@ -1,8 +1,9 @@
 import functools
 import re
 from collections import defaultdict
-from graphlib import TopologicalSorter
 from itertools import chain
+
+from graphlib import TopologicalSorter
 
 from bolt.db import models
 from bolt.db.migrations import operations

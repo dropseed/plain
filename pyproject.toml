@@ -32,3 +32,23 @@ ruff = "^0.0.292"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+ignore = [
+    "E501",  # Never enforce `E501` (line length violations)
+    # "S101",  # bandit use of assert
+]
+extend-select = [
+    "I",  # isort
+    # # "C90",  # mccabe
+    # # "N",  # pep8-naming
+    # "U",  # pyupgrade
+    # "S",  # bandit
+    # # "B",  # bugbear
+    # "C4",  # flake8-comprehensions
+    # # "DTZ",  # flake8-datetimez
+    # "ISC",  # flake8-implicit-str-concat
+    # # "G",  # flake8-logging-format
+    # # "T20",  # print
+    # "PT",  # pytest
+]

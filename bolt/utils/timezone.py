@@ -3,10 +3,11 @@ Timezone-related classes and functions.
 """
 
 import functools
-import zoneinfo
 from contextlib import ContextDecorator
 from datetime import datetime, timedelta, timezone, tzinfo
 from threading import local
+
+import zoneinfo
 
 from bolt.runtime import settings
 

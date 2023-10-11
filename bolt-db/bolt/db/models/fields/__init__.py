@@ -8,7 +8,7 @@ import warnings
 from base64 import b64decode, b64encode
 from functools import partialmethod, total_ordering
 
-from bolt import preflight, exceptions, validators
+from bolt import exceptions, preflight, validators
 from bolt.db import connection, connections, router
 from bolt.db.models.constants import LOOKUP_SEP
 from bolt.db.models.enums import ChoicesMeta

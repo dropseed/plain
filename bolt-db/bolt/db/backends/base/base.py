@@ -5,9 +5,10 @@ import logging
 import threading
 import time
 import warnings
-import zoneinfo
 from collections import deque
 from contextlib import contextmanager
+
+import zoneinfo
 
 from bolt.db import DEFAULT_DB_ALIAS, DatabaseError, NotSupportedError
 from bolt.db.backends import utils
