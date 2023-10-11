@@ -1,10 +1,8 @@
 from .views.base import AdminListView, AdminPageView
 from .views.cards import (
-    AdminCardView,
-    AdminChartCardView,
-    AdminStatCardView,
-    AdminTextCardView,
-    AdminTrendCardView,
+    AdminCard,
+    AdminChartCard,
+    AdminTrendCard,
 )
 from .views.models import AdminModelViewset
 from .views.registry import (
@@ -18,11 +16,9 @@ __all__ = [
     "AdminPageView",
     "AdminListView",
     "AdminModelViewset",
-    "AdminCardView",
-    "AdminTextCardView",
-    "AdminChartCardView",
-    "AdminTrendCardView",
-    "AdminStatCardView",
+    "AdminChartCard",
+    "AdminTrendCard",
+    "AdminCard",
     "register_model",
     "register_card",
     "register_view",

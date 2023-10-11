@@ -4,10 +4,10 @@ import uuid
 from bolt.db import ProgrammingError, models
 from bolt.exceptions import ValidationError
 from bolt.preflight import Info
+from bolt.runtime import settings
 
 from .bridge import get_flag_class
 from .exceptions import FlagImportError
-from .settings import FLAGS_MODULE
 
 
 def validate_flag_name(value):
@@ -85,7 +85,7 @@ class Flag(models.Model):
                     errors.append(
                         Info(
                             f"Flag {flag_name} is not used.",
-                            hint=f"Remove the flag from the database or define it in the {FLAGS_MODULE()} module.",
+                            hint=f"Remove the flag from the database or define it in the {settings.FLAGS_MODULE} module.",
                             id="bolt.flags.I001",
                         )
                     )

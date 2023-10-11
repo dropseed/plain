@@ -1,10 +1,11 @@
+from bolt.runtime import settings
+
 from . import exceptions
 from .flags import Flag
-from .settings import FLAGS_MODULE
 
 
 def get_flags_module():
-    flags_module = FLAGS_MODULE()
+    flags_module = settings.FLAGS_MODULE
 
     try:
         return __import__(flags_module)

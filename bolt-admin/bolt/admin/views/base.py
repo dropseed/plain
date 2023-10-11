@@ -17,7 +17,7 @@ from bolt.views import (
 from .registry import registry
 
 if TYPE_CHECKING:
-    from .cards import AdminCardView
+    from .cards import AdminCard
 
 
 URL_NAMESPACE = "admin"
@@ -92,7 +92,7 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 class AdminPageView(BaseAdminView):
     template_name = "admin/page.html"
     icon: str = ""
-    cards: list["AdminCardView"] = []
+    cards: list["AdminCard"] = []
 
     def get_context(self):
         context = super().get_context()
@@ -109,7 +109,7 @@ class AdminPageView(BaseAdminView):
     def view_name(cls) -> str:
         return f"view_{cls.get_slug()}"
 
-    def render_card(self, card: "AdminCardView"):
+    def render_card(self, card: "AdminCard"):
         """Render card as a subview"""
         response = card.as_view()(self.request)
         response.render()

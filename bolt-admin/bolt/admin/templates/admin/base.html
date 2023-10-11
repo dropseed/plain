@@ -15,13 +15,19 @@
     <script src="{{ asset('admin/chart.js') }}"></script>
     <script src="{{ asset('admin/jquery-3.6.1.slim.min.js') }}"></script>
 </head>
-<body class="flex min-h-screen text-black bg-stone-100">
+<body class="flex min-h-screen text-black bg-[#fbf7f0]">
     <div class="fixed flex flex-col justify-between flex-shrink-0 w-64 h-full px-6 pt-6 pb-3">
         <div>
-            <a class="font-bold text-stone-800" href="{{ url('admin:index') }}">Bolt Admin</a>
+            <a class="flex items-center font-bold text-stone-800" href="{{ url('admin:index') }}">
+                <svg class="w-5 h-5 mr-2" width="237" height="237" viewBox="0 0 237 237" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M163.316 15.876C172.248 15.876 180.501 20.641 184.967 28.376L229.783 106C234.249 113.735 234.249 123.265 229.783 131L184.967 208.624C180.501 216.359 172.248 221.124 163.316 221.124L73.6837 221.124C64.7521 221.124 56.4989 216.359 52.0331 208.624L7.21686 131C2.75105 123.265 2.75105 113.735 7.21687 106L52.0331 28.376C56.4989 20.6409 64.7521 15.876 73.6837 15.876L163.316 15.876Z" fill="#8B8276"/>
+                    <circle cx="118.5" cy="118.5" r="64.5" fill="#CDC8C2"/>
+                </svg>
+                Admin
+            </a>
             <div class="mt-4">
                 {% for view in admin_registry.get_nav_views() %}
-                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-stone-200" href="{{ view.get_absolute_url() }}">
+                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-black/5" href="{{ view.get_absolute_url() }}">
                     {{ view.title }}
                 </a>
                 {% endfor %}
@@ -31,7 +37,7 @@
             <div class="mt-6">
                 <div class="text-xs tracking-wide text-gray-500">Dashboards</div>
                 {% for view in admin_registry.registered_dashboards %}
-                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-stone-200" href="{{ view.get_absolute_url() }}">
+                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-black text-stone-600 hover:bg-black/5" href="{{ view.get_absolute_url() }}">
                     {{ view.title }}
                 </a>
                 {% endfor %}
@@ -56,7 +62,7 @@
             <a class="hover:text-white hover:underline" href="{{ url('logout') }}">Log out</a>
         </div>
     </div>
-    <div class="flex-grow ml-64 overflow-auto text-black bg-white rounded-l-lg shadow-sm shadow-stone-400">
+    <div class="flex-grow ml-64 overflow-auto text-black bg-white border-l border-black/10">
         <div class="flex justify-between px-8 py-4 text-sm border-b border-gray-200">
             <div class="flex items-center space-x-2">
                 <a class="text-gray-700" href="{{ url ('admin:index') }}">Admin</a>
@@ -97,19 +103,8 @@
             {% if cards %}
             <div class="grid grid-cols-4 gap-6 mb-6">
             {% for card in cards %}
-                <admin.Card class="
-                    {%- if card.size.value == 1 -%}
-                    col-span-1
-                    {%- elif card.size.value == 2 -%}
-                    col-span-2
-                    {%- elif card.size.value == 3 -%}
-                    col-span-3
-                    {%- elif card.size.value == 4 -%}
-                    col-span-4
-                    {%- endif -%}">
-
+                <admin.Card size=card.size.value>
                     {{ render_card(card)|safe }}
-
                 </admin.Card>
             {% endfor %}
             </div>

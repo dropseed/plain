@@ -8,33 +8,35 @@ from bolt.utils.functional import cached_property
 from .base import BaseAdminView
 
 
-class AdminCardView(BaseAdminView):
+class AdminCard(BaseAdminView):
     class Sizes(Enum):
-        # Three column grid
+        # Four column grid
         SMALL = 1
         MEDIUM = 2
         LARGE = 3
         FULL = 4
 
-    template_name = "admin/card.html"
-    size: Sizes = Sizes.MEDIUM
+    template_name = "admin/cards/card.html"
+    size: Sizes = Sizes.SMALL
     # unique_id: str  # Use for tying to dashboards, require it
+
+    text: str = ""
+    link: str = ""
+    number: int | None = None
 
     @classmethod
     def view_name(cls) -> str:
         return f"card_{cls.get_slug()}"
 
-
-class AdminTextCardView(AdminCardView):
-    text: str = ""
-    link: str = ""
-    template_name = "admin/cards/text.html"
-
     def get_context(self):
         context = super().get_context()
+        context["number"] = self.get_number()
         context["text"] = self.get_text()
         context["link"] = self.get_link()
         return context
+
+    def get_number(self) -> int | None:
+        return self.number
 
     def get_text(self) -> str:
         return self.text
@@ -43,19 +45,7 @@ class AdminTextCardView(AdminCardView):
         return self.link
 
 
-class AdminStatCardView(AdminCardView):
-    template_name = "admin/cards/stat.html"
-
-    def get_context(self):
-        context = super().get_context()
-        context["stat"] = self.get_stat()
-        return context
-
-    def get_stat(self) -> str:
-        raise NotImplementedError
-
-
-class AdminChartCardView(AdminCardView):
+class AdminChartCard(AdminCard):
     template_name = "admin/cards/chart.html"
 
     def get_context(self):
@@ -100,7 +90,7 @@ class DateRange:
         return self.start <= item <= self.end
 
 
-class AdminTrendCardView(AdminChartCardView):
+class AdminTrendCard(AdminChartCard):
     class Ranges(Enum):
         LAST_365_DAYS = "last_365_days"
         LAST_30_DAYS = "last_30_days"
