@@ -1,69 +1,14 @@
-import importlib
 import os
 import subprocess
 import sys
 from importlib.util import find_spec
 
 import click
-import pkg_resources
 
 import bolt.runtime
 from bolt.env.cli import cli as env_cli
-from bolt.packages import packages
 
-
-class InstalledPackagesGroup(click.Group):
-    BOLT_APPS_PREFIX = "bolt."
-
-    def list_commands(self, ctx):
-        packages_with_commands = []
-
-        # Get installed packages with a cli.py module
-        for app in packages.get_package_configs():
-            cli_module = app.name + ".cli"
-            try:
-                importlib.import_module(cli_module)
-            except ModuleNotFoundError:
-                continue
-
-            cli_name = app.name
-
-            if cli_name.startswith(self.BOLT_APPS_PREFIX):
-                cli_name = cli_name[len(self.BOLT_APPS_PREFIX) :]
-
-            packages_with_commands.append(cli_name)
-
-        return packages_with_commands
-
-    def get_command(self, ctx, name):
-        # Try it as bolt.x and just x (we don't know ahead of time which it is, but prefer bolt.x)
-        for name in [self.BOLT_APPS_PREFIX + name, name]:
-            try:
-                cli = importlib.import_module(name + ".cli")
-            except ModuleNotFoundError:
-                return
-
-            # Get the app's cli.py group
-            try:
-                return cli.cli
-            except AttributeError:
-                return
-
-
-class EntryPointGroup(click.Group):
-    def list_commands(self, ctx):
-        rv = []
-
-        for entry_point in pkg_resources.iter_entry_points("bolt_cli"):
-            rv.append(entry_point.name)
-
-        rv.sort()
-        return rv
-
-    def get_command(self, ctx, name):
-        for entry_point in pkg_resources.iter_entry_points("bolt_cli"):
-            if entry_point.name == name:
-                return entry_point.load()
+from .packages import EntryPointGroup, InstalledPackagesGroup
 
 
 @click.group()
@@ -205,16 +150,17 @@ def compile(ctx):
 
     # maybe also user customization in pyproject.toml (like bolt work)
 
-    tailwind_installed = find_spec("bolt.tailwind") is not None
-
     # Compile our Tailwind CSS (including templates in bolt itself)
-    if tailwind_installed:
+    # TODO make this an entrypoint instead
+    if find_spec("bolt.tailwind") is not None:
         result = subprocess.run(["bolt", "tailwind", "compile", "--minify"])
         if result.returncode:
             click.secho(
                 f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red"
             )
             sys.exit(result.returncode)
+
+    # TODO also look in [tool.bolt.compile.run]
 
     # Run the regular collectstatic
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
