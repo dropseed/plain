@@ -28,7 +28,7 @@ def test_oauth_provider_keys_check_pass(settings):
 
 
 @pytest.mark.bolt_db()
-def test_oauth_provider_keys_check_pass(settings):
+def test_oauth_provider_keys_check_fail(settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "google": {
             "client_id": "test_client_id",

@@ -50,6 +50,9 @@ __all__ = (
 )
 
 
+FILE_INPUT_CONTRADICTION = object()
+
+
 class Field:
     default_validators = []  # Default set of validators
     # Add an 'invalid' entry to default_error_message if you want a specific
@@ -1006,7 +1009,7 @@ def from_current_timezone(value):
             return timezone.make_aware(value, current_timezone)
         except Exception as exc:
             raise ValidationError(
-                _(
+                (
                     "%(datetime)s couldn’t be interpreted "
                     "in time zone %(current_timezone)s; it "
                     "may be ambiguous or it may not exist."

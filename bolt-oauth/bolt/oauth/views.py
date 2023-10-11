@@ -4,7 +4,6 @@ from bolt.http import HttpResponseBadRequest, HttpResponseRedirect
 from bolt.views import View
 
 from .exceptions import (
-    OAuthCannotDisconnectError,
     OAuthStateMismatchError,
     OAuthUserAlreadyExistsError,
 )
@@ -66,14 +65,14 @@ class OAuthDisconnectView(LoginRequiredMixin, View):
         request = self.request
         provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
-        try:
-            return provider_instance.handle_disconnect_request(request=request)
-        except OAuthCannotDisconnectError:
-            return render(
-                request,
-                "oauth/error.html",
-                {
-                    "oauth_error": "This connection can't be removed. You must have a usable password or at least one active connection."
-                },
-                status=400,
-            )
+        # try:
+        return provider_instance.handle_disconnect_request(request=request)
+        # except OAuthCannotDisconnectError:
+        #     return render(
+        #         request,
+        #         "oauth/error.html",
+        #         {
+        #             "oauth_error": "This connection can't be removed. You must have a usable password or at least one active connection."
+        #         },
+        #         status=400,
+        #     )

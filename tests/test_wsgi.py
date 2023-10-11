@@ -1,5 +1,6 @@
-from bolt.wsgi import app
 from io import BytesIO
+
+from bolt.wsgi import app
 
 
 def test_wsgi_app():

@@ -1,10 +1,10 @@
-import time
 import subprocess
 import sys
+import time
 
 import click
 
-from bolt.db import DEFAULT_DB_ALIAS, connections, OperationalError
+from bolt.db import DEFAULT_DB_ALIAS, OperationalError, connections
 
 
 @click.group()
@@ -67,7 +67,10 @@ def wait():
                 waiting_for.append(conn.alias)
 
         if waiting_for:
-            click.secho(f"Waiting for database (attempt {attempts}): {', '.join(waiting_for)}", fg="yellow")
+            click.secho(
+                f"Waiting for database (attempt {attempts}): {', '.join(waiting_for)}",
+                fg="yellow",
+            )
             time.sleep(1.5)
         else:
             click.secho(f"Database ready: {', '.join(connections)}", fg="green")

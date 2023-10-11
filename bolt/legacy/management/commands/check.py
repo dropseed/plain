@@ -1,7 +1,7 @@
 from bolt import preflight
-from bolt.preflight.registry import registry
 from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.packages import packages
+from bolt.preflight.registry import registry
 
 
 class Command(BaseCommand):

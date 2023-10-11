@@ -2,7 +2,7 @@ import functools
 import inspect
 from functools import partial
 
-from bolt import preflight, exceptions
+from bolt import exceptions, preflight
 from bolt.db import connection, router
 from bolt.db.backends import utils
 from bolt.db.models import Q

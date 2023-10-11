@@ -1,7 +1,7 @@
 import json
 import warnings
 
-from bolt import preflight, exceptions
+from bolt import exceptions, preflight
 from bolt.db import NotSupportedError, connections, router
 from bolt.db.models import expressions, lookups
 from bolt.db.models.constants import LOOKUP_SEP

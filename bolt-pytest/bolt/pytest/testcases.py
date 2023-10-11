@@ -24,7 +24,6 @@ logger = logging.getLogger("bolt.test")
 __all__ = (
     "TestCase",
     "TransactionTestCase",
-    "SimpleTestCase",
 )
 
 

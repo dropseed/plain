@@ -14,9 +14,9 @@ from pickle import PicklingError
 from threading import local
 from urllib.parse import quote
 
+from bolt.exceptions import ImproperlyConfigured
 from bolt.preflight import Error, Warning
 from bolt.preflight.urls import check_resolver
-from bolt.exceptions import ImproperlyConfigured
 from bolt.runtime import settings
 from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.functional import cached_property
