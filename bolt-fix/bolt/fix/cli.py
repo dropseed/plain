@@ -23,6 +23,8 @@ RUFF_DEFAULTS = [
     "--select",
     ",".join(
         [
+            "E",
+            "F",
             "I",  # isort
             # "C90",  # mccabe
             # "N",  # pep8-naming
