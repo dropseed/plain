@@ -1,3 +1,0 @@
-#!/bin/sh -e
-poetry run ruff --fix-only .
-poetry run black .
