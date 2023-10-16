@@ -1,5 +1,7 @@
+import os
 import subprocess
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 try:
@@ -9,22 +11,33 @@ except ModuleNotFoundError:
 
 import click
 
-from ..utils import boltpackage_installed, has_pyproject_toml
-from .install import install_git_hook
+
+def install_git_hook():
+    hook_path = os.path.join(".git", "hooks", "pre-commit")
+    if os.path.exists(hook_path):
+        print("pre-commit hook already exists")
+    else:
+        with open(hook_path, "w") as f:
+            f.write(
+                """#!/bin/sh
+bolt pre-commit"""
+            )
+        os.chmod(hook_path, 0o755)
+        print("pre-commit hook installed")
 
 
 @click.command()
 @click.option("--install", is_flag=True)
 def cli(install):
     """Git pre-commit checks"""
-    repo_root = get_repo_root()
-
     if install:
-        install_git_hook(repo_root)
+        install_git_hook()
         return
 
-    if repo_root and has_pyproject_toml(repo_root):
-        with open(Path(repo_root, "pyproject.toml"), "rb") as f:
+    pyproject = Path("pyproject.toml")
+
+    if pyproject.exists():
+        with open(pyproject, "rb") as f:
             pyproject = tomllib.load(f)
         for name, data in (
             pyproject.get("tool", {})
@@ -40,10 +53,10 @@ def cli(install):
 
     check_short("Checking .env files for changes", "bolt", "env", "check")
 
-    if repo_root and is_using_poetry(repo_root):
+    if Path("poetry.lock").exists():
         check_short("Checking poetry.lock", "poetry", "lock", "--check")
 
-    check_short("Checking code formatting", "bolt", "format", "--check")
+    check_short("Running `bolt fix --check`", "bolt", "fix", "--check")
 
     if bolt_db_connected():
         check_short(
@@ -69,7 +82,7 @@ def cli(install):
     print_event("Running bolt compile")
     subprocess.check_call(["bolt", "compile"])
 
-    if boltpackage_installed("pytest"):
+    if find_spec("bolt.pytest"):
         print_event("Running tests")
         subprocess.check_call(["bolt", "test"])
 
@@ -86,10 +99,6 @@ def bolt_db_connected():
         stderr=subprocess.DEVNULL,
     )
     return result.returncode == 0
-
-
-def is_using_poetry(target_path):
-    return (Path(target_path) / "poetry.lock").exists()
 
 
 def print_event(msg, newline=True):
@@ -109,21 +118,3 @@ def check_short(message, *args):
         sys.exit(1)
     else:
         click.secho("✔", fg="green")
-
-
-def get_repo_root():
-    try:
-        return (
-            subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode("utf-8")
-            .strip()
-        )
-    except subprocess.CalledProcessError:
-        click.secho(
-            "All bolt projects are expected to be in a git repo and we couldn't find one.",
-            fg="red",
-        )
-        exit(1)
