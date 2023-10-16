@@ -180,7 +180,7 @@ class Index:
         self.name = "{}_{}_{}".format(
             table_name[:11],
             column_names[0][:7],
-            "{}_{}".format(names_digest(*hash_data, length=6), self.suffix),
+            f"{names_digest(*hash_data, length=6)}_{self.suffix}",
         )
         if len(self.name) > self.max_name_length:
             raise ValueError(

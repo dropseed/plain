@@ -26,8 +26,9 @@ class EmailBackend(ConsoleEmailBackend):
             )
         except OSError as err:
             raise ImproperlyConfigured(
-                "Could not create directory for saving email messages: %s (%s)"
-                % (self.file_path, err)
+                "Could not create directory for saving email messages: {} ({})".format(
+                    self.file_path, err
+                )
             )
         # Make sure that self.file_path is writable.
         if not os.access(self.file_path, os.W_OK):

@@ -195,8 +195,7 @@ class FunctoolsPartialSerializer(BaseSerializer):
         # Add any imports needed by arguments
         imports = {"import functools", *func_imports, *args_imports, *keywords_imports}
         return (
-            "functools.%s(%s, *%s, **%s)"
-            % (
+            "functools.{}({}, *{}, **{})".format(
                 self.value.__class__.__name__,
                 func_string,
                 args_string,

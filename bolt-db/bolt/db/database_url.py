@@ -137,8 +137,9 @@ def parse(
         engine = SCHEMES.get(spliturl.scheme)
         if engine is None:
             raise ValueError(
-                "No support for '%s'. We support: %s"
-                % (spliturl.scheme, ", ".join(sorted(SCHEMES.keys())))
+                "No support for '{}'. We support: {}".format(
+                    spliturl.scheme, ", ".join(sorted(SCHEMES.keys()))
+                )
             )
 
     port = spliturl.port

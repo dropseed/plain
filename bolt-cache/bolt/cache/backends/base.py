@@ -296,8 +296,8 @@ class BaseCache:
 def memcache_key_warnings(key):
     if len(key) > MEMCACHE_MAX_KEY_LENGTH:
         yield (
-            "Cache key will cause errors if used with memcached: {!r} "
-            "(longer than {})".format(key, MEMCACHE_MAX_KEY_LENGTH)
+            f"Cache key will cause errors if used with memcached: {key!r} "
+            f"(longer than {MEMCACHE_MAX_KEY_LENGTH})"
         )
     for char in key:
         if ord(char) < 33 or ord(char) == 127:

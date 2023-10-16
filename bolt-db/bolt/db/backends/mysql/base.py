@@ -228,9 +228,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             isolation_level = isolation_level.lower()
             if isolation_level not in self.isolation_levels:
                 raise ImproperlyConfigured(
-                    "Invalid transaction isolation level '%s' specified.\n"
-                    "Use one of %s, or None."
-                    % (
+                    "Invalid transaction isolation level '{}' specified.\n"
+                    "Use one of {}, or None.".format(
                         isolation_level,
                         ", ".join("'%s'" % s for s in sorted(self.isolation_levels)),
                     )
@@ -330,12 +329,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                 ) in relations.items():
                     cursor.execute(
                         """
-                        SELECT REFERRING.`%s`, REFERRING.`%s` FROM `%s` as REFERRING
-                        LEFT JOIN `%s` as REFERRED
-                        ON (REFERRING.`%s` = REFERRED.`%s`)
-                        WHERE REFERRING.`%s` IS NOT NULL AND REFERRED.`%s` IS NULL
-                        """
-                        % (
+                        SELECT REFERRING.`{}`, REFERRING.`{}` FROM `{}` as REFERRING
+                        LEFT JOIN `{}` as REFERRED
+                        ON (REFERRING.`{}` = REFERRED.`{}`)
+                        WHERE REFERRING.`{}` IS NOT NULL AND REFERRED.`{}` IS NULL
+                        """.format(
                             primary_key_column_name,
                             column_name,
                             table_name,
@@ -348,10 +346,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     )
                     for bad_row in cursor.fetchall():
                         raise IntegrityError(
-                            "The row in table '%s' with primary key '%s' has an "
-                            "invalid foreign key: %s.%s contains a value '%s' that "
-                            "does not have a corresponding value in %s.%s."
-                            % (
+                            "The row in table '{}' with primary key '{}' has an "
+                            "invalid foreign key: {}.{} contains a value '{}' that "
+                            "does not have a corresponding value in {}.{}.".format(
                                 table_name,
                                 bad_row[0],
                                 table_name,

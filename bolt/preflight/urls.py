@@ -82,8 +82,8 @@ def get_warning_for_invalid_pattern(pattern):
     """
     if isinstance(pattern, str):
         hint = (
-            "Try removing the string '{}'. The list of urlpatterns should not "
-            "have a prefix string as the first element.".format(pattern)
+            f"Try removing the string '{pattern}'. The list of urlpatterns should not "
+            "have a prefix string as the first element."
         )
     elif isinstance(pattern, tuple):
         hint = "Try using path() instead of a tuple."

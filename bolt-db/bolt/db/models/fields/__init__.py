@@ -442,11 +442,8 @@ class Field(RegisterLookupMixin):
                     preflight.Error(
                         "All 'validators' must be callable.",
                         hint=(
-                            "validators[{i}] ({repr}) isn't a function or "
-                            "instance of a validator class.".format(
-                                i=i,
-                                repr=repr(validator),
-                            )
+                            f"validators[{i}] ({repr(validator)}) isn't a function or "
+                            "instance of a validator class."
                         ),
                         obj=self,
                         id="fields.E008",
@@ -1427,9 +1424,10 @@ class DateTimeField(DateField):
                 # do much about it, so we let the exceptions percolate up the
                 # call stack.
                 warnings.warn(
-                    "DateTimeField %s.%s received a naive datetime "
-                    "(%s) while time zone support is active."
-                    % (self.model.__name__, self.name, value),
+                    "DateTimeField {}.{} received a naive datetime "
+                    "({}) while time zone support is active.".format(
+                        self.model.__name__, self.name, value
+                    ),
                     RuntimeWarning,
                 )
                 default_timezone = timezone.get_default_timezone()
@@ -1487,8 +1485,8 @@ class DateTimeField(DateField):
             except AttributeError:
                 name = "(unbound)"
             warnings.warn(
-                "DateTimeField {} received a naive datetime ({})"
-                " while time zone support is active.".format(name, value),
+                f"DateTimeField {name} received a naive datetime ({value})"
+                " while time zone support is active.",
                 RuntimeWarning,
             )
             default_timezone = timezone.get_default_timezone()

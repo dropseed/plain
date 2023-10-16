@@ -129,9 +129,9 @@ class ModelBase(type):
             if package_config is None:
                 if not abstract:
                     raise RuntimeError(
-                        "Model class {}.{} doesn't declare an explicit "
+                        f"Model class {module}.{name} doesn't declare an explicit "
                         "package_label and isn't in an application in "
-                        "INSTALLED_PACKAGES.".format(module, name)
+                        "INSTALLED_PACKAGES."
                     )
 
             else:
@@ -258,9 +258,8 @@ class ModelBase(type):
                 for field in parent_fields:
                     if field.name in field_names:
                         raise FieldError(
-                            "Local field %r in class %r clashes with field of "
-                            "the same name from base class %r."
-                            % (
+                            "Local field {!r} in class {!r} clashes with field of "
+                            "the same name from base class {!r}.".format(
                                 field.name,
                                 name,
                                 base.__name__,
@@ -286,14 +285,9 @@ class ModelBase(type):
 
                     if attr_name in field_names:
                         raise FieldError(
-                            "Auto-generated field '%s' in class %r for "
-                            "parent_link to base class %r clashes with "
+                            f"Auto-generated field '{attr_name}' in class {name!r} for "
+                            f"parent_link to base class {base.__name__!r} clashes with "
                             "declared field of the same name."
-                            % (
-                                attr_name,
-                                name,
-                                base.__name__,
-                            )
                         )
 
                     # Only add the ptr field if it's not already present;
@@ -331,9 +325,8 @@ class ModelBase(type):
                 if field.name in field_names:
                     if not base._meta.abstract:
                         raise FieldError(
-                            "Local field %r in class %r clashes with field of "
-                            "the same name from base class %r."
-                            % (
+                            "Local field {!r} in class {!r} clashes with field of "
+                            "the same name from base class {!r}.".format(
                                 field.name,
                                 name,
                                 base.__name__,
@@ -626,9 +619,8 @@ class Model(AltersData, metaclass=ModelBase):
         if pickled_version:
             if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
-                    "Pickled model instance's Bolt version %s does not "
-                    "match the current version %s."
-                    % (pickled_version, bolt.runtime.__version__),
+                    f"Pickled model instance's Bolt version {pickled_version} does not "
+                    f"match the current version {bolt.runtime.__version__}.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -1608,9 +1600,10 @@ class Model(AltersData, metaclass=ModelBase):
                 package_label, model_name = cls._meta.swapped.split(".")
                 errors.append(
                     preflight.Error(
-                        "'%s' references '%s.%s', which has not been "
-                        "installed, or is abstract."
-                        % (cls._meta.swappable, package_label, model_name),
+                        "'{}' references '{}.{}', which has not been "
+                        "installed, or is abstract.".format(
+                            cls._meta.swappable, package_label, model_name
+                        ),
                         id="models.E002",
                     )
                 )
@@ -1715,10 +1708,9 @@ class Model(AltersData, metaclass=ModelBase):
                 if clash:
                     errors.append(
                         preflight.Error(
-                            "The field '%s' from parent model "
-                            "'%s' clashes with the field '%s' "
-                            "from parent model '%s'."
-                            % (clash.name, clash.model._meta, f.name, f.model._meta),
+                            f"The field '{clash.name}' from parent model "
+                            f"'{clash.model._meta}' clashes with the field '{f.name}' "
+                            f"from parent model '{f.model._meta}'.",
                             obj=cls,
                             id="models.E005",
                         )
@@ -1746,10 +1738,8 @@ class Model(AltersData, metaclass=ModelBase):
             if clash and not id_conflict:
                 errors.append(
                     preflight.Error(
-                        "The field '{}' clashes with the field '{}' "
-                        "from model '{}'.".format(
-                            f.name, clash.name, clash.model._meta
-                        ),
+                        f"The field '{f.name}' clashes with the field '{clash.name}' "
+                        f"from model '{clash.model._meta}'.",
                         obj=f,
                         id="models.E006",
                     )
@@ -2012,11 +2002,7 @@ class Model(AltersData, metaclass=ModelBase):
             except KeyError:
                 errors.append(
                     preflight.Error(
-                        "'%s' refers to the nonexistent field '%s'."
-                        % (
-                            option,
-                            field_name,
-                        ),
+                        f"'{option}' refers to the nonexistent field '{field_name}'.",
                         obj=cls,
                         id="models.E012",
                     )
@@ -2025,9 +2011,8 @@ class Model(AltersData, metaclass=ModelBase):
                 if isinstance(field.remote_field, models.ManyToManyRel):
                     errors.append(
                         preflight.Error(
-                            "'%s' refers to a ManyToManyField '%s', but "
-                            "ManyToManyFields are not permitted in '%s'."
-                            % (
+                            "'{}' refers to a ManyToManyField '{}', but "
+                            "ManyToManyFields are not permitted in '{}'.".format(
                                 option,
                                 field_name,
                                 option,
@@ -2199,9 +2184,10 @@ class Model(AltersData, metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Error(
-                        'Autogenerated column name too long for field "%s". '
-                        'Maximum length is "%s" for database "%s".'
-                        % (column_name, allowed_len, db_alias),
+                        'Autogenerated column name too long for field "{}". '
+                        'Maximum length is "{}" for database "{}".'.format(
+                            column_name, allowed_len, db_alias
+                        ),
                         hint="Set the column name manually using 'db_column'.",
                         obj=cls,
                         id="models.E018",
@@ -2225,8 +2211,9 @@ class Model(AltersData, metaclass=ModelBase):
                     errors.append(
                         preflight.Error(
                             "Autogenerated column name too long for M2M field "
-                            '"%s". Maximum length is "%s" for database "%s".'
-                            % (rel_name, allowed_len, db_alias),
+                            '"{}". Maximum length is "{}" for database "{}".'.format(
+                                rel_name, allowed_len, db_alias
+                            ),
                             hint=(
                                 "Use 'through' to create a separate model for "
                                 "M2M and then set column_name using 'db_column'."

@@ -109,8 +109,7 @@ class BaseForm:
             field = self.fields[name]
         except KeyError:
             raise KeyError(
-                "Key '%s' not found in '%s'. Choices are: %s."
-                % (
+                "Key '{}' not found in '{}'. Choices are: {}.".format(
                     name,
                     self.__class__.__name__,
                     ", ".join(sorted(self.fields)),
@@ -197,8 +196,7 @@ class BaseForm:
             if field not in self.errors:
                 if field != NON_FIELD_ERRORS and field not in self.fields:
                     raise ValueError(
-                        "'%s' has no field named '%s'."
-                        % (self.__class__.__name__, field)
+                        f"'{self.__class__.__name__}' has no field named '{field}'."
                     )
                 self._errors[field] = ValidationErrors()
 

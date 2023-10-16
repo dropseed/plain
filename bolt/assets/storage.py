@@ -857,8 +857,9 @@ class ManifestFilesMixin(HashedFilesMixin):
             if version in ("1.0", "1.1"):
                 return stored.get("paths", {}), stored.get("hash", "")
         raise ValueError(
-            "Couldn't load manifest '%s' (version %s)"
-            % (self.manifest_name, self.manifest_version)
+            "Couldn't load manifest '{}' (version {})".format(
+                self.manifest_name, self.manifest_version
+            )
         )
 
     def post_process(self, *args, **kwargs):

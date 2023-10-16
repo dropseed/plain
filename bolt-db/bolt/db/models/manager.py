@@ -63,10 +63,9 @@ class BaseManager:
             module = import_module(module_name)
             if not hasattr(module, name):
                 raise ValueError(
-                    "Could not find manager %s in %s.\n"
+                    f"Could not find manager {name} in {module_name}.\n"
                     "Please note that you need to inherit from managers you "
                     "dynamically generated with 'from_queryset()'."
-                    % (name, module_name)
                 )
             return (
                 False,  # as_manager
@@ -194,8 +193,7 @@ class ManagerDescriptor:
 
         if cls._meta.swapped:
             raise AttributeError(
-                "Manager isn't available; '%s' has been swapped for '%s'"
-                % (
+                "Manager isn't available; '{}' has been swapped for '{}'".format(
                     cls._meta.label,
                     cls._meta.swapped,
                 )

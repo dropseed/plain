@@ -197,10 +197,7 @@ class Signer:
             else settings.SECRET_KEY_FALLBACKS
         )
         self.sep = sep
-        self.salt = salt or "{}.{}".format(
-            self.__class__.__module__,
-            self.__class__.__name__,
-        )
+        self.salt = salt or f"{self.__class__.__module__}.{self.__class__.__name__}"
         self.algorithm = algorithm or "sha256"
         # RemovedInDjango51Warning.
         if args:

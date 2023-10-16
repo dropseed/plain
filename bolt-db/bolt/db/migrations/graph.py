@@ -106,14 +106,14 @@ class MigrationGraph:
         """
         if child not in self.nodes:
             error_message = (
-                "Migration {} dependencies reference nonexistent"
-                " child node {!r}".format(migration, child)
+                f"Migration {migration} dependencies reference nonexistent"
+                f" child node {child!r}"
             )
             self.add_dummy_node(child, migration, error_message)
         if parent not in self.nodes:
             error_message = (
-                "Migration {} dependencies reference nonexistent"
-                " parent node {!r}".format(migration, parent)
+                f"Migration {migration} dependencies reference nonexistent"
+                f" parent node {parent!r}"
             )
             self.add_dummy_node(parent, migration, error_message)
         self.node_map[child].add_parent(self.node_map[parent])
@@ -168,9 +168,10 @@ class MigrationGraph:
             replacement_node = self.node_map.pop(replacement)
         except KeyError as err:
             raise NodeNotFoundError(
-                "Unable to remove replacement node %r. It was either never added"
-                " to the migration graph, or has been removed already."
-                % (replacement,),
+                "Unable to remove replacement node {!r}. It was either never added"
+                " to the migration graph, or has been removed already.".format(
+                    replacement
+                ),
                 replacement,
             ) from err
         replaced_nodes = set()

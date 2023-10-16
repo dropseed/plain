@@ -317,11 +317,7 @@ class RenameField(FieldOperation):
             )
 
     def describe(self):
-        return "Rename field {} on {} to {}".format(
-            self.old_name,
-            self.model_name,
-            self.new_name,
-        )
+        return f"Rename field {self.old_name} on {self.model_name} to {self.new_name}"
 
     @property
     def migration_name_fragment(self):

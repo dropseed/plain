@@ -136,8 +136,7 @@ class ForwardManyToOneDescriptor:
             (self.field.remote_field.model.DoesNotExist, AttributeError),
             {
                 "__module__": self.field.model.__module__,
-                "__qualname__": "%s.%s.RelatedObjectDoesNotExist"
-                % (
+                "__qualname__": "{}.{}.RelatedObjectDoesNotExist".format(
                     self.field.model.__qualname__,
                     self.field.name,
                 ),
@@ -262,8 +261,7 @@ class ForwardManyToOneDescriptor:
             value, self.field.remote_field.model._meta.concrete_model
         ):
             raise ValueError(
-                'Cannot assign "%r": "%s.%s" must be a "%s" instance.'
-                % (
+                'Cannot assign "{!r}": "{}.{}" must be a "{}" instance.'.format(
                     value,
                     instance._meta.object_name,
                     self.field.name,
@@ -410,8 +408,7 @@ class ReverseOneToOneDescriptor:
             (self.related.related_model.DoesNotExist, AttributeError),
             {
                 "__module__": self.related.model.__module__,
-                "__qualname__": "%s.%s.RelatedObjectDoesNotExist"
-                % (
+                "__qualname__": "{}.{}.RelatedObjectDoesNotExist".format(
                     self.related.model.__qualname__,
                     self.related.name,
                 ),
@@ -488,8 +485,9 @@ class ReverseOneToOneDescriptor:
 
         if rel_obj is None:
             raise self.RelatedObjectDoesNotExist(
-                "%s has no %s."
-                % (instance.__class__.__name__, self.related.get_accessor_name())
+                "{} has no {}.".format(
+                    instance.__class__.__name__, self.related.get_accessor_name()
+                )
             )
         else:
             return rel_obj
@@ -525,8 +523,7 @@ class ReverseOneToOneDescriptor:
         elif not isinstance(value, self.related.related_model):
             # An object must be an instance of the related class.
             raise ValueError(
-                'Cannot assign "%r": "%s.%s" must be a "%s" instance.'
-                % (
+                'Cannot assign "{!r}": "{}.{}" must be a "{}" instance.'.format(
                     value,
                     instance._meta.object_name,
                     self.related.get_accessor_name(),
@@ -622,8 +619,9 @@ class ReverseManyToOneDescriptor:
 
     def __set__(self, instance, value):
         raise TypeError(
-            "Direct assignment to the %s is prohibited. Use %s.set() instead."
-            % self._get_set_deprecation_msg_params(),
+            "Direct assignment to the {} is prohibited. Use {}.set() instead.".format(
+                *self._get_set_deprecation_msg_params()
+            ),
         )
 
 
@@ -754,8 +752,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
             def check_and_update_obj(obj):
                 if not isinstance(obj, self.model):
                     raise TypeError(
-                        "'%s' instance expected, got %r"
-                        % (
+                        "'{}' instance expected, got {!r}".format(
                             self.model._meta.object_name,
                             obj,
                         )
@@ -822,8 +819,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
                 for obj in objs:
                     if not isinstance(obj, self.model):
                         raise TypeError(
-                            "'%s' instance expected, got %r"
-                            % (
+                            "'{}' instance expected, got {!r}".format(
                                 self.model._meta.object_name,
                                 obj,
                             )
@@ -983,9 +979,10 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             self.related_val = self.source_field.get_foreign_related_value(instance)
             if None in self.related_val:
                 raise ValueError(
-                    '"%r" needs to have a value for field "%s" before '
-                    "this many-to-many relationship can be used."
-                    % (instance, self.pk_field_names[self.source_field_name])
+                    '"{!r}" needs to have a value for field "{}" before '
+                    "this many-to-many relationship can be used.".format(
+                        instance, self.pk_field_names[self.source_field_name]
+                    )
                 )
             # Even if this relation is not to pk, we require still pk value.
             # The wish is that the instance has been already saved to DB,
@@ -1073,8 +1070,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             queryset = queryset.extra(
                 select={
                     "_prefetch_related_val_%s"
-                    % f.attname: "%s.%s"
-                    % (qn(join_table), qn(f.column))
+                    % f.attname: f"{qn(join_table)}.{qn(f.column)}"
                     for f in fk.local_related_fields
                 }
             )
@@ -1229,21 +1225,24 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 if isinstance(obj, self.model):
                     if not router.allow_relation(obj, self.instance):
                         raise ValueError(
-                            'Cannot add "%r": instance is on database "%s", '
-                            'value is on database "%s"'
-                            % (obj, self.instance._state.db, obj._state.db)
+                            'Cannot add "{!r}": instance is on database "{}", '
+                            'value is on database "{}"'.format(
+                                obj, self.instance._state.db, obj._state.db
+                            )
                         )
                     target_id = target_field.get_foreign_related_value(obj)[0]
                     if target_id is None:
                         raise ValueError(
-                            'Cannot add "%r": the value for field "%s" is None'
-                            % (obj, target_field_name)
+                            'Cannot add "{!r}": the value for field "{}" is None'.format(
+                                obj, target_field_name
+                            )
                         )
                     target_ids.add(target_id)
                 elif isinstance(obj, Model):
                     raise TypeError(
-                        "'%s' instance expected, got %r"
-                        % (self.model._meta.object_name, obj)
+                        "'{}' instance expected, got {!r}".format(
+                            self.model._meta.object_name, obj
+                        )
                     )
                 else:
                     target_ids.add(target_field.get_prep_value(obj))

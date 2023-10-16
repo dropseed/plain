@@ -14,14 +14,14 @@ class DatabaseValidation(BaseDatabaseValidation):
         ):
             return [
                 preflight.Warning(
-                    "%s Strict Mode is not set for database connection '%s'"
-                    % (self.connection.display_name, self.connection.alias),
+                    "{} Strict Mode is not set for database connection '{}'".format(
+                        self.connection.display_name, self.connection.alias
+                    ),
                     hint=(
-                        "%s's Strict Mode fixes many data integrity problems in "
-                        "%s, such as data truncation upon insertion, by "
+                        "{}'s Strict Mode fixes many data integrity problems in "
+                        "{}, such as data truncation upon insertion, by "
                         "escalating warnings into errors. It is strongly "
-                        "recommended you activate it."
-                        % (
+                        "recommended you activate it.".format(
                             self.connection.display_name,
                             self.connection.display_name,
                         ),
@@ -56,8 +56,9 @@ class DatabaseValidation(BaseDatabaseValidation):
         if field.db_index and field_type.lower() in self.connection._limited_data_types:
             errors.append(
                 preflight.Warning(
-                    "%s does not support a database index on %s columns."
-                    % (self.connection.display_name, field_type),
+                    "{} does not support a database index on {} columns.".format(
+                        self.connection.display_name, field_type
+                    ),
                     hint=(
                         "An index won't be created. Silence this warning if "
                         "you don't care about it."

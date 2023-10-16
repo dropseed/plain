@@ -578,10 +578,7 @@ class MigrationAutodetector:
                             )
                             self.renamed_models_rel[
                                 renamed_models_rel_key
-                            ] = "{}.{}".format(
-                                model_state.package_label,
-                                model_state.name_lower,
-                            )
+                            ] = f"{model_state.package_label}.{model_state.name_lower}"
                             self.old_model_keys.remove(
                                 (rem_package_label, rem_model_name)
                             )

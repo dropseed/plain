@@ -178,8 +178,9 @@ class Command(BaseCommand):
                     self.stdout.write("  No optimizations possible.")
                 else:
                     self.stdout.write(
-                        "  Optimized from %s operations to %s operations."
-                        % (len(operations), len(new_operations))
+                        "  Optimized from {} operations to {} operations.".format(
+                            len(operations), len(new_operations)
+                        )
                     )
 
         # Work out the value of replaces (any squashed ones we're re-squashing)
@@ -264,6 +265,5 @@ class Command(BaseCommand):
             )
         except KeyError:
             raise CommandError(
-                "Cannot find a migration matching '%s' from app '%s'."
-                % (name, package_label)
+                f"Cannot find a migration matching '{name}' from app '{package_label}'."
             )

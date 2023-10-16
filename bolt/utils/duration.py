@@ -37,9 +37,7 @@ def duration_iso_string(duration):
 
     days, hours, minutes, seconds, microseconds = _get_duration_components(duration)
     ms = f".{microseconds:06d}" if microseconds else ""
-    return "{}P{}DT{:02d}H{:02d}M{:02d}{}S".format(
-        sign, days, hours, minutes, seconds, ms
-    )
+    return f"{sign}P{days}DT{hours:02d}H{minutes:02d}M{seconds:02d}{ms}S"
 
 
 def duration_microseconds(delta):

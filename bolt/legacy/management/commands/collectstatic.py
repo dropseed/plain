@@ -194,26 +194,20 @@ class Command(BaseCommand):
             unmodified_count = len(collected["unmodified"])
             post_processed_count = len(collected["post_processed"])
             return (
-                "\n%(modified_count)s %(identifier)s %(action)s"
-                "%(destination)s%(unmodified)s%(post_processed)s."
-            ) % {
-                "modified_count": modified_count,
-                "identifier": "static file" + ("" if modified_count == 1 else "s"),
-                "action": "copied",
-                "destination": (
-                    " to '%s'" % destination_path if destination_path else ""
-                ),
-                "unmodified": (
-                    ", %s unmodified" % unmodified_count
-                    if collected["unmodified"]
-                    else ""
-                ),
-                "post_processed": (
-                    collected["post_processed"]
-                    and ", %s post-processed" % post_processed_count
-                    or ""
-                ),
-            }
+                "\n{modified_count} {identifier} {action}"
+                "{destination}{unmodified}{post_processed}."
+            ).format(
+                modified_count=modified_count,
+                identifier="static file" + ("" if modified_count == 1 else "s"),
+                action="copied",
+                destination=" to '%s'" % destination_path if destination_path else "",
+                unmodified=", %s unmodified" % unmodified_count
+                if collected["unmodified"]
+                else "",
+                post_processed=collected["post_processed"]
+                and ", %s post-processed" % post_processed_count
+                or "",
+            )
 
     def log(self, msg, level=2):
         """

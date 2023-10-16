@@ -245,13 +245,7 @@ class BaseDatabaseSchemaEditor:
                         )
                     )
             # Add the SQL to our big list.
-            column_sqls.append(
-                "%s %s"
-                % (
-                    self.quote_name(field.column),
-                    definition,
-                )
-            )
+            column_sqls.append(f"{self.quote_name(field.column)} {definition}")
             # Autoincrement SQL (for backends with post table definition
             # variant).
             if field.get_internal_type() in (
@@ -608,8 +602,7 @@ class BaseDatabaseSchemaEditor:
                 constraint_names = [default_name]
         if len(constraint_names) != 1:
             raise ValueError(
-                "Found wrong number (%s) of constraints for %s(%s)"
-                % (
+                "Found wrong number ({}) of constraints for {}({})".format(
                     len(constraint_names),
                     model._meta.db_table,
                     ", ".join(columns),
@@ -793,9 +786,10 @@ class BaseDatabaseSchemaEditor:
             new_type is None and new_field.remote_field is None
         ):
             raise ValueError(
-                "Cannot alter field %s into %s - they do not properly define "
-                "db_type (are you using a badly-written custom field?)"
-                % (old_field, new_field),
+                "Cannot alter field {} into {} - they do not properly define "
+                "db_type (are you using a badly-written custom field?)".format(
+                    old_field, new_field
+                ),
             )
         elif (
             old_type is None
@@ -878,8 +872,7 @@ class BaseDatabaseSchemaEditor:
             )
             if strict and len(fk_names) != 1:
                 raise ValueError(
-                    "Found wrong number (%s) of foreign key constraints for %s.%s"
-                    % (
+                    "Found wrong number ({}) of foreign key constraints for {}.{}".format(
                         len(fk_names),
                         model._meta.db_table,
                         old_field.column,
@@ -905,8 +898,7 @@ class BaseDatabaseSchemaEditor:
             )
             if strict and len(constraint_names) != 1:
                 raise ValueError(
-                    "Found wrong number (%s) of unique constraints for %s.%s"
-                    % (
+                    "Found wrong number ({}) of unique constraints for {}.{}".format(
                         len(constraint_names),
                         model._meta.db_table,
                         old_field.column,
@@ -981,8 +973,7 @@ class BaseDatabaseSchemaEditor:
             )
             if strict and len(constraint_names) != 1:
                 raise ValueError(
-                    "Found wrong number (%s) of check constraints for %s.%s"
-                    % (
+                    "Found wrong number ({}) of check constraints for {}.{}".format(
                         len(constraint_names),
                         model._meta.db_table,
                         old_field.column,
@@ -1811,8 +1802,7 @@ class BaseDatabaseSchemaEditor:
         constraint_names = self._constraint_names(model, primary_key=True)
         if strict and len(constraint_names) != 1:
             raise ValueError(
-                "Found wrong number (%s) of PK constraints for %s"
-                % (
+                "Found wrong number ({}) of PK constraints for {}".format(
                     len(constraint_names),
                     model._meta.db_table,
                 )

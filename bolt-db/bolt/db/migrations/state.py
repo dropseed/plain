@@ -783,12 +783,7 @@ class ModelState:
                 fields.append((name, field.clone()))
             except TypeError as e:
                 raise TypeError(
-                    "Couldn't reconstruct field %s on %s: %s"
-                    % (
-                        name,
-                        model._meta.label,
-                        e,
-                    )
+                    f"Couldn't reconstruct field {name} on {model._meta.label}: {e}"
                 )
         if not exclude_rels:
             for field in model._meta.local_many_to_many:
@@ -797,8 +792,7 @@ class ModelState:
                     fields.append((name, field.clone()))
                 except TypeError as e:
                     raise TypeError(
-                        "Couldn't reconstruct m2m field %s on %s: %s"
-                        % (
+                        "Couldn't reconstruct m2m field {} on {}: {}".format(
                             name,
                             model._meta.object_name,
                             e,

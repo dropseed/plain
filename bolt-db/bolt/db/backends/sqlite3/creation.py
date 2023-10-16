@@ -31,8 +31,9 @@ class DatabaseCreation(BaseDatabaseCreation):
             # Erase the old test database
             if verbosity >= 1:
                 self.log(
-                    "Destroying old test database for alias %s..."
-                    % (self._get_database_display_str(verbosity, test_database_name),)
+                    "Destroying old test database for alias {}...".format(
+                        self._get_database_display_str(verbosity, test_database_name)
+                    )
                 )
             if os.access(test_database_name, os.F_OK):
                 if not autoclobber:
@@ -81,8 +82,7 @@ class DatabaseCreation(BaseDatabaseCreation):
                     return
                 if verbosity >= 1:
                     self.log(
-                        "Destroying old test database for alias %s..."
-                        % (
+                        "Destroying old test database for alias {}...".format(
                             self._get_database_display_str(
                                 verbosity, target_database_name
                             ),

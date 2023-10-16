@@ -333,9 +333,8 @@ class BaseExpression:
             for source in sources_iter:
                 if not isinstance(output_field, source.__class__):
                     raise FieldError(
-                        "Expression contains mixed types: %s, %s. You must "
-                        "set output_field."
-                        % (
+                        "Expression contains mixed types: {}, {}. You must "
+                        "set output_field.".format(
                             output_field.__class__.__name__,
                             source.__class__.__name__,
                         )
@@ -899,8 +898,7 @@ class Func(SQLiteNumericMixin, Expression):
     def __init__(self, *expressions, output_field=None, **extra):
         if self.arity is not None and len(expressions) != self.arity:
             raise TypeError(
-                "'%s' takes exactly %s %s (%s given)"
-                % (
+                "'{}' takes exactly {} {} ({} given)".format(
                     self.__class__.__name__,
                     self.arity,
                     "argument" if self.arity == 1 else "arguments",

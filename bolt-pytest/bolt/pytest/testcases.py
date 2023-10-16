@@ -105,9 +105,8 @@ class TransactionTestCase(unittest.TestCase):
         for alias in cls.databases:
             if alias not in connections:
                 message = (
-                    "%s.%s.databases refers to %r which is not defined in "
-                    "settings.DATABASES."
-                    % (
+                    "{}.{}.databases refers to {!r} which is not defined in "
+                    "settings.DATABASES.".format(
                         cls.__module__,
                         cls.__qualname__,
                         alias,

@@ -82,11 +82,7 @@ class HttpRequest:
     def __repr__(self):
         if self.method is None or not self.get_full_path():
             return "<%s>" % self.__class__.__name__
-        return "<{}: {} {!r}>".format(
-            self.__class__.__name__,
-            self.method,
-            self.get_full_path(),
-        )
+        return f"<{self.__class__.__name__}: {self.method} {self.get_full_path()!r}>"
 
     def __getstate__(self):
         obj_dict = self.__dict__.copy()

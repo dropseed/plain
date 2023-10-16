@@ -88,8 +88,7 @@ class Command(BaseCommand):
             if f.db_index:
                 unique = "UNIQUE " if f.unique else ""
                 index_output.append(
-                    "CREATE %sINDEX %s ON %s (%s);"
-                    % (
+                    "CREATE {}INDEX {} ON {} ({});".format(
                         unique,
                         qn(f"{tablename}_{f.name}"),
                         qn(tablename),
@@ -120,8 +119,9 @@ class Command(BaseCommand):
                     curs.execute(full_statement)
                 except DatabaseError as e:
                     raise CommandError(
-                        "Cache table '%s' could not be created.\nThe error was: %s."
-                        % (tablename, e)
+                        "Cache table '{}' could not be created.\nThe error was: {}.".format(
+                            tablename, e
+                        )
                     )
                 for statement in index_output:
                     curs.execute(statement)

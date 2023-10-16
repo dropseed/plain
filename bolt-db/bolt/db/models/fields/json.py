@@ -365,9 +365,9 @@ class KeyTransform(Transform):
             [repr(datatype) for datatype in connection.ops.jsonfield_datatype_values]
         )
         return (
-            "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
-            "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
-        ) % (lhs, datatype_values, lhs, lhs), (tuple(params) + (json_path,)) * 3
+            f"(CASE WHEN JSON_TYPE({lhs}, %s) IN ({datatype_values}) "
+            f"THEN JSON_TYPE({lhs}, %s) ELSE JSON_EXTRACT({lhs}, %s) END)"
+        ), (tuple(params) + (json_path,)) * 3
 
 
 class KeyTextTransform(KeyTransform):

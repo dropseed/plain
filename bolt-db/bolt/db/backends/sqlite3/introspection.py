@@ -309,8 +309,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         # Find inline check constraints.
         try:
             table_schema = cursor.execute(
-                "SELECT sql FROM sqlite_master WHERE type='table' and name=%s"
-                % (self.connection.ops.quote_name(table_name),)
+                "SELECT sql FROM sqlite_master WHERE type='table' and name={}".format(
+                    self.connection.ops.quote_name(table_name)
+                )
             ).fetchone()[0]
         except TypeError:
             # table_name is a view.

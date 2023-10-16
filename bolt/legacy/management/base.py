@@ -583,15 +583,14 @@ class BaseCommand:
             )
             self.stdout.write(
                 self.style.NOTICE(
-                    "\nYou have %(unapplied_migration_count)s unapplied migration(s). "
+                    "\nYou have {unapplied_migration_count} unapplied migration(s). "
                     "Your project may not work properly until you apply the "
-                    "migrations for app(s): %(packages_waiting_migration)s."
-                    % {
-                        "unapplied_migration_count": len(plan),
-                        "packages_waiting_migration": ", ".join(
+                    "migrations for app(s): {packages_waiting_migration}.".format(
+                        unapplied_migration_count=len(plan),
+                        packages_waiting_migration=", ".join(
                             packages_waiting_migration
                         ),
-                    }
+                    )
                 )
             )
             self.stdout.write(

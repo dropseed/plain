@@ -115,15 +115,13 @@ class Paginator:
         ordered = getattr(self.object_list, "ordered", None)
         if ordered is not None and not ordered:
             obj_list_repr = (
-                "{} {}".format(
-                    self.object_list.model, self.object_list.__class__.__name__
-                )
+                f"{self.object_list.model} {self.object_list.__class__.__name__}"
                 if hasattr(self.object_list, "model")
                 else f"{self.object_list!r}"
             )
             warnings.warn(
                 "Pagination may yield inconsistent results with an unordered "
-                "object_list: {}.".format(obj_list_repr),
+                f"object_list: {obj_list_repr}.",
                 UnorderedObjectListWarning,
                 stacklevel=3,
             )

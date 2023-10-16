@@ -469,11 +469,7 @@ class Options:
                 return self.managers_map[base_manager_name]
             except KeyError:
                 raise ValueError(
-                    "%s has no manager named %r"
-                    % (
-                        self.object_name,
-                        base_manager_name,
-                    )
+                    f"{self.object_name} has no manager named {base_manager_name!r}"
                 )
 
         manager = Manager()
@@ -497,11 +493,7 @@ class Options:
                 return self.managers_map[default_manager_name]
             except KeyError:
                 raise ValueError(
-                    "%s has no manager named %r"
-                    % (
-                        self.object_name,
-                        default_manager_name,
-                    )
+                    f"{self.object_name} has no manager named {default_manager_name!r}"
                 )
 
         if self.managers:

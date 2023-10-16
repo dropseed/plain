@@ -159,9 +159,7 @@ class Command(BaseCommand):
                 except OperationalError as error:
                     warnings.warn(
                         "Got an error checking a consistent migration history "
-                        "performed for database connection '{}': {}".format(
-                            alias, error
-                        ),
+                        f"performed for database connection '{alias}': {error}",
                         RuntimeWarning,
                     )
         # Before anything else, see if there's conflicting packages and drop out

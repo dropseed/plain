@@ -155,8 +155,9 @@ class BaseHandler:
                 self.check_response(
                     response,
                     middleware_method,
-                    name="%s.process_template_response"
-                    % (middleware_method.__self__.__class__.__name__,),
+                    name="{}.process_template_response".format(
+                        middleware_method.__self__.__class__.__name__
+                    ),
                 )
             try:
                 response = response.render()

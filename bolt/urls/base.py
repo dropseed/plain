@@ -64,8 +64,9 @@ def reverse(viewname, urlconf=None, args=None, kwargs=None, using_namespace=None
             except KeyError as key:
                 if resolved_path:
                     raise NoReverseMatch(
-                        "%s is not a registered namespace inside '%s'"
-                        % (key, ":".join(resolved_path))
+                        "{} is not a registered namespace inside '{}'".format(
+                            key, ":".join(resolved_path)
+                        )
                     )
                 else:
                     raise NoReverseMatch("%s is not a registered namespace" % key)

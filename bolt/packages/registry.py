@@ -231,8 +231,9 @@ class Packages:
                 )
             else:
                 raise RuntimeError(
-                    "Conflicting '%s' models in application '%s': %s and %s."
-                    % (model_name, package_label, app_models[model_name], model)
+                    "Conflicting '{}' models in application '{}': {} and {}.".format(
+                        model_name, package_label, app_models[model_name], model
+                    )
                 )
         app_models[model_name] = model
         self.do_pending_operations(model)

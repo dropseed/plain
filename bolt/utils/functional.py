@@ -33,7 +33,7 @@ class cached_property:
         elif name != self.name:
             raise TypeError(
                 "Cannot assign the same cached_property to two different names "
-                "({!r} and {!r}).".format(self.name, name)
+                f"({self.name!r} and {name!r})."
             )
 
     def __get__(self, instance, cls=None):

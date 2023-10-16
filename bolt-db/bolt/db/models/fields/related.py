@@ -134,8 +134,7 @@ class RelatedField(FieldCacheMixin, Field):
         if not (is_valid_id or related_name.endswith("+")):
             return [
                 preflight.Error(
-                    "The name '%s' is invalid related_name for field %s.%s"
-                    % (
+                    "The name '{}' is invalid related_name for field {}.{}".format(
                         self.remote_field.related_name,
                         self.model._meta.object_name,
                         self.name,
@@ -171,8 +170,9 @@ class RelatedField(FieldCacheMixin, Field):
         if LOOKUP_SEP in rel_query_name:
             errors.append(
                 preflight.Error(
-                    "Reverse query name '%s' must not contain '%s'."
-                    % (rel_query_name, LOOKUP_SEP),
+                    "Reverse query name '{}' must not contain '{}'.".format(
+                        rel_query_name, LOOKUP_SEP
+                    ),
                     hint=(
                         "Add or change a related_name or related_query_name "
                         "argument for this field."
@@ -270,10 +270,9 @@ class RelatedField(FieldCacheMixin, Field):
                         f"for '{field_name}' clashes with field name "
                         f"'{clash_name}'.",
                         hint=(
-                            "Rename field '%s', or add/change a related_name "
-                            "argument to the definition for field '%s'."
-                        )
-                        % (clash_name, field_name),
+                            "Rename field '{}', or add/change a related_name "
+                            "argument to the definition for field '{}'."
+                        ).format(clash_name, field_name),
                         obj=self,
                         id="fields.E302",
                     )
@@ -282,13 +281,13 @@ class RelatedField(FieldCacheMixin, Field):
             if clash_field.name == rel_query_name:
                 errors.append(
                     preflight.Error(
-                        "Reverse query name for '%s' clashes with field name '%s'."
-                        % (field_name, clash_name),
+                        "Reverse query name for '{}' clashes with field name '{}'.".format(
+                            field_name, clash_name
+                        ),
                         hint=(
-                            "Rename field '%s', or add/change a related_name "
-                            "argument to the definition for field '%s'."
-                        )
-                        % (clash_name, field_name),
+                            "Rename field '{}', or add/change a related_name "
+                            "argument to the definition for field '{}'."
+                        ).format(clash_name, field_name),
                         obj=self,
                         id="fields.E303",
                     )
@@ -312,9 +311,8 @@ class RelatedField(FieldCacheMixin, Field):
                         f"'{clash_name}'.",
                         hint=(
                             "Add or change a related_name argument "
-                            "to the definition for '%s' or '%s'."
-                        )
-                        % (field_name, clash_name),
+                            f"to the definition for '{field_name}' or '{clash_name}'."
+                        ),
                         obj=self,
                         id="fields.E304",
                     )
@@ -327,9 +325,8 @@ class RelatedField(FieldCacheMixin, Field):
                         "for '{}'.".format(field_name, clash_name),
                         hint=(
                             "Add or change a related_name argument "
-                            "to the definition for '%s' or '%s'."
-                        )
-                        % (field_name, clash_name),
+                            f"to the definition for '{field_name}' or '{clash_name}'."
+                        ),
                         obj=self,
                         id="fields.E305",
                     )
@@ -567,9 +564,8 @@ class ForeignObject(RelatedField):
                 except exceptions.FieldDoesNotExist:
                     errors.append(
                         preflight.Error(
-                            "The to_field '%s' doesn't exist on the related "
-                            "model '%s'."
-                            % (to_field, self.remote_field.model._meta.label),
+                            f"The to_field '{to_field}' doesn't exist on the related "
+                            f"model '{self.remote_field.model._meta.label}'.",
                             obj=self,
                             id="fields.E312",
                         )
@@ -613,8 +609,9 @@ class ForeignObject(RelatedField):
             model_name = self.remote_field.model.__name__
             return [
                 preflight.Error(
-                    "No subset of the fields %s on model '%s' is unique."
-                    % (field_combination, model_name),
+                    "No subset of the fields {} on model '{}' is unique.".format(
+                        field_combination, model_name
+                    ),
                     hint=(
                         "Mark a single field as unique=True or add a set of "
                         "fields to a unique constraint (via unique_together "
@@ -669,8 +666,9 @@ class ForeignObject(RelatedField):
                 if kwargs["to"].setting_name != swappable_setting:
                     raise ValueError(
                         "Cannot deconstruct a ForeignKey pointing to a model "
-                        "that is swapped in place of more than one model (%s and %s)"
-                        % (kwargs["to"].setting_name, swappable_setting)
+                        "that is swapped in place of more than one model ({} and {})".format(
+                            kwargs["to"].setting_name, swappable_setting
+                        )
                     )
             # Set it
             kwargs["to"] = SettingsReference(
@@ -914,9 +912,8 @@ class ForeignKey(ForeignObject):
         except AttributeError:
             if not isinstance(to, str):
                 raise TypeError(
-                    "%s(%r) is invalid. First parameter to ForeignKey must be "
-                    "either a model, a model name, or the string %r"
-                    % (
+                    "{}({!r}) is invalid. First parameter to ForeignKey must be "
+                    "either a model, a model name, or the string {!r}".format(
                         self.__class__.__name__,
                         to,
                         RECURSIVE_RELATIONSHIP_CONSTANT,
@@ -1067,9 +1064,8 @@ class ForeignKey(ForeignObject):
                 and to_field.model != self.remote_field.model._meta.concrete_model
             ):
                 raise exceptions.FieldError(
-                    "'%s.%s' refers to field '%s' which is not local to model "
-                    "'%s'."
-                    % (
+                    "'{}.{}' refers to field '{}' which is not local to model "
+                    "'{}'.".format(
                         self.model._meta.label,
                         self.name,
                         to_field.name,
@@ -1294,9 +1290,8 @@ class ManyToManyField(RelatedField):
         except AttributeError:
             if not isinstance(to, str):
                 raise TypeError(
-                    "%s(%r) is invalid. First parameter to ManyToManyField "
-                    "must be either a model, a model name, or the string %r"
-                    % (
+                    "{}({!r}) is invalid. First parameter to ManyToManyField "
+                    "must be either a model, a model name, or the string {!r}".format(
                         self.__class__.__name__,
                         to,
                         RECURSIVE_RELATIONSHIP_CONSTANT,
@@ -1444,11 +1439,12 @@ class ManyToManyField(RelatedField):
                     errors.append(
                         preflight.Error(
                             "The model is used as an intermediate model by "
-                            "'%s', but it has more than two foreign keys "
-                            "to '%s', which is ambiguous. You must specify "
+                            "'{}', but it has more than two foreign keys "
+                            "to '{}', which is ambiguous. You must specify "
                             "which two foreign keys Bolt should use via the "
-                            "through_fields keyword argument."
-                            % (self, from_model_name),
+                            "through_fields keyword argument.".format(
+                                self, from_model_name
+                            ),
                             hint=(
                                 "Use through_fields to specify which two foreign keys "
                                 "Bolt should use."
@@ -1474,17 +1470,15 @@ class ManyToManyField(RelatedField):
                         preflight.Error(
                             (
                                 "The model is used as an intermediate model by "
-                                "'%s', but it has more than one foreign key "
-                                "from '%s', which is ambiguous. You must specify "
+                                "'{}', but it has more than one foreign key "
+                                "from '{}', which is ambiguous. You must specify "
                                 "which foreign key Bolt should use via the "
                                 "through_fields keyword argument."
-                            )
-                            % (self, from_model_name),
+                            ).format(self, from_model_name),
                             hint=(
                                 "If you want to create a recursive relationship, "
-                                'use ManyToManyField("%s", through="%s").'
-                            )
-                            % (
+                                'use ManyToManyField("{}", through="{}").'
+                            ).format(
                                 RECURSIVE_RELATIONSHIP_CONSTANT,
                                 relationship_model_name,
                             ),
@@ -1505,9 +1499,8 @@ class ManyToManyField(RelatedField):
                             ),
                             hint=(
                                 "If you want to create a recursive relationship, "
-                                'use ManyToManyField("%s", through="%s").'
-                            )
-                            % (
+                                'use ManyToManyField("{}", through="{}").'
+                            ).format(
                                 RECURSIVE_RELATIONSHIP_CONSTANT,
                                 relationship_model_name,
                             ),
@@ -1520,8 +1513,9 @@ class ManyToManyField(RelatedField):
                     errors.append(
                         preflight.Error(
                             "The model is used as an intermediate model by "
-                            "'%s', but it does not have a foreign key to '%s' or '%s'."
-                            % (self, from_model_name, to_model_name),
+                            "'{}', but it does not have a foreign key to '{}' or '{}'.".format(
+                                self, from_model_name, to_model_name
+                            ),
                             obj=self.remote_field.through,
                             id="fields.E336",
                         )
@@ -1582,9 +1576,8 @@ class ManyToManyField(RelatedField):
                             possible_field_names.append(f.name)
                     if possible_field_names:
                         hint = (
-                            "Did you mean one of the following foreign keys to '%s': "
-                            "%s?"
-                            % (
+                            "Did you mean one of the following foreign keys to '{}': "
+                            "{}?".format(
                                 related_model._meta.object_name,
                                 ", ".join(possible_field_names),
                             )
@@ -1597,8 +1590,9 @@ class ManyToManyField(RelatedField):
                     except exceptions.FieldDoesNotExist:
                         errors.append(
                             preflight.Error(
-                                "The intermediary model '%s' has no field '%s'."
-                                % (qualified_model_name, field_name),
+                                "The intermediary model '{}' has no field '{}'.".format(
+                                    qualified_model_name, field_name
+                                ),
                                 hint=hint,
                                 obj=self,
                                 id="fields.E338",
@@ -1612,8 +1606,7 @@ class ManyToManyField(RelatedField):
                         ):
                             errors.append(
                                 preflight.Error(
-                                    "'%s.%s' is not a foreign key to '%s'."
-                                    % (
+                                    "'{}.{}' is not a foreign key to '{}'.".format(
                                         through._meta.object_name,
                                         field_name,
                                         related_model._meta.object_name,
@@ -1669,8 +1662,8 @@ class ManyToManyField(RelatedField):
                 error_hint = None
             return [
                 error_class(
-                    "The field's intermediary table '{}' clashes with the "
-                    "table name of '{}'.".format(m2m_db_table, clashing_obj),
+                    f"The field's intermediary table '{m2m_db_table}' clashes with the "
+                    f"table name of '{clashing_obj}'.",
                     obj=self,
                     hint=error_hint,
                     id=error_id,

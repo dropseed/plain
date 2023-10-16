@@ -78,8 +78,7 @@ class Aggregate(Func):
                         else repr(before_resolved)
                     )
                     raise FieldError(
-                        "Cannot compute %s('%s'): '%s' is an aggregate"
-                        % (c.name, name, name)
+                        f"Cannot compute {c.name}('{name}'): '{name}' is an aggregate"
                     )
         if (default := c.default) is None:
             return c

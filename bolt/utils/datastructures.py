@@ -335,8 +335,8 @@ class CaseInsensitiveMapping(Mapping):
         for i, elem in enumerate(data):
             if len(elem) != 2:
                 raise ValueError(
-                    "dictionary update sequence element #{} has length {}; "
-                    "2 is required.".format(i, len(elem))
+                    f"dictionary update sequence element #{i} has length {len(elem)}; "
+                    "2 is required."
                 )
             if not isinstance(elem[0], str):
                 raise ValueError(

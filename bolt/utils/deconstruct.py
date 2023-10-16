@@ -31,10 +31,10 @@ def deconstructible(*args, path=None):
             module = import_module(module_name)
             if not hasattr(module, name):
                 raise ValueError(
-                    "Could not find object {} in {}.\n"
+                    f"Could not find object {name} in {module_name}.\n"
                     "Please note that you cannot serialize things like inner "
                     "classes. Please move the object into the main module "
-                    "body to use migrations.".format(name, module_name)
+                    "body to use migrations."
                 )
             return (
                 path

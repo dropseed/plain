@@ -80,9 +80,8 @@ class ResolverMatch:
         else:
             func = self._func_path
         return (
-            "ResolverMatch(func=%s, args=%r, kwargs=%r, url_name=%r, "
-            "default_namespaces=%r, namespaces=%r, route=%r%s%s)"
-            % (
+            "ResolverMatch(func={}, args={!r}, kwargs={!r}, url_name={!r}, "
+            "default_namespaces={!r}, namespaces={!r}, route={!r}{}{})".format(
                 func,
                 self.args,
                 self.kwargs,
@@ -258,8 +257,9 @@ def _route_to_regex(route, is_endpoint=False):
             converter = get_converter(raw_converter)
         except KeyError as e:
             raise ImproperlyConfigured(
-                "URL route %r uses invalid converter %r."
-                % (original_route, raw_converter)
+                "URL route {!r} uses invalid converter {!r}.".format(
+                    original_route, raw_converter
+                )
             ) from e
         converters[parameter] = converter
         parts.append("(?P<" + parameter + ">" + converter.regex + ")")
@@ -349,9 +349,8 @@ class URLPattern:
         if inspect.isclass(view) and issubclass(view, View):
             return [
                 Error(
-                    "Your URL pattern %s has an invalid view, pass %s.as_view() "
-                    "instead of %s."
-                    % (
+                    "Your URL pattern {} has an invalid view, pass {}.as_view() "
+                    "instead of {}.".format(
                         self.pattern.describe(),
                         view.__name__,
                         view.__name__,
@@ -726,7 +725,7 @@ class URLResolver:
             )
         else:
             msg = (
-                "Reverse for '{view}' not found. '{view}' is not "
-                "a valid view function or pattern name.".format(view=lookup_view_s)
+                f"Reverse for '{lookup_view_s}' not found. '{lookup_view_s}' is not "
+                "a valid view function or pattern name."
             )
         raise NoReverseMatch(msg)

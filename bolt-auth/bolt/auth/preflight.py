@@ -37,9 +37,10 @@ def check_user_model(package_configs=None, **kwargs):
                 "The field named as the 'USERNAME_FIELD' "
                 "for a custom user model must not be included in 'REQUIRED_FIELDS'.",
                 hint=(
-                    "The 'USERNAME_FIELD' is currently set to '%s', you "
-                    "should remove '%s' from the 'REQUIRED_FIELDS'."
-                    % (cls.USERNAME_FIELD, cls.USERNAME_FIELD)
+                    "The 'USERNAME_FIELD' is currently set to '{}', you "
+                    "should remove '{}' from the 'REQUIRED_FIELDS'.".format(
+                        cls.USERNAME_FIELD, cls.USERNAME_FIELD
+                    )
                 ),
                 obj=cls,
                 id="auth.E002",
@@ -65,8 +66,9 @@ def check_user_model(package_configs=None, **kwargs):
         else:
             errors.append(
                 preflight.Warning(
-                    "'%s.%s' is named as the 'USERNAME_FIELD', but it is not unique."
-                    % (cls._meta.object_name, cls.USERNAME_FIELD),
+                    "'{}.{}' is named as the 'USERNAME_FIELD', but it is not unique.".format(
+                        cls._meta.object_name, cls.USERNAME_FIELD
+                    ),
                     hint=(
                         "Ensure that your authentication backend(s) can handle "
                         "non-unique usernames."

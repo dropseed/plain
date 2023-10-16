@@ -182,13 +182,8 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
             value = getattr(opts, opt)
             if isinstance(value, str) and value != ALL_FIELDS:
                 msg = (
-                    "%(model)s.Meta.%(opt)s cannot be a string. "
-                    "Did you mean to type: ('%(value)s',)?"
-                    % {
-                        "model": new_class.__name__,
-                        "opt": opt,
-                        "value": value,
-                    }
+                    f"{new_class.__name__}.Meta.{opt} cannot be a string. "
+                    f"Did you mean to type: ('{value}',)?"
                 )
                 raise TypeError(msg)
 
@@ -414,8 +409,7 @@ class BaseModelForm(BaseForm, AltersData):
         """
         if self.errors:
             raise ValueError(
-                "The %s could not be %s because the data didn't validate."
-                % (
+                "The {} could not be {} because the data didn't validate.".format(
                     self.instance._meta.object_name,
                     "created" if self.instance._state.adding else "changed",
                 )

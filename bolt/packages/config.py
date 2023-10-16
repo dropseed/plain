@@ -183,10 +183,7 @@ class PackageConfig:
                     for name, candidate in inspect.getmembers(mod, inspect.isclass)
                     if issubclass(candidate, cls) and candidate is not cls
                 ]
-                msg = "Module '{}' does not contain a '{}' class.".format(
-                    mod_path,
-                    cls_name,
-                )
+                msg = f"Module '{mod_path}' does not contain a '{cls_name}' class."
                 if candidates:
                     msg += " Choices are: %s." % ", ".join(candidates)
                 raise ImportError(msg)
@@ -214,8 +211,7 @@ class PackageConfig:
             package_module = import_module(package_name)
         except ImportError:
             raise ImproperlyConfigured(
-                "Cannot import '%s'. Check that '%s.%s.name' is correct."
-                % (
+                "Cannot import '{}'. Check that '{}.{}.name' is correct.".format(
                     package_name,
                     package_config_class.__module__,
                     package_config_class.__qualname__,

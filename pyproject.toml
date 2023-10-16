@@ -42,7 +42,7 @@ extend-select = [
     "I",  # isort
     # # "C90",  # mccabe
     # # "N",  # pep8-naming
-    # "UP",  # pyupgrade
+    "UP",  # pyupgrade
     # "S",  # bandit
     # # "B",  # bugbear
     "C4",  # flake8-comprehensions
@@ -52,3 +52,6 @@ extend-select = [
     # # "T20",  # print
     "PT",  # pytest
 ]
+
+[tool.black]
+target-version = ["py310"]

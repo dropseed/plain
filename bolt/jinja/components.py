@@ -127,9 +127,7 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
             jinja_tag_name = component["tag_name"]
 
             closing_pattern = re.compile(
-                r"<{}(\s+[\s\S]*?)?>([\s\S]*?)</{}>".format(
-                    component_name, component_name
-                )
+                rf"<{component_name}(\s+[\s\S]*?)?>([\s\S]*?)</{component_name}>"
             )
             self_closing_pattern = re.compile(rf"<{component_name}(\s+[\s\S]*?)?/>")
 

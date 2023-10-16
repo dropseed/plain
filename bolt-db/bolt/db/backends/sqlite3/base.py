@@ -259,8 +259,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     cursor, table_name
                 )
                 primary_key_value, bad_value = cursor.execute(
-                    "SELECT %s, %s FROM %s WHERE rowid = %%s"
-                    % (
+                    "SELECT {}, {} FROM {} WHERE rowid = %s".format(
                         self.ops.quote_name(primary_key_column_name),
                         self.ops.quote_name(column_name),
                         self.ops.quote_name(table_name),
@@ -268,10 +267,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     (rowid,),
                 ).fetchone()
                 raise IntegrityError(
-                    "The row in table '%s' with primary key '%s' has an "
-                    "invalid foreign key: %s.%s contains a value '%s' that "
-                    "does not have a corresponding value in %s.%s."
-                    % (
+                    "The row in table '{}' with primary key '{}' has an "
+                    "invalid foreign key: {}.{} contains a value '{}' that "
+                    "does not have a corresponding value in {}.{}.".format(
                         table_name,
                         primary_key_value,
                         table_name,

@@ -89,7 +89,7 @@ class QueryStats:
     @staticmethod
     def get_time_display(seconds):
         if seconds < 0.01:
-            return "{:.0f} ms".format(seconds * 1000)
+            return f"{seconds * 1000:.0f} ms"
         return f"{seconds:.2f} seconds"
 
     @cached_property

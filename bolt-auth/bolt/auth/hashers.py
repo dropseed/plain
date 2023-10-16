@@ -200,8 +200,7 @@ class BasePasswordHasher:
                 module = importlib.import_module(mod_path)
             except ImportError as e:
                 raise ValueError(
-                    "Couldn't load %r algorithm library: %s"
-                    % (self.__class__.__name__, e)
+                    f"Couldn't load {self.__class__.__name__!r} algorithm library: {e}"
                 )
             return module
         raise ValueError(

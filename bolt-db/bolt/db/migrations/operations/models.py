@@ -981,8 +981,7 @@ class RenameIndex(IndexOperation):
             )
             if len(matching_index_name) != 1:
                 raise ValueError(
-                    "Found wrong number (%s) of indexes for %s(%s)."
-                    % (
+                    "Found wrong number ({}) of indexes for {}({}).".format(
                         len(matching_index_name),
                         from_model._meta.db_table,
                         ", ".join(columns),
@@ -1091,10 +1090,7 @@ class AddConstraint(IndexOperation):
         )
 
     def describe(self):
-        return "Create constraint {} on model {}".format(
-            self.constraint.name,
-            self.model_name,
-        )
+        return f"Create constraint {self.constraint.name} on model {self.model_name}"
 
     @property
     def migration_name_fragment(self):

@@ -168,8 +168,9 @@ class Command(BaseCommand):
                     )
                 except KeyError:
                     raise CommandError(
-                        "Cannot find a migration matching '%s' from app '%s'."
-                        % (migration_name, package_label)
+                        "Cannot find a migration matching '{}' from app '{}'.".format(
+                            migration_name, package_label
+                        )
                     )
                 target = (package_label, migration.name)
                 # Partially applied squashed migrations are not included in the
@@ -479,8 +480,9 @@ class Command(BaseCommand):
                         continue
                     if self.verbosity >= 3:
                         self.stdout.write(
-                            "    Processing %s.%s model"
-                            % (package_name, model._meta.object_name)
+                            "    Processing {}.{} model".format(
+                                package_name, model._meta.object_name
+                            )
                         )
                     if self.verbosity >= 1:
                         self.stdout.write(

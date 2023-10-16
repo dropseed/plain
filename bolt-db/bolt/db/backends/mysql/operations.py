@@ -191,8 +191,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not fields:
             return "", ()
         columns = [
-            "%s.%s"
-            % (
+            "{}.{}".format(
                 self.quote_name(field.model._meta.db_table),
                 self.quote_name(field.column),
             )
@@ -209,8 +208,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             # It's faster to TRUNCATE tables that require a sequence reset
             # since ALTER TABLE AUTO_INCREMENT is slower than TRUNCATE.
             sql.extend(
-                "%s %s;"
-                % (
+                "{} {};".format(
                     style.SQL_KEYWORD("TRUNCATE"),
                     style.SQL_FIELD(self.quote_name(table_name)),
                 )
@@ -220,8 +218,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             # Otherwise issue a simple DELETE since it's faster than TRUNCATE
             # and preserves sequences.
             sql.extend(
-                "%s %s %s;"
-                % (
+                "{} {} {};".format(
                     style.SQL_KEYWORD("DELETE"),
                     style.SQL_KEYWORD("FROM"),
                     style.SQL_FIELD(self.quote_name(table_name)),
@@ -233,8 +230,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def sequence_reset_by_name_sql(self, style, sequences):
         return [
-            "%s %s %s %s = 1;"
-            % (
+            "{} {} {} {} = 1;".format(
                 style.SQL_KEYWORD("ALTER"),
                 style.SQL_KEYWORD("TABLE"),
                 style.SQL_FIELD(self.quote_name(sequence_info["table"])),
@@ -349,21 +345,16 @@ class DatabaseOperations(BaseDatabaseOperations):
                 # MariaDB includes the microsecond component in TIME_TO_SEC as
                 # a decimal. MySQL returns an integer without microseconds.
                 return (
-                    "CAST((TIME_TO_SEC(%(lhs)s) - TIME_TO_SEC(%(rhs)s)) "
+                    f"CAST((TIME_TO_SEC({lhs_sql}) - TIME_TO_SEC({rhs_sql})) "
                     "* 1000000 AS SIGNED)"
-                ) % {
-                    "lhs": lhs_sql,
-                    "rhs": rhs_sql,
-                }, (
+                ), (
                     *lhs_params,
                     *rhs_params,
                 )
             return (
-                "((TIME_TO_SEC(%(lhs)s) * 1000000 + MICROSECOND(%(lhs)s)) -"
-                " (TIME_TO_SEC(%(rhs)s) * 1000000 + MICROSECOND(%(rhs)s)))"
-            ) % {"lhs": lhs_sql, "rhs": rhs_sql}, tuple(lhs_params) * 2 + tuple(
-                rhs_params
-            ) * 2
+                f"((TIME_TO_SEC({lhs_sql}) * 1000000 + MICROSECOND({lhs_sql})) -"
+                f" (TIME_TO_SEC({rhs_sql}) * 1000000 + MICROSECOND({rhs_sql})))"
+            ), tuple(lhs_params) * 2 + tuple(rhs_params) * 2
         params = (*rhs_params, *lhs_params)
         return f"TIMESTAMPDIFF(MICROSECOND, {rhs_sql}, {lhs_sql})", params
 

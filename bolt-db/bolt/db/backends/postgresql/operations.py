@@ -233,8 +233,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             # intermediate table (see BaseDatabaseIntrospection.sequence_list).
             column_name = sequence_info["column"] or "id"
             sql.append(
-                "%s setval(pg_get_serial_sequence('%s','%s'), 1, false);"
-                % (
+                "{} setval(pg_get_serial_sequence('{}','{}'), 1, false);".format(
                     style.SQL_KEYWORD("SELECT"),
                     style.SQL_TABLE(self.quote_name(table_name)),
                     style.SQL_FIELD(column_name),
@@ -264,9 +263,8 @@ class DatabaseOperations(BaseDatabaseOperations):
             for f in model._meta.local_fields:
                 if isinstance(f, models.AutoField):
                     output.append(
-                        "%s setval(pg_get_serial_sequence('%s','%s'), "
-                        "coalesce(max(%s), 1), max(%s) %s null) %s %s;"
-                        % (
+                        "{} setval(pg_get_serial_sequence('{}','{}'), "
+                        "coalesce(max({}), 1), max({}) {} null) {} {};".format(
                             style.SQL_KEYWORD("SELECT"),
                             style.SQL_TABLE(qn(model._meta.db_table)),
                             style.SQL_FIELD(f.column),
@@ -326,8 +324,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not fields:
             return "", ()
         columns = [
-            "%s.%s"
-            % (
+            "{}.{}".format(
                 self.quote_name(field.model._meta.db_table),
                 self.quote_name(field.column),
             )

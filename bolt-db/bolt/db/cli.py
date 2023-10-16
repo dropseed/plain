@@ -41,8 +41,7 @@ def shell(database, parameters):
         sys.exit(1)
     except subprocess.CalledProcessError as e:
         click.secho(
-            '"%s" returned non-zero exit status %s.'
-            % (
+            '"{}" returned non-zero exit status {}.'.format(
                 " ".join(e.cmd),
                 e.returncode,
             ),

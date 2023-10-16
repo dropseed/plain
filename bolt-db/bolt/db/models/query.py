@@ -326,9 +326,10 @@ class QuerySet(AltersData):
         if pickled_version:
             if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
-                    "Pickled queryset instance's Bolt version %s does not "
-                    "match the current version %s."
-                    % (pickled_version, bolt.runtime.__version__),
+                    "Pickled queryset instance's Bolt version {} does not "
+                    "match the current version {}.".format(
+                        pickled_version, bolt.runtime.__version__
+                    ),
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -566,8 +567,7 @@ class QuerySet(AltersData):
                 "%s matching query does not exist." % self.model._meta.object_name
             )
         raise self.model.MultipleObjectsReturned(
-            "get() returned more than one %s -- it returned %s!"
-            % (
+            "get() returned more than one {} -- it returned {}!".format(
                 self.model._meta.object_name,
                 num if not limit or num < limit else "more than %s" % (limit - 1),
             )
@@ -887,8 +887,7 @@ class QuerySet(AltersData):
                     invalid_params.append(param)
         if invalid_params:
             raise exceptions.FieldError(
-                "Invalid field name(s) for model %s: '%s'."
-                % (
+                "Invalid field name(s) for model {}: '{}'.".format(
                     self.model._meta.object_name,
                     "', '".join(sorted(invalid_params)),
                 )
@@ -1802,8 +1801,7 @@ class QuerySet(AltersData):
         )
         if invalid_args:
             raise TypeError(
-                "QuerySet.%s() received non-expression(s): %s."
-                % (
+                "QuerySet.{}() received non-expression(s): {}.".format(
                     method_name,
                     ", ".join(invalid_args),
                 )
@@ -1812,8 +1810,9 @@ class QuerySet(AltersData):
     def _not_support_combined_queries(self, operation_name):
         if self.query.combinator:
             raise NotSupportedError(
-                "Calling QuerySet.%s() after %s() is not supported."
-                % (operation_name, self.query.combinator)
+                "Calling QuerySet.{}() after {}() is not supported.".format(
+                    operation_name, self.query.combinator
+                )
             )
 
     def _check_operator_queryset(self, other, operator_):
@@ -2138,9 +2137,8 @@ def prefetch_related_objects(model_instances, *related_lookups):
 
             if not attr_found:
                 raise AttributeError(
-                    "Cannot find '%s' on %s object, '%s' is an invalid "
-                    "parameter to prefetch_related()"
-                    % (
+                    "Cannot find '{}' on {} object, '{}' is an invalid "
+                    "parameter to prefetch_related()".format(
                         through_attr,
                         first_obj.__class__.__name__,
                         lookup.prefetch_through,

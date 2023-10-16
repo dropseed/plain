@@ -135,11 +135,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             if self.connection.in_atomic_block:
                 raise NotSupportedError(
                     (
-                        "Renaming the %r.%r column while in a transaction is not "
+                        "Renaming the {!r}.{!r} column while in a transaction is not "
                         "supported on SQLite < 3.26 because it would break referential "
                         "integrity. Try adding `atomic = False` to the Migration class."
-                    )
-                    % (model._meta.db_table, old_field_name)
+                    ).format(model._meta.db_table, old_field_name)
                 )
             with atomic(self.connection.alias):
                 super().alter_field(model, old_field, new_field, strict=strict)
@@ -332,8 +331,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
         # Copy data from the old table into the new table
         self.execute(
-            "INSERT INTO %s (%s) SELECT %s FROM %s"
-            % (
+            "INSERT INTO {} ({}) SELECT {} FROM {}".format(
                 self.quote_name(new_model._meta.db_table),
                 ", ".join(self.quote_name(x) for x in mapping),
                 ", ".join(mapping.values()),
@@ -527,8 +525,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         self.create_model(new_field.remote_field.through)
         # Copy the data across
         self.execute(
-            "INSERT INTO %s (%s) SELECT %s FROM %s"
-            % (
+            "INSERT INTO {} ({}) SELECT {} FROM {}".format(
                 self.quote_name(new_field.remote_field.through._meta.db_table),
                 ", ".join(
                     [

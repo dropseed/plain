@@ -217,9 +217,7 @@ class WhiteNoise:
 
     def add_cache_headers(self, headers, path, url):
         if self.immutable_file_test(path, url):
-            headers["Cache-Control"] = "max-age={}, public, immutable".format(
-                self.FOREVER
-            )
+            headers["Cache-Control"] = f"max-age={self.FOREVER}, public, immutable"
         elif self.max_age is not None:
             headers["Cache-Control"] = f"max-age={self.max_age}, public"
 

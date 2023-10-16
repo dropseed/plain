@@ -103,8 +103,9 @@ class Extract(TimezoneMixin, Transform):
             "second",
         ):
             raise ValueError(
-                "Cannot extract time component '%s' from DateField '%s'."
-                % (copy.lookup_name, field.name)
+                "Cannot extract time component '{}' from DateField '{}'.".format(
+                    copy.lookup_name, field.name
+                )
             )
         if isinstance(field, DurationField) and copy.lookup_name in (
             "year",
@@ -116,8 +117,9 @@ class Extract(TimezoneMixin, Transform):
             "quarter",
         ):
             raise ValueError(
-                "Cannot extract component '%s' from DurationField '%s'."
-                % (copy.lookup_name, field.name)
+                "Cannot extract component '{}' from DurationField '{}'.".format(
+                    copy.lookup_name, field.name
+                )
             )
         return copy
 
@@ -310,8 +312,7 @@ class TruncBase(TimezoneMixin, Transform):
             or copy.kind in ("hour", "minute", "second", "time")
         ):
             raise ValueError(
-                "Cannot truncate DateField '%s' to %s."
-                % (
+                "Cannot truncate DateField '{}' to {}.".format(
                     field.name,
                     output_field.__class__.__name__
                     if has_explicit_output_field
@@ -323,8 +324,7 @@ class TruncBase(TimezoneMixin, Transform):
             or copy.kind in ("year", "quarter", "month", "week", "day", "date")
         ):
             raise ValueError(
-                "Cannot truncate TimeField '%s' to %s."
-                % (
+                "Cannot truncate TimeField '{}' to {}.".format(
                     field.name,
                     output_field.__class__.__name__
                     if has_explicit_output_field

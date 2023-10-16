@@ -740,9 +740,7 @@ class SQLCompiler:
             if combinator:
                 if not getattr(features, f"supports_select_{combinator}"):
                     raise NotSupportedError(
-                        "{} is not supported on this database backend.".format(
-                            combinator
-                        )
+                        f"{combinator} is not supported on this database backend."
                     )
                 result, params = self.get_combinator_sql(
                     combinator, self.query.combinator_all
@@ -788,10 +786,7 @@ class SQLCompiler:
                 out_cols = []
                 for _, (s_sql, s_params), alias in self.select + extra_select:
                     if alias:
-                        s_sql = "{} AS {}".format(
-                            s_sql,
-                            self.connection.ops.quote_name(alias),
-                        )
+                        s_sql = f"{s_sql} AS {self.connection.ops.quote_name(alias)}"
                     params.extend(s_params)
                     out_cols.append(s_sql)
 
@@ -918,8 +913,7 @@ class SQLCompiler:
                 for index, (select, _, alias) in enumerate(self.select, start=1):
                     if alias:
                         sub_selects.append(
-                            "%s.%s"
-                            % (
+                            "{}.{}".format(
                                 self.connection.ops.quote_name("subquery"),
                                 self.connection.ops.quote_name(alias),
                             )
@@ -1194,9 +1188,8 @@ class SQLCompiler:
                     # or if a single non-relational field is given.
                     if next or f.name in requested:
                         raise FieldError(
-                            "Non-relational field given in select_related: '%s'. "
-                            "Choices are: %s"
-                            % (
+                            "Non-relational field given in select_related: '{}'. "
+                            "Choices are: {}".format(
                                 f.name,
                                 ", ".join(_get_field_choices()) or "(none)",
                             )
@@ -1361,9 +1354,8 @@ class SQLCompiler:
             if fields_not_found:
                 invalid_fields = ("'%s'" % s for s in fields_not_found)
                 raise FieldError(
-                    "Invalid field name(s) given in select_related: %s. "
-                    "Choices are: %s"
-                    % (
+                    "Invalid field name(s) given in select_related: {}. "
+                    "Choices are: {}".format(
                         ", ".join(invalid_fields),
                         ", ".join(_get_field_choices()) or "(none)",
                     )
@@ -1466,10 +1458,9 @@ class SQLCompiler:
                     result.append(self.quote_name_unless_alias(col.alias))
         if invalid_names:
             raise FieldError(
-                "Invalid field name(s) given in select_for_update(of=(...)): %s. "
+                "Invalid field name(s) given in select_for_update(of=(...)): {}. "
                 "Only relational fields followed in the query are allowed. "
-                "Choices are: %s."
-                % (
+                "Choices are: {}.".format(
                     ", ".join(invalid_names),
                     ", ".join(_get_field_choices()),
                 )
@@ -1672,12 +1663,13 @@ class SQLInsertCompiler(SQLCompiler):
             if value.contains_aggregate:
                 raise FieldError(
                     "Aggregate functions are not allowed in this query "
-                    "({}={!r}).".format(field.name, value)
+                    f"({field.name}={value!r})."
                 )
             if value.contains_over_clause:
                 raise FieldError(
-                    "Window expressions are not allowed in this query (%s=%r)."
-                    % (field.name, value)
+                    "Window expressions are not allowed in this query ({}={!r}).".format(
+                        field.name, value
+                    )
                 )
         return field.get_db_prep_save(value, connection=self.connection)
 
@@ -1924,21 +1916,22 @@ class SQLUpdateCompiler(SQLCompiler):
                 if val.contains_aggregate:
                     raise FieldError(
                         "Aggregate functions are not allowed in this query "
-                        "({}={!r}).".format(field.name, val)
+                        f"({field.name}={val!r})."
                     )
                 if val.contains_over_clause:
                     raise FieldError(
                         "Window expressions are not allowed in this query "
-                        "({}={!r}).".format(field.name, val)
+                        f"({field.name}={val!r})."
                     )
             elif hasattr(val, "prepare_database_save"):
                 if field.remote_field:
                     val = val.prepare_database_save(field)
                 else:
                     raise TypeError(
-                        "Tried to update field %s with a model instance, %r. "
-                        "Use a value compatible with %s."
-                        % (field, val, field.__class__.__name__)
+                        "Tried to update field {} with a model instance, {!r}. "
+                        "Use a value compatible with {}.".format(
+                            field, val, field.__class__.__name__
+                        )
                     )
             val = field.get_db_prep_save(val, connection=self.connection)
 

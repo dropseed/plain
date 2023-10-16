@@ -73,8 +73,7 @@ class DatabaseCreation(BaseDatabaseCreation):
                 try:
                     if verbosity >= 1:
                         self.log(
-                            "Destroying old test database for alias %s..."
-                            % (
+                            "Destroying old test database for alias {}...".format(
                                 self._get_database_display_str(
                                     verbosity, target_database_name
                                 ),

@@ -1190,8 +1190,9 @@ class Query(BaseExpression):
         field_parts = lookup_splitted[0 : len(lookup_splitted) - len(lookup_parts)]
         if len(lookup_parts) > 1 and not field_parts:
             raise FieldError(
-                'Invalid lookup "%s" for model %s".'
-                % (lookup, self.get_meta().model.__name__)
+                'Invalid lookup "{}" for model {}".'.format(
+                    lookup, self.get_meta().model.__name__
+                )
             )
         return lookup_parts, field_parts, False
 
@@ -1203,8 +1204,7 @@ class Query(BaseExpression):
         if hasattr(value, "_meta"):
             if not check_rel_lookup_compatibility(value._meta.model, opts, field):
                 raise ValueError(
-                    'Cannot query "%s": Must be "%s" instance.'
-                    % (value, opts.object_name)
+                    f'Cannot query "{value}": Must be "{opts.object_name}" instance.'
                 )
 
     def check_related_objects(self, field, value, opts):
@@ -1221,8 +1221,9 @@ class Query(BaseExpression):
                 and not check_rel_lookup_compatibility(value.model, opts, field)
             ):
                 raise ValueError(
-                    'Cannot use QuerySet for "%s": Use a QuerySet for "%s".'
-                    % (value.model._meta.object_name, opts.object_name)
+                    'Cannot use QuerySet for "{}": Use a QuerySet for "{}".'.format(
+                        value.model._meta.object_name, opts.object_name
+                    )
                 )
             elif hasattr(value, "_meta"):
                 self.check_query_object_type(value, opts, field)
@@ -1591,14 +1592,15 @@ class Query(BaseExpression):
                     if relation_field_parts[idx] != lookup_field_part:
                         raise ValueError(
                             "FilteredRelation's condition doesn't support "
-                            "relations outside the %r (got %r)."
-                            % (filtered_relation.relation_name, lookup)
+                            "relations outside the {!r} (got {!r}).".format(
+                                filtered_relation.relation_name, lookup
+                            )
                         )
                 else:
                     raise ValueError(
                         "FilteredRelation's condition doesn't support nested "
-                        "relations deeper than the relation_name (got {!r} for "
-                        "{!r}).".format(lookup, filtered_relation.relation_name)
+                        f"relations deeper than the relation_name (got {lookup!r} for "
+                        f"{filtered_relation.relation_name!r})."
                     )
         self._filtered_relations[filtered_relation.alias] = filtered_relation
 

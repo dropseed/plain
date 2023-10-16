@@ -177,9 +177,8 @@ def call_command(command_name, *args, **options):
     unknown_options = set(options) - valid_options
     if unknown_options:
         raise TypeError(
-            "Unknown option(s) for %s command: %s. "
-            "Valid options are: %s."
-            % (
+            "Unknown option(s) for {} command: {}. "
+            "Valid options are: {}.".format(
                 command_name,
                 ", ".join(sorted(unknown_options)),
                 ", ".join(sorted(valid_options)),

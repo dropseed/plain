@@ -9,8 +9,7 @@ class SQLCompiler(compiler.SQLCompiler):
         qn2 = self.connection.ops.quote_name
         sql, params = self.as_sql()
         return (
-            "(%s) IN (%s)"
-            % (
+            "({}) IN ({})".format(
                 ", ".join(f"{qn(alias)}.{qn2(column)}" for column in columns),
                 sql,
             ),

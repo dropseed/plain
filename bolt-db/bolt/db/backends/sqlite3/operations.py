@@ -225,8 +225,7 @@ class DatabaseOperations(BaseDatabaseOperations):
                 chain.from_iterable(self._references_graph(table) for table in tables)
             )
         sql = [
-            "%s %s %s;"
-            % (
+            "{} {} {};".format(
                 style.SQL_KEYWORD("DELETE"),
                 style.SQL_KEYWORD("FROM"),
                 style.SQL_FIELD(self.quote_name(table)),
@@ -242,8 +241,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not sequences:
             return []
         return [
-            "%s %s %s %s = 0 %s %s %s (%s);"
-            % (
+            "{} {} {} {} = 0 {} {} {} ({});".format(
                 style.SQL_KEYWORD("UPDATE"),
                 style.SQL_TABLE(self.quote_name("sqlite_sequence")),
                 style.SQL_KEYWORD("SET"),
@@ -410,8 +408,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not fields:
             return "", ()
         columns = [
-            "%s.%s"
-            % (
+            "{}.{}".format(
                 self.quote_name(field.model._meta.db_table),
                 self.quote_name(field.column),
             )

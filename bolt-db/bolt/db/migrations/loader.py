@@ -128,8 +128,9 @@ class MigrationLoader:
                         raise
                 if not hasattr(migration_module, "Migration"):
                     raise BadMigrationError(
-                        "Migration %s in app %s has no Migration class"
-                        % (migration_name, package_config.label)
+                        "Migration {} in app {} has no Migration class".format(
+                            migration_name, package_config.label
+                        )
                     )
                 self.disk_migrations[
                     package_config.label, migration_name
@@ -155,8 +156,9 @@ class MigrationLoader:
                 results.append((migration_package_label, migration_name))
         if len(results) > 1:
             raise AmbiguityError(
-                "There is more than one migration for '%s' with the prefix '%s'"
-                % (package_label, name_prefix)
+                "There is more than one migration for '{}' with the prefix '{}'".format(
+                    package_label, name_prefix
+                )
             )
         elif not results:
             raise KeyError(

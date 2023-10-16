@@ -40,8 +40,9 @@ def check_all_models(package_configs=None, **kwargs):
         if not inspect.ismethod(model.check):
             errors.append(
                 Error(
-                    "The '%s.check()' class method is currently overridden by %r."
-                    % (model.__name__, model.check),
+                    "The '{}.check()' class method is currently overridden by {!r}.".format(
+                        model.__name__, model.check
+                    ),
                     obj=model,
                     id="models.E020",
                 )
@@ -66,8 +67,9 @@ def check_all_models(package_configs=None, **kwargs):
             model_labels_str = ", ".join(model_labels)
             errors.append(
                 error_class(
-                    "db_table '%s' is used by multiple models: %s."
-                    % (db_table, model_labels_str),
+                    "db_table '{}' is used by multiple models: {}.".format(
+                        db_table, model_labels_str
+                    ),
                     obj=db_table,
                     hint=(error_hint % model_labels_str) if error_hint else None,
                     id=error_id,
@@ -78,8 +80,7 @@ def check_all_models(package_configs=None, **kwargs):
             model_labels = set(model_labels)
             errors.append(
                 Error(
-                    "index name '%s' is not unique %s %s."
-                    % (
+                    "index name '{}' is not unique {} {}.".format(
                         index_name,
                         "for model" if len(model_labels) == 1 else "among models:",
                         ", ".join(sorted(model_labels)),
@@ -92,8 +93,7 @@ def check_all_models(package_configs=None, **kwargs):
             model_labels = set(model_labels)
             errors.append(
                 Error(
-                    "constraint name '%s' is not unique %s %s."
-                    % (
+                    "constraint name '{}' is not unique {} {}.".format(
                         constraint_name,
                         "for model" if len(model_labels) == 1 else "among models:",
                         ", ".join(sorted(model_labels)),
