@@ -26,7 +26,7 @@ RUFF_DEFAULTS = [
             "I",  # isort
             # "C90",  # mccabe
             # "N",  # pep8-naming
-            "U",  # pyupgrade
+            "UP",  # pyupgrade
             # "S",  # bandit
             # "B",  # bugbear
             "C4",  # flake8-comprehensions
