@@ -20,13 +20,9 @@ cryptography = "^41.0.3"
 
 
 [tool.poetry.group.dev.dependencies]
-# Testing
 pytest = "^7.4.2"
 coverage = "^7.3.2"
-
-# Formatting and linting
-black = "^23.9.1"
-ruff = "^0.0.292"
+ruff = "^0.1.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -52,6 +48,3 @@ extend-select = [
     # # "T20",  # print
     "PT",  # pytest
 ]
-
-[tool.black]
-target-version = ["py310"]

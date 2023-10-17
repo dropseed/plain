@@ -1143,10 +1143,9 @@ class Model(AltersData, metaclass=ModelBase):
                 self.__class__._default_manager.filter(**filter_args)
                 .filter(
                     **{
-                        "_order__%s"
-                        % op: self.__class__._default_manager.values("_order").filter(
-                            **{self._meta.pk.name: self.pk}
-                        )
+                        "_order__%s" % op: self.__class__._default_manager.values(
+                            "_order"
+                        ).filter(**{self._meta.pk.name: self.pk})
                     }
                 )
                 .order_by(order)[:1]

@@ -40,8 +40,7 @@ class QueryStatsMiddleware:
 
         querystats = QueryStats(
             # Only want these if we're getting ready to show it
-            include_tracebacks=request.GET.get("querystats")
-            == "store"
+            include_tracebacks=request.GET.get("querystats") == "store"
         )
 
         with connection.execute_wrapper(querystats):

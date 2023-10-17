@@ -1,8 +1,0 @@
-#!/bin/sh -e
-if [ "$1" = "--check" ]; then
-    poetry run ruff .
-    poetry run black . --check
-else
-    poetry run ruff --fix-only .
-    poetry run black .
-fi

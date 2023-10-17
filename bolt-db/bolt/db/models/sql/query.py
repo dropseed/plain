@@ -2147,8 +2147,9 @@ class Query(BaseExpression):
                     ]
                 )
                 raise FieldError(
-                    "Cannot resolve keyword {!r} into field. "
-                    "Choices are: {}".format(name, ", ".join(names))
+                    "Cannot resolve keyword {!r} into field. Choices are: {}".format(
+                        name, ", ".join(names)
+                    )
                 )
 
     def add_ordering(self, *ordering):

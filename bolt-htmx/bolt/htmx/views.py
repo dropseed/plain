@@ -43,10 +43,13 @@ class HTMXViewMixin:
                 return [self.htmx_template_name]
 
             default_template_names = super().get_template_names()
-            return [
-                re.sub(r"\.html$", "_htmx.html", template_name)
-                for template_name in default_template_names
-            ] + default_template_names  # Fallback to the defaults so you don't need _htmx.html
+            return (
+                [
+                    re.sub(r"\.html$", "_htmx.html", template_name)
+                    for template_name in default_template_names
+                ]
+                + default_template_names
+            )  # Fallback to the defaults so you don't need _htmx.html
 
         return super().get_template_names()
 

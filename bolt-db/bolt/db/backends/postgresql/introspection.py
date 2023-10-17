@@ -42,8 +42,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         field_type = super().get_field_type(data_type, description)
         if description.is_autofield or (
             # Required for pre-Bolt 4.1 serial columns.
-            description.default
-            and "nextval" in description.default
+            description.default and "nextval" in description.default
         ):
             if field_type == "IntegerField":
                 return "AutoField"

@@ -56,7 +56,11 @@ def cli(install):
     if Path("poetry.lock").exists():
         check_short("Checking poetry.lock", "poetry", "lock", "--check")
 
-    check_short("Running `bolt fix --check`", "bolt", "fix", "--check")
+    if find_spec("ruff"):
+        check_short("Running ruff", "ruff", "check", ".")
+        check_short("Running ruff format check", "ruff", "format", "--check", ".")
+    elif find_spec("black"):
+        check_short("Running black", "black", "--check", ".")
 
     if bolt_db_connected():
         check_short(
