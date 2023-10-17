@@ -3,7 +3,7 @@ name = "bolt"
 version = "0.1.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-# readme = "README.md"
+readme = "README.md"
 
 packages = [
     { include = "bolt" },
