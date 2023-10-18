@@ -4,6 +4,8 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
+from bolt.runtime import APP_PATH
+
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -57,10 +59,10 @@ def cli(install):
         check_short("Checking poetry.lock", "poetry", "lock", "--check")
 
     if find_spec("ruff"):
-        check_short("Running ruff", "ruff", "check", ".")
-        check_short("Running ruff format check", "ruff", "format", "--check", ".")
+        check_short("Running ruff", "ruff", "check", APP_PATH)
+        check_short("Running ruff format check", "ruff", "format", "--check", APP_PATH)
     elif find_spec("black"):
-        check_short("Running black", "black", "--check", ".")
+        check_short("Running black", "black", "--check", APP_PATH)
 
     if bolt_db_connected():
         check_short(
