@@ -48,7 +48,7 @@ def cli(install):
             .get("run", {})
         ).items():
             cmd = data["cmd"]
-            print_event(f"Custom: {name}")
+            print_event(f"Custom: {name} -> {cmd}")
             result = subprocess.run(cmd, shell=True)
             if result.returncode != 0:
                 sys.exit(result.returncode)
@@ -57,12 +57,6 @@ def cli(install):
 
     if Path("poetry.lock").exists():
         check_short("Checking poetry.lock", "poetry", "lock", "--check")
-
-    if find_spec("ruff"):
-        check_short("Running ruff", "ruff", "check", APP_PATH)
-        check_short("Running ruff format check", "ruff", "format", "--check", APP_PATH)
-    elif find_spec("black"):
-        check_short("Running black", "black", "--check", APP_PATH)
 
     if bolt_db_connected():
         check_short(
