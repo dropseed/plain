@@ -14,7 +14,7 @@ But it is paired with the default [settings](#) to actually show the logs like y
 without any additional configuration.
 
 ```python
-from bolt.logging import app_logger
+from bolt.logs import app_logger
 
 
 def example_function():

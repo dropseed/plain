@@ -24,7 +24,7 @@ def setup():
     first setting), configure logging and populate the app registry.
     """
     from bolt.env import dotenv
-    from bolt.logging import configure_logging
+    from bolt.logs import configure_logging
     from bolt.packages import packages
     from bolt.runtime import settings
 

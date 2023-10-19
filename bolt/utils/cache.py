@@ -19,7 +19,7 @@ from collections import defaultdict
 from hashlib import md5
 
 from bolt.http import HttpResponse, HttpResponseNotModified
-from bolt.logging import log_response
+from bolt.logs import log_response
 from bolt.runtime import settings
 from bolt.utils.http import http_date, parse_etags, parse_http_date_safe, quote_etag
 from bolt.utils.regex_helper import _lazy_re_compile

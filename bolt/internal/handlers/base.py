@@ -2,7 +2,7 @@ import logging
 import types
 
 from bolt.exceptions import ImproperlyConfigured, MiddlewareNotUsed
-from bolt.logging import log_response
+from bolt.logs import log_response
 from bolt.runtime import settings
 from bolt.signals import request_finished
 from bolt.urls import get_resolver, set_urlconf
