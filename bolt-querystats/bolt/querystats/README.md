@@ -108,17 +108,6 @@ INSTALLED_PACKAGES += [
 
 More specific settings can be found below.
 
-
-## Container class
-
-To make the toolbar better match your layout,
-you can change the classes via the template tag:
-
-```html
-<!-- base.html -->
-{% toolbar outer_class="fixed bottom-0 w-full" inner_class="max-w-4xl mx-auto" %}
-```
-
 ## Tailwind CSS
 
 This package is styled with [Tailwind CSS](https://tailwindcss.com/),
