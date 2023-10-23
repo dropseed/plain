@@ -4,8 +4,6 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from bolt.runtime import APP_PATH
-
 try:
     import tomllib
 except ModuleNotFoundError:
