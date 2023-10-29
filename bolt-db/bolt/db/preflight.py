@@ -251,11 +251,14 @@ def check_database_tables(package_configs, **kwargs):
 
     errors = []
 
-    cache_tables = [
-        x["LOCATION"]
-        for x in settings.CACHES.values()
-        if x["BACKEND"] == "bolt.cache.backends.db.DatabaseCache"
-    ]
+    if hasattr(settings, "CACHES"):
+        cache_tables = [
+            x["LOCATION"]
+            for x in settings.CACHES.values()
+            if x["BACKEND"] == "bolt.cache.backends.db.DatabaseCache"
+        ]
+    else:
+        cache_tables = []
 
     for database in databases:
         db_tables = connection.introspection.table_names()
