@@ -9,7 +9,6 @@ from bolt.exceptions import ValidationError
 from bolt.mail import EmailMultiAlternatives
 from bolt.utils.encoding import force_bytes
 from bolt.utils.http import urlsafe_base64_encode
-from bolt.utils.text import capfirst
 
 UserModel = get_user_model()
 
@@ -214,9 +213,9 @@ class AuthenticationForm(forms.Form):
         self.username_field = UserModel._meta.get_field(UserModel.USERNAME_FIELD)
         username_max_length = self.username_field.max_length or 254
         self.fields["username"].max_length = username_max_length
-        self.fields["username"].widget.attrs["maxlength"] = username_max_length
-        if self.fields["username"].label is None:
-            self.fields["username"].label = capfirst(self.username_field.verbose_name)
+        # self.fields["username"].widget.attrs["maxlength"] = username_max_length
+        # if self.fields["username"].label is None:
+        #     self.fields["username"].label = capfirst(self.username_field.verbose_name)
 
     def clean(self):
         username = self.cleaned_data.get("username")
@@ -318,8 +317,8 @@ class PasswordResetForm(forms.Form):
 
     def save(
         self,
-        subject_template_name="registration/password_reset_subject.txt",
-        email_template_name="registration/password_reset_email.html",
+        subject_template_name="auth/password_reset_subject.txt",
+        email_template_name="auth/password_reset_email.html",
         use_https=False,
         token_generator=default_token_generator,
         from_email=None,

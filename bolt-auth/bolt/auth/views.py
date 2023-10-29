@@ -60,13 +60,10 @@ class LoginView(RedirectURLMixin, FormView):
     """
 
     form_class = AuthenticationForm
-    authentication_form = None
-    template_name = "registration/login.html"
-    redirect_authenticated_user = False
-    extra_context = None
+    template_name = "auth/login.html"
 
     def get_response(self):
-        if self.redirect_authenticated_user and self.request.user:
+        if self.request.user:
             redirect_to = self.get_success_url()
             if redirect_to == self.request.path:
                 raise ValueError(
@@ -85,9 +82,6 @@ class LoginView(RedirectURLMixin, FormView):
         else:
             return resolve_url(settings.LOGIN_REDIRECT_URL)
 
-    def get_form_class(self):
-        return self.authentication_form or self.form_class
-
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["request"] = self.request
@@ -100,12 +94,7 @@ class LoginView(RedirectURLMixin, FormView):
 
     def get_context(self):
         context = super().get_context()
-        context.update(
-            {
-                self.redirect_field_name: self.get_redirect_url(),
-                **(self.extra_context or {}),
-            }
-        )
+        context[self.redirect_field_name] = self.get_redirect_url()
         return context
 
 
@@ -115,7 +104,7 @@ class LogoutView(RedirectURLMixin, TemplateView):
     """
 
     http_method_names = ["post", "options"]
-    template_name = "registration/logged_out.html"
+    template_name = "auth/logged_out.html"
     extra_context = None
 
     def get_response(self):
@@ -188,14 +177,14 @@ class PasswordContextMixin:
 
 
 class PasswordResetView(PasswordContextMixin, FormView):
-    email_template_name = "registration/password_reset_email.html"
+    email_template_name = "auth/password_reset_email.html"
     extra_email_context = None
     form_class = PasswordResetForm
     from_email = None
     html_email_template_name = None
-    subject_template_name = "registration/password_reset_subject.txt"
+    subject_template_name = "auth/password_reset_subject.txt"
     success_url = reverse_lazy("password_reset_done")
-    template_name = "registration/password_reset_form.html"
+    template_name = "auth/password_reset_form.html"
     title = "Password reset"
     token_generator = default_token_generator
 
@@ -217,7 +206,7 @@ INTERNAL_RESET_SESSION_TOKEN = "_password_reset_token"
 
 
 class PasswordResetDoneView(PasswordContextMixin, TemplateView):
-    template_name = "registration/password_reset_done.html"
+    template_name = "auth/password_reset_done.html"
     title = "Password reset sent"
 
 
@@ -227,7 +216,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
     post_reset_login_backend = None
     reset_url_token = "set-password"
     success_url = reverse_lazy("password_reset_complete")
-    template_name = "registration/password_reset_confirm.html"
+    template_name = "auth/password_reset_confirm.html"
     title = "Enter new password"
     token_generator = default_token_generator
 
@@ -312,7 +301,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
 
 
 class PasswordResetCompleteView(PasswordContextMixin, TemplateView):
-    template_name = "registration/password_reset_complete.html"
+    template_name = "auth/password_reset_complete.html"
     title = "Password reset complete"
 
     def get_context(self):
@@ -324,7 +313,7 @@ class PasswordResetCompleteView(PasswordContextMixin, TemplateView):
 class PasswordChangeView(PasswordContextMixin, AuthViewMixin, FormView):
     form_class = PasswordChangeForm
     success_url = reverse_lazy("password_change_done")
-    template_name = "registration/password_change_form.html"
+    template_name = "auth/password_change_form.html"
     title = "Password change"
     login_required = True
 
@@ -342,6 +331,6 @@ class PasswordChangeView(PasswordContextMixin, AuthViewMixin, FormView):
 
 
 class PasswordChangeDoneView(PasswordContextMixin, AuthViewMixin, TemplateView):
-    template_name = "registration/password_change_done.html"
+    template_name = "auth/password_change_done.html"
     title = "Password change successful"
     login_required = True

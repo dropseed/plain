@@ -12,7 +12,7 @@ To use these feaures on a view,
 simply inherit from the class (yes, this is designed to work with class-based views).
 
 ```python
-from django.views.generic import TemplateView
+from bolt.views import TemplateView
 
 from bolt.htmx.views import HTMXViewMixin
 

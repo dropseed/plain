@@ -21,3 +21,33 @@ Your settings file should be looking at the environment for secrets or other val
 
 In local development,
 you should use `.env` files to set these values.
+
+## Minimum required settings
+
+```python
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = environ["SECRET_KEY"]
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
+
+MIDDLEWARE = [
+    "bolt.middleware.security.SecurityMiddleware",
+    "bolt.assets.whitenoise.middleware.WhiteNoiseMiddleware",
+    "bolt.sessions.middleware.SessionMiddleware",
+    "bolt.middleware.common.CommonMiddleware",
+    "bolt.csrf.middleware.CsrfViewMiddleware",
+    "bolt.auth.middleware.AuthenticationMiddleware",
+    "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+if DEBUG:
+    INSTALLED_PACKAGES += [
+        "bolt.dev",
+    ]
+    MIDDLEWARE += [
+        "bolt.dev.RequestsMiddleware",
+    ]
+
+TIME_ZONE = "America/Chicago"
+```
