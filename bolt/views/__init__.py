@@ -1,9 +1,7 @@
 from .auth import AuthViewMixin
 from .base import View
 from .forms import FormView
-from .objects import CreateView, DeleteView, DetailView, UpdateView
-
-# from .list import ListView
+from .objects import CreateView, DeleteView, DetailView, ListView, UpdateView
 from .redirect import RedirectView
 from .templates import TemplateView
 
@@ -16,6 +14,6 @@ __all__ = [
     "CreateView",
     "UpdateView",
     "DeleteView",
-    # "ListView",
+    "ListView",
     "AuthViewMixin",
 ]

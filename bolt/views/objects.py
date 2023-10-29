@@ -183,3 +183,59 @@ class DeleteView(ObjectTemplateViewMixin, TemplateView):
         self.load_object()
         self.object.delete()
         return HttpResponseRedirect(self.get_success_url())
+
+
+class ListView(TemplateView):
+    """
+    Render some list of objects, set by `self.get_queryset()`, with a response
+    rendered by a template.
+    """
+
+    template_name_suffix = "_list"
+    context_object_name = "objects"
+
+    def get(self) -> HttpResponse:
+        self.objects = self.get_queryset()
+        return self.get_template_response()
+
+    def get_queryset(self):  # Intentionally untyped... subclasses must override this.
+        raise NotImplementedError(
+            f"get_queryset() is not implemented on {self.__class__.__name__}"
+        )
+
+    def get_context(self) -> dict:
+        """Insert the single object into the context dict."""
+        context = super().get_context()  # type: ignore
+        context[self.context_object_name] = self.objects
+        return context
+
+    def get_template_names(self) -> list[str]:
+        """
+        Return a list of template names to be used for the request. May not be
+        called if render_to_response() is overridden. Return the following list:
+
+        * the value of ``template_name`` on the view (if provided)
+          object instance that the view is operating upon (if available)
+        * ``<package_label>/<model_name><template_name_suffix>.html``
+        """
+        if self.template_name:  # type: ignore
+            return [self.template_name]  # type: ignore
+
+        # If template_name isn't specified, it's not a problem --
+        # we just start with an empty list.
+        names = []
+
+        # The least-specific option is the default <app>/<model>_detail.html;
+        # only use this if the object in question is a model.
+        if hasattr(self.objects, "_meta"):
+            object_meta = self.objects._meta
+            names.append(
+                "%s/%s%s.html"
+                % (
+                    object_meta.package_label,
+                    object_meta.model_name,
+                    self.template_name_suffix,  # type: ignore
+                )
+            )
+
+        return names
