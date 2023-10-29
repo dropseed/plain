@@ -11,7 +11,7 @@ from bolt.exceptions import (
     TooManyFieldsSent,
     TooManyFilesSent,
 )
-from bolt.http import Http404
+from bolt.http import Http404, HttpResponseServerError
 from bolt.http.multipartparser import MultiPartParserError
 from bolt.logs import log_response
 from bolt.runtime import settings
@@ -129,12 +129,10 @@ def response_for_exception(request, exc):
 
 def get_exception_response(request, resolver, status_code, exception):
     try:
-        response = get_error_view(status_code)(request)
+        return get_error_view(status_code)(request)
     except Exception:
         signals.got_request_exception.send(sender=None, request=request)
-        response = handle_uncaught_exception(request, resolver, sys.exc_info())
-
-    return response
+        return handle_uncaught_exception(request, resolver, sys.exc_info())
 
 
 def handle_uncaught_exception(request, resolver, exc_info):
@@ -142,7 +140,7 @@ def handle_uncaught_exception(request, resolver, exc_info):
     Processing for any otherwise uncaught exceptions (those that will
     generate HTTP 500 responses).
     """
-    return get_error_view(500)(request)
+    return HttpResponseServerError()
 
 
 def get_error_view(status_code):
