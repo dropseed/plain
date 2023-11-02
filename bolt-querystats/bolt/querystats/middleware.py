@@ -11,9 +11,12 @@ from bolt.urls import reverse
 from .core import QueryStats
 
 try:
-    import psycopg2
+    try:
+        import psycopg
+    except ImportError:
+        import psycopg2 as psycopg
 except ImportError:
-    psycopg2 = None
+    psycopg = None
 
 logger = logging.getLogger(__name__)
 _local = threading.local()
@@ -24,7 +27,7 @@ class QueryStatsJSONEncoder(BoltJSONEncoder):
         try:
             return super().default(obj)
         except TypeError:
-            if psycopg2 and isinstance(obj, psycopg2._json.Json):
+            if psycopg and isinstance(obj, psycopg._json.Json):
                 return obj.adapted
             else:
                 raise
