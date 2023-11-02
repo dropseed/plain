@@ -10,6 +10,7 @@ from honcho.manager import Manager as HonchoManager
 from bolt.runtime import APP_PATH
 
 from .db import cli as db_cli
+from .services import cli as services_cli
 from .utils import boltpackage_installed, has_pyproject_toml
 
 try:
@@ -69,7 +70,7 @@ def cli(ctx):
 
     if bolt_db_installed:
         runserver_cmd = f"bolt db wait && bolt legacy migrate && {gunicorn}"
-        manager.add_process("postgres", "bolt dev db start --logs")
+        manager.add_process("dev", "bolt dev services up")
     else:
         runserver_cmd = gunicorn
 
@@ -102,3 +103,4 @@ def cli(ctx):
 
 
 cli.add_command(db_cli)
+cli.add_command(services_cli)

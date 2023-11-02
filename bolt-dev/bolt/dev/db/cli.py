@@ -11,30 +11,10 @@ def cli():
     pass
 
 
-@cli.command()
-@click.option("--logs", is_flag=True)
-def start(logs):
-    container = DBContainer()
-    container.start()
-    if logs:
-        container.logs()
-
-
-@cli.command()
-def stop():
-    DBContainer().stop()
-    click.secho("Database stopped", fg="green")
-
-
-@cli.command()
-def shell():
-    DBContainer().shell()
-
-
-@cli.command()
-def reset():
-    DBContainer().reset(create=True)
-    click.secho("Local development database reset", fg="green")
+# @cli.command()
+# def reset():
+#     DBContainer().reset(create=True)
+#     click.secho("Local development database reset", fg="green")
 
 
 @cli.group()
