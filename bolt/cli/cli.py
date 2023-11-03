@@ -1,7 +1,9 @@
+import json
 import os
 import subprocess
 import sys
 from importlib.util import find_spec
+from pathlib import Path
 
 import click
 
@@ -282,6 +284,20 @@ def compile(ctx):
             sys.exit(result.returncode)
 
     # TODO also look in [tool.bolt.compile.run]
+
+    # Run a "compile" script from package.json automatically
+    package_json = Path("package.json")
+    if package_json.exists():
+        with package_json.open() as f:
+            package = json.load(f)
+
+        if package.get("scripts", {}).get("compile"):
+            result = subprocess.run(["npm", "run", "compile"])
+            if result.returncode:
+                click.secho(
+                    f"Error in `npm run compile` (exit {result.returncode})", fg="red"
+                )
+                sys.exit(result.returncode)
 
     # Run the regular collectstatic
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])

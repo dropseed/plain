@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -89,13 +90,21 @@ def cli(ctx):
         with open(Path(project_root, "pyproject.toml"), "rb") as f:
             pyproject = tomllib.load(f)
         for name, data in (
-            pyproject.get("tool", {}).get("bolt", {}).get("work", {}).get("run", {})
+            pyproject.get("tool", {}).get("bolt", {}).get("dev", {}).get("run", {})
         ).items():
             env = {
                 **custom_env,
                 **data.get("env", {}),
             }
             manager.add_process(name, data["cmd"], env=env)
+
+    package_json = Path("package.json")
+    if package_json.exists():
+        with package_json.open() as f:
+            package = json.load(f)
+
+        if package.get("scripts", {}).get("dev"):
+            manager.add_process("npm", "npm run dev", env=custom_env)
 
     manager.loop()
 
