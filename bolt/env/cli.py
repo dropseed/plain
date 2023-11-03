@@ -38,6 +38,10 @@ def check(files):
             click.secho(str(e.message), fg="red")
             exit(1)
 
+        if not env.encrypted_file.exists():
+            # It's ok not to have an encrypted counterpart
+            continue
+
         if diff_str := env.diff():
             print(diff_str)
             has_diffs = True
