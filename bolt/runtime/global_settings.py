@@ -110,7 +110,13 @@ SECURE_PROXY_SSL_HEADER = None
 # List of middleware to use. Order is important; in the request phase, these
 # middleware will be applied in the order given, and in the response
 # phase the middleware will be applied in reverse order.
-MIDDLEWARE = []
+MIDDLEWARE = [
+    "bolt.middleware.security.SecurityMiddleware",
+    "bolt.assets.whitenoise.middleware.WhiteNoiseMiddleware",
+    "bolt.middleware.common.CommonMiddleware",
+    "bolt.csrf.middleware.CsrfViewMiddleware",
+    "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
+]
 
 ###########
 # SIGNING #
