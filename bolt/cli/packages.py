@@ -1,8 +1,8 @@
 import importlib
+from importlib.metadata import entry_points
 from importlib.util import find_spec
 
 import click
-import pkg_resources
 
 from bolt.packages import packages
 
@@ -61,13 +61,13 @@ class EntryPointGroup(click.Group):
     def list_commands(self, ctx):
         rv = []
 
-        for entry_point in pkg_resources.iter_entry_points(self.ENTRYPOINT_NAME):
+        for entry_point in entry_points().get(self.ENTRYPOINT_NAME, []):
             rv.append(entry_point.name)
 
         rv.sort()
         return rv
 
     def get_command(self, ctx, name):
-        for entry_point in pkg_resources.iter_entry_points(self.ENTRYPOINT_NAME):
+        for entry_point in entry_points().get(self.ENTRYPOINT_NAME, []):
             if entry_point.name == name:
                 return entry_point.load()
