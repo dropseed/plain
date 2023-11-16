@@ -1,6 +1,6 @@
 # bolt-vendor
 
-Download your dependencies.
+Download those CDN scripts and styles.
 
 ## What about source maps?
 
