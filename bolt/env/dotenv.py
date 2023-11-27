@@ -13,7 +13,7 @@ def load(path: str = "", env_name: str = "") -> None:
     if app_env := environ.get("APP_ENV", ""):
         return load_dotenv(f".env.{app_env}")
 
-    return load_dotenv()
+    return load_dotenv(".env")
 
 
 __all__ = ["load"]
