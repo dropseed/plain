@@ -9,54 +9,61 @@
 
 <div>
 
-    {% if list_actions %}
-    <form method="POST" data-actions-form>
-        {{ csrf_input }}
-        <select name="action_key">
-            <option value="">Actions</option>
-            {% for action in list_actions %}
-            <option>{{ action }}</option>
-            {% endfor %}
-        </select>
-        <input type="hidden" name="action_pks" value="" />
-        <button type="submit" disabled>Apply</button>
-    </form>
-    {% endif %}
+    <div class="flex items-center justify-between pb-2 border-b border-stone-200">
+        <div class="font-semibold">
+            {{ title }}
+        </div>
+        <div>
+            {% if list_actions %}
+            <form method="POST" data-actions-form>
+                {{ csrf_input }}
+                <select name="action_key">
+                    <option value="">Actions</option>
+                    {% for action in list_actions %}
+                    <option>{{ action }}</option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="action_pks" value="" />
+                <button type="submit" disabled>Apply</button>
+            </form>
+            {% endif %}
 
-    {% if show_search %}
-    <div class="flex justify-end">
-        <form method="GET" class="flex">
-            <div class="relative max-w-xs">
-                <label for="search" class="sr-only">Search</label>
-                <input
-                    {% if search_query %}value="{{ search_query }}"{% endif %}
-                    type="text"
-                    name="search"
-                    id="search"
-                    class="block w-full p-3 pl-10 text-sm border-gray-200 rounded-md focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="Search for items"
-                    >
-                <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                    <svg class="h-3.5 w-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
-                    </svg>
-                </div>
+            {% if show_search %}
+            <div class="flex justify-end">
+                <form method="GET" class="flex">
+                    <div class="relative max-w-xs">
+                        <label for="search" class="sr-only">Search</label>
+                        <input
+                            {% if search_query %}value="{{ search_query }}"{% endif %}
+                            type="text"
+                            name="search"
+                            id="search"
+                            class="block w-full px-3 pl-10 text-sm border-gray-200 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="Search for items"
+                            >
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                            <svg class="h-3.5 w-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <!-- <button type="submit">Search</button> -->
+                </form>
             </div>
-            <button type="submit">Search</button>
-        </form>
+            {% endif %}
+        </div>
     </div>
-    {% endif %}
 
     <div class="overflow-auto">
-        <table class="w-full mt-4 text-sm table-auto">
+        <table class="w-full mt-6 text-sm table-auto">
             <thead>
-                <tr>
+                <tr class="bg-stone-100 [&>th]:py-2 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
                     {% if list_actions %}<th></th>{% endif %}
 
                     {% for field in list_fields %}
                         {% if order_by_field is defined %}
-                        <th class="font-mono">
-                            <a href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                        <th>
+                            <a class="font-mono text-xs font-normal text-gray-600" href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
                                 {{ field }}
                                 {% if field == order_by_field %}
                                 {% if order_by_direction == "-" %}
@@ -68,7 +75,7 @@
                             </a>
                         </th>
                         {% else %}
-                        <th class="font-mono">{{ field }}</th>
+                        <th class="font-mono text-xs font-normal text-gray-600">{{ field }}</th>
                         {% endif %}
                     {% endfor %}
                     <th></th>
