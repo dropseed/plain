@@ -12,7 +12,7 @@ license = "MIT"
 # readme = "README.md"
 
 # Make the CLI available without adding to INSTALLED_APPS
-[tool.poetry.plugins.bolt_cli]
+[tool.poetry.plugins."bolt.cli"]
 "vendor" = "bolt.vendor:cli"
 
 [tool.poetry.dependencies]

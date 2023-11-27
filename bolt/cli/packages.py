@@ -56,7 +56,7 @@ class EntryPointGroup(click.Group):
     This is intended for packages that don't go in INSTALLED_PACKAGES.
     """
 
-    ENTRYPOINT_NAME = "bolt_cli"
+    ENTRYPOINT_NAME = "bolt.cli"
 
     def list_commands(self, ctx):
         rv = []

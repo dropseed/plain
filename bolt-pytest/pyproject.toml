@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 # Make the CLI available without adding to INSTALLED_APPS
-[tool.poetry.plugins.bolt_cli]
+[tool.poetry.plugins."bolt.cli"]
 "test" = "bolt.pytest:cli"
 
 # Automatically sets this up with pytest
