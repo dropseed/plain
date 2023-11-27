@@ -60,11 +60,13 @@ def cli(pytest_args):
             'echo "## Pytest coverage" >> $GITHUB_STEP_SUMMARY', shell=True
         )
         subprocess.check_call(
-            "coverage report "
-            + "--skip-empty "
-            + "--format markdown "
-            + f"--data-file {coverage_file} "
-            + ">> $GITHUB_STEP_SUMMARY",
+            (
+                "coverage report "
+                "--skip-empty "
+                "--format markdown "
+                f"--data-file {coverage_file} "
+                ">> $GITHUB_STEP_SUMMARY"
+            ),
             shell=True,
         )
 

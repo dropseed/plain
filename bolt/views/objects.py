@@ -58,12 +58,7 @@ class ObjectTemplateViewMixin:
         if hasattr(self.object, "_meta"):
             object_meta = self.object._meta
             names.append(
-                "%s/%s%s.html"
-                % (
-                    object_meta.package_label,
-                    object_meta.model_name,
-                    self.template_name_suffix,  # type: ignore
-                )
+                f"{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             )
 
         return names
@@ -230,12 +225,7 @@ class ListView(TemplateView):
         if hasattr(self.objects, "_meta"):
             object_meta = self.objects._meta
             names.append(
-                "%s/%s%s.html"
-                % (
-                    object_meta.package_label,
-                    object_meta.model_name,
-                    self.template_name_suffix,  # type: ignore
-                )
+                f"{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             )
 
         return names

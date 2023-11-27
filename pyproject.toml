@@ -33,6 +33,7 @@ target-version = "py310"
 ignore = [
     "E501",  # Never enforce `E501` (line length violations)
     "S101",  # pytest use of assert
+    "ISC001",  # Implicit string concatenation
 ]
 extend-select = [
     "I",  # isort
@@ -47,4 +48,7 @@ extend-select = [
     # # "G",  # flake8-logging-format
     # # "T20",  # print
     "PT",  # pytest
+]
+extend-exclude = [
+    "bolt-pytest"
 ]

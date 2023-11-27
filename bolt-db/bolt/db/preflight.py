@@ -269,16 +269,15 @@ def check_database_tables(package_configs, **kwargs):
         if unknown_tables:
             table_names = ", ".join(unknown_tables)
             specific_hint = (
-                f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | '
-                + "bolt db shell"
+                f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | bolt db shell'
             )
             errors.append(
                 Error(
                     f"Unknown tables in {database} database: {table_names}",
                     hint=(
                         "Tables may be from packages/models that have been uninstalled. "
-                        + "Make sure you have a backup and delete the tables manually "
-                        + f"(ex. `{specific_hint}`)."
+                        "Make sure you have a backup and delete the tables manually "
+                        f"(ex. `{specific_hint}`)."
                     ),
                     id="bolt.db.E001",
                 )
