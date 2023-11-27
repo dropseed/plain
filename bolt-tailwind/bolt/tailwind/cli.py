@@ -1,8 +1,8 @@
 import os
-import sys
 
 import click
 
+from bolt.packages import packages
 from bolt.runtime import APP_PATH
 
 from .core import Tailwind
@@ -74,14 +74,15 @@ def compile(watch, minify):
     # These paths should actually work on Windows too
     # https://github.com/mrmlnc/fast-glob#how-to-write-patterns-on-windows
     args.append("--content")
-    content = ",".join(
-        [
-            os.path.relpath(APP_PATH) + "/**/*.{html,js}",
-            os.path.relpath(APP_PATH)
-            + "/../bolt/**/*.{html,js}",  # TODO use INSTALLED_PACKAGES?
-            sys.exec_prefix + "/lib/python*/site-packages/bolt*/**/*.{html,js}",
-        ]
-    )
+    paths = [
+        os.path.relpath(APP_PATH) + "/**/*.{html,js}",
+    ]
+
+    # Add paths from installed packages
+    for package_config in packages.get_package_configs():
+        paths.append(os.path.relpath(package_config.path) + "/**/*.{html,js}")
+
+    content = ",".join(paths)
     print(f"Content: {content}")
     args.append(content)
 
