@@ -1,5 +1,6 @@
 {% block header %}
-<div class="text-sm font-light">{{ title }}</div>
+<div class="text-sm">{{ title }}</div>
+{% if description %}<div class="mt-1 text-xs text-gray-500">{{ description }}</div>{% endif %}
 {% endblock %}
 
 {% block content %}{% endblock %}

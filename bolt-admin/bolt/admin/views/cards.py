@@ -78,7 +78,7 @@ class DateRange:
         return f"DateRange({self.start}, {self.end})"
 
     def __str__(self):
-        return f"{self.start} - {self.end}"
+        return f"{self.start} to {self.end}"
 
     def __eq__(self, other):
         return self.start == other.start and self.end == other.end
@@ -96,7 +96,10 @@ class AdminTrendCard(AdminChartCard):
         LAST_30_DAYS = "last_30_days"
         LAST_7_DAYS = "last_7_days"
 
-    range: Ranges = Ranges.LAST_30_DAYS
+    default_range: Ranges = Ranges.LAST_30_DAYS
+
+    def get_description(self) -> str:
+        return str(self.date_range)
 
     @cached_property
     def date_range(self) -> DateRange:
@@ -105,16 +108,16 @@ class AdminTrendCard(AdminChartCard):
     def get_date_range(self) -> DateRange:
         now = timezone.now()
 
-        if self.range == self.Ranges.LAST_365_DAYS:
+        if self.default_range == self.Ranges.LAST_365_DAYS:
             return DateRange(now - timedelta(days=365), now)
 
-        if self.range == self.Ranges.LAST_30_DAYS:
+        if self.default_range == self.Ranges.LAST_30_DAYS:
             return DateRange(now - timedelta(days=30), now)
 
-        if self.range == self.Ranges.LAST_7_DAYS:
+        if self.default_range == self.Ranges.LAST_7_DAYS:
             return DateRange(now - timedelta(days=7), now)
 
-        raise ValueError(f"Invalid range: {self.range}")
+        raise ValueError(f"Invalid range: {self.default_range}")
 
     def get_values(self) -> dict[datetime.date, int]:
         raise NotImplementedError

@@ -44,7 +44,7 @@ class BaseAdminView(AuthViewMixin, TemplateView):
         context = super().get_context()
         context["title"] = self.title
         context["slug"] = self.get_slug()
-        context["description"] = self.description
+        context["description"] = self.get_description()
         context["links"] = self.get_links()
         context["parent_view_classes"] = self.get_parent_view_classes()
         return context
@@ -56,6 +56,10 @@ class BaseAdminView(AuthViewMixin, TemplateView):
     @classmethod
     def get_slug(cls) -> str:
         return cls.slug or slugify(cls.title)
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
 
     @classmethod
     def get_path(cls) -> str:
