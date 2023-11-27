@@ -61,13 +61,13 @@ class EntryPointGroup(click.Group):
     def list_commands(self, ctx):
         rv = []
 
-        for entry_point in entry_points().get(self.ENTRYPOINT_NAME, []):
+        for entry_point in entry_points().select(group=self.ENTRYPOINT_NAME):
             rv.append(entry_point.name)
 
         rv.sort()
         return rv
 
     def get_command(self, ctx, name):
-        for entry_point in entry_points().get(self.ENTRYPOINT_NAME, []):
+        for entry_point in entry_points().select(group=self.ENTRYPOINT_NAME):
             if entry_point.name == name:
                 return entry_point.load()
