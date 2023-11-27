@@ -27,6 +27,4 @@ jobs:
         echo "## Pytest coverage" >> $GITHUB_STEP_SUMMARY
         poetry run coverage report --skip-empty --format markdown >> $GITHUB_STEP_SUMMARY
 
-    - run: |
-        poetry run black --check .
-        poetry run ruff .
+    - run: ./scripts/ruff --check
