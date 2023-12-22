@@ -48,7 +48,7 @@ class Cached:
             "value": value,
         }
 
-        if isinstance(expiration, int, float):
+        if isinstance(expiration, (int, float)):
             defaults["expires_at"] = timezone.now() + timedelta(seconds=expiration)
         elif isinstance(expiration, timedelta):
             defaults["expires_at"] = timezone.now() + expiration
