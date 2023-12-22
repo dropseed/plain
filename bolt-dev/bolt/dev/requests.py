@@ -167,10 +167,15 @@ class RequestLog:
 
         tb_string = "".join(traceback.format_tb(exception.__traceback__))
 
+        try:
+            args = json.dumps(exception.args)
+        except TypeError:
+            args = str(exception.args)
+
         return {
             "type": type(exception).__name__,
             "str": str(exception),
-            "args": exception.args,
+            "args": args,
             "traceback": tb_string,
         }
 
