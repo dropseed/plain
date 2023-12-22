@@ -43,12 +43,12 @@ class Cached:
 
         return self._model_instance.value
 
-    def set(self, value, expiration: datetime | timedelta | int | None = None):
+    def set(self, value, expiration: datetime | timedelta | int | float | None = None):
         defaults = {
             "value": value,
         }
 
-        if isinstance(expiration, int):
+        if isinstance(expiration, int, float):
             defaults["expires_at"] = timezone.now() + timedelta(seconds=expiration)
         elif isinstance(expiration, timedelta):
             defaults["expires_at"] = timezone.now() + expiration
