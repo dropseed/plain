@@ -53,7 +53,8 @@ class View:
 
         return view
 
-    def get_response(self) -> HttpResponseBase:
+    def get_request_handler(self) -> callable:
+        """Return the handler for the current request method."""
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
 
@@ -63,6 +64,12 @@ class View:
         handler = getattr(
             self, self.request.method.lower(), self._http_method_not_allowed
         )
+
+        return handler
+
+    def get_response(self) -> HttpResponseBase:
+        handler = self.get_request_handler()
+
         try:
             result = handler()
         except HttpResponseException as e:
