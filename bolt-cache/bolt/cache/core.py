@@ -3,18 +3,21 @@ from functools import cached_property
 
 from bolt.utils import timezone
 
-from .models import CachedItem
-
 
 class Cached:
     def __init__(self, key):
         self.key = key
 
+        # So we can import Cached in __init__.py
+        # without getting the packages not ready error...
+        from .models import CachedItem
+        self._model_class = CachedItem
+
     @cached_property
     def _model_instance(self):
         try:
-            return CachedItem.objects.get(key=self.key)
-        except CachedItem.DoesNotExist:
+            return self._model_class.objects.get(key=self.key)
+        except self._model_class.DoesNotExist:
             return None
 
     def reload(self):
@@ -58,7 +61,7 @@ class Cached:
             # Keep existing expires_at value or None
             pass
 
-        item, _ = CachedItem.objects.update_or_create(key=self.key, defaults=defaults)
+        item, _ = self._model_class.objects.update_or_create(key=self.key, defaults=defaults)
 
         self.reload()
 

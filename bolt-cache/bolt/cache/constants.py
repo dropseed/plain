@@ -1,1 +1,0 @@
-DEFAULT_CACHE_ALIAS = "default"

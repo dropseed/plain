@@ -19,21 +19,6 @@ COMPLEX_OVERRIDE_SETTINGS = {"DATABASES"}
 
 
 @receiver(setting_changed)
-def clear_cache_handlers(*, setting, **kwargs):
-    if setting == "CACHES":
-        try:
-            from bolt.cache import caches, close_caches
-        except ImportError:
-            return
-
-        from threading import local
-
-        close_caches()
-        caches._settings = caches.settings = caches.configure_settings(None)
-        caches._connections = local()
-
-
-@receiver(setting_changed)
 def update_installed_packages(*, setting, **kwargs):
     if setting == "INSTALLED_PACKAGES":
         # Rebuild any PackageDirectoriesFinder instance.

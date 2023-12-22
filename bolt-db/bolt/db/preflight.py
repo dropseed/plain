@@ -251,20 +251,11 @@ def check_database_tables(package_configs, **kwargs):
 
     errors = []
 
-    if hasattr(settings, "CACHES"):
-        cache_tables = [
-            x["LOCATION"]
-            for x in settings.CACHES.values()
-            if x["BACKEND"] == "bolt.cache.backends.db.DatabaseCache"
-        ]
-    else:
-        cache_tables = []
-
     for database in databases:
         db_tables = connection.introspection.table_names()
         model_tables = connection.introspection.bolt_table_names()
 
-        unknown_tables = set(db_tables) - set(model_tables) - set(cache_tables)
+        unknown_tables = set(db_tables) - set(model_tables)
         unknown_tables.discard("django_migrations")  # Know this could be there
         if unknown_tables:
             table_names = ", ".join(unknown_tables)
