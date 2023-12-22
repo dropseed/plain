@@ -88,8 +88,6 @@ class BaseDatabaseCreation:
         # if serialize:
         #     self.connection._test_serialized_contents = self.serialize_db_to_string()
 
-        call_command("createcachetable", database=self.connection.alias)
-
         # Ensure a connection for the side effect of initializing the test database.
         self.connection.ensure_connection()
 
