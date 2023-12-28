@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 import subprocess
@@ -307,6 +308,25 @@ def compile(ctx):
 bolt_cli.add_command(env_cli)
 
 
+class AppCLIGroup(click.Group):
+    """
+    Loads app.cli if it exists as `bolt app`
+    """
+
+    MODULE_NAME = "app.cli"
+
+    def list_commands(self, ctx):
+        if find_spec(self.MODULE_NAME):
+            return ["app"]
+        else:
+            return []
+
+    def get_command(self, ctx, name):
+        if find_spec(self.MODULE_NAME) and name == "app":
+            cli = importlib.import_module(self.MODULE_NAME)
+            return cli.cli
+
+
 class BoltCommandCollection(click.CommandCollection):
     def __init__(self, *args, **kwargs):
         bolt.runtime.setup()
@@ -316,6 +336,7 @@ class BoltCommandCollection(click.CommandCollection):
         self.sources = [
             InstalledPackagesGroup(),
             EntryPointGroup(),
+            AppCLIGroup(),
             bolt_cli,
         ]
 

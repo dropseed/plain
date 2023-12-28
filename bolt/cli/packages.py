@@ -35,17 +35,17 @@ class InstalledPackagesGroup(click.Group):
 
     def get_command(self, ctx, name):
         # Try it as bolt.x and just x (we don't know ahead of time which it is, but prefer bolt.x)
-        for name in [self.BOLT_APPS_PREFIX + name, name]:
+        for n in [self.BOLT_APPS_PREFIX + name, name]:
             try:
-                cli = importlib.import_module(f"{name}.{self.MODULE_NAME}")
+                cli = importlib.import_module(f"{n}.{self.MODULE_NAME}")
             except ModuleNotFoundError:
-                return
+                continue
 
             # Get the app's cli.py group
             try:
                 return cli.cli
             except AttributeError:
-                return
+                continue
 
 
 class EntryPointGroup(click.Group):
