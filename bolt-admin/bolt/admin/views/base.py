@@ -31,10 +31,12 @@ class AdminView(AuthViewMixin, TemplateView):
     path: str = ""
     description: str = ""
 
+    # Leave empty to hide from nav
+    #
     # An explicit disabling of showing this url/page in the nav
     # which importantly effects the (future) recent pages list
     # so you can also use this for pages that can never be bookmarked
-    show_in_nav: bool = True
+    nav_section = "App"
 
     links: dict[str] = {}
 
@@ -85,15 +87,15 @@ class AdminView(AuthViewMixin, TemplateView):
         return parents
 
     @classmethod
-    def should_show_in_nav(cls) -> bool:
-        if not cls.show_in_nav:
-            return False
+    def get_nav_section(cls) -> bool:
+        if not cls.nav_section:
+            return ""
 
         if cls.parent_view_class:
             # Don't show child views by default
-            return False
+            return ""
 
-        return True
+        return cls.nav_section
 
     @classmethod
     def get_absolute_url(cls) -> str:

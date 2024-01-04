@@ -34,6 +34,7 @@ class FlagAdmin(AdminModelViewset):
         list_fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
         search_fields = ["name", "description"]
         list_cards = [UnusedFlagsCard]
+        nav_section = "Feature flags"
 
     class DetailView(AdminModelDetailView):
         model = Flag
@@ -58,6 +59,7 @@ class FlagResultAdmin(AdminModelViewset):
             "uuid",
         ]
         search_fields = ["flag__name", "key"]
+        nav_section = "Feature flags"
 
         def get_initial_queryset(self):
             return self.model.objects.all().select_related("flag")

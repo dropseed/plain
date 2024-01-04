@@ -26,11 +26,14 @@
                 </svg>
                 <span class="sr-only">Admin</span>
             </a>
-            <div class="mt-4">
-                {% for view in admin_registry.get_nav_views() %}
-                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
+            <div>
+                {% for section, views in admin_registry.get_nav_sections().items() %}
+                <div class="mt-4 text-xs font-semibold tracking-wide uppercase text-stone-500">{{ section }}</div>
+                {% for view in views %}
+                <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
                     {{ view.get_title() }}
                 </a>
+                {% endfor %}
                 {% endfor %}
             </div>
 
@@ -38,19 +41,19 @@
             <div class="mt-6">
                 <div class="text-xs tracking-wide text-gray-500">Dashboards</div>
                 {% for view in admin_registry.registered_dashboards %}
-                <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
+                <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
                     {{ view.get_title() }}
                 </a>
                 {% endfor %}
             </div>
             {% endif %}
 
-            <div class="mt-6">
+            <!-- <div class="mt-6">
                 <div class="text-xs tracking-wide text-stone-500">Pinned</div>
             </div>
             <div class="mt-6">
                 <div class="text-xs tracking-wide text-stone-500">Recent</div>
-            </div>
+            </div> -->
         </div>
         <div class="flex items-center justify-between text-sm text-stone-400">
             <div class="flex items-center">

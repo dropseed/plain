@@ -40,18 +40,30 @@ class AdminViewRegistry:
         else:
             return inner
 
-    def get_nav_views(self):
+    def get_nav_sections(self):
         # class NavItem:
         #     def __init__(self, view, children):
         #         self.view = view
         #         self.children = children
 
-        sorted_views = sorted(
-            [view for view in self.registered_views if view.should_show_in_nav()],
-            key=lambda v: v.get_title(),
-        )
+        sections = {}
 
-        return sorted_views
+        for view in self.registered_views:
+            section = view.get_nav_section()
+            if not section:
+                continue
+            if section not in sections:
+                sections[section] = []
+            sections[section].append(view)
+
+        # Sort each section by title
+        for section in sections.values():
+            section.sort(key=lambda v: v.get_title())
+
+        # Sort sections dictionary by key
+        sections = dict(sorted(sections.items()))
+
+        return sections
 
         # root_nav_items = []
 
