@@ -2,8 +2,6 @@
 
 {% block content %}
 
-{% block before_form_content %}{% endblock %}
-
 <form method="post" class="card">
     {{ csrf_input }}
     <div class="p-4">
@@ -11,9 +9,5 @@
         <button class="px-5 py-2 mt-6 text-white bg-blue-600 rounded hover:bg-blue-700" type="submit">Save</button>
     </div>
 </form>
-
-<div class="mt-6">
-{% block after_form_content %}{% endblock %}
-</div>
 
 {% endblock %}

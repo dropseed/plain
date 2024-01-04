@@ -6,15 +6,12 @@ class AdminViewRegistry:
         # View classes that will be added to the admin automatically
         self.registered_views = set()
         self.registered_dashboards = set()
-        self.registered_cards = set()
 
     def register_view(self, view=None):
         def inner(view):
             self.registered_views.add(view)
             # TODO do this somewhere else...
             # self.registered_views = set(self.registered_views, key=lambda v: v.title)
-            for card in view.cards:
-                self.register_card(card)
             return view
 
         if callable(view):
@@ -25,8 +22,6 @@ class AdminViewRegistry:
     def register_dashboard(self, view=None):
         def inner(view):
             self.registered_dashboards.add(view)
-            for card in view.cards:
-                self.register_card(card)
             return view
 
         if callable(view):
@@ -34,18 +29,7 @@ class AdminViewRegistry:
         else:
             return inner
 
-    def register_card(self, card=None):
-        def inner(card):
-            # TODO make s
-            self.registered_cards.add(card)
-            return card
-
-        if callable(card):
-            return inner(card)
-        else:
-            return inner
-
-    def register_model(self, viewset=None):
+    def register_viewset(self, viewset=None):
         def inner(viewset):
             for view in viewset.get_views():
                 self.register_view(view)
@@ -98,14 +82,10 @@ class AdminViewRegistry:
         for view in self.registered_dashboards:
             add_view_path(view, f"dashboards/{view.get_path()}")
 
-        for view in self.registered_cards:
-            add_view_path(view, f"cards/{view.get_path()}")
-
         return urlpatterns
 
 
 registry = AdminViewRegistry()
 register_view = registry.register_view
 register_dashboard = registry.register_dashboard
-register_card = registry.register_card
-register_model = registry.register_model
+register_viewset = registry.register_viewset

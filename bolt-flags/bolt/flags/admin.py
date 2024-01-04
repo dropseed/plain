@@ -1,12 +1,13 @@
 from functools import cached_property
 
-from bolt.admin import AdminCard, AdminModelViewset, register_model
+from bolt.admin import AdminModelViewset, register_viewset
+from bolt.admin.cards import Card
 from bolt.db.forms import ModelForm
 
 from .models import Flag, FlagResult
 
 
-class UnusedFlagsCard(AdminCard):
+class UnusedFlagsCard(Card):
     title = "Unused Flags"
 
     @cached_property
@@ -20,7 +21,7 @@ class UnusedFlagsCard(AdminCard):
         return "\n".join(str(e.msg) for e in self.flag_errors)
 
 
-@register_model
+@register_viewset
 class FlagAdmin(AdminModelViewset):
     model = Flag
     list_fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
@@ -34,7 +35,7 @@ class FlagResultForm(ModelForm):
         fields = ["key", "value"]
 
 
-@register_model
+@register_viewset
 class FlagResultAdmin(AdminModelViewset):
     model = FlagResult
     list_fields = [

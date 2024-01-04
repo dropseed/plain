@@ -5,47 +5,10 @@ from enum import Enum
 from bolt.utils import timezone
 from bolt.utils.functional import cached_property
 
-from .base import BaseAdminView
+from .base import Card
 
 
-class AdminCard(BaseAdminView):
-    class Sizes(Enum):
-        # Four column grid
-        SMALL = 1
-        MEDIUM = 2
-        LARGE = 3
-        FULL = 4
-
-    template_name = "admin/cards/card.html"
-    size: Sizes = Sizes.SMALL
-    # unique_id: str  # Use for tying to dashboards, require it
-
-    text: str = ""
-    link: str = ""
-    number: int | None = None
-
-    @classmethod
-    def view_name(cls) -> str:
-        return f"card_{cls.get_slug()}"
-
-    def get_context(self):
-        context = super().get_context()
-        context["number"] = self.get_number()
-        context["text"] = self.get_text()
-        context["link"] = self.get_link()
-        return context
-
-    def get_number(self) -> int | None:
-        return self.number
-
-    def get_text(self) -> str:
-        return self.text
-
-    def get_link(self) -> str:
-        return self.link
-
-
-class AdminChartCard(AdminCard):
+class ChartCard(Card):
     template_name = "admin/cards/chart.html"
 
     def get_context(self):
@@ -90,7 +53,7 @@ class DateRange:
         return self.start <= item <= self.end
 
 
-class AdminTrendCard(AdminChartCard):
+class TrendCard(ChartCard):
     class Ranges(Enum):
         LAST_365_DAYS = "last_365_days"
         LAST_30_DAYS = "last_30_days"
@@ -153,8 +116,11 @@ class AdminTrendCard(AdminChartCard):
                         "display": False,
                     },
                     "y": {
-                        "display": False,
+                        "suggestedMin": 0,
                     },
+                },
+                "elements": {
+                    "bar": {"borderRadius": "3", "backgroundColor": "rgb(28, 25, 23)"}
                 },
             },
         }
