@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 URL_NAMESPACE = "admin"
 
 
-class BaseAdminView(AuthViewMixin, TemplateView):
+class AdminView(AuthViewMixin, TemplateView):
     staff_required = True
 
     title: str
@@ -38,7 +38,10 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 
     links: dict[str] = {}
 
-    parent_view_class: "BaseAdminView" = None
+    parent_view_class: "AdminView" = None
+
+    template_name = "admin/page.html"
+    cards: list["Card"] = []
 
     def get_context(self):
         context = super().get_context()
@@ -47,11 +50,14 @@ class BaseAdminView(AuthViewMixin, TemplateView):
         context["description"] = self.get_description()
         context["links"] = self.get_links()
         context["parent_view_classes"] = self.get_parent_view_classes()
+        context["admin_registry"] = registry
+        context["cards"] = self.get_cards()
+        context["render_card"] = self.render_card
         return context
 
     @classmethod
     def view_name(cls) -> str:
-        raise NotImplementedError
+        return f"view_{cls.get_slug()}"
 
     @classmethod
     def get_title(cls) -> str:
@@ -70,7 +76,7 @@ class BaseAdminView(AuthViewMixin, TemplateView):
         return cls.path or cls.get_slug()
 
     @classmethod
-    def get_parent_view_classes(cls) -> list["BaseAdminView"]:
+    def get_parent_view_classes(cls) -> list["AdminView"]:
         parents = []
         parent = cls.parent_view_class
         while parent:
@@ -96,24 +102,8 @@ class BaseAdminView(AuthViewMixin, TemplateView):
     def get_links(self) -> dict[str]:
         return self.links
 
-
-class AdminPageView(BaseAdminView):
-    template_name = "admin/page.html"
-    cards: list["Card"] = []
-
-    def get_context(self):
-        context = super().get_context()
-        context["admin_registry"] = registry
-        context["cards"] = self.get_cards()
-        context["render_card"] = self.render_card
-        return context
-
     def get_cards(self):
         return self.cards
-
-    @classmethod
-    def view_name(cls) -> str:
-        return f"view_{cls.get_slug()}"
 
     def render_card(self, card: "Card"):
         """Render card as a subview"""
@@ -123,7 +113,7 @@ class AdminPageView(BaseAdminView):
         return card().render(self.request)
 
 
-class AdminListView(AdminPageView):
+class AdminListView(AdminView):
     template_name = "admin/list.html"
     list_fields: list
     list_actions: dict[str] = {}
@@ -207,7 +197,7 @@ class AdminListView(AdminPageView):
         return None
 
 
-class AdminDetailView(AdminPageView, DetailView):
+class AdminDetailView(AdminView, DetailView):
     template_name = None
 
     def get_context(self):
@@ -229,7 +219,7 @@ class AdminDetailView(AdminPageView, DetailView):
         return getattr(obj, field)
 
 
-class AdminUpdateView(AdminPageView, UpdateView):
+class AdminUpdateView(AdminView, UpdateView):
     template_name = None
 
     def get_template_names(self) -> list[str]:
@@ -242,7 +232,7 @@ class AdminUpdateView(AdminPageView, UpdateView):
         return super().get_template_names()
 
 
-class AdminCreateView(AdminPageView, CreateView):
+class AdminCreateView(AdminView, CreateView):
     template_name = None
 
     def get_template_names(self) -> list[str]:
@@ -255,6 +245,6 @@ class AdminCreateView(AdminPageView, CreateView):
         return super().get_template_names()
 
 
-class AdminDeleteView(AdminPageView, DeleteView):
+class AdminDeleteView(AdminView, DeleteView):
     show_in_nav = False  # Never want this to show
     template_name = "admin/confirm_delete.html"

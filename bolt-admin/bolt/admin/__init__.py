@@ -2,8 +2,8 @@ from .views.base import (
     AdminDeleteView,
     AdminDetailView,
     AdminListView,
-    AdminPageView,
     AdminUpdateView,
+    AdminView,
 )
 from .views.models import (
     AdminModelDetailView,
@@ -18,7 +18,7 @@ from .views.registry import (
 )
 
 __all__ = [
-    "AdminPageView",
+    "AdminView",
     "AdminListView",
     "AdminDetailView",
     "AdminUpdateView",

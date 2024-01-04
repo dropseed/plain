@@ -1,11 +1,11 @@
 from bolt.http import HttpResponseRedirect
 
-from .base import AdminPageView
+from .base import AdminView
 from .registry import registry
 
 
 # This will be dashboard view...
-class AdminIndexView(AdminPageView):
+class AdminIndexView(AdminView):
     template_name = "admin/index.html"
     title = "Admin"
     slug = ""
