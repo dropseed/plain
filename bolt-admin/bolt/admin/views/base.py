@@ -99,12 +99,10 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 
 class AdminPageView(BaseAdminView):
     template_name = "admin/page.html"
-    icon: str = ""
     cards: list["Card"] = []
 
     def get_context(self):
         context = super().get_context()
-        context["icon"] = self.icon
         context["admin_registry"] = registry
         context["cards"] = self.get_cards()
         context["render_card"] = self.render_card
