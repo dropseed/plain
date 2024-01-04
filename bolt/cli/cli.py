@@ -316,15 +316,21 @@ class AppCLIGroup(click.Group):
     MODULE_NAME = "app.cli"
 
     def list_commands(self, ctx):
-        if find_spec(self.MODULE_NAME):
+        try:
+            find_spec(self.MODULE_NAME)
             return ["app"]
-        else:
+        except ModuleNotFoundError:
             return []
 
     def get_command(self, ctx, name):
-        if find_spec(self.MODULE_NAME) and name == "app":
+        if name != "app":
+            return
+
+        try:
             cli = importlib.import_module(self.MODULE_NAME)
             return cli.cli
+        except ModuleNotFoundError:
+            return
 
 
 class BoltCommandCollection(click.CommandCollection):
