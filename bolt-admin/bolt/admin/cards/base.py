@@ -16,7 +16,10 @@ class Card:
     size: Sizes = Sizes.SMALL
     # unique_id: str  # Use for tying to dashboards, require it
 
-    title: str = ""
+    # Required fields
+    title: str
+
+    # Optional fields
     slug: str = ""
     description: str = ""
     text: str = ""
