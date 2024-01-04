@@ -13,7 +13,18 @@
         <div class="font-semibold">
             {{ title }}
         </div>
-        <div>
+        <div class="flex space-x-5">
+            {% if list_filters %}
+            <form method="GET" class="inline-flex">
+                <select data-autosubmit name="filter" class="text-sm border-gray-200 rounded-md">
+                    <option value="">Filters</option>
+                    {% for filter in list_filters %}
+                    <option {% if filter == list_filter %}selected{% endif %}>{{ filter }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% endif %}
+
             {% if list_actions %}
             <form method="POST" data-actions-form>
                 {{ csrf_input }}

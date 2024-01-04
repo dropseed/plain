@@ -11,4 +11,8 @@ jQuery(function($) {
             }
         });
     });
+
+    $("[data-autosubmit]").on("change", function(e) {
+        $(this).closest("form").submit();
+    });
 });

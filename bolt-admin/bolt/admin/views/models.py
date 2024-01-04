@@ -43,6 +43,14 @@ class AdminModelListView(AdminListView):
     list_order = []
     search_fields: list = ["pk"]
 
+    @classmethod
+    def get_title(cls) -> str:
+        return cls.model._meta.verbose_name_plural.capitalize()
+
+    @classmethod
+    def get_slug(cls) -> str:
+        return cls.model._meta.model_name
+
     def get_context(self):
         context = super().get_context()
 
@@ -92,122 +100,90 @@ class AdminModelListView(AdminListView):
         return get_model_field(object, field)
 
 
-class AdminModelViewset:
+class AdminModelDetailView(AdminDetailView):
     model: "models.Model"
-    list_description = ""
-    list_fields: list = ["pk"]
-    list_order = []
-    detail_fields: list = []
-    search_fields = ["pk"]
+    fields: list = []
 
+    @classmethod
+    def get_title(cls) -> str:
+        return cls.model._meta.verbose_name.capitalize()
+
+    @classmethod
+    def get_slug(cls) -> str:
+        return f"{cls.model._meta.model_name}_detail"
+
+    @classmethod
+    def get_path(cls) -> str:
+        return f"{cls.model._meta.model_name}/<int:pk>/"
+
+    def get_context(self):
+        context = super().get_context()
+        context["fields"] = self.fields or ["pk"] + [
+            f.name for f in self.object._meta.get_fields() if not f.remote_field
+        ]
+        return context
+
+    def get_object_field(self, object, field: str):
+        return get_model_field(object, field)
+
+    def get_object(self):
+        return self.model.objects.get(pk=self.url_kwargs["pk"])
+
+    def get_template_names(self) -> list[str]:
+        return super().get_template_names() + [
+            "admin/detail.html",
+        ]
+
+
+class AdminModelUpdateView(AdminUpdateView):
+    model: "models.Model"
     form_class = None  # TODO type annotation
-
-    list_cards = []
-    form_cards = []
+    success_url = "."  # Redirect back to the same update page by default
 
     @classmethod
-    def get_list_view(cls) -> AdminModelListView:
-        class V(AdminModelListView):
-            model = cls.model
-            title = cls.model._meta.verbose_name_plural.capitalize()
-            description = cls.list_description
-            slug = cls.model._meta.model_name
-            list_fields = cls.list_fields
-            list_order = cls.list_order
-            cards = cls.list_cards
-            search_fields = cls.search_fields
-
-            def get_update_url(self, object):
-                update_view = cls.get_update_view()
-
-                if not update_view:
-                    return None
-
-                # TODO a way to do this without explicit namespace?
-                return reverse_lazy(
-                    URL_NAMESPACE + ":" + update_view.view_name(),
-                    kwargs={"pk": object.pk},
-                )
-
-            def get_detail_url(self, object):
-                detail_view = cls.get_detail_view()
-
-                if not detail_view:
-                    return None
-
-                return reverse_lazy(
-                    URL_NAMESPACE + ":" + detail_view.view_name(),
-                    kwargs={"pk": object.pk},
-                )
-
-            def get_initial_queryset(self):
-                return cls.get_list_queryset(self)
-
-        return V
+    def get_title(cls) -> str:
+        return f"Update {cls.model._meta.verbose_name}"
 
     @classmethod
-    def get_update_view(cls) -> AdminUpdateView | None:
-        if not cls.form_class:
-            return None
-
-        class V(AdminUpdateView):
-            title = f"Update {cls.model._meta.verbose_name}"
-            slug = f"{cls.model._meta.model_name}_update"
-            form_class = cls.form_class
-            path = f"{cls.model._meta.model_name}/<int:pk>/update/"
-            cards = cls.form_cards
-            success_url = "."  # Redirect back to the same update page by default
-            parent_view_class = cls.get_list_view()
-
-            def get_object(self):
-                return cls.model.objects.get(pk=self.url_kwargs["pk"])
-
-        return V
+    def get_slug(cls) -> str:
+        return f"{cls.model._meta.model_name}_update"
 
     @classmethod
-    def get_detail_view(cls) -> AdminDetailView | None:
-        class V(AdminDetailView):
-            title = cls.model._meta.verbose_name.capitalize()
-            slug = f"{cls.model._meta.model_name}_detail"
-            path = f"{cls.model._meta.model_name}/<int:pk>/"
-            parent_view_class = cls.get_list_view()
-            fields = cls.detail_fields
+    def get_path(cls) -> str:
+        return f"{cls.model._meta.model_name}/<int:pk>/update/"
 
-            def get_context(self):
-                context = super().get_context()
-                context["fields"] = self.fields or ["pk"] + [
-                    f.name for f in self.object._meta.get_fields() if not f.remote_field
-                ]
-                return context
+    def get_object(self):
+        return self.model.objects.get(pk=self.url_kwargs["pk"])
 
-            def get_object(self):
-                return cls.model.objects.get(pk=self.url_kwargs["pk"])
 
-            def get_template_names(self) -> list[str]:
-                return super().get_template_names() + [
-                    "admin/detail.html",
-                ]
-
-            def get_object_field(self, object, field: str):
-                return get_model_field(object, field)
-
-        return V
-
+class AdminModelViewset:
     @classmethod
     def get_views(cls) -> list["View"]:
         views = []
 
-        if list_view := cls.get_list_view():
-            views.append(list_view)
+        if hasattr(cls, "ListView") and hasattr(cls, "DetailView"):
+            cls.ListView.get_detail_url = lambda self, obj: reverse_lazy(
+                f"{URL_NAMESPACE}:{cls.DetailView.view_name()}",
+                kwargs={"pk": obj.pk},
+            )
 
-        if update_view := cls.get_update_view():
-            views.append(update_view)
+            cls.DetailView.parent_view_class = cls.ListView
 
-        if detail_view := cls.get_detail_view():
-            views.append(detail_view)
+        if hasattr(cls, "ListView") and hasattr(cls, "UpdateView"):
+            cls.ListView.get_update_url = lambda self, obj: reverse_lazy(
+                f"{URL_NAMESPACE}:{cls.UpdateView.view_name()}",
+                kwargs={"pk": obj.pk},
+            )
+
+            cls.UpdateView.parent_view_class = cls.ListView
+
+        if hasattr(cls, "ListView"):
+            views.append(cls.ListView)
+
+        if hasattr(cls, "DetailView"):
+            views.append(cls.DetailView)
+
+        if hasattr(cls, "UpdateView"):
+            views.append(cls.UpdateView)
 
         return views
-
-    def get_list_queryset(self):
-        # Can't use super() with this the way it works now
-        return self.model.objects.all()

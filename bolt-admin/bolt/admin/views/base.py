@@ -42,7 +42,7 @@ class BaseAdminView(AuthViewMixin, TemplateView):
 
     def get_context(self):
         context = super().get_context()
-        context["title"] = self.title
+        context["title"] = self.get_title()
         context["slug"] = self.get_slug()
         context["description"] = self.get_description()
         context["links"] = self.get_links()
@@ -54,8 +54,12 @@ class BaseAdminView(AuthViewMixin, TemplateView):
         raise NotImplementedError
 
     @classmethod
+    def get_title(cls) -> str:
+        return cls.title
+
+    @classmethod
     def get_slug(cls) -> str:
-        return cls.slug or slugify(cls.title)
+        return cls.slug or slugify(cls.get_title())
 
     @classmethod
     def get_description(cls) -> str:
@@ -125,16 +129,26 @@ class AdminListView(AdminPageView):
     template_name = "admin/list.html"
     list_fields: list
     list_actions: dict[str] = {}
+    list_filters: list[str] = []
     page_size = 100
     show_search = False
 
     def get_context(self):
         context = super().get_context()
-        context["paginator"] = Paginator(self.get_objects(), self.page_size)
+
+        list_filter = self.request.GET.get("filter", "")
+
+        objects = self.get_objects()
+        objects = self.filter_objects(list_filter, objects)
+
+        context["paginator"] = Paginator(objects, self.page_size)
         context["page"] = context["paginator"].get_page(self.request.GET.get("page", 1))
         context["objects"] = context["page"]  # alias
         context["list_fields"] = self.list_fields
         context["list_actions"] = self.list_actions
+
+        context["list_filters"] = self.list_filters
+        context["list_filter"] = list_filter
 
         # Implement search yourself in get_objects
         context["search_query"] = self.request.GET.get("search", "")
@@ -161,6 +175,10 @@ class AdminListView(AdminPageView):
 
     def get_objects(self) -> list:
         return []
+
+    def filter_objects(self, filter_name: str, objects: list):
+        """Implement custom object filters here by looking at filter name"""
+        return objects
 
     def get_object_field(self, obj, field: str):
         # Try basic dict lookup first
@@ -200,6 +218,7 @@ class AdminDetailView(AdminPageView, DetailView):
         return context
 
     def get_template_names(self) -> list[str]:
+        # TODO move these to model views
         if not self.template_name and isinstance(self.object, models.Model):
             object_meta = self.object._meta
             return [

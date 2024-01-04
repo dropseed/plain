@@ -29,7 +29,7 @@
             <div class="mt-4">
                 {% for view in admin_registry.get_nav_views() %}
                 <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
-                    {{ view.title }}
+                    {{ view.get_title() }}
                 </a>
                 {% endfor %}
             </div>
@@ -39,7 +39,7 @@
                 <div class="text-xs tracking-wide text-gray-500">Dashboards</div>
                 {% for view in admin_registry.registered_dashboards %}
                 <a class="flex items-center px-2 py-2 -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
-                    {{ view.title }}
+                    {{ view.get_title() }}
                 </a>
                 {% endfor %}
             </div>
@@ -75,7 +75,7 @@
                 <a class="text-stone-500" href="{{ url ('admin:index') }}">Admin</a>
                 {% for parent in parent_view_classes %}
                 <span class="text-stone-400">/</span>
-                <a class="text-stone-500" href="{{ parent.get_absolute_url() }}">{{ parent.title }}</a>
+                <a class="text-stone-500" href="{{ parent.get_absolute_url() }}">{{ parent.get_title() }}</a>
                 {% endfor %}
                 <span class="text-stone-400">/</span>
                 <a class="text-stone-600" href="{{ request.path }}">{{ title }}</a>

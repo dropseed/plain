@@ -1,6 +1,12 @@
 from functools import cached_property
 
-from bolt.admin import AdminModelViewset, register_viewset
+from bolt.admin import (
+    AdminModelDetailView,
+    AdminModelListView,
+    AdminModelUpdateView,
+    AdminModelViewset,
+    register_viewset,
+)
 from bolt.admin.cards import Card
 from bolt.db.forms import ModelForm
 
@@ -23,10 +29,14 @@ class UnusedFlagsCard(Card):
 
 @register_viewset
 class FlagAdmin(AdminModelViewset):
-    model = Flag
-    list_fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
-    search_fields = ["name", "description"]
-    list_cards = [UnusedFlagsCard]
+    class ListView(AdminModelListView):
+        model = Flag
+        list_fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
+        search_fields = ["name", "description"]
+        list_cards = [UnusedFlagsCard]
+
+    class DetailView(AdminModelDetailView):
+        model = Flag
 
 
 class FlagResultForm(ModelForm):
@@ -37,17 +47,24 @@ class FlagResultForm(ModelForm):
 
 @register_viewset
 class FlagResultAdmin(AdminModelViewset):
-    model = FlagResult
-    list_fields = [
-        "flag",
-        "key",
-        "value",
-        "created_at__date",
-        "updated_at__date",
-        "uuid",
-    ]
-    search_fields = ["flag__name", "key"]
-    form_class = FlagResultForm
+    class ListView(AdminModelListView):
+        model = FlagResult
+        list_fields = [
+            "flag",
+            "key",
+            "value",
+            "created_at__date",
+            "updated_at__date",
+            "uuid",
+        ]
+        search_fields = ["flag__name", "key"]
 
-    def get_list_queryset(self):
-        return self.model.objects.all().select_related("flag")
+        def get_initial_queryset(self):
+            return self.model.objects.all().select_related("flag")
+
+    class DetailView(AdminModelDetailView):
+        model = FlagResult
+
+    class UpdateView(AdminModelUpdateView):
+        model = FlagResult
+        form_class = FlagResultForm
