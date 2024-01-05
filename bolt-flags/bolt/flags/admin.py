@@ -33,7 +33,7 @@ class FlagAdmin(AdminModelViewset):
         model = Flag
         list_fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
         search_fields = ["name", "description"]
-        list_cards = [UnusedFlagsCard]
+        cards = [UnusedFlagsCard]
         nav_section = "Feature flags"
 
     class DetailView(AdminModelDetailView):
