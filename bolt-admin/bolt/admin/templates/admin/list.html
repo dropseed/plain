@@ -14,23 +14,23 @@
             Objects ({{ page.paginator.count }})
         </div>
         <div class="flex space-x-5">
-            {% if list_filters %}
+            {% if filters %}
             <form method="GET" class="inline-flex">
                 <select data-autosubmit name="filter" class="text-sm border-gray-200 rounded-md">
                     <option value="">Filters</option>
-                    {% for filter in list_filters %}
-                    <option {% if filter == list_filter %}selected{% endif %}>{{ filter }}</option>
+                    {% for filter in filters %}
+                    <option {% if filter == active_filter %}selected{% endif %}>{{ filter }}</option>
                     {% endfor %}
                 </select>
             </form>
             {% endif %}
 
-            {% if list_actions %}
+            {% if actions %}
             <form method="POST" data-actions-form>
                 {{ csrf_input }}
                 <select name="action_key">
                     <option value="">Actions</option>
-                    {% for action in list_actions %}
+                    {% for action in actions %}
                     <option>{{ action }}</option>
                     {% endfor %}
                 </select>
@@ -69,9 +69,9 @@
         <table class="w-full mt-6 text-sm table-auto">
             <thead>
                 <tr class="bg-stone-100 [&>th]:py-2 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
-                    {% if list_actions %}<th></th>{% endif %}
+                    {% if actions %}<th></th>{% endif %}
 
-                    {% for field in list_fields %}
+                    {% for field in fields %}
                         {% if order_by_field is defined %}
                         <th>
                             <a class="font-mono text-xs font-normal text-gray-600" href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
@@ -97,13 +97,13 @@
                 {% for object in objects %}
                 <tr>
 
-                    {% if list_actions %}
+                    {% if actions %}
                     <td class="p-0 pl-1">
                         <input data-action-checkbox class="rounded-sm" type="checkbox" name="{{ get_object_pk(object) }}" />
                     </td>
                     {% endif %}
 
-                    {% for field in list_fields %}
+                    {% for field in fields %}
                     <td>
                         <div class="flex">
                             {% set value = get_object_field(object, field) %}

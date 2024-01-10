@@ -39,7 +39,7 @@ class AdminModelListView(AdminListView):
 
     model: "models.Model"
 
-    list_fields: list = ["pk"]
+    fields: list = ["pk"]
     list_order = []
     search_fields: list = ["pk"]
 

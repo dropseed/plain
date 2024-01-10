@@ -117,28 +117,28 @@ class AdminView(AuthViewMixin, TemplateView):
 
 class AdminListView(AdminView):
     template_name = "admin/list.html"
-    list_fields: list
-    list_actions: dict[str] = {}
-    list_filters: list[str] = []
+    fields: list
+    actions: dict[str] = {}
+    filters: list[str] = []
     page_size = 100
     show_search = False
 
     def get_context(self):
         context = super().get_context()
 
-        list_filter = self.request.GET.get("filter", "")
+        # Make this available on self for usage in get_objects and other methods
+        self.filter = self.request.GET.get("filter", "")
 
         objects = self.get_objects()
-        objects = self.filter_objects(list_filter, objects)
 
         context["paginator"] = Paginator(objects, self.page_size)
         context["page"] = context["paginator"].get_page(self.request.GET.get("page", 1))
         context["objects"] = context["page"]  # alias
-        context["list_fields"] = self.list_fields
-        context["list_actions"] = self.list_actions
+        context["fields"] = self.get_fields()
+        context["actions"] = self.get_actions()
+        context["filters"] = self.get_filters()
 
-        context["list_filters"] = self.list_filters
-        context["list_filter"] = list_filter
+        context["active_filter"] = self.filter
 
         # Implement search yourself in get_objects
         context["search_query"] = self.request.GET.get("search", "")
@@ -155,8 +155,9 @@ class AdminListView(AdminView):
 
     def post(self) -> HttpResponse:
         action_key = self.request.POST.get("action_key")
-        if action_key and action_key in self.list_actions:
-            action_callable = self.list_actions[action_key]
+        actions = self.get_actions()
+        if action_key and action_key in actions:
+            action_callable = actions[action_key]
             if isinstance(action_callable, str):
                 action_callable = getattr(self, action_callable)
             return action_callable(self.request.POST.getlist("action_pks"))
@@ -166,9 +167,14 @@ class AdminListView(AdminView):
     def get_objects(self) -> list:
         return []
 
-    def filter_objects(self, filter_name: str, objects: list):
-        """Implement custom object filters here by looking at filter name"""
-        return objects
+    def get_fields(self) -> list:
+        return self.fields
+
+    def get_actions(self) -> dict[str]:
+        return self.actions
+
+    def get_filters(self) -> list[str]:
+        return self.filters
 
     def get_object_field(self, obj, field: str):
         # Try basic dict lookup first

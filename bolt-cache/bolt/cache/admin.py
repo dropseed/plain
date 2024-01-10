@@ -12,7 +12,7 @@ class CachedItemViewset(AdminModelViewset):
     class ListView(AdminModelListView):
         nav_section = "Cache"
         model = CachedItem
-        list_fields = [
+        fields = [
             "key",
             "created_at",
             "expires_at",

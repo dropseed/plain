@@ -31,7 +31,7 @@ class UnusedFlagsCard(Card):
 class FlagAdmin(AdminModelViewset):
     class ListView(AdminModelListView):
         model = Flag
-        list_fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
+        fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
         search_fields = ["name", "description"]
         cards = [UnusedFlagsCard]
         nav_section = "Feature flags"
@@ -50,7 +50,7 @@ class FlagResultForm(ModelForm):
 class FlagResultAdmin(AdminModelViewset):
     class ListView(AdminModelListView):
         model = FlagResult
-        list_fields = [
+        fields = [
             "flag",
             "key",
             "value",
