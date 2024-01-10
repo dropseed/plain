@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from bolt.db import models
-from bolt.http import HttpResponse
+from bolt.http import HttpResponse, HttpResponseRedirect
 from bolt.paginator import Paginator
 from bolt.urls import reverse
 from bolt.utils.text import slugify
@@ -117,8 +117,8 @@ class AdminView(AuthViewMixin, TemplateView):
 
 class AdminListView(AdminView):
     template_name = "admin/list.html"
-    fields: list
-    actions: dict[str] = {}
+    fields: list[str]
+    actions: list[str] = []
     filters: list[str] = []
     page_size = 100
     show_search = False
@@ -154,15 +154,22 @@ class AdminListView(AdminView):
         return context
 
     def post(self) -> HttpResponse:
-        action_key = self.request.POST.get("action_key")
+        # won't be "key" anymore, just list
+        action_name = self.request.POST.get("action_name")
         actions = self.get_actions()
-        if action_key and action_key in actions:
-            action_callable = actions[action_key]
-            if isinstance(action_callable, str):
-                action_callable = getattr(self, action_callable)
-            return action_callable(self.request.POST.getlist("action_pks"))
+        if action_name and action_name in actions:
+            target_pks = self.request.POST["action_pks"].split(",")
+            response = self.perform_action(action_name, target_pks)
+            if response:
+                return response
+            else:
+                # message in session first
+                return HttpResponseRedirect(".")
 
         raise ValueError("Invalid action")
+
+    def perform_action(self, action: str, target_pks: list) -> HttpResponse | None:
+        raise NotImplementedError
 
     def get_objects(self) -> list:
         return []

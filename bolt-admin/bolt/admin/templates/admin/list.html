@@ -28,7 +28,7 @@
             {% if actions %}
             <form method="POST" data-actions-form>
                 {{ csrf_input }}
-                <select name="action_key">
+                <select name="action_name" class="text-sm border-gray-200 rounded-md">
                     <option value="">Actions</option>
                     {% for action in actions %}
                     <option>{{ action }}</option>

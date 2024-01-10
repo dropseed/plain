@@ -1,7 +1,7 @@
 jQuery(function ($) {
   var $actionCheckbox = $("[data-action-checkbox]");
   var $actionPks = $('[name="action_pks"]');
-  var $actionSelect = $('[name="action_key"]');
+  var $actionSelect = $('[name="action_name"]');
   var $actionSubmit = $('[data-actions-form] [type="submit"]');
 
   $actionCheckbox.on("change", function () {
