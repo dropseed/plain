@@ -40,7 +40,7 @@ class AdminModelListView(AdminListView):
     model: "models.Model"
 
     fields: list = ["pk"]
-    list_order = []
+    queryset_order = []
     search_fields: list = ["pk"]
 
     @classmethod
@@ -81,8 +81,8 @@ class AdminModelListView(AdminListView):
     def order_queryset(self, queryset):
         if order_by := self.request.GET.get("order_by"):
             queryset = queryset.order_by(order_by)
-        elif self.list_order:
-            queryset = queryset.order_by(*self.list_order)
+        elif self.queryset_order:
+            queryset = queryset.order_by(*self.queryset_order)
 
         return queryset
 

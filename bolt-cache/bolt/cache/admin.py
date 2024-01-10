@@ -18,7 +18,7 @@ class CachedItemViewset(AdminModelViewset):
             "expires_at",
             "updated_at",
         ]
-        list_order = ["-pk"]
+        queryset_order = ["-pk"]
 
         def get_list_queryset(self):
             return CachedItem.objects.all().only(
