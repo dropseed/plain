@@ -168,13 +168,15 @@ class AdminListView(AdminView):
         return []
 
     def get_fields(self) -> list:
-        return self.fields
+        return (
+            self.fields.copy()
+        )  # Avoid mutating the class attribute if using append etc
 
     def get_actions(self) -> dict[str]:
-        return self.actions
+        return self.actions.copy()  # Avoid mutating the class attribute itself
 
     def get_filters(self) -> list[str]:
-        return self.filters
+        return self.filters.copy()  # Avoid mutating the class attribute itself
 
     def get_object_field(self, obj, field: str):
         # Try basic dict lookup first
