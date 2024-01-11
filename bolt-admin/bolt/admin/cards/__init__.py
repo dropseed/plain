@@ -1,8 +1,8 @@
 from .base import Card
-from .charts import ChartCard, TrendCard
+from .charts import ChartCard, DailyTrendCard
 
 __all__ = [
     "Card",
     "ChartCard",
-    "TrendCard",
+    "DailyTrendCard",
 ]

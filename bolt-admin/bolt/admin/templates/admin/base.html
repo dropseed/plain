@@ -130,19 +130,30 @@
             </div>
         </div>
 
-        <div class="px-4 py-6 lg:px-8">
-            {% if cards %}
-            <div class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-2 lg:grid-cols-4">
-            {% for card in cards %}
+
+        {% if cards %}
+        <div class="px-4 mt-8 lg:px-8">
+            <div class="flex justify-end">
+                <div class="flex items-center">
+                    <form method="GET">
+                        <span class="text-xs text-gray-600">{{ time_zone }}</span>
+                        <input class="text-sm border-gray-200 rounded-md" type="datetime-local" name="from" value="{{ from_datetime|strftime('%Y-%m-%dT%H:%M') }}" >
+                        <input class="text-sm border-gray-200 rounded-md" type="datetime-local" name="to" value="{{ to_datetime|strftime('%Y-%m-%dT%H:%M') }}" >
+                        <button type="submit" class="px-2 py-1 text-sm border border-gray-200 rounded-md">Go</button>
+                    </form>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 gap-6 mt-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
+                {% for card in cards %}
                 <admin.Card size=card.size.value>
                     {{ render_card(card)|safe }}
                 </admin.Card>
-            {% endfor %}
+                {% endfor %}
             </div>
-            {% endif %}
-
-            <main>{% block content %}{% endblock %}</main>
         </div>
+        {% endif %}
+
+        <main class="px-4 py-6 lg:px-8">{% block content %}{% endblock %}</main>
     </div>
 
     <!-- TODO only if installed -->

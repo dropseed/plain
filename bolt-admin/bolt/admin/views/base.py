@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING
 
+from bolt.admin.dates import DatetimeRange, DatetimeRangeAliases
 from bolt.db import models
 from bolt.htmx.views import HTMXViewMixin
 from bolt.http import HttpResponse, HttpResponseRedirect
 from bolt.paginator import Paginator
 from bolt.urls import reverse
+from bolt.utils import timezone
 from bolt.utils.text import slugify
 from bolt.views import (
     AuthViewMixin,
@@ -46,6 +48,8 @@ class AdminView(AuthViewMixin, TemplateView):
     template_name = "admin/page.html"
     cards: list["Card"] = []
 
+    default_datetime_range = DatetimeRangeAliases.LAST_365_DAYS
+
     def get_context(self):
         context = super().get_context()
         context["title"] = self.get_title()
@@ -56,7 +60,17 @@ class AdminView(AuthViewMixin, TemplateView):
         context["admin_registry"] = registry
         context["cards"] = self.get_cards()
         context["render_card"] = self.render_card
+        context["from_datetime"] = self.datetime_range.start
+        context["to_datetime"] = self.datetime_range.end
+        context["time_zone"] = timezone.get_current_timezone_name()
         return context
+
+    def get_response(self):
+        default_range = DatetimeRangeAliases.to_range(self.default_datetime_range)
+        from_datetime = self.request.GET.get("from", default_range.start)
+        to_datetime = self.request.GET.get("to", default_range.end)
+        self.datetime_range = DatetimeRange(from_datetime, to_datetime)
+        return super().get_response()
 
     @classmethod
     def view_name(cls) -> str:
@@ -113,7 +127,7 @@ class AdminView(AuthViewMixin, TemplateView):
         # response = card.as_view()(self.request)
         # response.render()
         # content = response.content.decode()
-        return card().render(self.request)
+        return card().render(self.request, self.datetime_range)
 
 
 class AdminListView(HTMXViewMixin, AdminView):

@@ -13,7 +13,15 @@
     <div>
         <div class="flex items-center justify-between pb-2 border-b border-stone-200">
             <div class="font-semibold">
-                {{ title }}
+                {% if table_style == "simple" %}
+                    {{ title }}
+                {% else %}
+                    {% if page.has_other_pages() %}
+                    Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
+                    {% else %}
+                    Showing all {{ page.paginator.count }} results
+                    {% endif %}
+                {% endif %}
             </div>
             <div class="flex space-x-5">
                 {% if table_style == "simple" %}
