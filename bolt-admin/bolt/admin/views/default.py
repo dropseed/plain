@@ -22,3 +22,15 @@ class AdminIndexView(AdminView):
         context = super().get_context()
         context["dashboards"] = registry.registered_dashboards
         return context
+
+
+class AdminSearchView(AdminView):
+    template_name = "admin/search.html"
+    title = "Search"
+    slug = "search"
+
+    def get_context(self):
+        context = super().get_context()
+        context["searchable_views"] = registry.get_searchable_views()
+        context["global_search_query"] = self.request.GET.get("query", "")
+        return context

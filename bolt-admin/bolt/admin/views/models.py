@@ -36,6 +36,7 @@ def get_model_field(instance, field):
 
 class AdminModelListView(AdminListView):
     show_search = True
+    allow_global_search = True
 
     model: "models.Model"
 

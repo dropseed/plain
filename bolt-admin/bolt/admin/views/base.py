@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from bolt.db import models
+from bolt.htmx.views import HTMXViewMixin
 from bolt.http import HttpResponse, HttpResponseRedirect
 from bolt.paginator import Paginator
 from bolt.urls import reverse
@@ -115,13 +116,14 @@ class AdminView(AuthViewMixin, TemplateView):
         return card().render(self.request)
 
 
-class AdminListView(AdminView):
+class AdminListView(HTMXViewMixin, AdminView):
     template_name = "admin/list.html"
     fields: list[str]
     actions: list[str] = []
     filters: list[str] = []
     page_size = 100
     show_search = False
+    allow_global_search = False
 
     def get_context(self):
         context = super().get_context()
@@ -129,11 +131,13 @@ class AdminListView(AdminView):
         # Make this available on self for usage in get_objects and other methods
         self.filter = self.request.GET.get("filter", "")
 
-        objects = self.get_objects()
+        page_size = self.request.GET.get("page_size", self.page_size)
+        paginator = Paginator(self.get_objects(), page_size)
+        self._page = paginator.get_page(self.request.GET.get("page", 1))
 
-        context["paginator"] = Paginator(objects, self.page_size)
-        context["page"] = context["paginator"].get_page(self.request.GET.get("page", 1))
-        context["objects"] = context["page"]  # alias
+        context["paginator"] = paginator
+        context["page"] = self._page
+        context["objects"] = self._page  # alias
         context["fields"] = self.get_fields()
         context["actions"] = self.get_actions()
         context["filters"] = self.get_filters()
@@ -144,6 +148,8 @@ class AdminListView(AdminView):
         context["search_query"] = self.request.GET.get("search", "")
         context["show_search"] = self.show_search
 
+        context["table_style"] = getattr(self, "_table_style", "default")
+
         context["get_object_pk"] = self.get_object_pk
         context["get_object_field"] = self.get_object_field
 
@@ -152,6 +158,24 @@ class AdminListView(AdminView):
         context["get_update_url"] = self.get_update_url
 
         return context
+
+    def get(self) -> HttpResponse:
+        if self.is_htmx_request:
+            hx_from_this_page = self.request.path in self.request.headers.get(
+                "HX-Current-Url", ""
+            )
+            if not hx_from_this_page:
+                self._table_style = "simple"
+        else:
+            hx_from_this_page = False
+
+        response = super().get()
+
+        if self.is_htmx_request and not hx_from_this_page and not self._page:
+            # Don't render anything
+            return HttpResponse(status=204)
+
+        return response
 
     def post(self) -> HttpResponse:
         # won't be "key" anymore, just list

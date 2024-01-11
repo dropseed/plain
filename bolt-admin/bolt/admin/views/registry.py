@@ -96,6 +96,15 @@ class AdminViewRegistry:
 
         return urlpatterns
 
+    def get_searchable_views(self):
+        views = [
+            view
+            for view in self.registered_views
+            if getattr(view, "allow_global_search", False)
+        ]
+        views.sort(key=lambda v: v.get_title())
+        return views
+
 
 registry = AdminViewRegistry()
 register_view = registry.register_view

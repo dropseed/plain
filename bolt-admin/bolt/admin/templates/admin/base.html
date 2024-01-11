@@ -11,6 +11,7 @@
         {%- endif -%}
     </title>
     {% tailwind_css %}
+    {% htmx_js %}
     <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
     <script src="{{ asset('admin/jquery-3.6.1.slim.min.js') }}"></script>
     <script src="{{ asset('admin/chart.js') }}" defer></script>
@@ -83,7 +84,27 @@
                 <span class="text-stone-400">/</span>
                 <a class="text-stone-600" href="{{ request.path }}">{{ title }}</a>
             </div>
-            <div class="flex items-center">
+            <div class="flex items-center space-x-5">
+                <div class="flex justify-end">
+                    <form method="GET" action="{{ url('admin:search') }}" class="flex">
+                        <div class="relative max-w-xs">
+                            <label for="query" class="sr-only">Search</label>
+                            <input
+                                type="text"
+                                name="query"
+                                id="query"
+                                class="block w-full px-3 pl-10 text-sm border-gray-200 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Search everything"
+                                value="{{ global_search_query|default('') }}"
+                                >
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                                <svg class="h-3.5 w-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </form>
+                </div>
                 <a href="/">Back to app</a>
             </div>
         </div>
@@ -92,7 +113,7 @@
             <div>
             {% block header %}
                 <h1 class="text-2xl font-semibold text-stone-700">
-                    {{ title }}
+                    {% block title %}{{ title }}{% endblock %}
                 </h1>
                 {% if description %}
                 <p class="mt-2 text-sm text-gray-500">{{ description }}</p>
