@@ -19,6 +19,7 @@ class CachedItemViewset(AdminModelViewset):
             "updated_at",
         ]
         queryset_order = ["-pk"]
+        allow_global_search = False
 
         def get_list_queryset(self):
             return CachedItem.objects.all().only(
