@@ -1,0 +1,9 @@
+{% extends "admin/detail.html" %}
+
+{% block actions %}
+<form method="post">
+    {{ csrf_input }}
+    <input type="hidden" name="action" value="retry">
+    <button type="submit">Retry job</button>
+</form>
+{% endblock %}
