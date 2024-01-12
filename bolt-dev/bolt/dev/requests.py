@@ -42,7 +42,7 @@ class RequestLog:
         data["request"]["headers"].pop("Cookie", None)
 
         # TODO???
-        if data["request"]["headers"]["X-Forwarded-Proto"] == "https,https":
+        if data["request"]["headers"].get("X-Forwarded-Proto", "") == "https,https":
             data["request"]["headers"]["X-Forwarded-Proto"] = "https"
 
         response = requests.request(
