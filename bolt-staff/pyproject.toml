@@ -1,6 +1,6 @@
 [tool.poetry]
 
-name = "bolt-admin"
+name = "bolt-staff"
 packages = [
     { include = "bolt" },
 ]
@@ -13,6 +13,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.8"
+sqlparse = ">=0.2.2"
 # TODO bolt-htmx required
 
 [tool.poetry.dev-dependencies]

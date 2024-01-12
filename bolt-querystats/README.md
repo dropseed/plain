@@ -1,1 +1,0 @@
-bolt/querystats/README.md

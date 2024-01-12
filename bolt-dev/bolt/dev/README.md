@@ -31,7 +31,6 @@ The following processes will run simultaneously (some will only run if they are 
 - [`npm run watch`](#package-json)
 - [`stripe listen --forward-to`](#stripe)
 - [`ngrok http --subdomain`](#ngrok)
-- [`celery worker`](#celery)
 
 It also comes with [debugging](#debugging) tools to make local debugging easier with VS Code.
 
