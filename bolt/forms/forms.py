@@ -214,10 +214,6 @@ class BaseForm:
         if not self.is_bound:  # Stop further processing.
             return
         self.cleaned_data = {}
-        # If the form is permitted to be empty, and none of the form data has
-        # changed from the initial data, short circuit any validation.
-        if not self.has_changed():
-            return
 
         self._clean_fields()
         self._clean_form()
@@ -275,10 +271,6 @@ class BaseForm:
         association with the field named '__all__'.
         """
         return self.cleaned_data
-
-    def has_changed(self):
-        """Return True if data differs from initial."""
-        return bool(self.changed_data)
 
     @cached_property
     def changed_data(self):
