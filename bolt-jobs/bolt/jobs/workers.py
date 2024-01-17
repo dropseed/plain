@@ -8,7 +8,7 @@ from bolt.db import transaction
 from bolt.logs import app_logger
 from bolt.signals import request_finished, request_started
 
-from .models import JobRequest, JobResult
+from .models import Job, JobRequest, JobResult
 
 logger = logging.getLogger("bolt.jobs")
 
@@ -39,8 +39,8 @@ class Worker:
                 self.maybe_check_job_results()
 
                 with transaction.atomic():
-                    next_job = JobRequest.objects.next_up()
-                    if not next_job:
+                    job_request = JobRequest.objects.next_up()
+                    if not job_request:
                         # Potentially no jobs to process (who knows for how long)
                         # but sleep for a second to give the CPU and DB a break
                         time.sleep(1)
@@ -48,21 +48,21 @@ class Worker:
 
                     logger.info(
                         'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
-                        next_job.job_class,
-                        next_job.uuid,
-                        next_job.priority,
-                        next_job.source,
+                        job_request.job_class,
+                        job_request.uuid,
+                        job_request.priority,
+                        job_request.source,
                     )
 
-                    job_result = next_job.convert_to_result()
+                    job = job_request.convert_to_job()
 
-                job_result_uuid = str(job_result.uuid)  # Make a str copy
+                job_uuid = str(job.uuid)  # Make a str copy
 
                 # Release these now
-                del next_job
-                del job_result
+                del job_request
+                del job
 
-                self.executor.submit(process_job_result, job_result_uuid)
+                self.executor.submit(process_job, job_uuid)
 
         except (KeyboardInterrupt, SystemExit):
             self.executor.shutdown(wait=True, cancel_futures=True)
@@ -108,45 +108,56 @@ class Worker:
         )
 
     def check_job_results(self):
-        JobResult.objects.mark_lost_jobs()
+        Job.objects.mark_lost_jobs()
         JobResult.objects.retry_failed_jobs()
 
 
-def process_job_result(job_result_uuid):
-    worker_pid = os.getpid()
+def process_job(job_uuid):
+    try:
+        worker_pid = os.getpid()
 
-    request_started.send(sender=None)
-    job_result = JobResult.objects.get(uuid=job_result_uuid)
+        request_started.send(sender=None)
+        job = Job.objects.get(uuid=job_uuid)
 
-    logger.info(
-        'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
-        worker_pid,
-        job_result.job_class,
-        job_result.job_request_uuid,
-        job_result.priority,
-        job_result.source,
-    )
+        logger.info(
+            'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
+            worker_pid,
+            job.job_class,
+            job.job_request_uuid,
+            job.priority,
+            job.source,
+        )
 
-    app_logger.kv.context["job_request_uuid"] = str(job_result.job_request_uuid)
-    app_logger.kv.context["job_result_uuid"] = str(job_result.uuid)
+        app_logger.kv.context["job_request_uuid"] = str(job.job_request_uuid)
+        app_logger.kv.context["job_uuid"] = str(job.uuid)
 
-    job_result.process_job()
+        job_result = job.run()
 
-    app_logger.kv.context.pop("job_request_uuid", None)
-    app_logger.kv.context.pop("job_result_uuid", None)
+        # Release it now
+        del job
 
-    duration = job_result.ended_at - job_result.started_at
-    duration = duration.total_seconds()
+        app_logger.kv.context.pop("job_request_uuid", None)
+        app_logger.kv.context.pop("job_uuid", None)
 
-    logger.info(
-        'Completed job worker_pid=%s job_class=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_duration=%s',
-        worker_pid,
-        job_result.job_class,
-        job_result.job_request_uuid,
-        job_result.uuid,
-        job_result.priority,
-        job_result.source,
-        duration,
-    )
+        duration = job_result.ended_at - job_result.started_at
+        duration = duration.total_seconds()
 
-    request_finished.send(sender=None)
+        logger.info(
+            'Completed job worker_pid=%s job_class=%s job_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_duration=%s',
+            worker_pid,
+            job_result.job_class,
+            job_result.job_uuid,
+            job_result.job_request_uuid,
+            job_result.uuid,
+            job_result.priority,
+            job_result.source,
+            duration,
+        )
+    except Exception as e:
+        # Raising exceptions inside the worker process doesn't
+        # seem to be caught/shown anywhere as configured.
+        # So we at least log it out here.
+        # (A job should catch it's own user-code errors, so this is for library errors)
+        logger.exception(e)
+    finally:
+        request_finished.send(sender=None)

@@ -5,7 +5,7 @@ import click
 
 from bolt.utils import timezone
 
-from .models import JobRequest, JobResult
+from .models import Job, JobRequest, JobResult
 from .workers import Worker
 
 logger = logging.getLogger("bolt.jobs")
@@ -62,12 +62,14 @@ def clear_completed(older_than):
 @cli.command()
 def stats():
     pending = JobRequest.objects.count()
+    processing = Job.objects.count()
 
-    processing = JobResult.objects.processing().count()
     successful = JobResult.objects.successful().count()
     errored = JobResult.objects.errored().count()
+    lost = JobResult.objects.lost().count()
 
-    click.echo(f"Pending: {click.style(pending, bold=True)}")
-    click.echo(f"Processing: {click.style(processing, bold=True)}")
-    click.echo(f"Successful: {click.style(successful, bold=True)}")
-    click.echo(f"Errored: {click.style(errored, bold=True)}")
+    click.secho(f"Pending: {pending}", bold=True)
+    click.secho(f"Processing: {processing}", bold=True)
+    click.secho(f"Successful: {successful}", bold=True, fg="green")
+    click.secho(f"Errored: {errored}", bold=True, fg="red")
+    click.secho(f"Lost: {lost}", bold=True, fg="yellow")

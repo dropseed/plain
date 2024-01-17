@@ -8,7 +8,7 @@ from bolt.admin.cards import Card
 from bolt.admin.dates import DatetimeRangeAliases
 from bolt.http import HttpResponseRedirect
 
-from .models import JobRequest, JobResult
+from .models import Job, JobRequest, JobResult
 
 
 class SuccessfulJobsCard(Card):
@@ -83,6 +83,22 @@ class JobRequestViewset(AdminModelViewset):
 
 
 @register_viewset
+class JobViewset(AdminModelViewset):
+    class ListView(AdminModelListView):
+        nav_section = "Jobs"
+        model = Job
+        fields = ["id", "job_class", "priority", "created_at", "started_at"]
+        actions = ["Delete"]
+
+        def perform_action(self, action: str, target_pks: list):
+            if action == "Delete":
+                Job.objects.filter(pk__in=target_pks).delete()
+
+    class DetailView(AdminModelDetailView):
+        model = Job
+
+
+@register_viewset
 class JobResultViewset(AdminModelViewset):
     class ListView(AdminModelListView):
         nav_section = "Jobs"
@@ -91,7 +107,7 @@ class JobResultViewset(AdminModelViewset):
             "id",
             "job_class",
             "priority",
-            "started_at",
+            "created_at",
             "status",
         ]
         cards = [
@@ -102,11 +118,9 @@ class JobResultViewset(AdminModelViewset):
         ]
         filters = [
             "Successful",
-            "Processing",
             "Errored",
             "Lost",
             "Retried",
-            "Unknown",
         ]
         actions = [
             "Retry",
@@ -120,14 +134,10 @@ class JobResultViewset(AdminModelViewset):
                 return queryset.successful()
             if self.filter == "Errored":
                 return queryset.errored()
-            if self.filter == "Processing":
-                return queryset.processing()
             if self.filter == "Lost":
                 return queryset.lost()
             if self.filter == "Retried":
                 return queryset.retried()
-            if self.filter == "Unknown":
-                return queryset.unknown()
             return queryset
 
         def get_fields(self):
