@@ -254,6 +254,7 @@ class AdminListView(HTMXViewMixin, AdminView):
 
 class AdminDetailView(AdminView, DetailView):
     template_name = None
+    nav_section = ""
 
     def get_context(self):
         context = super().get_context()
@@ -276,6 +277,7 @@ class AdminDetailView(AdminView, DetailView):
 
 class AdminUpdateView(AdminView, UpdateView):
     template_name = None
+    nav_section = ""
 
     def get_template_names(self) -> list[str]:
         if not self.template_name and isinstance(self.object, models.Model):
@@ -301,5 +303,5 @@ class AdminCreateView(AdminView, CreateView):
 
 
 class AdminDeleteView(AdminView, DeleteView):
-    show_in_nav = False  # Never want this to show
     template_name = "admin/confirm_delete.html"
+    nav_section = ""
