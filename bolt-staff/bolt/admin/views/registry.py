@@ -1,4 +1,4 @@
-from bolt.urls import path
+from bolt.urls import path, reverse_lazy
 
 
 class AdminViewRegistry:
@@ -104,6 +104,20 @@ class AdminViewRegistry:
         ]
         views.sort(key=lambda v: v.get_title())
         return views
+
+    def get_model_detail_url(self, instance):
+        from bolt.admin.views.base import URL_NAMESPACE
+        from bolt.admin.views.models import AdminDetailView
+
+        for view in self.registered_views:
+            if not issubclass(view, AdminDetailView):
+                continue
+
+            if view.model == instance.__class__:
+                return reverse_lazy(
+                    f"{URL_NAMESPACE}:{view.view_name()}",
+                    kwargs={"pk": instance.pk},
+                )
 
 
 registry = AdminViewRegistry()
