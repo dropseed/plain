@@ -39,6 +39,8 @@ class JobRequest(models.Model):
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
 
+    unique_key = models.CharField(max_length=255, blank=True, db_index=True)
+
     start_at = models.DateTimeField(blank=True, null=True, db_index=True)
 
     # context
@@ -48,6 +50,12 @@ class JobRequest(models.Model):
 
     class Meta:
         ordering = ["priority", "-created_at"]
+        indexes = [
+            # Used to dedupe unique in-process jobs
+            models.Index(
+                name="job_request_class_unique_key", fields=["job_class", "unique_key"]
+            ),
+        ]
 
     def __str__(self):
         return f"{self.job_class} [{self.uuid}]"
@@ -65,6 +73,7 @@ class JobRequest(models.Model):
             source=self.source,
             retries=self.retries,
             retry_attempt=self.retry_attempt,
+            unique_key=self.unique_key,
         )
 
         # Delete the pending JobRequest now
@@ -107,11 +116,18 @@ class Job(models.Model):
     source = models.TextField(blank=True)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
+    unique_key = models.CharField(max_length=255, blank=True, db_index=True)
 
     objects = JobQuerySet.as_manager()
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            # Used to dedupe unique in-process jobs
+            models.Index(
+                name="job_class_unique_key", fields=["job_class", "unique_key"]
+            ),
+        ]
 
     def run(self):
         # This is how we know it has been picked up
@@ -149,6 +165,7 @@ class Job(models.Model):
             source=self.source,
             retries=self.retries,
             retry_attempt=self.retry_attempt,
+            unique_key=self.unique_key,
         )
 
         # Delete the Job now
@@ -219,6 +236,7 @@ class JobResult(models.Model):
     source = models.TextField(blank=True)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
+    unique_key = models.CharField(max_length=255, blank=True, db_index=True)
 
     # Retries
     retry_job_request_uuid = models.UUIDField(blank=True, null=True)
@@ -250,6 +268,8 @@ class JobResult(models.Model):
                 priority=self.priority,
                 source=self.source,
                 retries=self.retries,
+                unique_key=self.unique_key,
+                # For the retry
                 retry_attempt=retry_attempt,
                 start_at=start_at,
             )
