@@ -145,8 +145,11 @@ class AdminListView(HTMXViewMixin, AdminView):
         # Make this available on self for usage in get_objects and other methods
         self.filter = self.request.GET.get("filter", "")
 
+        # Make this available to get_filters and stuff
+        self.objects = self.get_objects()
+
         page_size = self.request.GET.get("page_size", self.page_size)
-        paginator = Paginator(self.get_objects(), page_size)
+        paginator = Paginator(self.objects, page_size)
         self._page = paginator.get_page(self.request.GET.get("page", 1))
 
         context["paginator"] = paginator
