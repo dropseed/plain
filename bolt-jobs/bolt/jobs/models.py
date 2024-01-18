@@ -90,10 +90,13 @@ class JobQuerySet(models.QuerySet):
         # In theory we could save a timeout per-job and mark them timed-out more quickly,
         # but if they're still running, we can't actually send a signal to cancel it...
         now = timezone.now()
-        one_day_ago = now - datetime.timedelta(seconds=settings.JOBS_LOST_AFTER)
+        cutoff = now - datetime.timedelta(seconds=settings.JOBS_LOST_AFTER)
         lost_jobs = self.filter(
-            created_at__lt=one_day_ago
+            created_at__lt=cutoff
         )  # Doesn't matter whether it started or not -- it shouldn't take this long.
+
+        # Note that this will save it in the results,
+        # but lost jobs are only retried if they have a retry!
         for job in lost_jobs:
             job.convert_to_result(
                 ended_at=now,
