@@ -67,6 +67,10 @@ class Worker:
         except (KeyboardInterrupt, SystemExit):
             self.executor.shutdown(wait=True, cancel_futures=True)
 
+        except Exception as e:
+            # Some kind of error in the job system...
+            logger.exception(e)
+
     def maybe_log_stats(self):
         if not self.stats_every:
             return
