@@ -3,6 +3,7 @@ jQuery(function ($) {
   var $actionPks = $('[name="action_pks"]');
   var $actionSelect = $('[name="action_name"]');
   var $actionSubmit = $('[data-actions-form] [type="submit"]');
+  var $lastActionCheckboxChecked = null;
 
   $actionCheckbox.on("change", function () {
     var pks = [];
@@ -29,5 +30,18 @@ jQuery(function ($) {
     }
   }
 
-  // TODO Enable shift-clicking to select a range of checkboxes
+  // Enable shift-clicking to select a range of checkboxes
+  $actionCheckbox.on("click", function (e) {
+    if (e.shiftKey) {
+      var $this = $(this);
+      var thisIndex = $actionCheckbox.index($this);
+      var lastIndex = $actionCheckbox.index($lastActionCheckboxChecked);
+      var minIndex = Math.min(thisIndex, lastIndex);
+      var maxIndex = Math.max(thisIndex, lastIndex);
+      var $checkboxes = $actionCheckbox.slice(minIndex, maxIndex + 1);
+      $checkboxes.prop("checked", $this.is(":checked"));
+    } else {
+      $lastActionCheckboxChecked = $(this);
+    }
+  });
 });
