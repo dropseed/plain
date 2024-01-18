@@ -255,9 +255,8 @@ class JobResult(models.Model):
             job = load_job(self.job_class, self.parameters)
             class_delay = job.get_retry_delay(retry_attempt)
         except Exception as e:
-            # Could fail for various reasons -- most likely with parameters loading (model instance lookup, etc.).
-            # Ideally we wouldn't instantiate the job at all here and risk any of the loading stuff at this stage.
-            # The .get_retry_delay could maybe be a class method, but it is nice to have access to the instance...
+            # If this fails at all (loading model instance from str, class not existing, user code error)
+            # then we just continue without a delay. The job request itself can handle the failure like normal.
             logger.exception(e)
             class_delay = None
 
