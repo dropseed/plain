@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from bolt.admin import (
     AdminModelDetailView,
     AdminModelListView,
@@ -7,8 +9,30 @@ from bolt.admin import (
 from bolt.admin.cards import Card
 from bolt.admin.dates import DatetimeRangeAliases
 from bolt.http import HttpResponseRedirect
+from bolt.runtime import settings
 
 from .models import Job, JobRequest, JobResult
+
+
+def _td_format(td_object):
+    seconds = int(td_object.total_seconds())
+    periods = [
+        ("year", 60 * 60 * 24 * 365),
+        ("month", 60 * 60 * 24 * 30),
+        ("day", 60 * 60 * 24),
+        ("hour", 60 * 60),
+        ("minute", 60),
+        ("second", 1),
+    ]
+
+    strings = []
+    for period_name, period_seconds in periods:
+        if seconds > period_seconds:
+            period_value, seconds = divmod(seconds, period_seconds)
+            has_s = "s" if period_value > 1 else ""
+            strings.append("%s %s%s" % (period_value, period_name, has_s))
+
+    return ", ".join(strings)
 
 
 class SuccessfulJobsCard(Card):
@@ -44,6 +68,10 @@ class ErroredJobsCard(Card):
 class LostJobsCard(Card):
     title = "Lost Jobs"
     text = "View"  # TODO make not required - just an icon?
+
+    def get_description(self):
+        delta = timedelta(seconds=settings.JOBS_LOST_AFTER)
+        return f"Jobs are considered lost after {_td_format(delta)}"
 
     def get_number(self):
         return (
@@ -127,6 +155,10 @@ class JobResultViewset(AdminModelViewset):
         ]
         allow_global_search = False
         default_datetime_range = DatetimeRangeAliases.LAST_7_DAYS
+
+        def get_description(self):
+            delta = timedelta(seconds=settings.JOBS_CLEARABLE_AFTER)
+            return f"Jobs are cleared after {_td_format(delta)}"
 
         def get_initial_queryset(self):
             queryset = super().get_initial_queryset()

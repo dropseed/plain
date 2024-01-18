@@ -3,6 +3,7 @@ import logging
 
 import click
 
+from bolt.runtime import settings
 from bolt.utils import timezone
 
 from .models import Job, JobRequest, JobResult
@@ -47,9 +48,8 @@ def worker(max_processes, max_jobs_per_process, stats_every):
 
 
 @cli.command()
-@click.option("--older-than", type=int, default=60 * 60 * 24 * 7)
-def clear_completed(older_than):
-    cutoff = timezone.now() - datetime.timedelta(seconds=older_than)
+def clear_completed():
+    cutoff = timezone.now() - datetime.timedelta(seconds=settings.JOBS_CLEARABLE_AFTER)
     click.echo(f"Clearing jobs finished before {cutoff}")
     results = (
         JobResult.objects.exclude(ended_at__isnull=True)

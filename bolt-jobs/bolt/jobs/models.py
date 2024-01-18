@@ -4,6 +4,7 @@ import traceback
 import uuid
 
 from bolt.db import models, transaction
+from bolt.runtime import settings
 from bolt.utils import timezone
 
 from .jobs import load_job
@@ -84,12 +85,12 @@ class JobRequest(models.Model):
 
 class JobQuerySet(models.QuerySet):
     def mark_lost_jobs(self):
-        # Nothing should be pending after more than a 24 hrs... consider it lost
-        # Downside to these is that they are mark lost pretty late?
+        # Lost jobs are jobs that have been pending for too long,
+        # and probably never going to get picked up by a worker process.
         # In theory we could save a timeout per-job and mark them timed-out more quickly,
         # but if they're still running, we can't actually send a signal to cancel it...
         now = timezone.now()
-        one_day_ago = now - datetime.timedelta(days=1)
+        one_day_ago = now - datetime.timedelta(seconds=settings.JOBS_LOST_AFTER)
         lost_jobs = self.filter(
             created_at__lt=one_day_ago
         )  # Doesn't matter whether it started or not -- it shouldn't take this long.

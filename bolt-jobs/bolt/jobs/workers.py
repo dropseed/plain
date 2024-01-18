@@ -98,7 +98,10 @@ class Worker:
 
     def log_stats(self):
         num_proccesses = len(self.executor._processes)
-        num_backlog_jobs = JobRequest.objects.count()
+        num_backlog_jobs = (
+            JobRequest.objects.count()
+            + Job.objects.filter(started_at__isnull=True).count()
+        )
         if num_backlog_jobs > 0:
             # Basically show how many jobs aren't about to be picked
             # up in this same tick (so if there's 1, we don't really need to log that as a backlog)
