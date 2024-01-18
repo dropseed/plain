@@ -250,13 +250,22 @@ class JobResult(models.Model):
 
     def retry_job(self, delay: int | None = None):
         retry_attempt = self.retry_attempt + 1
-        job = load_job(self.job_class, self.parameters)
+
+        try:
+            job = load_job(self.job_class, self.parameters)
+            class_delay = job.get_retry_delay(retry_attempt)
+        except Exception as e:
+            # Could fail for various reasons -- most likely with parameters loading (model instance lookup, etc.).
+            # Ideally we wouldn't instantiate the job at all here and risk any of the loading stuff at this stage.
+            # The .get_retry_delay could maybe be a class method, but it is nice to have access to the instance...
+            logger.exception(e)
+            class_delay = None
 
         if delay is not None:
             # A manual delay set when calling retry_job.
             # Use 0 to retry immediately.
             start_at = timezone.now() + datetime.timedelta(seconds=delay)
-        elif class_delay := job.get_retry_delay(retry_attempt):
+        elif class_delay:
             # Delay based on job class
             start_at = timezone.now() + datetime.timedelta(seconds=class_delay)
         else:
