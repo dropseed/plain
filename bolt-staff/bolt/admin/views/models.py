@@ -27,10 +27,6 @@ def get_model_field(instance, field):
 
         return result
 
-    # Automatically call get_FOO_display() if it exists
-    if display := getattr(instance, f"get_{field}_display", None):
-        return display()
-
     return getattr(instance, field)
 
 
@@ -97,8 +93,16 @@ class AdminModelListView(AdminListView):
 
         return queryset
 
-    def get_object_field(self, object, field: str):
-        return get_model_field(object, field)
+    def get_field_value(self, obj, field: str):
+        return get_model_field(obj, field)
+
+    def get_field_value_template(self, obj, field: str, value):
+        templates = super().get_field_value_template(obj, field, value)
+        if hasattr(obj, f"get_{field}_display"):
+            # Insert before the last default template,
+            # so it can still be overriden by the user
+            templates.insert(-1, "admin/values/get_display.html")
+        return templates
 
 
 class AdminModelDetailView(AdminDetailView):
@@ -124,8 +128,8 @@ class AdminModelDetailView(AdminDetailView):
         ]
         return context
 
-    def get_object_field(self, object, field: str):
-        return get_model_field(object, field)
+    def get_field_value(self, obj, field: str):
+        return get_model_field(obj, field)
 
     def get_object(self):
         return self.model.objects.get(pk=self.url_kwargs["pk"])

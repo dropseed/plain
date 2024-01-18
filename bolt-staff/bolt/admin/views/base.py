@@ -168,7 +168,8 @@ class AdminListView(HTMXViewMixin, AdminView):
         context["table_style"] = getattr(self, "_table_style", "default")
 
         context["get_object_pk"] = self.get_object_pk
-        context["get_object_field"] = self.get_object_field
+        context["get_field_value"] = self.get_field_value
+        context["get_field_value_template"] = self.get_field_value_template
 
         context["get_create_url"] = self.get_create_url
         context["get_detail_url"] = self.get_detail_url
@@ -226,7 +227,7 @@ class AdminListView(HTMXViewMixin, AdminView):
     def get_filters(self) -> list[str]:
         return self.filters.copy()  # Avoid mutating the class attribute itself
 
-    def get_object_field(self, obj, field: str):
+    def get_field_value(self, obj, field: str):
         # Try basic dict lookup first
         if field in obj:
             return obj[field]
@@ -234,24 +235,32 @@ class AdminListView(HTMXViewMixin, AdminView):
         # Try dot notation
         if "." in field:
             field, subfield = field.split(".", 1)
-            return self.get_object_field(obj[field], subfield)
+            return self.get_field_value(obj[field], subfield)
 
         # Try regular object attribute
         return getattr(obj, field)
 
     def get_object_pk(self, obj):
         try:
-            return self.get_object_field(obj, "pk")
+            return self.get_field_value(obj, "pk")
         except AttributeError:
-            return self.get_object_field(obj, "id")
+            return self.get_field_value(obj, "id")
+
+    def get_field_value_template(self, obj, field: str, value):
+        type_str = type(value).__name__.lower()
+        return [
+            f"admin/values/{type_str}.html",  # Create a template per-type
+            f"admin/values/{field}.html",  # Or for specific field names
+            "admin/values/default.html",
+        ]
 
     def get_create_url(self) -> str | None:
         return None
 
-    def get_detail_url(self, object) -> str | None:
+    def get_detail_url(self, obj) -> str | None:
         return None
 
-    def get_update_url(self, object) -> str | None:
+    def get_update_url(self, obj) -> str | None:
         return None
 
 
@@ -261,7 +270,7 @@ class AdminDetailView(AdminView, DetailView):
 
     def get_context(self):
         context = super().get_context()
-        context["get_object_field"] = self.get_object_field
+        context["get_field_value"] = self.get_field_value
         return context
 
     def get_template_names(self) -> list[str]:
@@ -274,7 +283,7 @@ class AdminDetailView(AdminView, DetailView):
 
         return super().get_template_names()
 
-    def get_object_field(self, obj, field: str):
+    def get_field_value(self, obj, field: str):
         return getattr(obj, field)
 
 

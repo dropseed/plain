@@ -7,7 +7,7 @@
     <dl class="grid grid-cols-2 mt-6 text-sm">
         {% for field in fields %}
         <dt class="font-mono bg-gray-100 rounded inline-block px-0.5">{{ field }}</dt>
-        <dd>{{ get_object_field(object, field) or "Empty" }}</dd>
+        <dd>{{ get_field_value(object, field) }}</dd>
         {% endfor %}
     </dl>
 </admin.Card>
