@@ -1,5 +1,6 @@
 import datetime
 import logging
+import signal
 
 import click
 
@@ -40,11 +41,22 @@ def cli():
     envvar="BOLT_JOBS_STATS_EVERY",
 )
 def worker(max_processes, max_jobs_per_process, stats_every):
-    Worker(
+    worker = Worker(
         max_processes=max_processes,
         max_jobs_per_process=max_jobs_per_process,
         stats_every=stats_every,
-    ).run()
+    )
+
+    def _shutdown(signalnum, _):
+        logger.info("Job worker shutdown signal received signalnum=%s", signalnum)
+        worker.shutdown()
+
+    # Allow the worker to be stopped gracefully on SIGTERM
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    # Start processing jobs
+    worker.run()
 
 
 @cli.command()

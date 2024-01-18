@@ -2,13 +2,14 @@ import logging
 import multiprocessing
 import os
 import time
+import uuid
 from concurrent.futures import ProcessPoolExecutor
 
 from bolt.db import transaction
 from bolt.logs import app_logger
 from bolt.signals import request_finished, request_started
 
-from .models import Job, JobRequest, JobResult
+from .models import Job, JobRequest, JobResult, JobResultStatuses
 
 logger = logging.getLogger("bolt.jobs")
 
@@ -27,49 +28,71 @@ class Worker:
         self.max_processes = self.executor._max_workers
         self.max_jobs_per_process = max_jobs_per_process
 
+        self.uuid = uuid.uuid4()
+
     def run(self):
         logger.info(
             "Starting job worker with %s max processes",
             self.max_processes,
         )
 
-        try:
-            while True:
-                try:
-                    self.maybe_log_stats()
-                    self.maybe_check_job_results()
-                except Exception as e:
-                    # Log the issue, but don't stop the worker
-                    # (these tasks are kind of ancilarry to the main job processing)
-                    logger.exception(e)
+        while True:
+            try:
+                self.maybe_log_stats()
+                self.maybe_check_job_results()
+            except Exception as e:
+                # Log the issue, but don't stop the worker
+                # (these tasks are kind of ancilarry to the main job processing)
+                logger.exception(e)
 
-                with transaction.atomic():
-                    job_request = JobRequest.objects.next_up()
-                    if not job_request:
-                        # Potentially no jobs to process (who knows for how long)
-                        # but sleep for a second to give the CPU and DB a break
-                        time.sleep(1)
-                        continue
+            with transaction.atomic():
+                job_request = JobRequest.objects.next_up()
+                if not job_request:
+                    # Potentially no jobs to process (who knows for how long)
+                    # but sleep for a second to give the CPU and DB a break
+                    time.sleep(1)
+                    continue
 
-                    logger.info(
-                        'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
-                        job_request.job_class,
-                        job_request.uuid,
-                        job_request.priority,
-                        job_request.source,
-                    )
+                logger.info(
+                    'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
+                    job_request.job_class,
+                    job_request.uuid,
+                    job_request.priority,
+                    job_request.source,
+                )
 
-                    job = job_request.convert_to_job()
+                job = job_request.convert_to_job(worker_uuid=self.uuid)
 
-                job_uuid = str(job.uuid)  # Make a str copy
+            job_uuid = str(job.uuid)  # Make a str copy
 
-                # Release these now
-                del job_request
-                del job
+            # Release these now
+            del job_request
+            del job
 
-                self.executor.submit(process_job, job_uuid)
-        except (KeyboardInterrupt, SystemExit):
-            self.executor.shutdown(wait=True, cancel_futures=True)
+            self.executor.submit(process_job, job_uuid)
+
+    def shutdown(self):
+        # Prevent duplicate keyboard and sigterm calls
+        # (the way this works also only lets us shutdown once per instance)
+        if getattr(self, "_is_shutting_down", False):
+            return
+        self._is_shutting_down = True
+
+        logger.info("Job worker shutdown started")
+
+        # Make an attept to immediatelly move any unstarted jobs from this worker
+        # to the JobResults as cancelled. If they have a retry, they'll be picked
+        # up by the next worker process.
+        for job in Job.objects.filter(worker_uuid=self.uuid, started_at__isnull=True):
+            job.convert_to_result(status=JobResultStatuses.CANCELLED)
+
+        # Now shutdown the process pool.
+        # There's still some chance of a race condition here where we
+        # just deleted a Job and it was still picked up, but we'll log
+        # missing jobs as warnings instead of exceptions.
+        self.executor.shutdown(wait=True, cancel_futures=True)
+
+        logger.info("Job worker shutdown complete")
 
     def maybe_log_stats(self):
         if not self.stats_every:
@@ -124,7 +147,16 @@ def process_job(job_uuid):
         worker_pid = os.getpid()
 
         request_started.send(sender=None)
-        job = Job.objects.get(uuid=job_uuid)
+
+        try:
+            job = Job.objects.get(uuid=job_uuid)
+        except Job.DoesNotExist:
+            logger.warning(
+                "Job not found worker_pid=%s job_uuid=%s",
+                worker_pid,
+                job_uuid,
+            )
+            return
 
         logger.info(
             'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',

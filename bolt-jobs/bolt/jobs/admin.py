@@ -30,7 +30,7 @@ def _td_format(td_object):
         if seconds > period_seconds:
             period_value, seconds = divmod(seconds, period_seconds)
             has_s = "s" if period_value > 1 else ""
-            strings.append("%s %s%s" % (period_value, period_name, has_s))
+            strings.append(f"{period_value} {period_name}{has_s}")
 
     return ", ".join(strings)
 
@@ -147,6 +147,7 @@ class JobResultViewset(AdminModelViewset):
         filters = [
             "Successful",
             "Errored",
+            "Cancelled",
             "Lost",
             "Retried",
         ]
@@ -166,6 +167,8 @@ class JobResultViewset(AdminModelViewset):
                 return queryset.successful()
             if self.filter == "Errored":
                 return queryset.errored()
+            if self.filter == "Cancelled":
+                return queryset.cancelled()
             if self.filter == "Lost":
                 return queryset.lost()
             if self.filter == "Retried":

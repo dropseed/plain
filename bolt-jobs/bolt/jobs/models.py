@@ -61,24 +61,26 @@ class JobRequest(models.Model):
     def __str__(self):
         return f"{self.job_class} [{self.uuid}]"
 
-    def convert_to_job(self):
+    def convert_to_job(self, *, worker_uuid=None):
         """
         JobRequests are the pending jobs that are waiting to be executed.
         We immediately convert them to JobResults when they are picked up.
         """
-        result = Job.objects.create(
-            job_request_uuid=self.uuid,
-            job_class=self.job_class,
-            parameters=self.parameters,
-            priority=self.priority,
-            source=self.source,
-            retries=self.retries,
-            retry_attempt=self.retry_attempt,
-            unique_key=self.unique_key,
-        )
+        with transaction.atomic():
+            result = Job.objects.create(
+                job_request_uuid=self.uuid,
+                job_class=self.job_class,
+                parameters=self.parameters,
+                priority=self.priority,
+                source=self.source,
+                retries=self.retries,
+                retry_attempt=self.retry_attempt,
+                unique_key=self.unique_key,
+                worker_uuid=worker_uuid,
+            )
 
-        # Delete the pending JobRequest now
-        self.delete()
+            # Delete the pending JobRequest now
+            self.delete()
 
         return result
 
@@ -109,6 +111,9 @@ class Job(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     started_at = models.DateTimeField(blank=True, null=True, db_index=True)
+
+    # To associate with a worker
+    worker_uuid = models.UUIDField(blank=True, null=True, db_index=True)
 
     # From the JobRequest
     job_request_uuid = models.UUIDField(db_index=True)
@@ -152,26 +157,29 @@ class Job(models.Model):
         """
         Convert this Job to a JobResult.
         """
-        result = JobResult.objects.create(
-            ended_at=timezone.now(),
-            error=error,
-            status=status,
-            # From the Job
-            job_uuid=self.uuid,
-            started_at=self.started_at,
-            # From the JobRequest
-            job_request_uuid=self.job_request_uuid,
-            job_class=self.job_class,
-            parameters=self.parameters,
-            priority=self.priority,
-            source=self.source,
-            retries=self.retries,
-            retry_attempt=self.retry_attempt,
-            unique_key=self.unique_key,
-        )
+        with transaction.atomic():
+            result = JobResult.objects.create(
+                ended_at=timezone.now(),
+                error=error,
+                status=status,
+                # From the worker
+                worker_uuid=self.worker_uuid,
+                # From the Job
+                job_uuid=self.uuid,
+                started_at=self.started_at,
+                # From the JobRequest
+                job_request_uuid=self.job_request_uuid,
+                job_class=self.job_class,
+                parameters=self.parameters,
+                priority=self.priority,
+                source=self.source,
+                retries=self.retries,
+                retry_attempt=self.retry_attempt,
+                unique_key=self.unique_key,
+            )
 
-        # Delete the Job now
-        self.delete()
+            # Delete the Job now
+            self.delete()
 
         return result
 
@@ -179,6 +187,9 @@ class Job(models.Model):
 class JobResultQuerySet(models.QuerySet):
     def successful(self):
         return self.filter(status=JobResultStatuses.SUCCESSFUL)
+
+    def cancelled(self):
+        return self.filter(status=JobResultStatuses.CANCELLED)
 
     def lost(self):
         return self.filter(status=JobResultStatuses.LOST)
@@ -192,19 +203,31 @@ class JobResultQuerySet(models.QuerySet):
             | models.Q(retry_attempt__gt=0)
         )
 
-    def retry_failed_jobs(self):
-        for result in self.filter(
-            status__in=[JobResultStatuses.ERRORED, JobResultStatuses.LOST],
+    def failed(self):
+        return self.filter(
+            status__in=[
+                JobResultStatuses.ERRORED,
+                JobResultStatuses.LOST,
+                JobResultStatuses.CANCELLED,
+            ]
+        )
+
+    def retryable(self):
+        return self.failed().filter(
             retry_job_request_uuid__isnull=True,
             retries__gt=0,
             retry_attempt__lt=models.F("retries"),
-        ):
+        )
+
+    def retry_failed_jobs(self):
+        for result in self.retryable():
             result.retry_job()
 
 
 class JobResultStatuses(models.TextChoices):
     SUCCESSFUL = "SUCCESSFUL", "Successful"
     ERRORED = "ERRORED", "Errored"  # Threw an error
+    CANCELLED = "CANCELLED", "Cancelled"  # Cancelled (probably by deploy)
     LOST = (
         "LOST",
         "Lost",
@@ -218,6 +241,9 @@ class JobResult(models.Model):
 
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    # To associate with a worker
+    worker_uuid = models.UUIDField(blank=True, null=True, db_index=True)
 
     # From the Job
     job_uuid = models.UUIDField(db_index=True)
