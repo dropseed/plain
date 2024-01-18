@@ -98,11 +98,7 @@ class JobQuerySet(models.QuerySet):
         # Note that this will save it in the results,
         # but lost jobs are only retried if they have a retry!
         for job in lost_jobs:
-            job.convert_to_result(
-                ended_at=now,
-                error="",
-                status=JobResultStatuses.LOST,
-            )
+            job.convert_to_result(status=JobResultStatuses.LOST)
 
 
 class Job(models.Model):

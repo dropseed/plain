@@ -35,8 +35,13 @@ class Worker:
 
         try:
             while True:
-                self.maybe_log_stats()
-                self.maybe_check_job_results()
+                try:
+                    self.maybe_log_stats()
+                    self.maybe_check_job_results()
+                except Exception as e:
+                    # Log the issue, but don't stop the worker
+                    # (these tasks are kind of ancilarry to the main job processing)
+                    logger.exception(e)
 
                 with transaction.atomic():
                     job_request = JobRequest.objects.next_up()
@@ -63,13 +68,8 @@ class Worker:
                 del job
 
                 self.executor.submit(process_job, job_uuid)
-
         except (KeyboardInterrupt, SystemExit):
             self.executor.shutdown(wait=True, cancel_futures=True)
-
-        except Exception as e:
-            # Some kind of error in the job system...
-            logger.exception(e)
 
     def maybe_log_stats(self):
         if not self.stats_every:
