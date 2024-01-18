@@ -90,7 +90,7 @@ class JobQuerySet(models.QuerySet):
         # but if they're still running, we can't actually send a signal to cancel it...
         now = timezone.now()
         one_day_ago = now - datetime.timedelta(days=1)
-        lost_jobs = self.filter(created_at__lt=one_day_ago)
+        lost_jobs = self.filter(created_at__lt=one_day_ago)  # Doesn't matter whether it started or not -- it shouldn't take this long.
         for job in lost_jobs:
             job.convert_to_result(
                 ended_at=now,

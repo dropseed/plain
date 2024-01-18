@@ -161,7 +161,7 @@ class Job(metaclass=JobType):
         A unique key to prevent duplicate jobs from being queued.
         Enabled by returning a non-empty string.
         """
-        raise ""
+        return ""
 
     def get_priority(self) -> int:
         return 0
