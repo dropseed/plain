@@ -86,6 +86,12 @@ class JobRequest(models.Model):
 
 
 class JobQuerySet(models.QuerySet):
+    def running(self):
+        return self.filter(started_at__isnull=False)
+
+    def waiting(self):
+        return self.filter(started_at__isnull=True)
+
     def mark_lost_jobs(self):
         # Lost jobs are jobs that have been pending for too long,
         # and probably never going to get picked up by a worker process.

@@ -99,6 +99,20 @@ class RetriedJobsCard(Card):
         return JobResultViewset.ListView.get_absolute_url() + "?filter=Retried"
 
 
+class WaitingJobsCard(Card):
+    title = "Waiting Jobs"
+
+    def get_number(self):
+        return Job.objects.waiting().count()
+
+
+class RunningJobsCard(Card):
+    title = "Running Jobs"
+
+    def get_number(self):
+        return Job.objects.running().count()
+
+
 @register_viewset
 class JobRequestViewset(AdminModelViewset):
     class ListView(AdminModelListView):
@@ -117,6 +131,10 @@ class JobViewset(AdminModelViewset):
         model = Job
         fields = ["id", "job_class", "priority", "created_at", "started_at"]
         actions = ["Delete"]
+        cards = [
+            WaitingJobsCard,
+            RunningJobsCard,
+        ]
 
         def perform_action(self, action: str, target_pks: list):
             if action == "Delete":
