@@ -30,13 +30,15 @@ class Worker:
 
         self.uuid = uuid.uuid4()
 
+        self._is_shutting_down = False
+
     def run(self):
         logger.info(
             "Starting job worker with %s max processes",
             self.max_processes,
         )
 
-        while True:
+        while not self._is_shutting_down:
             try:
                 self.maybe_log_stats()
                 self.maybe_check_job_results()
@@ -72,10 +74,10 @@ class Worker:
             self.executor.submit(process_job, job_uuid)
 
     def shutdown(self):
-        # Prevent duplicate keyboard and sigterm calls
-        # (the way this works also only lets us shutdown once per instance)
-        if getattr(self, "_is_shutting_down", False):
+        if self._is_shutting_down:
+            # Already shutting down somewhere else
             return
+
         self._is_shutting_down = True
 
         logger.info("Job worker shutdown started")
@@ -120,7 +122,12 @@ class Worker:
             self.check_job_results()
 
     def log_stats(self):
-        num_proccesses = len(self.executor._processes)
+        try:
+            num_proccesses = len(self.executor._processes)
+        except (AttributeError, TypeError):
+            # Depending on shutdown timing and internal behavior, this might not work
+            num_proccesses = 0
+
         num_backlog_jobs = (
             JobRequest.objects.count()
             + Job.objects.filter(started_at__isnull=True).count()
