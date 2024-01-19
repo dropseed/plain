@@ -19,7 +19,7 @@
     {% block header_scripts %}{% endblock %}
 </head>
 <body class="flex min-h-screen text-black bg-stone-900">
-    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-6 pt-6 pb-5 lg:flex">
+    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-6 pt-6 pb-5 lg:flex overflow-auto">
         <div>
             <a class="inline-flex items-center font-bold text-stone-300" href="{{ url('admin:index') }}">
                 <svg class="w-5 h-5 mr-2" width="237" height="237" viewBox="0 0 237 237" fill="none" xmlns="http://www.w3.org/2000/svg">
