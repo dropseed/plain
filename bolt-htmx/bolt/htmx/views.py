@@ -5,7 +5,7 @@ class HTMXViewMixin:
     htmx_template_name = ""
 
     def render_template(self):
-        template = super().get_template()
+        template = self.get_template()
         context = self.get_context()
 
         if self.is_htmx_request and self.htmx_fragment_name:
