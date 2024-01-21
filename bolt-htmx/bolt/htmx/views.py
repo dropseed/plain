@@ -1,5 +1,7 @@
 import re
 
+from bolt.utils.cache import patch_vary_headers
+
 
 class HTMXViewMixin:
     htmx_template_name = ""
@@ -18,6 +20,13 @@ class HTMXViewMixin:
             )
 
         return template.render(context)
+
+    def get_response(self):
+        response = super().get_response()
+        # Tell browser caching to also consider the fragment header,
+        # not just the url/cookie.
+        patch_vary_headers(response, ["HX-Request", "BHX-Fragment", "BHX-Action"])
+        return response
 
     def get_request_handler(self):
         if self.is_htmx_request:
