@@ -7,9 +7,7 @@ from .defaults import create_default_environment, get_template_dirs
 
 class JinjaEnvironment(LazyObject):
     def _setup(self):
-        environment_setting = getattr(
-            settings, "JINJA_ENVIRONMENT", create_default_environment
-        )
+        environment_setting = settings.JINJA_ENVIRONMENT
 
         if isinstance(environment_setting, str):
             environment = import_string(environment_setting)()

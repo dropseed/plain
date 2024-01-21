@@ -6,9 +6,8 @@ from jinja2 import Environment, StrictUndefined
 
 from bolt.packages import packages
 from bolt.runtime import settings
-from bolt.utils.module_loading import module_has_submodule
+from bolt.utils.module_loading import import_string, module_has_submodule
 
-from .components import FileSystemTemplateComponentsLoader
 from .filters import default_filters
 from .globals import default_globals
 
@@ -92,8 +91,9 @@ def create_default_environment(include_packages=True, **environment_kwargs):
     This default jinja environment, also used by the error rendering and internal views so
     customization needs to happen by using this function, not settings that hook in internally.
     """
+    loader = import_string(settings.JINJA_LOADER)(get_template_dirs())
     kwargs = {
-        "loader": FileSystemTemplateComponentsLoader(get_template_dirs()),
+        "loader": loader,
         "autoescape": True,
         "auto_reload": settings.DEBUG,
         "undefined": StrictUndefined,

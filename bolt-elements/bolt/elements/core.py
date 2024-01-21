@@ -13,55 +13,55 @@ if TYPE_CHECKING:
     from jinja2 import Environment
 
 
-class FileSystemTemplateComponentsLoader(FileSystemLoader):
+class ElementsLoader(FileSystemLoader):
     def get_source(self, environment: "Environment", template: str):
         contents, path, uptodate = super().get_source(environment, template)
 
-        # Clear components cache if it looks like a component changed
-        # if os.path.splitext(path)[1] == ".html" and "components" in path and "template_components" in self.__dict__:
-        #     del self.__dict__["template_components"]
+        # Clear elements cache if it looks like a element changed
+        # if os.path.splitext(path)[1] == ".html" and "elements" in path and "template_elements" in self.__dict__:
+        #     del self.__dict__["template_elements"]
 
-        # If it's html, replace component tags
+        # If it's html, replace element tags
         if os.path.splitext(path)[1] == ".html":
-            self._template_components_environment = (
-                environment  # Save this so we can use it in template_components
+            self._elements_environment = (
+                environment  # Save this so we can use it in template_elements
             )
-            contents = self.replace_template_component_tags(contents)
+            contents = self.replace_template_element_tags(contents)
 
         return contents, path, uptodate
 
     @cached_property
-    def template_components(self):
-        components = []
+    def template_elements(self):
+        elements = []
 
         for searchpath in self.searchpath:
-            components_dir = os.path.join(searchpath, "components")
-            if os.path.isdir(components_dir):
-                for root, dirs, files in os.walk(components_dir):
+            elements_dir = os.path.join(searchpath, "elements")
+            if os.path.isdir(elements_dir):
+                for root, dirs, files in os.walk(elements_dir):
                     for file in files:
                         relative_path = os.path.relpath(
-                            os.path.join(root, file), components_dir
+                            os.path.join(root, file), elements_dir
                         )
                         # Replace slashes with .
-                        component_name = os.path.splitext(relative_path)[0].replace(
+                        element_name = os.path.splitext(relative_path)[0].replace(
                             os.sep, "."
                         )
-                        components.append(
+                        elements.append(
                             {
                                 "path": relative_path,
-                                "html_name": component_name,  # Uses . syntax
-                                "tag_name": component_name.replace(
+                                "html_name": element_name,  # Uses . syntax
+                                "tag_name": element_name.replace(
                                     ".", "_"
                                 ),  # Uses _ syntax
                             }
                         )
 
-        for component in components:
-            component_name = component["html_name"]
-            jinja_tag_name = component["tag_name"]
-            component_relative_path = component["path"]
+        for element in elements:
+            element_name = element["html_name"]
+            jinja_tag_name = element["tag_name"]
+            element_relative_path = element["path"]
 
-            class ComponentExtension(Extension):
+            class ElemenetExtension(Extension):
                 def parse(self, parser):
                     lineno = next(parser.stream).lineno
                     args = [
@@ -93,27 +93,27 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
                     rendered = template.render({**context, **kwargs})
 
                     if settings.DEBUG:
-                        # Add an HTML comment in dev to help identify components in output
+                        # Add an HTML comment in dev to help identify elements in output
                         return f"<!-- <{self.html_name}>\n{self.source_ref} -->\n{rendered}\n<!-- </{self.html_name}> -->"
                     else:
                         return rendered
 
             # Create a new class on the fly
-            NamedComponentExtension = type(
-                f"HTMLComponent.{component_name}",
-                (ComponentExtension,),
+            NamedElementExtension = type(
+                f"BoltElement.{element_name}",
+                (ElemenetExtension,),
                 {
                     "tags": {jinja_tag_name, f"end{jinja_tag_name}"},
-                    "template_name": f"components/{component_relative_path}",
+                    "template_name": f"elements/{element_relative_path}",
                     "jinja_tag_name": jinja_tag_name,
-                    "html_name": component_name,
+                    "html_name": element_name,
                 },
             )
-            self._template_components_environment.add_extension(NamedComponentExtension)
+            self._elements_environment.add_extension(NamedElementExtension)
 
-        return components
+        return elements
 
-    def replace_template_component_tags(self, contents: str):
+    def replace_template_element_tags(self, contents: str):
         def replace_quoted_braces(s) -> str:
             """
             We're converting to tag syntax, but it's very natural to write
@@ -122,19 +122,19 @@ class FileSystemTemplateComponentsLoader(FileSystemLoader):
             """
             return re.sub(r"(?<=\"{{)(.+)(?=}}\")", r"\1", s)
 
-        for component in self.template_components:
-            component_name = component["html_name"]
-            jinja_tag_name = component["tag_name"]
+        for element in self.template_elements:
+            element_name = element["html_name"]
+            jinja_tag_name = element["tag_name"]
 
             closing_pattern = re.compile(
-                rf"<{component_name}(\s+[\s\S]*?)?>([\s\S]*?)</{component_name}>"
+                rf"<{element_name}(\s+[\s\S]*?)?>([\s\S]*?)</{element_name}>"
             )
-            self_closing_pattern = re.compile(rf"<{component_name}(\s+[\s\S]*?)?/>")
+            self_closing_pattern = re.compile(rf"<{element_name}(\s+[\s\S]*?)?/>")
 
             def closing_cb(match: re.Match) -> str:
-                if f"<{component_name}" in match.group(2):
+                if f"<{element_name}" in match.group(2):
                     raise ValueError(
-                        f"Component {component_name} cannot be nested in itself"
+                        f"Element {element_name} cannot be nested in itself"
                     )
 
                 attrs_str = match.group(1) or ""

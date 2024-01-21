@@ -190,3 +190,10 @@ SECURE_REDIRECT_EXEMPT = []
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_SSL_HOST = None
 SECURE_SSL_REDIRECT = False
+
+#############
+# Templates #
+#############
+
+JINJA_LOADER = "jinja2.loaders.FileSystemLoader"
+JINJA_ENVIRONMENT = "bolt.jinja.defaults.create_default_environment"
