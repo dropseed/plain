@@ -15,7 +15,11 @@ class ErrorView(TemplateView):
     def get_template_names(self) -> list[str]:
         return [f"{self.status_code}.html", "error.html"]
 
+    def get_request_handler(self):
+        return self.get  # All methods (post, patch, etc.) will use the get()
+
     def get_response(self) -> HttpResponseBase:
-        response = super().get()  # All methods (post, patch, etc.) will use the get()
+        response = super().get_response()
+        # Set the status code we want
         response.status_code = self.status_code
         return response
