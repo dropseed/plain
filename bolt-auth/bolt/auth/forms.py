@@ -1,12 +1,13 @@
 import unicodedata
 
-from bolt import forms, jinja
+from bolt import forms
 from bolt.auth import authenticate, get_user_model, password_validation
 from bolt.auth.models import User
 from bolt.auth.tokens import default_token_generator
 from bolt.db.forms import ModelForm
 from bolt.exceptions import ValidationError
 from bolt.mail import EmailMultiAlternatives
+from bolt.templates import Template
 from bolt.utils.encoding import force_bytes
 from bolt.utils.http import urlsafe_base64_encode
 
@@ -279,16 +280,16 @@ class PasswordResetForm(forms.Form):
         """
         Send a bolt.mail.EmailMultiAlternatives to `to_email`.
         """
-        template = jinja.environment.from_string(subject_template_name)
+        template = Template(subject_template_name)
         subject = template.render(context)
         # Email subject *must not* contain newlines
         subject = "".join(subject.splitlines())
-        template = jinja.environment.from_string(email_template_name)
+        template = Template(email_template_name)
         body = template.render(context)
 
         email_message = EmailMultiAlternatives(subject, body, from_email, [to_email])
         if html_email_template_name is not None:
-            template = jinja.environment.from_string(html_email_template_name)
+            template = Template(html_email_template_name)
             html_email = template.render(context)
             email_message.attach_alternative(html_email, "text/html")
 

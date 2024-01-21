@@ -3,8 +3,8 @@ import os
 import frontmatter
 import pycmarkgfm
 
-from bolt.jinja import environment
 from bolt.runtime import settings
+from bolt.templates.jinja import environment
 from bolt.utils.functional import cached_property
 
 

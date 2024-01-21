@@ -15,7 +15,6 @@ logger = logging.getLogger("bolt.request")
 
 class BaseHandler:
     _view_middleware = None
-    _template_response_middleware = None
     _exception_middleware = None
     _middleware_chain = None
 
@@ -26,7 +25,6 @@ class BaseHandler:
         Must be called after the environment is fixed (see __call__ in subclasses).
         """
         self._view_middleware = []
-        self._template_response_middleware = []
         self._exception_middleware = []
 
         get_response = self._get_response
@@ -60,10 +58,6 @@ class BaseHandler:
                 self._view_middleware.insert(
                     0,
                     self.adapt_method_mode(mw_instance.process_view),
-                )
-            if hasattr(mw_instance, "process_template_response"):
-                self._template_response_middleware.append(
-                    self.adapt_method_mode(mw_instance.process_template_response),
                 )
             if hasattr(mw_instance, "process_exception"):
                 # The exception-handling stack is still always synchronous for
@@ -144,27 +138,6 @@ class BaseHandler:
 
         # Complain if the view returned None (a common error).
         self.check_response(response, callback)
-
-        # If the response supports deferred rendering, apply template
-        # response middleware and then render the response
-        if hasattr(response, "render") and callable(response.render):
-            for middleware_method in self._template_response_middleware:
-                response = middleware_method(request, response)
-                # Complain if the template response middleware returned None
-                # (a common error).
-                self.check_response(
-                    response,
-                    middleware_method,
-                    name="{}.process_template_response".format(
-                        middleware_method.__self__.__class__.__name__
-                    ),
-                )
-            try:
-                response = response.render()
-            except Exception as e:
-                response = self.process_exception_by_middleware(e, request)
-                if response is None:
-                    raise
 
         return response
 

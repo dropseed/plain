@@ -1,7 +1,7 @@
 from enum import Enum
 
-from bolt import jinja
 from bolt.admin.dates import DatetimeRange, DatetimeRangeAliases
+from bolt.templates import Template
 from bolt.utils.text import slugify
 
 
@@ -39,8 +39,7 @@ class Card:
             # If fixed, show that on the card too (I guess you could use description for this)
         else:
             self.datetime_range = datetime_range
-        template = jinja.environment.get_template(self.template_name)
-        return template.render(self.get_context())
+        return Template(self.template_name).render(self.get_context())
 
     @classmethod
     def view_name(cls) -> str:

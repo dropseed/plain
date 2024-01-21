@@ -55,6 +55,7 @@ class View:
 
     def get_request_handler(self) -> callable:
         """Return the handler for the current request method."""
+
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
 

@@ -1,7 +1,7 @@
 import jinja2
 from jinja2.ext import Extension
 
-from bolt.jinja.extensions import InclusionTagExtension
+from bolt.templates.jinja.extensions import InclusionTagExtension
 
 
 class HTMXJSExtension(InclusionTagExtension):

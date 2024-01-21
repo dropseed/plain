@@ -22,7 +22,7 @@
             {% endif %}
         </div>
         <div class="flex items-center space-x-4">
-            {% if querystats_enabled|default(false) %}{% include "querystats/toolbar.html" %}{% endif %}
+            {% include "querystats/toolbar.html" %}
 
             <div class="flex items-center space-x-3 transition-all">
                 {% include "toolbar/links.html" %}

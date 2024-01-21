@@ -1,6 +1,6 @@
 from bolt.assets.finders import APP_ASSETS_DIR
-from bolt.jinja.extensions import InclusionTagExtension
 from bolt.runtime import settings
+from bolt.templates.jinja.extensions import InclusionTagExtension
 
 
 class TailwindCSSExtension(InclusionTagExtension):

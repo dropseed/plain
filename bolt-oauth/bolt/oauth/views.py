@@ -1,6 +1,6 @@
-from bolt import jinja
 from bolt.auth.mixins import LoginRequiredMixin
 from bolt.http import HttpResponseBadRequest, HttpResponseRedirect
+from bolt.templates import jinja
 from bolt.views import View
 
 from .exceptions import (

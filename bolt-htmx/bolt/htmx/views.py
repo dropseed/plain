@@ -1,26 +1,23 @@
 import re
 
-from bolt.http import HttpResponse
-
 
 class HTMXViewMixin:
     htmx_template_name = ""
 
-    def get_template_response(self, context=None) -> HttpResponse:
+    def render_template(self):
+        template = super().get_template()
+        context = self.get_context()
+
         if self.is_htmx_request and self.htmx_fragment_name:
             from .jinja import HTMXFragmentExtension
 
-            template = self.get_template()
-            if context is None:
-                context = self.get_context()
-            rendered = HTMXFragmentExtension.render_template_fragment(
-                template=template,
+            return HTMXFragmentExtension.render_template_fragment(
+                template=template._jinja_template,
                 fragment_name=self.htmx_fragment_name,
                 context=context,
             )
-            return HttpResponse(rendered, content_type=self.content_type)
 
-        return super().get_template_response(context=context)
+        return template.render(context)
 
     def get_request_handler(self):
         if self.is_htmx_request:

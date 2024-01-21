@@ -10,7 +10,7 @@ class ObjectTemplateViewMixin:
 
     def get(self) -> HttpResponse:
         self.load_object()
-        return self.get_template_response()
+        return self.render_template()
 
     def load_object(self) -> None:
         try:
@@ -191,7 +191,7 @@ class ListView(TemplateView):
 
     def get(self) -> HttpResponse:
         self.objects = self.get_queryset()
-        return self.get_template_response()
+        return super().get()
 
     def get_queryset(self):  # Intentionally untyped... subclasses must override this.
         raise NotImplementedError(

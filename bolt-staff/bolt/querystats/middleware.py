@@ -86,15 +86,3 @@ class QueryStatsMiddleware:
             return request.impersonator and request.impersonator.is_staff
 
         return hasattr(request, "user") and request.user and request.user.is_staff
-
-    def process_template_response(self, request, response):
-        # Template hasn't been rendered yet, so we can't include querystats themselves
-        # unless we're pulling the previous page stats from the session storage
-        if (
-            response.context_data is not None
-            and hasattr(_local, "querystats")
-            and self.is_staff_request(request)
-        ):
-            response.context_data["querystats_enabled"] = True
-
-        return response

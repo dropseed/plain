@@ -196,4 +196,4 @@ SECURE_SSL_REDIRECT = False
 #############
 
 JINJA_LOADER = "jinja2.loaders.FileSystemLoader"
-JINJA_ENVIRONMENT = "bolt.jinja.defaults.create_default_environment"
+JINJA_ENVIRONMENT = "bolt.templates.jinja.defaults.create_default_environment"
