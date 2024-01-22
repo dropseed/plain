@@ -97,7 +97,12 @@ class Job(metaclass=JobType):
     def run(self):
         raise NotImplementedError
 
-    def run_in_background(self, start_at: datetime.datetime | None = None):
+    def run_in_background(
+        self,
+        start_at: datetime.datetime | None = None,
+        priority: int | None = None,
+        retries: int | None = None,
+    ):
         from .models import JobRequest
 
         if unique_existing := self._get_existing_unique_job_or_request():
@@ -112,13 +117,19 @@ class Job(metaclass=JobType):
 
         parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
 
+        if priority is None:
+            priority = self.get_priority()
+
+        if retries is None:
+            retries = self.get_retries()
+
         return JobRequest.objects.create(
             job_class=self._job_class_str(),
             parameters=parameters,
-            priority=self.get_priority(),
-            source=source,
-            retries=self.get_retries(),
             start_at=start_at,
+            source=source,
+            priority=priority,
+            retries=retries,
         )
 
     def _job_class_str(self):
