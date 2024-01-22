@@ -97,7 +97,7 @@ class Job(metaclass=JobType):
     def run(self):
         raise NotImplementedError
 
-    def run_in_background(
+    def run_in_worker(
         self,
         start_at: datetime.datetime | None = None,
         priority: int | None = None,
