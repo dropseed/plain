@@ -1,3 +1,4 @@
+import gc
 import logging
 import multiprocessing
 import os
@@ -194,6 +195,8 @@ def process_job(job_uuid):
             job_result.source,
             duration,
         )
+
+        del job_result
     except Exception as e:
         # Raising exceptions inside the worker process doesn't
         # seem to be caught/shown anywhere as configured.
@@ -202,3 +205,4 @@ def process_job(job_uuid):
         logger.exception(e)
     finally:
         request_finished.send(sender=None)
+        gc.collect()
