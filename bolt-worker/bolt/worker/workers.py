@@ -151,15 +151,7 @@ def process_job(job_uuid):
 
         request_started.send(sender=None)
 
-        try:
-            job = Job.objects.get(uuid=job_uuid)
-        except Job.DoesNotExist:
-            logger.warning(
-                "Job not found worker_pid=%s job_uuid=%s",
-                worker_pid,
-                job_uuid,
-            )
-            return
+        job = Job.objects.get(uuid=job_uuid)
 
         logger.info(
             'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
