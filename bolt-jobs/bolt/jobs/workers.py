@@ -2,8 +2,8 @@ import logging
 import multiprocessing
 import os
 import time
-import uuid
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor
+from functools import partial
 
 from bolt.db import transaction
 from bolt.logs import app_logger
@@ -27,8 +27,6 @@ class Worker:
 
         self.max_processes = self.executor._max_workers
         self.max_jobs_per_process = max_jobs_per_process
-
-        self.uuid = uuid.uuid4()
 
         self._is_shutting_down = False
 
@@ -63,7 +61,7 @@ class Worker:
                     job_request.source,
                 )
 
-                job = job_request.convert_to_job(worker_uuid=self.uuid)
+                job = job_request.convert_to_job()
 
             job_uuid = str(job.uuid)  # Make a str copy
 
@@ -71,29 +69,17 @@ class Worker:
             del job_request
             del job
 
-            self.executor.submit(process_job, job_uuid)
+            future = self.executor.submit(process_job, job_uuid)
+            future.add_done_callback(partial(future_finished_callback, job_uuid))
 
     def shutdown(self):
         if self._is_shutting_down:
             # Already shutting down somewhere else
             return
 
-        self._is_shutting_down = True
-
         logger.info("Job worker shutdown started")
-
-        # Make an attept to immediatelly move any unstarted jobs from this worker
-        # to the JobResults as cancelled. If they have a retry, they'll be picked
-        # up by the next worker process.
-        for job in Job.objects.filter(worker_uuid=self.uuid, started_at__isnull=True):
-            job.convert_to_result(status=JobResultStatuses.CANCELLED)
-
-        # Now shutdown the process pool.
-        # There's still some chance of a race condition here where we
-        # just deleted a Job and it was still picked up, but we'll log
-        # missing jobs as warnings instead of exceptions.
+        self._is_shutting_down = True
         self.executor.shutdown(wait=True, cancel_futures=True)
-
         logger.info("Job worker shutdown complete")
 
     def maybe_log_stats(self):
@@ -147,6 +133,15 @@ class Worker:
     def check_job_results(self):
         Job.objects.mark_lost_jobs()
         JobResult.objects.retry_failed_jobs()
+
+
+def future_finished_callback(job_uuid: str, future: Future):
+    if future.cancelled():
+        logger.warning("Job cancelled job_uuid=%s", job_uuid)
+        job = Job.objects.get(uuid=job_uuid)
+        job.convert_to_result(status=JobResultStatuses.CANCELLED)
+    else:
+        logger.debug("Job finished job_uuid=%s", job_uuid)
 
 
 def process_job(job_uuid):

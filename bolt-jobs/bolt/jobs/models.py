@@ -61,7 +61,7 @@ class JobRequest(models.Model):
     def __str__(self):
         return f"{self.job_class} [{self.uuid}]"
 
-    def convert_to_job(self, *, worker_uuid=None):
+    def convert_to_job(self):
         """
         JobRequests are the pending jobs that are waiting to be executed.
         We immediately convert them to JobResults when they are picked up.
@@ -76,7 +76,6 @@ class JobRequest(models.Model):
                 retries=self.retries,
                 retry_attempt=self.retry_attempt,
                 unique_key=self.unique_key,
-                worker_uuid=worker_uuid,
             )
 
             # Delete the pending JobRequest now
@@ -117,9 +116,6 @@ class Job(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     started_at = models.DateTimeField(blank=True, null=True, db_index=True)
-
-    # To associate with a worker
-    worker_uuid = models.UUIDField(blank=True, null=True, db_index=True)
 
     # From the JobRequest
     job_request_uuid = models.UUIDField(db_index=True)
@@ -168,8 +164,6 @@ class Job(models.Model):
                 ended_at=timezone.now(),
                 error=error,
                 status=status,
-                # From the worker
-                worker_uuid=self.worker_uuid,
                 # From the Job
                 job_uuid=self.uuid,
                 started_at=self.started_at,
@@ -247,9 +241,6 @@ class JobResult(models.Model):
 
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-
-    # To associate with a worker
-    worker_uuid = models.UUIDField(blank=True, null=True, db_index=True)
 
     # From the Job
     job_uuid = models.UUIDField(db_index=True)
