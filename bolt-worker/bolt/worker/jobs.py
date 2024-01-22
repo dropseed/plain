@@ -3,6 +3,7 @@ import inspect
 from importlib import import_module
 
 from bolt.db.models import Model
+from bolt.utils import timezone
 
 
 def load_job(job_class_path, parameters):
@@ -99,7 +100,8 @@ class Job(metaclass=JobType):
 
     def run_in_worker(
         self,
-        start_at: datetime.datetime | None = None,
+        *,
+        delay: int | datetime.timedelta | datetime.datetime | None = None,
         priority: int | None = None,
         retries: int | None = None,
     ):
@@ -122,6 +124,17 @@ class Job(metaclass=JobType):
 
         if retries is None:
             retries = self.get_retries()
+
+        if delay is None:
+            start_at = None
+        elif isinstance(delay, int):
+            start_at = timezone.now() + datetime.timedelta(seconds=delay)
+        elif isinstance(delay, datetime.timedelta):
+            start_at = timezone.now() + delay
+        elif isinstance(delay, datetime.datetime):
+            start_at = delay
+        else:
+            raise ValueError(f"Invalid delay: {delay}")
 
         return JobRequest.objects.create(
             job_class=self._job_class_str(),
