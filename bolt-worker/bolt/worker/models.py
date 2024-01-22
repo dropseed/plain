@@ -9,7 +9,7 @@ from bolt.utils import timezone
 
 from .jobs import load_job
 
-logger = logging.getLogger("bolt.jobs")
+logger = logging.getLogger("bolt.worker")
 
 
 class JobRequestQuerySet(models.QuerySet):

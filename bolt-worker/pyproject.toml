@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "bolt-jobs"
+name = "bolt-worker"
 packages = [
     { include = "bolt" },
 ]

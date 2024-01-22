@@ -12,7 +12,7 @@ from bolt.signals import request_finished, request_started
 
 from .models import Job, JobRequest, JobResult, JobResultStatuses
 
-logger = logging.getLogger("bolt.jobs")
+logger = logging.getLogger("bolt.worker")
 
 
 class Worker:

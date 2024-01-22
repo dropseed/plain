@@ -7,7 +7,7 @@ MODULE_NAME = "jobs"
 
 class BoltJobsConfig(PackageConfig):
     default_auto_field = "bolt.db.models.BigAutoField"
-    name = "bolt.jobs"
+    name = "bolt.worker"
     label = "boltqueue"
 
     def ready(self):

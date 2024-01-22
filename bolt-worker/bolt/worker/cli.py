@@ -10,7 +10,7 @@ from bolt.utils import timezone
 from .models import Job, JobRequest, JobResult
 from .workers import Worker
 
-logger = logging.getLogger("bolt.jobs")
+logger = logging.getLogger("bolt.worker")
 
 
 @click.group()
@@ -40,7 +40,7 @@ def cli():
     type=int,
     envvar="BOLT_JOBS_STATS_EVERY",
 )
-def worker(max_processes, max_jobs_per_process, stats_every):
+def run(max_processes, max_jobs_per_process, stats_every):
     worker = Worker(
         max_processes=max_processes,
         max_jobs_per_process=max_jobs_per_process,
