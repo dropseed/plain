@@ -11,7 +11,7 @@ def localtime_filter(value, timezone=None):
     if not value:
         # Without this, we get the current localtime
         # which doesn't make sense as a filter
-        return ""
+        return None
     return localtime(value, timezone)
 
 
