@@ -8,7 +8,7 @@ class HTMXViewMixin:
 
     def render_template(self):
         template = self.get_template()
-        context = self.get_context()
+        context = self.get_template_context()
 
         if self.is_htmx_request and self.htmx_fragment_name:
             from .jinja import HTMXFragmentExtension

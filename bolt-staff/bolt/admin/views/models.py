@@ -48,8 +48,8 @@ class AdminModelListView(AdminListView):
     def get_slug(cls) -> str:
         return cls.model._meta.model_name
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
 
         order_by = self.request.GET.get("order_by", "")
         if order_by.startswith("-"):
@@ -121,8 +121,8 @@ class AdminModelDetailView(AdminDetailView):
     def get_path(cls) -> str:
         return f"{cls.model._meta.model_name}/<int:pk>/"
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
         context["fields"] = self.fields or ["pk"] + [
             f.name for f in self.object._meta.get_fields() if not f.remote_field
         ]

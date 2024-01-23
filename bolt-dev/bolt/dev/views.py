@@ -7,8 +7,8 @@ from .requests import RequestLog
 class RequestsView(TemplateView):
     template_name = "dev/requests.html"
 
-    def get_context(self):
-        ctx = super().get_context()
+    def get_template_context(self):
+        ctx = super().get_template_context()
         requestlogs = RequestLog.load_json_logs()
 
         if self.request.GET.get("log"):

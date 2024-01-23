@@ -7,8 +7,8 @@ class QuerystatsView(AuthViewMixin, TemplateView):
     template_name = "querystats/querystats.html"
     staff_required = True  # allow impersonator?
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
 
         stored_querystats = self.request.session.get(
             "querystats"

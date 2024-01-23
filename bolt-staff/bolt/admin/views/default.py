@@ -18,8 +18,8 @@ class AdminIndexView(AdminView):
 
         return super().get()
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
         context["dashboards"] = registry.registered_dashboards
         return context
 
@@ -29,8 +29,8 @@ class AdminSearchView(AdminView):
     title = "Search"
     slug = "search"
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
         context["searchable_views"] = registry.get_searchable_views()
         context["global_search_query"] = self.request.GET.get("query", "")
         return context

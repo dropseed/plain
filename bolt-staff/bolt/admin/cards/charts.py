@@ -6,8 +6,8 @@ from .base import Card
 class ChartCard(Card):
     template_name = "admin/cards/chart.html"
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
         context["chart_data"] = self.get_chart_data()
         return context
 

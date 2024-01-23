@@ -39,13 +39,13 @@ class Card:
             # If fixed, show that on the card too (I guess you could use description for this)
         else:
             self.datetime_range = datetime_range
-        return Template(self.template_name).render(self.get_context())
+        return Template(self.template_name).render(self.get_template_context())
 
     @classmethod
     def view_name(cls) -> str:
         return f"card_{cls.get_slug()}"
 
-    def get_context(self):
+    def get_template_context(self):
         context = {}
         context["title"] = self.get_title()
         context["slug"] = self.get_slug()

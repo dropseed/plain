@@ -27,8 +27,8 @@ class PageView(TemplateView):
         content_type_template_name = f"pages/{self.page.content_type}.html"
         return [content_type_template_name] + super().get_template_names()
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
         context["page"] = self.page
         return context
 

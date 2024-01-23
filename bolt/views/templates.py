@@ -26,7 +26,7 @@ class TemplateView(View):
 
     template_name: str | None = None
 
-    def get_context(self) -> dict:
+    def get_template_context(self) -> dict:
         return {
             "request": self.request,
             "csrf_input": csrf_input_lazy(self.request),
@@ -54,7 +54,7 @@ class TemplateView(View):
                 pass
 
     def render_template(self) -> str:
-        return self.get_template().render(self.get_context())
+        return self.get_template().render(self.get_template_context())
 
     def get(self):
         return self.render_template()

@@ -50,8 +50,8 @@ class AdminView(AuthViewMixin, TemplateView):
 
     default_datetime_range = DatetimeRangeAliases.LAST_365_DAYS
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
         context["title"] = self.get_title()
         context["slug"] = self.get_slug()
         context["description"] = self.get_description()
@@ -139,8 +139,8 @@ class AdminListView(HTMXViewMixin, AdminView):
     show_search = False
     allow_global_search = False
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
 
         # Make this available on self for usage in get_objects and other methods
         self.filter = self.request.GET.get("filter", "")
@@ -268,8 +268,8 @@ class AdminDetailView(AdminView, DetailView):
     template_name = None
     nav_section = ""
 
-    def get_context(self):
-        context = super().get_context()
+    def get_template_context(self):
+        context = super().get_template_context()
         context["get_field_value"] = self.get_field_value
         return context
 

@@ -41,7 +41,7 @@ There is a default set of globals, filters, and extensions.
 Each request is rendered with a `context`.
 This will include the [default globals](#default-globals),
 any app or project globals,
-as well as the `get_context()` from your view.
+as well as the `get_template_context()` from your view.
 
 When a view is rendered,
 the default context includes the `request` itself,

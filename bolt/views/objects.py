@@ -27,9 +27,9 @@ class ObjectTemplateViewMixin:
             f"get_object() is not implemented on {self.__class__.__name__}"
         )
 
-    def get_context(self) -> dict:
+    def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
-        context = super().get_context()  # type: ignore
+        context = super().get_template_context()  # type: ignore
         context["object"] = self.object
         if self.context_object_name:
             context[self.context_object_name] = self.object
@@ -79,8 +79,6 @@ class CreateView(ObjectTemplateViewMixin, FormView):
     """
     View for creating a new object, with a response rendered by a template.
     """
-
-    template_name_suffix = "_form"
 
     def post(self) -> HttpResponse:
         """
@@ -198,9 +196,9 @@ class ListView(TemplateView):
             f"get_objects() is not implemented on {self.__class__.__name__}"
         )
 
-    def get_context(self) -> dict:
+    def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
-        context = super().get_context()  # type: ignore
+        context = super().get_template_context()  # type: ignore
         context[self.context_object_name] = self.objects
         return context
 
