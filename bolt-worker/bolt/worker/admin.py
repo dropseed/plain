@@ -8,6 +8,7 @@ from bolt.admin import (
 )
 from bolt.admin.cards import Card
 from bolt.admin.dates import DatetimeRangeAliases
+from bolt.db import models
 from bolt.http import HttpResponseRedirect
 from bolt.runtime import settings
 
@@ -116,7 +117,7 @@ class RunningJobsCard(Card):
 @register_viewset
 class JobRequestViewset(AdminModelViewset):
     class ListView(AdminModelListView):
-        nav_section = "Jobs"
+        nav_section = "Worker"
         model = JobRequest
         fields = ["id", "job_class", "priority", "created_at"]
 
@@ -127,7 +128,7 @@ class JobRequestViewset(AdminModelViewset):
 @register_viewset
 class JobViewset(AdminModelViewset):
     class ListView(AdminModelListView):
-        nav_section = "Jobs"
+        nav_section = "Worker"
         model = Job
         fields = ["id", "job_class", "priority", "created_at", "started_at"]
         actions = ["Delete"]
@@ -147,7 +148,7 @@ class JobViewset(AdminModelViewset):
 @register_viewset
 class JobResultViewset(AdminModelViewset):
     class ListView(AdminModelListView):
-        nav_section = "Jobs"
+        nav_section = "Worker"
         model = JobResult
         fields = [
             "id",
@@ -155,6 +156,8 @@ class JobResultViewset(AdminModelViewset):
             "priority",
             "created_at",
             "status",
+            "retried",
+            "is_retry",
         ]
         cards = [
             SuccessfulJobsCard,
@@ -173,7 +176,7 @@ class JobResultViewset(AdminModelViewset):
             "Retry",
         ]
         allow_global_search = False
-        default_datetime_range = DatetimeRangeAliases.LAST_7_DAYS
+        default_datetime_range = DatetimeRangeAliases.LAST_30_DAYS
 
         def get_description(self):
             delta = timedelta(seconds=settings.JOBS_CLEARABLE_AFTER)
@@ -181,6 +184,18 @@ class JobResultViewset(AdminModelViewset):
 
         def get_initial_queryset(self):
             queryset = super().get_initial_queryset()
+            queryset = queryset.annotate(
+                retried=models.Case(
+                    models.When(retry_job_request_uuid__isnull=False, then=True),
+                    default=False,
+                    output_field=models.BooleanField(),
+                ),
+                is_retry=models.Case(
+                    models.When(retry_attempt__gt=0, then=True),
+                    default=False,
+                    output_field=models.BooleanField(),
+                ),
+            )
             if self.filter == "Successful":
                 return queryset.successful()
             if self.filter == "Errored":
