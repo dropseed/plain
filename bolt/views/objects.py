@@ -190,12 +190,12 @@ class ListView(TemplateView):
     context_object_name = "objects"
 
     def get(self) -> HttpResponse:
-        self.objects = self.get_queryset()
+        self.objects = self.get_objects()
         return super().get()
 
-    def get_queryset(self):  # Intentionally untyped... subclasses must override this.
+    def get_objects(self):
         raise NotImplementedError(
-            f"get_queryset() is not implemented on {self.__class__.__name__}"
+            f"get_objects() is not implemented on {self.__class__.__name__}"
         )
 
     def get_context(self) -> dict:
@@ -222,8 +222,8 @@ class ListView(TemplateView):
 
         # The least-specific option is the default <app>/<model>_detail.html;
         # only use this if the object in question is a model.
-        if hasattr(self.objects, "_meta"):
-            object_meta = self.objects._meta
+        if hasattr(self.objects, "model") and hasattr(self.objects.model, "_meta"):
+            object_meta = self.objects.model._meta
             names.append(
                 f"{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
             )
