@@ -94,7 +94,10 @@
                                     {{ field }}
                                 </div>
                                 {% else %}
-                                <a class="font-mono text-xs font-normal text-gray-600" href="?order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                                <a
+                                    data-merge-params
+                                    class="font-mono text-xs font-normal text-gray-600"
+                                    href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
                                     {{ field }}
                                     {% if field == order_by_field %}
                                     {% if order_by_direction == "-" %}
@@ -172,23 +175,23 @@
                 <ul class="flex justify-center">
                     {% if page.has_previous() %}
                     <li>
-                        <a href="?page={{ page.previous_page_number() }}">&laquo;</a>
+                        <a data-merge-params href="?page={{ page.previous_page_number() }}">&laquo;</a>
                     </li>
                     {% endif %}
                     {% for page_num in page.paginator.page_range %}
                     {% if page_num == page.number %}
                     <li>
-                        <a href="?page={{ page_num }}">{{ page_num }}</a>
+                        <a data-merge-params href="?page={{ page_num }}">{{ page_num }}</a>
                     </li>
                     {% else %}
                     <li>
-                        <a href="?page={{ page_num }}">{{ page_num }}</a>
+                        <a data-merge-params href="?page={{ page_num }}">{{ page_num }}</a>
                     </li>
                     {% endif %}
                     {% endfor %}
                     {% if page.has_next() %}
                     <li>
-                        <a href="?page={{ page.next_page_number() }}">&raquo;</a>
+                        <a data-merge-params href="?page={{ page.next_page_number() }}">&raquo;</a>
                     </li>
                     {% endif %}
                 </ul>

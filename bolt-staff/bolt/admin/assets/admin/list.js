@@ -44,4 +44,14 @@ jQuery(function ($) {
       $lastActionCheckboxChecked = $(this);
     }
   });
+
+  // Merge query params with the current url and the link url
+  $("[data-merge-params]").each(function () {
+    var currentUrl = new URL(window.location.href);
+    var params = new URL($(this).attr("href"), window.location.href).searchParams;
+    params.forEach(function (value, key) {
+      currentUrl.searchParams.set(key, value);
+    });
+    $(this).attr("href", currentUrl.toString());
+  });
 });
