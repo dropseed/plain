@@ -53,6 +53,8 @@ class TemplateView(View):
             except TemplateFileMissing:
                 pass
 
+        raise TemplateFileMissing()
+
     def render_template(self) -> str:
         return self.get_template().render(self.get_template_context())
 
