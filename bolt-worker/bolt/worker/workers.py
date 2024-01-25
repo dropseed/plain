@@ -73,6 +73,10 @@ class Worker:
             future = self.executor.submit(process_job, job_uuid)
             future.add_done_callback(partial(future_finished_callback, job_uuid))
 
+            # Do a quick sleep regardless to see if it
+            # gives processes a chance to start up
+            time.sleep(0.1)
+
     def shutdown(self):
         if self._is_shutting_down:
             # Already shutting down somewhere else
