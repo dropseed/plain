@@ -5,6 +5,8 @@ from pathlib import Path
 
 import click
 
+from bolt.cli.print import print_event
+
 DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
 
 
@@ -16,35 +18,22 @@ def cli():
 
 @cli.command()
 @click.argument("path", default=".")
-@click.option("--fix/--no-fix", "do_fix", default=False)
-def lint(path, do_fix):
+def check(path):
+    """Check the given path for formatting or linting issues."""
     ruff_args = []
 
     if not user_has_ruff_config():
-        click.secho("Using default bolt.code ruff config", italic=True, bold=True)
+        click.secho("Using default bolt.code ruff config", italic=True)
         ruff_args.extend(["--config", str(DEFAULT_RUFF_CONFIG)])
 
-    if do_fix:
-        ruff_args.append("--fix")
-
-    click.secho("Ruff check", bold=True)
+    print_event("Ruff check")
     result = subprocess.run(["ruff", "check", path, *ruff_args])
 
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-
-@cli.command()
-@click.argument("path", default=".")
-def format(path):
-    ruff_args = []
-
-    if not user_has_ruff_config():
-        click.secho("Using default bolt.code ruff config", italic=True, bold=True)
-        ruff_args.extend(["--config", str(DEFAULT_RUFF_CONFIG)])
-
-    click.secho("Ruff format", bold=True)
-    result = subprocess.run(["ruff", "format", path, *ruff_args])
+    print_event("Ruff format check")
+    result = subprocess.run(["ruff", "format", path, "--check", *ruff_args])
 
     if result.returncode != 0:
         sys.exit(result.returncode)
@@ -57,16 +46,16 @@ def fix(path):
     ruff_args = []
 
     if not user_has_ruff_config():
-        click.secho("Using default bolt.code ruff config", italic=True, bold=True)
+        click.secho("Using default bolt.code ruff config", italic=True)
         ruff_args.extend(["--config", str(DEFAULT_RUFF_CONFIG)])
 
-    click.secho("Ruff check", bold=True)
+    print_event("Ruff check")
     result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
 
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    click.secho("Ruff format", bold=True)
+    print_event("Ruff format")
     result = subprocess.run(["ruff", "format", path, *ruff_args])
 
     if result.returncode != 0:

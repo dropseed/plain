@@ -4,6 +4,8 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
+from bolt.cli.print import print_event
+
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -51,6 +53,11 @@ def cli(install):
             if result.returncode != 0:
                 sys.exit(result.returncode)
 
+    # Run this first since it's probably the most likely to fail
+    if find_spec("bolt.code"):
+        print_event("Running bolt code checks")
+        subprocess.check_call(["bolt", "code", "check"])
+
     check_short("Checking .env files for changes", "bolt", "env", "check")
 
     if Path("poetry.lock").exists():
@@ -97,14 +104,6 @@ def bolt_db_connected():
         stderr=subprocess.DEVNULL,
     )
     return result.returncode == 0
-
-
-def print_event(msg, newline=True):
-    arrow = click.style("-->", fg=214, bold=True)
-    message = str(msg)
-    if not newline:
-        message += " "
-    click.secho(f"{arrow} {message}", nl=newline)
 
 
 def check_short(message, *args):
