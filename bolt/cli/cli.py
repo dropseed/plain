@@ -335,16 +335,32 @@ class AppCLIGroup(click.Group):
 
 class BoltCommandCollection(click.CommandCollection):
     def __init__(self, *args, **kwargs):
-        bolt.runtime.setup()
+        sources = []
+
+        try:
+            bolt.runtime.setup()
+
+            sources = [
+                InstalledPackagesGroup(),
+                EntryPointGroup(),
+                AppCLIGroup(),
+                bolt_cli,
+            ]
+        except bolt.runtime.AppPathNotFound:
+            click.secho(
+                "Bolt `app` directory not found. Some commands may be missing.",
+                fg="yellow",
+                err=True,
+            )
+
+            sources = [
+                EntryPointGroup(),
+                bolt_cli,
+            ]
 
         super().__init__(*args, **kwargs)
 
-        self.sources = [
-            InstalledPackagesGroup(),
-            EntryPointGroup(),
-            AppCLIGroup(),
-            bolt_cli,
-        ]
+        self.sources = sources
 
 
 cli = BoltCommandCollection()
