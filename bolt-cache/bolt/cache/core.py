@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from functools import cached_property
 
+from bolt.db import IntegrityError, transaction
 from bolt.utils import timezone
 
 
@@ -62,12 +63,18 @@ class Cached:
             # Keep existing expires_at value or None
             pass
 
-        item, _ = self._model_class.objects.update_or_create(
-            key=self.key, defaults=defaults
-        )
+        try:
+            with transaction.atomic():
+                item, _ = self._model_class.objects.update_or_create(
+                    key=self.key, defaults=defaults
+                )
+        except IntegrityError:
+            # Most likely a race condition in creating the item
+            # so we'll effectively do a get and return the stored value
+            self.reload()
+            return self.value
 
         self.reload()
-
         return item.value
 
     def delete(self):
