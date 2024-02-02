@@ -97,7 +97,7 @@ class JobQuerySet(models.QuerySet):
         # In theory we could save a timeout per-job and mark them timed-out more quickly,
         # but if they're still running, we can't actually send a signal to cancel it...
         now = timezone.now()
-        cutoff = now - datetime.timedelta(seconds=settings.JOBS_LOST_AFTER)
+        cutoff = now - datetime.timedelta(seconds=settings.WORKER_JOBS_LOST_AFTER)
         lost_jobs = self.filter(
             created_at__lt=cutoff
         )  # Doesn't matter whether it started or not -- it shouldn't take this long.
@@ -182,6 +182,22 @@ class Job(models.Model):
             self.delete()
 
         return result
+
+    def as_json(self):
+        """A JSON-compatible representation to make it easier to reference in Sentry or logging"""
+        return {
+            "uuid": str(self.uuid),
+            "created_at": self.created_at.isoformat(),
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "job_request_uuid": str(self.job_request_uuid),
+            "job_class": self.job_class,
+            "parameters": self.parameters,
+            "priority": self.priority,
+            "source": self.source,
+            "retries": self.retries,
+            "retry_attempt": self.retry_attempt,
+            "unique_key": self.unique_key,
+        }
 
 
 class JobResultQuerySet(models.QuerySet):

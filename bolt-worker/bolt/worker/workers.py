@@ -7,8 +7,9 @@ from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
 
 from bolt.db import transaction
-from bolt.logs import app_logger
+from bolt.runtime import settings
 from bolt.signals import request_finished, request_started
+from bolt.utils.module_loading import import_string
 
 from .models import Job, JobRequest, JobResult, JobResultStatuses
 
@@ -166,16 +167,17 @@ def process_job(job_uuid):
             job.source,
         )
 
-        app_logger.kv.context["job_request_uuid"] = str(job.job_request_uuid)
-        app_logger.kv.context["job_uuid"] = str(job.uuid)
+        middleware_chain = lambda job: job.run()
 
-        job_result = job.run()
+        for middleware_path in reversed(settings.WORKER_MIDDLEWARE):
+            middleware_class = import_string(middleware_path)
+            middleware_instance = middleware_class(middleware_chain)
+            middleware_chain = middleware_instance
+
+        job_result = middleware_chain(job)
 
         # Release it now
         del job
-
-        app_logger.kv.context.pop("job_request_uuid", None)
-        app_logger.kv.context.pop("job_uuid", None)
 
         duration = job_result.ended_at - job_result.started_at
         duration = duration.total_seconds()

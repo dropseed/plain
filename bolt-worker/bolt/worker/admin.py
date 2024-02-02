@@ -71,7 +71,7 @@ class LostJobsCard(Card):
     text = "View"  # TODO make not required - just an icon?
 
     def get_description(self):
-        delta = timedelta(seconds=settings.JOBS_LOST_AFTER)
+        delta = timedelta(seconds=settings.WORKER_JOBS_LOST_AFTER)
         return f"Jobs are considered lost after {_td_format(delta)}"
 
     def get_number(self):
@@ -179,7 +179,7 @@ class JobResultViewset(AdminModelViewset):
         default_datetime_range = DatetimeRangeAliases.LAST_30_DAYS
 
         def get_description(self):
-            delta = timedelta(seconds=settings.JOBS_CLEARABLE_AFTER)
+            delta = timedelta(seconds=settings.WORKER_JOBS_CLEARABLE_AFTER)
             return f"Jobs are cleared after {_td_format(delta)}"
 
         def get_initial_queryset(self):
