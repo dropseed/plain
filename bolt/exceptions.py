@@ -109,12 +109,6 @@ class ViewDoesNotExist(Exception):
     pass
 
 
-class MiddlewareNotUsed(Exception):
-    """This middleware is not used in this server configuration"""
-
-    pass
-
-
 class ImproperlyConfigured(Exception):
     """Bolt is somehow improperly configured"""
 

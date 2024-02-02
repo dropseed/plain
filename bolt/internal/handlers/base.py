@@ -1,7 +1,7 @@
 import logging
 import types
 
-from bolt.exceptions import ImproperlyConfigured, MiddlewareNotUsed
+from bolt.exceptions import ImproperlyConfigured
 from bolt.logs import log_response
 from bolt.runtime import settings
 from bolt.signals import request_finished
@@ -15,7 +15,6 @@ logger = logging.getLogger("bolt.request")
 
 class BaseHandler:
     _view_middleware = None
-    _exception_middleware = None
     _middleware_chain = None
 
     def load_middleware(self):
@@ -25,29 +24,12 @@ class BaseHandler:
         Must be called after the environment is fixed (see __call__ in subclasses).
         """
         self._view_middleware = []
-        self._exception_middleware = []
 
         get_response = self._get_response
         handler = convert_exception_to_response(get_response)
         for middleware_path in reversed(settings.MIDDLEWARE):
             middleware = import_string(middleware_path)
-            try:
-                # Adapt handler, if needed.
-                adapted_handler = self.adapt_method_mode(
-                    handler,
-                    debug=settings.DEBUG,
-                    name="middleware %s" % middleware_path,
-                )
-                mw_instance = middleware(adapted_handler)
-            except MiddlewareNotUsed as exc:
-                if settings.DEBUG:
-                    if str(exc):
-                        logger.debug("MiddlewareNotUsed(%r): %s", middleware_path, exc)
-                    else:
-                        logger.debug("MiddlewareNotUsed: %r", middleware_path)
-                continue
-            else:
-                handler = adapted_handler
+            mw_instance = middleware(handler)
 
             if mw_instance is None:
                 raise ImproperlyConfigured(
@@ -57,41 +39,14 @@ class BaseHandler:
             if hasattr(mw_instance, "process_view"):
                 self._view_middleware.insert(
                     0,
-                    self.adapt_method_mode(mw_instance.process_view),
-                )
-            if hasattr(mw_instance, "process_exception"):
-                # The exception-handling stack is still always synchronous for
-                # now, so adapt that way.
-                self._exception_middleware.append(
-                    self.adapt_method_mode(False, mw_instance.process_exception),
+                    mw_instance.process_view,
                 )
 
             handler = convert_exception_to_response(mw_instance)
 
-        # Adapt the top of the stack, if needed.
-        handler = self.adapt_method_mode(handler)
         # We only assign to this when initialization is complete as it is used
         # as a flag for initialization being complete.
         self._middleware_chain = handler
-
-    def adapt_method_mode(
-        self,
-        method,
-        debug=False,
-        name=None,
-    ):
-        """
-        Adapt a method to be in the correct "mode":
-        - If is_async is False:
-          - Synchronous methods are left alone
-          - Asynchronous methods are wrapped with async_to_sync
-        - If is_async is True:
-          - Synchronous methods are wrapped with sync_to_async()
-          - Asynchronous methods are left alone
-        """
-        if debug and not name:
-            name = name or "method %s()" % method.__qualname__
-        return method
 
     def get_response(self, request):
         """Return an HttpResponse object for the given HttpRequest."""
@@ -128,13 +83,7 @@ class BaseHandler:
 
         if response is None:
             wrapped_callback = self.make_view_atomic(callback)
-
-            try:
-                response = wrapped_callback(request, *callback_args, **callback_kwargs)
-            except Exception as e:
-                response = self.process_exception_by_middleware(e, request)
-                if response is None:
-                    raise
+            response = wrapped_callback(request, *callback_args, **callback_kwargs)
 
         # Complain if the view returned None (a common error).
         self.check_response(response, callback)
@@ -188,17 +137,6 @@ class BaseHandler:
             if settings_dict["ATOMIC_REQUESTS"] and alias not in non_atomic_requests:
                 view = transaction.atomic(using=alias)(view)
         return view
-
-    def process_exception_by_middleware(self, exception, request):
-        """
-        Pass the exception to the exception middleware. If no middleware
-        return a response for this exception, return None.
-        """
-        for middleware_method in self._exception_middleware:
-            response = middleware_method(request, exception)
-            if response:
-                return response
-        return None
 
 
 def reset_urlconf(sender, **kwargs):
