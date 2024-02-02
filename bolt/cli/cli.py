@@ -13,6 +13,7 @@ from bolt import preflight
 from bolt.env.cli import cli as env_cli
 from bolt.packages import packages
 
+from .formatting import BoltContext
 from .packages import EntryPointGroup, InstalledPackagesGroup
 
 
@@ -334,6 +335,8 @@ class AppCLIGroup(click.Group):
 
 
 class BoltCommandCollection(click.CommandCollection):
+    context_class = BoltContext
+
     def __init__(self, *args, **kwargs):
         sources = []
 
