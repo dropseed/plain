@@ -159,6 +159,12 @@ class JobResultViewset(AdminModelViewset):
             "retried",
             "is_retry",
         ]
+        search_fields = [
+            "uuid",
+            "job_uuid",
+            "job_request_uuid",
+            "job_class",
+        ]
         cards = [
             SuccessfulJobsCard,
             ErroredJobsCard,
