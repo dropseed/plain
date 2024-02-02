@@ -167,7 +167,8 @@ def process_job(job_uuid):
             job.source,
         )
 
-        middleware_chain = lambda job: job.run()
+        def middleware_chain(job):
+            return job.run()
 
         for middleware_path in reversed(settings.WORKER_MIDDLEWARE):
             middleware_class = import_string(middleware_path)

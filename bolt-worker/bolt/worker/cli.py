@@ -61,7 +61,9 @@ def run(max_processes, max_jobs_per_process, stats_every):
 
 @cli.command()
 def clear_completed():
-    cutoff = timezone.now() - datetime.timedelta(seconds=settings.WORKER_JOBS_CLEARABLE_AFTER)
+    cutoff = timezone.now() - datetime.timedelta(
+        seconds=settings.WORKER_JOBS_CLEARABLE_AFTER
+    )
     click.echo(f"Clearing jobs finished before {cutoff}")
     results = (
         JobResult.objects.exclude(ended_at__isnull=True)
