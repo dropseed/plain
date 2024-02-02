@@ -7,6 +7,10 @@ class BoltHelpFormatter(click.HelpFormatter):
         styled_heading = click.style(heading, underline=True)
         self.write(f"{'':>{self.current_indent}}{styled_heading}\n")
 
+    def write_usage(self, prog, args, prefix="Usage: "):
+        prefix_styled = click.style(prefix, italic=True)
+        super().write_usage(prog, args, prefix=prefix_styled)
+
     def write_dl(
         self,
         rows,

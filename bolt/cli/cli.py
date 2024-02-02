@@ -7,6 +7,7 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
+from click.core import Command, Context
 
 import bolt.runtime
 from bolt import preflight
@@ -364,6 +365,13 @@ class BoltCommandCollection(click.CommandCollection):
         super().__init__(*args, **kwargs)
 
         self.sources = sources
+
+    def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd:
+            # Pass the formatting down to subcommands automatically
+            cmd.context_class = self.context_class
+        return cmd
 
 
 cli = BoltCommandCollection()
