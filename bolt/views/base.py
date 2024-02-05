@@ -60,18 +60,25 @@ class View:
             raise AttributeError("HTTP method is not set")
 
         if self.request.method.lower() not in self.http_method_names:
-            return self._http_method_not_allowed()
+            # Is this necessary anymore? Same behavior as method not defined
+            handler = None
+        else:
+            handler = getattr(self, self.request.method.lower(), None)
 
-        handler = getattr(
-            self, self.request.method.lower(), self._http_method_not_allowed
-        )
+        if not handler:
+            logger.warning(
+                "Method Not Allowed (%s): %s",
+                self.request.method,
+                self.request.path,
+                extra={"status_code": 405, "request": self.request},
+            )
+            raise HttpResponseException(HttpResponseNotAllowed(self._allowed_methods()))
 
         return handler
 
     def get_response(self) -> HttpResponseBase:
-        handler = self.get_request_handler()
-
         try:
+            handler = self.get_request_handler()
             result = handler()
         except HttpResponseException as e:
             return e.response
@@ -92,15 +99,6 @@ class View:
             return JsonResponse(result)
 
         raise ValueError(f"Unexpected view return type: {type(result)}")
-
-    def _http_method_not_allowed(self) -> HttpResponse:
-        logger.warning(
-            "Method Not Allowed (%s): %s",
-            self.request.method,
-            self.request.path,
-            extra={"status_code": 405, "request": self.request},
-        )
-        return HttpResponseNotAllowed(self._allowed_methods())
 
     def options(self) -> HttpResponse:
         """Handle responding to requests for the OPTIONS HTTP verb."""
