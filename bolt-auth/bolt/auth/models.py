@@ -19,10 +19,8 @@ def update_last_login(sender, user, **kwargs):
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
-    def _create_user(self, username, email, password, **extra_fields):
-        """
-        Create and save a user with the given username, email, and password.
-        """
+    def create_user(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", False)
         if not username:
             raise ValueError("The given username must be set")
         email = self.normalize_email(email)
@@ -37,10 +35,6 @@ class UserManager(BaseUserManager):
         user.password = make_password(password)
         user.save(using=self._db)
         return user
-
-    def create_user(self, username, email=None, password=None, **extra_fields):
-        extra_fields.setdefault("is_staff", False)
-        return self._create_user(username, email, password, **extra_fields)
 
 
 class AbstractUser(AbstractBaseUser):
