@@ -21,8 +21,6 @@ from bolt.views import FormView, TemplateView
 
 from .utils import resolve_url
 
-UserModel = get_user_model()
-
 
 class LoginRequired(Exception):
     def __init__(self, login_url=None, redirect_field_name="next"):
@@ -326,6 +324,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
         return response
 
     def get_user(self, uidb64):
+        UserModel = get_user_model()
         try:
             # urlsafe_base64_decode() decodes to bytestring
             uid = urlsafe_base64_decode(uidb64).decode()

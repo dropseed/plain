@@ -11,8 +11,6 @@ from bolt.templates import Template
 from bolt.utils.encoding import force_bytes
 from bolt.utils.http import urlsafe_base64_encode
 
-UserModel = get_user_model()
-
 
 def _unicode_ci_compare(s1, s2):
     """
@@ -211,6 +209,7 @@ class AuthenticationForm(forms.Form):
         super().__init__(*args, **kwargs)
 
         # Set the max length and label for the "username" field.
+        UserModel = get_user_model()
         self.username_field = UserModel._meta.get_field(UserModel.USERNAME_FIELD)
         username_max_length = self.username_field.max_length or 254
         self.fields["username"].max_length = username_max_length
