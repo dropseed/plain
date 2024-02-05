@@ -40,7 +40,5 @@ By default, all staff users can impersonate other users.
 
 ```python
 # settings.py
-IMPERSONATE_ALLOWED = lambda user: user.is_superuser or user.is_staff
+IMPERSONATE_ALLOWED = lambda user: user.is_staff
 ```
-
-> Note: Regardless of who is allowed to be an impersonator, nobody can impersonate a superuser!

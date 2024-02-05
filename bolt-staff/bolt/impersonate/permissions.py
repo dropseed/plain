@@ -9,12 +9,8 @@ def can_impersonate_user(impersonator, target_user):
     if not can_be_impersonator(impersonator):
         return False
 
-    if target_user.is_superuser:
-        # Nobody can impersonate superusers
-        return False
-
-    if target_user.is_staff and not impersonator.is_superuser:
-        # Only superusers can impersonate other staff
+    # You can't impersonate staff users
+    if target_user.is_staff:
         return False
 
     return True

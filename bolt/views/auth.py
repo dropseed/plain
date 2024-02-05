@@ -15,7 +15,6 @@ class LoginRequired(Exception):
 class AuthViewMixin:
     login_required = True
     staff_required = False
-    superuser_required = False
     login_url = None
 
     def check_auth(self) -> None:
@@ -37,9 +36,6 @@ class AuthViewMixin:
             # Ideally could customize staff_required_status_code,
             # but we can't set status code with an exception...
             # (404 to hide a private url from non-staff)
-            raise PermissionDenied
-
-        if self.superuser_required and not self.request.user.is_superuser:
             raise PermissionDenied
 
     def get_response(self) -> HttpResponse:
