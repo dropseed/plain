@@ -1,4 +1,4 @@
-from bolt.auth.mixins import LoginRequiredMixin
+from bolt.auth.views import AuthViewMixin
 from bolt.http import HttpResponseBadRequest, HttpResponseRedirect
 from bolt.templates import jinja
 from bolt.views import View
@@ -52,7 +52,7 @@ class OAuthCallbackView(View):
             )
 
 
-class OAuthConnectView(LoginRequiredMixin, View):
+class OAuthConnectView(AuthViewMixin, View):
     def post(self):
         request = self.request
         provider = self.url_kwargs["provider"]
@@ -60,7 +60,7 @@ class OAuthConnectView(LoginRequiredMixin, View):
         return provider_instance.handle_connect_request(request=request)
 
 
-class OAuthDisconnectView(LoginRequiredMixin, View):
+class OAuthDisconnectView(AuthViewMixin, View):
     def post(self):
         request = self.request
         provider = self.url_kwargs["provider"]

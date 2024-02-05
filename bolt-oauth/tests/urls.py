@@ -1,12 +1,11 @@
 from bolt import admin
-from bolt.auth.mixins import LoginRequiredMixin
-from bolt.auth.views import LogoutView
+from bolt.auth.views import AuthViewMixin, LogoutView
 from bolt.oauth.providers import get_provider_keys
 from bolt.urls import include, path
 from bolt.views import TemplateView
 
 
-class LoggedInView(LoginRequiredMixin, TemplateView):
+class LoggedInView(AuthViewMixin, TemplateView):
     template_name = "index.html"
 
     def get_context(self, **kwargs):
