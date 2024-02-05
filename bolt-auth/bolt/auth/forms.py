@@ -302,18 +302,16 @@ class PasswordResetForm(forms.Form):
         that prevent inactive users and users with unusable passwords from
         resetting their password.
         """
-        email_field_name = UserModel.get_email_field_name()
-        active_users = UserModel._default_manager.filter(
+        active_users = get_user_model()._default_manager.filter(
             **{
-                "%s__iexact" % email_field_name: email,
+                "email__iexact": email,
                 "is_active": True,
             }
         )
         return (
             u
             for u in active_users
-            if u.has_usable_password()
-            and _unicode_ci_compare(email, getattr(u, email_field_name))
+            if u.has_usable_password() and _unicode_ci_compare(email, u.email)
         )
 
     def save(
@@ -331,11 +329,9 @@ class PasswordResetForm(forms.Form):
         user.
         """
         email = self.cleaned_data["email"]
-        email_field_name = UserModel.get_email_field_name()
         for user in self.get_users(email):
-            user_email = getattr(user, email_field_name)
             context = {
-                "email": user_email,
+                "email": user.email,
                 "uid": urlsafe_base64_encode(force_bytes(user.pk)),
                 "user": user,
                 "token": token_generator.make_token(user),
@@ -347,7 +343,7 @@ class PasswordResetForm(forms.Form):
                 email_template_name,
                 context,
                 from_email,
-                user_email,
+                user.email,
                 html_email_template_name=html_email_template_name,
             )
 
