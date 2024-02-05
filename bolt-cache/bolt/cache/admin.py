@@ -1,4 +1,4 @@
-from bolt.admin import (
+from bolt.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
     AdminModelViewset,

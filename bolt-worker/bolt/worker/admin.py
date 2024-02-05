@@ -1,13 +1,13 @@
 from datetime import timedelta
 
-from bolt.admin import (
+from bolt.admin.cards import Card
+from bolt.admin.dates import DatetimeRangeAliases
+from bolt.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
     AdminModelViewset,
     register_viewset,
 )
-from bolt.admin.cards import Card
-from bolt.admin.dates import DatetimeRangeAliases
 from bolt.db import models
 from bolt.http import HttpResponseRedirect
 from bolt.runtime import settings

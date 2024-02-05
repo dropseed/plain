@@ -1,13 +1,13 @@
 from functools import cached_property
 
-from bolt.admin import (
+from bolt.admin.cards import Card
+from bolt.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
     AdminModelUpdateView,
     AdminModelViewset,
     register_viewset,
 )
-from bolt.admin.cards import Card
 from bolt.db.forms import ModelForm
 
 from .models import Flag, FlagResult
