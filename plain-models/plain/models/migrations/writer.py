@@ -143,9 +143,9 @@ class MigrationWriter:
         # Format dependencies and write out swappable dependencies right
         dependencies = []
         for dependency in self.migration.dependencies:
-            if dependency[0] == "__setting__":
+            if isinstance(dependency, migrations.SettingsTuple):
                 dependencies.append(
-                    f"        migrations.swappable_dependency(settings.{dependency[1]}),"
+                    f"        migrations.settings_dependency(settings.{dependency[1]}),"
                 )
                 imports.add("from plain.runtime import settings")
             else:

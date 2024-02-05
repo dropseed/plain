@@ -6,7 +6,7 @@ from plain.exceptions import ValidationError
 from plain.models import transaction
 from plain.models.db import IntegrityError, OperationalError, ProgrammingError
 from plain.preflight import Error
-from plain.runtime import settings
+from plain.runtime import SettingsReference
 from plain.utils import timezone
 
 from .exceptions import OAuthUserAlreadyExistsError
@@ -24,7 +24,7 @@ class OAuthConnection(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.CASCADE,
         related_name="oauth_connections",
     )
@@ -125,7 +125,7 @@ class OAuthConnection(models.Model):
     def connect(
         cls,
         *,
-        user: settings.AUTH_USER_MODEL,
+        user,
         provider_key: str,
         oauth_token: "OAuthToken",
         oauth_user: "OAuthUser",

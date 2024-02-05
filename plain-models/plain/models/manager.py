@@ -191,11 +191,6 @@ class ManagerDescriptor:
                 f"Manager isn't available; {cls._meta.object_name} is abstract"
             )
 
-        if cls._meta.swapped:
-            raise AttributeError(
-                f"Manager isn't available; '{cls._meta.label}' has been swapped for '{cls._meta.swapped}'"
-            )
-
         return cls._meta.managers_map[self.manager.name]
 
 

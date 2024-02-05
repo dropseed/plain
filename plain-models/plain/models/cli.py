@@ -17,7 +17,7 @@ from .db import DEFAULT_DB_ALIAS, OperationalError, connections, router
 from .migrations.autodetector import MigrationAutodetector
 from .migrations.executor import MigrationExecutor
 from .migrations.loader import AmbiguityError, MigrationLoader
-from .migrations.migration import Migration, SwappableTuple
+from .migrations.migration import Migration, SettingsTuple
 from .migrations.optimizer import MigrationOptimizer
 from .migrations.questioner import (
     InteractiveMigrationQuestioner,
@@ -1111,11 +1111,8 @@ def squash_migrations(
             )
         operations.extend(smigration.operations)
         for dependency in smigration.dependencies:
-            if isinstance(dependency, SwappableTuple):
-                if getattr(settings, "AUTH_USER_MODEL", None) == dependency.setting:
-                    dependencies.add(("__setting__", "AUTH_USER_MODEL"))
-                else:
-                    dependencies.add(dependency)
+            if isinstance(dependency, SettingsTuple):
+                dependencies.add(dependency)
             elif dependency[0] != smigration.package_label or first_migration:
                 dependencies.add(dependency)
         first_migration = False
