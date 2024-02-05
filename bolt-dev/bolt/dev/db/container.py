@@ -12,7 +12,7 @@ class DBContainer:
         project_root = APP_PATH.parent
         tmp_dir = settings.BOLT_TEMP_PATH
 
-        name = os.path.basename(project_root) + "-postgres"
+        name = os.path.basename(project_root) + "-postgres-1"
 
         if "DATABASE_URL" in os.environ:
             from bolt.db import database_url
