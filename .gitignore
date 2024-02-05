@@ -2,3 +2,4 @@
 *.egg-info
 *.py[co]
 __pycache__
+*.DS_Store
