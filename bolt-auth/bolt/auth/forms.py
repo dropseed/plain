@@ -2,7 +2,6 @@ import unicodedata
 
 from bolt import forms
 from bolt.auth import authenticate, get_user_model, password_validation
-from bolt.auth.models import User
 from bolt.auth.tokens import default_token_generator
 from bolt.db.forms import ModelForm
 from bolt.exceptions import ValidationError
@@ -98,7 +97,7 @@ class BaseUserCreationForm(ModelForm):
     )
 
     class Meta:
-        model = User
+        model = get_user_model()
         fields = ("username",)
         field_classes = {"username": UsernameField}
 
@@ -149,7 +148,10 @@ class UserCreationForm(BaseUserCreationForm):
     def clean_username(self):
         """Reject usernames that differ only in case."""
         username = self.cleaned_data.get("username")
-        if username and User.objects.filter(username__iexact=username).exists():
+        if (
+            username
+            and get_user_model().objects.filter(username__iexact=username).exists()
+        ):
             raise forms.ValidationError(self.error_messages["unique"], code="unique")
         else:
             return username
@@ -166,7 +168,7 @@ class UserChangeForm(ModelForm):
     )
 
     class Meta:
-        model = User
+        model = get_user_model()
         fields = "__all__"
         field_classes = {"username": UsernameField}
 

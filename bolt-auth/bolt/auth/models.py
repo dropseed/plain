@@ -205,15 +205,3 @@ class AbstractUser(models.Model):
             if isinstance(username, str)
             else username
         )
-
-
-class User(AbstractUser):
-    """
-    Users within the Bolt authentication system are represented by this
-    model.
-
-    Username and password are required. Other fields are optional.
-    """
-
-    class Meta(AbstractUser.Meta):
-        swappable = "AUTH_USER_MODEL"
