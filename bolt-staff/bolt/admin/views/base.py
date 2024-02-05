@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from bolt.admin.dates import DatetimeRange, DatetimeRangeAliases
+from bolt.auth.views import AuthViewMixin
 from bolt.db import models
 from bolt.htmx.views import HTMXViewMixin
 from bolt.http import HttpResponse, HttpResponseRedirect
@@ -9,7 +10,6 @@ from bolt.urls import reverse
 from bolt.utils import timezone
 from bolt.utils.text import slugify
 from bolt.views import (
-    AuthViewMixin,
     CreateView,
     DeleteView,
     DetailView,

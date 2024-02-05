@@ -1,4 +1,3 @@
-from .auth import AuthViewMixin
 from .base import View
 from .forms import FormView
 from .objects import CreateView, DeleteView, DetailView, ListView, UpdateView

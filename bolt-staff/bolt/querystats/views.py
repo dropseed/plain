@@ -1,6 +1,7 @@
 import json
 
-from bolt.views import AuthViewMixin, TemplateView
+from bolt.auth.views import AuthViewMixin
+from bolt.views import TemplateView
 
 
 class QuerystatsView(AuthViewMixin, TemplateView):
