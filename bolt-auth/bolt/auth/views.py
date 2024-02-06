@@ -11,7 +11,7 @@ from bolt.auth.forms import (
     SetPasswordForm,
 )
 from bolt.auth.tokens import default_token_generator
-from bolt.exceptions import ImproperlyConfigured, ValidationError
+from bolt.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
 from bolt.http import (
     Http404,
     HttpResponse,
@@ -53,7 +53,14 @@ class AuthViewMixin:
         if self.login_required and not self.request.user:
             raise LoginRequired(login_url=self.login_url)
 
-        if self.staff_required and not self.request.user.is_staff:
+        if impersonator := getattr(self.request, "impersonator", None):
+            # Impersonators should be able to view staff pages while impersonating.
+            # There's probably never a case where an impersonator isn't staff, but it can be configured.
+            if self.staff_required and not impersonator.is_staff:
+                raise PermissionDenied(
+                    "You do not have permission to access this page."
+                )
+        elif self.staff_required and not self.request.user.is_staff:
             # Show a 404 so we don't expose staff urls to non-staff users
             raise Http404()
 
