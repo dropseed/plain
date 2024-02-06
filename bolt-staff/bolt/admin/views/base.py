@@ -117,7 +117,7 @@ class AdminView(AuthViewMixin, TemplateView):
         return reverse(f"{URL_NAMESPACE}:" + cls.view_name())
 
     def get_links(self) -> dict[str]:
-        return self.links
+        return self.links.copy()
 
     def get_cards(self):
         return self.cards
@@ -286,6 +286,9 @@ class AdminDetailView(AdminView, DetailView):
     def get_field_value(self, obj, field: str):
         return getattr(obj, field)
 
+    def get_update_url(self, obj) -> str | None:
+        return None
+
 
 class AdminUpdateView(AdminView, UpdateView):
     template_name = None
@@ -299,6 +302,9 @@ class AdminUpdateView(AdminView, UpdateView):
             ]
 
         return super().get_template_names()
+
+    def get_detail_url(self, obj) -> str | None:
+        return None
 
 
 class AdminCreateView(AdminView, CreateView):

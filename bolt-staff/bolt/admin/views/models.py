@@ -143,6 +143,8 @@ class AdminModelDetailView(AdminDetailView):
         links = super().get_links()
         if hasattr(self.object, "get_absolute_url"):
             links["View in app"] = self.object.get_absolute_url()
+        if update_url := self.get_update_url(self.object):
+            links["Update"] = update_url
         return links
 
 
@@ -170,6 +172,8 @@ class AdminModelUpdateView(AdminUpdateView):
         links = super().get_links()
         if hasattr(self.object, "get_absolute_url"):
             links["View in app"] = self.object.get_absolute_url()
+        if detail_url := self.get_detail_url(self.object):
+            links["Detail"] = detail_url
         return links
 
 
@@ -193,6 +197,17 @@ class AdminModelViewset:
             )
 
             cls.UpdateView.parent_view_class = cls.ListView
+
+        if hasattr(cls, "DetailView") and hasattr(cls, "UpdateView"):
+            cls.DetailView.get_update_url = lambda self, obj: reverse_lazy(
+                f"{URL_NAMESPACE}:{cls.UpdateView.view_name()}",
+                kwargs={"pk": obj.pk},
+            )
+
+            cls.UpdateView.get_detail_url = lambda self, obj: reverse_lazy(
+                f"{URL_NAMESPACE}:{cls.DetailView.view_name()}",
+                kwargs={"pk": obj.pk},
+            )
 
         if hasattr(cls, "ListView"):
             views.append(cls.ListView)
