@@ -1,9 +1,9 @@
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 import click
+import tomllib
 
 from bolt.cli.print import print_event
 
@@ -20,11 +20,10 @@ def cli():
 @click.argument("path", default=".")
 def check(path):
     """Check the given path for formatting or linting issues."""
-    ruff_args = []
+    ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
 
-    if not user_has_ruff_config():
-        click.secho("Using default bolt.code ruff config", italic=True)
-        ruff_args.extend(["--config", str(DEFAULT_RUFF_CONFIG)])
+    for e in get_code_config().get("exclude", []):
+        ruff_args.extend(["--exclude", e])
 
     print_event("Ruff check")
     result = subprocess.run(["ruff", "check", path, *ruff_args])
@@ -43,11 +42,10 @@ def check(path):
 @click.argument("path", default=".")
 def fix(path):
     """Lint and format the given path."""
-    ruff_args = []
+    ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
 
-    if not user_has_ruff_config():
-        click.secho("Using default bolt.code ruff config", italic=True)
-        ruff_args.extend(["--config", str(DEFAULT_RUFF_CONFIG)])
+    for e in get_code_config().get("exclude", []):
+        ruff_args.extend(["--exclude", e])
 
     print_event("Ruff check")
     result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
@@ -62,13 +60,9 @@ def fix(path):
         sys.exit(result.returncode)
 
 
-def user_has_ruff_config():
-    try:
-        output = subprocess.check_output(["ruff", "check", ".", "--show-settings"])
-    except subprocess.CalledProcessError:
-        return False
-
-    if re.search("Settings path: (.+)", output.decode("utf-8")):
-        return True
-    else:
-        return False
+def get_code_config():
+    pyproject = Path("pyproject.toml")
+    if not pyproject.exists():
+        return {}
+    with pyproject.open("rb") as f:
+        return tomllib.load(f).get("tool", {}).get("bolt", {}).get("code", {})

@@ -32,3 +32,6 @@ build-backend = "poetry.core.masonry.api"
 extend = "bolt-code/bolt/code/ruff_defaults.toml"
 target-version = "py310"
 extend-exclude = ["bolt-pytest/bolt/pytest/pytest"]
+
+[tool.bolt.code]
+exclude = ["bolt-pytest/bolt/pytest/pytest"]

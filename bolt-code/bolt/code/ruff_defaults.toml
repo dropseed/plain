@@ -1,3 +1,4 @@
+target-version = "py310"
 ignore = [
     "E501",  # Never enforce `E501` (line length violations)
     "S101",  # pytest use of assert
