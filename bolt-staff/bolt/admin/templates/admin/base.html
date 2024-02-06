@@ -19,7 +19,7 @@
     {% block header_scripts %}{% endblock %}
 </head>
 <body class="flex min-h-screen text-black bg-stone-900">
-    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-6 pt-6 pb-5 lg:flex overflow-auto">
+    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-6 pt-6 pb-5 overflow-auto lg:flex">
         <div>
             <a class="inline-flex items-center font-bold text-stone-300" href="{{ url('admin:index') }}">
                 <svg class="w-5 h-5 mr-2" width="237" height="237" viewBox="0 0 237 237" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -57,7 +57,7 @@
                 <div class="text-xs tracking-wide text-stone-500">Recent</div>
             </div> -->
         </div>
-        <div class="flex items-center justify-between text-sm text-stone-400">
+        <div class="flex items-center justify-between mt-8 text-sm text-stone-400">
             <div class="flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-person-circle" viewBox="0 0 16 16">
                     <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
