@@ -44,7 +44,10 @@ class View:
         def view(request, *args, **kwargs):
             v = cls(*init_args, **init_kwargs)
             v.setup(request, *args, **kwargs)
-            return v.get_response()
+            try:
+                return v.get_response()
+            except HttpResponseException as e:
+                return e.response
 
         # Copy possible attributes set by decorators, e.g. @csrf_exempt, from
         # the dispatch method.
@@ -77,11 +80,9 @@ class View:
         return handler
 
     def get_response(self) -> HttpResponseBase:
-        try:
-            handler = self.get_request_handler()
-            result = handler()
-        except HttpResponseException as e:
-            return e.response
+        handler = self.get_request_handler()
+
+        result = handler()
 
         if isinstance(result, HttpResponseBase):
             return result

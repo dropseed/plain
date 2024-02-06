@@ -11,8 +11,13 @@ from bolt.auth.forms import (
     SetPasswordForm,
 )
 from bolt.auth.tokens import default_token_generator
-from bolt.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
-from bolt.http import HttpResponse, HttpResponseRedirect, QueryDict
+from bolt.exceptions import ImproperlyConfigured, ValidationError
+from bolt.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseRedirect,
+    QueryDict,
+)
 from bolt.runtime import settings
 from bolt.urls import reverse, reverse_lazy
 from bolt.utils.cache import add_never_cache_headers
@@ -49,10 +54,8 @@ class AuthViewMixin:
             raise LoginRequired(login_url=self.login_url)
 
         if self.staff_required and not self.request.user.is_staff:
-            # Ideally could customize staff_required_status_code,
-            # but we can't set status code with an exception...
-            # (404 to hide a private url from non-staff)
-            raise PermissionDenied
+            # Show a 404 so we don't expose staff urls to non-staff users
+            raise Http404()
 
     def get_response(self) -> HttpResponse:
         if not hasattr(self, "request"):
