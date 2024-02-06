@@ -120,7 +120,7 @@ class AdminView(AuthViewMixin, TemplateView):
         return self.links.copy()
 
     def get_cards(self):
-        return self.cards
+        return self.cards.copy()
 
     def render_card(self, card: "Card"):
         """Render card as a subview"""
