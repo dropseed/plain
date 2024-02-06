@@ -144,7 +144,6 @@ class ConnectionHandler(BaseConnectionHandler):
 
         # Configure default settings.
         for conn in databases.values():
-            conn.setdefault("ATOMIC_REQUESTS", False)
             conn.setdefault("AUTOCOMMIT", True)
             conn.setdefault("ENGINE", "bolt.db.backends.dummy")
             if conn["ENGINE"] == "bolt.db.backends." or not conn["ENGINE"]:

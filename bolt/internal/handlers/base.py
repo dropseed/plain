@@ -82,8 +82,7 @@ class BaseHandler:
                 break
 
         if response is None:
-            wrapped_callback = self.make_view_atomic(callback)
-            response = wrapped_callback(request, *callback_args, **callback_kwargs)
+            response = callback(request, *callback_args, **callback_kwargs)
 
         # Complain if the view returned None (a common error).
         self.check_response(response, callback)
@@ -124,19 +123,6 @@ class BaseHandler:
                 "%s didn't return an HttpResponse object. It returned None "
                 "instead." % name
             )
-
-    # Other utility methods.
-
-    def make_view_atomic(self, view):
-        try:
-            from bolt.db import connections, transaction
-        except ImportError:
-            return view
-        non_atomic_requests = getattr(view, "_non_atomic_requests", set())
-        for alias, settings_dict in connections.settings.items():
-            if settings_dict["ATOMIC_REQUESTS"] and alias not in non_atomic_requests:
-                view = transaction.atomic(using=alias)(view)
-        return view
 
 
 def reset_urlconf(sender, **kwargs):

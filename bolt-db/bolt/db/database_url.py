@@ -48,7 +48,6 @@ for key in SCHEMES.keys():
 
 # From https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 class DBConfig(TypedDict, total=False):
-    ATOMIC_REQUESTS: bool
     AUTOCOMMIT: bool
     CONN_MAX_AGE: int | None
     CONN_HEALTH_CHECKS: bool

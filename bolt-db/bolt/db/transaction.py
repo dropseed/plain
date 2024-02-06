@@ -321,20 +321,3 @@ def atomic(using=None, savepoint=True, durable=False):
     # Decorator: @atomic(...) or context manager: with atomic(...): ...
     else:
         return Atomic(using, savepoint, durable)
-
-
-def _non_atomic_requests(view, using):
-    try:
-        view._non_atomic_requests.add(using)
-    except AttributeError:
-        view._non_atomic_requests = {using}
-    return view
-
-
-def non_atomic_requests(using=None):
-    if callable(using):
-        return _non_atomic_requests(using, DEFAULT_DB_ALIAS)
-    else:
-        if using is None:
-            using = DEFAULT_DB_ALIAS
-        return lambda view: _non_atomic_requests(view, using)
