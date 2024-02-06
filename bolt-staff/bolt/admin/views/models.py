@@ -139,6 +139,12 @@ class AdminModelDetailView(AdminDetailView):
             "admin/detail.html",
         ]
 
+    def get_links(self):
+        links = super().get_links()
+        if hasattr(self.object, "get_absolute_url"):
+            links["View in app"] = self.object.get_absolute_url()
+        return links
+
 
 class AdminModelUpdateView(AdminUpdateView):
     model: "models.Model"
@@ -159,6 +165,12 @@ class AdminModelUpdateView(AdminUpdateView):
 
     def get_object(self):
         return self.model.objects.get(pk=self.url_kwargs["pk"])
+
+    def get_links(self):
+        links = super().get_links()
+        if hasattr(self.object, "get_absolute_url"):
+            links["View in app"] = self.object.get_absolute_url()
+        return links
 
 
 class AdminModelViewset:
