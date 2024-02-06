@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from functools import cached_property
 
-from bolt.db import IntegrityError, transaction
+from bolt.db import IntegrityError
 from bolt.utils import timezone
 
 
@@ -64,17 +64,15 @@ class Cached:
             pass
 
         try:
-            with transaction.atomic():
-                item, _ = self._model_class.objects.update_or_create(
-                    key=self.key, defaults=defaults
-                )
+            item, _ = self._model_class.objects.update_or_create(
+                key=self.key, defaults=defaults
+            )
         except IntegrityError:
             # Most likely a race condition in creating the item,
             # so trying again should do an update
-            with transaction.atomic():
-                item, _ = self._model_class.objects.update_or_create(
-                    key=self.key, defaults=defaults
-                )
+            item, _ = self._model_class.objects.update_or_create(
+                key=self.key, defaults=defaults
+            )
 
         self.reload()
         return item.value
