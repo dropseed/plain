@@ -1,4 +1,4 @@
-from bolt.assets.storage import assets_storage
+from bolt.assets import get_asset_url
 from bolt.paginator import Paginator
 
 
@@ -9,12 +9,8 @@ def url(viewname, *args, **kwargs):
     return reverse(viewname, args=args, kwargs=kwargs)
 
 
-def asset(path):
-    return assets_storage.url(path)
-
-
 default_globals = {
-    "asset": asset,
+    "asset": get_asset_url,
     "url": url,
     "Paginator": Paginator,
 }
