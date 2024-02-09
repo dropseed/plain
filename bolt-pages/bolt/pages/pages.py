@@ -1,9 +1,11 @@
 import os
 
 import frontmatter
-from .markdown import render_markdown
+
 from bolt.templates.jinja import environment
 from bolt.utils.functional import cached_property
+
+from .markdown import render_markdown
 
 
 class Page:
