@@ -14,6 +14,10 @@ __version__ = get_version(VERSION)
 APP_PATH = Path.cwd() / "app"
 
 
+# from bolt.runtime import settings
+settings = LazySettings()
+
+
 class AppPathNotFound(RuntimeError):
     pass
 
@@ -26,7 +30,6 @@ def setup():
     from bolt.env import dotenv
     from bolt.logs import configure_logging
     from bolt.packages import packages
-    from bolt.runtime import settings
 
     if not APP_PATH.exists():
         raise AppPathNotFound(
@@ -43,10 +46,6 @@ def setup():
     configure_logging(settings.LOGGING)
 
     packages.populate(settings.INSTALLED_PACKAGES)
-
-
-# from bolt.runtime import settings
-settings = LazySettings()
 
 
 __all__ = [

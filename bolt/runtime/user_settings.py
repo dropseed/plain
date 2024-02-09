@@ -5,8 +5,9 @@ Read values from the module specified by the BOLT_SETTINGS_MODULE environment
 variable, and then from bolt.global_settings; see the global_settings.py
 for a list of all possible variables.
 """
-
 import importlib
+import json
+import logging
 import os
 import time
 import types
@@ -18,6 +19,9 @@ from bolt.packages import PackageConfig
 from bolt.utils.functional import LazyObject, empty
 
 ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"
+ENV_SETTINGS_PREFIX = "BOLT_"
+
+logger = logging.getLogger("bolt.runtime")
 
 
 class SettingsReference(str):
@@ -142,6 +146,9 @@ class DefaultSetting:
 class Settings:
     def __init__(self, settings_module):
         self._default_settings = {}
+        self._explicit_settings = set()
+
+        # First load the global settings from bolt
         self._load_module_settings(
             importlib.import_module("bolt.runtime.global_settings")
         )
@@ -155,10 +162,18 @@ class Settings:
         # so we can find files next to it (assume it's at the app root)
         self.path = Path(mod.__file__).resolve()
 
+        # First, get all the default_settings from the INSTALLED_PACKAGES and set those values
+        self._load_default_settings(mod)
+        # Second, look at the environment variables and overwrite with those
+        self._load_env_settings()
+        # Finally, load the explicit settings from the settings module
+        self._load_explicit_settings(mod)
+
+    def _load_default_settings(self, settings_module):
         # Get INSTALLED_PACKAGES from mod,
         # then (without populating packages) do a check for default_settings in each
         # app and load those now too.
-        for entry in getattr(mod, "INSTALLED_PACKAGES", []):
+        for entry in getattr(settings_module, "INSTALLED_PACKAGES", []):
             try:
                 if isinstance(entry, PackageConfig):
                     app_settings = entry.module.default_settings
@@ -168,29 +183,6 @@ class Settings:
                 continue
 
             self._load_module_settings(app_settings)
-
-        self._explicit_settings = set()
-        for setting in dir(mod):
-            if setting.isupper():
-                setting_value = getattr(mod, setting)
-
-                if setting in self._default_settings:
-                    self._default_settings[setting].check_type(setting_value)
-
-                setattr(self, setting, setting_value)
-                self._explicit_settings.add(setting)
-
-        if hasattr(time, "tzset") and self.TIME_ZONE:
-            # When we can, attempt to validate the timezone. If we can't find
-            # this file, no check happens and it's harmless.
-            zoneinfo_root = Path("/usr/share/zoneinfo")
-            zone_info_file = zoneinfo_root.joinpath(*self.TIME_ZONE.split("/"))
-            if zoneinfo_root.exists() and not zone_info_file.exists():
-                raise ValueError("Incorrect timezone setting: %s" % self.TIME_ZONE)
-            # Move the time zone info into os.environ. See ticket #2315 for why
-            # we don't do this unconditionally (breaks Windows).
-            os.environ["TZ"] = self.TIME_ZONE
-            time.tzset()
 
     def _load_module_settings(self, module):
         annotations = getattr(module, "__annotations__", {})
@@ -213,6 +205,60 @@ class Settings:
                     module=module,
                 )
 
+    def _load_env_settings(self):
+        env_settings = {
+            k[len(ENV_SETTINGS_PREFIX) :]: v
+            for k, v in os.environ.items()
+            if k.startswith(ENV_SETTINGS_PREFIX)
+        }
+        logger.debug("Loading environment settings: %s", env_settings)
+        for setting, value in env_settings.items():
+            if setting not in self._default_settings:
+                # Ignore anything not defined in the default settings
+                continue
+
+            default_setting = self._default_settings[setting]
+            if not default_setting.annotation:
+                raise ValueError(
+                    f"Setting {setting} needs a type hint to be set from the environment"
+                )
+
+            if default_setting.annotation is not str:
+                # Anything besides a string will be parsed as JSON
+                # (works for ints, lists, etc.)
+                parsed_value = json.loads(value)
+            else:
+                parsed_value = value
+
+            default_setting.check_type(parsed_value)
+
+            setattr(self, setting, parsed_value)
+            self._explicit_settings.add(setting)
+
+    def _load_explicit_settings(self, settings_module):
+        for setting in dir(settings_module):
+            if setting.isupper():
+                setting_value = getattr(settings_module, setting)
+
+                if setting in self._default_settings:
+                    self._default_settings[setting].check_type(setting_value)
+
+                setattr(self, setting, setting_value)
+                self._explicit_settings.add(setting)
+
+        if hasattr(time, "tzset") and self.TIME_ZONE:
+            # When we can, attempt to validate the timezone. If we can't find
+            # this file, no check happens and it's harmless.
+            zoneinfo_root = Path("/usr/share/zoneinfo")
+            zone_info_file = zoneinfo_root.joinpath(*self.TIME_ZONE.split("/"))
+            if zoneinfo_root.exists() and not zone_info_file.exists():
+                raise ValueError("Incorrect timezone setting: %s" % self.TIME_ZONE)
+            # Move the time zone info into os.environ. See ticket #2315 for why
+            # we don't do this unconditionally (breaks Windows).
+            os.environ["TZ"] = self.TIME_ZONE
+            time.tzset()
+
+    # Seems like this could almost be removed
     def is_overridden(self, setting):
         return setting in self._explicit_settings
 
