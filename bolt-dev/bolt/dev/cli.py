@@ -10,6 +10,7 @@ from honcho.manager import Manager as HonchoManager
 
 from bolt.runtime import APP_PATH
 
+from .contribute import cli as contribute_cli
 from .db import cli as db_cli
 from .services import cli as services_cli
 from .utils import boltpackage_installed, has_pyproject_toml
@@ -113,3 +114,4 @@ def cli(ctx):
 
 cli.add_command(db_cli)
 cli.add_command(services_cli)
+cli.add_command(contribute_cli)
