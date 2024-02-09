@@ -64,12 +64,8 @@ def clear_completed():
     cutoff = timezone.now() - datetime.timedelta(
         seconds=settings.WORKER_JOBS_CLEARABLE_AFTER
     )
-    click.echo(f"Clearing jobs finished before {cutoff}")
-    results = (
-        JobResult.objects.exclude(ended_at__isnull=True)
-        .filter(ended_at__lt=cutoff)
-        .delete()
-    )
+    click.echo(f"Clearing job results created before {cutoff}")
+    results = JobResult.objects.filter(created_at__lt=cutoff).delete()
     click.echo(f"Deleted {results[0]} jobs")
 
 
