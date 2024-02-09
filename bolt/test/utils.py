@@ -21,12 +21,6 @@ from bolt.runtime import settings
 from bolt.runtime.user_settings import UserSettingsHolder
 from bolt.signals import request_started
 
-try:
-    import jinja2
-except ImportError:
-    jinja2 = None
-
-
 __all__ = (
     "ContextList",
     "CaptureQueriesContext",
