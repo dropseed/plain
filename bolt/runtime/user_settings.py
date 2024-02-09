@@ -96,14 +96,15 @@ class LazySettings(LazyObject):
         return self._wrapped is not empty
 
 
-class DefaultSetting:
+class SettingDefinition:
     """Store some basic info about default settings and where they came from"""
 
-    def __init__(self, name, value, annotation, module):
+    def __init__(self, name, value, annotation, module, required=False):
         self.name = name
         self.value = value
         self.annotation = annotation
         self.module = module
+        self.required = required
 
     def __str__(self):
         return self.name
@@ -112,7 +113,7 @@ class DefaultSetting:
         if not self.annotation:
             return
 
-        if not DefaultSetting._is_instance_of_type(obj, self.annotation):
+        if not SettingDefinition._is_instance_of_type(obj, self.annotation):
             raise ValueError(
                 f"The {self.name} setting must be of type {self.annotation}"
             )
@@ -129,14 +130,16 @@ class DefaultSetting:
             or typing.get_origin(type_hint) is types.UnionType
         ):
             return any(
-                DefaultSetting._is_instance_of_type(value, arg)
+                SettingDefinition._is_instance_of_type(value, arg)
                 for arg in typing.get_args(type_hint)
             )
 
         # List types
         if typing.get_origin(type_hint) is list:
             return isinstance(value, list) and all(
-                DefaultSetting._is_instance_of_type(item, typing.get_args(type_hint)[0])
+                SettingDefinition._is_instance_of_type(
+                    item, typing.get_args(type_hint)[0]
+                )
                 for item in value
             )
 
@@ -168,6 +171,8 @@ class Settings:
         self._load_env_settings()
         # Finally, load the explicit settings from the settings module
         self._load_explicit_settings(mod)
+        # Check for any required settings that are missing
+        self._check_required_settings()
 
     def _load_default_settings(self, settings_module):
         # Get INSTALLED_PACKAGES from mod,
@@ -186,8 +191,9 @@ class Settings:
 
     def _load_module_settings(self, module):
         annotations = getattr(module, "__annotations__", {})
+        settings = dir(module)
 
-        for setting in dir(module):
+        for setting in settings:
             if setting.isupper():
                 if hasattr(self, setting):
                     raise ImproperlyConfigured("The %s setting is duplicated" % setting)
@@ -198,11 +204,22 @@ class Settings:
                 setattr(self, setting, setting_value)
 
                 # Store a more complex setting reference for more detail
-                self._default_settings[setting] = DefaultSetting(
+                self._default_settings[setting] = SettingDefinition(
                     name=setting,
                     value=setting_value,
                     annotation=annotations.get(setting, ""),
                     module=module,
+                )
+
+        # Store any annotations that didn't have a value (these are required settings)
+        for setting, annotation in annotations.items():
+            if setting not in self._default_settings:
+                self._default_settings[setting] = SettingDefinition(
+                    name=setting,
+                    value=None,
+                    annotation=annotation,
+                    module=module,
+                    required=True,
                 )
 
     def _load_env_settings(self):
@@ -260,6 +277,17 @@ class Settings:
             # we don't do this unconditionally (breaks Windows).
             os.environ["TZ"] = self.TIME_ZONE
             time.tzset()
+
+    def _check_required_settings(self):
+        # Required settings have to be explicitly defined (there is no default)
+        # so we can check whether they have been set by the user
+        required_settings = {
+            k for k, v in self._default_settings.items() if v.required
+        }
+        if missing := required_settings - self._explicit_settings:
+            raise ImproperlyConfigured(
+                "The following settings are required: %s" % ", ".join(missing)
+            )
 
     # Seems like this could almost be removed
     def is_overridden(self, setting):

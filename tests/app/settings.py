@@ -1,3 +1,4 @@
+SECRET_KEY = "secret"
 DEBUG = True
 
 INSTALLED_PACKAGES = [

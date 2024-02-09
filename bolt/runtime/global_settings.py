@@ -40,7 +40,7 @@ APPEND_SLASH = True
 # A secret key for this particular Bolt installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Bolt will complain
 # loudly.
-SECRET_KEY: str = ""
+SECRET_KEY: str
 
 # List of secret keys used to verify the validity of signatures. This allows
 # secret key rotation.
