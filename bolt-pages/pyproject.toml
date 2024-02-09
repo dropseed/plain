@@ -10,7 +10,7 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pycmarkgfm = "^1.1.0"
+mistune = "^3.0.0"
 python-frontmatter = "^1.0.0"
 
 [tool.poetry.dev-dependencies]

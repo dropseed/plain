@@ -1,9 +1,7 @@
 import os
 
 import frontmatter
-import pycmarkgfm
-
-from bolt.runtime import settings
+from .markdown import render_markdown
 from bolt.templates.jinja import environment
 from bolt.utils.functional import cached_property
 
@@ -36,11 +34,7 @@ class Page:
             content = environment.from_string(content).render()
 
         if self.content_type == "markdown":
-            content = pycmarkgfm.markdown_to_html(
-                content,
-                options=settings.PYCMARKGFM_OPTIONS,
-                extensions=settings.PYCMARKGFM_EXTENSIONS,
-            )
+            content = render_markdown(content)
 
         return content
 
