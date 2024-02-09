@@ -16,7 +16,6 @@ from bolt.internal.handlers.wsgi import WSGIRequest
 from bolt.json import BoltJSONEncoder
 from bolt.runtime import settings
 from bolt.signals import got_request_exception, request_finished, request_started
-from bolt.test import signals
 from bolt.test.utils import ContextList
 from bolt.urls import resolve
 from bolt.utils.encoding import force_bytes
@@ -704,16 +703,16 @@ class Client(ClientMixin, RequestFactory):
         # Curry a data dictionary into an instance of the template renderer
         # callback function.
         data = {}
-        on_template_render = partial(store_rendered_templates, data)
-        signal_uid = "template-render-%s" % id(request)
-        signals.template_rendered.connect(on_template_render, dispatch_uid=signal_uid)
+        partial(store_rendered_templates, data)
+        "template-render-%s" % id(request)
+        # signals.template_rendered.connect(on_template_render, dispatch_uid=signal_uid)
         # Capture exceptions created by the handler.
         exception_uid = "request-exception-%s" % id(request)
         got_request_exception.connect(self.store_exc_info, dispatch_uid=exception_uid)
         try:
             response = self.handler(environ)
         finally:
-            signals.template_rendered.disconnect(dispatch_uid=signal_uid)
+            # signals.template_rendered.disconnect(dispatch_uid=signal_uid)
             got_request_exception.disconnect(dispatch_uid=exception_uid)
         # Check for signaled exceptions.
         self.check_exception(response)

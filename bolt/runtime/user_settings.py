@@ -281,9 +281,7 @@ class Settings:
     def _check_required_settings(self):
         # Required settings have to be explicitly defined (there is no default)
         # so we can check whether they have been set by the user
-        required_settings = {
-            k for k, v in self._default_settings.items() if v.required
-        }
+        required_settings = {k for k, v in self._default_settings.items() if v.required}
         if missing := required_settings - self._explicit_settings:
             raise ImproperlyConfigured(
                 "The following settings are required: %s" % ", ".join(missing)

@@ -11,8 +11,6 @@ from bolt.legacy.management import call_command
 from bolt.legacy.management.color import no_style
 from bolt.legacy.management.sql import emit_post_migrate_signal
 from bolt.packages import packages
-from bolt.runtime import settings
-from bolt.signals import setting_changed
 from bolt.test.client import Client
 from bolt.test.utils import (
     modify_settings,
@@ -208,12 +206,6 @@ class TransactionTestCase(unittest.TestCase):
 
         if self.available_packages is not None:
             packages.set_available_packages(self.available_packages)
-            setting_changed.send(
-                sender=settings._wrapped.__class__,
-                setting="INSTALLED_PACKAGES",
-                value=self.available_packages,
-                enter=True,
-            )
             for db_name in self._databases_names(include_mirrors=False):
                 emit_post_migrate_signal(verbosity=0, interactive=False, db=db_name)
         try:
@@ -221,12 +213,6 @@ class TransactionTestCase(unittest.TestCase):
         except Exception:
             if self.available_packages is not None:
                 packages.unset_available_packages()
-                setting_changed.send(
-                    sender=settings._wrapped.__class__,
-                    setting="INSTALLED_PACKAGES",
-                    value=settings.INSTALLED_PACKAGES,
-                    enter=False,
-                )
             raise
         # Clear the queries_log so that it's less likely to overflow (a single
         # test probably won't execute 9K queries). If queries_log overflows,
@@ -255,12 +241,6 @@ class TransactionTestCase(unittest.TestCase):
         finally:
             if self.available_packages is not None:
                 packages.unset_available_packages()
-                setting_changed.send(
-                    sender=settings._wrapped.__class__,
-                    setting="INSTALLED_PACKAGES",
-                    value=settings.INSTALLED_PACKAGES,
-                    enter=False,
-                )
 
     def settings(self, **kwargs):
         """

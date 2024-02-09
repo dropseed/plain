@@ -19,8 +19,7 @@ from bolt.exceptions import ImproperlyConfigured
 from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.runtime.user_settings import UserSettingsHolder
-from bolt.signals import request_started, setting_changed
-from bolt.test.signals import template_rendered
+from bolt.signals import request_started
 
 try:
     import jinja2
@@ -82,7 +81,6 @@ def instrumented_test_render(self, context):
     An instrumented Template render method, providing a signal that can be
     intercepted by the test Client.
     """
-    template_rendered.send(sender=self, template=self, context=context)
     return self._original_render(context)
 
 
@@ -440,17 +438,17 @@ class override_settings(TestContextDecorator):
             setattr(override, key, new_value)
         self.wrapped = settings._wrapped
         settings._wrapped = override
-        for key, new_value in self.options.items():
-            try:
-                setting_changed.send(
-                    sender=settings._wrapped.__class__,
-                    setting=key,
-                    value=new_value,
-                    enter=True,
-                )
-            except Exception as exc:
-                self.enable_exception = exc
-                self.disable()
+        # for key, new_value in self.options.items():
+        #     try:
+        #         setting_changed.send(
+        #             sender=settings._wrapped.__class__,
+        #             setting=key,
+        #             value=new_value,
+        #             enter=True,
+        #         )
+        #     except Exception as exc:
+        #         self.enable_exception = exc
+        #         self.disable()
 
     def disable(self):
         if "INSTALLED_PACKAGES" in self.options:
@@ -459,14 +457,14 @@ class override_settings(TestContextDecorator):
         del self.wrapped
         responses = []
         for key in self.options:
-            new_value = getattr(settings, key, None)
-            responses_for_setting = setting_changed.send_robust(
-                sender=settings._wrapped.__class__,
-                setting=key,
-                value=new_value,
-                enter=False,
-            )
-            responses.extend(responses_for_setting)
+            getattr(settings, key, None)
+            # responses_for_setting = setting_changed.send_robust(
+            #     sender=settings._wrapped.__class__,
+            #     setting=key,
+            #     value=new_value,
+            #     enter=False,
+            # )
+            # responses.extend(responses_for_setting)
         if self.enable_exception is not None:
             exc = self.enable_exception
             self.enable_exception = None

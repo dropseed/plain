@@ -14,7 +14,6 @@ from bolt.files.base import ContentFile
 from bolt.files.move import file_move_safe
 from bolt.files.utils import validate_file_name
 from bolt.runtime import settings
-from bolt.signals import setting_changed
 from bolt.utils._os import safe_join
 from bolt.utils.crypto import get_random_string
 from bolt.utils.deconstruct import deconstructible
@@ -227,7 +226,6 @@ class FileSystemStorage(Storage, StorageSettingsMixin):
             self.base_url += "/"
         self._file_permissions_mode = file_permissions_mode
         self._directory_permissions_mode = directory_permissions_mode
-        setting_changed.connect(self._clear_cached_properties)
 
     @cached_property
     def location(self):
