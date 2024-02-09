@@ -223,12 +223,15 @@ class Settings:
                     f"Setting {setting} needs a type hint to be set from the environment"
                 )
 
-            if default_setting.annotation is not str:
+            if default_setting.annotation is bool:
+                # Special case for bools
+                parsed_value = value.lower() in ("true", "1", "yes")
+            elif default_setting.annotation is str:
+                parsed_value = value
+            else:
                 # Anything besides a string will be parsed as JSON
                 # (works for ints, lists, etc.)
                 parsed_value = json.loads(value)
-            else:
-                parsed_value = value
 
             default_setting.check_type(parsed_value)
 
