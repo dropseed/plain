@@ -5,11 +5,6 @@ from pathlib import Path
 import click
 import tomllib
 
-from bolt.runtime import settings
-
-REPO_URL = "https://github.com/dropseed/bolt"
-REPO_DIR_NAME = "repo"
-
 
 @click.group("contribute")
 def cli():
@@ -18,24 +13,29 @@ def cli():
 
 
 @cli.command()
-@click.option("--clone-depth", default=1, help="Depth to clone the repository")
-def clone(clone_depth):
-    """Clone the Bolt repository"""
-    clone_target = settings.BOLT_TEMP_PATH / REPO_DIR_NAME
-    click.secho(
-        f"Cloning {REPO_URL} to {clone_target.relative_to(Path.cwd())}", bold=True
-    )
-    result = subprocess.run(
-        ["git", "clone", REPO_URL, "--depth", str(clone_depth), str(clone_target)]
-    )
-    if result.returncode:
-        click.secho("Failed to clone the repository", fg="red")
-        sys.exit(result.returncode)
-
-
-@cli.command()
+@click.option("--repo", default="../bolt", help="Path to the bolt repo")
 @click.argument("package")
-def link(package):
+def link(package, repo):
+    repo = Path(repo)
+    if not repo.exists():
+        click.secho(f"Repo not found at {repo}", fg="red")
+        return
+
+    repo_branch = (
+        subprocess.check_output(
+            [
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "HEAD",
+            ],
+            cwd=repo,
+        )
+        .decode()
+        .strip()
+    )
+    click.secho(f"Using repo at {repo} ({repo_branch} branch)", bold=True)
+
     pyproject = Path("pyproject.toml")
     if not pyproject.exists():
         click.secho("pyproject.toml not found", fg="red")
@@ -63,9 +63,7 @@ def link(package):
             )
             return
 
-    clone_target = settings.BOLT_TEMP_PATH / REPO_DIR_NAME
-
-    click.secho(f"Linking {package} to {clone_target}", bold=True)
+    click.secho(f"Linking {package} to {repo}", bold=True)
     if package == "bolt":
         result = subprocess.run(
             [
@@ -74,7 +72,7 @@ def link(package):
                 "--editable",
                 "--group",
                 poetry_group,
-                str(clone_target.relative_to(Path.cwd())),
+                str(repo),
             ]
         )
         if result.returncode:
@@ -88,7 +86,7 @@ def link(package):
                 "--editable",
                 "--group",
                 poetry_group,
-                str((clone_target / package).relative_to(Path.cwd())),
+                str(repo / package),
             ]
         )
         if result.returncode:
