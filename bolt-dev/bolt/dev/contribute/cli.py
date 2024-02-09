@@ -92,3 +92,24 @@ def link(package, repo):
         if result.returncode:
             click.secho("Failed to link the package", fg="red")
             sys.exit(result.returncode)
+
+
+@cli.command()
+def reset():
+    click.secho("Undoing any changes to pyproject.toml and poetry.lock", bold=True)
+    result = subprocess.run(["git", "checkout", "pyproject.toml", "poetry.lock"])
+    if result.returncode:
+        click.secho("Failed to checkout pyproject.toml and poetry.lock", fg="red")
+        sys.exit(result.returncode)
+
+    click.secho("Removing current .venv", bold=True)
+    result = subprocess.run(["rm", "-rf", ".venv"])
+    if result.returncode:
+        click.secho("Failed to remove .venv", fg="red")
+        sys.exit(result.returncode)
+
+    click.secho("Running poetry install", bold=True)
+    result = subprocess.run(["poetry", "install"])
+    if result.returncode:
+        click.secho("Failed to install", fg="red")
+        sys.exit(result.returncode)
