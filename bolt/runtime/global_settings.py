@@ -10,7 +10,7 @@ from bolt.runtime import APP_PATH as default_app_path
 # CORE             #
 ####################
 
-DEBUG: bool
+DEBUG: bool = False
 
 BOLT_TEMP_PATH: Path = default_app_path.parent / ".bolt"
 
