@@ -157,30 +157,6 @@ class UserCreationForm(BaseUserCreationForm):
             return username
 
 
-class UserChangeForm(ModelForm):
-    password = ReadOnlyPasswordHashField(
-        # label="Password",
-        # help_text=_(
-        #     "Raw passwords are not stored, so there is no way to see this "
-        #     "user’s password, but you can change the password using "
-        #     '<a href="{}">this form</a>.'
-        # ),
-    )
-
-    class Meta:
-        model = get_user_model()
-        fields = "__all__"
-        field_classes = {"username": UsernameField}
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        password = self.fields.get("password")
-        if password:
-            password.help_text = password.help_text.format(
-                f"../../{self.instance.pk}/password/"
-            )
-
-
 class AuthenticationForm(forms.Form):
     """
     Base class for authenticating users. Extend this to get a form that accepts
