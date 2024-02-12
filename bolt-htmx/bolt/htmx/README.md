@@ -132,16 +132,16 @@ When you use the `{% htmxfragment %}` tag,
 a standard `div` is output that looks like this:
 
 ```html
-<div bhx-fragment="main" hx-swap="outerHTML" hx-target="this" hx-indicator="this">
+<div bolt-hx-fragment="main" hx-swap="outerHTML" hx-target="this" hx-indicator="this">
   {{ fragment_content }}
 </div>
 ```
 
-The `bhx-fragment` is a custom attribute that we've added ("F" is for "Forge"),
+The `bolt-hx-fragment` is a custom attribute that we've added ("F" is for "Forge"),
 but the rest are standard HTMX attributes.
 
 When Django renders the response to an HTMX request,
-it will get the `BHX-Fragment` header,
+it will get the `Bolt-HX-Fragment` header,
 find the fragment with that name in the template,
 and render that for the response.
 
@@ -169,7 +169,7 @@ and associate buttons in that template with class methods in the view.
 
 As an example, let's say we have a `PullRequest` model and we want users to be able to open, close, or merge it with a button.
 
-In our template, we would use the `bhx-action` attribute to name the action:
+In our template, we would use the `bolt-hx-action` attribute to name the action:
 
 ```html
 {% extends "base.html" %}
@@ -187,11 +187,11 @@ In our template, we would use the `bhx-action` attribute to name the action:
 
   {% if pullrequest.state == "open" %}
     <!-- If it's open, they can close or merge it -->
-    <button hx-post bhx-action="close">Close</button>
-    <button hx-post bhx-action="merge">Merge</button>
+    <button hx-post bolt-hx-action="close">Close</button>
+    <button hx-post bolt-hx-action="merge">Merge</button>
   {% else if pullrequest.state == "closed" %}
     <!-- If it's closed, it can be re-opened -->
-    <button hx-post bhx-action="open">Open</button>
+    <button hx-post bolt-hx-action="open">Open</button>
   {% endif %}
 
   {% endhtmxfragment %}
@@ -199,7 +199,7 @@ In our template, we would use the `bhx-action` attribute to name the action:
 {% endblock %}
 ```
 
-Then in the view class, we can define methods for each HTTP method + `bhx-action`:
+Then in the view class, we can define methods for each HTTP method + `bolt-hx-action`:
 
 ```python
 class PullRequestDetailView(HTMXViewMixin, DetailView):
@@ -262,7 +262,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         # The queryset will apply to all actions on the view, so "permission" logic can be shared
         return super().get_queryset().filter(users=self.request.user)
 
-    # You can also leave off the "bhx-action" attribute and just handle the HTTP method
+    # You can also leave off the "bolt-hx-action" attribute and just handle the HTTP method
     def htmx_delete(self, request, *args, **kwargs):
         self.object = self.get_object()
 
@@ -310,7 +310,7 @@ And then subsequent HTMX requests/actions on individual items can be handled by 
   <!-- Send all HTMX requests to a URL for single pull requests (works inside of a loop, or on a single detail page) -->
   <h2>{{ pullrequest.title }}</h2>
   <button hx-get>Refresh</button>
-  <button hx-post bhx-action="update">Update</button>
+  <button hx-post bolt-hx-action="update">Update</button>
 </div>
 ```
 

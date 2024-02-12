@@ -25,7 +25,9 @@ class HTMXViewMixin:
         response = super().get_response()
         # Tell browser caching to also consider the fragment header,
         # not just the url/cookie.
-        patch_vary_headers(response, ["HX-Request", "BHX-Fragment", "BHX-Action"])
+        patch_vary_headers(
+            response, ["HX-Request", "Bolt-HX-Fragment", "Bolt-HX-Action"]
+        )
         return response
 
     def get_request_handler(self):
@@ -65,8 +67,8 @@ class HTMXViewMixin:
     @property
     def htmx_fragment_name(self):
         # A custom header that we pass with the {% htmxfragment %} tag
-        return self.request.headers.get("BHX-Fragment", "")
+        return self.request.headers.get("Bolt-HX-Fragment", "")
 
     @property
     def htmx_action_name(self):
-        return self.request.headers.get("BHX-Action", "")
+        return self.request.headers.get("Bolt-HX-Action", "")

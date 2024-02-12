@@ -2,17 +2,17 @@
 var csrfToken = document.currentScript.dataset.csrftoken;
 
 htmx.on("htmx:configRequest", function (event) {
-  // Custom header for BHX-Action
-  var actionElt = htmx.closest(event.detail.elt, "[bhx-action]");
+  // Custom header for Bolt-HX-Action
+  var actionElt = htmx.closest(event.detail.elt, "[bolt-hx-action]");
   if (actionElt) {
-    event.detail.headers["BHX-Action"] = actionElt.getAttribute("bhx-action");
+    event.detail.headers["Bolt-HX-Action"] = actionElt.getAttribute("bolt-hx-action");
   }
 
-  // Custom header for BHX-Fragment
-  var fragmentElt = htmx.closest(event.detail.elt, "[bhx-fragment]");
+  // Custom header for Bolt-HX-Fragment
+  var fragmentElt = htmx.closest(event.detail.elt, "[bolt-hx-fragment]");
   if (fragmentElt) {
-    event.detail.headers["BHX-Fragment"] =
-      fragmentElt.getAttribute("bhx-fragment");
+    event.detail.headers["Bolt-HX-Fragment"] =
+      fragmentElt.getAttribute("bolt-hx-fragment");
   }
 
   // Add the CSRF token to all non-GET requests automatically
