@@ -1,7 +1,9 @@
+import os
 import sys
 
 import click
 
+from ..services import Services
 from .container import DBContainer
 
 
@@ -15,6 +17,23 @@ def cli():
 # def reset():
 #     DBContainer().reset(create=True)
 #     click.secho("Local development database reset", fg="green")
+
+
+@cli.command()
+@click.argument("export_path", default="")
+def export(export_path):
+    """Export the local database to a file"""
+    if not export_path:
+        current_dir_name = os.path.basename(os.getcwd())
+        export_path = f"{current_dir_name}-dev-db.sql"
+    with Services():
+        export_successful = DBContainer().export(export_path)
+
+    if export_successful:
+        click.secho(f"Local development database exported to {export_path}", fg="green")
+    else:
+        click.secho("Export failed", fg="red")
+        sys.exit(1)
 
 
 @cli.group()

@@ -121,3 +121,20 @@ class DBContainer:
         self.execute(
             f"createdb {self.postgres_db} -U {self.postgres_user} -T {snapshot_name}",
         )
+
+    def export(self, export_path):
+        successful = (
+            subprocess.run(
+                [
+                    "docker",
+                    "exec",
+                    self.name,
+                    "/bin/bash",
+                    "-c",
+                    f"pg_dump -U {self.postgres_user} {self.postgres_db}",
+                ],
+                stdout=open(export_path, "w+"),
+            ).returncode
+            == 0
+        )
+        return successful
