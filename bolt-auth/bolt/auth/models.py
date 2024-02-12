@@ -1,5 +1,4 @@
 import unicodedata
-import warnings
 
 from bolt.auth import password_validation
 from bolt.auth.hashers import (
@@ -11,8 +10,7 @@ from bolt.db import models
 from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.utils import timezone
-from bolt.utils.crypto import get_random_string, salted_hmac
-from bolt.utils.deprecation import RemovedInDjango51Warning
+from bolt.utils.crypto import salted_hmac
 
 from .validators import UnicodeUsernameValidator
 
