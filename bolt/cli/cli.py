@@ -361,9 +361,9 @@ class BoltCommandCollection(click.CommandCollection):
                 EntryPointGroup(),
                 bolt_cli,
             ]
-        except Exception:
+        except Exception as e:
             click.secho(
-                "Error setting up Bolt CLI\n{e}",
+                f"Error setting up Bolt CLI\n{e}",
                 fg="red",
                 err=True,
             )
