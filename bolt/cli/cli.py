@@ -361,6 +361,18 @@ class BoltCommandCollection(click.CommandCollection):
                 EntryPointGroup(),
                 bolt_cli,
             ]
+        except Exception:
+            click.secho(
+                "Error setting up Bolt CLI\n{e}",
+                fg="red",
+                err=True,
+            )
+
+            sources = [
+                EntryPointGroup(),
+                AppCLIGroup(),
+                bolt_cli,
+            ]
 
         super().__init__(*args, **kwargs)
 
