@@ -36,6 +36,23 @@ def export(export_path):
         sys.exit(1)
 
 
+@cli.command("import")
+@click.argument("sql_file")
+def import_db(sql_file):
+    """Import a database file into the local database"""
+
+    print(f"Importing {sql_file} ({os.path.getsize(sql_file) / 1024 / 1024:.2f} MB)")
+
+    with Services():
+        successful = DBContainer().import_sql(sql_file)
+
+    if successful:
+        click.secho(f"Local development database imported from {sql_file}", fg="green")
+    else:
+        click.secho("Import failed", fg="red")
+        sys.exit(1)
+
+
 @cli.group()
 def snapshot():
     """Manage local database snapshots"""

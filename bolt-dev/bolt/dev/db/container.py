@@ -138,3 +138,14 @@ class DBContainer:
             == 0
         )
         return successful
+
+    def import_sql(self, sql_file):
+        self.reset(create=True)
+        successful = (
+            subprocess.run(
+                f"docker exec -i {self.name} psql -U {self.postgres_user} {self.postgres_db} < {shlex.quote(sql_file)}",
+                shell=True,
+            ).returncode
+            == 0
+        )
+        return successful
