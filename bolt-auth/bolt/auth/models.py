@@ -4,8 +4,8 @@ import warnings
 from bolt.auth import password_validation
 from bolt.auth.hashers import (
     check_password,
+    hash_password,
     is_password_usable,
-    make_password,
 )
 from bolt.db import models
 from bolt.packages import packages
@@ -42,7 +42,7 @@ class UserManager(models.Manager):
         )
         username = GlobalUserModel.normalize_username(username)
         user = self.model(username=username, email=email, **extra_fields)
-        user.password = make_password(password)
+        user.password = hash_password(password)
         user.save(using=self._db)
         return user
 
@@ -152,7 +152,7 @@ class AbstractUser(models.Model):
         return (self.get_username(),)
 
     def set_password(self, raw_password):
-        self.password = make_password(raw_password)
+        self.password = hash_password(raw_password)
         self._password = raw_password
 
     def check_password(self, raw_password):
@@ -171,7 +171,7 @@ class AbstractUser(models.Model):
 
     def set_unusable_password(self):
         # Set a value that will never be a valid hash
-        self.password = make_password(None)
+        self.password = hash_password(None)
 
     def has_usable_password(self):
         """
