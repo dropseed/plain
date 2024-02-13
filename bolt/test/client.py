@@ -591,21 +591,10 @@ class ClientMixin:
             return True
         return False
 
-    def force_login(self, user, backend=None):
-        def get_backend():
-            from bolt.auth import load_backend
+    def force_login(self, user):
+        self._login(user)
 
-            for backend_path in settings.AUTHENTICATION_BACKENDS:
-                backend = load_backend(backend_path)
-                if hasattr(backend, "get_user"):
-                    return backend_path
-
-        if backend is None:
-            backend = get_backend()
-        user.backend = backend
-        self._login(user, backend)
-
-    def _login(self, user, backend=None):
+    def _login(self, user):
         from bolt.auth import login
 
         # Create a fake request to store login details.
@@ -615,7 +604,7 @@ class ClientMixin:
         else:
             engine = import_module(settings.SESSION_ENGINE)
             request.session = engine.SessionStore()
-        login(request, user, backend)
+        login(request, user)
         # Save the session values.
         request.session.save()
         # Set the cookie to represent the session.
