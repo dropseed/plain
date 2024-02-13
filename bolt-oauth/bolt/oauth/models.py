@@ -71,11 +71,6 @@ class OAuthConnection(models.Model):
     def set_user_fields(self, oauth_user: "OAuthUser"):
         self.provider_user_id = oauth_user.id
 
-    def can_be_disconnected(self) -> bool:
-        return (
-            self.user.has_usable_password() or self.user.oauth_connections.count() > 1
-        )
-
     def access_token_expired(self) -> bool:
         return (
             self.access_token_expires_at is not None

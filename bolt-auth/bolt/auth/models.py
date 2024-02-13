@@ -1,10 +1,5 @@
 import unicodedata
 
-from bolt.auth.hashers import (
-    check_password,
-    hash_password,
-    is_password_usable,
-)
 from bolt.db import models
 from bolt.packages import packages
 from bolt.runtime import settings
@@ -39,7 +34,7 @@ class UserManager(models.Manager):
         )
         username = GlobalUserModel.normalize_username(username)
         user = self.model(username=username, email=email, **extra_fields)
-        user.password = hash_password(password)
+        # user.password = hash_password(password)
         user.save(using=self._db)
         return user
 
@@ -87,20 +82,14 @@ class AbstractUser(models.Model):
         default=False,
         help_text="Designates whether the user can log into this admin site.",
     )
-    is_active = models.BooleanField(
-        "active",
-        default=True,
-        help_text="Designates whether this user should be treated as active. Unselect this instead of deleting accounts.",
-    )
     date_joined = models.DateTimeField("date joined", default=timezone.now)
-
-    password = models.CharField("password", max_length=128)
     last_login = models.DateTimeField("last login", blank=True, null=True)
 
     objects = UserManager()
 
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["email"]
+    SESSION_HASH_FIELD = ""
 
     class Meta:
         verbose_name = "user"
@@ -118,34 +107,6 @@ class AbstractUser(models.Model):
         """Return the username for this User."""
         return getattr(self, self.USERNAME_FIELD)
 
-    def natural_key(self):
-        return (self.get_username(),)
-
-    def set_password(self, raw_password):
-        self.password = hash_password(raw_password)
-
-    def check_password(self, raw_password):
-        """
-        Return a boolean of whether the raw_password was correct. Handles
-        hashing formats behind the scenes.
-        """
-
-        def setter(raw_password):
-            self.set_password(raw_password)
-            self.save(update_fields=["password"])
-
-        return check_password(raw_password, self.password, setter)
-
-    def set_unusable_password(self):
-        # Set a value that will never be a valid hash
-        self.password = hash_password(None)
-
-    def has_usable_password(self):
-        """
-        Return False if set_unusable_password() has been called for this user.
-        """
-        return is_password_usable(self.password)
-
     def get_session_auth_hash(self):
         """
         Return an HMAC of the password field.
@@ -160,7 +121,7 @@ class AbstractUser(models.Model):
         key_salt = "bolt.auth.models.AbstractBaseUser.get_session_auth_hash"
         return salted_hmac(
             key_salt,
-            self.password,
+            getattr(self, self.SESSION_HASH_FIELD),
             secret=secret,
             algorithm="sha256",
         ).hexdigest()

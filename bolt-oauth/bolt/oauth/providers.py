@@ -55,14 +55,11 @@ class OAuthProvider:
         client_secret: str,
         # Not necessarily required, but commonly used
         scope: str = "",
-        # Authentication backend only needs to be set if you have custom backends which don't include the default
-        authentication_backend: str = "bolt.auth.backends.ModelBackend",
     ):
         self.provider_key = provider_key
         self.client_id = client_id
         self.client_secret = client_secret
         self.scope = scope
-        self.authentication_backend = authentication_backend
 
     def get_authorization_url_params(self, *, request: HttpRequest) -> dict:
         return {
@@ -180,9 +177,7 @@ class OAuthProvider:
         return HttpResponseRedirect(redirect_url)
 
     def login(self, *, request: HttpRequest, user: Any) -> HttpResponse:
-        # Backend is *required* if there are multiple backends configured.
-        # We could/should have our own backend, but that feels like an unnecessary addition right now?
-        auth_login(request=request, user=user, backend=self.authentication_backend)
+        auth_login(request=request, user=user)
 
     def get_login_redirect_url(self, *, request: HttpRequest) -> str:
         return request.session.pop(SESSION_NEXT_KEY, settings.LOGIN_REDIRECT_URL)
