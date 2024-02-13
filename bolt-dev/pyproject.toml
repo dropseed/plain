@@ -18,6 +18,7 @@ repository = "https://github.com/boltpackages/bolt-dev"
 [tool.poetry.plugins."bolt.cli"]
 "dev" = "bolt.dev:cli"
 "pre-commit" = "bolt.dev.precommit:cli"
+"contrib" = "bolt.dev.contribute:cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"
