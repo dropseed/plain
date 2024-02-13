@@ -15,17 +15,6 @@ logger = logging.getLogger("bolt.request")
 
 
 class View:
-    http_method_names = [
-        "get",
-        "post",
-        "put",
-        "patch",
-        "delete",
-        "head",
-        "options",
-        "trace",
-    ]
-
     def __init__(self, *args, **kwargs) -> None:
         # Views can customize their init, which receives
         # the args and kwargs from as_view()
@@ -62,11 +51,7 @@ class View:
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
 
-        if self.request.method.lower() not in self.http_method_names:
-            # Is this necessary anymore? Same behavior as method not defined
-            handler = None
-        else:
-            handler = getattr(self, self.request.method.lower(), None)
+        handler = getattr(self, self.request.method.lower(), None)
 
         if not handler:
             logger.warning(
@@ -109,4 +94,14 @@ class View:
         return response
 
     def _allowed_methods(self) -> list[str]:
-        return [m.upper() for m in self.http_method_names if hasattr(self, m)]
+        known_http_method_names = [
+            "get",
+            "post",
+            "put",
+            "patch",
+            "delete",
+            "head",
+            "options",
+            "trace",
+        ]
+        return [m.upper() for m in known_http_method_names if hasattr(self, m)]
