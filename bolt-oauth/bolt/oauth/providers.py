@@ -10,7 +10,7 @@ from bolt.urls import reverse
 from bolt.utils.crypto import get_random_string
 from bolt.utils.module_loading import import_string
 
-from .exceptions import OAuthCannotDisconnectError, OAuthStateMismatchError
+from .exceptions import OAuthStateMismatchError
 from .models import OAuthConnection
 
 SESSION_STATE_KEY = "boltoauth_state"
@@ -135,16 +135,7 @@ class OAuthProvider:
         connection = OAuthConnection.objects.get(
             provider_key=self.provider_key, provider_user_id=provider_user_id
         )
-        if (
-            request.user.has_usable_password()
-            or request.user.oauth_connections.count() > 1
-        ):
-            connection.delete()
-        else:
-            raise OAuthCannotDisconnectError(
-                "Cannot remove last OAuth connection without a usable password"
-            )
-
+        connection.delete()
         redirect_url = self.get_disconnect_redirect_url(request=request)
         return HttpResponseRedirect(redirect_url)
 
