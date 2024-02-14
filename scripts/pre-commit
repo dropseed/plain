@@ -1,0 +1,10 @@
+#!/bin/sh -e
+BOLD=$(tput bold)
+NORMAL=$(tput sgr0)
+
+echo "${BOLD}Checking with ruff${NORMAL}"
+./scripts/ruff --check
+
+echo ""
+echo "${BOLD}Running tests${NORMAL}"
+./scripts/test

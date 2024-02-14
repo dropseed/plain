@@ -1,2 +1,8 @@
 #!/bin/sh -e
 POETRY_VIRTUALENVS_IN_PROJECT=true poetry install
+
+if [ ! -f .git/hooks/pre-commit ]; then
+    echo ""
+    echo "${BOLD}Installing git pre-commit hook${NORMAL}"
+    cp scripts/pre-commit .git/hooks/pre-commit
+fi
