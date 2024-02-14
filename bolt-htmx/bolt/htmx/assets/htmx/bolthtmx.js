@@ -49,5 +49,5 @@ htmx.defineExtension("error-classes", {
 
 // Our own load event, to support lazy loading
 // *after* our fragment extension is added.
-// Use with hx-trigger="bhxLoad from:body"
-htmx.trigger(document.body, "bhxLoad");
+// Use with hx-trigger="bolthtmx:load from:body"
+htmx.trigger(document.body, "bolthtmx:load");

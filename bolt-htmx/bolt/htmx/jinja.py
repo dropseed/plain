@@ -52,7 +52,7 @@ class HTMXFragmentExtension(Extension):
 
     def _render_htmx_fragment(self, fragment_name, render_lazy, context, caller):
         if render_lazy:
-            return f'<div hx-get hx-trigger="bhxLoad from:body" bolt-hx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
+            return f'<div hx-get hx-trigger="bolthtmx:load from:body" bolt-hx-fragment="{fragment_name}" hx-swap="outerHTML" hx-target="this" hx-indicator="this"></div>'
         else:
             # Swap innerHTML so we can re-run hx calls inside the fragment automatically
             # (render_template_fragment won't render this part of the node again, just the inner nodes)
