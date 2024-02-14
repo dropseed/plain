@@ -50,4 +50,7 @@ htmx.defineExtension("error-classes", {
 // Our own load event, to support lazy loading
 // *after* our fragment extension is added.
 // Use with hx-trigger="bolthtmx:load from:body"
-htmx.trigger(document.body, "bolthtmx:load");
+// (this used to work without the timeout -- I'm not sure why there's a race condition now?)
+setTimeout(function () {
+  htmx.trigger(document.body, "bolthtmx:load");
+}, 250);
