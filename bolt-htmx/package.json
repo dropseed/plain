@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "copy-assets": "cp node_modules/htmx.org/dist/htmx.min.js bolt/htmx/assets/htmx/htmx.min.js"
+    "copy-assets": "cp node_modules/htmx.org/dist/htmx{.min,}.js bolt/htmx/assets/htmx/"
   },
   "dependencies": {
     "htmx.org": "^1.8.5"

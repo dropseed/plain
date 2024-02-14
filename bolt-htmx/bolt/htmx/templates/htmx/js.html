@@ -1,2 +1,6 @@
+{%- if DEBUG -%}
+<script src="{{ asset('htmx/htmx.js') }}" defer></script>
+{%- else -%}
 <script src="{{ asset('htmx/htmx.min.js') }}" defer></script>
+{%- endif %}
 <script src="{{ asset('htmx/bolthtmx.js') }}" defer data-csrftoken="{{ csrf_token }}"></script>

@@ -1,6 +1,7 @@
 import jinja2
 from jinja2.ext import Extension
 
+from bolt.runtime import settings
 from bolt.templates.jinja.extensions import InclusionTagExtension
 
 
@@ -9,7 +10,7 @@ class HTMXJSExtension(InclusionTagExtension):
     template_name = "htmx/js.html"
 
     def get_context(self, context, *args, **kwargs):
-        return {"csrf_token": context["csrf_token"]}
+        return {"csrf_token": context["csrf_token"], "DEBUG": settings.DEBUG}
 
 
 class HTMXFragmentExtension(Extension):
