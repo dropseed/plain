@@ -1,5 +1,6 @@
 from bolt.assets import get_asset_url
 from bolt.paginator import Paginator
+from bolt.utils import timezone
 
 
 def url(viewname, *args, **kwargs):
@@ -13,4 +14,6 @@ default_globals = {
     "asset": get_asset_url,
     "url": url,
     "Paginator": Paginator,
+    "now": timezone.now,
+    "localtime": timezone.localtime,
 }
