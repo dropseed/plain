@@ -94,7 +94,7 @@ If you want to render a fragment lazily,
 you can add the `lazy` attribute to the `{% htmxfragment %}` tag.
 
 ```html
-{% htmxfragment main lazy %}
+{% htmxfragment main lazy=True %}
 <!-- This content will be fetched with hx-get -->
 {% endhtmxfragment %}
 ```
@@ -117,7 +117,7 @@ class HomeView(HTMXViewMixin, TemplateView):
 ```
 
 ```html
-{% htmxfragment main lazy %}
+{% htmxfragment main lazy=True %}
 <ul>
   {% for item in items %}
     <li>{{ item }}</li>
