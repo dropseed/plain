@@ -4,10 +4,12 @@ from pathlib import Path
 from bolt.exceptions import (
     ValidationError,
 )
+from bolt.utils.deconstruct import deconstructible
 from bolt.utils.functional import cached_property
 from bolt.utils.text import pluralize
 
 
+@deconstructible
 class MinimumLengthValidator:
     """
     Validate that the password is of a minimum length.
@@ -61,6 +63,7 @@ class MinimumLengthValidator:
 #     return pwd_len >= 10 * value_len and value_len < length_bound_similarity
 
 
+# @deconstructible
 # class UserAttributeSimilarityValidator:
 #     """
 #     Validate that the password is sufficiently different from the user's
@@ -117,6 +120,7 @@ class MinimumLengthValidator:
 #         return "Your password can’t be too similar to your other personal information."
 
 
+@deconstructible
 class CommonPasswordValidator:
     """
     Validate that the password is not a common password.
@@ -150,6 +154,7 @@ class CommonPasswordValidator:
             )
 
 
+@deconstructible
 class NumericPasswordValidator:
     """
     Validate that the password is not entirely numeric.
