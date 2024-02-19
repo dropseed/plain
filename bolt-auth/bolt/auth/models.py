@@ -88,7 +88,6 @@ class AbstractUser(models.Model):
     objects = UserManager()
 
     USERNAME_FIELD = "username"
-    REQUIRED_FIELDS = ["email"]
     SESSION_HASH_FIELD = ""
 
     class Meta:

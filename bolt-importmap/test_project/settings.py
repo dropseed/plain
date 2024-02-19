@@ -48,24 +48,6 @@ DATABASES = {
 }
 
 
-# Password validation
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "bolt.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "bolt.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "bolt.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "bolt.auth.password_validation.NumericPasswordValidator",
-    },
-]
-
-
 # Internationalization
 
 LANGUAGE_CODE = "en-us"
