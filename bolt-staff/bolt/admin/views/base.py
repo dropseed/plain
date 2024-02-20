@@ -172,8 +172,7 @@ class AdminListView(HTMXViewMixin, AdminView):
         context["get_field_value_template"] = self.get_field_value_template
 
         context["get_create_url"] = self.get_create_url
-        context["get_detail_url"] = self.get_detail_url
-        context["get_update_url"] = self.get_update_url
+        context["get_object_links"] = self.get_object_links
 
         return context
 
@@ -262,6 +261,14 @@ class AdminListView(HTMXViewMixin, AdminView):
 
     def get_update_url(self, obj) -> str | None:
         return None
+
+    def get_object_links(self, obj) -> dict[str]:
+        links = {}
+        if self.get_detail_url(obj):
+            links["Detail"] = self.get_detail_url(obj)
+        if self.get_update_url(obj):
+            links["Update"] = self.get_update_url(obj)
+        return links
 
 
 class AdminDetailView(AdminView, DetailView):

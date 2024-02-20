@@ -113,8 +113,9 @@
                             <th class="font-mono text-xs font-normal text-gray-600">{{ field }}</th>
                             {% endif %}
                         {% endfor %}
-                        <th></th>
-                        <th></th>
+
+                        {# A th that spans any links columns that will be added #}
+                        <th colspan="99"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -136,25 +137,11 @@
                             </td>
                         {% endfor %}
 
-                        {% set detail_url = get_detail_url(object) %}
-                        {% if detail_url %}
+                        {% for text, url in get_object_links(object).items() %}
                         <td>
-                            <a href="{{ detail_url }}">Detail</a>
+                            <a href="{{ url }}">{{ text }}</a>
                         </td>
-                        {% else %}
-                        <td>
-                        </td>
-                        {% endif %}
-
-                        {% set update_url = get_update_url(object) %}
-                        {% if update_url %}
-                        <td>
-                            <a href="{{ update_url }}">Update</a>
-                        </td>
-                        {% else %}
-                        <td>
-                        </td>
-                        {% endif %}
+                        {% endfor %}
                     </tr>
                     {% endfor %}
                 </tbody>
