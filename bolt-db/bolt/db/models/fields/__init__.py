@@ -139,7 +139,6 @@ class Field(RegisterLookupMixin):
         "db_column",
         "editable",
         "error_messages",
-        "help_text",
         "limit_choices_to",
         # Database-level options are not supported, see #21961.
         "on_delete",
@@ -184,7 +183,6 @@ class Field(RegisterLookupMixin):
         unique_for_month=None,
         unique_for_year=None,
         choices=None,
-        help_text="",
         db_column=None,
         db_tablespace=None,
         auto_created=False,
@@ -211,7 +209,6 @@ class Field(RegisterLookupMixin):
         if isinstance(choices, collections.abc.Iterator):
             choices = list(choices)
         self.choices = choices
-        self.help_text = help_text
         self.db_index = db_index
         self.db_column = db_column
         self.db_comment = db_comment
@@ -550,7 +547,6 @@ class Field(RegisterLookupMixin):
             "unique_for_month": None,
             "unique_for_year": None,
             "choices": None,
-            "help_text": "",
             "db_column": None,
             "db_comment": None,
             "db_tablespace": None,

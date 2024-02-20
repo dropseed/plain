@@ -70,7 +70,6 @@ class AbstractUser(models.Model):
         "username",
         max_length=150,
         unique=True,
-        help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
         validators=[username_validator],
         error_messages={
             "unique": "A user with that username already exists.",
@@ -80,7 +79,6 @@ class AbstractUser(models.Model):
     is_staff = models.BooleanField(
         "staff status",
         default=False,
-        help_text="Designates whether the user can log into this admin site.",
     )
     date_joined = models.DateTimeField("date joined", default=timezone.now)
     last_login = models.DateTimeField("last login", blank=True, null=True)
