@@ -1,4 +1,4 @@
-from bolt.http import HttpResponsePermanentRedirect
+from bolt.http import ResponsePermanentRedirect
 from bolt.runtime import settings
 from bolt.urls import is_valid_path
 from bolt.utils.http import escape_leading_slashes
@@ -21,7 +21,7 @@ class CommonMiddleware:
           overriding the response_redirect_class attribute.
     """
 
-    response_redirect_class = HttpResponsePermanentRedirect
+    response_redirect_class = ResponsePermanentRedirect
 
     def __init__(self, get_response):
         self.get_response = get_response

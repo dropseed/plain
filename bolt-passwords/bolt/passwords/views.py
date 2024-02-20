@@ -4,7 +4,7 @@ from bolt.auth import login as auth_login
 from bolt.auth.views import AuthViewMixin
 from bolt.exceptions import ImproperlyConfigured, ValidationError
 from bolt.http import (
-    HttpResponseRedirect,
+    ResponseRedirect,
 )
 from bolt.runtime import settings
 from bolt.urls import NoReverseMatch, reverse, reverse_lazy
@@ -168,7 +168,7 @@ class PasswordResetConfirmView(PasswordContextMixin, FormView):
                     redirect_url = self.request.path.replace(
                         token, self.reset_url_token
                     )
-                    response = HttpResponseRedirect(redirect_url)
+                    response = ResponseRedirect(redirect_url)
                     add_never_cache_headers(response)
                     return response
 

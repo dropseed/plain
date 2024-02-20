@@ -4,7 +4,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from bolt.auth import login as auth_login
-from bolt.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from bolt.http import HttpRequest, Response, ResponseRedirect
 from bolt.runtime import settings
 from bolt.urls import reverse
 from bolt.utils.crypto import get_random_string
@@ -106,7 +106,7 @@ class OAuthProvider:
 
     def handle_login_request(
         self, *, request: HttpRequest, redirect_to: str = ""
-    ) -> HttpResponse:
+    ) -> Response:
         authorization_url = self.get_authorization_url(request=request)
         authorization_params = self.get_authorization_url_params(request=request)
 
@@ -123,23 +123,23 @@ class OAuthProvider:
         # Sort authorization params for consistency
         sorted_authorization_params = sorted(authorization_params.items())
         redirect_url = authorization_url + "?" + urlencode(sorted_authorization_params)
-        return HttpResponseRedirect(redirect_url)
+        return ResponseRedirect(redirect_url)
 
     def handle_connect_request(
         self, *, request: HttpRequest, redirect_to: str = ""
-    ) -> HttpResponse:
+    ) -> Response:
         return self.handle_login_request(request=request, redirect_to=redirect_to)
 
-    def handle_disconnect_request(self, *, request: HttpRequest) -> HttpResponse:
+    def handle_disconnect_request(self, *, request: HttpRequest) -> Response:
         provider_user_id = request.POST["provider_user_id"]
         connection = OAuthConnection.objects.get(
             provider_key=self.provider_key, provider_user_id=provider_user_id
         )
         connection.delete()
         redirect_url = self.get_disconnect_redirect_url(request=request)
-        return HttpResponseRedirect(redirect_url)
+        return ResponseRedirect(redirect_url)
 
-    def handle_callback_request(self, *, request: HttpRequest) -> HttpResponse:
+    def handle_callback_request(self, *, request: HttpRequest) -> Response:
         self.check_request_state(request=request)
 
         oauth_token = self.get_oauth_token(code=request.GET["code"], request=request)
@@ -165,9 +165,9 @@ class OAuthProvider:
             self.login(request=request, user=user)
 
         redirect_url = self.get_login_redirect_url(request=request)
-        return HttpResponseRedirect(redirect_url)
+        return ResponseRedirect(redirect_url)
 
-    def login(self, *, request: HttpRequest, user: Any) -> HttpResponse:
+    def login(self, *, request: HttpRequest, user: Any) -> Response:
         auth_login(request=request, user=user)
 
     def get_login_redirect_url(self, *, request: HttpRequest) -> str:

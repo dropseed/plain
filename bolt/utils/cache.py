@@ -18,7 +18,7 @@ import time
 from collections import defaultdict
 from hashlib import md5
 
-from bolt.http import HttpResponse, HttpResponseNotModified
+from bolt.http import Response, ResponseNotModified
 from bolt.logs import log_response
 from bolt.runtime import settings
 from bolt.utils.http import http_date, parse_etags, parse_http_date_safe, quote_etag
@@ -121,7 +121,7 @@ def set_response_etag(response):
 
 
 def _precondition_failed(request):
-    response = HttpResponse(status=412)
+    response = Response(status=412)
     log_response(
         "Precondition Failed: %s",
         request.path,
@@ -132,7 +132,7 @@ def _precondition_failed(request):
 
 
 def _not_modified(request, response=None):
-    new_response = HttpResponseNotModified()
+    new_response = ResponseNotModified()
     if response:
         # Preserve the headers required by RFC 9110 Section 15.4.5, as well as
         # Last-Modified.
@@ -265,7 +265,7 @@ def _if_modified_since_passes(last_modified, if_modified_since):
 
 def patch_response_headers(response, cache_timeout=None):
     """
-    Add HTTP caching headers to the given HttpResponse: Expires and
+    Add HTTP caching headers to the given Response: Expires and
     Cache-Control.
 
     Each header is only added if it isn't already set.
@@ -294,7 +294,7 @@ def add_never_cache_headers(response):
 
 def patch_vary_headers(response, newheaders):
     """
-    Add (or update) the "Vary" header in the given HttpResponse object.
+    Add (or update) the "Vary" header in the given Response object.
     newheaders is a list of header names that should be in "Vary". If headers
     contains an asterisk, then "Vary" header will consist of a single asterisk
     '*'. Otherwise, existing headers in "Vary" aren't removed.

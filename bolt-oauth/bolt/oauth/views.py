@@ -1,5 +1,5 @@
 from bolt.auth.views import AuthViewMixin
-from bolt.http import HttpResponseBadRequest, HttpResponseRedirect
+from bolt.http import ResponseBadRequest, ResponseRedirect
 from bolt.templates import jinja
 from bolt.views import View
 
@@ -15,7 +15,7 @@ class OAuthLoginView(View):
         request = self.request
         provider = self.url_kwargs["provider"]
         if request.user:
-            return HttpResponseRedirect("/")
+            return ResponseRedirect("/")
 
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         return provider_instance.handle_login_request(request=request)
@@ -34,7 +34,7 @@ class OAuthCallbackView(View):
             return provider_instance.handle_callback_request(request=request)
         except OAuthUserAlreadyExistsError:
             template = jinja.get_template("oauth/error.html")
-            return HttpResponseBadRequest(
+            return ResponseBadRequest(
                 template.render(
                     {
                         "oauth_error": "A user already exists with this email address. Please log in first and then connect this OAuth provider to the existing account."
@@ -43,7 +43,7 @@ class OAuthCallbackView(View):
             )
         except OAuthStateMismatchError:
             template = jinja.get_template("oauth/error.html")
-            return HttpResponseBadRequest(
+            return ResponseBadRequest(
                 template.render(
                     {
                         "oauth_error": "The state parameter did not match. Please try again."

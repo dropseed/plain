@@ -1,4 +1,4 @@
-from bolt.http import HttpResponseForbidden, HttpResponseRedirect
+from bolt.http import ResponseForbidden, ResponseRedirect
 from bolt.views import View
 
 from .permissions import can_be_impersonator
@@ -12,12 +12,12 @@ class ImpersonateStartView(View):
         impersonator = getattr(self.request, "impersonator", self.request.user)
         if impersonator and can_be_impersonator(impersonator):
             self.request.session[IMPERSONATE_KEY] = self.url_kwargs["pk"]
-            return HttpResponseRedirect(self.request.GET.get("next", "/"))
+            return ResponseRedirect(self.request.GET.get("next", "/"))
 
-        return HttpResponseForbidden()
+        return ResponseForbidden()
 
 
 class ImpersonateStopView(View):
     def get(self):
         self.request.session.pop(IMPERSONATE_KEY)
-        return HttpResponseRedirect(self.request.GET.get("next", "/"))
+        return ResponseRedirect(self.request.GET.get("next", "/"))

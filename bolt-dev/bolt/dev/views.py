@@ -1,4 +1,4 @@
-from bolt.http import HttpResponseRedirect
+from bolt.http import ResponseRedirect
 from bolt.views import TemplateView
 
 from .requests import RequestLog
@@ -31,7 +31,7 @@ class RequestsView(TemplateView):
     def post(self):
         if self.request.POST.get("action") == "clear":
             RequestLog.clear()
-            return HttpResponseRedirect(self.request.path)
+            return ResponseRedirect(self.request.path)
         else:
             RequestLog.replay_request(self.request.POST["log"])
-            return HttpResponseRedirect(".")
+            return ResponseRedirect(".")

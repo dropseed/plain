@@ -1,5 +1,5 @@
 from bolt.exceptions import ImproperlyConfigured, ObjectDoesNotExist
-from bolt.http import Http404, HttpResponse, HttpResponseRedirect
+from bolt.http import Http404, Response, ResponseRedirect
 
 from .forms import FormView
 from .templates import TemplateView
@@ -8,7 +8,7 @@ from .templates import TemplateView
 class ObjectTemplateViewMixin:
     context_object_name = ""
 
-    def get(self) -> HttpResponse:
+    def get(self) -> Response:
         self.load_object()
         return self.render_template()
 
@@ -80,7 +80,7 @@ class CreateView(ObjectTemplateViewMixin, FormView):
     View for creating a new object, with a response rendered by a template.
     """
 
-    def post(self) -> HttpResponse:
+    def post(self) -> Response:
         """
         Handle POST requests: instantiate a form instance with the passed
         POST variables and then check if it's valid.
@@ -118,7 +118,7 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
 
     template_name_suffix = "_form"
 
-    def post(self) -> HttpResponse:
+    def post(self) -> Response:
         """
         Handle POST requests: instantiate a form instance with the passed
         POST variables and then check if it's valid.
@@ -175,7 +175,7 @@ class DeleteView(ObjectTemplateViewMixin, TemplateView):
     def post(self):
         self.load_object()
         self.object.delete()
-        return HttpResponseRedirect(self.get_success_url())
+        return ResponseRedirect(self.get_success_url())
 
 
 class ListView(TemplateView):
@@ -187,7 +187,7 @@ class ListView(TemplateView):
     template_name_suffix = "_list"
     context_object_name = "objects"
 
-    def get(self) -> HttpResponse:
+    def get(self) -> Response:
         self.objects = self.get_objects()
         return super().get()
 

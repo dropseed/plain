@@ -3,7 +3,7 @@ import logging
 import threading
 
 from bolt.db import connection
-from bolt.http import HttpResponseRedirect
+from bolt.http import ResponseRedirect
 from bolt.json import BoltJSONEncoder
 from bolt.runtime import settings
 from bolt.urls import reverse
@@ -70,7 +70,7 @@ class QueryStatsMiddleware:
                 request.session["querystats"] = json.dumps(
                     _local.querystats.as_context_dict(), cls=QueryStatsJSONEncoder
                 )
-                return HttpResponseRedirect(reverse("querystats:querystats"))
+                return ResponseRedirect(reverse("querystats:querystats"))
 
             del _local.querystats
 

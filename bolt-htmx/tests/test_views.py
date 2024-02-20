@@ -1,11 +1,11 @@
 from bolt.htmx.views import HTMXViewMixin
-from bolt.http import HttpResponse
+from bolt.http import Response
 from bolt.views import View
 
 
 class V(HTMXViewMixin, View):
     def get(self, request):
-        return HttpResponse("Ok")
+        return Response("Ok")
 
 
 def test_is_htmx_request(rf):

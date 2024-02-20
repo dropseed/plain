@@ -1,4 +1,4 @@
-from bolt.http import HttpResponseRedirect
+from bolt.http import ResponseRedirect
 
 from .base import AdminView
 from .registry import registry
@@ -14,7 +14,7 @@ class AdminIndexView(AdminView):
         # If there's exactly one dashboard, redirect straight to it
         dashboards = registry.registered_dashboards
         if len(dashboards) == 1:
-            return HttpResponseRedirect(list(dashboards)[0].get_absolute_url())
+            return ResponseRedirect(list(dashboards)[0].get_absolute_url())
 
         return super().get()
 

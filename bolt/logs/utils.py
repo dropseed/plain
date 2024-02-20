@@ -13,10 +13,10 @@ def log_response(
     exception=None,
 ):
     """
-    Log errors based on HttpResponse status.
+    Log errors based on Response status.
 
     Log 5xx responses as errors and 4xx responses as warnings (unless a level
-    is given as a keyword argument). The HttpResponse status_code and the
+    is given as a keyword argument). The Response status_code and the
     request are passed to the logger's extra parameter.
     """
     # Check if the response has already been logged. Multiple requests to log

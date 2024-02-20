@@ -140,7 +140,7 @@ def conditional_content_removal(request, response):
 class ClientHandler(BaseHandler):
     """
     An HTTP Handler that can be used for testing purposes. Use the WSGI
-    interface to compose requests, but return the raw HttpResponse object with
+    interface to compose requests, but return the raw Response object with
     the originating WSGIRequest attached to its ``wsgi_request`` attribute.
     """
 

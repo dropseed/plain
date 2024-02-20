@@ -1,6 +1,6 @@
 import re
 
-from bolt.http import HttpResponsePermanentRedirect
+from bolt.http import ResponsePermanentRedirect
 from bolt.runtime import settings
 
 
@@ -25,9 +25,7 @@ class SecurityMiddleware:
             and not any(pattern.search(path) for pattern in self.redirect_exempt)
         ):
             host = self.redirect_host or request.get_host()
-            return HttpResponsePermanentRedirect(
-                f"https://{host}{request.get_full_path()}"
-            )
+            return ResponsePermanentRedirect(f"https://{host}{request.get_full_path()}")
 
         response = self.get_response(request)
 

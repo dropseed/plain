@@ -1,4 +1,4 @@
-from bolt.http import HttpResponseBase
+from bolt.http import ResponseBase
 
 from .templates import TemplateView
 
@@ -18,7 +18,7 @@ class ErrorView(TemplateView):
     def get_request_handler(self):
         return self.get  # All methods (post, patch, etc.) will use the get()
 
-    def get_response(self) -> HttpResponseBase:
+    def get_response(self) -> ResponseBase:
         response = super().get_response()
         # Set the status code we want
         response.status_code = self.status_code

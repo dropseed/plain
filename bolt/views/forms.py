@@ -2,7 +2,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from bolt.exceptions import ImproperlyConfigured
-from bolt.http import HttpResponse, HttpResponseRedirect
+from bolt.http import Response, ResponseRedirect
 
 from .templates import TemplateView
 
@@ -46,11 +46,11 @@ class FormView(TemplateView):
             raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
         return str(self.success_url)  # success_url may be lazy
 
-    def form_valid(self, form: "BaseForm") -> HttpResponse:
+    def form_valid(self, form: "BaseForm") -> Response:
         """If the form is valid, redirect to the supplied URL."""
-        return HttpResponseRedirect(self.get_success_url())
+        return ResponseRedirect(self.get_success_url())
 
-    def form_invalid(self, form: "BaseForm") -> HttpResponse:
+    def form_invalid(self, form: "BaseForm") -> Response:
         """If the form is invalid, render the invalid form."""
         context = {
             **self.get_template_context(),
@@ -64,7 +64,7 @@ class FormView(TemplateView):
         context["form"] = self.get_form()
         return context
 
-    def post(self) -> HttpResponse:
+    def post(self) -> Response:
         """
         Handle POST requests: instantiate a form instance with the passed
         POST variables and then check if it's valid.

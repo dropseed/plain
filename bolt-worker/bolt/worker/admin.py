@@ -9,7 +9,7 @@ from bolt.admin.views import (
     register_viewset,
 )
 from bolt.db import models
-from bolt.http import HttpResponseRedirect
+from bolt.http import ResponseRedirect
 from bolt.runtime import settings
 
 from .models import Job, JobRequest, JobResult
@@ -234,4 +234,4 @@ class JobResultViewset(AdminModelViewset):
         def post(self):
             self.load_object()
             self.object.retry_job(delay=0)
-            return HttpResponseRedirect(".")
+            return ResponseRedirect(".")

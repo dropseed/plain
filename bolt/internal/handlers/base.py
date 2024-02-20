@@ -49,7 +49,7 @@ class BaseHandler:
         self._middleware_chain = handler
 
     def get_response(self, request):
-        """Return an HttpResponse object for the given HttpRequest."""
+        """Return a Response object for the given HttpRequest."""
         # Setup default url resolver for this thread
         set_urlconf(settings.ROOT_URLCONF)
         response = self._middleware_chain(request)
@@ -120,7 +120,7 @@ class BaseHandler:
                 )
         if response is None:
             raise ValueError(
-                "%s didn't return an HttpResponse object. It returned None "
+                "%s didn't return a Response object. It returned None "
                 "instead." % name
             )
 

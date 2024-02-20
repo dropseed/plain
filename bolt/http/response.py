@@ -96,12 +96,12 @@ class BadHeaderError(ValueError):
     pass
 
 
-class HttpResponseBase:
+class ResponseBase:
     """
     An HTTP response base class with dictionary-accessed headers.
 
     This class doesn't handle content. It should not be used directly.
-    Use the HttpResponse and StreamingHttpResponse subclasses instead.
+    Use the Response and StreamingResponse subclasses instead.
     """
 
     status_code = 200
@@ -358,7 +358,7 @@ class HttpResponseBase:
         raise OSError("This %s instance is not writable" % self.__class__.__name__)
 
 
-class HttpResponse(HttpResponseBase):
+class Response(ResponseBase):
     """
     An HTTP response class with a string as content.
 
@@ -443,7 +443,7 @@ class HttpResponse(HttpResponseBase):
             self.write(line)
 
 
-class StreamingHttpResponse(HttpResponseBase):
+class StreamingResponse(ResponseBase):
     """
     A streaming HTTP response class with an iterator as content.
 
@@ -495,7 +495,7 @@ class StreamingHttpResponse(HttpResponseBase):
         return b"".join(self.streaming_content)
 
 
-class FileResponse(StreamingHttpResponse):
+class FileResponse(StreamingResponse):
     """
     A streaming HTTP response class optimized for files.
     """
@@ -577,7 +577,7 @@ class FileResponse(StreamingHttpResponse):
             self.headers["Content-Disposition"] = content_disposition
 
 
-class HttpResponseRedirectBase(HttpResponse):
+class ResponseRedirectBase(Response):
     allowed_schemes = ["http", "https", "ftp"]
 
     def __init__(self, redirect_to, *args, **kwargs):
@@ -603,19 +603,19 @@ class HttpResponseRedirectBase(HttpResponse):
         )
 
 
-class HttpResponseRedirect(HttpResponseRedirectBase):
+class ResponseRedirect(ResponseRedirectBase):
     """HTTP 302 response"""
 
     status_code = 302
 
 
-class HttpResponsePermanentRedirect(HttpResponseRedirectBase):
+class ResponsePermanentRedirect(ResponseRedirectBase):
     """HTTP 301 response"""
 
     status_code = 301
 
 
-class HttpResponseNotModified(HttpResponse):
+class ResponseNotModified(Response):
     """HTTP 304 response"""
 
     status_code = 304
@@ -624,7 +624,7 @@ class HttpResponseNotModified(HttpResponse):
         super().__init__(*args, **kwargs)
         del self["content-type"]
 
-    @HttpResponse.content.setter
+    @Response.content.setter
     def content(self, value):
         if value:
             raise AttributeError(
@@ -633,25 +633,25 @@ class HttpResponseNotModified(HttpResponse):
         self._container = []
 
 
-class HttpResponseBadRequest(HttpResponse):
+class ResponseBadRequest(Response):
     """HTTP 400 response"""
 
     status_code = 400
 
 
-class HttpResponseNotFound(HttpResponse):
+class ResponseNotFound(Response):
     """HTTP 404 response"""
 
     status_code = 404
 
 
-class HttpResponseForbidden(HttpResponse):
+class ResponseForbidden(Response):
     """HTTP 403 response"""
 
     status_code = 403
 
 
-class HttpResponseNotAllowed(HttpResponse):
+class ResponseNotAllowed(Response):
     """HTTP 405 response"""
 
     status_code = 405
@@ -669,13 +669,13 @@ class HttpResponseNotAllowed(HttpResponse):
         }
 
 
-class HttpResponseGone(HttpResponse):
+class ResponseGone(Response):
     """HTTP 410 response"""
 
     status_code = 410
 
 
-class HttpResponseServerError(HttpResponse):
+class ResponseServerError(Response):
     """HTTP 500 response"""
 
     status_code = 500
@@ -685,7 +685,7 @@ class Http404(Exception):
     pass
 
 
-class JsonResponse(HttpResponse):
+class JsonResponse(Response):
     """
     An HTTP response class that consumes data to be serialized to JSON.
 

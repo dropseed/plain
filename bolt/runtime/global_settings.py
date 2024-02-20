@@ -27,7 +27,7 @@ TIME_ZONE = "America/Chicago"
 # If you set this to True, Bolt will use timezone-aware datetimes.
 USE_TZ = True
 
-# Default charset to use for all HttpResponse objects, if a MIME type isn't
+# Default charset to use for all Response objects, if a MIME type isn't
 # manually specified. It's used to construct the Content-Type header.
 DEFAULT_CHARSET = "utf-8"
 

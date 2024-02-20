@@ -1,9 +1,9 @@
 import logging
 
 from bolt.http import (
-    HttpResponseGone,
-    HttpResponsePermanentRedirect,
-    HttpResponseRedirect,
+    ResponseGone,
+    ResponsePermanentRedirect,
+    ResponseRedirect,
 )
 from bolt.urls import reverse
 
@@ -42,16 +42,16 @@ class RedirectView(View):
         url = self.get_redirect_url()
         if url:
             if self.permanent:
-                return HttpResponsePermanentRedirect(url)
+                return ResponsePermanentRedirect(url)
             else:
-                return HttpResponseRedirect(url)
+                return ResponseRedirect(url)
         else:
             logger.warning(
                 "Gone: %s",
                 self.request.path,
                 extra={"status_code": 410, "request": self.request},
             )
-            return HttpResponseGone()
+            return ResponseGone()
 
     def head(self):
         return self.get()

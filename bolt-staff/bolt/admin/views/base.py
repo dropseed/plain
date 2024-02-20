@@ -4,7 +4,7 @@ from bolt.admin.dates import DatetimeRange, DatetimeRangeAliases
 from bolt.auth.views import AuthViewMixin
 from bolt.db import models
 from bolt.htmx.views import HTMXViewMixin
-from bolt.http import HttpResponse, HttpResponseRedirect
+from bolt.http import Response, ResponseRedirect
 from bolt.paginator import Paginator
 from bolt.urls import reverse
 from bolt.utils import timezone
@@ -176,7 +176,7 @@ class AdminListView(HTMXViewMixin, AdminView):
 
         return context
 
-    def get(self) -> HttpResponse:
+    def get(self) -> Response:
         if self.is_htmx_request:
             hx_from_this_page = self.request.path in self.request.headers.get(
                 "HX-Current-Url", ""
@@ -190,11 +190,11 @@ class AdminListView(HTMXViewMixin, AdminView):
 
         if self.is_htmx_request and not hx_from_this_page and not self._page:
             # Don't render anything
-            return HttpResponse(status=204)
+            return Response(status=204)
 
         return response
 
-    def post(self) -> HttpResponse:
+    def post(self) -> Response:
         # won't be "key" anymore, just list
         action_name = self.request.POST.get("action_name")
         actions = self.get_actions()
@@ -205,11 +205,11 @@ class AdminListView(HTMXViewMixin, AdminView):
                 return response
             else:
                 # message in session first
-                return HttpResponseRedirect(".")
+                return ResponseRedirect(".")
 
         raise ValueError("Invalid action")
 
-    def perform_action(self, action: str, target_pks: list) -> HttpResponse | None:
+    def perform_action(self, action: str, target_pks: list) -> Response | None:
         raise NotImplementedError
 
     def get_objects(self) -> list:

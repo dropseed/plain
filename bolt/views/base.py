@@ -2,14 +2,14 @@ import logging
 
 from bolt.http import (
     HttpRequest,
-    HttpResponse,
-    HttpResponseBase,
-    HttpResponseNotAllowed,
     JsonResponse,
+    Response,
+    ResponseBase,
+    ResponseNotAllowed,
 )
 from bolt.utils.decorators import classonlymethod
 
-from .exceptions import HttpResponseException
+from .exceptions import ResponseException
 
 logger = logging.getLogger("bolt.request")
 
@@ -35,7 +35,7 @@ class View:
             v.setup(request, *args, **kwargs)
             try:
                 return v.get_response()
-            except HttpResponseException as e:
+            except ResponseException as e:
                 return e.response
 
         # Copy possible attributes set by decorators, e.g. @csrf_exempt, from
@@ -60,23 +60,23 @@ class View:
                 self.request.path,
                 extra={"status_code": 405, "request": self.request},
             )
-            raise HttpResponseException(HttpResponseNotAllowed(self._allowed_methods()))
+            raise ResponseException(ResponseNotAllowed(self._allowed_methods()))
 
         return handler
 
-    def get_response(self) -> HttpResponseBase:
+    def get_response(self) -> ResponseBase:
         handler = self.get_request_handler()
 
         result = handler()
 
-        if isinstance(result, HttpResponseBase):
+        if isinstance(result, ResponseBase):
             return result
 
         # Allow return of an int (status code)
         # or tuple (status code, content)?
 
         if isinstance(result, str):
-            return HttpResponse(result)
+            return Response(result)
 
         if isinstance(result, list):
             return JsonResponse(result, safe=False)
@@ -86,9 +86,9 @@ class View:
 
         raise ValueError(f"Unexpected view return type: {type(result)}")
 
-    def options(self) -> HttpResponse:
+    def options(self) -> Response:
         """Handle responding to requests for the OPTIONS HTTP verb."""
-        response = HttpResponse()
+        response = Response()
         response.headers["Allow"] = ", ".join(self._allowed_methods())
         response.headers["Content-Length"] = "0"
         return response

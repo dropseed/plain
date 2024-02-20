@@ -1,4 +1,4 @@
-from bolt.http import Http404, HttpResponsePermanentRedirect, HttpResponseRedirect
+from bolt.http import Http404, ResponsePermanentRedirect, ResponseRedirect
 from bolt.utils.functional import cached_property
 from bolt.views import TemplateView
 
@@ -42,8 +42,8 @@ class PageView(TemplateView):
                 )
 
             if self.page.vars.get("temporary", True):
-                return HttpResponseRedirect(url)
+                return ResponseRedirect(url)
             else:
-                return HttpResponsePermanentRedirect(url)
+                return ResponsePermanentRedirect(url)
 
         return super().get()

@@ -3,9 +3,9 @@ from urllib.parse import urlparse, urlunparse
 from bolt.exceptions import PermissionDenied
 from bolt.http import (
     Http404,
-    HttpResponse,
-    HttpResponseRedirect,
     QueryDict,
+    Response,
+    ResponseRedirect,
 )
 from bolt.runtime import settings
 from bolt.urls import reverse
@@ -50,7 +50,7 @@ class AuthViewMixin:
             # Show a 404 so we don't expose staff urls to non-staff users
             raise Http404()
 
-    def get_response(self) -> HttpResponse:
+    def get_response(self) -> Response:
         if not hasattr(self, "request"):
             raise AttributeError(
                 "AuthViewMixin requires the request attribute to be set."
@@ -97,4 +97,4 @@ def redirect_to_login(next, login_url=None, redirect_field_name="next"):
         querystring[redirect_field_name] = next
         login_url_parts[4] = querystring.urlencode(safe="/")
 
-    return HttpResponseRedirect(urlunparse(login_url_parts))
+    return ResponseRedirect(urlunparse(login_url_parts))

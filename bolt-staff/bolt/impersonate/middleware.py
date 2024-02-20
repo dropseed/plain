@@ -1,5 +1,5 @@
 from bolt.auth import get_user_model
-from bolt.http import HttpResponseForbidden
+from bolt.http import ResponseForbidden
 
 from .permissions import can_be_impersonator, can_impersonate_user
 from .views import IMPERSONATE_KEY
@@ -29,7 +29,7 @@ class ImpersonateMiddleware:
                 if not can_impersonate_user(request.user, user_to_impersonate):
                     # Can't impersonate this user, remove it and show an error
                     del request.session[IMPERSONATE_KEY]
-                    return HttpResponseForbidden()
+                    return ResponseForbidden()
 
                 # Finally, change the request user and keep a reference to the original
                 request.impersonator = request.user
