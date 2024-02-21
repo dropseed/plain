@@ -14,4 +14,4 @@ class HighlightRenderer(mistune.HTMLRenderer):
 
 
 def render_markdown(content):
-    return mistune.markdown(content, renderer=HighlightRenderer())
+    return mistune.markdown(content, renderer=HighlightRenderer(escape=False))
