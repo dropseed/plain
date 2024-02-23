@@ -107,7 +107,9 @@ class Job(metaclass=JobType):
     ):
         from .models import JobRequest
 
-        if unique_existing := self._get_existing_unique_job_or_request():
+        unique_key = self.get_unique_key()
+
+        if unique_existing := self._get_existing_unique_job_or_request(unique_key):
             return unique_existing
 
         try:
@@ -143,12 +145,13 @@ class Job(metaclass=JobType):
             source=source,
             priority=priority,
             retries=retries,
+            unique_key=unique_key,
         )
 
     def _job_class_str(self):
         return f"{self.__module__}.{self.__class__.__name__}"
 
-    def _get_existing_unique_job_or_request(self):
+    def _get_existing_unique_job_or_request(self, unique_key):
         """
         Find pending or running versions of this job that already exist.
         Note this doesn't include instances that may have failed and are
@@ -157,7 +160,6 @@ class Job(metaclass=JobType):
         from .models import Job, JobRequest
 
         job_class = self._job_class_str()
-        unique_key = self.get_unique_key()
 
         if not unique_key:
             return None
