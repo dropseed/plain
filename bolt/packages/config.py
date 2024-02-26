@@ -39,10 +39,6 @@ class PackageConfig:
                 "The app label '%s' is not a valid Python identifier." % self.label
             )
 
-        # Human-readable name for the application e.g. "Admin".
-        if not hasattr(self, "verbose_name"):
-            self.verbose_name = self.label.title()
-
         # Filesystem path to the application directory e.g.
         # '/path/to/admin'.
         if not hasattr(self, "path"):
