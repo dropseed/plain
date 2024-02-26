@@ -199,4 +199,9 @@ class Job(metaclass=JobType):
         return 0
 
     def get_retry_delay(self, attempt: int) -> int:
+        """
+        Calcluate a delay in seconds before the next retry attempt.
+
+        On the first retry, attempt will be 1.
+        """
         return 0
