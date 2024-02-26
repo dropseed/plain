@@ -107,11 +107,6 @@ class Job(metaclass=JobType):
     ):
         from .models import JobRequest
 
-        unique_key = self.get_unique_key()
-
-        if unique_existing := self._get_existing_unique_job_or_request(unique_key):
-            return unique_existing
-
         try:
             # Try to automatically annotate the source of the job
             caller = inspect.stack()[1]
@@ -138,6 +133,11 @@ class Job(metaclass=JobType):
         else:
             raise ValueError(f"Invalid delay: {delay}")
 
+        unique_key = self.get_unique_key()
+
+        if unique_existing := self._get_existing_unique_job_or_request(unique_key):
+            return unique_existing
+
         return JobRequest.objects.create(
             job_class=self._job_class_str(),
             parameters=parameters,
@@ -156,6 +156,9 @@ class Job(metaclass=JobType):
         Find pending or running versions of this job that already exist.
         Note this doesn't include instances that may have failed and are
         not yet queued for retry.
+
+        Unique key is a "at least once" guarantee, so jobs should still be
+        idempotent in case multiple instances are queued in a race condition.
         """
         from .models import Job, JobRequest
 
@@ -164,21 +167,17 @@ class Job(metaclass=JobType):
         if not unique_key:
             return None
 
-        try:
-            return JobRequest.objects.get(
-                job_class=job_class,
-                unique_key=unique_key,
-            )
-        except JobRequest.DoesNotExist:
-            pass
+        if job_request := JobRequest.objects.filter(
+            job_class=job_class,
+            unique_key=unique_key,
+        ).first():
+            return job_request
 
-        try:
-            return Job.objects.get(
-                job_class=job_class,
-                unique_key=unique_key,
-            )
-        except Job.DoesNotExist:
-            pass
+        if job := Job.objects.filter(
+            job_class=job_class,
+            unique_key=unique_key,
+        ).first():
+            return job
 
         return None
 
@@ -186,6 +185,10 @@ class Job(metaclass=JobType):
         """
         A unique key to prevent duplicate jobs from being queued.
         Enabled by returning a non-empty string.
+
+        Note that this is not a "once and only once" guarantee, but rather
+        an "at least once" guarantee. Jobs should still be idempotent in case
+        multiple instances are queued in a race condition.
         """
         return ""
 
