@@ -47,7 +47,7 @@
         </table>
 
         {% if object|default(false) %}
-        <div class="font-mono" title="PK: {{ object.pk }}">
+        <div class="font-mono" title="PK: {{ object.pk|default('unknown') }}">
             {{ object.__repr__() }}
         </div>
         {% endif %}
