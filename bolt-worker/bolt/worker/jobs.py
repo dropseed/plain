@@ -135,8 +135,12 @@ class Job(metaclass=JobType):
 
         unique_key = self.get_unique_key()
 
-        if unique_existing := self._get_existing_unique_job_or_request(unique_key):
-            return unique_existing
+        if unique_key:
+            # Only need to look at in progress jobs
+            # if we also have a unique key.
+            # Otherwise it's up to the user to use in_progress()
+            if running := self.in_progress():
+                return running
 
         return JobRequest.objects.create(
             job_class=self._job_class_str(),
@@ -151,35 +155,25 @@ class Job(metaclass=JobType):
     def _job_class_str(self):
         return f"{self.__module__}.{self.__class__.__name__}"
 
-    def _get_existing_unique_job_or_request(self, unique_key):
-        """
-        Find pending or running versions of this job that already exist.
-        Note this doesn't include instances that may have failed and are
-        not yet queued for retry.
-
-        Unique key is a "at least once" guarantee, so jobs should still be
-        idempotent in case multiple instances are queued in a race condition.
-        """
+    def in_progress(self):
+        """Get all JobRequests and Jobs that are currently in progress."""
         from .models import Job, JobRequest
 
         job_class = self._job_class_str()
 
-        if not unique_key:
-            return None
+        unique_key = self.get_unique_key()
 
-        if job_request := JobRequest.objects.filter(
+        job_requests = JobRequest.objects.filter(
             job_class=job_class,
             unique_key=unique_key,
-        ).first():
-            return job_request
+        )
 
-        if job := Job.objects.filter(
+        jobs = Job.objects.filter(
             job_class=job_class,
             unique_key=unique_key,
-        ).first():
-            return job
+        )
 
-        return None
+        return list(job_requests) + list(jobs)
 
     def get_unique_key(self) -> str:
         """

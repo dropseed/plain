@@ -137,6 +137,7 @@ class Worker:
         )
 
     def check_job_results(self):
+        # TODO return results and log them if there are any?
         Job.objects.mark_lost_jobs()
         JobResult.objects.retry_failed_jobs()
 
