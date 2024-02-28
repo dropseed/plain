@@ -133,8 +133,8 @@ class ProjectState:
                 if not model_relations:
                     del self._relations[related_model_key]
         if "packages" in self.__dict__:  # hasattr would cache the property
-            self.packages.unregister_viewset(*model_key)
-            # Need to do this explicitly since unregister_viewset() doesn't clear
+            self.packages.unregister_model(*model_key)
+            # Need to do this explicitly since unregister_model() doesn't clear
             # the cache automatically (#24513)
             self.packages.clear_cache()
 
@@ -413,7 +413,7 @@ class ProjectState:
         # Unregister all related models
         with self.packages.bulk_update():
             for rel_package_label, rel_model_name in related_models:
-                self.packages.unregister_viewset(rel_package_label, rel_model_name)
+                self.packages.unregister_model(rel_package_label, rel_model_name)
 
         states_to_be_rendered = []
         # Gather all models states of those models that will be rerendered.
@@ -695,7 +695,7 @@ class StatePackages(Packages):
         clone.real_models = self.real_models
         return clone
 
-    def register_viewset(self, package_label, model):
+    def register_model(self, package_label, model):
         self.all_models[package_label][model._meta.model_name] = model
         if package_label not in self.package_configs:
             self.package_configs[package_label] = PackageConfigStub(package_label)
@@ -704,7 +704,7 @@ class StatePackages(Packages):
         self.do_pending_operations(model)
         self.clear_cache()
 
-    def unregister_viewset(self, package_label, model_name):
+    def unregister_model(self, package_label, model_name):
         try:
             del self.all_models[package_label][model_name]
             del self.package_configs[package_label].models[model_name]
@@ -954,7 +954,7 @@ class ModelState:
 
         # Restore managers
         body.update(self.construct_managers())
-        # Then, make a Model object (packages.register_viewset is called in __new__)
+        # Then, make a Model object (packages.register_model is called in __new__)
         return type(self.name, bases, body)
 
     def get_index_by_name(self, name):

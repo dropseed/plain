@@ -352,7 +352,7 @@ class ModelBase(type):
             return new_class
 
         new_class._prepare()
-        new_class._meta.packages.register_viewset(
+        new_class._meta.packages.register_model(
             new_class._meta.package_label, new_class
         )
         return new_class

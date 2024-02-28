@@ -25,7 +25,7 @@ class Packages:
             raise RuntimeError("You must supply an installed_packages argument.")
 
         # Mapping of app labels => model names => model classes. Every time a
-        # model is imported, ModelBase.__new__ calls packages.register_viewset which
+        # model is imported, ModelBase.__new__ calls packages.register_model which
         # creates an entry in all_models. All imported models are registered,
         # regardless of whether they're defined in an installed application
         # and whether the registry has been populated. Since it isn't possible
@@ -211,7 +211,7 @@ class Packages:
 
         return package_config.get_model(model_name, require_ready=require_ready)
 
-    def register_viewset(self, package_label, model):
+    def register_model(self, package_label, model):
         # Since this method is called when models are imported, it cannot
         # perform imports because of the risk of import loops. It mustn't
         # call get_package_config().
@@ -428,7 +428,7 @@ class Packages:
     def do_pending_operations(self, model):
         """
         Take a newly-prepared model and pass it to each function waiting for
-        it. This is called at the very end of Packages.register_viewset().
+        it. This is called at the very end of Packages.register_model().
         """
         key = model._meta.package_label, model._meta.model_name
         for function in self._pending_operations.pop(key, []):

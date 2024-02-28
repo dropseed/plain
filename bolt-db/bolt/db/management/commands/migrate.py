@@ -379,7 +379,7 @@ class Command(BaseCommand):
             for model_state in post_migrate_packages.real_models:
                 model_key = model_state.package_label, model_state.name_lower
                 model_keys.append(model_key)
-                post_migrate_packages.unregister_viewset(*model_key)
+                post_migrate_packages.unregister_model(*model_key)
         post_migrate_packages.render_multiple(
             [ModelState.from_model(packages.get_model(*model)) for model in model_keys]
         )
