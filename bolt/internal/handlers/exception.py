@@ -1,5 +1,4 @@
 import logging
-import sys
 from functools import wraps
 
 from bolt import signals
@@ -15,7 +14,6 @@ from bolt.http import Http404, ResponseServerError
 from bolt.http.multipartparser import MultiPartParserError
 from bolt.logs import log_response
 from bolt.runtime import settings
-from bolt.urls import get_resolver, get_urlconf
 from bolt.views.errors import ErrorView
 
 
@@ -46,14 +44,10 @@ def convert_exception_to_response(get_response):
 
 def response_for_exception(request, exc):
     if isinstance(exc, Http404):
-        response = get_exception_response(
-            request, get_resolver(get_urlconf()), 404, exc
-        )
+        response = get_exception_response(request, 404)
 
     elif isinstance(exc, PermissionDenied):
-        response = get_exception_response(
-            request, get_resolver(get_urlconf()), 403, exc
-        )
+        response = get_exception_response(request, 403)
         log_response(
             "Forbidden (Permission denied): %s",
             request.path,
@@ -63,9 +57,7 @@ def response_for_exception(request, exc):
         )
 
     elif isinstance(exc, MultiPartParserError):
-        response = get_exception_response(
-            request, get_resolver(get_urlconf()), 400, exc
-        )
+        response = get_exception_response(request, 400)
         log_response(
             "Bad request (Unable to parse request body): %s",
             request.path,
@@ -75,9 +67,7 @@ def response_for_exception(request, exc):
         )
 
     elif isinstance(exc, BadRequest):
-        response = get_exception_response(
-            request, get_resolver(get_urlconf()), 400, exc
-        )
+        response = get_exception_response(request, 400)
         log_response(
             "%s: %s",
             str(exc),
@@ -100,15 +90,11 @@ def response_for_exception(request, exc):
             exc_info=exc,
             extra={"status_code": 400, "request": request},
         )
-        response = get_exception_response(
-            request, get_resolver(get_urlconf()), 400, exc
-        )
+        response = get_exception_response(request, 400)
 
     else:
         signals.got_request_exception.send(sender=None, request=request)
-        response = handle_uncaught_exception(
-            request, get_resolver(get_urlconf()), sys.exc_info()
-        )
+        response = get_exception_response(request, 500)
         log_response(
             "%s: %s",
             response.reason_phrase,
@@ -127,15 +113,15 @@ def response_for_exception(request, exc):
     return response
 
 
-def get_exception_response(request, resolver, status_code, exception):
+def get_exception_response(request, status_code):
     try:
         return get_error_view(status_code)(request)
     except Exception:
         signals.got_request_exception.send(sender=None, request=request)
-        return handle_uncaught_exception(request, resolver, sys.exc_info())
+        return handle_uncaught_exception()
 
 
-def handle_uncaught_exception(request, resolver, exc_info):
+def handle_uncaught_exception():
     """
     Processing for any otherwise uncaught exceptions (those that will
     generate HTTP 500 responses).
