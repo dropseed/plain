@@ -23,8 +23,6 @@ def cli(pytest_args):
         with open(os.path.join(bolt_tmp_dir, ".gitignore"), "w") as f:
             f.write("*\n")
 
-    coverage_file = os.path.join(bolt_tmp_dir, ".coverage")
-
     # Turn deprecation warnings into errors
     #     if "-W" not in pytest_args:
     #         pytest_args = list(pytest_args)  # Make sure it's a list instead of tuple
@@ -33,55 +31,17 @@ def cli(pytest_args):
 
     os.environ.setdefault("APP_ENV", "test")
 
-    click.secho(
-        f"Running pytest with coverage and APP_ENV={os.environ['APP_ENV']}", bold=True
-    )
+    click.secho(f"Running pytest with APP_ENV={os.environ['APP_ENV']}", bold=True)
 
     result = subprocess.run(
         [
-            "coverage",
-            "run",
-            "-m",
             "pytest",
             *pytest_args,
         ],
         env={
             **os.environ,
-            "COVERAGE_FILE": coverage_file,
         },
     )
     if result.returncode:
         # Can be invoked by pre-commit, so only exit if it fails
         sys.exit(result.returncode)
-
-    if "GITHUB_STEP_SUMMARY" in os.environ:
-        click.secho("Adding coverage report to GitHub Action summary", bold=True)
-        subprocess.check_call(
-            'echo "## Pytest coverage" >> $GITHUB_STEP_SUMMARY', shell=True
-        )
-        subprocess.check_call(
-            (
-                "coverage report "
-                "--skip-empty "
-                "--format markdown "
-                f"--data-file {coverage_file} "
-                ">> $GITHUB_STEP_SUMMARY"
-            ),
-            shell=True,
-        )
-
-    html_result = subprocess.run(
-        [
-            "coverage",
-            "html",
-            "--skip-empty",
-            "--directory",
-            os.path.join(bolt_tmp_dir, "coverage"),
-        ],
-        env={
-            **os.environ,
-            "COVERAGE_FILE": coverage_file,
-        },
-    )
-    if html_result.returncode:
-        sys.exit(html_result.returncode)

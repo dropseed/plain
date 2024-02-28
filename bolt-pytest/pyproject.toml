@@ -35,7 +35,6 @@ classifiers = [
 python = "^3.8"
 click = ">=8.0.0"
 pytest = "^7.0.0"
-coverage = "^7.0.1"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.9"
