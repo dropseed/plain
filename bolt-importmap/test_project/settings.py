@@ -64,7 +64,3 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 
 ASSETS_URL = "/assets/"
-
-# Default primary key field type
-
-DEFAULT_AUTO_FIELD = "bolt.db.models.BigAutoField"

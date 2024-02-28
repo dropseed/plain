@@ -3,7 +3,6 @@ import os
 from importlib import import_module
 
 from bolt.exceptions import ImproperlyConfigured
-from bolt.utils.functional import cached_property
 from bolt.utils.module_loading import import_string, module_has_submodule
 
 CONFIG_MODULE_NAME = "config"
@@ -55,16 +54,6 @@ class PackageConfig:
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.label}>"
-
-    @cached_property
-    def default_auto_field(self):
-        from bolt.runtime import settings
-
-        return settings.DEFAULT_AUTO_FIELD
-
-    @property
-    def _is_default_auto_field_overridden(self):
-        return self.__class__.default_auto_field is not PackageConfig.default_auto_field
 
     def _path_from_module(self, module):
         """Attempt to determine app's filesystem path from its module."""

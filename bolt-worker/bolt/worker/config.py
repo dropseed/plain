@@ -6,7 +6,6 @@ MODULE_NAME = "jobs"
 
 
 class BoltJobsConfig(PackageConfig):
-    default_auto_field = "bolt.db.models.BigAutoField"
     name = "bolt.worker"
     label = "boltqueue"
 

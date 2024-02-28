@@ -46,7 +46,6 @@ from bolt.exceptions import (
     ValidationError,
 )
 from bolt.packages import packages
-from bolt.runtime import settings
 from bolt.utils.encoding import force_str
 from bolt.utils.hashable import make_hashable
 from bolt.utils.text import capfirst, get_text_list
@@ -1519,43 +1518,10 @@ class Model(AltersData, metaclass=ModelBase):
                 *cls._check_indexes(databases),
                 *cls._check_ordering(),
                 *cls._check_constraints(databases),
-                *cls._check_default_pk(),
                 *cls._check_db_table_comment(databases),
             ]
 
         return errors
-
-    @classmethod
-    def _check_default_pk(cls):
-        if (
-            not cls._meta.abstract
-            and cls._meta.pk.auto_created
-            and
-            # Inherited PKs are checked in parents models.
-            not (
-                isinstance(cls._meta.pk, OneToOneField)
-                and cls._meta.pk.remote_field.parent_link
-            )
-            and not settings.is_overridden("DEFAULT_AUTO_FIELD")
-            and cls._meta.package_config
-            and not cls._meta.package_config._is_default_auto_field_overridden
-        ):
-            return [
-                preflight.Warning(
-                    f"Auto-created primary key used when not defining a "
-                    f"primary key type, by default "
-                    f"'{settings.DEFAULT_AUTO_FIELD}'.",
-                    hint=(
-                        f"Configure the DEFAULT_AUTO_FIELD setting or the "
-                        f"{cls._meta.package_config.__class__.__qualname__}."
-                        f"default_auto_field attribute to point to a subclass "
-                        f"of AutoField, e.g. 'bolt.db.models.BigAutoField'."
-                    ),
-                    obj=cls,
-                    id="models.W042",
-                ),
-            ]
-        return []
 
     @classmethod
     def _check_db_table_comment(cls, databases):
