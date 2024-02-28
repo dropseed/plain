@@ -63,6 +63,10 @@ class Cached:
             # Keep existing expires_at value or None
             pass
 
+        # Make sure expires_at is timezone aware
+        if defaults["expires_at"] and not timezone.is_aware(defaults["expires_at"]):
+            defaults["expires_at"] = timezone.make_aware(defaults["expires_at"])
+
         try:
             item, _ = self._model_class.objects.update_or_create(
                 key=self.key, defaults=defaults
