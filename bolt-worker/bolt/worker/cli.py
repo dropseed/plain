@@ -83,3 +83,17 @@ def stats():
     click.secho(f"Successful: {successful}", bold=True, fg="green")
     click.secho(f"Errored: {errored}", bold=True, fg="red")
     click.secho(f"Lost: {lost}", bold=True, fg="yellow")
+
+
+@cli.command()
+def cancel_all():
+    if not click.confirm(
+        "Are you sure you want to clear all running and pending jobs? This will delete all current Jobs and JobRequests"
+    ):
+        return
+
+    deleted = JobRequest.objects.all().delete()[0]
+    click.echo(f"Deleted {deleted} job requests")
+
+    deleted = Job.objects.all().delete()[0]
+    click.echo(f"Deleted {deleted} jobs")
