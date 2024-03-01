@@ -57,12 +57,7 @@ class HTMXFragmentExtension(Extension):
         return node
 
     def _render_htmx_fragment(self, fragment_name, context, caller, **kwargs):
-        render_lazy = kwargs.get("lazy", False)
-        hx_attributes = {
-            k.replace("_", "-"): v for k, v in kwargs.items() if k.startswith("hx_")
-        }
-
-        def hx_attrs_to_str(attrs):
+        def attrs_to_str(attrs):
             parts = []
             for k, v in attrs.items():
                 if v == "":
@@ -71,21 +66,28 @@ class HTMXFragmentExtension(Extension):
                     parts.append(f'{k}="{v}"')
             return " ".join(parts)
 
+        render_lazy = kwargs.get("lazy", False)
+        attrs = {
+            k.replace("_", "-"): v for k, v in kwargs.items() if k.startswith("hx_")
+        }
+
         if render_lazy:
-            hx_attributes.setdefault("hx-swap", "outerHTML")
-            hx_attributes.setdefault("hx-target", "this")
-            hx_attributes.setdefault("hx-indicator", "this")
-            hx_attrs = hx_attrs_to_str(hx_attributes)
-            return f'<div bolt-hx-fragment="{fragment_name}" hx-get hx-trigger="bolthtmx:load from:body" {hx_attrs}></div>'
+            attrs.setdefault("hx-swap", "outerHTML")
+            attrs.setdefault("hx-target", "this")
+            attrs.setdefault("hx-indicator", "this")
+            attrs_str = attrs_to_str(attrs)
+            return f'<div bolt-hx-fragment="{fragment_name}" hx-get hx-trigger="bolthtmx:load from:body" {attrs_str}></div>'
         else:
             # Swap innerHTML so we can re-run hx calls inside the fragment automatically
             # (render_template_fragment won't render this part of the node again, just the inner nodes)
-            hx_attributes.setdefault("hx-swap", "innerHTML")
-            hx_attributes.setdefault("hx-target", "this")
-            hx_attributes.setdefault("hx-indicator", "this")
-            hx_attrs = hx_attrs_to_str(hx_attributes)
+            attrs.setdefault("hx-swap", "innerHTML")
+            attrs.setdefault("hx-target", "this")
+            attrs.setdefault("hx-indicator", "this")
+            # Add an id that you can use to target the fragment from outside the fragment
+            attrs.setdefault("id", f"bolt-hx-fragment-{fragment_name}")
+            attrs_str = attrs_to_str(attrs)
             return (
-                f'<div bolt-hx-fragment="{fragment_name}" {hx_attrs}>{caller()}</div>'
+                f'<div bolt-hx-fragment="{fragment_name}" {attrs_str}>{caller()}</div>'
             )
 
     @staticmethod
