@@ -11,7 +11,9 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name="oauthconnection",
-            options={"ordering": ("provider_key",), "verbose_name": "OAuth Connection"},
+            options={
+                "ordering": ("provider_key",),
+            },
         ),
         migrations.AlterField(
             model_name="oauthconnection",

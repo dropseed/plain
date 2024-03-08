@@ -727,7 +727,7 @@ class AlterOrderWithRespectTo(ModelOptionOperation):
 class AlterModelOptions(ModelOptionOperation):
     """
     Set new model options that don't directly affect the database schema
-    (like verbose_name, ordering). Python code in migrations
+    (like ordering). Python code in migrations
     may still need them.
     """
 
@@ -740,8 +740,6 @@ class AlterModelOptions(ModelOptionOperation):
         "managed",
         "ordering",
         "select_on_save",
-        "verbose_name",
-        "verbose_name_plural",
     ]
 
     def __init__(self, name, options):

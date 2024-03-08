@@ -436,8 +436,6 @@ class RelatedField(FieldCacheMixin, Field):
             + "_"
             + self.remote_field.model._meta.pk.name
         )
-        if self.verbose_name is None:
-            self.verbose_name = self.remote_field.model._meta.verbose_name
         self.remote_field.set_field_name()
 
     def do_related_class(self, other, cls):
@@ -1049,7 +1047,7 @@ class ForeignKey(ForeignObject):
                 self.error_messages["invalid"],
                 code="invalid",
                 params={
-                    "model": self.remote_field.model._meta.verbose_name,
+                    "model": self.remote_field.model._meta.model_name,
                     "pk": value,
                     "field": self.remote_field.field_name,
                     "value": value,
@@ -1220,9 +1218,6 @@ def create_many_to_many_intermediary_model(field, klass):
             "package_label": klass._meta.package_label,
             "db_tablespace": klass._meta.db_tablespace,
             "unique_together": (from_, to),
-            "verbose_name": "%(from)s-%(to)s relationship" % {"from": from_, "to": to},
-            "verbose_name_plural": "%(from)s-%(to)s relationships"
-            % {"from": from_, "to": to},
             "packages": field.model._meta.packages,
         },
     )

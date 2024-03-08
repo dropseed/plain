@@ -145,7 +145,6 @@ class Field(RegisterLookupMixin):
         "related_name",
         "related_query_name",
         "validators",
-        "verbose_name",
     )
 
     # Field flags
@@ -167,7 +166,6 @@ class Field(RegisterLookupMixin):
 
     def __init__(
         self,
-        verbose_name=None,
         name=None,
         primary_key=False,
         max_length=None,
@@ -191,8 +189,6 @@ class Field(RegisterLookupMixin):
         db_comment=None,
     ):
         self.name = name
-        self.verbose_name = verbose_name  # May be set by set_attributes_from_name
-        self._verbose_name = verbose_name  # Store original for deconstruction
         self.primary_key = primary_key
         self.max_length, self._unique = max_length, unique
         self.blank, self.null = blank, null
@@ -533,7 +529,6 @@ class Field(RegisterLookupMixin):
         # Short-form way of fetching all the default parameters
         keywords = {}
         possibles = {
-            "verbose_name": None,
             "primary_key": False,
             "max_length": None,
             "unique": False,
@@ -558,7 +553,6 @@ class Field(RegisterLookupMixin):
             "unique": "_unique",
             "error_messages": "_error_messages",
             "validators": "_validators",
-            "verbose_name": "_verbose_name",
             "db_tablespace": "_db_tablespace",
         }
         equals_comparison = {"choices", "validators"}
@@ -865,8 +859,6 @@ class Field(RegisterLookupMixin):
         self.name = self.name or name
         self.attname, self.column = self.get_attname_column()
         self.concrete = self.column is not None
-        if self.verbose_name is None and self.name:
-            self.verbose_name = self.name.replace("_", " ")
 
     def contribute_to_class(self, cls, name, private_only=False):
         """
@@ -1266,14 +1258,12 @@ class DateField(DateTimeCheckMixin, Field):
     }
     description = "Date (without time)"
 
-    def __init__(
-        self, verbose_name=None, name=None, auto_now=False, auto_now_add=False, **kwargs
-    ):
+    def __init__(self, name=None, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
             kwargs["editable"] = False
             kwargs["blank"] = True
-        super().__init__(verbose_name, name, **kwargs)
+        super().__init__(name, **kwargs)
 
     def _check_fix_default_value(self):
         """
@@ -1509,14 +1499,13 @@ class DecimalField(Field):
 
     def __init__(
         self,
-        verbose_name=None,
         name=None,
         max_digits=None,
         decimal_places=None,
         **kwargs,
     ):
         self.max_digits, self.decimal_places = max_digits, decimal_places
-        super().__init__(verbose_name, name, **kwargs)
+        super().__init__(name, **kwargs)
 
     def check(self, **kwargs):
         errors = super().check(**kwargs)
@@ -1896,7 +1885,6 @@ class GenericIPAddressField(Field):
 
     def __init__(
         self,
-        verbose_name=None,
         name=None,
         protocol="both",
         unpack_ipv4=False,
@@ -1911,7 +1899,7 @@ class GenericIPAddressField(Field):
         ) = validators.ip_address_validators(protocol, unpack_ipv4)
         self.default_error_messages["invalid"] = invalid_error_message
         kwargs["max_length"] = 39
-        super().__init__(verbose_name, name, *args, **kwargs)
+        super().__init__(name, *args, **kwargs)
 
     def check(self, **kwargs):
         return [
@@ -2145,14 +2133,12 @@ class TimeField(DateTimeCheckMixin, Field):
     }
     description = "Time"
 
-    def __init__(
-        self, verbose_name=None, name=None, auto_now=False, auto_now_add=False, **kwargs
-    ):
+    def __init__(self, name=None, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
             kwargs["editable"] = False
             kwargs["blank"] = True
-        super().__init__(verbose_name, name, **kwargs)
+        super().__init__(name, **kwargs)
 
     def _check_fix_default_value(self):
         """
@@ -2245,9 +2231,9 @@ class URLField(CharField):
     default_validators = [validators.URLValidator()]
     description = "URL"
 
-    def __init__(self, verbose_name=None, name=None, **kwargs):
+    def __init__(self, name=None, **kwargs):
         kwargs.setdefault("max_length", 200)
-        super().__init__(verbose_name, name, **kwargs)
+        super().__init__(name, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -2327,9 +2313,9 @@ class UUIDField(Field):
     description = "Universally unique identifier"
     empty_strings_allowed = False
 
-    def __init__(self, verbose_name=None, **kwargs):
+    def __init__(self, **kwargs):
         kwargs["max_length"] = 32
-        super().__init__(verbose_name, **kwargs)
+        super().__init__(**kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()

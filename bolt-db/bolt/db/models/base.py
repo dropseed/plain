@@ -48,7 +48,7 @@ from bolt.exceptions import (
 from bolt.packages import packages
 from bolt.utils.encoding import force_str
 from bolt.utils.hashable import make_hashable
-from bolt.utils.text import capfirst, get_text_list
+from bolt.utils.text import get_text_list
 
 
 class Deferred:
@@ -1346,12 +1346,12 @@ class Model(AltersData, metaclass=ModelBase):
             code="unique_for_date",
             params={
                 "model": self,
-                "model_name": capfirst(opts.verbose_name),
+                "model_name": opts.model_name,
                 "lookup_type": lookup_type,
                 "field": field_name,
-                "field_label": capfirst(field.verbose_name),
+                "field_label": field.name,
                 "date_field": unique_for,
-                "date_field_label": capfirst(opts.get_field(unique_for).verbose_name),
+                "date_field_label": opts.get_field(unique_for).name,
             },
         )
 
@@ -1361,14 +1361,14 @@ class Model(AltersData, metaclass=ModelBase):
         params = {
             "model": self,
             "model_class": model_class,
-            "model_name": capfirst(opts.verbose_name),
+            "model_name": opts.model_name,
             "unique_check": unique_check,
         }
 
         # A unique field
         if len(unique_check) == 1:
             field = opts.get_field(unique_check[0])
-            params["field_label"] = capfirst(field.verbose_name)
+            params["field_label"] = field.name
             return ValidationError(
                 message=field.error_messages["unique"],
                 code="unique",
@@ -1377,9 +1377,7 @@ class Model(AltersData, metaclass=ModelBase):
 
         # unique_together
         else:
-            field_labels = [
-                capfirst(opts.get_field(f).verbose_name) for f in unique_check
-            ]
+            field_labels = [opts.get_field(f).name for f in unique_check]
             params["field_labels"] = get_text_list(field_labels, "and")
             return ValidationError(
                 message="%(model_name)s with this %(field_labels)s already exists.",

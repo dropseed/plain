@@ -13,7 +13,6 @@ from bolt.runtime import settings
 from bolt.utils.datastructures import ImmutableList, OrderedSet
 from bolt.utils.deprecation import RemovedInDjango51Warning
 from bolt.utils.functional import cached_property
-from bolt.utils.text import camel_case_to_spaces, format_lazy
 
 PROXY_PARENTS = object()
 
@@ -25,8 +24,6 @@ IMMUTABLE_WARNING = (
 )
 
 DEFAULT_NAMES = (
-    "verbose_name",
-    "verbose_name_plural",
     "db_table",
     "db_table_comment",
     "ordering",
@@ -106,8 +103,6 @@ class Options:
         self.base_manager_name = None
         self.default_manager_name = None
         self.model_name = None
-        self.verbose_name = None
-        self.verbose_name_plural = None
         self.db_table = ""
         self.db_table_comment = ""
         self.ordering = []
@@ -175,7 +170,6 @@ class Options:
         # First, construct the default values for these options.
         self.object_name = cls.__name__
         self.model_name = self.object_name.lower()
-        self.verbose_name = camel_case_to_spaces(self.object_name)
 
         # Store the original user-defined values for each option,
         # for use when serializing the model definition
@@ -213,11 +207,6 @@ class Options:
                     objs = getattr(self, attr_name, [])
                     setattr(self, attr_name, self._format_names_with_class(cls, objs))
 
-            # verbose_name_plural is a special case because it uses a 's'
-            # by default.
-            if self.verbose_name_plural is None:
-                self.verbose_name_plural = format_lazy("{}s", self.verbose_name)
-
             # order_with_respect_and ordering are mutually exclusive.
             self._ordering_clash = bool(self.ordering and self.order_with_respect_to)
 
@@ -226,8 +215,7 @@ class Options:
                 raise TypeError(
                     "'class Meta' got invalid attribute(s): %s" % ",".join(meta_attrs)
                 )
-        else:
-            self.verbose_name_plural = format_lazy("{}s", self.verbose_name)
+
         del self.meta
 
         # If the db_table wasn't provided, use the package_label + model_name.
@@ -289,9 +277,7 @@ class Options:
                 field.primary_key = True
                 self.setup_pk(field)
             else:
-                auto = BigAutoField(
-                    verbose_name="ID", primary_key=True, auto_created=True
-                )
+                auto = BigAutoField(primary_key=True, auto_created=True)
                 model.add_to_class("id", auto)
 
     def add_manager(self, manager):

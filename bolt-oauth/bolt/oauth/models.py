@@ -41,7 +41,6 @@ class OAuthConnection(models.Model):
     class Meta:
         unique_together = ("provider_key", "provider_user_id")
         ordering = ("provider_key",)
-        verbose_name = "OAuth Connection"
 
     def __str__(self):
         return f"{self.provider_key}[{self.user}:{self.provider_user_id}]"

@@ -14,21 +14,18 @@ class Migration(migrations.Migration):
                     models.CharField(
                         max_length=40,
                         serialize=False,
-                        verbose_name="session key",
                         primary_key=True,
                     ),
                 ),
-                ("session_data", models.TextField(verbose_name="session data")),
+                ("session_data", models.TextField()),
                 (
                     "expire_date",
-                    models.DateTimeField(verbose_name="expire date", db_index=True),
+                    models.DateTimeField(db_index=True),
                 ),
             ],
             options={
                 "abstract": False,
                 "db_table": "django_session",
-                "verbose_name": "session",
-                "verbose_name_plural": "sessions",
             },
             managers=[
                 ("objects", bolt.sessions.models.SessionManager()),

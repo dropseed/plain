@@ -89,8 +89,6 @@ class AbstractUser(models.Model):
     SESSION_HASH_FIELD = ""
 
     class Meta:
-        verbose_name = "user"
-        verbose_name_plural = "users"
         abstract = True
 
     def clean(self):
