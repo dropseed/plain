@@ -45,11 +45,6 @@ def _get_related_models(m):
         ):
             related_fields_models.add(f.model)
             related_models.append(f.related_model)
-    # Reverse accessors of foreign keys to proxy models are attached to their
-    # concrete proxied model.
-    opts = m._meta
-    if opts.proxy and m in related_fields_models:
-        related_models.append(opts.concrete_model)
     return related_models
 
 
@@ -313,7 +308,7 @@ class ProjectState:
                 )
         # Fix index/unique_together to refer to the new field.
         options = model_state.options
-        for option in ("index_together", "unique_together"):
+        for option in ("unique_together",):
             if option in options:
                 options[option] = [
                     [new_name if n == old_name else n for n in together]
@@ -472,7 +467,7 @@ class ProjectState:
         if not remote_field:
             return
         if concretes is None:
-            concretes, _ = self._get_concrete_models_mapping_and_proxy_models()
+            concretes = self._get_concrete_models_mapping()
 
         self.update_model_field_relation(
             remote_field.model,
@@ -491,7 +486,7 @@ class ProjectState:
 
     def resolve_model_relations(self, model_key, concretes=None):
         if concretes is None:
-            concretes, _ = self._get_concrete_models_mapping_and_proxy_models()
+            concretes = self._get_concrete_models_mapping()
 
         model_state = self.models[model_key]
         for field_name, field in model_state.fields.items():
@@ -505,50 +500,21 @@ class ProjectState:
         # Resolve relations.
         # {remote_model_key: {model_key: {field_name: field}}}
         self._relations = defaultdict(partial(defaultdict, dict))
-        concretes, proxies = self._get_concrete_models_mapping_and_proxy_models()
+        concretes = self._get_concrete_models_mapping()
 
         for model_key in concretes:
             self.resolve_model_relations(model_key, concretes)
 
-        for model_key in proxies:
-            self._relations[model_key] = self._relations[concretes[model_key]]
-
     def get_concrete_model_key(self, model):
-        (
-            concrete_models_mapping,
-            _,
-        ) = self._get_concrete_models_mapping_and_proxy_models()
+        (concrete_models_mapping,) = self._get_concrete_models_mapping()
         model_key = make_model_tuple(model)
         return concrete_models_mapping[model_key]
 
-    def _get_concrete_models_mapping_and_proxy_models(self):
+    def _get_concrete_models_mapping(self):
         concrete_models_mapping = {}
-        proxy_models = {}
-        # Split models to proxy and concrete models.
         for model_key, model_state in self.models.items():
-            if model_state.options.get("proxy"):
-                proxy_models[model_key] = model_state
-                # Find a concrete model for the proxy.
-                concrete_models_mapping[
-                    model_key
-                ] = self._find_concrete_model_from_proxy(
-                    proxy_models,
-                    model_state,
-                )
-            else:
-                concrete_models_mapping[model_key] = model_key
-        return concrete_models_mapping, proxy_models
-
-    def _find_concrete_model_from_proxy(self, proxy_models, model_state):
-        for base in model_state.bases:
-            if not (isinstance(base, str) or issubclass(base, models.Model)):
-                continue
-            base_key = make_model_tuple(base)
-            base_state = proxy_models.get(base_key)
-            if not base_state:
-                # Concrete model found, stop looking at bases.
-                return base_key
-            return self._find_concrete_model_from_proxy(proxy_models, base_state)
+            concrete_models_mapping[model_key] = model_key
+        return concrete_models_mapping
 
     def clone(self):
         """Return an exact copy of this ProjectState."""
@@ -808,9 +774,6 @@ class ModelState:
                 if name == "unique_together":
                     ut = model._meta.original_attrs["unique_together"]
                     options[name] = set(normalize_together(ut))
-                elif name == "index_together":
-                    it = model._meta.original_attrs["index_together"]
-                    options[name] = set(normalize_together(it))
                 elif name == "indexes":
                     indexes = [idx.clone() for idx in model._meta.indexes]
                     for index in indexes:
@@ -826,7 +789,7 @@ class ModelState:
         # If we're ignoring relationships, remove all field-listing model
         # options (that option basically just means "make a stub model")
         if exclude_rels:
-            for key in ["unique_together", "index_together", "order_with_respect_to"]:
+            for key in ["unique_together", "order_with_respect_to"]:
                 if key in options:
                     del options[key]
         # Private fields are ignored, so remove options that refer to them.

@@ -35,7 +35,7 @@ def check_all_models(package_configs=None, **kwargs):
             package_config.get_models() for package_config in package_configs
         )
     for model in models:
-        if model._meta.managed and not model._meta.proxy:
+        if model._meta.managed:
             db_table_models[model._meta.db_table].append(model._meta.label)
         if not inspect.ismethod(model.check):
             errors.append(

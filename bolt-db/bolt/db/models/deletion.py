@@ -110,8 +110,7 @@ class Collector:
         # Tracks deletion-order dependency for databases without transactions
         # or ability to defer constraint checks. Only concrete model classes
         # should be included, as the dependencies exist only between actual
-        # database tables; proxy models are represented here by their concrete
-        # parent.
+        # database tables.
         self.dependencies = defaultdict(set)  # {model: {models}}
 
     def add(self, objs, source=None, nullable=False, reverse_dependency=False):

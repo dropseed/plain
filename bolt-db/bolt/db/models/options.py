@@ -1,7 +1,6 @@
 import bisect
 import copy
 import inspect
-import warnings
 from collections import defaultdict
 
 from bolt.db import connections
@@ -11,7 +10,6 @@ from bolt.exceptions import FieldDoesNotExist
 from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.utils.datastructures import ImmutableList, OrderedSet
-from bolt.utils.deprecation import RemovedInDjango51Warning
 from bolt.utils.functional import cached_property
 
 PROXY_PARENTS = object()
@@ -34,11 +32,8 @@ DEFAULT_NAMES = (
     "db_tablespace",
     "abstract",
     "managed",
-    "proxy",
     "swappable",
     "auto_created",
-    # Must be kept for backward compatibility with old migrations.
-    "index_together",
     "packages",
     "select_on_save",
     "default_related_name",
@@ -110,7 +105,6 @@ class Options:
         self.indexes = []
         self.constraints = []
         self.unique_together = []
-        self.index_together = []  # RemovedInDjango51Warning.
         self.select_on_save = False
         self.object_name = None
         self.package_label = package_label
@@ -124,13 +118,6 @@ class Options:
         self.auto_field = None
         self.abstract = False
         self.managed = True
-        self.proxy = False
-        # For any class that is a proxy (including automatically created
-        # classes for deferred object loading), proxy_for_model tells us
-        # which class this model is proxying. Note that proxy_for_model
-        # can create a chain of proxy models. For non-proxy models, the
-        # variable is always None.
-        self.proxy_for_model = None
         # For any non-abstract class, the concrete class is the model
         # in the end of the proxy_for_model chain. In particular, for
         # concrete models, the concrete_model is always the class itself.
@@ -193,13 +180,7 @@ class Options:
                     self.original_attrs[attr_name] = getattr(self, attr_name)
 
             self.unique_together = normalize_together(self.unique_together)
-            self.index_together = normalize_together(self.index_together)
-            if self.index_together:
-                warnings.warn(
-                    f"'index_together' is deprecated. Use 'Meta.indexes' in "
-                    f"{self.label!r} instead.",
-                    RemovedInDjango51Warning,
-                )
+
             # Package label/class name interpolation for names of constraints and
             # indexes.
             if not getattr(cls._meta, "abstract", False):
@@ -323,15 +304,6 @@ class Options:
             self.pk = field
             field.serialize = False
 
-    def setup_proxy(self, target):
-        """
-        Do the internal setup so that the current model is a proxy for
-        "target".
-        """
-        self.pk = target._meta.pk
-        self.proxy_for_model = target
-        self.db_table = target._meta.db_table
-
     def __repr__(self):
         return "<Options for %s>" % self.object_name
 
@@ -343,7 +315,7 @@ class Options:
         Return True if the model can/should be migrated on the `connection`.
         `connection` can be either a real connection or a connection alias.
         """
-        if self.proxy or self.swapped or not self.managed:
+        if self.swapped or not self.managed:
             return False
         if isinstance(connection, str):
             connection = connections[connection]
@@ -861,7 +833,7 @@ class Options:
                         or obj.model == self.concrete_model
                     ):
                         fields.append(obj)
-        if reverse and not self.proxy:
+        if reverse:
             # Tree is computed once and cached until the app cache is expired.
             # It is composed of a list of fields pointing to the current model
             # from other models.

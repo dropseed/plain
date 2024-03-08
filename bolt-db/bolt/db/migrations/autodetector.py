@@ -1,6 +1,5 @@
 import functools
 import re
-from collections import defaultdict
 from graphlib import TopologicalSorter
 from itertools import chain
 
@@ -127,22 +126,16 @@ class MigrationAutodetector:
         self.altered_constraints = {}
         self.renamed_fields = {}
 
-        # Prepare some old/new state and model lists, separating
-        # proxy models and ignoring unmigrated packages.
+        # Prepare some old/new state and model lists, ignoring unmigrated packages.
         self.old_model_keys = set()
-        self.old_proxy_keys = set()
         self.old_unmanaged_keys = set()
         self.new_model_keys = set()
-        self.new_proxy_keys = set()
         self.new_unmanaged_keys = set()
         for (package_label, model_name), model_state in self.from_state.models.items():
             if not model_state.options.get("managed", True):
                 self.old_unmanaged_keys.add((package_label, model_name))
             elif package_label not in self.from_state.real_packages:
-                if model_state.options.get("proxy"):
-                    self.old_proxy_keys.add((package_label, model_name))
-                else:
-                    self.old_model_keys.add((package_label, model_name))
+                self.old_model_keys.add((package_label, model_name))
 
         for (package_label, model_name), model_state in self.to_state.models.items():
             if not model_state.options.get("managed", True):
@@ -150,10 +143,7 @@ class MigrationAutodetector:
             elif package_label not in self.from_state.real_packages or (
                 convert_packages and package_label in convert_packages
             ):
-                if model_state.options.get("proxy"):
-                    self.new_proxy_keys.add((package_label, model_name))
-                else:
-                    self.new_model_keys.add((package_label, model_name))
+                self.new_model_keys.add((package_label, model_name))
 
         self.from_state.resolve_fields_and_relations()
         self.to_state.resolve_fields_and_relations()
@@ -168,8 +158,6 @@ class MigrationAutodetector:
         # Generate non-rename model operations
         self.generate_deleted_models()
         self.generate_created_models()
-        self.generate_deleted_proxies()
-        self.generate_created_proxies()
         self.generate_altered_options()
         self.generate_altered_managers()
         self.generate_altered_db_table_comment()
@@ -192,14 +180,12 @@ class MigrationAutodetector:
         self.generate_renamed_indexes()
         # Generate removal of foo together.
         self.generate_removed_altered_unique_together()
-        self.generate_removed_altered_index_together()  # RemovedInDjango51Warning.
         # Generate field operations.
         self.generate_removed_fields()
         self.generate_added_fields()
         self.generate_altered_fields()
         self.generate_altered_order_with_respect_to()
         self.generate_altered_unique_together()
-        self.generate_altered_index_together()  # RemovedInDjango51Warning.
         self.generate_added_indexes()
         self.generate_added_constraints()
         self.generate_altered_db_table()
@@ -217,7 +203,6 @@ class MigrationAutodetector:
         deletion to the field that uses it.
         """
         self.kept_model_keys = self.old_model_keys & self.new_model_keys
-        self.kept_proxy_keys = self.old_proxy_keys & self.new_proxy_keys
         self.kept_unmanaged_keys = self.old_unmanaged_keys & self.new_unmanaged_keys
         self.through_users = {}
         self.old_field_keys = {
@@ -475,7 +460,7 @@ class MigrationAutodetector:
             return (
                 isinstance(
                     operation,
-                    operations.AlterUniqueTogether | operations.AlterIndexTogether,
+                    operations.AlterUniqueTogether,
                 )
                 and operation.name_lower == dependency[1].lower()
             )
@@ -593,7 +578,7 @@ class MigrationAutodetector:
         possible).
 
         Defer any model options that refer to collections of fields that might
-        be deferred (e.g. unique_together, index_together).
+        be deferred (e.g. unique_together).
         """
         old_keys = self.old_model_keys | self.old_unmanaged_keys
         added_models = self.new_model_keys - old_keys
@@ -617,12 +602,10 @@ class MigrationAutodetector:
                     if getattr(field.remote_field, "through", None):
                         related_fields[field_name] = field
 
-            # Are there indexes/unique|index_together to defer?
+            # Are there indexes/unique_together to defer?
             indexes = model_state.options.pop("indexes")
             constraints = model_state.options.pop("constraints")
             unique_together = model_state.options.pop("unique_together", None)
-            # RemovedInDjango51Warning.
-            index_together = model_state.options.pop("index_together", None)
             order_with_respect_to = model_state.options.pop(
                 "order_with_respect_to", None
             )
@@ -757,67 +740,6 @@ class MigrationAutodetector:
                     ),
                     dependencies=related_dependencies,
                 )
-            # RemovedInDjango51Warning.
-            if index_together:
-                self.add_operation(
-                    package_label,
-                    operations.AlterIndexTogether(
-                        name=model_name,
-                        index_together=index_together,
-                    ),
-                    dependencies=related_dependencies,
-                )
-            # Fix relationships if the model changed from a proxy model to a
-            # concrete model.
-            relations = self.to_state.relations
-            if (package_label, model_name) in self.old_proxy_keys:
-                for related_model_key, related_fields in relations[
-                    package_label, model_name
-                ].items():
-                    related_model_state = self.to_state.models[related_model_key]
-                    for related_field_name, related_field in related_fields.items():
-                        self.add_operation(
-                            related_model_state.package_label,
-                            operations.AlterField(
-                                model_name=related_model_state.name,
-                                name=related_field_name,
-                                field=related_field,
-                            ),
-                            dependencies=[(package_label, model_name, None, True)],
-                        )
-
-    def generate_created_proxies(self):
-        """
-        Make CreateModel statements for proxy models. Use the same statements
-        as that way there's less code duplication, but for proxy models it's
-        safe to skip all the pointless field stuff and chuck out an operation.
-        """
-        added = self.new_proxy_keys - self.old_proxy_keys
-        for package_label, model_name in sorted(added):
-            model_state = self.to_state.models[package_label, model_name]
-            assert model_state.options.get("proxy")
-            # Depend on the deletion of any possible non-proxy version of us
-            dependencies = [
-                (package_label, model_name, None, False),
-            ]
-            # Depend on all bases
-            for base in model_state.bases:
-                if isinstance(base, str) and "." in base:
-                    base_package_label, base_name = base.split(".", 1)
-                    dependencies.append((base_package_label, base_name, None, True))
-            # Generate creation operation
-            self.add_operation(
-                package_label,
-                operations.CreateModel(
-                    name=model_state.name,
-                    fields=[],
-                    options=model_state.options,
-                    bases=model_state.bases,
-                    managers=model_state.managers,
-                ),
-                # Depend on the deletion of any possible non-proxy version of us
-                dependencies=dependencies,
-            )
 
     def generate_deleted_models(self):
         """
@@ -847,23 +769,12 @@ class MigrationAutodetector:
                         related_fields[field_name] = field
             # Generate option removal first
             unique_together = model_state.options.pop("unique_together", None)
-            # RemovedInDjango51Warning.
-            index_together = model_state.options.pop("index_together", None)
             if unique_together:
                 self.add_operation(
                     package_label,
                     operations.AlterUniqueTogether(
                         name=model_name,
                         unique_together=None,
-                    ),
-                )
-            # RemovedInDjango51Warning.
-            if index_together:
-                self.add_operation(
-                    package_label,
-                    operations.AlterIndexTogether(
-                        name=model_name,
-                        index_together=None,
                     ),
                 )
             # Then remove each related field
@@ -916,19 +827,6 @@ class MigrationAutodetector:
                     name=model_state.name,
                 ),
                 dependencies=list(set(dependencies)),
-            )
-
-    def generate_deleted_proxies(self):
-        """Make DeleteModel options for proxy models."""
-        deleted = self.old_proxy_keys - self.new_proxy_keys
-        for package_label, model_name in sorted(deleted):
-            model_state = self.from_state.models[package_label, model_name]
-            assert model_state.options.get("proxy")
-            self.add_operation(
-                package_label,
-                operations.DeleteModel(
-                    name=model_state.name,
-                ),
             )
 
     def create_renamed_fields(self):
@@ -1234,7 +1132,6 @@ class MigrationAutodetector:
 
     def create_altered_indexes(self):
         option_name = operations.AddIndex.option_name
-        self.renamed_index_together_values = defaultdict(list)
 
         for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
@@ -1265,43 +1162,7 @@ class MigrationAutodetector:
                         renamed_indexes.append((old_index_name, new_index_name, None))
                         remove_from_added.append(new_index)
                         remove_from_removed.append(old_index)
-            # Find index_together changed to indexes.
-            for (
-                old_value,
-                new_value,
-                index_together_package_label,
-                index_together_model_name,
-                dependencies,
-            ) in self._get_altered_foo_together_operations(
-                operations.AlterIndexTogether.option_name
-            ):
-                if (
-                    package_label != index_together_package_label
-                    or model_name != index_together_model_name
-                ):
-                    continue
-                removed_values = old_value.difference(new_value)
-                for removed_index_together in removed_values:
-                    renamed_index_together_indexes = []
-                    for new_index in added_indexes:
-                        _, args, kwargs = new_index.deconstruct()
-                        # Ensure only 'fields' are defined in the Index.
-                        if (
-                            not args
-                            and new_index.fields == list(removed_index_together)
-                            and set(kwargs) == {"name", "fields"}
-                        ):
-                            renamed_index_together_indexes.append(new_index)
 
-                    if len(renamed_index_together_indexes) == 1:
-                        renamed_index = renamed_index_together_indexes[0]
-                        remove_from_added.append(renamed_index)
-                        renamed_indexes.append(
-                            (None, renamed_index.name, removed_index_together)
-                        )
-                        self.renamed_index_together_values[
-                            index_together_package_label, index_together_model_name
-                        ].append(removed_index_together)
             # Remove renamed indexes from the lists of added and removed
             # indexes.
             added_indexes = [
@@ -1523,13 +1384,6 @@ class MigrationAutodetector:
             model_name,
             dependencies,
         ) in self._get_altered_foo_together_operations(operation.option_name):
-            if operation == operations.AlterIndexTogether:
-                old_value = {
-                    value
-                    for value in old_value
-                    if value
-                    not in self.renamed_index_together_values[package_label, model_name]
-                }
             removal_value = new_value.intersection(old_value)
             if removal_value or old_value:
                 self.add_operation(
@@ -1542,10 +1396,6 @@ class MigrationAutodetector:
 
     def generate_removed_altered_unique_together(self):
         self._generate_removed_altered_foo_together(operations.AlterUniqueTogether)
-
-    # RemovedInDjango51Warning.
-    def generate_removed_altered_index_together(self):
-        self._generate_removed_altered_foo_together(operations.AlterIndexTogether)
 
     def _generate_altered_foo_together(self, operation):
         for (
@@ -1566,14 +1416,8 @@ class MigrationAutodetector:
     def generate_altered_unique_together(self):
         self._generate_altered_foo_together(operations.AlterUniqueTogether)
 
-    # RemovedInDjango51Warning.
-    def generate_altered_index_together(self):
-        self._generate_altered_foo_together(operations.AlterIndexTogether)
-
     def generate_altered_db_table(self):
-        models_to_check = self.kept_model_keys.union(
-            self.kept_proxy_keys, self.kept_unmanaged_keys
-        )
+        models_to_check = self.kept_model_keys.union(self.kept_unmanaged_keys)
         for package_label, model_name in sorted(models_to_check):
             old_model_name = self.renamed_models.get(
                 (package_label, model_name), model_name
@@ -1592,9 +1436,7 @@ class MigrationAutodetector:
                 )
 
     def generate_altered_db_table_comment(self):
-        models_to_check = self.kept_model_keys.union(
-            self.kept_proxy_keys, self.kept_unmanaged_keys
-        )
+        models_to_check = self.kept_model_keys.union(self.kept_unmanaged_keys)
         for package_label, model_name in sorted(models_to_check):
             old_model_name = self.renamed_models.get(
                 (package_label, model_name), model_name
@@ -1620,7 +1462,6 @@ class MigrationAutodetector:
         migrations needs them).
         """
         models_to_check = self.kept_model_keys.union(
-            self.kept_proxy_keys,
             self.kept_unmanaged_keys,
             # unmanaged converted to managed
             self.old_unmanaged_keys & self.new_model_keys,

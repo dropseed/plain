@@ -175,15 +175,6 @@ class ModelBase(type):
                 if not hasattr(meta, "get_latest_by"):
                     new_class._meta.get_latest_by = base_meta.get_latest_by
 
-        is_proxy = new_class._meta.proxy
-
-        # If the model is a proxy, ensure that the base class
-        # hasn't been swapped out.
-        if is_proxy and base_meta and base_meta.swapped:
-            raise TypeError(
-                f"{name} cannot proxy the swapped model '{base_meta.swapped}'."
-            )
-
         # Add remaining attributes (those with a contribute_to_class() method)
         # to the class.
         for obj_name, obj in contributable_attrs.items():
@@ -197,33 +188,7 @@ class ModelBase(type):
         )
         field_names = {f.name for f in new_fields}
 
-        # Basic setup for proxy models.
-        if is_proxy:
-            base = None
-            for parent in [kls for kls in parents if hasattr(kls, "_meta")]:
-                if parent._meta.abstract:
-                    if parent._meta.fields:
-                        raise TypeError(
-                            "Abstract base class containing model fields not "
-                            "permitted for proxy model '%s'." % name
-                        )
-                    else:
-                        continue
-                if base is None:
-                    base = parent
-                elif parent._meta.concrete_model is not base._meta.concrete_model:
-                    raise TypeError(
-                        "Proxy model '%s' has more than one non-abstract model base "
-                        "class." % name
-                    )
-            if base is None:
-                raise TypeError(
-                    "Proxy model '%s' has no non-abstract model base class." % name
-                )
-            new_class._meta.setup_proxy(base)
-            new_class._meta.concrete_model = base._meta.concrete_model
-        else:
-            new_class._meta.concrete_model = new_class
+        new_class._meta.concrete_model = new_class
 
         # Collect the parent links for multi-table inheritance.
         parent_links = {}
@@ -272,7 +237,7 @@ class ModelBase(type):
                 base_key = make_model_tuple(base)
                 if base_key in parent_links:
                     field = parent_links[base_key]
-                elif not is_proxy:
+                else:
                     attr_name = "%s_ptr" % base._meta.model_name
                     field = OneToOneField(
                         base,
@@ -293,8 +258,6 @@ class ModelBase(type):
                     # e.g. migrations will already have it specified
                     if not hasattr(new_class, attr_name):
                         new_class.add_to_class(attr_name, field)
-                else:
-                    field = None
                 new_class._meta.parents[base] = field
             else:
                 base_parents = base._meta.parents.copy()
@@ -822,9 +785,6 @@ class Model(AltersData, metaclass=ModelBase):
         assert not (force_insert and (force_update or update_fields))
         assert update_fields is None or update_fields
         cls = origin = self.__class__
-        # Skip proxies, but keep the origin as the proxy model.
-        if cls._meta.proxy:
-            cls = cls._meta.concrete_model
         meta = cls._meta
         if not meta.auto_created:
             pre_save.send(
@@ -1488,7 +1448,6 @@ class Model(AltersData, metaclass=ModelBase):
     def check(cls, **kwargs):
         errors = [
             *cls._check_swappable(),
-            *cls._check_model(),
             *cls._check_managers(**kwargs),
         ]
         if not cls._meta.swapped:
@@ -1511,7 +1470,6 @@ class Model(AltersData, metaclass=ModelBase):
             if not clash_errors:
                 errors.extend(cls._check_column_name_clashes())
             errors += [
-                *cls._check_index_together(),
                 *cls._check_unique_together(),
                 *cls._check_indexes(databases),
                 *cls._check_ordering(),
@@ -1568,19 +1526,6 @@ class Model(AltersData, metaclass=ModelBase):
                             cls._meta.swappable, package_label, model_name
                         ),
                         id="models.E002",
-                    )
-                )
-        return errors
-
-    @classmethod
-    def _check_model(cls):
-        errors = []
-        if cls._meta.proxy:
-            if cls._meta.local_fields or cls._meta.local_many_to_many:
-                errors.append(
-                    preflight.Error(
-                        "Proxy model '%s' contains model fields." % cls.__name__,
-                        id="models.E017",
                     )
                 )
         return errors
@@ -1795,36 +1740,6 @@ class Model(AltersData, metaclass=ModelBase):
                 )
             )
         return errors
-
-    # RemovedInDjango51Warning.
-    @classmethod
-    def _check_index_together(cls):
-        """Check the value of "index_together" option."""
-        if not isinstance(cls._meta.index_together, tuple | list):
-            return [
-                preflight.Error(
-                    "'index_together' must be a list or tuple.",
-                    obj=cls,
-                    id="models.E008",
-                )
-            ]
-
-        elif any(
-            not isinstance(fields, tuple | list) for fields in cls._meta.index_together
-        ):
-            return [
-                preflight.Error(
-                    "All 'index_together' elements must be lists or tuples.",
-                    obj=cls,
-                    id="models.E009",
-                )
-            ]
-
-        else:
-            errors = []
-            for fields in cls._meta.index_together:
-                errors.extend(cls._check_local_fields(fields, "index_together"))
-            return errors
 
     @classmethod
     def _check_unique_together(cls):

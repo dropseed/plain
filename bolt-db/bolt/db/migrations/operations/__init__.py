@@ -2,7 +2,6 @@ from .fields import AddField, AlterField, RemoveField, RenameField
 from .models import (
     AddConstraint,
     AddIndex,
-    AlterIndexTogether,
     AlterModelManagers,
     AlterModelOptions,
     AlterModelTable,
@@ -25,7 +24,6 @@ __all__ = [
     "AlterModelTableComment",
     "AlterUniqueTogether",
     "RenameModel",
-    "AlterIndexTogether",
     "AlterModelOptions",
     "AddIndex",
     "RemoveIndex",

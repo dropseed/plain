@@ -461,8 +461,7 @@ class BaseDatabaseSchemaEditor:
                                 model, field, field_type, field.db_comment
                             )
                         )
-        # Add any field index and index_together's (deferred as SQLite
-        # _remake_table needs it).
+        # Add any field index (deferred as SQLite _remake_table needs it).
         self.deferred_sql.extend(self._model_indexes_sql(model))
 
         # Make M2M tables
@@ -555,27 +554,6 @@ class BaseDatabaseSchemaEditor:
         for field_names in news.difference(olds):
             fields = [model._meta.get_field(field) for field in field_names]
             self.execute(self._create_unique_sql(model, fields))
-
-    def alter_index_together(self, model, old_index_together, new_index_together):
-        """
-        Deal with a model changing its index_together. The input
-        index_togethers must be doubly-nested, not the single-nested
-        ["foo", "bar"] format.
-        """
-        olds = {tuple(fields) for fields in old_index_together}
-        news = {tuple(fields) for fields in new_index_together}
-        # Deleted indexes
-        for fields in olds.difference(news):
-            self._delete_composed_index(
-                model,
-                fields,
-                {"index": True, "unique": False},
-                self.sql_delete_index,
-            )
-        # Created indexes
-        for field_names in news.difference(olds):
-            fields = [model._meta.get_field(field) for field in field_names]
-            self.execute(self._create_index_sql(model, fields=fields, suffix="_idx"))
 
     def _delete_composed_index(self, model, fields, constraint_kwargs, sql):
         meta_constraint_names = {
@@ -1480,18 +1458,13 @@ class BaseDatabaseSchemaEditor:
 
     def _model_indexes_sql(self, model):
         """
-        Return a list of all index SQL statements (field indexes,
-        index_together, Meta.indexes) for the specified model.
+        Return a list of all index SQL statements (field indexes, Meta.indexes) for the specified model.
         """
-        if not model._meta.managed or model._meta.proxy or model._meta.swapped:
+        if not model._meta.managed or model._meta.swapped:
             return []
         output = []
         for field in model._meta.local_fields:
             output.extend(self._field_indexes_sql(model, field))
-
-        for field_names in model._meta.index_together:
-            fields = [model._meta.get_field(field) for field in field_names]
-            output.append(self._create_index_sql(model, fields=fields, suffix="_idx"))
 
         for index in model._meta.indexes:
             if (

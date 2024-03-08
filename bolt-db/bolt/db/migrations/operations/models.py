@@ -101,10 +101,7 @@ class CreateModel(ModelOperation):
             schema_editor.delete_model(model)
 
     def describe(self):
-        return "Create {}model {}".format(
-            "proxy " if self.options.get("proxy", False) else "",
-            self.name,
-        )
+        return f"Create model {self.name}"
 
     @property
     def migration_name_fragment(self):
@@ -137,7 +134,6 @@ class CreateModel(ModelOperation):
         if (
             isinstance(operation, DeleteModel)
             and self.name_lower == operation.name_lower
-            and not self.options.get("proxy", False)
         ):
             return []
         elif (
@@ -244,7 +240,7 @@ class CreateModel(ModelOperation):
                 ]
             elif isinstance(operation, RemoveField):
                 options = self.options.copy()
-                for option_name in ("unique_together", "index_together"):
+                for option_name in ("unique_together",):
                     option = options.pop(option_name, None)
                     if option:
                         option = set(
@@ -278,7 +274,7 @@ class CreateModel(ModelOperation):
                 ]
             elif isinstance(operation, RenameField):
                 options = self.options.copy()
-                for option_name in ("unique_together", "index_together"):
+                for option_name in ("unique_together",):
                     option = options.get(option_name)
                     if option:
                         options[option_name] = {
@@ -644,18 +640,6 @@ class AlterUniqueTogether(AlterTogetherOptionOperation):
         super().__init__(name, unique_together)
 
 
-class AlterIndexTogether(AlterTogetherOptionOperation):
-    """
-    Change the value of index_together to the target one.
-    Input value of index_together must be a set of tuples.
-    """
-
-    option_name = "index_together"
-
-    def __init__(self, name, index_together):
-        super().__init__(name, index_together)
-
-
 class AlterOrderWithRespectTo(ModelOptionOperation):
     """Represent a change with the order_with_respect_to option."""
 
@@ -952,12 +936,6 @@ class RenameIndex(IndexOperation):
                 package_label,
                 self.model_name_lower,
                 models.Index(fields=self.old_fields, name=self.new_name),
-            )
-            state.remove_model_options(
-                package_label,
-                self.model_name_lower,
-                AlterIndexTogether.option_name,
-                self.old_fields,
             )
         else:
             state.rename_index(
