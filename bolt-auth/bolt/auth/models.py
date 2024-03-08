@@ -67,7 +67,6 @@ class AbstractUser(models.Model):
     username_validator = UnicodeUsernameValidator()
 
     username = models.CharField(
-        "username",
         max_length=150,
         unique=True,
         validators=[username_validator],
@@ -77,7 +76,6 @@ class AbstractUser(models.Model):
     )
     email = models.EmailField(blank=True)
     is_staff = models.BooleanField(
-        "staff status",
         default=False,
     )
     date_joined = models.DateTimeField(default=timezone.now)
