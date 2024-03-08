@@ -75,13 +75,13 @@ class AbstractUser(models.Model):
             "unique": "A user with that username already exists.",
         },
     )
-    email = models.EmailField("email address", blank=True)
+    email = models.EmailField(blank=True)
     is_staff = models.BooleanField(
         "staff status",
         default=False,
     )
-    date_joined = models.DateTimeField("date joined", default=timezone.now)
-    last_login = models.DateTimeField("last login", blank=True, null=True)
+    date_joined = models.DateTimeField(default=timezone.now)
+    last_login = models.DateTimeField(blank=True, null=True)
 
     objects = UserManager()
 
