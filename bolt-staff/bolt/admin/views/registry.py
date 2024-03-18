@@ -107,10 +107,10 @@ class AdminViewRegistry:
 
     def get_model_detail_url(self, instance):
         from bolt.admin.views.base import URL_NAMESPACE
-        from bolt.admin.views.models import AdminDetailView
+        from bolt.admin.views.models import AdminModelDetailView
 
         for view in self.registered_views:
-            if not issubclass(view, AdminDetailView):
+            if not issubclass(view, AdminModelDetailView):
                 continue
 
             if view.model == instance.__class__:
@@ -124,3 +124,4 @@ registry = AdminViewRegistry()
 register_view = registry.register_view
 register_dashboard = registry.register_dashboard
 register_viewset = registry.register_viewset
+get_model_detail_url = registry.get_model_detail_url

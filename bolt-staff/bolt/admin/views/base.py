@@ -127,7 +127,7 @@ class AdminView(AuthViewMixin, TemplateView):
         # response = card.as_view()(self.request)
         # response.render()
         # content = response.content.decode()
-        return card().render(self.request, self.datetime_range)
+        return card().render(self, self.request, self.datetime_range)
 
 
 class AdminListView(HTMXViewMixin, AdminView):

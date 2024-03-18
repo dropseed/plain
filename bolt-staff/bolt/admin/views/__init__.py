@@ -12,6 +12,7 @@ from .models import (
     AdminModelViewset,
 )
 from .registry import (
+    get_model_detail_url,
     register_dashboard,
     register_view,
     register_viewset,
@@ -30,4 +31,5 @@ __all__ = [
     "register_viewset",
     "register_view",
     "register_dashboard",
+    "get_model_detail_url",
 ]

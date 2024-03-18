@@ -1,8 +1,10 @@
 from enum import Enum
 
 from bolt.admin.dates import DatetimeRange, DatetimeRangeAliases
+from bolt.http import HttpRequest
 from bolt.templates import Template
 from bolt.utils.text import slugify
+from bolt.views import View
 
 
 class Card:
@@ -31,7 +33,15 @@ class Card:
     # which by default is the range of the page it's on
     fixed_datetime_range: DatetimeRangeAliases | DatetimeRange | None = None
 
-    def render(self, request, datetime_range):
+    # These will be accessible at render time
+    view: View
+    request: HttpRequest
+    datetime_range: DatetimeRange
+
+    def render(self, view, request, datetime_range):
+        self.view = view
+        self.request = request
+
         if self.fixed_datetime_range:
             self.datetime_range = DatetimeRangeAliases.to_range(
                 self.fixed_datetime_range
