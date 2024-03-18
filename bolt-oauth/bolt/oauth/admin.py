@@ -38,8 +38,10 @@ class OAuthConnectionViewset(AdminModelViewset):
     class ListView(AdminModelListView):
         nav_section = "OAuth"
         model = OAuthConnection
+        title = "Connections"
         fields = ["id", "user", "provider_key", "provider_user_id"]
         cards = [ProvidersChartCard]
 
     class DetailView(AdminModelDetailView):
         model = OAuthConnection
+        title = "OAuth connection"

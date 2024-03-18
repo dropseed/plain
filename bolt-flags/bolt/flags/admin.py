@@ -50,6 +50,7 @@ class FlagResultForm(ModelForm):
 class FlagResultAdmin(AdminModelViewset):
     class ListView(AdminModelListView):
         model = FlagResult
+        title = "Flag results"
         fields = [
             "flag",
             "key",
@@ -66,7 +67,9 @@ class FlagResultAdmin(AdminModelViewset):
 
     class DetailView(AdminModelDetailView):
         model = FlagResult
+        title = "Flag result"
 
     class UpdateView(AdminModelUpdateView):
         model = FlagResult
+        title = "Update flag result"
         form_class = FlagResultForm

@@ -42,7 +42,7 @@ class AdminModelListView(AdminListView):
 
     @classmethod
     def get_title(cls) -> str:
-        return cls.model._meta.model_name.capitalize() + "s"
+        return getattr(cls, "title", cls.model._meta.model_name.capitalize() + "s")
 
     @classmethod
     def get_slug(cls) -> str:
@@ -111,7 +111,7 @@ class AdminModelDetailView(AdminDetailView):
 
     @classmethod
     def get_title(cls) -> str:
-        return cls.model._meta.model_name.capitalize()
+        return getattr(cls, "title", cls.model._meta.model_name.capitalize())
 
     @classmethod
     def get_slug(cls) -> str:
@@ -155,7 +155,7 @@ class AdminModelUpdateView(AdminUpdateView):
 
     @classmethod
     def get_title(cls) -> str:
-        return f"Update {cls.model._meta.model_name}"
+        return getattr(cls, "title", f"Update {cls.model._meta.model_name}")
 
     @classmethod
     def get_slug(cls) -> str:

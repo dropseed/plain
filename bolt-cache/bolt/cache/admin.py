@@ -12,6 +12,7 @@ class CachedItemViewset(AdminModelViewset):
     class ListView(AdminModelListView):
         nav_section = "Cache"
         model = CachedItem
+        title = "Cached items"
         fields = [
             "key",
             "created_at",
@@ -28,3 +29,4 @@ class CachedItemViewset(AdminModelViewset):
 
     class DetailView(AdminModelDetailView):
         model = CachedItem
+        title = "Cached item"

@@ -119,10 +119,12 @@ class JobRequestViewset(AdminModelViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
         model = JobRequest
+        title = "Job requests"
         fields = ["id", "job_class", "priority", "created_at"]
 
     class DetailView(AdminModelDetailView):
         model = JobRequest
+        title = "Job Request"
 
 
 @register_viewset
@@ -150,6 +152,7 @@ class JobResultViewset(AdminModelViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
         model = JobResult
+        title = "Job results"
         fields = [
             "id",
             "job_class",
@@ -230,6 +233,7 @@ class JobResultViewset(AdminModelViewset):
 
     class DetailView(AdminModelDetailView):
         model = JobResult
+        title = "Job result"
 
         def post(self):
             self.load_object()
