@@ -52,9 +52,6 @@ class UserManager(models.Manager):
             email = email_name + "@" + domain_part.lower()
         return email
 
-    def get_by_natural_key(self, username):
-        return self.get(**{self.model.USERNAME_FIELD: username})
-
 
 class AbstractUser(models.Model):
     """
@@ -83,22 +80,17 @@ class AbstractUser(models.Model):
 
     objects = UserManager()
 
-    USERNAME_FIELD = "username"
     SESSION_HASH_FIELD = ""
 
     class Meta:
         abstract = True
 
     def clean(self):
-        setattr(self, self.USERNAME_FIELD, self.normalize_username(self.get_username()))
+        self.username = self.normalize_username(self.username)
         self.email = self.__class__.objects.normalize_email(self.email)
 
     def __str__(self):
-        return self.get_username()
-
-    def get_username(self):
-        """Return the username for this User."""
-        return getattr(self, self.USERNAME_FIELD)
+        return self.username
 
     def get_session_auth_hash(self):
         """
