@@ -101,6 +101,7 @@ class Job(metaclass=JobType):
     def run_in_worker(
         self,
         *,
+        queue: str | None = None,
         delay: int | datetime.timedelta | datetime.datetime | None = None,
         priority: int | None = None,
         retries: int | None = None,
@@ -115,6 +116,9 @@ class Job(metaclass=JobType):
             source = ""
 
         parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
+
+        if queue is None:
+            queue = self.get_queue()
 
         if priority is None:
             priority = self.get_priority()
@@ -147,6 +151,7 @@ class Job(metaclass=JobType):
             parameters=parameters,
             start_at=start_at,
             source=source,
+            queue=queue,
             priority=priority,
             retries=retries,
             unique_key=unique_key,
@@ -156,7 +161,7 @@ class Job(metaclass=JobType):
         return f"{self.__module__}.{self.__class__.__name__}"
 
     def in_progress(self):
-        """Get all JobRequests and Jobs that are currently in progress."""
+        """Get all JobRequests and Jobs that are currently in progress, regardless of queue."""
         from .models import Job, JobRequest
 
         job_class = self._job_class_str()
@@ -185,6 +190,9 @@ class Job(metaclass=JobType):
         multiple instances are queued in a race condition.
         """
         return ""
+
+    def get_queue(self) -> str:
+        return "default"
 
     def get_priority(self) -> int:
         return 0

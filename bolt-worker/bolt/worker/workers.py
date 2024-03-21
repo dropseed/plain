@@ -6,9 +6,10 @@ import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
 
-from bolt.db import transaction
+from bolt.db import models, transaction
 from bolt.runtime import settings
 from bolt.signals import request_finished, request_started
+from bolt.utils import timezone
 from bolt.utils.module_loading import import_string
 
 from .models import Job, JobRequest, JobResult, JobResultStatuses
@@ -17,12 +18,16 @@ logger = logging.getLogger("bolt.worker")
 
 
 class Worker:
-    def __init__(self, max_processes=None, max_jobs_per_process=None, stats_every=None):
+    def __init__(
+        self, queues, max_processes=None, max_jobs_per_process=None, stats_every=None
+    ):
         self.executor = ProcessPoolExecutor(
             max_workers=max_processes,
             max_tasks_per_child=max_jobs_per_process,
             mp_context=multiprocessing.get_context("spawn"),
         )
+
+        self.queues = queues
 
         # How often to log the stats (in seconds)
         self.stats_every = stats_every
@@ -48,7 +53,18 @@ class Worker:
                 logger.exception(e)
 
             with transaction.atomic():
-                job_request = JobRequest.objects.next_up()
+                job_request = (
+                    JobRequest.objects.select_for_update(skip_locked=True)
+                    .filter(
+                        queue__in=self.queues,
+                    )
+                    .filter(
+                        models.Q(start_at__isnull=True)
+                        | models.Q(start_at__lte=timezone.now())
+                    )
+                    .order_by("priority", "-start_at", "-created_at")
+                    .first()
+                )
                 if not job_request:
                     # Potentially no jobs to process (who knows for how long)
                     # but sleep for a second to give the CPU and DB a break
@@ -56,11 +72,12 @@ class Worker:
                     continue
 
                 logger.info(
-                    'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
+                    'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queues="%s"',
                     job_request.job_class,
                     job_request.uuid,
                     job_request.priority,
                     job_request.source,
+                    job_request.queue,
                 )
 
                 job = job_request.convert_to_job()
@@ -111,7 +128,7 @@ class Worker:
 
         if now - self._job_results_checked_at > check_every:
             self._job_results_checked_at = now
-            self.check_job_results()
+            self.rescue_job_results()
 
     def log_stats(self):
         try:
@@ -121,25 +138,27 @@ class Worker:
             num_proccesses = 0
 
         num_backlog_jobs = (
-            JobRequest.objects.count()
-            + Job.objects.filter(started_at__isnull=True).count()
+            JobRequest.objects.filter(queue__in=self.queues).count()
+            + Job.objects.filter(queue__in=self.queues, started_at__isnull=True).count()
         )
         if num_backlog_jobs > 0:
             # Basically show how many jobs aren't about to be picked
             # up in this same tick (so if there's 1, we don't really need to log that as a backlog)
             num_backlog_jobs = num_backlog_jobs - 1
         logger.info(
-            "Job worker stats worker_processes=%s jobs_backlog=%s worker_max_processes=%s worker_max_jobs_per_process=%s",
+            "Job worker stats worker_processes=%s worker_queues=%s jobs_backlog=%s worker_max_processes=%s worker_max_jobs_per_process=%s",
             num_proccesses,
+            self.queues,
             num_backlog_jobs,
             self.max_processes,
             self.max_jobs_per_process,
         )
 
-    def check_job_results(self):
+    def rescue_job_results(self):
+        """Find any lost or failed jobs on this worker's queues and handle them."""
         # TODO return results and log them if there are any?
-        Job.objects.mark_lost_jobs()
-        JobResult.objects.retry_failed_jobs()
+        Job.objects.filter(queue__in=self.queues).mark_lost_jobs()
+        JobResult.objects.filter(queue__in=self.queues).retry_failed_jobs()
 
 
 def future_finished_callback(job_uuid: str, future: Future):
@@ -160,12 +179,13 @@ def process_job(job_uuid):
         job = Job.objects.get(uuid=job_uuid)
 
         logger.info(
-            'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s"',
+            'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queue="%s"',
             worker_pid,
             job.job_class,
             job.job_request_uuid,
             job.priority,
             job.source,
+            job.queue,
         )
 
         def middleware_chain(job):
@@ -185,7 +205,7 @@ def process_job(job_uuid):
         duration = duration.total_seconds()
 
         logger.info(
-            'Completed job worker_pid=%s job_class=%s job_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_duration=%s',
+            'Completed job worker_pid=%s job_class=%s job_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s',
             worker_pid,
             job_result.job_class,
             job_result.job_uuid,
@@ -193,6 +213,7 @@ def process_job(job_uuid):
             job_result.uuid,
             job_result.priority,
             job_result.source,
+            job_result.queue,
             duration,
         )
 

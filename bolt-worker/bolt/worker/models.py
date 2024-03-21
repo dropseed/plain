@@ -12,18 +12,6 @@ from .jobs import load_job
 logger = logging.getLogger("bolt.worker")
 
 
-class JobRequestQuerySet(models.QuerySet):
-    def next_up(self):
-        return (
-            self.select_for_update(skip_locked=True)
-            .filter(
-                models.Q(start_at__isnull=True) | models.Q(start_at__lte=timezone.now())
-            )
-            .order_by("priority", "-start_at", "-created_at")
-            .first()
-        )
-
-
 class JobRequest(models.Model):
     """
     Keep all pending job requests in a single table.
@@ -36,6 +24,7 @@ class JobRequest(models.Model):
     parameters = models.JSONField(blank=True, null=True)
     priority = models.IntegerField(default=0, db_index=True)
     source = models.TextField(blank=True)
+    queue = models.CharField(default="default", max_length=255, db_index=True)
 
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
@@ -46,8 +35,6 @@ class JobRequest(models.Model):
 
     # context
     # expires_at = models.DateTimeField(blank=True, null=True)
-
-    objects = JobRequestQuerySet.as_manager()
 
     class Meta:
         ordering = ["priority", "-created_at"]
@@ -73,6 +60,7 @@ class JobRequest(models.Model):
                 parameters=self.parameters,
                 priority=self.priority,
                 source=self.source,
+                queue=self.queue,
                 retries=self.retries,
                 retry_attempt=self.retry_attempt,
                 unique_key=self.unique_key,
@@ -123,6 +111,7 @@ class Job(models.Model):
     parameters = models.JSONField(blank=True, null=True)
     priority = models.IntegerField(default=0, db_index=True)
     source = models.TextField(blank=True)
+    queue = models.CharField(default="default", max_length=255, db_index=True)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
     unique_key = models.CharField(max_length=255, blank=True, db_index=True)
@@ -173,6 +162,7 @@ class Job(models.Model):
                 parameters=self.parameters,
                 priority=self.priority,
                 source=self.source,
+                queue=self.queue,
                 retries=self.retries,
                 retry_attempt=self.retry_attempt,
                 unique_key=self.unique_key,
@@ -194,6 +184,7 @@ class Job(models.Model):
             "parameters": self.parameters,
             "priority": self.priority,
             "source": self.source,
+            "queue": self.queue,
             "retries": self.retries,
             "retry_attempt": self.retry_attempt,
             "unique_key": self.unique_key,
@@ -275,6 +266,7 @@ class JobResult(models.Model):
     parameters = models.JSONField(blank=True, null=True)
     priority = models.IntegerField(default=0, db_index=True)
     source = models.TextField(blank=True)
+    queue = models.CharField(default="default", max_length=255, db_index=True)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
     unique_key = models.CharField(max_length=255, blank=True, db_index=True)
@@ -316,6 +308,7 @@ class JobResult(models.Model):
                 parameters=self.parameters,
                 priority=self.priority,
                 source=self.source,
+                queue=self.queue,
                 retries=self.retries,
                 unique_key=self.unique_key,
                 # For the retry

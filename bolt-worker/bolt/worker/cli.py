@@ -20,6 +20,14 @@ def cli():
 
 @cli.command()
 @click.option(
+    "queues",
+    "--queue",
+    default=["default"],
+    multiple=True,
+    type=str,
+    help="Queue to process",
+)
+@click.option(
     "--max-processes",
     "max_processes",
     default=None,
@@ -40,8 +48,9 @@ def cli():
     type=int,
     envvar="BOLT_JOBS_STATS_EVERY",
 )
-def run(max_processes, max_jobs_per_process, stats_every):
+def run(queues, max_processes, max_jobs_per_process, stats_every):
     worker = Worker(
+        queues=queues,
         max_processes=max_processes,
         max_jobs_per_process=max_jobs_per_process,
         stats_every=stats_every,
@@ -61,6 +70,7 @@ def run(max_processes, max_jobs_per_process, stats_every):
 
 @cli.command()
 def clear_completed():
+    """Clear all completed job results in all queues."""
     cutoff = timezone.now() - datetime.timedelta(
         seconds=settings.WORKER_JOBS_CLEARABLE_AFTER
     )
@@ -71,6 +81,7 @@ def clear_completed():
 
 @cli.command()
 def stats():
+    """Stats across all queues."""
     pending = JobRequest.objects.count()
     processing = Job.objects.count()
 
@@ -87,6 +98,7 @@ def stats():
 
 @cli.command()
 def cancel_all():
+    """Cancel all running and pending jobs regardless of queue."""
     if not click.confirm(
         "Are you sure you want to clear all running and pending jobs? This will delete all current Jobs and JobRequests"
     ):
