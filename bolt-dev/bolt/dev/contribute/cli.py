@@ -64,7 +64,7 @@ def link(package, repo):
             return
 
     click.secho(f"Linking {package} to {repo}", bold=True)
-    if package == "bolt":
+    if package.startswith("bolt-"):
         result = subprocess.run(
             [
                 "poetry",
@@ -72,7 +72,7 @@ def link(package, repo):
                 "--editable",
                 "--group",
                 poetry_group,
-                str(repo),
+                str(repo / package),  # Link a subdirectory
             ]
         )
         if result.returncode:
@@ -86,7 +86,7 @@ def link(package, repo):
                 "--editable",
                 "--group",
                 poetry_group,
-                str(repo / package),
+                str(repo),
             ]
         )
         if result.returncode:
