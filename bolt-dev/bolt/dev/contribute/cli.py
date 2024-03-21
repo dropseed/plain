@@ -78,7 +78,7 @@ def link(package, repo):
         if result.returncode:
             click.secho("Failed to link the package", fg="red")
             sys.exit(result.returncode)
-    else:
+    elif package == "bolt" or package.startswith("boltx-"):
         result = subprocess.run(
             [
                 "poetry",
@@ -92,6 +92,9 @@ def link(package, repo):
         if result.returncode:
             click.secho("Failed to link the package", fg="red")
             sys.exit(result.returncode)
+    else:
+        click.secho(f"Unknown package {package}", fg="red")
+        sys.exit(2)
 
 
 @cli.command()
