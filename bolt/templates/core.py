@@ -4,7 +4,11 @@ from .jinja import environment
 
 
 class TemplateFileMissing(Exception):
-    pass
+    def __str__(self) -> str:
+        if self.args:
+            return f"Template file {self.args[0]} not found"
+        else:
+            return "Template file not found"
 
 
 class Template:
@@ -14,7 +18,7 @@ class Template:
         try:
             self._jinja_template = environment.get_template(filename)
         except jinja2.TemplateNotFound:
-            raise TemplateFileMissing(f"Template file {filename} not found")
+            raise TemplateFileMissing(filename)
 
     def render(self, context: dict) -> str:
         return self._jinja_template.render(context)

@@ -47,13 +47,15 @@ class TemplateView(View):
             return [self.template_name]
 
     def get_template(self) -> Template:
-        for template_name in self.get_template_names():
+        template_names = self.get_template_names()
+
+        for template_name in template_names:
             try:
                 return Template(template_name)
             except TemplateFileMissing:
                 pass
 
-        raise TemplateFileMissing()
+        raise TemplateFileMissing(template_names)
 
     def render_template(self) -> str:
         return self.get_template().render(self.get_template_context())
