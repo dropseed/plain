@@ -2,7 +2,7 @@ import os
 
 import frontmatter
 
-from bolt.templates.jinja import environment
+from bolt.templates import Template
 from bolt.utils.functional import cached_property
 
 from .markdown import render_markdown
@@ -30,10 +30,14 @@ class Page:
 
     @cached_property
     def content(self):
+        # Strip the frontmatter
         content = self._frontmatter.content
 
-        if self.vars.get("use_jinja", True):
-            content = environment.from_string(content).render()
+        if not self.vars.get("render_plain", False):
+            template = Template(os.path.join("pages", self.relative_path))
+            content = template.render({})
+            # Strip the frontmatter again, since it was in the template file itself
+            _, content = frontmatter.parse(content)
 
         if self.content_type == "markdown":
             content = render_markdown(content)

@@ -7,7 +7,7 @@ from .registry import registry
 
 
 class PageView(TemplateView):
-    template_name = "pages/page.html"
+    template_name = "page.html"
 
     @cached_property
     def page(self):
@@ -22,9 +22,9 @@ class PageView(TemplateView):
     def get_template_names(self) -> list[str]:
         """
         Allow for more specific user templates like
-        pages/markdown.html or pages/html.html
+        markdown.html or html.html
         """
-        content_type_template_name = f"pages/{self.page.content_type}.html"
+        content_type_template_name = f"{self.page.content_type}.html"
         return [content_type_template_name] + super().get_template_names()
 
     def get_template_context(self):
