@@ -97,15 +97,6 @@ W018 = Warning(
     id="security.W018",
 )
 
-W019 = Warning(
-    "You have "
-    "'bolt.middleware.clickjacking.XFrameOptionsMiddleware' in your "
-    "MIDDLEWARE, but X_FRAME_OPTIONS is not set to 'DENY'. "
-    "Unless there is a good reason for your site to serve other parts of "
-    "itself in a frame, you should change it to 'DENY'.",
-    id="security.W019",
-)
-
 W020 = Warning(
     "ALLOWED_HOSTS must not be empty in deployment.",
     id="security.W020",
@@ -241,12 +232,6 @@ def check_secret_key_fallbacks(package_configs, **kwargs):
 def check_debug(package_configs, **kwargs):
     passed_check = not settings.DEBUG
     return [] if passed_check else [W018]
-
-
-@register(deploy=True)
-def check_xframe_deny(package_configs, **kwargs):
-    passed_check = not _xframe_middleware() or settings.X_FRAME_OPTIONS == "DENY"
-    return [] if passed_check else [W019]
 
 
 @register(deploy=True)
