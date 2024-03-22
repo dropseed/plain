@@ -21,8 +21,8 @@ class ElementsLoader(FileSystemLoader):
         # if os.path.splitext(path)[1] == ".html" and "elements" in path and "template_elements" in self.__dict__:
         #     del self.__dict__["template_elements"]
 
-        # If it's html, replace element tags
-        if os.path.splitext(path)[1] == ".html":
+        # If it's html or markdown, replace element tags
+        if os.path.splitext(path)[1] in [".html", ".md"]:
             self._elements_environment = (
                 environment  # Save this so we can use it in template_elements
             )
