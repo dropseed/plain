@@ -61,7 +61,7 @@ class ElementsLoader(FileSystemLoader):
             jinja_tag_name = element["tag_name"]
             element_relative_path = element["path"]
 
-            class ElemenetExtension(Extension):
+            class ElementExtension(Extension):
                 def parse(self, parser):
                     lineno = next(parser.stream).lineno
                     args = [
@@ -101,7 +101,7 @@ class ElementsLoader(FileSystemLoader):
             # Create a new class on the fly
             NamedElementExtension = type(
                 f"BoltElement.{element_name}",
-                (ElemenetExtension,),
+                (ElementExtension,),
                 {
                     "tags": {jinja_tag_name, f"end{jinja_tag_name}"},
                     "template_name": f"elements/{element_relative_path}",
