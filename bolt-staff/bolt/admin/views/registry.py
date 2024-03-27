@@ -109,6 +109,10 @@ class AdminViewRegistry:
         from bolt.admin.views.base import URL_NAMESPACE
         from bolt.admin.views.models import AdminModelDetailView
 
+        if not instance.pk:
+            # Has to actually be in the db
+            return
+
         for view in self.registered_views:
             if not issubclass(view, AdminModelDetailView):
                 continue
