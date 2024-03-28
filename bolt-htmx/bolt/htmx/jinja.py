@@ -95,6 +95,24 @@ class HTMXFragmentExtension(Extension):
         callblock_node = template.environment.htmx_fragment_nodes.get(
             template.name, {}
         ).get(fragment_name)
+
+        if not callblock_node:
+            # Look in other templates for this fragment
+            matching_callblock_nodes = []
+            for _, fragments in template.environment.htmx_fragment_nodes.items():
+                if fragment_name in fragments:
+                    matching_callblock_nodes.append(fragments[fragment_name])
+            if len(matching_callblock_nodes) == 1:
+                callblock_node = matching_callblock_nodes[0]
+            elif len(matching_callblock_nodes) > 1:
+                raise jinja2.TemplateNotFound(
+                    f"Fragment {fragment_name} found in multiple templates. Use a more specific name."
+                )
+            else:
+                raise jinja2.TemplateNotFound(
+                    f"Fragment {fragment_name} not found in any templates"
+                )
+
         if not callblock_node:
             raise jinja2.TemplateNotFound(
                 f"Fragment {fragment_name} not found in template {template.name}"
