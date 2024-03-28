@@ -23,7 +23,7 @@ class HTMXFragmentExtension(Extension):
 
     def __init__(self, environment):
         super().__init__(environment)
-        environment.htmx_fragment_nodes = {}
+        environment.extend(htmx_fragment_nodes={})
 
     def parse(self, parser):
         lineno = next(parser.stream).lineno
@@ -47,6 +47,7 @@ class HTMXFragmentExtension(Extension):
             args=[fragment_name, jinja2.nodes.ContextReference()],
             kwargs=kwargs,
         )
+
         node = jinja2.nodes.CallBlock(call, [], [], body).set_lineno(lineno)
 
         # Store a reference to the node for later
