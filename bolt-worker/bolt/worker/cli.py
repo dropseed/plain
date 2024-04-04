@@ -97,8 +97,8 @@ def stats():
 
 
 @cli.command()
-def cancel_all():
-    """Cancel all running and pending jobs regardless of queue."""
+def purge_processing():
+    """Delete all running and pending jobs regardless of queue."""
     if not click.confirm(
         "Are you sure you want to clear all running and pending jobs? This will delete all current Jobs and JobRequests"
     ):
