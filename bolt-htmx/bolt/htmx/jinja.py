@@ -91,42 +91,44 @@ class HTMXFragmentExtension(Extension):
                 f'<div bolt-hx-fragment="{fragment_name}" {attrs_str}>{caller()}</div>'
             )
 
-    @staticmethod
-    def find_template_fragment(template: jinja2.Template, fragment_name: str):
-        callblock_node = template.environment.htmx_fragment_nodes.get(
-            template.name, {}
-        ).get(fragment_name)
 
-        if not callblock_node:
-            # Look in other templates for this fragment
-            matching_callblock_nodes = []
-            for _, fragments in template.environment.htmx_fragment_nodes.items():
-                if fragment_name in fragments:
-                    matching_callblock_nodes.append(fragments[fragment_name])
-            if len(matching_callblock_nodes) == 1:
-                callblock_node = matching_callblock_nodes[0]
-            elif len(matching_callblock_nodes) > 1:
-                raise jinja2.TemplateNotFound(
-                    f"Fragment {fragment_name} found in multiple templates. Use a more specific name."
-                )
-            else:
-                raise jinja2.TemplateNotFound(
-                    f"Fragment {fragment_name} not found in any templates"
-                )
+def render_template_fragment(*, template, fragment_name, context):
+    template = find_template_fragment(template, fragment_name)
+    return template.render(context)
 
-        if not callblock_node:
+
+def find_template_fragment(template: jinja2.Template, fragment_name: str):
+    callblock_node = template.environment.htmx_fragment_nodes.get(
+        template.name, {}
+    ).get(fragment_name)
+
+    if not callblock_node:
+        # Look in other templates for this fragment
+        # The potential issue here is if you have multiple gunicorn workers,
+        # you could be asking a different worker for a template/fragment it hasn't actually parsed yet?
+        matching_callblock_nodes = []
+        for _, fragments in template.environment.htmx_fragment_nodes.items():
+            if fragment_name in fragments:
+                matching_callblock_nodes.append(fragments[fragment_name])
+        if len(matching_callblock_nodes) == 1:
+            callblock_node = matching_callblock_nodes[0]
+        elif len(matching_callblock_nodes) > 1:
             raise jinja2.TemplateNotFound(
-                f"Fragment {fragment_name} not found in template {template.name}"
+                f"Fragment {fragment_name} found in multiple templates. Use a more specific name."
+            )
+        else:
+            raise jinja2.TemplateNotFound(
+                f"Fragment {fragment_name} not found in any templates"
             )
 
-        # Create a new template from the node
-        template_node = jinja2.nodes.Template(callblock_node.body)
-        return template.environment.from_string(template_node)
+    if not callblock_node:
+        raise jinja2.TemplateNotFound(
+            f"Fragment {fragment_name} not found in template {template.name}"
+        )
 
-    @staticmethod
-    def render_template_fragment(*, template, fragment_name, context):
-        template = HTMXFragmentExtension.find_template_fragment(template, fragment_name)
-        return template.render(context)
+    # Create a new template from the node
+    template_node = jinja2.nodes.Template(callblock_node.body)
+    return template.environment.from_string(template_node)
 
 
 extensions = [

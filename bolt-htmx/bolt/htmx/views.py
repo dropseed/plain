@@ -2,6 +2,8 @@ import re
 
 from bolt.utils.cache import patch_vary_headers
 
+from .jinja import render_template_fragment
+
 
 class HTMXViewMixin:
     htmx_template_name = ""
@@ -11,9 +13,7 @@ class HTMXViewMixin:
         context = self.get_template_context()
 
         if self.is_htmx_request and self.htmx_fragment_name:
-            from .jinja import HTMXFragmentExtension
-
-            return HTMXFragmentExtension.render_template_fragment(
+            return render_template_fragment(
                 template=template._jinja_template,
                 fragment_name=self.htmx_fragment_name,
                 context=context,
