@@ -105,6 +105,7 @@ class Job(metaclass=JobType):
         delay: int | datetime.timedelta | datetime.datetime | None = None,
         priority: int | None = None,
         retries: int | None = None,
+        retry_attempt: int = 0,
     ):
         from .models import JobRequest
 
@@ -154,6 +155,7 @@ class Job(metaclass=JobType):
             queue=queue,
             priority=priority,
             retries=retries,
+            retry_attempt=retry_attempt,
             unique_key=unique_key,
         )
 

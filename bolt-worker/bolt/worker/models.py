@@ -291,33 +291,28 @@ class JobResult(models.Model):
             logger.exception(e)
             class_delay = None
 
-        if delay is not None:
-            # A manual delay set when calling retry_job.
-            # Use 0 to retry immediately.
-            start_at = timezone.now() + datetime.timedelta(seconds=delay)
-        elif class_delay:
-            # Delay based on job class
-            start_at = timezone.now() + datetime.timedelta(seconds=class_delay)
-        else:
-            # No delay
-            start_at = None
+        retry_delay = delay or class_delay
 
         with transaction.atomic():
-            retry_request = JobRequest.objects.create(
-                job_class=self.job_class,
-                parameters=self.parameters,
-                priority=self.priority,
-                source=self.source,
+            result = job.run_in_worker(
+                # Pass most of what we know through so it stays consistent
                 queue=self.queue,
+                delay=retry_delay,
+                priority=self.priority,
                 retries=self.retries,
-                unique_key=self.unique_key,
-                # For the retry
                 retry_attempt=retry_attempt,
-                start_at=start_at,
+                # Unique key could be passed also?
             )
 
-            # So we know this result was retried
-            self.retry_job_request_uuid = retry_request.uuid
-            self.save(update_fields=["retry_job_request_uuid"])
+            # It's possible this could return a list of pending
+            # jobs, so we need to check if we actually created a new job
+            if isinstance(result, JobRequest):
+                # We need to know the retry request for this result
+                self.retry_job_request_uuid = result.uuid
+                self.save(update_fields=["retry_job_request_uuid"])
+            else:
+                # What to do in this situation? Will continue to run the retry
+                # logic until it successfully retries or it is deleted.
+                pass
 
-        return retry_request
+        return result
