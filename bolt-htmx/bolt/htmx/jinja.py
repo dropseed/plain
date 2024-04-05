@@ -68,9 +68,12 @@ class HTMXFragmentExtension(Extension):
             return " ".join(parts)
 
         render_lazy = kwargs.get("lazy", False)
-        attrs = {
-            k.replace("_", "-"): v for k, v in kwargs.items() if k.startswith("hx_")
-        }
+        attrs = {}
+        for k, v in kwargs.items():
+            if k.startswith("hx_"):
+                attrs[k.replace("_", "-")] = v
+            else:
+                attrs[k] = v
 
         if render_lazy:
             attrs.setdefault("hx-swap", "outerHTML")
