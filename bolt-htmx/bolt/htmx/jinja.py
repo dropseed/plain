@@ -1,5 +1,5 @@
 import jinja2
-from jinja2 import nodes
+from jinja2 import meta, nodes
 from jinja2.ext import Extension
 
 from bolt.runtime import settings
@@ -101,18 +101,36 @@ def render_template_fragment(*, template, fragment_name, context):
 
 
 def find_template_fragment(template: jinja2.Template, fragment_name: str):
+    # Look in this template for the fragment
     callblock_node = template.environment.htmx_fragment_nodes.get(
         template.name, {}
     ).get(fragment_name)
 
     if not callblock_node:
         # Look in other templates for this fragment
-        # The potential issue here is if you have multiple gunicorn workers,
-        # you could be asking a different worker for a template/fragment it hasn't actually parsed yet?
         matching_callblock_nodes = []
-        for _, fragments in template.environment.htmx_fragment_nodes.items():
+        for fragments in template.environment.htmx_fragment_nodes.values():
             if fragment_name in fragments:
                 matching_callblock_nodes.append(fragments[fragment_name])
+
+        if len(matching_callblock_nodes) == 0:
+            # If we still haven't found anything, it's possible that we're
+            # in a different/new worker/process and haven't parsed the related templates yet
+            ast = template.environment.parse(
+                template.environment.loader.get_source(
+                    template.environment, template.name
+                )[0]
+            )
+            for ref in meta.find_referenced_templates(ast):
+                if ref not in template.environment.htmx_fragment_nodes:
+                    # Trigger them to parse
+                    template.environment.get_template(ref)
+
+            # Now look again
+            for fragments in template.environment.htmx_fragment_nodes.values():
+                if fragment_name in fragments:
+                    matching_callblock_nodes.append(fragments[fragment_name])
+
         if len(matching_callblock_nodes) == 1:
             callblock_node = matching_callblock_nodes[0]
         elif len(matching_callblock_nodes) > 1:
