@@ -55,8 +55,7 @@ def cli(install):
 
     # Run this first since it's probably the most likely to fail
     if find_spec("bolt.code"):
-        print_event("Running bolt code checks")
-        subprocess.check_call(["bolt", "code", "check"])
+        check_short("Running bolt code checks", "bolt", "code", "check")
 
     check_short("Checking .env files for changes", "bolt", "env", "check")
 
@@ -85,11 +84,15 @@ def cli(install):
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
     print_event("Running bolt compile")
-    subprocess.check_call(["bolt", "compile"])
+    result = subprocess.run(["bolt", "compile"])
+    if result.returncode != 0:
+        sys.exit(result.returncode)
 
     if find_spec("bolt.pytest"):
         print_event("Running tests")
-        subprocess.check_call(["bolt", "test"])
+        result = subprocess.run(["bolt", "test"])
+        if result.returncode != 0:
+            sys.exit(result.returncode)
 
 
 def bolt_db_connected():
