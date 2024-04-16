@@ -7,6 +7,7 @@ import click
 from bolt.runtime import settings
 from bolt.utils import timezone
 
+from .jobs import load_job
 from .models import Job, JobRequest, JobResult
 from .workers import Worker
 
@@ -109,3 +110,13 @@ def purge_processing():
 
     deleted = Job.objects.all().delete()[0]
     click.echo(f"Deleted {deleted} jobs")
+
+
+@cli.command()
+@click.argument("job_class", type=str)
+def run_job(job_class):
+    """Run a job class directly (and not using a worker)."""
+    job = load_job(job_class, {"args": [], "kwargs": {}})
+    click.secho("Loaded job: ", bold=True, nl=False)
+    print(job)
+    job.run()
