@@ -1,5 +1,7 @@
 import datetime
 
+from bolt.utils import timezone
+
 _MONTH_NAMES = {
     "JAN": 1,
     "FEB": 2,
@@ -147,8 +149,11 @@ class Schedule:
             raw=raw,
         )
 
-    def next(self, start_at=None):
-        dt = start_at or datetime.datetime.now(datetime.timezone.utc)
+    def next(self, now: datetime.datetime):
+        """
+        Find the next datetime that matches the schedule after the given datetime.
+        """
+        dt = now or timezone.localtime()  # Use the defined bolt timezone by default
 
         # We only care about minutes, so immediately jump to the next minute
         dt += datetime.timedelta(minutes=1)
