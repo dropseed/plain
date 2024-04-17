@@ -8,12 +8,11 @@ import tomllib
 
 @click.command("contribute")
 @click.option("--repo", default="../bolt", help="Path to the bolt repo")
-@click.option("--reset", default=False, is_flag=True, help="Unlink everything")
 @click.argument("package")
-def cli(package, repo, reset):
+def cli(package, repo):
     """Contribute to bolt by linking a package locally."""
 
-    if reset:
+    if package == "reset":
         click.secho("Undoing any changes to pyproject.toml and poetry.lock", bold=True)
         result = subprocess.run(["git", "checkout", "pyproject.toml", "poetry.lock"])
         if result.returncode:
