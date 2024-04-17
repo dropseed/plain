@@ -143,6 +143,15 @@ class SettingDefinition:
                 for item in value
             )
 
+        # Tuple types
+        if typing.get_origin(type_hint) is tuple:
+            return isinstance(value, tuple) and all(
+                SettingDefinition._is_instance_of_type(
+                    item, typing.get_args(type_hint)[i]
+                )
+                for i, item in enumerate(value)
+            )
+
         raise ValueError("Unsupported type hint: %s" % type_hint)
 
 
