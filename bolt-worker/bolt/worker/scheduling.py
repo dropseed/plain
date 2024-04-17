@@ -39,26 +39,41 @@ class _ScheduleComponent:
         return self.values == other.values
 
     @classmethod
-    def parse(cls, value, min, max, converters={}):
+    def parse(cls, value, min_allowed, max_allowed, str_conversions={}):
         if isinstance(value, int):
-            if value < min or value > max:
+            if value < min_allowed or value > max_allowed:
                 raise ValueError(
-                    f"Schedule component should be between {min} and {max}"
+                    f"Schedule component should be between {min_allowed} and {max_allowed}"
                 )
             return cls([value], raw=value)
 
         if not isinstance(value, str):
             raise ValueError("Schedule component should be an int or str")
 
+        # First split any subcomponents and re-parse them
+        if "," in value:
+            return cls(
+                sum(
+                    (
+                        cls.parse(
+                            sub_value, min_allowed, max_allowed, str_conversions
+                        ).values
+                        for sub_value in value.split(",")
+                    ),
+                    [],
+                ),
+                raw=value,
+            )
+
         if value == "*":
-            return cls(list(range(min, max + 1)), raw=value)
+            return cls(list(range(min_allowed, max_allowed + 1)), raw=value)
 
         def _convert(value):
-            return converters.get(value.upper(), int(value))
+            return str_conversions.get(value.upper(), int(value))
 
         if "/" in value:
             values, step = value.split("/")
-            values = cls.parse(values, min, max, converters)
+            values = cls.parse(values, min_allowed, max_allowed, str_conversions)
             return cls([v for v in values.values if v % int(step) == 0], raw=value)
 
         if "-" in value:
@@ -79,20 +94,22 @@ class Schedule:
         day_of_week="*",
         raw="",
     ):
-        self.minute = _ScheduleComponent.parse(minute, min=0, max=59)
-        self.hour = _ScheduleComponent.parse(hour, min=0, max=23)
-        self.day_of_month = _ScheduleComponent.parse(day_of_month, min=1, max=31)
+        self.minute = _ScheduleComponent.parse(minute, min_allowed=0, max_allowed=59)
+        self.hour = _ScheduleComponent.parse(hour, min_allowed=0, max_allowed=23)
+        self.day_of_month = _ScheduleComponent.parse(
+            day_of_month, min_allowed=1, max_allowed=31
+        )
         self.month = _ScheduleComponent.parse(
             month,
-            min=1,
-            max=12,
-            converters=_MONTH_NAMES,
+            min_allowed=1,
+            max_allowed=12,
+            str_conversions=_MONTH_NAMES,
         )
         self.day_of_week = _ScheduleComponent.parse(
             day_of_week,
-            min=0,
-            max=6,
-            converters=_DAY_NAMES,
+            min_allowed=0,
+            max_allowed=6,
+            str_conversions=_DAY_NAMES,
         )
         self._raw = raw
 

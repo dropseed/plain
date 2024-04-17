@@ -116,3 +116,41 @@ def test_boundary_transition():
 #     start_time = datetime.datetime(2021, 3, 14, 1, 59, tzinfo=datetime.timezone.utc)  # DST start in many regions
 #     next_run = s.next(start_time)
 #     assert next_run.hour == 3  # Depending on how your timezone data handles DST, this may need adjustment
+
+
+def test_schedule_comma():
+    s = Schedule(minute=0, hour="9,12")  # 9 AM and 12 PM
+    assert s.next(datetime.datetime(2021, 1, 1, 8, 0)) == datetime.datetime(
+        2021, 1, 1, 9, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 9, 0)) == datetime.datetime(
+        2021, 1, 1, 12, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 12, 0)) == datetime.datetime(
+        2021, 1, 2, 9, 0
+    )
+
+
+def test_schedule_comma_ranges():
+    s = Schedule(minute=0, hour="9-11,12-14")  # 9-11 AM and 12-2 PM
+    assert s.next(datetime.datetime(2021, 1, 1, 8, 0)) == datetime.datetime(
+        2021, 1, 1, 9, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 9, 0)) == datetime.datetime(
+        2021, 1, 1, 10, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 10, 0)) == datetime.datetime(
+        2021, 1, 1, 11, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 11, 0)) == datetime.datetime(
+        2021, 1, 1, 12, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 12, 0)) == datetime.datetime(
+        2021, 1, 1, 13, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 13, 0)) == datetime.datetime(
+        2021, 1, 1, 14, 0
+    )
+    assert s.next(datetime.datetime(2021, 1, 1, 14, 0)) == datetime.datetime(
+        2021, 1, 2, 9, 0
+    )
