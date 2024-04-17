@@ -46,7 +46,7 @@ def cli():
 @click.option(
     "--max-pending-per-process",
     "max_pending_per_process",
-    default=None,
+    default=10,
     type=int,
     envvar="BOLT_JOBS_MAX_PENDING_PER_PROCESS",
 )
