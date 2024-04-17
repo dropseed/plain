@@ -174,10 +174,11 @@ class Worker:
                     )
                     if not scheduled_job_request:
                         logger.info(
-                            'Scheduling job job_class=%s job_queue="%s" job_start_at="%s"',
+                            'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s"',
                             job._job_class_str(),
                             job.get_queue(),
                             next_start_at,
+                            schedule,
                         )
                         job.run_in_worker(
                             delay=next_start_at,
