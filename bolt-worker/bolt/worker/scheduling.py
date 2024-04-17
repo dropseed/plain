@@ -149,7 +149,7 @@ class Schedule:
             raw=raw,
         )
 
-    def next(self, now: datetime.datetime):
+    def next(self, now=None):
         """
         Find the next datetime that matches the schedule after the given datetime.
         """
