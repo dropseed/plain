@@ -33,7 +33,9 @@ class Worker:
         )
 
         self.queues = queues
-        self.jobs_schedule = jobs_schedule
+
+        # Filter the jobs schedule to those that are in the same queue as this worker
+        self.jobs_schedule = [x for x in jobs_schedule if x[0].get_queue() in queues]
 
         # How often to log the stats (in seconds)
         self.stats_every = stats_every
@@ -47,7 +49,7 @@ class Worker:
         logger.info(
             "⬣ Starting Bolt worker\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    PID: %s",
             ", ".join(self.queues),
-            self.jobs_schedule,
+            "\n                   ".join(str(x) for x in self.jobs_schedule),
             self.stats_every,
             self.max_processes,
             self.max_jobs_per_process,
@@ -155,10 +157,6 @@ class Worker:
 
         if now - self._jobs_schedule_checked_at < check_every:
             for job, schedule in self.jobs_schedule:
-                if job.get_queue() not in self.queues:
-                    # Not the responsibility of this worker
-                    continue
-
                 next_start_at = schedule.next()
 
                 scheduled_job_request = JobRequest.objects.filter(
