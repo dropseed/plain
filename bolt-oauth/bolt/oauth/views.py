@@ -1,13 +1,18 @@
+import logging
+
 from bolt.auth.views import AuthViewMixin
 from bolt.http import ResponseBadRequest, ResponseRedirect
 from bolt.templates import jinja
 from bolt.views import View
 
 from .exceptions import (
+    OAuthError,
     OAuthStateMismatchError,
     OAuthUserAlreadyExistsError,
 )
 from .providers import get_oauth_provider_instance
+
+logger = logging.getLogger(__name__)
 
 
 class OAuthLoginView(View):
@@ -50,6 +55,10 @@ class OAuthCallbackView(View):
                     }
                 )
             )
+        except OAuthError as e:
+            logger.exception("OAuth error")
+            template = jinja.get_template("oauth/error.html")
+            return ResponseBadRequest(template.render({"oauth_error": str(e)}))
 
 
 class OAuthConnectView(AuthViewMixin, View):

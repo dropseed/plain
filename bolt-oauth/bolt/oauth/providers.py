@@ -10,7 +10,7 @@ from bolt.urls import reverse
 from bolt.utils.crypto import get_random_string
 from bolt.utils.module_loading import import_string
 
-from .exceptions import OAuthStateMismatchError
+from .exceptions import OAuthError, OAuthStateMismatchError
 from .models import OAuthConnection
 
 SESSION_STATE_KEY = "boltoauth_state"
@@ -99,6 +99,9 @@ class OAuthProvider:
         return get_random_string(length=32)
 
     def check_request_state(self, *, request: HttpRequest) -> None:
+        if error := request.GET.get("error"):
+            raise OAuthError(error)
+
         state = request.GET["state"]
         expected_state = request.session.pop(SESSION_STATE_KEY)
         if not secrets.compare_digest(state, expected_state):
