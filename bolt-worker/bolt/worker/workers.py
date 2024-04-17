@@ -159,24 +159,29 @@ class Worker:
             for job, schedule in self.jobs_schedule:
                 next_start_at = schedule.next()
 
-                scheduled_job_request = JobRequest.objects.filter(
-                    job_class=job._job_class_str(),
-                    queue=job.get_queue(),
-                    start_at=next_start_at,
-                    # If you manually schedule the same job to start at the same time,
-                    # it will see that and not add another one...
-                    # Also, if you change the schedule, previously scheduled jobs will still run.
-                ).first()
-                if not scheduled_job_request:
-                    logger.info(
-                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s"',
-                        job._job_class_str(),
-                        job.get_queue(),
-                        next_start_at,
+                with transaction.atomic():
+                    scheduled_job_request = (
+                        JobRequest.objects.select_for_update()
+                        .filter(
+                            job_class=job._job_class_str(),
+                            queue=job.get_queue(),
+                            start_at=next_start_at,
+                            # If you manually schedule the same job to start at the same time,
+                            # it will see that and not add another one...
+                            # Also, if you change the schedule, previously scheduled jobs will still run.
+                        )
+                        .first()
                     )
-                    job.run_in_worker(
-                        delay=next_start_at,
-                    )
+                    if not scheduled_job_request:
+                        logger.info(
+                            'Scheduling job job_class=%s job_queue="%s" job_start_at="%s"',
+                            job._job_class_str(),
+                            job.get_queue(),
+                            next_start_at,
+                        )
+                        job.run_in_worker(
+                            delay=next_start_at,
+                        )
 
             self._jobs_schedule_checked_at = now
 
