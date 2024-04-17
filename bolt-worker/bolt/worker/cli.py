@@ -9,6 +9,7 @@ from bolt.utils import timezone
 
 from .jobs import load_job
 from .models import Job, JobRequest, JobResult
+from .scheduling import Schedule
 from .workers import Worker
 
 logger = logging.getLogger("bolt.worker")
@@ -50,8 +51,17 @@ def cli():
     envvar="BOLT_JOBS_STATS_EVERY",
 )
 def run(queues, max_processes, max_jobs_per_process, stats_every):
+    jobs_schedule = []
+    for job, schedule in settings.WORKER_JOBS_SCHEDULE:
+        if isinstance(job, str):
+            job = load_job(job, {"args": [], "kwargs": {}})
+        if isinstance(schedule, str):
+            schedule = Schedule.from_cron(schedule)
+        jobs_schedule.append((job, schedule))
+
     worker = Worker(
         queues=queues,
+        jobs_schedule=jobs_schedule,
         max_processes=max_processes,
         max_jobs_per_process=max_jobs_per_process,
         stats_every=stats_every,

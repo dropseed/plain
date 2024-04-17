@@ -120,7 +120,7 @@ class JobRequestViewset(AdminModelViewset):
         nav_section = "Worker"
         model = JobRequest
         title = "Job requests"
-        fields = ["id", "job_class", "priority", "created_at"]
+        fields = ["id", "job_class", "priority", "created_at", "start_at"]
 
     class DetailView(AdminModelDetailView):
         model = JobRequest

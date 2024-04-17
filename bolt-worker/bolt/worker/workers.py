@@ -19,7 +19,12 @@ logger = logging.getLogger("bolt.worker")
 
 class Worker:
     def __init__(
-        self, queues, max_processes=None, max_jobs_per_process=None, stats_every=None
+        self,
+        queues,
+        jobs_schedule=[],
+        max_processes=None,
+        max_jobs_per_process=None,
+        stats_every=None,
     ):
         self.executor = ProcessPoolExecutor(
             max_workers=max_processes,
@@ -28,6 +33,7 @@ class Worker:
         )
 
         self.queues = queues
+        self.jobs_schedule = jobs_schedule
 
         # How often to log the stats (in seconds)
         self.stats_every = stats_every
@@ -39,14 +45,20 @@ class Worker:
 
     def run(self):
         logger.info(
-            "Starting job worker with %s max processes",
+            "⬣ Starting Bolt worker\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    PID: %s",
+            ", ".join(self.queues),
+            self.jobs_schedule,
+            self.stats_every,
             self.max_processes,
+            self.max_jobs_per_process,
+            os.getpid(),
         )
 
         while not self._is_shutting_down:
             try:
                 self.maybe_log_stats()
                 self.maybe_check_job_results()
+                self.maybe_schedule_jobs()
             except Exception as e:
                 # Log the issue, but don't stop the worker
                 # (these tasks are kind of ancilarry to the main job processing)
@@ -129,6 +141,46 @@ class Worker:
         if now - self._job_results_checked_at > check_every:
             self._job_results_checked_at = now
             self.rescue_job_results()
+
+    def maybe_schedule_jobs(self):
+        if not self.jobs_schedule:
+            return
+
+        now = time.time()
+
+        if not hasattr(self, "_jobs_schedule_checked_at"):
+            self._jobs_schedule_checked_at = now
+
+        check_every = 60  # Only need to check once every 60 seconds
+
+        if now - self._jobs_schedule_checked_at < check_every:
+            for job, schedule in self.jobs_schedule:
+                if job.get_queue() not in self.queues:
+                    # Not the responsibility of this worker
+                    continue
+
+                next_start_at = schedule.next()
+
+                scheduled_job_request = JobRequest.objects.filter(
+                    job_class=job._job_class_str(),
+                    queue=job.get_queue(),
+                    start_at=next_start_at,
+                    # If you manually schedule the same job to start at the same time,
+                    # it will see that and not add another one...
+                    # Also, if you change the schedule, previously scheduled jobs will still run.
+                ).first()
+                if not scheduled_job_request:
+                    logger.info(
+                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s"',
+                        job._job_class_str(),
+                        job.get_queue(),
+                        next_start_at,
+                    )
+                    job.run_in_worker(
+                        delay=next_start_at,
+                    )
+
+            self._jobs_schedule_checked_at = now
 
     def log_stats(self):
         try:
