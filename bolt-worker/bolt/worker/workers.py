@@ -202,9 +202,9 @@ class Worker:
             # up in this same tick (so if there's 1, we don't really need to log that as a backlog)
             num_backlog_jobs = num_backlog_jobs - 1
         logger.info(
-            "Job worker stats worker_processes=%s worker_queues=%s jobs_backlog=%s worker_max_processes=%s worker_max_jobs_per_process=%s",
+            'Job worker stats worker_processes=%s worker_queues="%s" jobs_backlog=%s worker_max_processes=%s worker_max_jobs_per_process=%s',
             num_proccesses,
-            self.queues,
+            ",".join(self.queues),
             num_backlog_jobs,
             self.max_processes,
             self.max_jobs_per_process,
