@@ -6,16 +6,34 @@ import click
 import tomllib
 
 
-@click.group("contribute")
-def cli():
-    """Contribute to Bolt itself"""
-    pass
-
-
-@cli.command()
+@click.command("contribute")
 @click.option("--repo", default="../bolt", help="Path to the bolt repo")
+@click.option("--reset", default=False, is_flag=True, help="Unlink everything")
 @click.argument("package")
-def link(package, repo):
+def cli(package, repo, reset):
+    """Contribute to bolt by linking a package locally."""
+
+    if reset:
+        click.secho("Undoing any changes to pyproject.toml and poetry.lock", bold=True)
+        result = subprocess.run(["git", "checkout", "pyproject.toml", "poetry.lock"])
+        if result.returncode:
+            click.secho("Failed to checkout pyproject.toml and poetry.lock", fg="red")
+            sys.exit(result.returncode)
+
+        click.secho("Removing current .venv", bold=True)
+        result = subprocess.run(["rm", "-rf", ".venv"])
+        if result.returncode:
+            click.secho("Failed to remove .venv", fg="red")
+            sys.exit(result.returncode)
+
+        click.secho("Running poetry install", bold=True)
+        result = subprocess.run(["poetry", "install"])
+        if result.returncode:
+            click.secho("Failed to install", fg="red")
+            sys.exit(result.returncode)
+
+        return
+
     repo = Path(repo)
     if not repo.exists():
         click.secho(f"Repo not found at {repo}", fg="red")
@@ -95,24 +113,3 @@ def link(package, repo):
     else:
         click.secho(f"Unknown package {package}", fg="red")
         sys.exit(2)
-
-
-@cli.command()
-def reset():
-    click.secho("Undoing any changes to pyproject.toml and poetry.lock", bold=True)
-    result = subprocess.run(["git", "checkout", "pyproject.toml", "poetry.lock"])
-    if result.returncode:
-        click.secho("Failed to checkout pyproject.toml and poetry.lock", fg="red")
-        sys.exit(result.returncode)
-
-    click.secho("Removing current .venv", bold=True)
-    result = subprocess.run(["rm", "-rf", ".venv"])
-    if result.returncode:
-        click.secho("Failed to remove .venv", fg="red")
-        sys.exit(result.returncode)
-
-    click.secho("Running poetry install", bold=True)
-    result = subprocess.run(["poetry", "install"])
-    if result.returncode:
-        click.secho("Failed to install", fg="red")
-        sys.exit(result.returncode)
