@@ -44,13 +44,22 @@ def cli():
     envvar="BOLT_JOBS_MAX_JOBS_PER_PROCESS",
 )
 @click.option(
+    "--max-pending-per-process",
+    "max_pending_per_process",
+    default=None,
+    type=int,
+    envvar="BOLT_JOBS_MAX_PENDING_PER_PROCESS",
+)
+@click.option(
     "--stats-every",
     "stats_every",
     default=60,
     type=int,
     envvar="BOLT_JOBS_STATS_EVERY",
 )
-def run(queues, max_processes, max_jobs_per_process, stats_every):
+def run(
+    queues, max_processes, max_jobs_per_process, max_pending_per_process, stats_every
+):
     jobs_schedule = []
     for job, schedule in settings.WORKER_JOBS_SCHEDULE:
         if isinstance(job, str):
@@ -64,6 +73,7 @@ def run(queues, max_processes, max_jobs_per_process, stats_every):
         jobs_schedule=jobs_schedule,
         max_processes=max_processes,
         max_jobs_per_process=max_jobs_per_process,
+        max_pending_per_process=max_pending_per_process,
         stats_every=stats_every,
     )
 

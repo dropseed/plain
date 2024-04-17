@@ -24,6 +24,7 @@ class Worker:
         jobs_schedule=[],
         max_processes=None,
         max_jobs_per_process=None,
+        max_pending_per_process=10,
         stats_every=None,
     ):
         self.executor = ProcessPoolExecutor(
@@ -42,17 +43,19 @@ class Worker:
 
         self.max_processes = self.executor._max_workers
         self.max_jobs_per_process = max_jobs_per_process
+        self.max_pending_per_process = max_pending_per_process
 
         self._is_shutting_down = False
 
     def run(self):
         logger.info(
-            "⬣ Starting Bolt worker\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    PID: %s",
+            "⬣ Starting Bolt worker\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
             ", ".join(self.queues),
             "\n                   ".join(str(x) for x in self.jobs_schedule),
             self.stats_every,
             self.max_processes,
             self.max_jobs_per_process,
+            self.max_pending_per_process,
             os.getpid(),
         )
 
@@ -65,6 +68,15 @@ class Worker:
                 # Log the issue, but don't stop the worker
                 # (these tasks are kind of ancilarry to the main job processing)
                 logger.exception(e)
+
+            if len(self.executor._pending_work_items) >= (
+                self.max_processes * self.max_pending_per_process
+            ):
+                # We don't want to convert too many JobRequests to Jobs,
+                # because anything not started yet will be cancelled on deploy etc.
+                # It's easier to leave them in the JobRequest db queue as long as possible.
+                time.sleep(0.1)
+                continue
 
             with transaction.atomic():
                 job_request = (
