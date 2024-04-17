@@ -205,19 +205,15 @@ class Worker:
             # Depending on shutdown timing and internal behavior, this might not work
             num_proccesses = 0
 
-        num_backlog_jobs = (
-            JobRequest.objects.filter(queue__in=self.queues).count()
-            + Job.objects.filter(queue__in=self.queues, started_at__isnull=True).count()
-        )
-        if num_backlog_jobs > 0:
-            # Basically show how many jobs aren't about to be picked
-            # up in this same tick (so if there's 1, we don't really need to log that as a backlog)
-            num_backlog_jobs = num_backlog_jobs - 1
+        jobs_requested = JobRequest.objects.filter(queue__in=self.queues).count()
+        jobs_processing = Job.objects.filter(queue__in=self.queues).count()
+
         logger.info(
-            'Job worker stats worker_processes=%s worker_queues="%s" jobs_backlog=%s worker_max_processes=%s worker_max_jobs_per_process=%s',
+            'Job worker stats worker_processes=%s worker_queues="%s" jobs_requested=%s jobs_processing=%s worker_max_processes=%s worker_max_jobs_per_process=%s',
             num_proccesses,
             ",".join(self.queues),
-            num_backlog_jobs,
+            jobs_requested,
+            jobs_processing,
             self.max_processes,
             self.max_jobs_per_process,
         )
