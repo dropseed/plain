@@ -1,3 +1,4 @@
+import contextlib
 import os
 import subprocess
 import sys
@@ -5,6 +6,11 @@ import sys
 import click
 
 from bolt.runtime import settings
+
+try:
+    from bolt.dev.services import Services
+except ImportError:
+    Services = None
 
 
 @click.command(
@@ -33,15 +39,22 @@ def cli(pytest_args):
 
     click.secho(f"Running pytest with APP_ENV={os.environ['APP_ENV']}", bold=True)
 
-    result = subprocess.run(
-        [
-            "pytest",
-            *pytest_args,
-        ],
-        env={
-            **os.environ,
-        },
+    # Won't want to start services automatically in some cases...
+    # may need a better check for this but CI is the primary auto-exclusion
+    services = (
+        Services() if "CI" not in os.environ and Services else contextlib.nullcontext()
     )
+    with services:
+        result = subprocess.run(
+            [
+                "pytest",
+                *pytest_args,
+            ],
+            env={
+                **os.environ,
+            },
+        )
+
     if result.returncode:
         # Can be invoked by pre-commit, so only exit if it fails
         sys.exit(result.returncode)
