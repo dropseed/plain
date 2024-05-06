@@ -45,7 +45,7 @@
                 </form>
                 {% endif %}
 
-                <form method="GET" hx-get="{{ request.path }}" hx-push-url="true" class="inline-flex">
+                <form method="GET" class="inline-flex">
                     {% if filters %}
                     <select data-autosubmit name="filter" class="text-sm border-gray-200 rounded-md">
                         <option value="">Filters</option>
@@ -159,29 +159,23 @@
                     {% endif %}
                 </div>
                 {% if page.has_other_pages() %}
-                <ul class="flex justify-center">
+                <div class="flex items-center justify-center space-x-2">
                     {% if page.has_previous() %}
-                    <li>
-                        <a data-merge-params href="?page={{ page.previous_page_number() }}">&laquo;</a>
-                    </li>
+                    <a data-merge-params href="?page={{ page.previous_page_number() }}">&lsaquo;</a>
                     {% endif %}
-                    {% for page_num in page.paginator.page_range %}
-                    {% if page_num == page.number %}
-                    <li>
-                        <a data-merge-params href="?page={{ page_num }}">{{ page_num }}</a>
-                    </li>
-                    {% else %}
-                    <li>
-                        <a data-merge-params href="?page={{ page_num }}">{{ page_num }}</a>
-                    </li>
-                    {% endif %}
-                    {% endfor %}
+                    <form data-autosubmit method="GET">
+                        {% if show_search and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
+                        {% if filters and active_filter %}<input type="hidden" name="filter" value="{{ active_filter }}" />{% endif %}
+                        <select name="page" class="text-xs border-gray-200 rounded-md">
+                        {% for page_num in page.paginator.page_range %}
+                            <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
+                        {% endfor %}
+                        </select>
+                    </form>
                     {% if page.has_next() %}
-                    <li>
-                        <a data-merge-params href="?page={{ page.next_page_number() }}">&raquo;</a>
-                    </li>
+                    <a data-merge-params href="?page={{ page.next_page_number() }}">&rsaquo;</a>
                     {% endif %}
-                </ul>
+                </div>
                 {% endif %}
             </div>
         </div>
