@@ -14,4 +14,8 @@ class HighlightRenderer(mistune.HTMLRenderer):
 
 
 def render_markdown(content):
-    return mistune.markdown(content, renderer=HighlightRenderer(escape=False))
+    renderer = HighlightRenderer(escape=False)
+    markdown = mistune.create_markdown(
+        renderer=renderer, plugins=["strikethrough", "table"]
+    )
+    return markdown(content)
