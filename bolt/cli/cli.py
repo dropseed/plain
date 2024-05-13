@@ -11,7 +11,6 @@ from click.core import Command, Context
 
 import bolt.runtime
 from bolt import preflight
-from bolt.env.cli import cli as env_cli
 from bolt.packages import packages
 
 from .formatting import BoltContext
@@ -306,10 +305,6 @@ def compile(ctx):
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
 
 
-# Add other internal packages that don't need to be in INSTALLED_PACKAGES
-bolt_cli.add_command(env_cli)
-
-
 class AppCLIGroup(click.Group):
     """
     Loads app.cli if it exists as `bolt app`
@@ -342,6 +337,8 @@ class BoltCommandCollection(click.CommandCollection):
         sources = []
 
         try:
+            # Setup has to run before the installed packages CLI work
+            # and it also does the .env file loading right now...
             bolt.runtime.setup()
 
             sources = [

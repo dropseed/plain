@@ -1,5 +1,8 @@
 import sys
+from os import environ
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from bolt.utils.version import get_version
 
@@ -27,7 +30,6 @@ def setup():
     Configure the settings (this happens as a side effect of accessing the
     first setting), configure logging and populate the app registry.
     """
-    from bolt.env import dotenv
     from bolt.logs import configure_logging
     from bolt.packages import packages
 
@@ -41,7 +43,10 @@ def setup():
         sys.path.insert(0, APP_PATH.as_posix())
 
     # Load .env files automatically before settings
-    dotenv.load()
+    if app_env := environ.get("APP_ENV", ""):
+        load_dotenv(f".env.{app_env}")
+    else:
+        load_dotenv(".env")
 
     configure_logging(settings.LOGGING)
 
