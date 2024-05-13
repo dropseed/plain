@@ -50,10 +50,6 @@ def cli(ctx):
         click.secho("Preflight check failed!", fg="red")
         sys.exit(1)
 
-    # if subprocess.run(["bolt", "env", "check"], env=bolt_env).returncode:
-    #     click.secho("Bolt env check failed!", fg="red")
-    #     sys.exit(1)
-
     bolt_db_installed = find_spec("bolt.db") is not None
 
     manager = HonchoManager()

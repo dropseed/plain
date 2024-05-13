@@ -57,8 +57,6 @@ def cli(install):
     if find_spec("bolt.code"):
         check_short("Running bolt code checks", "bolt", "code", "check")
 
-    check_short("Checking .env files for changes", "bolt", "env", "check")
-
     if Path("poetry.lock").exists():
         check_short("Checking poetry.lock", "poetry", "lock", "--check")
 
