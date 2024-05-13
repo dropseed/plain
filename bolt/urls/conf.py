@@ -82,8 +82,7 @@ def _path(route, view, kwargs=None, name=None, Pattern=None):
         pattern = Pattern(route, name=name, is_endpoint=True)
         return URLPattern(pattern, as_view(), kwargs, name)
 
-    # Function-based views...
-    # TODO remove?
+    # Function-based views or view_class.as_view() usage
     if callable(view):
         pattern = Pattern(route, name=name, is_endpoint=True)
         return URLPattern(pattern, view, kwargs, name)
