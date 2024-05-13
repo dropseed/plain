@@ -21,7 +21,7 @@ class LoginView(TemplateView):
 urlpatterns = [
     path("admin", admin.site.urls),
     path("oauth/", include("bolt.oauth.urls")),
-    path("login/", LoginView.as_view(), name="login"),
-    path("logout/", LogoutView.as_view(), name="logout"),
-    path("", LoggedInView.as_view()),
+    path("login/", LoginView, name="login"),
+    path("logout/", LogoutView, name="logout"),
+    path("", LoggedInView),
 ]

@@ -57,6 +57,7 @@ def _path(route, view, kwargs=None, name=None, Pattern=None):
         raise TypeError(
             f"kwargs argument must be a dict, but got {kwargs.__class__.__name__}."
         )
+
     if isinstance(view, list | tuple):
         # For include(...) processing.
         pattern = Pattern(route, is_endpoint=False)
@@ -68,19 +69,26 @@ def _path(route, view, kwargs=None, name=None, Pattern=None):
             default_namespace=default_namespace,
             namespace=namespace,
         )
-    elif callable(view):
-        pattern = Pattern(route, name=name, is_endpoint=True)
-        return URLPattern(pattern, view, kwargs, name)
-    elif isinstance(view, View):
+
+    if isinstance(view, View):
         view_cls_name = view.__class__.__name__
         raise TypeError(
-            f"view must be a callable, pass {view_cls_name}.as_view(), not "
+            f"view must be a callable, pass {view_cls_name} or {view_cls_name}.as_view(*args, **kwargs), not "
             f"{view_cls_name}()."
         )
-    else:
-        raise TypeError(
-            "view must be a callable or a list/tuple in the case of include()."
-        )
+
+    # Automatically call view.as_view() for class-based views
+    if as_view := getattr(view, "as_view", None):
+        pattern = Pattern(route, name=name, is_endpoint=True)
+        return URLPattern(pattern, as_view(), kwargs, name)
+
+    # Function-based views...
+    # TODO remove?
+    if callable(view):
+        pattern = Pattern(route, name=name, is_endpoint=True)
+        return URLPattern(pattern, view, kwargs, name)
+
+    raise TypeError("view must be a callable or a list/tuple in the case of include().")
 
 
 path = partial(_path, Pattern=RoutePattern)

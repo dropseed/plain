@@ -8,5 +8,5 @@ class TestView(View):
 
 
 urlpatterns = [
-    path("", TestView.as_view()),
+    path("", TestView),
 ]

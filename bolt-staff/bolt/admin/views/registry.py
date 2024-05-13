@@ -86,7 +86,7 @@ class AdminViewRegistry:
             paths_seen.add(_path)
             if not _path.endswith("/"):
                 _path += "/"
-            urlpatterns.append(path(_path, view.as_view(), name=view.view_name()))
+            urlpatterns.append(path(_path, view, name=view.view_name()))
 
         for view in self.registered_views:
             add_view_path(view, f"p/{view.get_path()}")

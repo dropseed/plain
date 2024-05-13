@@ -30,7 +30,7 @@ def get_page_urls():
         paths.append(
             path(
                 url,
-                view_class.as_view(),
+                view_class,
                 name=name,
                 kwargs={"url_path": url_path},
             )

@@ -7,7 +7,7 @@ default_namespace = "admin"
 
 
 urlpatterns = [
-    path("search/", AdminSearchView.as_view(), name="search"),
+    path("search/", AdminSearchView, name="search"),
     path("", include(registry.get_urls())),
-    path("", AdminIndexView.as_view(), name="index"),
+    path("", AdminIndexView, name="index"),
 ]

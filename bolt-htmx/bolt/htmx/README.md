@@ -333,7 +333,7 @@ And then subsequent HTMX requests/actions on individual items can be handled by 
 default_namespace = "pullrequests"
 
 urlpatterns = [
-  path("<uuid:uuid>/", views.PullRequestDetailView.as_view(), name="detail"),
+  path("<uuid:uuid>/", views.PullRequestDetailView, name="detail"),
 ]
 
 # views.py
