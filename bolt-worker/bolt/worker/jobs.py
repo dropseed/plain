@@ -3,6 +3,7 @@ import inspect
 import logging
 from importlib import import_module
 
+from bolt.db import IntegrityError
 from bolt.db.models import Model
 from bolt.utils import timezone
 
@@ -164,7 +165,7 @@ class Job(metaclass=JobType):
                 retry_attempt=retry_attempt,
                 unique_key=unique_key,
             )
-        except JobRequest.UniqueConstraintError as e:
+        except IntegrityError as e:
             logger.warning("Job already in progress: %s", e)
             # Try to return the in_progress list again
             return self.in_progress()
