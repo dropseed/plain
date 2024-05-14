@@ -1,6 +1,9 @@
 import datetime
+import subprocess
 
 from bolt.utils import timezone
+
+from .jobs import Job, load_job
 
 _MONTH_NAMES = {
     "JAN": 1,
@@ -196,3 +199,32 @@ class Schedule:
 
             if dt > max_future:
                 raise ValueError("No valid schedule match found in the next 500 days")
+
+
+class Command(Job):
+    def __init__(self, command):
+        self.command = command
+
+    def __repr__(self) -> str:
+        return f"<Command: {self.command}>"
+
+    def run(self):
+        subprocess.run(self.command, shell=True, check=True)
+
+
+def load_schedule(schedules):
+    jobs_schedule = []
+
+    for job, schedule in schedules:
+        if isinstance(job, str):
+            if job.startswith("cmd:"):
+                job = Command(job[4:])
+            else:
+                job = load_job(job, {"args": [], "kwargs": {}})
+
+        if isinstance(schedule, str):
+            schedule = Schedule.from_cron(schedule)
+
+        jobs_schedule.append((job, schedule))
+
+    return jobs_schedule
