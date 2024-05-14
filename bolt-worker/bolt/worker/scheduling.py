@@ -71,7 +71,8 @@ class _ScheduleComponent:
             return cls(list(range(min_allowed, max_allowed + 1)), raw=value)
 
         def _convert(value):
-            return str_conversions.get(value.upper(), int(value))
+            result = str_conversions.get(value.upper(), value)
+            return int(result)
 
         if "/" in value:
             values, step = value.split("/")
