@@ -201,15 +201,20 @@ class Schedule:
                 raise ValueError("No valid schedule match found in the next 500 days")
 
 
-class Command(Job):
+class ScheduledCommand(Job):
     def __init__(self, command):
         self.command = command
 
     def __repr__(self) -> str:
-        return f"<Command: {self.command}>"
+        return f"<ScheduledCommand: {self.command}>"
 
     def run(self):
         subprocess.run(self.command, shell=True, check=True)
+
+    def get_unique_key(self) -> str:
+        # The ScheduledCommand can be used for different commands,
+        # so we need the unique_key to separate them in the scheduling uniqueness logic
+        return self.command
 
 
 def load_schedule(schedules):
@@ -218,7 +223,7 @@ def load_schedule(schedules):
     for job, schedule in schedules:
         if isinstance(job, str):
             if job.startswith("cmd:"):
-                job = Command(job[4:])
+                job = ScheduledCommand(job[4:])
             else:
                 job = load_job(job, {"args": [], "kwargs": {}})
 

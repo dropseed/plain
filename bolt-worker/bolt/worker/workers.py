@@ -171,42 +171,28 @@ class Worker:
             for job, schedule in self.jobs_schedule:
                 next_start_at = schedule.next()
 
-                # If we don't have a unique_key defined by the job, we're going to create our
-                # own so we can detect at the db-level if the job is already scheduled
-                # using a unique constraint.
-                if unique_key := job.get_unique_key():
-                    schedule_unique_key = unique_key
-                else:
-                    schedule_unique_key = (
-                        f"{job._job_class_str()}:{next_start_at.timestamp()}"
-                    )
+                # Leverage the unique_key to prevent duplicate scheduled
+                # jobs with the same start time (also works if unique_key == "")
+                schedule_unique_key = (
+                    f"{job.get_unique_key()}:{next_start_at.timestamp()}"
+                )
 
-                with transaction.atomic():
-                    scheduled_job_request = (
-                        JobRequest.objects.select_for_update()
-                        .filter(
-                            job_class=job._job_class_str(),
-                            queue=job.get_queue(),
-                            start_at=next_start_at,
-                            unique_key=schedule_unique_key,
-                            # If you manually schedule the same job to start at the same time,
-                            # it will see that and not add another one...
-                            # Also, if you change the schedule, previously scheduled jobs will still run.
-                        )
-                        .first()
+                # Drawback here is if scheduled job is running, and detected by unique_key
+                # so it doesn't schedule the next one? Maybe an ok downside... prevents
+                # overlapping executions...?
+                result = job.run_in_worker(
+                    delay=next_start_at,
+                    unique_key=schedule_unique_key,
+                )
+                # Results are a list if it found scheduled/running jobs...
+                if not isinstance(result, list):
+                    logger.info(
+                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s"',
+                        job._job_class_str(),
+                        job.get_queue(),
+                        next_start_at,
+                        schedule,
                     )
-                    if not scheduled_job_request:
-                        logger.info(
-                            'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s"',
-                            job._job_class_str(),
-                            job.get_queue(),
-                            next_start_at,
-                            schedule,
-                        )
-                        job.run_in_worker(
-                            delay=next_start_at,
-                            unique_key=schedule_unique_key,
-                        )
 
             self._jobs_schedule_checked_at = now
 
