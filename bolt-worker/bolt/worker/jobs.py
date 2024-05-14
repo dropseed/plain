@@ -149,8 +149,8 @@ class Job(metaclass=JobType):
         if unique_key:
             # Only need to look at in progress jobs
             # if we also have a unique key.
-            # Otherwise it's up to the user to use in_progress()
-            if running := self.in_progress():
+            # Otherwise it's up to the user to use _in_progress()
+            if running := self._in_progress(unique_key):
                 return running
 
         try:
@@ -167,19 +167,17 @@ class Job(metaclass=JobType):
             )
         except IntegrityError as e:
             logger.warning("Job already in progress: %s", e)
-            # Try to return the in_progress list again
-            return self.in_progress()
+            # Try to return the _in_progress list again
+            return self._in_progress(unique_key)
 
     def _job_class_str(self):
         return f"{self.__module__}.{self.__class__.__name__}"
 
-    def in_progress(self):
+    def _in_progress(self, unique_key):
         """Get all JobRequests and Jobs that are currently in progress, regardless of queue."""
         from .models import Job, JobRequest
 
         job_class = self._job_class_str()
-
-        unique_key = self.get_unique_key()
 
         job_requests = JobRequest.objects.filter(
             job_class=job_class,
