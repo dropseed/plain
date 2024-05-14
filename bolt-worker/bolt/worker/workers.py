@@ -174,7 +174,7 @@ class Worker:
                 # Leverage the unique_key to prevent duplicate scheduled
                 # jobs with the same start time (also works if unique_key == "")
                 schedule_unique_key = (
-                    f"{job.get_unique_key()}:{next_start_at.timestamp()}"
+                    f"{job.get_unique_key()}:scheduled:{int(next_start_at.timestamp())}"
                 )
 
                 # Drawback here is if scheduled job is running, and detected by unique_key
