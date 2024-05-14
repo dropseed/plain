@@ -120,7 +120,7 @@ class JobRequestViewset(AdminModelViewset):
         nav_section = "Worker"
         model = JobRequest
         title = "Job requests"
-        fields = ["id", "job_class", "priority", "created_at", "start_at"]
+        fields = ["id", "job_class", "priority", "created_at", "start_at", "unique_key"]
         actions = ["Delete"]
 
         def perform_action(self, action: str, target_pks: list):
