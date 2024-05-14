@@ -187,11 +187,12 @@ class Worker:
                 # Results are a list if it found scheduled/running jobs...
                 if not isinstance(result, list):
                     logger.info(
-                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s"',
-                        job._job_class_str(),
-                        job.get_queue(),
-                        next_start_at,
+                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s" job_unique_key="%s"',
+                        result.job_class,
+                        result.queue,
+                        result.start_at,
                         schedule,
+                        result.unique_key,
                     )
 
             self._jobs_schedule_checked_at = now
