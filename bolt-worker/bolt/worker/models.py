@@ -44,6 +44,15 @@ class JobRequest(models.Model):
                 name="job_request_class_unique_key", fields=["job_class", "unique_key"]
             ),
         ]
+        # The job_class and unique_key should be unique at the db-level,
+        # but only if unique_key is not ""
+        constraints = [
+            models.UniqueConstraint(
+                fields=["job_class", "unique_key"],
+                condition=models.Q(unique_key__gt="", retry_attempt=0),
+                name="unique_job_class_unique_key",
+            )
+        ]
 
     def __str__(self):
         return f"{self.job_class} [{self.uuid}]"

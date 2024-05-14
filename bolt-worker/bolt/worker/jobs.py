@@ -1,9 +1,12 @@
 import datetime
 import inspect
+import logging
 from importlib import import_module
 
 from bolt.db.models import Model
 from bolt.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 def load_job(job_class_path, parameters):
@@ -106,6 +109,7 @@ class Job(metaclass=JobType):
         priority: int | None = None,
         retries: int | None = None,
         retry_attempt: int = 0,
+        unique_key: str | None = None,
     ):
         from .models import JobRequest
 
@@ -138,7 +142,8 @@ class Job(metaclass=JobType):
         else:
             raise ValueError(f"Invalid delay: {delay}")
 
-        unique_key = self.get_unique_key()
+        if unique_key is None:
+            unique_key = self.get_unique_key()
 
         if unique_key:
             # Only need to look at in progress jobs
@@ -147,17 +152,22 @@ class Job(metaclass=JobType):
             if running := self.in_progress():
                 return running
 
-        return JobRequest.objects.create(
-            job_class=self._job_class_str(),
-            parameters=parameters,
-            start_at=start_at,
-            source=source,
-            queue=queue,
-            priority=priority,
-            retries=retries,
-            retry_attempt=retry_attempt,
-            unique_key=unique_key,
-        )
+        try:
+            return JobRequest.objects.create(
+                job_class=self._job_class_str(),
+                parameters=parameters,
+                start_at=start_at,
+                source=source,
+                queue=queue,
+                priority=priority,
+                retries=retries,
+                retry_attempt=retry_attempt,
+                unique_key=unique_key,
+            )
+        except JobRequest.UniqueConstraintError as e:
+            logger.warning("Job already in progress: %s", e)
+            # Try to return the in_progress list again
+            return self.in_progress()
 
     def _job_class_str(self):
         return f"{self.__module__}.{self.__class__.__name__}"

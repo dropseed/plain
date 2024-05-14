@@ -167,9 +167,19 @@ class Worker:
 
         check_every = 60  # Only need to check once every 60 seconds
 
-        if now - self._jobs_schedule_checked_at < check_every:
+        if now - self._jobs_schedule_checked_at > check_every:
             for job, schedule in self.jobs_schedule:
                 next_start_at = schedule.next()
+
+                # If we don't have a unique_key defined by the job, we're going to create our
+                # own so we can detect at the db-level if the job is already scheduled
+                # using a unique constraint.
+                if unique_key := job.get_unique_key():
+                    schedule_unique_key = unique_key
+                else:
+                    schedule_unique_key = (
+                        f"{job._job_class_str()}:{next_start_at.timestamp()}"
+                    )
 
                 with transaction.atomic():
                     scheduled_job_request = (
@@ -178,6 +188,7 @@ class Worker:
                             job_class=job._job_class_str(),
                             queue=job.get_queue(),
                             start_at=next_start_at,
+                            unique_key=schedule_unique_key,
                             # If you manually schedule the same job to start at the same time,
                             # it will see that and not add another one...
                             # Also, if you change the schedule, previously scheduled jobs will still run.
@@ -194,6 +205,7 @@ class Worker:
                         )
                         job.run_in_worker(
                             delay=next_start_at,
+                            unique_key=schedule_unique_key,
                         )
 
             self._jobs_schedule_checked_at = now
