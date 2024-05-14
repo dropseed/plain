@@ -137,7 +137,14 @@ class JobViewset(AdminModelViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
         model = Job
-        fields = ["id", "job_class", "priority", "created_at", "started_at"]
+        fields = [
+            "id",
+            "job_class",
+            "priority",
+            "created_at",
+            "started_at",
+            "unique_key",
+        ]
         actions = ["Delete"]
         cards = [
             WaitingJobsCard,
