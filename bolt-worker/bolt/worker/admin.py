@@ -121,6 +121,11 @@ class JobRequestViewset(AdminModelViewset):
         model = JobRequest
         title = "Job requests"
         fields = ["id", "job_class", "priority", "created_at", "start_at"]
+        actions = ["Delete"]
+
+        def perform_action(self, action: str, target_pks: list):
+            if action == "Delete":
+                JobRequest.objects.filter(pk__in=target_pks).delete()
 
     class DetailView(AdminModelDetailView):
         model = JobRequest
