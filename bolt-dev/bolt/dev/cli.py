@@ -67,7 +67,7 @@ def cli(ctx):
 
     if bolt_db_installed:
         runserver_cmd = f"bolt db wait && bolt legacy migrate && {gunicorn}"
-        manager.add_process("dev", "bolt dev services up")
+        manager.add_process("services", "bolt dev services up")
     else:
         runserver_cmd = gunicorn
 
