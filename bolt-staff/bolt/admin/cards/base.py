@@ -63,6 +63,7 @@ class Card:
         context["number"] = self.get_number()
         context["text"] = self.get_text()
         context["link"] = self.get_link()
+        context["fixed_datetime_range"] = self.fixed_datetime_range
         return context
 
     def get_title(self) -> str:

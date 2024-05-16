@@ -68,7 +68,7 @@
             <a class="hover:text-white hover:underline" href="{{ url('logout') }}">Log out</a>
         </div>
     </div>
-    <div id="admin-content" data-toggle-class="fixed ml-64 -mr-64" class="flex-grow overflow-auto text-black bg-white border-l lg:rounded-lg lg:mt-3 lg:mb-3 lg:mr-3 lg:ml-64 border-black/10">
+    <div id="admin-content" data-toggle-class="fixed ml-64 -mr-64" class="flex-grow overflow-auto text-black border-l bg-paper lg:rounded-lg lg:mt-3 lg:mb-3 lg:mr-3 lg:ml-64 border-black/10">
         <div class="flex justify-between px-4 py-4 text-xs border-b border-gray-200 lg:px-8">
             <div class="flex items-center space-x-2">
                 <button type="button" data-toggle="#admin-sidebar,#admin-content" class="mr-1 lg:hidden">
@@ -146,9 +146,9 @@
             </div>
             <div class="grid grid-cols-1 gap-6 mt-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
                 {% for card in cards %}
-                <admin.Card size=card.size.value>
+                <section class="col-span-{{ card.size.value }}">
                     {{ render_card(card)|safe }}
-                </admin.Card>
+                </section>
                 {% endfor %}
             </div>
         </div>

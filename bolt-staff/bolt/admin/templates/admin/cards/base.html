@@ -1,6 +1,15 @@
 {% block header %}
-<div>{{ title }}</div>
-{% if description %}<div class="mt-1 text-xs text-gray-500">{{ description }}</div>{% endif %}
+<header>
+    {% if fixed_datetime_range %}
+    <p>{{ fixed_datetime_range }}</p>
+    {% endif %}
+
+    <h2 class="text-sm font-semibold">{{ title }}</h2>
+
+    {% if description %}<p class="mt-1 text-xs text-gray-500">{{ description }}</p>{% endif %}
+</header>
 {% endblock %}
 
+<div>
 {% block content %}{% endblock %}
+</div>

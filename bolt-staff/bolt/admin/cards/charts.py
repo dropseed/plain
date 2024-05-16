@@ -16,9 +16,6 @@ class ChartCard(Card):
 
 
 class DailyTrendCard(ChartCard):
-    def get_description(self) -> str:
-        return str(self.datetime_range)
-
     def get_values(self) -> dict[datetime.date, int]:
         raise NotImplementedError
 
@@ -61,6 +58,7 @@ class DailyTrendCard(ChartCard):
                         "suggestedMin": 0,
                     },
                 },
+                "maintainAspectRatio": False,
                 "elements": {
                     "bar": {"borderRadius": "3", "backgroundColor": "rgb(28, 25, 23)"}
                 },

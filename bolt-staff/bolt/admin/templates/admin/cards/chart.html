@@ -1,9 +1,7 @@
 {% extends "admin/cards/base.html" %}
 
 {% block content %}
-<div class="px-2 pt-3 pb-1">
-    <canvas id="card-chart-{{ slug }}"></canvas>
-</div>
+<canvas id="card-chart-{{ slug }}"></canvas>
 {{ chart_data|json_script(slug) }}
 <script>
   document.addEventListener('DOMContentLoaded', function() {
