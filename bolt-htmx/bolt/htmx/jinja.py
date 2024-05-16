@@ -68,6 +68,7 @@ class HTMXFragmentExtension(Extension):
             return " ".join(parts)
 
         render_lazy = kwargs.get("lazy", False)
+        as_element = kwargs.get("as", "div")
         attrs = {}
         for k, v in kwargs.items():
             if k.startswith("hx_"):
@@ -80,7 +81,7 @@ class HTMXFragmentExtension(Extension):
             attrs.setdefault("hx-target", "this")
             attrs.setdefault("hx-indicator", "this")
             attrs_str = attrs_to_str(attrs)
-            return f'<div bolt-hx-fragment="{fragment_name}" hx-get hx-trigger="bolthtmx:load from:body" {attrs_str}></div>'
+            return f'<{as_element} bolt-hx-fragment="{fragment_name}" hx-get hx-trigger="bolthtmx:load from:body" {attrs_str}></{as_element}>'
         else:
             # Swap innerHTML so we can re-run hx calls inside the fragment automatically
             # (render_template_fragment won't render this part of the node again, just the inner nodes)
@@ -90,9 +91,7 @@ class HTMXFragmentExtension(Extension):
             # Add an id that you can use to target the fragment from outside the fragment
             attrs.setdefault("id", f"bolt-hx-fragment-{fragment_name}")
             attrs_str = attrs_to_str(attrs)
-            return (
-                f'<div bolt-hx-fragment="{fragment_name}" {attrs_str}>{caller()}</div>'
-            )
+            return f'<{as_element} bolt-hx-fragment="{fragment_name}" {attrs_str}>{caller()}</{as_element}>'
 
 
 def render_template_fragment(*, template, fragment_name, context):
