@@ -62,7 +62,7 @@ class Page:
         return extension.lstrip(".")
 
     def get_template_name(self):
-        if template_name := self._frontmatter.metadata.get("template_name"):
+        if template_name := self.vars.get("template_name"):
             return template_name
 
         return f"{self.content_type}.html"
