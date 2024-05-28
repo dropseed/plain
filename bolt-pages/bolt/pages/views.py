@@ -24,8 +24,7 @@ class PageView(TemplateView):
         Allow for more specific user templates like
         markdown.html or html.html
         """
-        content_type_template_name = f"{self.page.content_type}.html"
-        return [content_type_template_name] + super().get_template_names()
+        return [self.page.get_template_name()] + super().get_template_names()
 
     def get_template_context(self):
         context = super().get_template_context()

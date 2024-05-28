@@ -60,3 +60,9 @@ class Page:
             return "redirect"
 
         return extension.lstrip(".")
+
+    def get_template_name(self):
+        if template_name := self._frontmatter.metadata.get("template_name"):
+            return template_name
+
+        return f"{self.content_type}.html"
