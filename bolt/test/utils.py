@@ -116,7 +116,7 @@ def setup_test_environment(debug=None):
 
         mail.outbox = []
         saved_data.email_backend = settings.EMAIL_BACKEND
-        settings.EMAIL_BACKEND = "bolt.mail.backends.locmem.EmailBackend"
+        settings.EMAIL_BACKEND = "bolt.mail.backends.testing.EmailBackend"
     except ImportError:
         pass
 
