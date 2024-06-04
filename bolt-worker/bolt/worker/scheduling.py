@@ -44,7 +44,10 @@ class _ScheduleComponent:
         return self.values == other.values
 
     @classmethod
-    def parse(cls, value, min_allowed, max_allowed, str_conversions={}):
+    def parse(cls, value, min_allowed, max_allowed, str_conversions=None):
+        if str_conversions is None:
+            str_conversions = {}
+
         if isinstance(value, int):
             if value < min_allowed or value > max_allowed:
                 raise ValueError(

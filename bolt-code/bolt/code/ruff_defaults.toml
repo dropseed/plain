@@ -17,4 +17,5 @@ extend-select = [
     # # "G",  # flake8-logging-format
     # # "T20",  # print
     "PT",  # pytest
+    "B006",  # mutable-argument-default
 ]

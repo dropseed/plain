@@ -21,12 +21,15 @@ class Worker:
     def __init__(
         self,
         queues,
-        jobs_schedule=[],
+        jobs_schedule=None,
         max_processes=None,
         max_jobs_per_process=None,
         max_pending_per_process=10,
         stats_every=None,
     ):
+        if jobs_schedule is None:
+            jobs_schedule = []
+
         self.executor = ProcessPoolExecutor(
             max_workers=max_processes,
             max_tasks_per_child=max_jobs_per_process,
