@@ -68,7 +68,7 @@ def cli(ctx, port):
             extra_watch_files.append(f)
 
     reload_extra = " ".join(f"--reload-extra-file {f}" for f in extra_watch_files)
-    gunicorn = f"gunicorn --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - {reload_extra} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+    gunicorn = f"gunicorn --bind 127.0.0.1:{port} --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - {reload_extra} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
     if bolt_db_installed:
         runserver_cmd = f"bolt db wait && bolt legacy migrate && {gunicorn}"
