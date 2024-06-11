@@ -20,7 +20,7 @@ class PagesRenderer(mistune.HTMLRenderer):
 
         if info:
             lexer = get_lexer_by_name(info, stripall=True)
-            formatter = html.HtmlFormatter()
+            formatter = html.HtmlFormatter(wrapcode=True)
             return highlight(code, lexer, formatter)
 
         return "<pre><code>" + mistune.escape(code) + "</code></pre>"
