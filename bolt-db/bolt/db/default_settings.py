@@ -5,6 +5,7 @@ from . import database_url
 # Make DATABASES a required setting
 DATABASES: dict
 
+# Automatically configure DATABASES if a DATABASE_URL was given in the environment
 if "DATABASE_URL" in environ:
     DATABASES = {
         "default": database_url.parse(

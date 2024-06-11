@@ -1,56 +1,81 @@
-Local development made easy.
+# bolt-dev
 
-## Local development - opinions
-
-One of my original goals in extending Django was to build a complete local development experience.
-What's the single command that gets my project up and running locally?
-
-At one point I tried to use [tmux](https://github.com/tmux/tmux) for this,
-but even I am not old enough to care to learn how tmux works.
-
-After that I built `forge-work`, which automatically detected which processes you needed and ran them using [Honcho](https://honcho.readthedocs.io/en/latest/).
-This became `bolt work`.
-
-### Removed runsever
-
-### `bolt work`
-
-rename to dev?
-
-# bolt-work
-
-A single command to run everything you need for local Django development.
+A single command to run everything you need for local Bolt development.
 
 ![Bolt work command example](https://user-images.githubusercontent.com/649496/176533533-cfd44dc5-afe5-42af-8b5d-33a9fa23f8d9.gif)
 
+The `bolt dev` command runs a combination of local commands + a Docker container for your database.
+
 The following processes will run simultaneously (some will only run if they are detected as available):
 
-- [`manage.py runserver` (and migrations)](#runserver)
+<!-- - [`manage.py runserver` (and migrations)](#runserver)
 - [`bolt-db start --logs`](#bolt-db)
 - [`bolt-tailwind compile --watch`](#bolt-tailwind)
 - [`npm run watch`](#package-json)
 - [`stripe listen --forward-to`](#stripe)
 - [`ngrok http --subdomain`](#ngrok)
 
-It also comes with [debugging](#debugging) tools to make local debugging easier with VS Code.
+It also comes with [debugging](#debugging) tools to make local debugging easier with VS Code. -->
 
 ## Installation
 
-First, install `bolt-work` from [PyPI](https://pypi.org/project/bolt-work/):
-
 ```sh
-pip install bolt-work
+pip install bolt-dev
 ```
 
-Now instead of using the basic `manage.py runserver` (and a bunch of commands before and during that process), you can simply do:
+If you have `bolt-db` installed (i.e. you're using a database),
+then add `DATABASE_URL` to your `.env` file.
 
 ```sh
-bolt work
+DATABASE_URL=postgres://postgres:postgres@localhost:54321/postgres
 ```
+
+```sh
+bolt dev
+```
+
+## `bolt dev`
+
+### Default processes
+
+- bolt preflight
+- gunicorn
+- migrations
+- tailwind
+
+### Custom processes
+
+- package.json "dev" script
+- pyproject.toml `tool.bolt.dev.run = {command = "..."}`
+
+### GitHub Codespaces
+
+The `BASE_URL` setting is automatically set to the Codespace URL.
+
+TODO
+
+## `bolt dev services`
+
+`REDIS_URL`
+`DATABASE_URL`
+
+- up
+- down
+
+TODO option to turn this off? pyproject.toml `tool.bolt.dev.services.enabled = false`
+
+## `bolt dev db`
+
+Only supports Postgres currently.
+
+- snapshot
+- import
+- export
+
 
 ## Development processes
 
-### Runserver
+### Gunicorn
 
 The key process here is still `manage.py runserver`.
 But, before that runs, it will also wait for the database to be available and run `manage.py migrate`.
@@ -62,16 +87,6 @@ If [`bolt-db`](https://github.com/boltpackages/bolt-db) is installed, it will au
 ### bolt-tailwind
 
 If [`bolt-tailwind`](https://github.com/boltpackages/bolt-tailwind) is installed, it will automatically run the Tailwind `compile --watch` process.
-
-### package.json
-
-If a `package.json` file is found and contains a `watch` script,
-it will automatically run.
-This is an easy place to run your own custom JavaScript watch process.
-
-### Stripe
-
-If a `STRIPE_WEBHOOK_PATH` env variable is set then this will add a `STRIPE_WEBHOOK_SECRET` to `.env` (using `stripe listen --print-secret`) and it will then run `stripe listen --forward-to <runserver:port/stripe-webhook-path>`.
 
 ## Debugging
 
