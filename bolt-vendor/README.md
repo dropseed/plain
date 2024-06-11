@@ -1,1 +1,1 @@
-bolt/mail/README.md
+bolt/vendor/README.md
