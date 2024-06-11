@@ -22,7 +22,14 @@ except ModuleNotFoundError:
 
 @click.group(invoke_without_command=True)
 @click.pass_context
-def cli(ctx):
+@click.option(
+    "--port",
+    default=8000,
+    type=int,
+    help="Port to run the web server on",
+    envvar="PORT",
+)
+def cli(ctx, port):
     """Start local development"""
 
     if ctx.invoked_subcommand:
@@ -36,10 +43,8 @@ def cli(ctx):
         "PYTHONUNBUFFERED": "true",
     }
 
-    runserver_port = os.environ.get("PORT", "8000")
-
     if "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ:
-        codespace_base_url = f"https://{os.environ['CODESPACE_NAME']}-{runserver_port}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
+        codespace_base_url = f"https://{os.environ['CODESPACE_NAME']}-{port}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
         click.secho(
             f"Automatically using Codespace BASE_URL={click.style(codespace_base_url, underline=True)}",
             bold=True,
@@ -78,7 +83,7 @@ def cli(ctx):
 
     custom_env = {
         **bolt_env,
-        "PORT": runserver_port,
+        "PORT": port,
         "PYTHONPATH": os.path.join(project_root, "app"),
     }
 
