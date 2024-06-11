@@ -2,6 +2,9 @@ from os import environ
 
 from . import database_url
 
+# Make DATABASES a required setting
+DATABASES: dict
+
 if "DATABASE_URL" in environ:
     DATABASES = {
         "default": database_url.parse(
@@ -17,8 +20,6 @@ if "DATABASE_URL" in environ:
             ],
         )
     }
-else:
-    DATABASES = {}
 
 # Classes used to implement DB routing behavior.
 DATABASE_ROUTERS = []
