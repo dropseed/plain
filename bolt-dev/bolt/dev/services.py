@@ -32,8 +32,8 @@ class Services:
         self.manager = HonchoManager()
 
     def __enter__(self):
-        if Pid.exists():
-            click.secho("Services already running in `bolt dev` command", yellow=True)
+        if Pid().exists():
+            click.secho("Services already running in `bolt dev` command", fg="yellow")
             return
 
         services = self.get_services(APP_PATH.parent)
