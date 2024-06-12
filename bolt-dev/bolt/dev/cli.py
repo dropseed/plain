@@ -1,4 +1,3 @@
-import json
 import os
 import subprocess
 import sys
@@ -11,7 +10,8 @@ from honcho.manager import Manager as HonchoManager
 from bolt.runtime import APP_PATH
 
 from .db import cli as db_cli
-from .services import cli as services_cli
+from .pid import Pid
+from .services import Services
 from .utils import boltpackage_installed, has_pyproject_toml
 
 try:
@@ -35,82 +35,117 @@ def cli(ctx, port):
     if ctx.invoked_subcommand:
         return
 
-    # TODO check docker is available first
-    project_root = APP_PATH.parent
+    returncode = Dev(port=port).run()
+    if returncode:
+        sys.exit(returncode)
 
-    bolt_env = {
-        **os.environ,
-        "PYTHONUNBUFFERED": "true",
-    }
 
-    if "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ:
-        codespace_base_url = f"https://{os.environ['CODESPACE_NAME']}-{port}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
-        click.secho(
-            f"Automatically using Codespace BASE_URL={click.style(codespace_base_url, underline=True)}",
-            bold=True,
-        )
-        bolt_env["BASE_URL"] = codespace_base_url
+class Dev:
+    def __init__(self, *, port):
+        self.manager = HonchoManager()
+        self.port = port
+        self.bolt_env = {
+            **os.environ,
+            "PYTHONUNBUFFERED": "true",
+        }
+        self.custom_process_env = {
+            **self.bolt_env,
+            "PORT": str(self.port),
+            "PYTHONPATH": os.path.join(APP_PATH.parent, "app"),
+        }
 
-    if subprocess.run(["bolt", "preflight"], env=bolt_env).returncode:
-        click.secho("Preflight check failed!", fg="red")
-        sys.exit(1)
+    def run(self):
+        pid = Pid()
+        pid.write()
 
-    bolt_db_installed = find_spec("bolt.db") is not None
+        try:
+            self.add_github_codespace_support()
+            self.run_preflight()
+            self.add_gunicorn()
+            self.add_tailwind()
+            self.add_pyproject_run()
+            self.add_services()
 
-    manager = HonchoManager()
+            self.manager.loop()
 
-    # TODO not necessarily watching the right .env...
-    # could return path from env.load?
-    extra_watch_files = []
-    for f in os.listdir(project_root):
-        if f.startswith(".env"):
-            # Will include some extra, but good enough for now
-            extra_watch_files.append(f)
+            return self.manager.returncode
+        finally:
+            pid.rm()
 
-    reload_extra = " ".join(f"--reload-extra-file {f}" for f in extra_watch_files)
-    gunicorn = f"gunicorn --bind 127.0.0.1:{port} --reload bolt.wsgi:app --timeout 0 --workers 2 --access-logfile - --error-logfile - {reload_extra} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+    def add_github_codespace_support(self):
+        if "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ:
+            codespace_base_url = f"https://{os.environ['CODESPACE_NAME']}-{self.port}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
+            click.secho(
+                f"Automatically using Codespace BASE_URL={click.style(codespace_base_url, underline=True)}",
+                bold=True,
+            )
 
-    if bolt_db_installed:
-        runserver_cmd = f"bolt db wait && bolt legacy migrate && {gunicorn}"
-        manager.add_process("services", "bolt dev services up")
-    else:
-        runserver_cmd = gunicorn
+            # Set BASE_URL for bolt and custom processes
+            self.bolt_env["BASE_URL"] = codespace_base_url
+            self.custom_process_env["BASE_URL"] = codespace_base_url
 
-    manager.add_process("bolt", runserver_cmd, env=bolt_env)
+    def run_preflight(self):
+        if subprocess.run(["bolt", "preflight"], env=self.bolt_env).returncode:
+            click.secho("Preflight check failed!", fg="red")
+            sys.exit(1)
 
-    if boltpackage_installed("tailwind"):
-        manager.add_process("tailwind", "bolt tailwind compile --watch")
+    def add_gunicorn(self):
+        bolt_db_installed = find_spec("bolt.db") is not None
 
-    custom_env = {
-        **bolt_env,
-        "PORT": port,
-        "PYTHONPATH": os.path.join(project_root, "app"),
-    }
+        # TODO not necessarily watching the right .env...
+        # could return path from env.load?
+        extra_watch_files = []
+        for f in os.listdir(APP_PATH.parent):
+            if f.startswith(".env"):
+                # Will include some extra, but good enough for now
+                extra_watch_files.append(f)
 
-    if project_root and has_pyproject_toml(project_root):
-        with open(Path(project_root, "pyproject.toml"), "rb") as f:
+        reload_extra = " ".join(f"--reload-extra-file {f}" for f in extra_watch_files)
+        gunicorn = f"gunicorn --bind 127.0.0.1:{self.port} --reload bolt.wsgi:app --timeout 60 --access-logfile - --error-logfile - {reload_extra} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
+
+        if bolt_db_installed:
+            runserver_cmd = f"bolt db wait && bolt legacy migrate && {gunicorn}"
+        else:
+            runserver_cmd = gunicorn
+
+        if "WEB_CONCURRENCY" not in self.bolt_env:
+            # Default to two workers so request log etc are less
+            # likely to get locked up
+            self.bolt_env["WEB_CONCURRENCY"] = "2"
+
+        self.manager.add_process("bolt", runserver_cmd, env=self.bolt_env)
+
+    def add_tailwind(self):
+        if not boltpackage_installed("tailwind"):
+            return
+
+        self.manager.add_process("tailwind", "bolt tailwind compile --watch")
+
+    def add_pyproject_run(self):
+        if not has_pyproject_toml(APP_PATH.parent):
+            return
+
+        with open(Path(APP_PATH.parent, "pyproject.toml"), "rb") as f:
             pyproject = tomllib.load(f)
+
         for name, data in (
             pyproject.get("tool", {}).get("bolt", {}).get("dev", {}).get("run", {})
         ).items():
             env = {
-                **custom_env,
+                **self.custom_process_env,
                 **data.get("env", {}),
             }
-            manager.add_process(name, data["cmd"], env=env)
+            self.manager.add_process(name, data["cmd"], env=env)
 
-    package_json = Path("package.json")
-    if package_json.exists():
-        with package_json.open() as f:
-            package = json.load(f)
-
-        if package.get("scripts", {}).get("dev"):
-            manager.add_process("npm", "npm run dev", env=custom_env)
-
-    manager.loop()
-
-    sys.exit(manager.returncode)
+    def add_services(self):
+        services = Services.get_services(APP_PATH.parent)
+        for name, data in services.items():
+            env = {
+                **os.environ,
+                "PYTHONUNBUFFERED": "true",
+                **data.get("env", {}),
+            }
+            self.manager.add_process(name, data["cmd"], env=env)
 
 
 cli.add_command(db_cli)
-cli.add_command(services_cli)

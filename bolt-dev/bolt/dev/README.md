@@ -54,16 +54,6 @@ The `BASE_URL` setting is automatically set to the Codespace URL.
 
 TODO
 
-## `bolt dev services`
-
-`REDIS_URL`
-`DATABASE_URL`
-
-- up
-- down
-
-TODO option to turn this off? pyproject.toml `tool.bolt.dev.services.enabled = false`
-
 ## `bolt dev db`
 
 Only supports Postgres currently.

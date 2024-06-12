@@ -29,6 +29,16 @@ First, install `bolt-tailwind` from [PyPI](https://pypi.org/project/bolt-tailwin
 pip install bolt-tailwind
 ```
 
+Then add `bolt.tailwind` to your `INSTALLED_PACKAGES`:
+
+```python
+# settings.py
+INSTALLED_PACKAGES = [
+    # ...
+    "bolt.tailwind",
+]
+```
+
 Create a new `tailwind.config.js` file in your project root:
 
 ```sh
