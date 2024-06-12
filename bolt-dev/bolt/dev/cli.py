@@ -40,6 +40,12 @@ def cli(ctx, port):
         sys.exit(returncode)
 
 
+@cli.command()
+def services():
+    """Start additional services defined in pyproject.toml"""
+    Services().run()
+
+
 class Dev:
     def __init__(self, *, port):
         self.manager = HonchoManager()

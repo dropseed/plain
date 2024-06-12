@@ -1,4 +1,6 @@
 import os
+import subprocess
+import time
 from pathlib import Path
 
 import click
@@ -31,11 +33,7 @@ class Services:
     def __init__(self):
         self.manager = HonchoManager()
 
-    def __enter__(self):
-        if Pid().exists():
-            click.secho("Services already running in `bolt dev` command", fg="yellow")
-            return
-
+    def run(self):
         services = self.get_services(APP_PATH.parent)
         for name, data in services.items():
             env = {
@@ -47,5 +45,16 @@ class Services:
 
         self.manager.loop()
 
+    def __enter__(self):
+        if Pid().exists():
+            click.secho("Services already running in `bolt dev` command", fg="yellow")
+            return
+
+        print("Starting `bolt dev services`")
+        self.subprocess = subprocess.Popen(
+            ["bolt", "dev", "services"], cwd=APP_PATH.parent
+        )
+        time.sleep(0.5)
+
     def __exit__(self, *args):
-        self.manager.terminate()
+        self.subprocess.terminate()
