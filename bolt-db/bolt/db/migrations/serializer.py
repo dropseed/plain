@@ -16,7 +16,6 @@ from bolt.db.migrations.operations.base import Operation
 from bolt.db.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
 from bolt.runtime.user_settings import SettingsReference
 from bolt.utils.functional import LazyObject, Promise
-from bolt.utils.version import PY311
 
 
 class BaseSerializer:
@@ -126,11 +125,7 @@ class EnumSerializer(BaseSerializer):
         enum_class = self.value.__class__
         module = enum_class.__module__
         if issubclass(enum_class, enum.Flag):
-            if PY311:
-                members = list(self.value)
-            else:
-                members, _ = enum._decompose(enum_class, self.value)
-                members = reversed(members)
+            members = list(self.value)
         else:
             members = (self.value,)
         return (

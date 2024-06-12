@@ -174,7 +174,7 @@ class OAuthProvider:
         auth_login(request=request, user=user)
 
     def get_login_redirect_url(self, *, request: HttpRequest) -> str:
-        return request.session.pop(SESSION_NEXT_KEY, settings.LOGIN_REDIRECT_URL)
+        return request.session.pop(SESSION_NEXT_KEY, "/")
 
     def get_disconnect_redirect_url(self, *, request: HttpRequest) -> str:
         return request.POST.get("next", "/")

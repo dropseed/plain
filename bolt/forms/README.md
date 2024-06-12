@@ -8,3 +8,7 @@ Handle user input.
 - Form: validates input from request, saves it
 - Form field: validates field, knows how to parse from html data ?
 - starter includes form components - no markup in python
+
+## Re-using input styles
+
+bolt-elements, or includes

@@ -10,7 +10,7 @@ from bolt.legacy.management.base import BaseCommand, CommandError
 from bolt.legacy.management.utils import run_formatters
 from bolt.packages import packages
 from bolt.runtime import settings
-from bolt.utils.version import get_docs_version
+from bolt.utils.version import get_version
 
 
 class Command(BaseCommand):
@@ -147,7 +147,7 @@ class Command(BaseCommand):
                 raise CommandError(
                     "You cannot squash squashed migrations! Please transition it to a "
                     "normal migration first: https://docs.djangoproject.com/en/%s/"
-                    "topics/migrations/#squashing-migrations" % get_docs_version()
+                    "topics/migrations/#squashing-migrations" % get_version()
                 )
             operations.extend(smigration.operations)
             for dependency in smigration.dependencies:

@@ -1,9 +1,14 @@
-##################
-# AUTHENTICATION #
-##################
+from importlib.util import find_spec
 
 AUTH_USER_MODEL: str
 
-LOGIN_URL = "/accounts/login/"
+if find_spec("bolt.passwords"):
+    # Automatically invalidate sessions on password field change,
+    # if the bolt-passwords is installed. You can change this value
+    # if your password field is named differently, or you want
+    # to use a different field to invalidate sessions.
+    AUTH_USER_SESSION_HASH_FIELD: str = "password"
+else:
+    AUTH_USER_SESSION_HASH_FIELD: str = ""
 
-LOGIN_REDIRECT_URL = "/accounts/profile/"
+LOGIN_URL = "login"

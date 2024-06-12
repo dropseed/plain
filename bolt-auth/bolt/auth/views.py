@@ -9,7 +9,9 @@ from bolt.http import (
 )
 from bolt.runtime import settings
 from bolt.urls import reverse
+from bolt.views import View
 
+from .sessions import logout
 from .utils import resolve_url
 
 
@@ -59,10 +61,6 @@ class AuthViewMixin:
         try:
             self.check_auth()
         except LoginRequired as e:
-            from bolt.auth.views import (
-                redirect_to_login,
-            )
-
             # Ideally this could be handled elsewhere... like PermissionDenied
             # also seems like this code is used multiple places anyway...
             # could be easier to get redirect query param
@@ -83,6 +81,12 @@ class AuthViewMixin:
             )
 
         return super().get_response()  # type: ignore
+
+
+class LogoutView(View):
+    def post(self):
+        logout(self.request)
+        return ResponseRedirect("/")
 
 
 def redirect_to_login(next, login_url=None, redirect_field_name="next"):

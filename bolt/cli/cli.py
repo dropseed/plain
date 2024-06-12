@@ -341,7 +341,21 @@ def create(package_name):
     """
         )
 
-    click.secho(f"Created {package_dir.relative_to(Path.cwd())}", fg="green")
+    click.secho(
+        f'Created {package_dir.relative_to(Path.cwd())}. Make sure to add "{package_name}" to INSTALLED_PACKAGES!',
+        fg="green",
+    )
+
+
+@bolt_cli.command()
+@click.argument("setting_name")
+def setting(setting_name):
+    """Print the value of a setting at runtime"""
+    try:
+        setting = getattr(bolt.runtime.settings, setting_name)
+        click.echo(setting)
+    except AttributeError:
+        click.secho(f'Setting "{setting_name}" not found', fg="red")
 
 
 class AppCLIGroup(click.Group):

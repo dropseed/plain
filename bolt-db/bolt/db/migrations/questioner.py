@@ -7,7 +7,7 @@ from bolt.db.models import NOT_PROVIDED
 from bolt.legacy.management.base import OutputWrapper
 from bolt.packages import packages
 from bolt.utils import timezone
-from bolt.utils.version import get_docs_version
+from bolt.utils.version import get_version
 
 from .loader import MigrationLoader
 
@@ -277,7 +277,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
     def ask_unique_callable_default_addition(self, field_name, model_name):
         """Adding a unique field with a callable default."""
         if not self.dry_run:
-            version = get_docs_version()
+            version = get_version()
             choice = self._choice_input(
                 f"Callable default on unique field {model_name}.{field_name} "
                 f"will not generate unique values upon migrating.\n"

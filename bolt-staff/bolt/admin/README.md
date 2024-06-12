@@ -12,7 +12,12 @@ in addition to models.
 - diy forms
 - detached from login (do your own login (oauth, passkeys, etc))
 
-# bolt-querystats
+## Installation
+
+- install bolt.staff and bolt.htmx, add bolt.admin and bolt.htmx to installed packages
+- add url
+
+<!-- # bolt-querystats
 
 On-page database query stats in development and production.
 
@@ -252,4 +257,4 @@ By default, all staff users can impersonate other users.
 ```python
 # settings.py
 IMPERSONATE_ALLOWED = lambda user: user.is_staff
-```
+``` -->

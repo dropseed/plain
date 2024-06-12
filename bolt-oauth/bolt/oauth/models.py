@@ -99,10 +99,12 @@ class OAuthConnection(models.Model):
                 # If email needs to be unique, then we expect
                 # that to be taken care of on the user model itself
                 try:
-                    user = get_user_model().objects.create_user(
+                    user = get_user_model()(
                         username=oauth_user.username,
                         email=oauth_user.email,
                     )
+                    user.full_clean()
+                    user.save()
                 except IntegrityError:
                     raise OAuthUserAlreadyExistsError()
 

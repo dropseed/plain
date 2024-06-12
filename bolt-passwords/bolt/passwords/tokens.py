@@ -100,23 +100,13 @@ class PasswordResetTokenGenerator:
         invalidated when it's used:
         1. The password field will change upon a password reset (even if the
            same password is chosen, due to password salting).
-        2. The last_login field will usually be updated very shortly after
-           a password reset.
         Failing those things, settings.PASSWORD_RESET_TIMEOUT eventually
         invalidates the token.
 
         Running this data through salted_hmac() prevents password cracking
         attempts using the reset token, provided the secret isn't compromised.
         """
-        # Truncate microseconds so that tokens are consistent even if the
-        # database doesn't support microseconds.
-        login_timestamp = (
-            ""
-            if user.last_login is None
-            else user.last_login.replace(microsecond=0, tzinfo=None)
-        )
-        email = user.email or ""
-        return f"{user.pk}{user.password}{login_timestamp}{timestamp}{email}"
+        return f"{user.pk}{user.password}{timestamp}{user.email}"
 
     def _num_seconds(self, dt):
         return int((dt - datetime(2001, 1, 1)).total_seconds())

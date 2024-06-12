@@ -125,7 +125,7 @@ class Field(RegisterLookupMixin):
         "invalid_choice": "Value %(value)r is not a valid choice.",
         "null": "This field cannot be null.",
         "blank": "This field cannot be blank.",
-        "unique": "%(model_name)s with this %(field_label)s already exists.",
+        "unique": "A %(model_name)s with this %(field_label)s already exists.",
         "unique_for_date": "%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s.",
     }
     system_check_deprecated_details = None
