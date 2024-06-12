@@ -1,8 +1,9 @@
 #!/bin/sh -e
+cd bolt
 if [ "$1" = "--check" ]; then
-    poetry run ruff check .
-    poetry run ruff format . --check
+    poetry run ruff check ..
+    poetry run ruff format .. --check
 else
-    poetry run ruff --fix-only .
-    poetry run ruff format .
+    poetry run ruff --fix-only ..
+    poetry run ruff format ..
 fi

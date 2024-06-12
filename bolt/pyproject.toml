@@ -29,9 +29,9 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-extend = "bolt-code/bolt/code/ruff_defaults.toml"
+extend = "../bolt-code/bolt/code/ruff_defaults.toml"
 target-version = "py310"
-extend-exclude = ["bolt-pytest/bolt/pytest/pytest"]
+extend-exclude = ["../bolt-pytest/bolt/pytest/pytest"]
 
 [tool.bolt.code]
-exclude = ["bolt-pytest/bolt/pytest/pytest"]
+exclude = ["../bolt-pytest/bolt/pytest/pytest"]

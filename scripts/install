@@ -1,5 +1,7 @@
 #!/bin/sh -e
+cd bolt
 POETRY_VIRTUALENVS_IN_PROJECT=true poetry install
+cd ..
 
 if [ ! -f .git/hooks/pre-commit ]; then
     echo ""
