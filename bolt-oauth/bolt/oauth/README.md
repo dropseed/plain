@@ -147,9 +147,9 @@ one way to do this is to have your own `User` model:
 
 ```python
 # In an app named "users", for example
-from bolt.auth.models import AbstractUser
+from bolt.auth.models import BaseUser
 
-class User(AbstractUser):
+class User(BaseUser):
     email = models.EmailField(unique=True)
 
 

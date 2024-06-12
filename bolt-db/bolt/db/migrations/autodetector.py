@@ -493,7 +493,7 @@ class MigrationAutodetector:
             string_version = f"{item[0]}.{item[1]}"
             if (
                 model_state.options.get("swappable")
-                or "AbstractUser" in base_names
+                or "BaseUser" in base_names
                 or "AbstractBaseUser" in base_names
                 or settings.AUTH_USER_MODEL.lower() == string_version.lower()
             ):

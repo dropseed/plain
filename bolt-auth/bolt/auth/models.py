@@ -53,7 +53,7 @@ class UserManager(models.Manager):
         return email
 
 
-class AbstractUser(models.Model):
+class BaseUser(models.Model):
     """
     An abstract base class implementing a fully featured User model with
     admin-compliant permissions.
