@@ -305,6 +305,45 @@ def compile(ctx):
     ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
 
 
+@bolt_cli.command()
+@click.argument("package_name")
+def create(package_name):
+    """Create a new local package"""
+    package_dir = bolt.runtime.APP_PATH / package_name
+    package_dir.mkdir(exist_ok=True)
+
+    empty_dirs = (
+        f"templates/{package_name}",
+        "migrations",
+    )
+    for d in empty_dirs:
+        (package_dir / d).mkdir(parents=True, exist_ok=True)
+
+    empty_files = (
+        "__init__.py",
+        "migrations/__init__.py",
+        "models.py",
+        "views.py",
+    )
+    for f in empty_files:
+        (package_dir / f).touch(exist_ok=True)
+
+    # Create a urls.py file with a default namespace
+    if not (package_dir / "urls.py").exists():
+        (package_dir / "urls.py").write_text(
+            f"""from bolt.urls import path
+
+    default_namespace = f"{package_name}"
+
+    urlpatterns = [
+        # path("", views.IndexView, name="index"),
+    ]
+    """
+        )
+
+    click.secho(f"Created {package_dir.relative_to(Path.cwd())}", fg="green")
+
+
 class AppCLIGroup(click.Group):
     """
     Loads app.cli if it exists as `bolt app`
