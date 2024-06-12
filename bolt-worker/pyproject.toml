@@ -13,7 +13,7 @@ python = "^3.11"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
-bolt = {path = ".."}
+bolt = {path = "../bolt"}
 bolt-db = {path = "../bolt-db"}
 
 [build-system]

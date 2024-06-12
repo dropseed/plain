@@ -35,4 +35,5 @@ jobs:
         python-version: "3.11"
         cache: poetry
     - run: poetry install
+      working-directory: bolt
     - run: ./scripts/ruff --check
