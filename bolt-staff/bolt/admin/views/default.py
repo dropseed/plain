@@ -7,7 +7,7 @@ from .registry import registry
 # This will be dashboard view...
 class AdminIndexView(AdminView):
     template_name = "admin/index.html"
-    title = "Admin"
+    title = "Dashboards"
     slug = ""
 
     def get(self):

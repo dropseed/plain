@@ -41,10 +41,10 @@ main a:hover {
 }
 
 .actions a, .actions button {
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 1rem;
     color: white;
-    background-color: rgb(37, 99, 235);
-    border-radius: 0.25rem;
+    background-color: rgb(30, 28, 21);
+    border-radius: 999px;
 }
 
 section {

@@ -17,6 +17,10 @@ in addition to models.
 - install bolt.staff and bolt.htmx, add bolt.admin and bolt.htmx to installed packages
 - add url
 
+## Models in the admin
+
+## Dashboards
+
 <!-- # bolt-querystats
 
 On-page database query stats in development and production.
