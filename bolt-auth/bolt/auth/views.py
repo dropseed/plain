@@ -17,7 +17,7 @@ from .utils import resolve_url
 
 class LoginRequired(Exception):
     def __init__(self, login_url=None, redirect_field_name="next"):
-        self.login_url = login_url or settings.LOGIN_URL
+        self.login_url = login_url or settings.AUTH_LOGIN_URL
         self.redirect_field_name = redirect_field_name
 
 
@@ -93,7 +93,7 @@ def redirect_to_login(next, login_url=None, redirect_field_name="next"):
     """
     Redirect the user to the login page, passing the given 'next' page.
     """
-    resolved_url = resolve_url(login_url or settings.LOGIN_URL)
+    resolved_url = resolve_url(login_url or settings.AUTH_LOGIN_URL)
 
     login_url_parts = list(urlparse(resolved_url))
     if redirect_field_name:

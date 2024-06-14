@@ -222,7 +222,7 @@ def update_session_auth_hash(request, user):
 
 #     def get_template_context(self):
 #         context = super().get_template_context()
-#         context["login_url"] = resolve_url(settings.LOGIN_URL)
+#         context["login_url"] = resolve_url(settings.AUTH_LOGIN_URL)
 #         return context
 
 
