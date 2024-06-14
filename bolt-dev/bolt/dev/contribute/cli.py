@@ -81,7 +81,7 @@ def cli(package, repo):
             return
 
     click.secho(f"Linking {package} to {repo}", bold=True)
-    if package.startswith("bolt-"):
+    if package == "bolt" or package.startswith("bolt-"):
         result = subprocess.run(
             [
                 "poetry",
@@ -95,7 +95,7 @@ def cli(package, repo):
         if result.returncode:
             click.secho("Failed to link the package", fg="red")
             sys.exit(result.returncode)
-    elif package == "bolt" or package.startswith("boltx-"):
+    elif package.startswith("boltx-"):
         result = subprocess.run(
             [
                 "poetry",
