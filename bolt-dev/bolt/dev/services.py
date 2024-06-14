@@ -1,6 +1,7 @@
 import os
 import subprocess
 import time
+from importlib.util import find_spec
 from pathlib import Path
 
 import click
@@ -46,15 +47,31 @@ class Services:
         self.manager.loop()
 
     def __enter__(self):
+        if not self.get_services(APP_PATH.parent):
+            # No-op if no services are defined
+            return
+
         if Pid().exists():
             click.secho("Services already running in `bolt dev` command", fg="yellow")
             return
 
         print("Starting `bolt dev services`")
-        self.subprocess = subprocess.Popen(
+        self._subprocess = subprocess.Popen(
             ["bolt", "dev", "services"], cwd=APP_PATH.parent
         )
-        time.sleep(0.5)
+
+        if find_spec("bolt.db"):
+            time.sleep(0.5)  # Give it a chance to hit on the first try
+            subprocess.check_call(["bolt", "db", "wait"], env=os.environ)
+        else:
+            # A bit of a hack to wait for the services to start
+            time.sleep(3)
 
     def __exit__(self, *args):
-        self.subprocess.terminate()
+        if not hasattr(self, "_subprocess"):
+            return
+
+        self._subprocess.terminate()
+
+        # Flush the buffer so the output doesn't spill over
+        self._subprocess.communicate()

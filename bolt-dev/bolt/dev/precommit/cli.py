@@ -6,6 +6,8 @@ from pathlib import Path
 
 from bolt.cli.print import print_event
 
+from ..services import Services
+
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -38,59 +40,62 @@ def cli(install):
 
     pyproject = Path("pyproject.toml")
 
-    if pyproject.exists():
-        with open(pyproject, "rb") as f:
-            pyproject = tomllib.load(f)
-        for name, data in (
-            pyproject.get("tool", {})
-            .get("bolt", {})
-            .get("pre-commit", {})
-            .get("run", {})
-        ).items():
-            cmd = data["cmd"]
-            print_event(f"Custom: {name} -> {cmd}")
-            result = subprocess.run(cmd, shell=True)
-            if result.returncode != 0:
-                sys.exit(result.returncode)
+    with Services():
+        if pyproject.exists():
+            with open(pyproject, "rb") as f:
+                pyproject = tomllib.load(f)
+            for name, data in (
+                pyproject.get("tool", {})
+                .get("bolt", {})
+                .get("pre-commit", {})
+                .get("run", {})
+            ).items():
+                cmd = data["cmd"]
+                print_event(f"Custom: {name} -> {cmd}")
+                result = subprocess.run(cmd, shell=True)
+                if result.returncode != 0:
+                    sys.exit(result.returncode)
 
-    # Run this first since it's probably the most likely to fail
-    if find_spec("bolt.code"):
-        check_short("Running bolt code checks", "bolt", "code", "check")
+        # Run this first since it's probably the most likely to fail
+        if find_spec("bolt.code"):
+            check_short("Running bolt code checks", "bolt", "code", "check")
 
-    if Path("poetry.lock").exists():
-        check_short("Checking poetry.lock", "poetry", "lock", "--check")
+        if Path("poetry.lock").exists():
+            check_short("Checking poetry.lock", "poetry", "lock", "--check")
 
-    if bolt_db_connected():
-        check_short(
-            "Running preflight checks",
-            "bolt",
-            "preflight",
-            "--database",
-            "default",
-        )
-        check_short("Checking Bolt migrations", "bolt", "legacy", "migrate", "--check")
-        check_short(
-            "Checking for Bolt models missing migrations",
-            "bolt",
-            "legacy",
-            "makemigrations",
-            "--dry-run",
-            "--check",
-        )
-    else:
-        check_short("Running Bolt checks (without database)", "bolt", "preflight")
-        click.secho("--> Skipping migration checks", bold=True, fg="yellow")
+        if bolt_db_connected():
+            check_short(
+                "Running preflight checks",
+                "bolt",
+                "preflight",
+                "--database",
+                "default",
+            )
+            check_short(
+                "Checking Bolt migrations", "bolt", "legacy", "migrate", "--check"
+            )
+            check_short(
+                "Checking for Bolt models missing migrations",
+                "bolt",
+                "legacy",
+                "makemigrations",
+                "--dry-run",
+                "--check",
+            )
+        else:
+            check_short("Running Bolt checks (without database)", "bolt", "preflight")
+            click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
-    print_event("Running bolt compile")
-    result = subprocess.run(["bolt", "compile"])
-    if result.returncode != 0:
-        sys.exit(result.returncode)
-
-    if find_spec("bolt.pytest"):
-        print_event("Running tests")
-        result = subprocess.run(["bolt", "test"])
+        print_event("Running bolt compile")
+        result = subprocess.run(["bolt", "compile"])
         if result.returncode != 0:
             sys.exit(result.returncode)
+
+        if find_spec("bolt.pytest"):
+            print_event("Running tests")
+            result = subprocess.run(["bolt", "test"])
+            if result.returncode != 0:
+                sys.exit(result.returncode)
 
 
 def bolt_db_connected():
