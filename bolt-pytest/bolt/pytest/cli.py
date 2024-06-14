@@ -6,11 +6,6 @@ import click
 
 from bolt.runtime import settings
 
-try:
-    from bolt.dev.services import Services
-except ImportError:
-    Services = None
-
 
 @click.command(
     context_settings={
