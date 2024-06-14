@@ -333,12 +333,12 @@ def create(package_name):
         (package_dir / "urls.py").write_text(
             f"""from bolt.urls import path
 
-    default_namespace = f"{package_name}"
+default_namespace = f"{package_name}"
 
-    urlpatterns = [
-        # path("", views.IndexView, name="index"),
-    ]
-    """
+urlpatterns = [
+    # path("", views.IndexView, name="index"),
+]
+"""
         )
 
     click.secho(
