@@ -25,6 +25,7 @@ except ModuleNotFoundError:
 @click.pass_context
 @click.option(
     "--port",
+    "-p",
     default=8000,
     type=int,
     help="Port to run the web server on",
