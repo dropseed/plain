@@ -254,7 +254,6 @@ def update_session_auth_hash(request, user):
 
 class PasswordLoginView(FormView):
     form_class = PasswordLoginForm
-    template_name = "login.html"
     success_url = "/"
 
     def get(self):
@@ -273,7 +272,6 @@ class PasswordLoginView(FormView):
 
 class PasswordSignupView(CreateView):
     form_class = PasswordSignupForm
-    template_name = "signup.html"
     success_url = "/"
 
     def form_valid(self, form):
