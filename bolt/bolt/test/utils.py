@@ -130,13 +130,14 @@ def teardown_test_environment():
 
     settings.ALLOWED_HOSTS = saved_data.allowed_hosts
     settings.DEBUG = saved_data.debug
-    settings.EMAIL_BACKEND = saved_data.email_backend
     Template._render = saved_data.template_render
 
     del _TestState.saved_data
 
     try:
         from bolt import mail
+
+        settings.EMAIL_BACKEND = saved_data.email_backend
 
         del mail.outbox
     except ImportError:
