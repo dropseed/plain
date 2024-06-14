@@ -9,6 +9,7 @@ class Pid:
 
     def write(self):
         pid = os.getpid()
+        self.pidfile.parent.mkdir(parents=True, exist_ok=True)
         with self.pidfile.open("w+") as f:
             f.write(str(pid))
 
