@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -65,7 +66,7 @@ class Dev:
         pid.write()
 
         try:
-            self.add_github_codespace_support()
+            self.add_csrf_trusted_origins()
             self.run_preflight()
             self.add_gunicorn()
             self.add_tailwind()
@@ -78,17 +79,22 @@ class Dev:
         finally:
             pid.rm()
 
-    def add_github_codespace_support(self):
-        if "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ:
-            codespace_base_url = f"https://{os.environ['CODESPACE_NAME']}-{self.port}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
-            click.secho(
-                f"Automatically using Codespace BASE_URL={click.style(codespace_base_url, underline=True)}",
-                bold=True,
-            )
+    def add_csrf_trusted_origins(self):
+        if "BOLT_CSRF_TRUSTED_ORIGINS" in os.environ:
+            return
 
-            # Set BASE_URL for bolt and custom processes
-            self.bolt_env["BASE_URL"] = codespace_base_url
-            self.custom_process_env["BASE_URL"] = codespace_base_url
+        csrf_trusted_origins = json.dumps(
+            [f"http://localhost:{self.port}", f"http://127.0.0.1:{self.port}"]
+        )
+
+        click.secho(
+            f"Automatically set BOLT_CSRF_TRUSTED_ORIGINS={click.style(csrf_trusted_origins, underline=True)}",
+            bold=True,
+        )
+
+        # Set BASE_URL for bolt and custom processes
+        self.bolt_env["BOLT_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
+        self.custom_process_env["BOLT_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
 
     def run_preflight(self):
         if subprocess.run(["bolt", "preflight"], env=self.bolt_env).returncode:
