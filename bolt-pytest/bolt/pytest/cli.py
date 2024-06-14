@@ -1,4 +1,3 @@
-import contextlib
 import os
 import subprocess
 import sys
@@ -39,21 +38,15 @@ def cli(pytest_args):
 
     click.secho(f"Running pytest with APP_ENV={os.environ['APP_ENV']}", bold=True)
 
-    # Won't want to start services automatically in some cases...
-    # may need a better check for this but CI is the primary auto-exclusion
-    services = (
-        Services() if "CI" not in os.environ and Services else contextlib.nullcontext()
+    result = subprocess.run(
+        [
+            "pytest",
+            *pytest_args,
+        ],
+        env={
+            **os.environ,
+        },
     )
-    with services:
-        result = subprocess.run(
-            [
-                "pytest",
-                *pytest_args,
-            ],
-            env={
-                **os.environ,
-            },
-        )
 
     if result.returncode:
         # Can be invoked by pre-commit, so only exit if it fails
