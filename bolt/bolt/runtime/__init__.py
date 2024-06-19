@@ -43,7 +43,7 @@ def setup():
         sys.path.insert(0, APP_PATH.as_posix())
 
     # Load .env files automatically before settings
-    if app_env := environ.get("APP_ENV", ""):
+    if app_env := environ.get("BOLT_ENV", ""):
         load_dotenv(f".env.{app_env}")
     else:
         load_dotenv(".env")

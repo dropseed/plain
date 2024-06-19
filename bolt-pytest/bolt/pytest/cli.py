@@ -29,9 +29,9 @@ def cli(pytest_args):
     #         pytest_args.append("-W")
     #         pytest_args.append("error::DeprecationWarning")
 
-    os.environ.setdefault("APP_ENV", "test")
+    os.environ.setdefault("BOLT_ENV", "test")
 
-    click.secho(f"Running pytest with APP_ENV={os.environ['APP_ENV']}", bold=True)
+    click.secho(f"Running pytest with BOLT_ENV={os.environ['BOLT_ENV']}", bold=True)
 
     result = subprocess.run(
         [
