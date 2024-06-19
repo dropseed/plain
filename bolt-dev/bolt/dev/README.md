@@ -30,6 +30,12 @@ then add `DATABASE_URL` to your `.env` file.
 DATABASE_URL=postgres://postgres:postgres@localhost:54321/postgres
 ```
 
+```toml
+# pyproject.toml
+[tool.bolt.dev.services]
+postgres = {cmd = "docker run --name app-postgres --rm -p 54321:5432 -v $(pwd)/.bolt/dev/pgdata:/var/lib/postgresql/data -e POSTGRES_PASSWORD=postgres postgres:15 postgres"}
+```
+
 ```sh
 bolt dev
 ```
