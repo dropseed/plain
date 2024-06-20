@@ -1,1 +1,0 @@
-bolt/db/README.md

@@ -1,1 +1,0 @@
-bolt/htmx/README.md

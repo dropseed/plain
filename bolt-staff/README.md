@@ -1,1 +1,0 @@
-bolt/admin/README.md
