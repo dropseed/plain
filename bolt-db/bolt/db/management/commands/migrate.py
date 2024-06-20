@@ -7,8 +7,15 @@ from bolt.db.migrations.autodetector import MigrationAutodetector
 from bolt.db.migrations.executor import MigrationExecutor
 from bolt.db.migrations.loader import AmbiguityError
 from bolt.db.migrations.state import ModelState, ProjectState
-from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
-from bolt.legacy.management.sql import emit_post_migrate_signal, emit_pre_migrate_signal
+from bolt.internal.legacy.management.base import (
+    BaseCommand,
+    CommandError,
+    no_translations,
+)
+from bolt.internal.legacy.management.sql import (
+    emit_post_migrate_signal,
+    emit_pre_migrate_signal,
+)
 from bolt.packages import packages
 from bolt.utils.module_loading import module_has_submodule
 from bolt.utils.text import Truncator

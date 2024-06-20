@@ -34,7 +34,7 @@ def legacy_alias(legacy_args):
         [
             "python",
             "-m",
-            "bolt.legacy",
+            "bolt.internal.legacy",
             *legacy_args,
         ],
     )

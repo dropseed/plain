@@ -14,13 +14,13 @@ from importlib import import_module
 
 import bolt.runtime
 from bolt.exceptions import ImproperlyConfigured
-from bolt.legacy.management.base import (
+from bolt.internal.legacy.management.base import (
     BaseCommand,
     CommandError,
     CommandParser,
     handle_default_options,
 )
-from bolt.legacy.management.color import color_style
+from bolt.internal.legacy.management.color import color_style
 from bolt.packages import packages
 from bolt.runtime import settings
 
@@ -53,7 +53,7 @@ def get_commands():
     """
     Return a dictionary mapping command names to their callback applications.
 
-    Look for a management.commands package in bolt.legacy, and in each
+    Look for a management.commands package in bolt.internal.legacy, and in each
     installed application -- if a commands package exists, register all
     commands in that package.
 
@@ -67,7 +67,7 @@ def get_commands():
     The dictionary is cached on the first call and reused on subsequent
     calls.
     """
-    commands = {name: "bolt.legacy" for name in find_commands(__path__[0])}
+    commands = {name: "bolt.internal.legacy" for name in find_commands(__path__[0])}
 
     if not settings.configured:
         return commands
@@ -94,7 +94,7 @@ def call_command(command_name, *args, **options):
         call_command('shell', plain=True)
         call_command('sqlmigrate', 'myapp')
 
-        from bolt.legacy.management.commands import flush
+        from bolt.internal.legacy.management.commands import flush
         cmd = flush.Command()
         call_command(cmd, verbosity=0, interactive=False)
         # Do something with cmd ...
@@ -217,7 +217,7 @@ class ManagementUtility:
             ]
             commands_dict = defaultdict(lambda: [])
             for name, app in get_commands().items():
-                if app == "bolt.legacy":
+                if app == "bolt.internal.legacy":
                     app = "django"
                 else:
                     app = app.rpartition(".")[-1]

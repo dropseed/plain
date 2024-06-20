@@ -427,7 +427,7 @@ class BaseDatabaseOperations:
         themselves).
 
         The `style` argument is a Style object as returned by either
-        color_style() or no_style() in bolt.legacy.management.color.
+        color_style() or no_style() in bolt.internal.legacy.management.color.
 
         If `reset_sequences` is True, the list includes SQL statements required
         to reset the sequences.
@@ -456,7 +456,7 @@ class BaseDatabaseOperations:
         passed in `sequences`.
 
         The `style` argument is a Style object as returned by either
-        color_style() or no_style() in bolt.legacy.management.color.
+        color_style() or no_style() in bolt.internal.legacy.management.color.
         """
         return []
 
@@ -466,7 +466,7 @@ class BaseDatabaseOperations:
         the given models.
 
         The `style` argument is a Style object as returned by either
-        color_style() or no_style() in bolt.legacy.management.color.
+        color_style() or no_style() in bolt.internal.legacy.management.color.
         """
         return []  # No sequence reset required by default.
 

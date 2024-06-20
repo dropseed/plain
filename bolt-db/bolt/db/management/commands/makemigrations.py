@@ -17,8 +17,12 @@ from bolt.db.migrations.questioner import (
 from bolt.db.migrations.state import ProjectState
 from bolt.db.migrations.utils import get_migration_name_timestamp
 from bolt.db.migrations.writer import MigrationWriter
-from bolt.legacy.management.base import BaseCommand, CommandError, no_translations
-from bolt.legacy.management.utils import run_formatters
+from bolt.internal.legacy.management.base import (
+    BaseCommand,
+    CommandError,
+    no_translations,
+)
+from bolt.internal.legacy.management.utils import run_formatters
 from bolt.packages import packages
 from bolt.runtime import settings
 

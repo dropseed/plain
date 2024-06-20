@@ -4,7 +4,7 @@ import os
 import sys
 
 from bolt.db.models import NOT_PROVIDED
-from bolt.legacy.management.base import OutputWrapper
+from bolt.internal.legacy.management.base import OutputWrapper
 from bolt.packages import packages
 from bolt.utils import timezone
 from bolt.utils.version import get_version

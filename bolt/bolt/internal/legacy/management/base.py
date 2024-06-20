@@ -12,7 +12,7 @@ from io import TextIOBase
 import bolt.runtime
 from bolt import preflight
 from bolt.exceptions import ImproperlyConfigured
-from bolt.legacy.management.color import color_style, no_style
+from bolt.internal.legacy.management.color import color_style, no_style
 
 ALL_CHECKS = "__all__"
 

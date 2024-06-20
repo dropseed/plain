@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-from bolt.legacy import management
+from bolt.internal.legacy import management
 
 if __name__ == "__main__":
     # Automatically put the app dir on the Python path for convenience

@@ -6,8 +6,8 @@ from bolt.db.migrations.loader import AmbiguityError, MigrationLoader
 from bolt.db.migrations.migration import SwappableTuple
 from bolt.db.migrations.optimizer import MigrationOptimizer
 from bolt.db.migrations.writer import MigrationWriter
-from bolt.legacy.management.base import BaseCommand, CommandError
-from bolt.legacy.management.utils import run_formatters
+from bolt.internal.legacy.management.base import BaseCommand, CommandError
+from bolt.internal.legacy.management.utils import run_formatters
 from bolt.packages import packages
 from bolt.runtime import settings
 from bolt.utils.version import get_version
