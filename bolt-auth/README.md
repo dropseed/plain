@@ -4,7 +4,7 @@
 
 Create users and authenticate them.
 
-[link](https://github.com/dropseed/bolt/tree/main/bolt-auth/bolt/auth/config.py)
+[link](https://boltframework.dev/docs/bolt-auth/bolt/auth/config.py)
 
 ## Installation
 

@@ -8,3 +8,7 @@ echo "${BOLD}Checking with ruff${NORMAL}"
 echo ""
 echo "${BOLD}Running tests${NORMAL}"
 ./scripts/test
+
+echo ""
+echo "${BOLD}Compiling readmes${NORMAL}"
+./scripts/compile-readmes

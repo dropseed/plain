@@ -4,7 +4,7 @@ Default logging settings and key-value logger.
 
 In Python, logging can be a surprisingly complex topic.
 
-So Bolt includes some easy-to-use defaults that "just work".
+So Bolt aims for easy-to-use defaults that "just work".
 
 ## `app_logger`
 
