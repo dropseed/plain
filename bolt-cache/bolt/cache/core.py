@@ -6,7 +6,9 @@ from bolt.utils import timezone
 
 
 class Cached:
-    def __init__(self, key):
+    """Store and retrieve cached items."""
+
+    def __init__(self, key: str) -> None:
         self.key = key
 
         # So we can import Cached in __init__.py
@@ -22,7 +24,7 @@ class Cached:
         except self._model_class.DoesNotExist:
             return None
 
-    def reload(self):
+    def reload(self) -> None:
         if hasattr(self, "_model_instance"):
             del self._model_instance
 
@@ -35,7 +37,7 @@ class Cached:
 
         return self._model_instance.expires_at < timezone.now()
 
-    def exists(self):
+    def exists(self) -> bool:
         if self._model_instance is None:
             return False
 
@@ -81,7 +83,7 @@ class Cached:
         self.reload()
         return item.value
 
-    def delete(self):
+    def delete(self) -> bool:
         if not self._model_instance:
             # A no-op, but a return value you can use to know whether it did anything
             return False
