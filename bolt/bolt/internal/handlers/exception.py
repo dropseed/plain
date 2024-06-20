@@ -14,6 +14,7 @@ from bolt.http import Http404, ResponseServerError
 from bolt.http.multipartparser import MultiPartParserError
 from bolt.logs import log_response
 from bolt.runtime import settings
+from bolt.utils.module_loading import import_string
 from bolt.views.errors import ErrorView
 
 
@@ -132,7 +133,11 @@ def handle_uncaught_exception():
 def get_error_view(status_code):
     views_by_status = settings.HTTP_ERROR_VIEWS
     if status_code in views_by_status:
-        return views_by_status[status_code].as_view()
+        view = views_by_status[status_code]
+        if isinstance(view, str):
+            # Import the view if it's a string
+            view = import_string(view)
+        return view.as_view()
 
     # Create a standard view for any other status code
     return ErrorView.as_view(status_code=status_code)
