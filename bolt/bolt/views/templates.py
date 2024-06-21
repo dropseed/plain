@@ -1,5 +1,6 @@
 from bolt.csrf.middleware import get_token
 from bolt.exceptions import ImproperlyConfigured
+from bolt.runtime import settings
 from bolt.templates import Template, TemplateFileMissing
 from bolt.utils.functional import lazy
 from bolt.utils.html import format_html
@@ -31,6 +32,7 @@ class TemplateView(View):
             "request": self.request,
             "csrf_input": csrf_input_lazy(self.request),
             "csrf_token": csrf_token_lazy(self.request),
+            "DEBUG": settings.DEBUG,
         }
 
     def get_template_names(self) -> list[str]:
