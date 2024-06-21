@@ -43,6 +43,17 @@ import flags
 print(flags.FooEnabled(user).value)
 ```
 
+## Installation
+
+```python
+INSTALLED_PACKAGES = [
+    ...
+    "bolt.flags",
+]
+```
+
+Create a `flags.py` at the top of your `app` (or point `settings.FLAGS_MODULE` to a different location).
+
 ## Advanced usage
 
 Ultimately you can do whatever you want inside of `get_key` and `get_value`.
