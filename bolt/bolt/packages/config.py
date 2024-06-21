@@ -15,10 +15,10 @@ class PackageConfig:
     migrations_module = "migrations"
 
     def __init__(self, package_name, package_module):
-        # Full Python path to the application e.g. 'bolt.admin.admin'.
+        # Full Python path to the application e.g. 'bolt.staff.admin.admin'.
         self.name = package_name
 
-        # Root module for the application e.g. <module 'bolt.admin.admin'
+        # Root module for the application e.g. <module 'bolt.staff.admin.admin'
         # from 'admin/__init__.py'>.
         self.module = package_module
 
@@ -43,7 +43,7 @@ class PackageConfig:
         if not hasattr(self, "path"):
             self.path = self._path_from_module(package_module)
 
-        # Module containing models e.g. <module 'bolt.admin.models'
+        # Module containing models e.g. <module 'bolt.staff.admin.models'
         # from 'admin/models.py'>. Set by import_models().
         # None if the application doesn't have a models module.
         self.models_module = None

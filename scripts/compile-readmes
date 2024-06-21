@@ -25,12 +25,8 @@ compile_readme "bolt/README.md" "bolt/bolt/README.md"
 
 # Now do the same for every bolt-* package and the README.md found at bolt-<pkg>/bolt/*/README.md
 for package_dir in bolt-*; do
-    # if [ -d "$package_dir/bolt" ]; then
-    # Find the README.md in $package_dir/bolt/*/README.md
-    find "$package_dir/bolt" -name "README.md" | while read -r code_readme; do
-        package_readme="$package_dir/README.md"
-        compile_readme "$package_readme" "$code_readme"
-    done
-    # compile_readme "$package_dir/README.md" "$package_dir/bolt/README.md"
-    # fi
+    package_name=$(echo "$package_dir" | sed -e "s/^bolt-//")
+    package_readme="$package_dir/README.md"
+    code_readme="$package_dir/bolt/$package_name/README.md"
+    compile_readme "$package_readme" "$code_readme"
 done

@@ -1,11 +1,11 @@
-from bolt.admin.cards import ChartCard
-from bolt.admin.views import (
+from bolt.db.models import Count
+from bolt.staff.admin.cards import ChartCard
+from bolt.staff.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
     AdminModelViewset,
     register_viewset,
 )
-from bolt.db.models import Count
 
 from .models import OAuthConnection
 

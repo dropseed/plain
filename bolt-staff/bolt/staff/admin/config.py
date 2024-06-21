@@ -6,7 +6,7 @@ MODULE_NAME = "admin"
 
 
 class BoltAdminConfig(PackageConfig):
-    name = "bolt.admin"
+    name = "bolt.staff.admin"
     label = "boltadmin"
 
     def ready(self):

@@ -1,10 +1,10 @@
-from bolt.admin.views import (
+from bolt.cache.models import CachedItem
+from bolt.staff.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
     AdminModelViewset,
     register_viewset,
 )
-from bolt.cache.models import CachedItem
 
 
 @register_viewset

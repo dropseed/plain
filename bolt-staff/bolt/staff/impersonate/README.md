@@ -18,11 +18,11 @@ To impersonate users, you need the app, middleware, and URLs:
 ```python
 # settings.py
 INSTALLED_PACKAGES = INSTALLED_PACKAGES + [
-  "bolt.impersonate",
+  "bolt.staff.impersonate",
 ]
 
 MIDDLEWARE = MIDDLEWARE + [
-  "bolt.impersonate.ImpersonateMiddleware",
+  "bolt.staff.impersonate.ImpersonateMiddleware",
 ]
 ```
 
@@ -30,7 +30,7 @@ MIDDLEWARE = MIDDLEWARE + [
 # urls.py
 urlpatterns = [
     # ...
-    path("impersonate/", include("bolt.impersonate.urls")),
+    path("impersonate/", include("bolt.staff.impersonate.urls")),
 ]
 ```
 

@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING
 
-from bolt.admin.dates import DatetimeRange, DatetimeRangeAliases
 from bolt.auth.views import AuthViewMixin
 from bolt.db import models
 from bolt.htmx.views import HTMXViewMixin
 from bolt.http import Response, ResponseRedirect
 from bolt.paginator import Paginator
+from bolt.staff.admin.dates import DatetimeRange, DatetimeRangeAliases
 from bolt.urls import reverse
 from bolt.utils import timezone
 from bolt.utils.text import slugify

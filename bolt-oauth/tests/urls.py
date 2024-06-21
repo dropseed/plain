@@ -1,6 +1,6 @@
-from bolt import admin
 from bolt.auth.views import AuthViewMixin, LogoutView
 from bolt.oauth.providers import get_provider_keys
+from bolt.staff import admin
 from bolt.urls import include, path
 from bolt.views import TemplateView
 

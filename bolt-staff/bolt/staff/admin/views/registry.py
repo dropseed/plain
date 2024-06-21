@@ -106,8 +106,8 @@ class AdminViewRegistry:
         return views
 
     def get_model_detail_url(self, instance):
-        from bolt.admin.views.base import URL_NAMESPACE
-        from bolt.admin.views.models import AdminModelDetailView
+        from bolt.staff.admin.views.base import URL_NAMESPACE
+        from bolt.staff.admin.views.models import AdminModelDetailView
 
         if not instance.pk:
             # Has to actually be in the db

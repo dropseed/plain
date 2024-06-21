@@ -1,7 +1,7 @@
 from enum import Enum
 
-from bolt.admin.dates import DatetimeRange, DatetimeRangeAliases
 from bolt.http import HttpRequest
+from bolt.staff.admin.dates import DatetimeRange, DatetimeRangeAliases
 from bolt.templates import Template
 from bolt.utils.text import slugify
 from bolt.views import View
