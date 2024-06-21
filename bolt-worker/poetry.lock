@@ -2,7 +2,7 @@
 
 [[package]]
 name = "bolt"
-version = "0.1.0"
+version = "0.0.0"
 description = ""
 optional = false
 python-versions = "^3.11"
@@ -21,7 +21,7 @@ url = "../bolt"
 
 [[package]]
 name = "bolt-db"
-version = "0.1.0"
+version = "0.0.0"
 description = ""
 optional = false
 python-versions = "^3.11"
