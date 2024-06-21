@@ -1,8 +1,8 @@
-# bolt-htmx
+# HTMX
 
 Integrate HTMX with templates and views.
 
-The `bolt-htmx` Django package adds a couple of unique features for working with HTMX.
+The `bolt-htmx` package adds a couple of unique features for working with HTMX.
 One is [template fragments](#template-fragments) and the other is [view actions](#view-actions).
 
 The combination of these features lets you build HTMX-powered views that focus on server-side rendering and avoid overly complicated URL structures or REST APIs that you may not otherwise need.
@@ -40,14 +40,6 @@ you can use the `{% htmx_js %}` template tag:
 ```
 
 ## Installation
-
-You can install `bolt-htmx` with any Django project:
-
-```sh
-pip install bolt-htmx
-```
-
-Then add `bolt.htmx` to `settings.py`:
 
 ```python
 INSTALLED_PACKAGES = [
@@ -140,7 +132,7 @@ a standard `div` is output that looks like this:
 The `bolt-hx-fragment` is a custom attribute that we've added ("F" is for "Forge"),
 but the rest are standard HTMX attributes.
 
-When Django renders the response to an HTMX request,
+When Bolt renders the response to an HTMX request,
 it will get the `Bolt-HX-Fragment` header,
 find the fragment with that name in the template,
 and render that for the response.
@@ -209,7 +201,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 
     # Action handling methods follow this format:
     # htmx_{method}_{action}
-    def htmx_post_open(self, request, *args, **kwargs):
+    def htmx_post_open(self):
         self.object = self.get_object()
 
         if self.object.state != "closed":
@@ -223,7 +215,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         context = self.get_context(object=self.object)
         return self.render_to_response(context)
 
-    def htmx_post_close(self, request, *args, **kwargs):
+    def htmx_post_close(self):
         self.object = self.get_object()
 
         if self.object.state != "open":
@@ -235,7 +227,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         context = self.get_context(object=self.object)
         return self.render_to_response(context)
 
-    def htmx_post_merge(self, request, *args, **kwargs):
+    def htmx_post_merge(self):
         self.object = self.get_object()
 
         if self.object.state != "open":
@@ -263,7 +255,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         return super().get_queryset().filter(users=self.request.user)
 
     # You can also leave off the "bolt-hx-action" attribute and just handle the HTTP method
-    def htmx_delete(self, request, *args, **kwargs):
+    def htmx_delete(self):
         self.object = self.get_object()
 
         self.object.delete()
@@ -338,7 +330,7 @@ urlpatterns = [
 
 # views.py
 class PullRequestDetailView(HTMXViewMixin, DetailView):
-  def htmx_post_update(self, request, *args, **kwargs):
+  def htmx_post_update(self):
       self.object = self.get_object()
 
       self.object.update()
