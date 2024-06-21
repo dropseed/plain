@@ -4,7 +4,7 @@ Base file upload handler classes, and the built-in concrete subclasses
 import os
 from io import BytesIO
 
-from bolt.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
+from bolt.internal.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from bolt.runtime import settings
 from bolt.utils.module_loading import import_string
 
@@ -243,7 +243,7 @@ def load_handler(path, *args, **kwargs):
         >>> from bolt.http import HttpRequest
         >>> request = HttpRequest()
         >>> load_handler(
-        ...     'bolt.files.uploadhandler.TemporaryFileUploadHandler',
+        ...     'bolt.internal.files.uploadhandler.TemporaryFileUploadHandler',
         ...     request,
         ... )
         <TemporaryFileUploadHandler object at 0x...>

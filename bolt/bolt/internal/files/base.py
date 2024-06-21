@@ -1,7 +1,7 @@
 import os
 from io import BytesIO, StringIO, UnsupportedOperation
 
-from bolt.files.utils import FileProxyMixin
+from bolt.internal.files.utils import FileProxyMixin
 from bolt.utils.functional import cached_property
 
 

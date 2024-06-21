@@ -15,7 +15,7 @@ from bolt.exceptions import (
     TooManyFieldsSent,
     TooManyFilesSent,
 )
-from bolt.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
+from bolt.internal.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
 from bolt.runtime import settings
 from bolt.utils.datastructures import MultiValueDict
 from bolt.utils.encoding import force_str

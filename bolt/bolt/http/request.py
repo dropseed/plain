@@ -12,12 +12,12 @@ from bolt.exceptions import (
     RequestDataTooBig,
     TooManyFieldsSent,
 )
-from bolt.files import uploadhandler
 from bolt.http.multipartparser import (
     MultiPartParser,
     MultiPartParserError,
     TooManyFilesSent,
 )
+from bolt.internal.files import uploadhandler
 from bolt.runtime import settings
 from bolt.utils.datastructures import (
     CaseInsensitiveMapping,

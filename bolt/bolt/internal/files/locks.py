@@ -11,7 +11,7 @@ Anatoly Techtonik for Roundup [2] (license [3]).
 
 Example Usage::
 
-    >>> from bolt.files import locks
+    >>> from bolt.internal.files import locks
     >>> with open('./file', 'wb') as f:
     ...     locks.lock(f, locks.LOCK_EX)
     ...     f.write('Bolt')

@@ -50,8 +50,8 @@ ROOT_URLCONF = "urls"
 
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [
-    "bolt.files.uploadhandler.MemoryFileUploadHandler",
-    "bolt.files.uploadhandler.TemporaryFileUploadHandler",
+    "bolt.internal.files.uploadhandler.MemoryFileUploadHandler",
+    "bolt.internal.files.uploadhandler.TemporaryFileUploadHandler",
 ]
 
 # Maximum size, in bytes, of a request before it will be streamed to the

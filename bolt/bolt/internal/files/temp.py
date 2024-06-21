@@ -19,7 +19,7 @@ arguments available in tempfile.NamedTemporaryFile.
 import os
 import tempfile
 
-from bolt.files.utils import FileProxyMixin
+from bolt.internal.files.utils import FileProxyMixin
 
 __all__ = (
     "NamedTemporaryFile",

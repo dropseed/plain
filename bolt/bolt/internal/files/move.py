@@ -1,14 +1,14 @@
 """
 Move a file in the safest way possible::
 
-    >>> from bolt.files.move import file_move_safe
+    >>> from bolt.internal.files.move import file_move_safe
     >>> file_move_safe("/tmp/old_file", "/tmp/new_file")
 """
 
 import os
 from shutil import copymode, copystat
 
-from bolt.files import locks
+from bolt.internal.files import locks
 
 __all__ = ["file_move_safe"]
 
