@@ -220,15 +220,6 @@ class CsrfViewMiddleware:
             allowed_origin_subdomains[parsed.scheme].append(parsed.netloc.lstrip("*"))
         return allowed_origin_subdomains
 
-    # The _accept and _reject methods currently only exist for the sake of the
-    # requires_csrf_token decorator.
-    def _accept(self, request):
-        # Avoid checking the request twice by adding a custom attribute to
-        # request.  This will be relevant when both decorator and middleware
-        # are used.
-        request.csrf_processing_done = True
-        return None
-
     def _reject(self, request, reason):
         from .views import CsrfFailureView
 
@@ -421,9 +412,6 @@ class CsrfViewMiddleware:
             raise RejectRequest(reason)
 
     def process_view(self, request, callback, callback_args, callback_kwargs):
-        if getattr(request, "csrf_processing_done", False):
-            return None
-
         # Wait until request.META["CSRF_COOKIE"] has been manipulated before
         # bailing out, so that get_token still works
         if getattr(callback, "csrf_exempt", False):
@@ -431,14 +419,14 @@ class CsrfViewMiddleware:
 
         # Assume that anything not defined as 'safe' by RFC 9110 needs protection
         if request.method in ("GET", "HEAD", "OPTIONS", "TRACE"):
-            return self._accept(request)
+            return None
 
         if getattr(request, "_dont_enforce_csrf_checks", False):
             # Mechanism to turn off CSRF checks for test suite. It comes after
             # the creation of CSRF cookies, so that everything else continues
             # to work exactly the same (e.g. cookies are sent, etc.), but
             # before any branches that call the _reject method.
-            return self._accept(request)
+            return None
 
         # Reject the request if the Origin header doesn't match an allowed
         # value.
@@ -475,4 +463,4 @@ class CsrfViewMiddleware:
         except RejectRequest as exc:
             return self._reject(request, exc.reason)
 
-        return self._accept(request)
+        return None
