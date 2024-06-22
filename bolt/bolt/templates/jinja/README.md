@@ -1,6 +1,4 @@
-# Templates
-
-Render templates using Jinja2.
+# Jinja
 
 Templates can be stored inside `INSTALLED_PACKAGES` (ex. `app/<pkg>/templates`) or in the `templates` directory at the root of your project (ex. `app/templates`).
 
@@ -10,6 +8,9 @@ You `app/templates` will typically have things like `base.html`,
 which the whole app depends on.
 
 ### Package templates
+
+Since all template directories are effectively "merged" together,
+packages will typically namespace their own templates such as `app/users/templates/users/delete.html`.
 
 ## Jinja
 
