@@ -4,9 +4,8 @@
 
 Integrate Tailwind CSS without JavaScript or npm.
 
-Use [Tailwind CSS](https://tailwindcss.com/) with [Django](https://www.djangoproject.com/) *without* requiring JavaScript or npm.
-
-Made possible by the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli).
+Made possible by the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli),
+which is installed for you.
 
 ```console
 $ bolt tailwind
@@ -25,13 +24,7 @@ Commands:
 
 ## Installation
 
-First, install `bolt-tailwind` from [PyPI](https://pypi.org/project/bolt-tailwind/):
-
-```sh
-pip install bolt-tailwind
-```
-
-Then add `bolt.tailwind` to your `INSTALLED_PACKAGES`:
+Add `bolt.tailwind` to your `INSTALLED_PACKAGES`:
 
 ```python
 # settings.py
@@ -74,19 +67,12 @@ You should add `.bolt` to your `.gitignore` file.
 
 ## Updating Tailwind
 
-This package manages the Tailwind versioning by comparing `.bolt/tailwind.version` to the `FORGE_TAILWIND_VERSION` variable that is injected into your `tailwind.config.js` file.
+This package manages the Tailwind versioning by comparing the value in your `pyproject.toml` to `.bolt/tailwind.version`.
 
-```js
-const FORGE_TAILWIND_VERSION = "3.0.24"
-
-module.exports = {
-  theme: {
-    extend: {},
-  },
-  plugins: [
-    require("@tailwindcss/forms"),
-  ],
-}
+```toml
+# pyproject.toml
+[tool.bolt.tailwind]
+version = "3.4.1"
 ```
 
 When you run `tailwind compile`,
@@ -95,7 +81,7 @@ it will automatically check whether your local installation needs to be updated 
 You can use the `update` command to update your project to the latest version of Tailwind:
 
 ```sh
-tailwind update
+bolt tailwind update
 ```
 
 ## Adding custom CSS
