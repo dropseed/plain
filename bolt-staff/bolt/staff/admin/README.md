@@ -45,7 +45,7 @@ which can typically be removed by using `select_related`,
 # settings.py
 INSTALLED_PACKAGES = [
     # ...
-    "boltquerystats",
+    "bolt.staff.querystats",
 ]
 
 MIDDLEWARE = [
@@ -56,7 +56,7 @@ MIDDLEWARE = [
     "bolt.auth.middleware.AuthenticationMiddleware",
     "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
 
-    "boltquerystats.QueryStatsMiddleware",
+    "bolt.staff.querystats.QueryStatsMiddleware",
     # Put additional middleware below querystats
     # ...
 ]

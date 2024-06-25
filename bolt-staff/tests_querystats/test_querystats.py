@@ -1,4 +1,4 @@
-from boltquerystats.core import tidy_stack
+from bolt.staff.querystats.core import tidy_stack
 
 
 def test_tidy_stack():

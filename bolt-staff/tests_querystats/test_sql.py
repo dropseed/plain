@@ -1,4 +1,4 @@
-from boltquerystats.sql import pretty_print_sql
+from bolt.staff.querystats.sql import pretty_print_sql
 
 
 def test_pretty_print_sql():

@@ -9,7 +9,7 @@ DEBUG = True
 INSTALLED_PACKAGES = [
     "bolt.auth",
     "bolt.sessions",
-    "boltquerystats",
+    "bolt.staff.querystats",
 ]
 
 MIDDLEWARE = [
@@ -19,7 +19,7 @@ MIDDLEWARE = [
     "bolt.csrf.middleware.CsrfViewMiddleware",
     "bolt.auth.middleware.AuthenticationMiddleware",
     "bolt.middleware.clickjacking.XFrameOptionsMiddleware",
-    "boltquerystats.middleware.QueryStatsMiddleware",
+    "bolt.staff.querystats.middleware.QueryStatsMiddleware",
 ]
 
 DATABASES = {
