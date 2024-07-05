@@ -1,6 +1,6 @@
 # Templates
 
-Render HTML templates using Jinja.
+Render templates using Jinja2.
 
 Templates are typically rendered in `TemplateViews`,
 but you can also render them directly to strings for emails or other use cases.

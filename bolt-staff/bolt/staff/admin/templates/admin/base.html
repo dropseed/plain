@@ -67,7 +67,7 @@
                     {{ request.user }}
                 </span>
             </div>
-            <a class="ml-2 hover:text-white hover:underline flex-shrink-0" href="{{ url('logout') }}">Log out</a>
+            <a class="flex-shrink-0 ml-2 hover:text-white hover:underline" href="{{ url('logout') }}">Log out</a>
         </div>
     </div>
     <div id="admin-content" data-toggle-class="fixed ml-64 -mr-64" class="flex-grow overflow-auto text-black border-l bg-paper lg:rounded-lg lg:mt-3 lg:mb-3 lg:mr-3 lg:ml-64 border-black/10">
@@ -145,6 +145,13 @@
                     </form>
                 </div>
             </div>
+            {#
+            <!-- Tell tailwind about potential col-span sizes for cards -->
+            <div class="col-span-1"></div>
+            <div class="col-span-2"></div>
+            <div class="col-span-3"></div>
+            <div class="col-span-4"></div>
+            #}
             <div class="grid grid-cols-1 gap-6 mt-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
                 {% for card in cards %}
                 <section class="col-span-{{ card.size.value }}">

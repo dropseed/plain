@@ -1,6 +1,78 @@
 import datetime
-
+import plotly.express as px
+import pandas as pd
 from .base import Card
+from bolt.db.models import Count
+from bolt.db.models.functions import TruncDate
+
+class Chart:
+    def render_html(self):
+        config = {
+            "displayModeBar": False,
+            "scrollZoom": False,
+            "responsive": True,
+            # "staticPlot": True,
+        }
+        return self.get_figure().to_html(full_html=False, config=config)#, include_plotlyjs=False)
+
+    def render_image(self):
+        return self.get_figure().to_image(format="png")
+
+    def __html__(self):
+        return self.render_html()
+
+
+class BarChart(Chart):
+    def __init__(self, *, dataframe, x, y):
+        self.dataframe = dataframe
+        self.x = x
+        self.y = y
+
+    def get_figure(self):
+        fig = px.bar(self.dataframe, x=self.x, y=self.y)
+        return fig
+
+
+
+class TrendCard(Card):
+    template_name = "admin/cards/trend.html"
+
+    model = None
+    trend_field = "created_at"
+
+    # default behavior can be querysets and  models?
+    # override if custom objects, but rare?
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["chart"] = self.get_chart()
+        return context
+
+    def get_chart(self):
+        filters = {
+            f"{self.trend_field}__range": self.datetime_range.as_tuple(),
+        }
+        data = (
+            self.model.objects.filter(**filters)
+            .annotate(date=TruncDate(self.trend_field))
+            .values("date")
+            .annotate(count=Count("id"))
+            .order_by("date")
+        )
+
+        dataframe = pd.DataFrame.from_records(
+            data,
+            columns=["date", "count"],
+        )
+
+        # fill the zeroes for the missing dates
+        dataframe = dataframe.set_index("date").reindex(self.datetime_range).fillna(0).reset_index()
+
+        return BarChart(
+            dataframe=dataframe,
+            x="date",
+            y="count",
+        )
 
 
 class ChartCard(Card):
