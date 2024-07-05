@@ -1,0 +1,18 @@
+# Local development files
+/.env
+/.plain
+
+# Publishing
+/dist
+
+# Python
+/.venv
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store
+
+# Node files
+node_modules/

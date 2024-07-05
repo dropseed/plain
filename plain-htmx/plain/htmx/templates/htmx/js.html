@@ -1,0 +1,18 @@
+{%- if DEBUG -%}
+<script src="{{ asset('htmx/src/htmx.js') }}" defer></script>
+{%- else -%}
+<script src="{{ asset('htmx/src/htmx.min.js') }}" defer></script>
+{%- endif -%}
+
+{%- if DEBUG -%}
+<script src="{{ asset('htmx/idiomorph/idiomorph.js') }}" defer></script>
+{%- else -%}
+<script src="{{ asset('htmx/idiomorph/idiomorph.min.js') }}" defer></script>
+{%- endif -%}
+<script src="{{ asset('htmx/idiomorph/idiomorph-htmx.js') }}" defer></script>
+
+{%- for extension in extensions -%}
+<script src="{{ asset('htmx/src/ext/' ~ extension ~ '.js') }}" defer></script>
+{%- endfor -%}
+
+<script src="{{ asset('htmx/plainhtmx.js') }}" defer data-csrftoken="{{ csrf_token }}"></script>

@@ -1,0 +1,16 @@
+# Local development files
+/.env
+/.plain
+*.sqlite3
+
+# Publishing
+/dist
+
+# Python
+/.venv
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store

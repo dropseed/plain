@@ -1,5 +1,5 @@
 #!/bin/sh -e
-cd bolt
+cd plain
 if [ "$1" = "--check" ]; then
     poetry run ruff check ..
     poetry run ruff format .. --check
