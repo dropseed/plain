@@ -28,7 +28,10 @@ class Services:
             pyproject = tomllib.load(f)
 
         return (
-            pyproject.get("tool", {}).get("plain", {}).get("dev", {}).get("services", {})
+            pyproject.get("tool", {})
+            .get("plain", {})
+            .get("dev", {})
+            .get("services", {})
         )
 
     def __init__(self):

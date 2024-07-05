@@ -1,5 +1,7 @@
 from plain.runtime import settings
-from plain.runtime import setup as plain_setup  # Rename so pytest doesn't call setup()...
+from plain.runtime import (
+    setup as plain_setup,  # Rename so pytest doesn't call setup()...
+)
 
 
 def test_setup():

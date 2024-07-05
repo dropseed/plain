@@ -13,7 +13,7 @@ from plain.runtime import APP_PATH
 from .db import cli as db_cli
 from .pid import Pid
 from .services import Services
-from .utils import plainpackage_installed, has_pyproject_toml
+from .utils import has_pyproject_toml, plainpackage_installed
 
 try:
     import tomllib

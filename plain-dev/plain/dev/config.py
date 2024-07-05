@@ -10,7 +10,9 @@ class Config(PackageConfig):
 
     def ready(self):
         # Symlink the plain package into .plain so we can look at it easily
-        plain_path = Path(importlib.util.find_spec("plain.runtime").origin).parent.parent
+        plain_path = Path(
+            importlib.util.find_spec("plain.runtime").origin
+        ).parent.parent
         if not settings.BOLT_TEMP_PATH.exists():
             settings.BOLT_TEMP_PATH.mkdir()
         src_path = settings.BOLT_TEMP_PATH / "src"

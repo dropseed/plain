@@ -4,7 +4,10 @@ Base file upload handler classes, and the built-in concrete subclasses
 import os
 from io import BytesIO
 
-from plain.internal.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
+from plain.internal.files.uploadedfile import (
+    InMemoryUploadedFile,
+    TemporaryUploadedFile,
+)
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 

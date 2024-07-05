@@ -106,9 +106,9 @@ class Tailwind:
         with open(pyproject_path) as f:
             config = tomlkit.load(f)
 
-        config.setdefault("tool", {}).setdefault("plain", {}).setdefault("tailwind", {})[
-            "version"
-        ] = version
+        config.setdefault("tool", {}).setdefault("plain", {}).setdefault(
+            "tailwind", {}
+        )["version"] = version
 
         with open(pyproject_path, "w") as f:
             tomlkit.dump(config, f)
