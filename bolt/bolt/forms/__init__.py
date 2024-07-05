@@ -1,5 +1,5 @@
 """
-Bolt validation and HTML form handling.
+Plain validation and HTML form handling.
 """
 
 from .boundfield import BoundField  # NOQA

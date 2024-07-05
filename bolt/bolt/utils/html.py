@@ -65,9 +65,9 @@ def json_script(value, element_id=None, encoder=None):
     value is safe to be output anywhere except for inside a tag attribute. Wrap
     the escaped JSON in a script tag.
     """
-    from bolt.json import BoltJSONEncoder
+    from bolt.json import PlainJSONEncoder
 
-    json_str = json.dumps(value, cls=encoder or BoltJSONEncoder).translate(
+    json_str = json.dumps(value, cls=encoder or PlainJSONEncoder).translate(
         _json_script_escapes
     )
     if element_id:
@@ -83,7 +83,7 @@ def conditional_escape(text):
     """
     Similar to escape(), except that it doesn't operate on pre-escaped strings.
 
-    This function relies on the __html__ convention used both by Bolt's
+    This function relies on the __html__ convention used both by Plain's
     SafeData class and by third-party libraries like markupsafe.
     """
     if isinstance(text, Promise):

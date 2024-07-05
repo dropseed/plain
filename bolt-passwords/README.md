@@ -2,4 +2,4 @@
 
 # bolt-password
 
-Password authentication for Bolt.
+Password authentication for Plain.

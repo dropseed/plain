@@ -1,6 +1,6 @@
 from bolt.packages import PackageConfig
 
 
-class BoltOAuthConfig(PackageConfig):
+class PlainOAuthConfig(PackageConfig):
     name = "bolt.oauth"
     label = "boltoauth"  # Primarily for migrations

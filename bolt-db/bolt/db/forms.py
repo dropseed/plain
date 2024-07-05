@@ -1,5 +1,5 @@
 """
-Helper functions for creating Form classes from Bolt models
+Helper functions for creating Form classes from Plain models
 and database field objects.
 """
 from itertools import chain

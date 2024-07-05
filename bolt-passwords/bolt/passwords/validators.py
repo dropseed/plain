@@ -126,7 +126,7 @@ class CommonPasswordValidator:
     Validate that the password is not a common password.
 
     The password is rejected if it occurs in a provided list of passwords,
-    which may be gzipped. The list Bolt ships with contains 20000 common
+    which may be gzipped. The list Plain ships with contains 20000 common
     passwords (lowercased and deduplicated), created by Royce Williams:
     https://gist.github.com/roycewilliams/226886fd01572964e1431ac8afc999ce
     The password list must be lowercased to match the comparison in validate().

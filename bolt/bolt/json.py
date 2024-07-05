@@ -8,7 +8,7 @@ from bolt.utils.functional import Promise
 from bolt.utils.timezone import is_aware
 
 
-class BoltJSONEncoder(json.JSONEncoder):
+class PlainJSONEncoder(json.JSONEncoder):
     """
     JSONEncoder subclass that knows how to encode date/time, decimal types, and
     UUIDs.

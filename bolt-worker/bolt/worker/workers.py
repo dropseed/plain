@@ -52,7 +52,7 @@ class Worker:
 
     def run(self):
         logger.info(
-            "⬣ Starting Bolt worker\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
+            "⬣ Starting Plain worker\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
             ", ".join(self.queues),
             "\n                   ".join(str(x) for x in self.jobs_schedule),
             self.stats_every,

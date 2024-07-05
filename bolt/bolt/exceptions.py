@@ -1,5 +1,5 @@
 """
-Global Bolt exception and warning classes.
+Global Plain exception and warning classes.
 """
 import operator
 
@@ -110,7 +110,7 @@ class ViewDoesNotExist(Exception):
 
 
 class ImproperlyConfigured(Exception):
-    """Bolt is somehow improperly configured"""
+    """Plain is somehow improperly configured"""
 
     pass
 

@@ -2,16 +2,16 @@
 var csrfToken = document.currentScript.dataset.csrftoken;
 
 htmx.on("htmx:configRequest", function (event) {
-  // Custom header for Bolt-HX-Action
+  // Custom header for Plain-HX-Action
   var actionElt = htmx.closest(event.detail.elt, "[bolt-hx-action]");
   if (actionElt) {
-    event.detail.headers["Bolt-HX-Action"] = actionElt.getAttribute("bolt-hx-action");
+    event.detail.headers["Plain-HX-Action"] = actionElt.getAttribute("bolt-hx-action");
   }
 
-  // Custom header for Bolt-HX-Fragment
+  // Custom header for Plain-HX-Fragment
   var fragmentElt = htmx.closest(event.detail.elt, "[bolt-hx-fragment]");
   if (fragmentElt) {
-    event.detail.headers["Bolt-HX-Fragment"] =
+    event.detail.headers["Plain-HX-Fragment"] =
       fragmentElt.getAttribute("bolt-hx-fragment");
   }
 

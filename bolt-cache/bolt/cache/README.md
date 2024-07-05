@@ -2,7 +2,7 @@
 
 A simple cache using the database.
 
-The Bolt Cache stores JSON-serializable values in a `CachedItem` model.
+The Plain Cache stores JSON-serializable values in a `CachedItem` model.
 Cached data can be set to expire after a certain amount of time.
 
 Access to the cache is provided through the `Cached` class.

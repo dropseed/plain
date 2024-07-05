@@ -1,16 +1,16 @@
 # CLI
 
-The `bolt` CLI loads commands from Bolt itself, and any `INSTALLED_PACKAGES`.
+The `bolt` CLI loads commands from Plain itself, and any `INSTALLED_PACKAGES`.
 
 Commands are written using [Click]((https://click.palletsprojects.com/en/8.1.x/))
-(one of Bolt's few dependencies),
+(one of Plain's few dependencies),
 which has been one of those most popular CLI frameworks in Python for a long time now.
 
 ## Built-in commands
 
 ### `bolt shell`
 
-Open a Python shell with the Bolt loaded.
+Open a Python shell with the Plain loaded.
 
 To auto-load models or run other code at shell launch,
 create an `app/shell.py` and it will be imported automatically.
@@ -98,7 +98,7 @@ def hello():
     click.echo("Hello, world!")
 ```
 
-Bolt will use the name of the package in the CLI,
+Plain will use the name of the package in the CLI,
 then any commands you defined.
 
 ```bash

@@ -2,7 +2,7 @@
 
 Serve static assets (CSS, JS, images, etc.) for your app.
 
-The default behavior is for Bolt to serve assets directly via a middleware.
+The default behavior is for Plain to serve assets directly via a middleware.
 This is based on [whitenoise](http://whitenoise.evans.io/en/stable/).
 
 ## Usage

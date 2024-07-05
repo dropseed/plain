@@ -1,4 +1,4 @@
-"""Bolt Unit Test framework."""
+"""Plain Unit Test framework."""
 
 from bolt.test.client import Client, RequestFactory
 from bolt.test.utils import (

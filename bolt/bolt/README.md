@@ -1,6 +1,6 @@
-# Bolt
+# Plain
 
-Bolt is a web framework for building products with Python.
+Plain is a web framework for building products with Python.
 
 With the core `bolt` package you can build an app that:
 
@@ -14,7 +14,7 @@ With the core `bolt` package you can build an app that:
 - Integrates first-party and third-party [packages](./packages)
 - Has a [preflight check system](./preflight)
 
-With the official Bolt ecosystem packages you can:
+With the official Plain ecosystem packages you can:
 
 - Integrate a full-featured [database ORM](https://plainframework.com/docs/bolt-db/)
 - Use a built-in [user authentication](https://plainframework.com/docs/bolt-auth/) system

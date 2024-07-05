@@ -1,4 +1,4 @@
-"""A pytest plugin which helps testing Bolt applications
+"""A pytest plugin which helps testing Plain applications
 
 This plugin handles creating and destroying the test environment and
 test database and provides some useful text fixtures.
@@ -54,7 +54,7 @@ def pytest_addoption(parser) -> None:
 
     parser.addini(
         "bolt_debug_mode",
-        "How to set the Bolt DEBUG setting (default `False`). "
+        "How to set the Plain DEBUG setting (default `False`). "
         "Use `keep` to not override.",
         default="False",
     )
@@ -98,9 +98,9 @@ def pytest_load_initial_conftests(
         "markers",
         "bolt_db(transaction=False, reset_sequences=False, databases=None, "
         "serialized_rollback=False): "
-        "Mark the test as using the Bolt test database.  "
+        "Mark the test as using the Plain test database.  "
         "The *transaction* argument allows you to use real transactions "
-        "in the test like Bolt's TransactionTestCase.  "
+        "in the test like Plain's TransactionTestCase.  "
         "The *reset_sequences* argument resets database sequences before "
         "the test.  "
         "The *databases* argument sets which database aliases the test "
@@ -111,7 +111,7 @@ def pytest_load_initial_conftests(
     early_config.addinivalue_line(
         "markers",
         "urls(modstr): Use a different URLconf for this test, similar to "
-        "the `urls` attribute of Bolt's `TestCase` objects.  *modstr* is "
+        "the `urls` attribute of Plain's `TestCase` objects.  *modstr* is "
         "a string specifying the module of a URL config, e.g. "
         '"my_app.test_urls".',
     )
@@ -131,7 +131,7 @@ def pytest_load_initial_conftests(
 
 @pytest.hookimpl(trylast=True)
 def pytest_configure() -> None:
-    # Allow Bolt settings to be configured in a user pytest_configure call,
+    # Allow Plain settings to be configured in a user pytest_configure call,
     # but make sure we call bolt.setup()
     _setup_bolt()
 
@@ -169,13 +169,13 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 @pytest.fixture(autouse=True, scope="session")
 def bolt_test_environment(request) -> None:
     """
-    Ensure that Bolt is loaded and has its testing environment setup.
+    Ensure that Plain is loaded and has its testing environment setup.
 
     XXX It is a little dodgy that this is an autouse fixture.  Perhaps
         an email fixture should be requested in order to be able to
-        use the Bolt email machinery just like you need to request a
-        db fixture for access to the Bolt database, etc.  But
-        without duplicating a lot more of Bolt's test support code
+        use the Plain email machinery just like you need to request a
+        db fixture for access to the Plain database, etc.  But
+        without duplicating a lot more of Plain's test support code
         we need to follow this model.
     """
     _setup_bolt()
@@ -196,7 +196,7 @@ def bolt_test_environment(request) -> None:
 
 @pytest.fixture(scope="session")
 def bolt_db_blocker() -> "_DatabaseBlocker | None":
-    """Wrapper around Bolt's database access.
+    """Wrapper around Plain's database access.
 
     This object can be used to re-enable database access.  This fixture is used
     internally in pytest-bolt to build the other fixtures and can be used for
@@ -308,13 +308,13 @@ class _DatabaseBlocker:
         )
 
     def unblock(self) -> "ContextManager[None]":
-        """Enable access to the Bolt database."""
+        """Enable access to the Plain database."""
         self._save_active_wrapper()
         self._dj_db_wrapper.ensure_connection = self._real_ensure_connection
         return _DatabaseBlockerContextManager(self)
 
     def block(self) -> "ContextManager[None]":
-        """Disable access to the Bolt database."""
+        """Disable access to the Plain database."""
         self._save_active_wrapper()
         self._dj_db_wrapper.ensure_connection = self._blocking_wrapper
         return _DatabaseBlockerContextManager(self)

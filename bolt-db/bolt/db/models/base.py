@@ -104,7 +104,7 @@ class ModelBase(type):
         if classcell is not None:
             new_attrs["__classcell__"] = classcell
         attr_meta = attrs.pop("Meta", None)
-        # Pass all attrs without a (Bolt-specific) contribute_to_class()
+        # Pass all attrs without a (Plain-specific) contribute_to_class()
         # method to type.__new__() so that they're properly initialized
         # (i.e. __set_name__()).
         contributable_attrs = {}
@@ -581,14 +581,14 @@ class Model(AltersData, metaclass=ModelBase):
         if pickled_version:
             if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
-                    f"Pickled model instance's Bolt version {pickled_version} does not "
+                    f"Pickled model instance's Plain version {pickled_version} does not "
                     f"match the current version {bolt.runtime.__version__}.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
         else:
             warnings.warn(
-                "Pickled model instance's Bolt version is not specified.",
+                "Pickled model instance's Plain version is not specified.",
                 RuntimeWarning,
                 stacklevel=2,
             )

@@ -1,5 +1,5 @@
 """
-Bolt's standard crypto functions and utilities.
+Plain's standard crypto functions and utilities.
 """
 import hashlib
 import hmac

@@ -46,7 +46,7 @@ class Command(BaseCommand):
             "--no-input",
             action="store_false",
             dest="interactive",
-            help="Tells Bolt to NOT prompt the user for input of any kind.",
+            help="Tells Plain to NOT prompt the user for input of any kind.",
         )
         parser.add_argument(
             "--squashed-name",

@@ -100,7 +100,7 @@ class ElementsLoader(FileSystemLoader):
 
             # Create a new class on the fly
             NamedElementExtension = type(
-                f"BoltElement.{element_name}",
+                f"PlainElement.{element_name}",
                 (ElementExtension,),
                 {
                     "tags": {jinja_tag_name, f"end{jinja_tag_name}"},

@@ -17,7 +17,7 @@ class SafeData:
         """
         Return the html representation of a string for interoperability.
 
-        This allows other template engines to understand Bolt's SafeData.
+        This allows other template engines to understand Plain's SafeData.
         """
         return self
 
@@ -44,7 +44,7 @@ class SafeString(str, SafeData):
         return self
 
 
-SafeText = SafeString  # For backwards compatibility since Bolt 2.0.
+SafeText = SafeString  # For backwards compatibility since Plain 2.0.
 
 
 def _safety_decorator(safety_marker, func):

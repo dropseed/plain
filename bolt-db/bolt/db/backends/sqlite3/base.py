@@ -301,7 +301,7 @@ FORMAT_QMARK_REGEX = _lazy_re_compile(r"(?<!%)%s")
 
 class SQLiteCursorWrapper(Database.Cursor):
     """
-    Bolt uses the "format" and "pyformat" styles, but Python's sqlite3 module
+    Plain uses the "format" and "pyformat" styles, but Python's sqlite3 module
     supports neither of these styles.
 
     This wrapper performs the following conversions:

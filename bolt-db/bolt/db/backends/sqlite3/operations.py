@@ -157,7 +157,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return results
 
         sql = "SELECT " + ", ".join(["QUOTE(?)"] * len(params))
-        # Bypass Bolt's wrappers and use the underlying sqlite3 connection
+        # Bypass Plain's wrappers and use the underlying sqlite3 connection
         # to avoid logging this query - it would trigger infinite recursion.
         cursor = self.connection.connection.cursor()
         # Native sqlite3 cursors cannot be used as context managers.
@@ -214,7 +214,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     @cached_property
     def _references_graph(self):
         # 512 is large enough to fit the ~330 tables (as of this writing) in
-        # Bolt's test suite.
+        # Plain's test suite.
         return lru_cache(maxsize=512)(self.__references_graph)
 
     def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):

@@ -38,7 +38,7 @@ a production `.env` shouldn't be committed in your repo anyway,
 so using `.env` for local development is ok.
 The downside to this is that it's harder to share your local settings with others,
 but these also often contain real secrets which shouldn't be committed to your repo either!
-More advanced `.env` sharing patterns are currently beyond the scope of Bolt...
+More advanced `.env` sharing patterns are currently beyond the scope of Plain...
 
 #### Production
 

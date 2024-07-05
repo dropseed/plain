@@ -2,7 +2,7 @@
 
 Take a request, return a response.
 
-Bolt views are written as classes,
+Plain views are written as classes,
 with a straightforward API that keeps simple views simple,
 but gives you the power of a full class to handle more complex cases.
 
@@ -20,7 +20,7 @@ class ExampleView(View):
 The HTTP methd of the request will map to a class method of the same name on the view.
 
 If a request comes in and there isn't a matching method on the view,
-Bolt will return a `405 Method Not Allowed` response.
+Plain will return a `405 Method Not Allowed` response.
 
 ```python
 from bolt.views import View

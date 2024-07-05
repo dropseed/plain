@@ -2,7 +2,7 @@ import click
 from click.formatting import iter_rows, measure_table, term_len, wrap_text
 
 
-class BoltHelpFormatter(click.HelpFormatter):
+class PlainHelpFormatter(click.HelpFormatter):
     def write_heading(self, heading):
         styled_heading = click.style(heading, underline=True)
         self.write(f"{'':>{self.current_indent}}{styled_heading}\n")
@@ -57,5 +57,5 @@ class BoltHelpFormatter(click.HelpFormatter):
                 self.write("\n")
 
 
-class BoltContext(click.Context):
-    formatter_class = BoltHelpFormatter
+class PlainContext(click.Context):
+    formatter_class = PlainHelpFormatter

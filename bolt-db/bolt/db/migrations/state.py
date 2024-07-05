@@ -592,7 +592,7 @@ class StatePackages(Packages):
         super().__init__(package_configs)
 
         # These locks get in the way of copying as implemented in clone(),
-        # which is called whenever Bolt duplicates a StatePackages before
+        # which is called whenever Plain duplicates a StatePackages before
         # updating it.
         self._lock = None
 
@@ -680,7 +680,7 @@ class StatePackages(Packages):
 
 class ModelState:
     """
-    Represent a Bolt Model. Don't use the actual Model class as it's not
+    Represent a Plain Model. Don't use the actual Model class as it's not
     designed to have its options changed - instead, mutate this one and then
     render it into a Model as required.
 

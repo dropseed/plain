@@ -13,7 +13,7 @@ import bolt.runtime
 from bolt import preflight
 from bolt.packages import packages
 
-from .formatting import BoltContext
+from .formatting import PlainContext
 from .packages import EntryPointGroup, InstalledPackagesGroup
 
 
@@ -103,7 +103,7 @@ def run(script):
 # @click.option("--filter", "-f", "name_filter", help="Filter settings by name")
 # @click.option("--overridden", is_flag=True, help="Only show overridden settings")
 # def settings(name_filter, overridden):
-#     """Print Bolt settings"""
+#     """Print Plain settings"""
 #     table = Table(box=box.MINIMAL)
 #     table.add_column("Setting")
 #     table.add_column("Default value")
@@ -166,7 +166,7 @@ def run(script):
 )
 def preflight_checks(package_label, deploy, fail_level, databases):
     """
-    Use the system check framework to validate entire Bolt project.
+    Use the system check framework to validate entire Plain project.
     Raise CommandError for any serious message (error or critical errors).
     If there are only light messages (like warnings), print them to stderr
     and don't raise an exception.
@@ -383,8 +383,8 @@ class AppCLIGroup(click.Group):
             return
 
 
-class BoltCommandCollection(click.CommandCollection):
-    context_class = BoltContext
+class PlainCommandCollection(click.CommandCollection):
+    context_class = PlainContext
 
     def __init__(self, *args, **kwargs):
         sources = []
@@ -402,7 +402,7 @@ class BoltCommandCollection(click.CommandCollection):
             ]
         except bolt.runtime.AppPathNotFound:
             click.secho(
-                "Bolt `app` directory not found. Some commands may be missing.",
+                "Plain `app` directory not found. Some commands may be missing.",
                 fg="yellow",
                 err=True,
             )
@@ -413,7 +413,7 @@ class BoltCommandCollection(click.CommandCollection):
             ]
         except Exception as e:
             click.secho(
-                f"Error setting up Bolt CLI\n{e}",
+                f"Error setting up Plain CLI\n{e}",
                 fg="red",
                 err=True,
             )
@@ -436,4 +436,4 @@ class BoltCommandCollection(click.CommandCollection):
         return cmd
 
 
-cli = BoltCommandCollection()
+cli = PlainCommandCollection()

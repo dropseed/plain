@@ -17,7 +17,7 @@ class Flag:
         Determine a unique key for this instance of the flag.
         This should be a quick operation, as it will be called on every use of the flag.
 
-        For convenience, you can return an instance of a Bolt Model
+        For convenience, you can return an instance of a Plain Model
         and it will be converted to a string automatically.
 
         Return a falsy value if you don't want to store the flag result.
@@ -47,7 +47,7 @@ class Flag:
         Retrieve the value from the DB if it exists,
         otherwise compute the value and save it to the DB.
         """
-        from .models import Flag, FlagResult  # So Bolt app is ready...
+        from .models import Flag, FlagResult  # So Plain app is ready...
 
         # Create an associated DB Flag that we can use to enable/disable
         # and tie the results to

@@ -161,7 +161,7 @@ class Packages:
                     break
             raise LookupError(message)
 
-    # This method is performance-critical at least for Bolt's test suite.
+    # This method is performance-critical at least for Plain's test suite.
     @functools.cache
     def get_models(self, include_auto_created=False, include_swapped=False):
         """
@@ -289,7 +289,7 @@ class Packages:
 
         This method is decorated with @functools.cache because it's performance
         critical when it comes to migrations. Since the swappable settings don't
-        change after Bolt has loaded the settings, there is no reason to get
+        change after Plain has loaded the settings, there is no reason to get
         the respective settings attribute over and over again.
         """
         to_string = to_string.lower()

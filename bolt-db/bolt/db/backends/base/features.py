@@ -258,12 +258,12 @@ class BaseDatabaseFeatures:
     # a type with time?
     time_cast_precision = 6
 
-    # SQL to create a procedure for use by the Bolt test suite. The
+    # SQL to create a procedure for use by the Plain test suite. The
     # functionality of the procedure isn't important.
     create_test_procedure_without_params_sql = None
     create_test_procedure_with_int_param_sql = None
 
-    # SQL to create a table with a composite primary key for use by the Bolt
+    # SQL to create a table with a composite primary key for use by the Plain
     # test suite.
     create_test_table_with_composite_primary_key = None
 
@@ -348,7 +348,7 @@ class BaseDatabaseFeatures:
     # Does the backend support unlimited character columns?
     supports_unlimited_charfield = False
 
-    # Collation names for use by the Bolt test suite.
+    # Collation names for use by the Plain test suite.
     test_collations = {
         "ci": None,  # Case-insensitive.
         "cs": None,  # Case-sensitive.

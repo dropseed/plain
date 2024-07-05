@@ -47,7 +47,7 @@ class Command(BaseCommand):
             "--no-input",
             action="store_false",
             dest="interactive",
-            help="Tells Bolt to NOT prompt the user for input of any kind.",
+            help="Tells Plain to NOT prompt the user for input of any kind.",
         )
         parser.add_argument(
             "--database",
@@ -68,7 +68,7 @@ class Command(BaseCommand):
             help=(
                 "Detect if tables already exist and fake-apply initial migrations if "
                 "so. Make sure that the current database schema matches your initial "
-                "migration before using this flag. Bolt will only check for an "
+                "migration before using this flag. Plain will only check for an "
                 "existing table name."
             ),
         )

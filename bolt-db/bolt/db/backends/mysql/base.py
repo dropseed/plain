@@ -1,5 +1,5 @@
 """
-MySQL database backend for Bolt.
+MySQL database backend for Plain.
 
 Requires mysqlclient: https://pypi.org/project/mysqlclient/
 """
@@ -37,7 +37,7 @@ if version < (1, 4, 3):
 
 
 # MySQLdb returns TIME columns as timedelta -- they are more like timedelta in
-# terms of actual behavior as they are signed and include days -- and Bolt
+# terms of actual behavior as they are signed and include days -- and Plain
 # expects time.
 bolt_conversions = {
     **conversions,
@@ -74,7 +74,7 @@ class CursorWrapper:
             return self.cursor.execute(query, args)
         except Database.OperationalError as e:
             # Map some error codes to IntegrityError, since they seem to be
-            # misclassified and Bolt would prefer the more logical place.
+            # misclassified and Plain would prefer the more logical place.
             if e.args[0] in self.codes_for_integrityerror:
                 raise IntegrityError(*tuple(e.args))
             raise
@@ -84,7 +84,7 @@ class CursorWrapper:
             return self.cursor.executemany(query, args)
         except Database.OperationalError as e:
             # Map some error codes to IntegrityError, since they seem to be
-            # misclassified and Bolt would prefer the more logical place.
+            # misclassified and Plain would prefer the more logical place.
             if e.args[0] in self.codes_for_integrityerror:
                 raise IntegrityError(*tuple(e.args))
             raise
@@ -241,8 +241,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def get_new_connection(self, conn_params):
         connection = Database.connect(**conn_params)
         # bytes encoder in mysqlclient doesn't work and was added only to
-        # prevent KeyErrors in Bolt < 2.0. We can remove this workaround when
-        # mysqlclient 2.1 becomes the minimal mysqlclient supported by Bolt.
+        # prevent KeyErrors in Plain < 2.0. We can remove this workaround when
+        # mysqlclient 2.1 becomes the minimal mysqlclient supported by Plain.
         # See https://github.com/PyMySQL/mysqlclient/issues/489
         if connection.encoders.get(bytes) is bytes:
             connection.encoders.pop(bytes)

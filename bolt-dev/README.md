@@ -2,9 +2,9 @@
 
 # bolt-dev
 
-A single command to run everything you need for local Bolt development.
+A single command to run everything you need for local Plain development.
 
-![Bolt work command example](https://user-images.githubusercontent.com/649496/176533533-cfd44dc5-afe5-42af-8b5d-33a9fa23f8d9.gif)
+![Plain work command example](https://user-images.githubusercontent.com/649496/176533533-cfd44dc5-afe5-42af-8b5d-33a9fa23f8d9.gif)
 
 The `bolt dev` command runs a combination of local commands + a Docker container for your database.
 
@@ -124,7 +124,7 @@ Add a new VS Code debug configuration (using localhost and port 5768) by saving 
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Bolt: Attach to Django",
+            "name": "Plain: Attach to Django",
             "type": "python",
             "request": "attach",
             "connect": {
@@ -144,7 +144,7 @@ Add a new VS Code debug configuration (using localhost and port 5768) by saving 
 }
 ```
 
-Then in the "Run and Debug" tab, you can click the green arrow next to "Bolt: Attach to Django" to start the debugger.
+Then in the "Run and Debug" tab, you can click the green arrow next to "Plain: Attach to Django" to start the debugger.
 
 In your terminal is should tell you it was attached, and when you hit a breakpoint you'll see the debugger information in VS Code.
 If Django's runserver reloads, you'll be prompted to reattach by clicking the green arrow again.

@@ -35,7 +35,7 @@ def setup():
 
     if not APP_PATH.exists():
         raise AppPathNotFound(
-            "No app directory found. Are you sure you're in a Bolt project?"
+            "No app directory found. Are you sure you're in a Plain project?"
         )
 
     # Automatically put the app dir on the Python path for convenience

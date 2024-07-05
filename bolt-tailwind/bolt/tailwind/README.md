@@ -115,4 +115,4 @@ If possible, you should add `static/dist/tailwind.css` to your `.gitignore` and 
 
 When you run `bolt tailwind compile`, it will automatically check whether the Tailwind standalone CLI has been installed, and install it if it isn't.
 
-When using Bolt on Heroku, we do this for you automatically in our [Bolt buildpack](https://github.com/boltpackages/heroku-buildpack-bolt/blob/master/bin/files/post_compile).
+When using Plain on Heroku, we do this for you automatically in our [Plain buildpack](https://github.com/boltpackages/heroku-buildpack-bolt/blob/master/bin/files/post_compile).

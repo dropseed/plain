@@ -232,7 +232,7 @@ class ManagementUtility:
             if self.settings_exception is not None:
                 usage.append(
                     style.NOTICE(
-                        "Note that only Bolt core commands are listed "
+                        "Note that only Plain core commands are listed "
                         "as settings are not properly configured (error: %s)."
                         % self.settings_exception
                     )
@@ -258,7 +258,7 @@ class ManagementUtility:
                 # informed about it.
                 settings.INSTALLED_PACKAGES
             elif not settings.configured:
-                sys.stderr.write("No Bolt settings specified.\n")
+                sys.stderr.write("No Plain settings specified.\n")
             possible_matches = get_close_matches(subcommand, commands)
             sys.stderr.write("Unknown command: %r" % subcommand)
             if possible_matches:

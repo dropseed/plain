@@ -6,7 +6,7 @@ packages = [
 ]
 
 version = "0.0.0"
-description = "Work library for Bolt"
+description = "Work library for Plain"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "MIT"
 readme = "README.md"

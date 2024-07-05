@@ -722,7 +722,7 @@ def freeze_time(t):
     modifies the time function of the time module. Modules which import the
     time function directly (e.g. `from time import time`) won't be affected
     This isn't meant as a public API, but helps reduce some repetitive code in
-    Bolt's test suite.
+    Plain's test suite.
     """
     _real_time = time.time
     time.time = lambda: t

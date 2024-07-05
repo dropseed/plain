@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-# Follow Bolt in treating URLs as UTF-8 encoded (which requires undoing the
+# Follow Plain in treating URLs as UTF-8 encoded (which requires undoing the
 # implicit ISO-8859-1 decoding applied in Python 3). Strictly speaking, URLs
 # should only be ASCII anyway, but UTF-8 can be found in the wild.
 def decode_path_info(path_info):

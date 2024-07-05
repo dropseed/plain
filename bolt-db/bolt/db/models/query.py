@@ -326,7 +326,7 @@ class QuerySet(AltersData):
         if pickled_version:
             if pickled_version != bolt.runtime.__version__:
                 warnings.warn(
-                    "Pickled queryset instance's Bolt version {} does not "
+                    "Pickled queryset instance's Plain version {} does not "
                     "match the current version {}.".format(
                         pickled_version, bolt.runtime.__version__
                     ),
@@ -335,7 +335,7 @@ class QuerySet(AltersData):
                 )
         else:
             warnings.warn(
-                "Pickled queryset instance's Bolt version is not specified.",
+                "Pickled queryset instance's Plain version is not specified.",
                 RuntimeWarning,
                 stacklevel=2,
             )
@@ -2118,7 +2118,7 @@ def prefetch_related_objects(model_instances, *related_lookups):
                         # Must be an immutable object from
                         # values_list(flat=True), for example (TypeError) or
                         # a QuerySet subclass that isn't returning Model
-                        # instances (AttributeError), either in Bolt or a 3rd
+                        # instances (AttributeError), either in Plain or a 3rd
                         # party. prefetch_related() doesn't make sense, so quit.
                         good_objects = False
                         break

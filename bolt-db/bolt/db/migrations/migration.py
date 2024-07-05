@@ -224,7 +224,7 @@ class Migration:
 
 class SwappableTuple(tuple):
     """
-    Subclass of tuple so Bolt can tell this was originally a swappable
+    Subclass of tuple so Plain can tell this was originally a swappable
     dependency when it reads the migration file.
     """
 

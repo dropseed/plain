@@ -58,7 +58,7 @@ class TimeFormat(Formatter):
         if isinstance(obj, datetime):
             # Timezone is only supported when formatting datetime objects, not
             # date objects (timezone information not appropriate), or time
-            # objects (against established Bolt policy).
+            # objects (against established Plain policy).
             if is_naive(obj):
                 timezone = get_default_timezone()
             else:

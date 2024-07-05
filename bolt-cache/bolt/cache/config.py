@@ -1,6 +1,6 @@
 from bolt.packages import PackageConfig
 
 
-class BoltCacheConfig(PackageConfig):
+class PlainCacheConfig(PackageConfig):
     name = "bolt.cache"
     label = "boltcache"

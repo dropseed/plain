@@ -166,7 +166,7 @@ class Options:
         if self.meta:
             meta_attrs = self.meta.__dict__.copy()
             for name in self.meta.__dict__:
-                # Ignore any private attributes that Bolt doesn't care about.
+                # Ignore any private attributes that Plain doesn't care about.
                 # NOTE: We can't modify a dictionary's contents while looping
                 # over it, so we loop over the *original* dictionary instead.
                 if name.startswith("_"):
@@ -429,7 +429,7 @@ class Options:
         Return a list of all forward fields on the model and its parents,
         excluding ManyToManyFields.
 
-        Private API intended only to be used by Bolt itself; get_fields()
+        Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
@@ -470,7 +470,7 @@ class Options:
         """
         Return a list of all concrete fields on the model and its parents.
 
-        Private API intended only to be used by Bolt itself; get_fields()
+        Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
@@ -483,7 +483,7 @@ class Options:
         """
         Return a list of all concrete fields on the model.
 
-        Private API intended only to be used by Bolt itself; get_fields()
+        Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
@@ -496,7 +496,7 @@ class Options:
         """
         Return a list of all many to many fields on the model and its parents.
 
-        Private API intended only to be used by Bolt itself; get_fields()
+        Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this list.
         """
@@ -516,7 +516,7 @@ class Options:
         objects can come from a one-to-one, one-to-many, or many-to-many field
         relation type.
 
-        Private API intended only to be used by Bolt itself; get_fields()
+        Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
@@ -538,7 +538,7 @@ class Options:
         fields = self._get_fields(reverse=False)
         for field in fields:
             res[field.name] = field
-            # Due to the way Bolt's internals work, get_field() should also
+            # Due to the way Plain's internals work, get_field() should also
             # be able to fetch a field by attname. In the case of a concrete
             # field with relation, includes the *_id name too
             try:
@@ -553,7 +553,7 @@ class Options:
         fields = self._get_fields(forward=False, include_hidden=True)
         for field in fields:
             res[field.name] = field
-            # Due to the way Bolt's internals work, get_field() should also
+            # Due to the way Plain's internals work, get_field() should also
             # be able to fetch a field by attname. In the case of a concrete
             # field with relation, includes the *_id name too
             try:
@@ -786,7 +786,7 @@ class Options:
         if include_parents not in (True, False, PROXY_PARENTS):
             raise TypeError(f"Invalid argument for include_parents: {include_parents}")
         # This helper function is used to allow recursion in ``get_fields()``
-        # implementation and to provide a fast way for Bolt's internals to
+        # implementation and to provide a fast way for Plain's internals to
         # access specific subsets of fields.
 
         # We must keep track of which models we have already seen. Otherwise we
@@ -905,7 +905,7 @@ class Options:
     @cached_property
     def db_returning_fields(self):
         """
-        Private API intended only to be used by Bolt itself.
+        Private API intended only to be used by Plain itself.
         Fields to be returned after a database insert.
         """
         return [

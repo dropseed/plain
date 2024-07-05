@@ -14,7 +14,7 @@ Example Usage::
     >>> from bolt.internal.files import locks
     >>> with open('./file', 'wb') as f:
     ...     locks.lock(f, locks.LOCK_EX)
-    ...     f.write('Bolt')
+    ...     f.write('Plain')
 """
 import os
 

@@ -108,7 +108,7 @@ def _check_lazy_references(packages, ignore=None):
     """
     Ensure all lazy (i.e. string) model references have been resolved.
 
-    Lazy references are used in various places throughout Bolt, primarily in
+    Lazy references are used in various places throughout Plain, primarily in
     related fields and model signals. Identify those common cases and provide
     more helpful error messages for them.
 
@@ -155,7 +155,7 @@ def _check_lazy_references(packages, ignore=None):
         return model_error
 
     # Here are several functions which return CheckMessage instances for the
-    # most common usages of lazy operations throughout Bolt. These functions
+    # most common usages of lazy operations throughout Plain. These functions
     # take the model that was being waited on as an (package_label, modelname)
     # pair, the original lazy function, and its positional and keyword args as
     # determined by extract_operation().

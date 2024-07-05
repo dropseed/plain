@@ -271,7 +271,7 @@ class EmailMessage:
         header_names = [key.lower() for key in self.extra_headers]
         if "date" not in header_names:
             # formatdate() uses stdlib methods to format the date, which use
-            # the stdlib/OS concept of a timezone, however, Bolt sets the
+            # the stdlib/OS concept of a timezone, however, Plain sets the
             # TZ environment variable based on the TIME_ZONE setting which
             # will get picked up by formatdate().
             msg["Date"] = formatdate(localtime=settings.EMAIL_USE_LOCALTIME)

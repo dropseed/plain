@@ -530,7 +530,7 @@ class QueryDict(MultiValueDict):
                 self.appendlist(key, value)
         except ValueError as e:
             # ValueError can also be raised if the strict_parsing argument to
-            # parse_qsl() is True. As that is not used by Bolt, assume that
+            # parse_qsl() is True. As that is not used by Plain, assume that
             # the exception was raised by exceeding the value of max_num_fields
             # instead of fragile checks of exception message strings.
             raise TooManyFieldsSent(

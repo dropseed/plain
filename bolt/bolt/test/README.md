@@ -1,3 +1,3 @@
 # test
 
-Testing utilities for Bolt.
+Testing utilities for Plain.

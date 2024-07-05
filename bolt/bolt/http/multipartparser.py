@@ -58,7 +58,7 @@ class MultiPartParser:
         Initialize the MultiPartParser object.
 
         :META:
-            The standard ``META`` dictionary in Bolt request objects.
+            The standard ``META`` dictionary in Plain request objects.
         :input_data:
             The raw post data, as a file-like object.
         :upload_handlers:
@@ -526,7 +526,7 @@ class LazyStream:
             raise SuspiciousMultipartForm(
                 "The multipart parser got stuck, which shouldn't happen with"
                 " normal uploaded files. Check for malicious upload activity;"
-                " if there is none, report this to the Bolt developers."
+                " if there is none, report this to the Plain developers."
             )
 
 

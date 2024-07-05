@@ -14,7 +14,7 @@ class WelcomeUserJob(Job):
     def run(self):
         send_mail(
             subject="Welcome!",
-            message=f"Hello from Bolt, {self.user}",
+            message=f"Hello from Plain, {self.user}",
             from_email="welcome@plainframework.com",
             recipient_list=[self.user.email],
         )

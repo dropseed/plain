@@ -102,7 +102,7 @@ def deactivate():
     """
     Unset the time zone for the current thread.
 
-    Bolt will then use the time zone defined by settings.TIME_ZONE.
+    Plain will then use the time zone defined by settings.TIME_ZONE.
     """
     if hasattr(_active, "value"):
         del _active.value
@@ -117,7 +117,7 @@ class override(ContextDecorator):
     on exit.
 
     The ``timezone`` argument must be an instance of a ``tzinfo`` subclass, a
-    time zone name, or ``None``. If it is ``None``, Bolt enables the default
+    time zone name, or ``None``. If it is ``None``, Plain enables the default
     time zone.
     """
 

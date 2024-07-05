@@ -2,7 +2,7 @@
 
 An admin interface for staff users.
 
-The Bolt Admin is a new packages built from the ground up.
+The Plain Admin is a new packages built from the ground up.
 It leverages class-based views and standard URLs and templates to provide a flexible admin where
 you can quickly create your own pages and cards,
 in addition to models.
@@ -81,7 +81,7 @@ This package is styled with [Tailwind CSS](https://tailwindcss.com/),
 and pairs well with [`bolt-tailwind`](https://github.com/boltpackages/bolt-tailwind).
 
 If you are using your own Tailwind implementation,
-you can modify the "content" in your Tailwind config to include any Bolt packages:
+you can modify the "content" in your Tailwind config to include any Plain packages:
 
 ```js
 // tailwind.config.js
@@ -101,7 +101,7 @@ If you aren't using Tailwind, and don't intend to, open an issue to discuss othe
 
 The staff toolbar is enabled for every user who `is_staff`.
 
-![Bolt staff toolbar](https://user-images.githubusercontent.com/649496/213781915-a2094f54-99b8-4a05-a36e-dee107405229.png)
+![Plain staff toolbar](https://user-images.githubusercontent.com/649496/213781915-a2094f54-99b8-4a05-a36e-dee107405229.png)
 
 ## Installation
 
@@ -137,7 +137,7 @@ This package is styled with [Tailwind CSS](https://tailwindcss.com/),
 and pairs well with [`bolt-tailwind`](https://github.com/boltpackages/bolt-tailwind).
 
 If you are using your own Tailwind implementation,
-you can modify the "content" in your Tailwind config to include any Bolt packages:
+you can modify the "content" in your Tailwind config to include any Plain packages:
 
 ```js
 // tailwind.config.js
@@ -202,7 +202,7 @@ This package is styled with [Tailwind CSS](https://tailwindcss.com/),
 and pairs well with [`bolt-tailwind`](https://github.com/boltpackages/bolt-tailwind).
 
 If you are using your own Tailwind implementation,
-you can modify the "content" in your Tailwind config to include any Bolt packages:
+you can modify the "content" in your Tailwind config to include any Plain packages:
 
 ```js
 // tailwind.config.js

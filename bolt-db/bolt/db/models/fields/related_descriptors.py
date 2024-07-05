@@ -54,7 +54,7 @@ and two directions (forward and reverse) for a total of six combinations.
 5. Related objects manager for related instances on the forward or reverse
    sides of a many-to-many relation: ``ManyToManyDescriptor``.
 
-   Many-to-many relations are symmetrical. The syntax of Bolt models
+   Many-to-many relations are symmetrical. The syntax of Plain models
    requires declaring them on one side but that's an implementation detail.
    They could be declared on the other side without any change in behavior.
    Therefore the forward and reverse descriptors can be the same.

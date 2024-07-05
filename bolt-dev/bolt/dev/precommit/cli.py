@@ -72,10 +72,10 @@ def cli(install):
                 "default",
             )
             check_short(
-                "Checking Bolt migrations", "bolt", "legacy", "migrate", "--check"
+                "Checking Plain migrations", "bolt", "legacy", "migrate", "--check"
             )
             check_short(
-                "Checking for Bolt models missing migrations",
+                "Checking for Plain models missing migrations",
                 "bolt",
                 "legacy",
                 "makemigrations",
@@ -83,7 +83,7 @@ def cli(install):
                 "--check",
             )
         else:
-            check_short("Running Bolt checks (without database)", "bolt", "preflight")
+            check_short("Running Plain checks (without database)", "bolt", "preflight")
             click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
         print_event("Running bolt compile")

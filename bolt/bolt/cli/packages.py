@@ -50,7 +50,7 @@ class InstalledPackagesGroup(click.Group):
 
 class EntryPointGroup(click.Group):
     """
-    Python packages can be added to the Bolt CLI
+    Python packages can be added to the Plain CLI
     via the bolt_cli entrypoint in their setup.py.
 
     This is intended for packages that don't go in INSTALLED_PACKAGES.

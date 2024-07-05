@@ -6,7 +6,7 @@ from bolt.runtime import APP_PATH
 from .registry import registry
 
 
-class BoltPagesConfig(PackageConfig):
+class PlainPagesConfig(PackageConfig):
     name = "bolt.pages"
 
     def ready(self):

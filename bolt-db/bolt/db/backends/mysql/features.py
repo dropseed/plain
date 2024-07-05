@@ -84,7 +84,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
 
     @cached_property
     def _mysql_storage_engine(self):
-        "Internal method used in Bolt tests. Don't rely on this from your code"
+        "Internal method used in Plain tests. Don't rely on this from your code"
         return self.connection.mysql_server_data["default_storage_engine"]
 
     @cached_property

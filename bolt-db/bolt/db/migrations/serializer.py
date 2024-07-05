@@ -381,6 +381,6 @@ def serializer_factory(value):
         if isinstance(value, type_):
             return serializer_cls(value)
     raise ValueError(
-        "Cannot serialize: %r\nThere are some values Bolt cannot serialize into "
+        "Cannot serialize: %r\nThere are some values Plain cannot serialize into "
         "migration files." % value
     )

@@ -13,7 +13,7 @@ from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 from bolt.http import HttpHeaders, HttpRequest, QueryDict
 from bolt.internal.handlers.base import BaseHandler
 from bolt.internal.handlers.wsgi import WSGIRequest
-from bolt.json import BoltJSONEncoder
+from bolt.json import PlainJSONEncoder
 from bolt.runtime import settings
 from bolt.signals import got_request_exception, request_finished, request_started
 from bolt.test.utils import ContextList
@@ -306,7 +306,7 @@ class RequestFactory:
     just as if that view had been hooked up using a URLconf.
     """
 
-    def __init__(self, *, json_encoder=BoltJSONEncoder, headers=None, **defaults):
+    def __init__(self, *, json_encoder=PlainJSONEncoder, headers=None, **defaults):
         self.json_encoder = json_encoder
         self.defaults = defaults
         self.cookies = SimpleCookie()

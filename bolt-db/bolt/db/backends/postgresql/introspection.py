@@ -10,7 +10,7 @@ TableInfo = namedtuple("TableInfo", BaseTableInfo._fields + ("comment",))
 
 
 class DatabaseIntrospection(BaseDatabaseIntrospection):
-    # Maps type codes to Bolt Field types.
+    # Maps type codes to Plain Field types.
     data_types_reverse = {
         16: "BooleanField",
         17: "BinaryField",
@@ -41,7 +41,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
     def get_field_type(self, data_type, description):
         field_type = super().get_field_type(data_type, description)
         if description.is_autofield or (
-            # Required for pre-Bolt 4.1 serial columns.
+            # Required for pre-Plain 4.1 serial columns.
             description.default and "nextval" in description.default
         ):
             if field_type == "IntegerField":

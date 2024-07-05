@@ -1,5 +1,5 @@
 """
-PostgreSQL database backend for Bolt.
+PostgreSQL database backend for Plain.
 
 Requires psycopg2 >= 2.8.4 or psycopg >= 3.1.8
 """
@@ -371,7 +371,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def is_usable(self):
         try:
-            # Use a psycopg cursor directly, bypassing Bolt's utilities.
+            # Use a psycopg cursor directly, bypassing Plain's utilities.
             with self.connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
         except Database.Error:
@@ -389,10 +389,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             if cursor is not None:
                 raise
             warnings.warn(
-                "Normally Bolt will use a connection to the 'postgres' database "
+                "Normally Plain will use a connection to the 'postgres' database "
                 "to avoid running initialization queries against the production "
                 "database when it's not needed (for example, when running tests). "
-                "Bolt was unable to create a connection to the 'postgres' database "
+                "Plain was unable to create a connection to the 'postgres' database "
                 "and will use the first PostgreSQL database instead.",
                 RuntimeWarning,
             )

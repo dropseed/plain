@@ -231,7 +231,7 @@ def bolt_db_serialized_rollback(
 
 @pytest.fixture()
 def client() -> "bolt.test.client.Client":
-    """A Bolt test client instance."""
+    """A Plain test client instance."""
     from bolt.test.client import Client
 
     return Client()
@@ -280,7 +280,7 @@ class SettingsWrapper:
 
 @pytest.fixture()
 def settings():
-    """A Bolt settings object which restores changes after the testrun"""
+    """A Plain settings object which restores changes after the testrun"""
     wrapper = SettingsWrapper()
     yield wrapper
     wrapper.finalize()

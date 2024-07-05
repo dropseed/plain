@@ -43,7 +43,7 @@ router = ConnectionRouter()
 connection = ConnectionProxy(connections, DEFAULT_DB_ALIAS)
 
 
-# Register an event to reset saved queries when a Bolt request is started.
+# Register an event to reset saved queries when a Plain request is started.
 def reset_queries(**kwargs):
     for conn in connections.all(initialized_only=True):
         conn.queries_log.clear()

@@ -134,8 +134,8 @@ a standard `div` is output that looks like this:
 The `bolt-hx-fragment` is a custom attribute that we've added ("F" is for "Forge"),
 but the rest are standard HTMX attributes.
 
-When Bolt renders the response to an HTMX request,
-it will get the `Bolt-HX-Fragment` header,
+When Plain renders the response to an HTMX request,
+it will get the `Plain-HX-Fragment` header,
 find the fragment with that name in the template,
 and render that for the response.
 
@@ -346,7 +346,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 The standard behavior for `{% htmxfragment %}` is to set `hx-indicator="this"` on the rendered element.
 This tells HTMX to add the `htmx-request` class to the fragment element when it is loading.
 
-Since Bolt emphasizes using Tailwind CSS,
+Since Plain emphasizes using Tailwind CSS,
 here's a simple variant you can add to your `tailwind.config.js` to easily style the loading state:
 
 ```js

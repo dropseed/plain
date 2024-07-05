@@ -142,7 +142,7 @@ class CompressedManifestStaticFilesStorage(ManifestStaticFilesStorage):
     def make_helpful_exception(self, exception, name):
         """
         If a CSS file contains references to images, fonts etc that can't be found
-        then Bolt's `post_process` blows up with a not particularly helpful
+        then Plain's `post_process` blows up with a not particularly helpful
         ValueError that leads people to think WhiteNoise is broken.
 
         Here we attempt to intercept such errors and reformat them to be more

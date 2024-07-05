@@ -10,7 +10,7 @@ MODELS_MODULE_NAME = "models"
 
 
 class PackageConfig:
-    """Class representing a Bolt application and its configuration."""
+    """Class representing a Plain application and its configuration."""
 
     migrations_module = "migrations"
 
@@ -30,7 +30,7 @@ class PackageConfig:
         # subclass, hence the test-and-set pattern.
 
         # Last component of the Python path to the application e.g. 'admin'.
-        # This value must be unique across a Bolt project.
+        # This value must be unique across a Plain project.
         if not hasattr(self, "label"):
             self.label = package_name.rpartition(".")[2]
         if not self.label.isidentifier():
@@ -255,5 +255,5 @@ class PackageConfig:
 
     def ready(self):
         """
-        Override this method in subclasses to run code when Bolt starts.
+        Override this method in subclasses to run code when Plain starts.
         """

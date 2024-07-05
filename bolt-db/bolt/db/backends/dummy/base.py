@@ -1,7 +1,7 @@
 """
-Dummy database backend for Bolt.
+Dummy database backend for Plain.
 
-Bolt uses this if the database ENGINE setting is empty (None or empty string).
+Plain uses this if the database ENGINE setting is empty (None or empty string).
 
 Each of these API functions, except connection.close(), raise
 ImproperlyConfigured.

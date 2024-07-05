@@ -23,7 +23,7 @@ class CreateError(Exception):
 
 class UpdateError(Exception):
     """
-    Occurs if Bolt tries to update a session that was deleted.
+    Occurs if Plain tries to update a session that was deleted.
     """
 
     pass

@@ -121,13 +121,13 @@ def identify_hasher(encoded):
     get_hasher() to return hasher. Raise ValueError if
     algorithm cannot be identified, or if hasher is not loaded.
     """
-    # Ancient versions of Bolt created plain MD5 passwords and accepted
+    # Ancient versions of Plain created plain MD5 passwords and accepted
     # MD5 passwords with an empty salt.
     if (len(encoded) == 32 and "$" not in encoded) or (
         len(encoded) == 37 and encoded.startswith("md5$$")
     ):
         algorithm = "unsalted_md5"
-    # Ancient versions of Bolt accepted SHA1 passwords with an empty salt.
+    # Ancient versions of Plain accepted SHA1 passwords with an empty salt.
     elif len(encoded) == 46 and encoded.startswith("sha1$$"):
         algorithm = "unsalted_sha1"
     else:

@@ -106,7 +106,7 @@ def no_style():
 
 def color_style(force_color=False):
     """
-    Return a Style object from the Bolt color scheme.
+    Return a Style object from the Plain color scheme.
     """
     if not force_color and not supports_color():
         return no_style()

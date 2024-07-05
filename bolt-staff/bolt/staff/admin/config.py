@@ -5,7 +5,7 @@ from bolt.packages import PackageConfig, packages
 MODULE_NAME = "admin"
 
 
-class BoltAdminConfig(PackageConfig):
+class PlainAdminConfig(PackageConfig):
     name = "bolt.staff.admin"
     label = "boltadmin"
 

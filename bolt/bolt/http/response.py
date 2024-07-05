@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 from bolt import signals, signing
 from bolt.exceptions import DisallowedRedirect
-from bolt.json import BoltJSONEncoder
+from bolt.json import PlainJSONEncoder
 from bolt.runtime import settings
 from bolt.utils import timezone
 from bolt.utils.datastructures import CaseInsensitiveMapping
@@ -693,7 +693,7 @@ class JsonResponse(Response):
       are allowed to be passed due to a security flaw before ECMAScript 5. See
       the ``safe`` parameter for more information.
     :param encoder: Should be a json encoder class. Defaults to
-      ``bolt.json.BoltJSONEncoder``.
+      ``bolt.json.PlainJSONEncoder``.
     :param safe: Controls if only ``dict`` objects may be serialized. Defaults
       to ``True``.
     :param json_dumps_params: A dictionary of kwargs passed to json.dumps().
@@ -702,7 +702,7 @@ class JsonResponse(Response):
     def __init__(
         self,
         data,
-        encoder=BoltJSONEncoder,
+        encoder=PlainJSONEncoder,
         safe=True,
         json_dumps_params=None,
         **kwargs,

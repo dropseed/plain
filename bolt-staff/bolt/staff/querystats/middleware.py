@@ -4,7 +4,7 @@ import threading
 
 from bolt.db import connection
 from bolt.http import ResponseRedirect
-from bolt.json import BoltJSONEncoder
+from bolt.json import PlainJSONEncoder
 from bolt.runtime import settings
 from bolt.urls import reverse
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 _local = threading.local()
 
 
-class QueryStatsJSONEncoder(BoltJSONEncoder):
+class QueryStatsJSONEncoder(PlainJSONEncoder):
     def default(self, obj):
         try:
             return super().default(obj)

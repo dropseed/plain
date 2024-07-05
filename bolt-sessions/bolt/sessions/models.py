@@ -22,20 +22,20 @@ class SessionManager(models.Manager):
 
 class Session(models.Model):
     """
-    Bolt provides full support for anonymous sessions. The session
+    Plain provides full support for anonymous sessions. The session
     framework lets you store and retrieve arbitrary data on a
     per-site-visitor basis. It stores data on the server side and
     abstracts the sending and receiving of cookies. Cookies contain a
     session ID -- not the data itself.
 
-    The Bolt sessions framework is entirely cookie-based. It does
+    The Plain sessions framework is entirely cookie-based. It does
     not fall back to putting session IDs in URLs. This is an intentional
     design decision. Not only does that behavior make URLs ugly, it makes
     your site vulnerable to session-ID theft via the "Referer" header.
 
     For complete documentation on using Sessions in your code, consult
-    the sessions documentation that is shipped with Bolt (also available
-    on the Bolt web site).
+    the sessions documentation that is shipped with Plain (also available
+    on the Plain web site).
     """
 
     session_key = models.CharField(max_length=40, primary_key=True)

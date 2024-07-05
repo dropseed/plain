@@ -2,7 +2,7 @@
 
 Create app-packages and install third-party packages from PyPI.
 
-Like Django, Bolt is heavily dependent on the concept of "packages".
+Like Django, Plain is heavily dependent on the concept of "packages".
 
 In your `settings.py`, you define which packages are enabled with the `INSTALLED_PACKAGES` setting.
 

@@ -77,7 +77,7 @@ class MigrationExecutor:
         """
         state = ProjectState(real_packages=self.loader.unmigrated_packages)
         if with_applied_migrations:
-            # Create the forwards plan Bolt would follow on an empty database
+            # Create the forwards plan Plain would follow on an empty database
             full_plan = self.migration_plan(
                 self.loader.graph.leaf_nodes(), clean_start=True
             )
@@ -95,7 +95,7 @@ class MigrationExecutor:
         """
         Migrate the database up to the given targets.
 
-        Bolt first needs to create all project states before a migration is
+        Plain first needs to create all project states before a migration is
         (un)applied and in a second step run all the database operations.
         """
         # The bolt_migrations table must be present to record applied
@@ -108,7 +108,7 @@ class MigrationExecutor:
 
         if plan is None:
             plan = self.migration_plan(targets)
-        # Create the forwards plan Bolt would follow on an empty database
+        # Create the forwards plan Plain would follow on an empty database
         full_plan = self.migration_plan(
             self.loader.graph.leaf_nodes(), clean_start=True
         )
@@ -177,7 +177,7 @@ class MigrationExecutor:
         unapply them in reverse order they occur in the full_plan.
 
         Since unapplying a migration requires the project state prior to that
-        migration, Bolt will compute the migration states before each of them
+        migration, Plain will compute the migration states before each of them
         in a first run over the plan and then unapply them in a second run over
         the plan.
         """

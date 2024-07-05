@@ -132,7 +132,7 @@ def parse_datetime(value):
 def parse_duration(value):
     """Parse a duration string and return a datetime.timedelta.
 
-    The preferred format for durations in Bolt is '%d %H:%M:%S.%f'.
+    The preferred format for durations in Plain is '%d %H:%M:%S.%f'.
 
     Also supports ISO 8601 representation and PostgreSQL's day-time interval
     format.

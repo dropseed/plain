@@ -1,5 +1,5 @@
 """
-Settings and configuration for Bolt.
+Settings and configuration for Plain.
 
 Read values from the module specified by the BOLT_SETTINGS_MODULE environment
 variable, and then from bolt.global_settings; see the global_settings.py
@@ -39,9 +39,9 @@ class SettingsReference(str):
 
 class LazySettings(LazyObject):
     """
-    A lazy proxy for either global Bolt settings or a custom settings object.
+    A lazy proxy for either global Plain settings or a custom settings object.
     The user can manually configure settings prior to using them. Otherwise,
-    Bolt uses the settings module pointed to by BOLT_SETTINGS_MODULE.
+    Plain uses the settings module pointed to by BOLT_SETTINGS_MODULE.
     """
 
     def _setup(self, name=None):

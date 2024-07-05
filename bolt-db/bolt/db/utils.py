@@ -50,7 +50,7 @@ class NotSupportedError(DatabaseError):
 class DatabaseErrorWrapper:
     """
     Context manager and decorator that reraises backend-specific database
-    exceptions using Bolt's common wrappers.
+    exceptions using Plain's common wrappers.
     """
 
     def __init__(self, wrapper):
@@ -124,7 +124,7 @@ def load_backend(backend_name):
                 "    {}".format(backend_name, ", ".join(backend_reprs))
             ) from e_user
         else:
-            # If there's some other error, this must be an error in Bolt
+            # If there's some other error, this must be an error in Plain
             raise
 
 
@@ -171,7 +171,7 @@ class ConnectionHandler(BaseConnectionHandler):
     def databases(self):
         # Maintained for backward compatibility as some 3rd party packages have
         # made use of this private API in the past. It is no longer used within
-        # Bolt itself.
+        # Plain itself.
         return self.settings
 
     def create_connection(self, alias):

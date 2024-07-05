@@ -76,7 +76,7 @@ class TransactionTestCase(unittest.TestCase):
         "and silence this failure."
     )
 
-    # If transactions aren't available, Bolt will serialize the database
+    # If transactions aren't available, Plain will serialize the database
     # contents into a fixture during setup and flush and reload them
     # during teardown (as flush does not restore data from migrations).
     # This can be slow; this flag allows enabling on a per-case basis.
@@ -144,7 +144,7 @@ class TransactionTestCase(unittest.TestCase):
 
     def __call__(self, result=None):
         """
-        Wrapper around default __call__ method to perform common Bolt test
+        Wrapper around default __call__ method to perform common Plain test
         set up. This means that user-defined Test Cases aren't required to
         include a call to super().setUp().
         """

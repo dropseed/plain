@@ -15,7 +15,7 @@ def _print_italic(s):
     print("\x1B[0m", end="")
 
 
-_print_bold("\n⬣ Welcome to the Bolt shell! ⬣")
+_print_bold("\n⬣ Welcome to the Plain shell! ⬣")
 
 _app_shell = bolt.runtime.APP_PATH / "shell.py"
 

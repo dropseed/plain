@@ -20,7 +20,7 @@ class Command(BaseCommand):
             "--no-input",
             action="store_false",
             dest="interactive",
-            help="Tells Bolt to NOT prompt the user for input of any kind.",
+            help="Tells Plain to NOT prompt the user for input of any kind.",
         )
         parser.add_argument(
             "--database",
@@ -33,7 +33,7 @@ class Command(BaseCommand):
         connection = connections[database]
         verbosity = options["verbosity"]
         interactive = options["interactive"]
-        # The following are stealth options used by Bolt's internals.
+        # The following are stealth options used by Plain's internals.
         reset_sequences = options.get("reset_sequences", True)
         allow_cascade = options.get("allow_cascade", False)
         inhibit_post_migrate = options.get("inhibit_post_migrate", False)

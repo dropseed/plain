@@ -275,8 +275,8 @@ class BaseCommand:
 
     def get_version(self):
         """
-        Return the Bolt version, which should be correct for all built-in
-        Bolt commands. User-supplied commands can override this method to
+        Return the Plain version, which should be correct for all built-in
+        Plain commands. User-supplied commands can override this method to
         return their own version.
         """
         return bolt.runtime.get_version()
@@ -385,7 +385,7 @@ class BaseCommand:
     def run_from_argv(self, argv):
         """
         Set up any environment changes requested (e.g., Python path
-        and Bolt settings), then run this command. If the
+        and Plain settings), then run this command. If the
         command raises a ``CommandError``, intercept it and print it sensibly
         to stderr. If the ``--traceback`` option is present or the raised
         ``Exception`` is not ``CommandError``, raise it.
@@ -470,7 +470,7 @@ class BaseCommand:
         databases=None,
     ):
         """
-        Use the system check framework to validate entire Bolt project.
+        Use the system check framework to validate entire Plain project.
         Raise CommandError for any serious message (error or critical errors).
         If there are only light messages (like warnings), print them to stderr
         and don't raise an exception.
