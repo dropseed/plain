@@ -34,28 +34,28 @@ def cli():
     "max_processes",
     default=None,
     type=int,
-    envvar="BOLT_JOBS_MAX_PROCESSES",
+    envvar="PLAIN_JOBS_MAX_PROCESSES",
 )
 @click.option(
     "--max-jobs-per-process",
     "max_jobs_per_process",
     default=None,
     type=int,
-    envvar="BOLT_JOBS_MAX_JOBS_PER_PROCESS",
+    envvar="PLAIN_JOBS_MAX_JOBS_PER_PROCESS",
 )
 @click.option(
     "--max-pending-per-process",
     "max_pending_per_process",
     default=10,
     type=int,
-    envvar="BOLT_JOBS_MAX_PENDING_PER_PROCESS",
+    envvar="PLAIN_JOBS_MAX_PENDING_PER_PROCESS",
 )
 @click.option(
     "--stats-every",
     "stats_every",
     default=60,
     type=int,
-    envvar="BOLT_JOBS_STATS_EVERY",
+    envvar="PLAIN_JOBS_STATS_EVERY",
 )
 def run(
     queues, max_processes, max_jobs_per_process, max_pending_per_process, stats_every

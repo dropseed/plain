@@ -13,7 +13,7 @@ class InstalledPackagesGroup(click.Group):
     will be discovered automatically.
     """
 
-    BOLT_APPS_PREFIX = "plain."
+    PLAIN_APPS_PREFIX = "plain."
     MODULE_NAME = "cli"
 
     def list_commands(self, ctx):
@@ -26,8 +26,8 @@ class InstalledPackagesGroup(click.Group):
 
             cli_name = app.name
 
-            if cli_name.startswith(self.BOLT_APPS_PREFIX):
-                cli_name = cli_name[len(self.BOLT_APPS_PREFIX) :]
+            if cli_name.startswith(self.PLAIN_APPS_PREFIX):
+                cli_name = cli_name[len(self.PLAIN_APPS_PREFIX) :]
 
             packages_with_commands.append(cli_name)
 
@@ -35,7 +35,7 @@ class InstalledPackagesGroup(click.Group):
 
     def get_command(self, ctx, name):
         # Try it as plain.x and just x (we don't know ahead of time which it is, but prefer plain.x)
-        for n in [self.BOLT_APPS_PREFIX + name, name]:
+        for n in [self.PLAIN_APPS_PREFIX + name, name]:
             try:
                 cli = importlib.import_module(f"{n}.{self.MODULE_NAME}")
             except ModuleNotFoundError:

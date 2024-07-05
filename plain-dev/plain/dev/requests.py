@@ -18,7 +18,7 @@ class RequestLog:
 
     @staticmethod
     def storage_path():
-        return str(settings.BOLT_TEMP_PATH / "requestlog")
+        return str(settings.PLAIN_TEMP_PATH / "requestlog")
 
     @classmethod
     def replay_request(cls, name):

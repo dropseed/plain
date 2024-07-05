@@ -8,7 +8,7 @@ from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
 
 DEFAULT_DB_ALIAS = "default"
-BOLT_VERSION_PICKLE_KEY = "_django_version"
+PLAIN_VERSION_PICKLE_KEY = "_django_version"
 
 
 class Error(Exception):

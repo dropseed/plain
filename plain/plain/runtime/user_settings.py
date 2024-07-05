@@ -1,7 +1,7 @@
 """
 Settings and configuration for Plain.
 
-Read values from the module specified by the BOLT_SETTINGS_MODULE environment
+Read values from the module specified by the PLAIN_SETTINGS_MODULE environment
 variable, and then from plain.global_settings; see the global_settings.py
 for a list of all possible variables.
 """
@@ -18,8 +18,8 @@ from plain.exceptions import ImproperlyConfigured
 from plain.packages import PackageConfig
 from plain.utils.functional import LazyObject, empty
 
-ENVIRONMENT_VARIABLE = "BOLT_SETTINGS_MODULE"
-ENV_SETTINGS_PREFIX = "BOLT_"
+ENVIRONMENT_VARIABLE = "PLAIN_SETTINGS_MODULE"
+ENV_SETTINGS_PREFIX = "PLAIN_"
 
 logger = logging.getLogger("plain.runtime")
 
@@ -41,7 +41,7 @@ class LazySettings(LazyObject):
     """
     A lazy proxy for either global Plain settings or a custom settings object.
     The user can manually configure settings prior to using them. Otherwise,
-    Plain uses the settings module pointed to by BOLT_SETTINGS_MODULE.
+    Plain uses the settings module pointed to by PLAIN_SETTINGS_MODULE.
     """
 
     def _setup(self, name=None):

@@ -1,6 +1,6 @@
 """
 Default Plain settings. Override these with settings in the module pointed to
-by the BOLT_SETTINGS_MODULE environment variable.
+by the PLAIN_SETTINGS_MODULE environment variable.
 """
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from plain.runtime import APP_PATH as default_app_path
 
 DEBUG: bool = False
 
-BOLT_TEMP_PATH: Path = default_app_path.parent / ".plain"
+PLAIN_TEMP_PATH: Path = default_app_path.parent / ".plain"
 
 # Hosts/domain names that are valid for this site.
 # "*" matches anything, ".example.com" matches example.com and all subdomains
@@ -162,7 +162,7 @@ ASSETS_FINDERS = [
 
 # Absolute path to the directory assets files should be collected to.
 # Example: "/var/www/example.com/assets/"
-ASSETS_ROOT = BOLT_TEMP_PATH / "assets_collected"
+ASSETS_ROOT = PLAIN_TEMP_PATH / "assets_collected"
 
 # URL that handles the assets files served from ASSETS_ROOT.
 # Example: "http://example.com/assets/", "http://assets.example.com/"

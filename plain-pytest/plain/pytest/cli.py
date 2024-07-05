@@ -16,7 +16,7 @@ from plain.runtime import settings
 def cli(pytest_args):
     """Run tests with pytest"""
 
-    plain_tmp_dir = str(settings.BOLT_TEMP_PATH)
+    plain_tmp_dir = str(settings.PLAIN_TEMP_PATH)
 
     if not os.path.exists(os.path.join(plain_tmp_dir, ".gitignore")):
         os.makedirs(plain_tmp_dir, exist_ok=True)
@@ -29,9 +29,9 @@ def cli(pytest_args):
     #         pytest_args.append("-W")
     #         pytest_args.append("error::DeprecationWarning")
 
-    os.environ.setdefault("BOLT_ENV", "test")
+    os.environ.setdefault("PLAIN_ENV", "test")
 
-    click.secho(f"Running pytest with BOLT_ENV={os.environ['BOLT_ENV']}", bold=True)
+    click.secho(f"Running pytest with PLAIN_ENV={os.environ['PLAIN_ENV']}", bold=True)
 
     result = subprocess.run(
         [

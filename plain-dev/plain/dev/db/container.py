@@ -10,7 +10,7 @@ SNAPSHOT_DB_PREFIX = "plaindb_snapshot_"
 class DBContainer:
     def __init__(self):
         project_root = APP_PATH.parent
-        tmp_dir = settings.BOLT_TEMP_PATH
+        tmp_dir = settings.PLAIN_TEMP_PATH
 
         name = os.path.basename(project_root) + "-postgres-1"
 

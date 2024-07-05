@@ -15,7 +15,7 @@ packages = [
 
 [tool.pytest.ini_options]
 python_files = "tests.py test_*.py *_tests.py"
-BOLT_SETTINGS_MODULE = "tests.settings"
+PLAIN_SETTINGS_MODULE = "tests.settings"
 FAIL_INVALID_TEMPLATE_VARS = true
 
 [tool.poetry.dependencies]

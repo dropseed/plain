@@ -32,7 +32,7 @@ The `.env` should then be in your `.gitignore`!
 
 It would seem like `.env.dev` would be a good idea,
 but there's a chicken-and-egg problem with that.
-You would then have to prefix most (or all) of your local commands with `BOLT_ENV=dev` or otherwise configure your environment to do that for you.
+You would then have to prefix most (or all) of your local commands with `PLAIN_ENV=dev` or otherwise configure your environment to do that for you.
 Generally speaking,
 a production `.env` shouldn't be committed in your repo anyway,
 so using `.env` for local development is ok.

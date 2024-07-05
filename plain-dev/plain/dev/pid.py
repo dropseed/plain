@@ -5,7 +5,7 @@ from plain.runtime import settings
 
 class Pid:
     def __init__(self):
-        self.pidfile = settings.BOLT_TEMP_PATH / "dev.pid"
+        self.pidfile = settings.PLAIN_TEMP_PATH / "dev.pid"
 
     def write(self):
         pid = os.getpid()

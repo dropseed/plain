@@ -7,7 +7,7 @@ from itertools import chain
 import plain.runtime
 from plain import preflight
 from plain.db import (
-    BOLT_VERSION_PICKLE_KEY,
+    PLAIN_VERSION_PICKLE_KEY,
     DatabaseError,
     connection,
     connections,
@@ -555,7 +555,7 @@ class Model(AltersData, metaclass=ModelBase):
 
     def __reduce__(self):
         data = self.__getstate__()
-        data[BOLT_VERSION_PICKLE_KEY] = plain.runtime.__version__
+        data[PLAIN_VERSION_PICKLE_KEY] = plain.runtime.__version__
         class_id = self._meta.package_label, self._meta.object_name
         return model_unpickle, (class_id,), data
 
@@ -577,7 +577,7 @@ class Model(AltersData, metaclass=ModelBase):
         return state
 
     def __setstate__(self, state):
-        pickled_version = state.get(BOLT_VERSION_PICKLE_KEY)
+        pickled_version = state.get(PLAIN_VERSION_PICKLE_KEY)
         if pickled_version:
             if pickled_version != plain.runtime.__version__:
                 warnings.warn(

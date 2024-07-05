@@ -48,7 +48,7 @@ ASSETS_FINDERS = [
 
 # Absolute path to the directory assets files should be collected to.
 # Example: "/var/www/example.com/assets/"
-ASSETS_ROOT = BOLT_TEMP_PATH / "assets_collected"
+ASSETS_ROOT = PLAIN_TEMP_PATH / "assets_collected"
 
 # URL that handles the assets files served from ASSETS_ROOT.
 # Example: "http://example.com/assets/", "http://assets.example.com/"

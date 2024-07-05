@@ -13,8 +13,8 @@ class Config(PackageConfig):
         plain_path = Path(
             importlib.util.find_spec("plain.runtime").origin
         ).parent.parent
-        if not settings.BOLT_TEMP_PATH.exists():
-            settings.BOLT_TEMP_PATH.mkdir()
-        src_path = settings.BOLT_TEMP_PATH / "src"
+        if not settings.PLAIN_TEMP_PATH.exists():
+            settings.PLAIN_TEMP_PATH.mkdir()
+        src_path = settings.PLAIN_TEMP_PATH / "src"
         if plain_path.exists() and not src_path.exists():
             src_path.symlink_to(plain_path)

@@ -23,7 +23,7 @@ def configure_logging(logging_settings):
         "loggers": {
             "plain": {
                 "handlers": ["console"],
-                "level": environ.get("BOLT_LOG_LEVEL", "INFO"),
+                "level": environ.get("PLAIN_LOG_LEVEL", "INFO"),
             },
             "app": {
                 "handlers": ["console"],

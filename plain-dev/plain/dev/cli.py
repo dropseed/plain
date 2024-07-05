@@ -81,7 +81,7 @@ class Dev:
             pid.rm()
 
     def add_csrf_trusted_origins(self):
-        if "BOLT_CSRF_TRUSTED_ORIGINS" in os.environ:
+        if "PLAIN_CSRF_TRUSTED_ORIGINS" in os.environ:
             return
 
         csrf_trusted_origins = json.dumps(
@@ -89,13 +89,13 @@ class Dev:
         )
 
         click.secho(
-            f"Automatically set BOLT_CSRF_TRUSTED_ORIGINS={click.style(csrf_trusted_origins, underline=True)}",
+            f"Automatically set PLAIN_CSRF_TRUSTED_ORIGINS={click.style(csrf_trusted_origins, underline=True)}",
             bold=True,
         )
 
         # Set BASE_URL for plain and custom processes
-        self.plain_env["BOLT_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
-        self.custom_process_env["BOLT_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
+        self.plain_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
+        self.custom_process_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
 
     def run_preflight(self):
         if subprocess.run(["plain", "preflight"], env=self.plain_env).returncode:

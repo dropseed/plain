@@ -10,7 +10,7 @@ from itertools import chain, islice
 import plain.runtime
 from plain import exceptions
 from plain.db import (
-    BOLT_VERSION_PICKLE_KEY,
+    PLAIN_VERSION_PICKLE_KEY,
     IntegrityError,
     NotSupportedError,
     connections,
@@ -319,10 +319,10 @@ class QuerySet(AltersData):
     def __getstate__(self):
         # Force the cache to be fully populated.
         self._fetch_all()
-        return {**self.__dict__, BOLT_VERSION_PICKLE_KEY: plain.runtime.__version__}
+        return {**self.__dict__, PLAIN_VERSION_PICKLE_KEY: plain.runtime.__version__}
 
     def __setstate__(self, state):
-        pickled_version = state.get(BOLT_VERSION_PICKLE_KEY)
+        pickled_version = state.get(PLAIN_VERSION_PICKLE_KEY)
         if pickled_version:
             if pickled_version != plain.runtime.__version__:
                 warnings.warn(

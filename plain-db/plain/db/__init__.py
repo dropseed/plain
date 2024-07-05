@@ -1,7 +1,7 @@
 from plain import signals
 from plain.db.utils import (
-    BOLT_VERSION_PICKLE_KEY,
     DEFAULT_DB_ALIAS,
+    PLAIN_VERSION_PICKLE_KEY,
     ConnectionHandler,
     ConnectionRouter,
     DatabaseError,
@@ -32,7 +32,7 @@ __all__ = [
     "InterfaceError",
     "OperationalError",
     "DEFAULT_DB_ALIAS",
-    "BOLT_VERSION_PICKLE_KEY",
+    "PLAIN_VERSION_PICKLE_KEY",
 ]
 
 connections = ConnectionHandler()

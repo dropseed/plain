@@ -21,7 +21,7 @@ DEFAULT_CSS = """@tailwind base;
 class Tailwind:
     @property
     def target_directory(self) -> str:
-        return str(settings.BOLT_TEMP_PATH)
+        return str(settings.PLAIN_TEMP_PATH)
 
     @property
     def standalone_path(self) -> str:
