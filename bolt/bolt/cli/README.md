@@ -28,7 +28,7 @@ __all__ = [
 
 Compile static assets (used in the deploy/production process).
 
-Automatically runs `bolt tailwind compile` if [bolt-tailwind](https://boltframework.dev/docs/bolt-tailwind/) is installed.
+Automatically runs `bolt tailwind compile` if [bolt-tailwind](https://plainframework.com/docs/bolt-tailwind/) is installed.
 
 Automatically runs `npm run compile` if you have a `package.json` with `scripts.compile`.
 
@@ -108,7 +108,7 @@ Hello, world!
 
 ### Add CLI commands to published packages
 
-Some packages, like [bolt-dev](https://boltframework.dev/docs/bolt-dev/),
+Some packages, like [bolt-dev](https://plainframework.com/docs/bolt-dev/),
 never show up in `INSTALLED_PACKAGES` but still have CLI commands.
 These are detected via Python entry points.
 

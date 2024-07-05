@@ -15,7 +15,7 @@ class WelcomeUserJob(Job):
         send_mail(
             subject="Welcome!",
             message=f"Hello from Bolt, {self.user}",
-            from_email="welcome@boltframework.dev",
+            from_email="welcome@plainframework.com",
             recipient_list=[self.user.email],
         )
 

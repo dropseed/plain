@@ -4,7 +4,7 @@
 
 Local feature flags via database models.
 
-Custom flags are written as subclasses of [`Flag`](https://boltframework.dev/docs/bolt-flags/bolt/flags/flags.py).
+Custom flags are written as subclasses of [`Flag`](https://plainframework.com/docs/bolt-flags/bolt/flags/flags.py).
 You define the flag's "key" and initial value,
 and the results will be stored in the database for future reference.
 

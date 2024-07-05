@@ -17,7 +17,7 @@ compile_readme() {
     # support ../ and other paths...
 
     # Find and replace any "](./" markdown links and replace with a full github.com url
-    docs_url="https://boltframework.dev/docs"
+    docs_url="https://plainframework.com/docs"
     sed -i '' -e "s#](\./\([^)]*\))#]($docs_url/$code_base_dir/\1)#g" "$package_readme"
 }
 

@@ -75,17 +75,17 @@ DATABASES = {
 }
 ```
 
-[Multiple backends are supported, including Postgres, MySQL, and SQLite.](https://boltframework.dev/docs/bolt-db/bolt/db/backends/README.md)
+[Multiple backends are supported, including Postgres, MySQL, and SQLite.](https://plainframework.com/docs/bolt-db/bolt/db/backends/README.md)
 
 ## Querying
 
 ## Migrations
 
-[Migration docs](https://boltframework.dev/docs/bolt-db/bolt/db/migrations/README.md)
+[Migration docs](https://plainframework.com/docs/bolt-db/bolt/db/migrations/README.md)
 
 ## Fields
 
-[Field docs](https://boltframework.dev/docs/bolt-db/bolt/db/fields/README.md)
+[Field docs](https://plainframework.com/docs/bolt-db/bolt/db/fields/README.md)
 
 ## Validation
 

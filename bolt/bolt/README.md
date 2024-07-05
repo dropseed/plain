@@ -16,18 +16,18 @@ With the core `bolt` package you can build an app that:
 
 With the official Bolt ecosystem packages you can:
 
-- Integrate a full-featured [database ORM](https://boltframework.dev/docs/bolt-db/)
-- Use a built-in [user authentication](https://boltframework.dev/docs/bolt-auth/) system
-- [Lint and format code](https://boltframework.dev/docs/bolt-code/)
-- Run a [database-backed cache](https://boltframework.dev/docs/bolt-cache/)
-- [Send emails](https://boltframework.dev/docs/bolt-mail/)
-- Streamline [local development](https://boltframework.dev/docs/bolt-dev/)
-- Manage [feature flags](https://boltframework.dev/docs/bolt-flags/)
-- Integrate [HTMX](https://boltframework.dev/docs/bolt-htmx/)
-- Style with [Tailwind CSS](https://boltframework.dev/docs/bolt-tailwind/)
-- Add [OAuth login](https://boltframework.dev/docs/bolt-oauth/) and API access
-- Run tests with [pytest](https://boltframework.dev/docs/bolt-test/)
-- Run a [background job worker](https://boltframework.dev/docs/bolt-worker/)
-- Build [staff tooling and admin dashboards](https://boltframework.dev/docs/bolt-staff/)
+- Integrate a full-featured [database ORM](https://plainframework.com/docs/bolt-db/)
+- Use a built-in [user authentication](https://plainframework.com/docs/bolt-auth/) system
+- [Lint and format code](https://plainframework.com/docs/bolt-code/)
+- Run a [database-backed cache](https://plainframework.com/docs/bolt-cache/)
+- [Send emails](https://plainframework.com/docs/bolt-mail/)
+- Streamline [local development](https://plainframework.com/docs/bolt-dev/)
+- Manage [feature flags](https://plainframework.com/docs/bolt-flags/)
+- Integrate [HTMX](https://plainframework.com/docs/bolt-htmx/)
+- Style with [Tailwind CSS](https://plainframework.com/docs/bolt-tailwind/)
+- Add [OAuth login](https://plainframework.com/docs/bolt-oauth/) and API access
+- Run tests with [pytest](https://plainframework.com/docs/bolt-test/)
+- Run a [background job worker](https://plainframework.com/docs/bolt-worker/)
+- Build [staff tooling and admin dashboards](https://plainframework.com/docs/bolt-staff/)
 
-Learn more at [boltframework.dev](https://boltframework.dev).
+Learn more at [plainframework.com](https://plainframework.com).
