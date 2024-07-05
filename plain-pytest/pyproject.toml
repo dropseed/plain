@@ -1,6 +1,6 @@
 [tool.poetry]
 
-name = "plain-pytest"
+name = "plain.pytest"
 packages = [
     { include = "plain" },
 ]

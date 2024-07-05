@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-sessions"
+name = "plain.sessions"
 packages = [
     { include = "plain" },
 ]

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-worker"
+name = "plain.worker"
 packages = [
     { include = "plain" },
 ]

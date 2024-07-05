@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-elements"
+name = "plain.elements"
 packages = [
     { include = "plain" },
 ]

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-auth"
+name = "plain.auth"
 packages = [
     { include = "plain" },
 ]

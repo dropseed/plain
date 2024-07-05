@@ -1,6 +1,6 @@
 [tool.poetry]
 
-name = "plain-dev"
+name = "plain.dev"
 packages = [
     { include = "plain" },
 ]

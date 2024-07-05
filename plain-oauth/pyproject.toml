@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-oauth"
+name = "plain.oauth"
 version = "0.0.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]

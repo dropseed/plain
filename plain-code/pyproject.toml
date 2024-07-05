@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-code"
+name = "plain.code"
 packages = [
     { include = "plain" },
 ]

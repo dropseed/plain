@@ -1,6 +1,6 @@
 [tool.poetry]
 
-name = "plain-mail"
+name = "plain.mail"
 packages = [
     { include = "plain" },
 ]

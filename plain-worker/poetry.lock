@@ -20,7 +20,7 @@ type = "directory"
 url = "../plain"
 
 [[package]]
-name = "plain-db"
+name = "plain.db"
 version = "0.0.0"
 description = ""
 optional = false

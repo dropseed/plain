@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-flags"
+name = "plain.flags"
 packages = [
     { include = "plain" },
 ]

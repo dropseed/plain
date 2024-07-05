@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "plain-cache"
+name = "plain.cache"
 packages = [
     { include = "plain" },
 ]
