@@ -4,14 +4,13 @@ from itertools import chain
 from operator import attrgetter, or_
 
 from plain.models import (
-    IntegrityError,
-    connections,
-    models,
     query_utils,
     signals,
     sql,
     transaction,
 )
+from plain.models.db import IntegrityError, connections
+from plain.models.query import QuerySet
 
 
 class ProtectedError(IntegrityError):
@@ -482,7 +481,7 @@ class Collector:
                 objs = []
                 for instances in instances_list:
                     if (
-                        isinstance(instances, models.QuerySet)
+                        isinstance(instances, QuerySet)
                         and instances._result_cache is None
                     ):
                         updates.append(instances)

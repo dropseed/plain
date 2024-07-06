@@ -8,8 +8,9 @@ from types import NoneType
 from uuid import UUID
 
 from plain.exceptions import EmptyResultSet, FieldError, FullResultSet
-from plain.models import DatabaseError, NotSupportedError, connection, fields
+from plain.models import fields
 from plain.models.constants import LOOKUP_SEP
+from plain.models.db import DatabaseError, NotSupportedError, connection
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
 from plain.utils.functional import cached_property

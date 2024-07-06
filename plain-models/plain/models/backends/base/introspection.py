@@ -78,7 +78,7 @@ class BaseDatabaseIntrospection:
         )
 
     def get_migratable_models(self):
-        from plain.models import router
+        from plain.models.db import router
         from plain.packages import packages
 
         return (

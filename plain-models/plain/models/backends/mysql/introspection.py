@@ -3,10 +3,10 @@ from collections import namedtuple
 import sqlparse
 from MySQLdb.constants import FIELD_TYPE
 
-from plain.models import Index
 from plain.models.backends.base.introspection import BaseDatabaseIntrospection
 from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
 from plain.models.backends.base.introspection import TableInfo as BaseTableInfo
+from plain.models.indexes import Index
 from plain.utils.datastructures import OrderedSet
 
 FieldInfo = namedtuple(

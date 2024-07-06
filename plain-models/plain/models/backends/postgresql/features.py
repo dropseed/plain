@@ -1,8 +1,8 @@
 import operator
 
-from plain.models import DataError, InterfaceError
 from plain.models.backends.base.features import BaseDatabaseFeatures
 from plain.models.backends.postgresql.psycopg_any import is_psycopg3
+from plain.models.db import DataError, InterfaceError
 from plain.utils.functional import cached_property
 
 

@@ -9,10 +9,10 @@ import warnings
 from contextlib import contextmanager
 
 from plain.exceptions import ImproperlyConfigured
-from plain.models import DatabaseError as WrappedDatabaseError
-from plain.models import connections
 from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
+from plain.models.db import DatabaseError as WrappedDatabaseError
+from plain.models.db import connections
 from plain.runtime import settings
 from plain.utils.functional import cached_property
 from plain.utils.safestring import SafeString

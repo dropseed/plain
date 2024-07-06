@@ -4,7 +4,11 @@ import inspect
 from collections import defaultdict
 
 from plain.exceptions import FieldDoesNotExist
-from plain.models import BigAutoField, Manager, OrderWrt, UniqueConstraint, connections
+from plain.models.constraints import UniqueConstraint
+from plain.models.db import connections
+from plain.models.fields import BigAutoField
+from plain.models.fields.proxy import OrderWrt
+from plain.models.manager import Manager
 from plain.models.query_utils import PathInfo
 from plain.packages import packages
 from plain.runtime import settings
@@ -148,8 +152,8 @@ class Options:
         return self.packages.package_configs.get(self.package_label)
 
     def contribute_to_class(self, cls, name):
-        from plain.models import connection
         from plain.models.backends.utils import truncate_name
+        from plain.models.db import connection
 
         cls._meta = self
         self.model = cls

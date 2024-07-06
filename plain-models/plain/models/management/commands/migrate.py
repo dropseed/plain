@@ -11,7 +11,7 @@ from plain.internal.legacy.management.sql import (
     emit_post_migrate_signal,
     emit_pre_migrate_signal,
 )
-from plain.models import DEFAULT_DB_ALIAS, connections, router
+from plain.models.db import DEFAULT_DB_ALIAS, connections, router
 from plain.models.migrations.autodetector import MigrationAutodetector
 from plain.models.migrations.executor import MigrationExecutor
 from plain.models.migrations.loader import AmbiguityError

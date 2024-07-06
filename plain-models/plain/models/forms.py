@@ -814,7 +814,7 @@ def modelfield_to_formfield(
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
         # TODO: Handle multiple backends with different feature flags.
-        from plain.models import connection
+        from plain.models.db import connection
 
         if (
             modelfield.null

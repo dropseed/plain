@@ -3,8 +3,7 @@ from enum import Enum
 from types import NoneType
 
 from plain.exceptions import FieldError, ValidationError
-from plain.models import connections
-from plain.models.db_utils import DEFAULT_DB_ALIAS
+from plain.models.db import DEFAULT_DB_ALIAS, connections
 from plain.models.expressions import Exists, ExpressionList, F, OrderBy
 from plain.models.indexes import IndexExpression
 from plain.models.lookups import Exact

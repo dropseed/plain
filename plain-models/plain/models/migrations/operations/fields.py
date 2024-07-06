@@ -1,4 +1,4 @@
-from plain.models import NOT_PROVIDED
+from plain.models.fields import NOT_PROVIDED
 from plain.models.migrations.utils import field_references
 from plain.utils.functional import cached_property
 

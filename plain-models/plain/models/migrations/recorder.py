@@ -1,4 +1,5 @@
-from plain.models import DatabaseError, models
+from plain import models
+from plain.models.db import DatabaseError
 from plain.packages.registry import Packages
 from plain.utils.functional import classproperty
 from plain.utils.timezone import now

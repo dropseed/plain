@@ -1,6 +1,6 @@
-from plain.models import NOT_PROVIDED, F, UniqueConstraint
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.constants import LOOKUP_SEP
+from plain.models.fields import NOT_PROVIDED, F, UniqueConstraint
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):

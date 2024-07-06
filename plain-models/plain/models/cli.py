@@ -4,7 +4,7 @@ import time
 
 import click
 
-from plain.models import DEFAULT_DB_ALIAS, OperationalError, connections
+from plain.models.db import DEFAULT_DB_ALIAS, OperationalError, connections
 
 
 @click.group()
@@ -22,7 +22,7 @@ def cli():
     ),
 )
 @click.argument("parameters", nargs=-1)
-def shell(database, parameters):
+def db_shell(database, parameters):
     """Runs the command-line client for specified database, or the default database if none is provided."""
     connection = connections[database]
     try:
@@ -52,7 +52,7 @@ def shell(database, parameters):
 
 
 @cli.command()
-def wait():
+def db_wait():
     """Wait for the database to be ready"""
     attempts = 0
     while True:

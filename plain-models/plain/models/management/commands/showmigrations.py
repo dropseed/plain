@@ -1,7 +1,7 @@
 import sys
 
 from plain.internal.legacy.management.base import BaseCommand
-from plain.models import DEFAULT_DB_ALIAS, connections
+from plain.models.db import DEFAULT_DB_ALIAS, connections
 from plain.models.migrations.loader import MigrationLoader
 from plain.models.migrations.recorder import MigrationRecorder
 from plain.packages import packages

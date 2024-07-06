@@ -2,7 +2,7 @@ import operator
 
 from plain.models import transaction
 from plain.models.backends.base.features import BaseDatabaseFeatures
-from plain.models.db_utils import OperationalError
+from plain.models.db import OperationalError
 from plain.utils.functional import cached_property
 
 from .base import Database

@@ -2,12 +2,12 @@ from collections import namedtuple
 
 import sqlparse
 
-from plain.models import DatabaseError, Index
 from plain.models.backends.base.introspection import (
     BaseDatabaseIntrospection,
     TableInfo,
 )
 from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
+from plain.models.db import DatabaseError, Index
 from plain.utils.regex_helper import _lazy_re_compile
 
 FieldInfo = namedtuple(

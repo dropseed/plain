@@ -1,9 +1,10 @@
 import pkgutil
 from importlib import import_module
 
+from plain import signals
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
-from plain.utils.connection import BaseConnectionHandler
+from plain.utils.connection import BaseConnectionHandler, ConnectionProxy
 from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
 
@@ -264,3 +265,31 @@ class ConnectionRouter:
         """Return app models allowed to be migrated on provided db."""
         models = package_config.get_models(include_auto_created=include_auto_created)
         return [model for model in models if self.allow_migrate_model(db, model)]
+
+
+connections = ConnectionHandler()
+
+router = ConnectionRouter()
+
+# For backwards compatibility. Prefer connections['default'] instead.
+connection = ConnectionProxy(connections, DEFAULT_DB_ALIAS)
+
+
+# Register an event to reset saved queries when a Plain request is started.
+def reset_queries(**kwargs):
+    for conn in connections.all(initialized_only=True):
+        conn.queries_log.clear()
+
+
+signals.request_started.connect(reset_queries)
+
+
+# Register an event to reset transaction state and close connections past
+# their lifetime.
+def close_old_connections(**kwargs):
+    for conn in connections.all(initialized_only=True):
+        conn.close_if_unusable_or_obsolete()
+
+
+signals.request_started.connect(close_old_connections)
+signals.request_finished.connect(close_old_connections)

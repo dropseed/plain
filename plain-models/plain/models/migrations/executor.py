@@ -1,4 +1,5 @@
-from plain.models import migrations, router
+from plain.models import migrations
+from plain.models.db import router
 from plain.packages.registry import packages as global_packages
 
 from .exceptions import InvalidMigrationPlan

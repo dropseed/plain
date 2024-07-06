@@ -3,11 +3,11 @@ import inspect
 from functools import partial
 
 from plain import exceptions, preflight
-from plain.models import Q, connection, router
 from plain.models.backends import utils
 from plain.models.constants import LOOKUP_SEP
+from plain.models.db import connection, router
 from plain.models.deletion import CASCADE, SET_DEFAULT, SET_NULL
-from plain.models.query_utils import PathInfo
+from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
 from plain.packages import packages
 from plain.runtime import settings

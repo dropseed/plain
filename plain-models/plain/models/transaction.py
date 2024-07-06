@@ -1,6 +1,6 @@
 from contextlib import ContextDecorator, contextmanager
 
-from plain.models import (
+from plain.models.db import (
     DEFAULT_DB_ALIAS,
     DatabaseError,
     Error,

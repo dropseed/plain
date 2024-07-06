@@ -13,7 +13,7 @@ def check_database_backends(databases=None, **kwargs):
     if databases is None:
         return []
 
-    from plain.models import connections
+    from plain.models.db import connections
 
     issues = []
     for alias in databases:
@@ -243,7 +243,7 @@ def check_lazy_references(package_configs=None, **kwargs):
 
 @register
 def check_database_tables(package_configs, **kwargs):
-    from plain.models import connection
+    from plain.models.db import connection
 
     databases = kwargs.get("databases", None)
     if not databases:
@@ -259,9 +259,7 @@ def check_database_tables(package_configs, **kwargs):
         unknown_tables.discard("django_migrations")  # Know this could be there
         if unknown_tables:
             table_names = ", ".join(unknown_tables)
-            specific_hint = (
-                f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain db shell'
-            )
+            specific_hint = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
             errors.append(
                 Warning(
                     f"Unknown tables in {database} database: {table_names}",

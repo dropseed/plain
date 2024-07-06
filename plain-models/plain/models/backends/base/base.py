@@ -10,12 +10,16 @@ from collections import deque
 from contextlib import contextmanager
 
 from plain.exceptions import ImproperlyConfigured
-from plain.models import DEFAULT_DB_ALIAS, DatabaseError, NotSupportedError
 from plain.models.backends import utils
 from plain.models.backends.base.validation import BaseDatabaseValidation
 from plain.models.backends.signals import connection_created
 from plain.models.backends.utils import debug_transaction
-from plain.models.db_utils import DatabaseErrorWrapper
+from plain.models.db import (
+    DEFAULT_DB_ALIAS,
+    DatabaseError,
+    DatabaseErrorWrapper,
+    NotSupportedError,
+)
 from plain.models.transaction import TransactionManagementError
 from plain.runtime import settings
 from plain.utils.functional import cached_property

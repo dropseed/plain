@@ -1,5 +1,5 @@
 """Database functions that do comparisons or type conversions."""
-from plain.models import NotSupportedError
+from plain.models.db import NotSupportedError
 from plain.models.expressions import Func, Value
 from plain.models.fields import TextField
 from plain.models.fields.json import JSONField

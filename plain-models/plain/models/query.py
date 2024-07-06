@@ -10,21 +10,24 @@ from itertools import chain, islice
 import plain.runtime
 from plain import exceptions
 from plain.models import (
-    PLAIN_VERSION_PICKLE_KEY,
-    AutoField,
-    DateField,
-    DateTimeField,
-    Field,
-    IntegrityError,
-    NotSupportedError,
-    connections,
-    router,
     sql,
     transaction,
 )
 from plain.models.constants import LOOKUP_SEP, OnConflict
-from plain.models.deletion import Collector
+from plain.models.db import (
+    PLAIN_VERSION_PICKLE_KEY,
+    IntegrityError,
+    NotSupportedError,
+    connections,
+    router,
+)
 from plain.models.expressions import Case, F, Value, When
+from plain.models.fields import (
+    AutoField,
+    DateField,
+    DateTimeField,
+    Field,
+)
 from plain.models.functions import Cast, Trunc
 from plain.models.query_utils import FilteredRelation, Q
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
@@ -1017,6 +1020,8 @@ class QuerySet(AltersData):
         del_query.query.select_for_update = False
         del_query.query.select_related = False
         del_query.query.clear_ordering(force=True)
+
+        from plain.models.deletion import Collector
 
         collector = Collector(using=del_query.db, origin=self)
         collector.collect(del_query)

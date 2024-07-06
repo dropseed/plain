@@ -3,7 +3,7 @@ from importlib import import_module
 from plain.internal.legacy.management.base import BaseCommand, CommandError
 from plain.internal.legacy.management.color import no_style
 from plain.internal.legacy.management.sql import emit_post_migrate_signal, sql_flush
-from plain.models import DEFAULT_DB_ALIAS, connections
+from plain.models.db import DEFAULT_DB_ALIAS, connections
 from plain.packages import packages
 
 

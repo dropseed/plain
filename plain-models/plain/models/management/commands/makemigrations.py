@@ -9,7 +9,7 @@ from plain.internal.legacy.management.base import (
     no_translations,
 )
 from plain.internal.legacy.management.utils import run_formatters
-from plain.models import DEFAULT_DB_ALIAS, OperationalError, connections, router
+from plain.models.db import DEFAULT_DB_ALIAS, OperationalError, connections, router
 from plain.models.migrations import Migration
 from plain.models.migrations.autodetector import MigrationAutodetector
 from plain.models.migrations.loader import MigrationLoader

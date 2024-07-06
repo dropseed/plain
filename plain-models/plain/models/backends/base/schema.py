@@ -2,7 +2,6 @@ import logging
 import operator
 from datetime import datetime
 
-from plain.models import Deferrable, Index
 from plain.models.backends.ddl_references import (
     Columns,
     Expressions,
@@ -12,6 +11,8 @@ from plain.models.backends.ddl_references import (
     Table,
 )
 from plain.models.backends.utils import names_digest, split_identifier, truncate_name
+from plain.models.constraints import Deferrable
+from plain.models.indexes import Index
 from plain.models.sql import Query
 from plain.models.transaction import TransactionManagementError, atomic
 from plain.runtime import settings

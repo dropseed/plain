@@ -5,7 +5,7 @@ from functools import partial
 
 from plain import models
 from plain.exceptions import FieldDoesNotExist
-from plain.models import NOT_PROVIDED
+from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from plain.models.migrations.utils import field_is_referenced, get_references
 from plain.models.options import DEFAULT_NAMES, normalize_together

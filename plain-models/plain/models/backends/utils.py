@@ -6,7 +6,7 @@ import time
 from contextlib import contextmanager
 from hashlib import md5
 
-from plain.models import NotSupportedError
+from plain.models.db import NotSupportedError
 from plain.utils.dateparse import parse_time
 
 logger = logging.getLogger("plain.models.backends")

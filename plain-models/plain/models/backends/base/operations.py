@@ -5,8 +5,9 @@ from importlib import import_module
 
 import sqlparse
 
-from plain.models import NotSupportedError, transaction
+from plain.models import transaction
 from plain.models.backends import utils
+from plain.models.db import NotSupportedError
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.encoding import force_str

@@ -9,8 +9,8 @@ from base64 import b64decode, b64encode
 from functools import partialmethod, total_ordering
 
 from plain import exceptions, preflight, validators
-from plain.models import connection, connections, router
 from plain.models.constants import LOOKUP_SEP
+from plain.models.db import connection, connections, router
 from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import DeferredAttribute, RegisterLookupMixin
 from plain.packages import packages

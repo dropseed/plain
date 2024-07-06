@@ -1,4 +1,4 @@
-from plain.models import DatabaseError
+from plain.models.db import DatabaseError
 
 
 class AmbiguityError(Exception):

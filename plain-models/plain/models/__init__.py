@@ -1,15 +1,15 @@
-from plain import signals
 from plain.exceptions import ObjectDoesNotExist
-from plain.models import signals as model_signals  # NOQA
-from plain.models.aggregates import *  # NOQA
-from plain.models.aggregates import __all__ as aggregates_all
-from plain.models.constraints import *  # NOQA
-from plain.models.constraints import __all__ as constraints_all
-from plain.models.db_utils import (
+
+from . import (
+    preflight,  # noqa
+)
+from .aggregates import *  # NOQA
+from .aggregates import __all__ as aggregates_all
+from .constraints import *  # NOQA
+from .constraints import __all__ as constraints_all
+from .db import (
     DEFAULT_DB_ALIAS,
     PLAIN_VERSION_PICKLE_KEY,
-    ConnectionHandler,
-    ConnectionRouter,
     DatabaseError,
     DataError,
     Error,
@@ -19,8 +19,13 @@ from plain.models.db_utils import (
     NotSupportedError,
     OperationalError,
     ProgrammingError,
+    close_old_connections,
+    connection,
+    connections,
+    reset_queries,
+    router,
 )
-from plain.models.deletion import (
+from .deletion import (
     CASCADE,
     DO_NOTHING,
     PROTECT,
@@ -31,9 +36,9 @@ from plain.models.deletion import (
     ProtectedError,
     RestrictedError,
 )
-from plain.models.enums import *  # NOQA
-from plain.models.enums import __all__ as enums_all
-from plain.models.expressions import (
+from .enums import *  # NOQA
+from .enums import __all__ as enums_all
+from .expressions import (
     Case,
     Exists,
     Expression,
@@ -51,23 +56,20 @@ from plain.models.expressions import (
     Window,
     WindowFrame,
 )
-from plain.models.fields import *  # NOQA
-from plain.models.fields import __all__ as fields_all
-from plain.models.fields.json import JSONField
-from plain.models.fields.proxy import OrderWrt
-from plain.models.indexes import *  # NOQA
-from plain.models.indexes import __all__ as indexes_all
-from plain.models.lookups import Lookup, Transform
-from plain.models.manager import Manager
-from plain.models.query import Prefetch, QuerySet, prefetch_related_objects
-from plain.models.query_utils import FilteredRelation, Q
-from plain.utils.connection import ConnectionProxy
-
-from . import preflight  # noqa
+from .fields import *  # NOQA
+from .fields import __all__ as fields_all
+from .fields.json import JSONField
+from .fields.proxy import OrderWrt
+from .indexes import *  # NOQA
+from .indexes import __all__ as indexes_all
+from .lookups import Lookup, Transform
+from .manager import Manager
+from .query import Prefetch, QuerySet, prefetch_related_objects
+from .query_utils import FilteredRelation, Q
 
 # Imports that would create circular imports if sorted
-from plain.models.base import DEFERRED, Model  # isort:skip
-from plain.models.fields.related import (  # isort:skip
+from .base import DEFERRED, Model  # isort:skip
+from .fields.related import (  # isort:skip
     ForeignKey,
     ForeignObject,
     OneToOneField,
@@ -82,7 +84,6 @@ from plain.models.fields.related import (  # isort:skip
 __all__ = aggregates_all + constraints_all + enums_all + fields_all + indexes_all
 __all__ += [
     "ObjectDoesNotExist",
-    "signals",
     "CASCADE",
     "DO_NOTHING",
     "PROTECT",
@@ -130,10 +131,13 @@ __all__ += [
     "OneToOneRel",
 ]
 
+# DB-related exports
 __all__ += [
     "connection",
     "connections",
     "router",
+    "reset_queries",
+    "close_old_connections",
     "DatabaseError",
     "IntegrityError",
     "InternalError",
@@ -146,30 +150,3 @@ __all__ += [
     "DEFAULT_DB_ALIAS",
     "PLAIN_VERSION_PICKLE_KEY",
 ]
-
-connections = ConnectionHandler()
-
-router = ConnectionRouter()
-
-# For backwards compatibility. Prefer connections['default'] instead.
-connection = ConnectionProxy(connections, DEFAULT_DB_ALIAS)
-
-
-# Register an event to reset saved queries when a Plain request is started.
-def reset_queries(**kwargs):
-    for conn in connections.all(initialized_only=True):
-        conn.queries_log.clear()
-
-
-signals.request_started.connect(reset_queries)
-
-
-# Register an event to reset transaction state and close connections past
-# their lifetime.
-def close_old_connections(**kwargs):
-    for conn in connections.all(initialized_only=True):
-        conn.close_if_unusable_or_obsolete()
-
-
-signals.request_started.connect(close_old_connections)
-signals.request_finished.connect(close_old_connections)

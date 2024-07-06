@@ -5,9 +5,9 @@ from functools import lru_cache
 from itertools import chain
 
 from plain.exceptions import FieldError
-from plain.models import DatabaseError, NotSupportedError, models
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.constants import OnConflict
+from plain.models.db import DatabaseError, NotSupportedError, models
 from plain.models.expressions import Col
 from plain.runtime import settings
 from plain.utils import timezone

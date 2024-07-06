@@ -4,9 +4,9 @@ MySQL database backend for Plain.
 Requires mysqlclient: https://pypi.org/project/mysqlclient/
 """
 from plain.exceptions import ImproperlyConfigured
-from plain.models import IntegrityError
 from plain.models.backends import utils as backend_utils
 from plain.models.backends.base.base import BaseDatabaseWrapper
+from plain.models.db import IntegrityError
 from plain.utils.functional import cached_property
 from plain.utils.regex_helper import _lazy_re_compile
 

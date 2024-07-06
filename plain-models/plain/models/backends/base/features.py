@@ -1,4 +1,4 @@
-from plain.models import ProgrammingError
+from plain.models.db import ProgrammingError
 from plain.utils.functional import cached_property
 
 

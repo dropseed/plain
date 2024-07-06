@@ -1,9 +1,10 @@
 import uuid
 
-from plain.models import Exists, ExpressionWrapper, Lookup
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.backends.utils import split_tzname_delta
 from plain.models.constants import OnConflict
+from plain.models.expressions import Exists, ExpressionWrapper
+from plain.models.lookups import Lookup
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.encoding import force_str

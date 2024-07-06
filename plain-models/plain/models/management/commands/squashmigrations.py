@@ -3,7 +3,7 @@ import shutil
 
 from plain.internal.legacy.management.base import BaseCommand, CommandError
 from plain.internal.legacy.management.utils import run_formatters
-from plain.models import DEFAULT_DB_ALIAS, connections, migrations
+from plain.models.db import DEFAULT_DB_ALIAS, connections, migrations
 from plain.models.migrations.loader import AmbiguityError, MigrationLoader
 from plain.models.migrations.migration import SwappableTuple
 from plain.models.migrations.optimizer import MigrationOptimizer

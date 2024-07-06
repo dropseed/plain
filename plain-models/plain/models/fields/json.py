@@ -2,8 +2,9 @@ import json
 import warnings
 
 from plain import exceptions, preflight
-from plain.models import NotSupportedError, connections, expressions, lookups, router
+from plain.models import expressions, lookups
 from plain.models.constants import LOOKUP_SEP
+from plain.models.db import NotSupportedError, connections, router
 from plain.models.fields import TextField
 from plain.models.lookups import (
     FieldGetDbPrepValueMixin,

@@ -281,7 +281,7 @@ class WhereNode(tree.Node):
 
     @cached_property
     def output_field(self):
-        from plain.models import BooleanField
+        from plain.models.fields import BooleanField
 
         return BooleanField()
 

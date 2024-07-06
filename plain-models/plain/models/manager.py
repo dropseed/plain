@@ -3,7 +3,7 @@ import inspect
 from functools import wraps
 from importlib import import_module
 
-from plain.models import router
+from plain.models.db import router
 from plain.models.query import QuerySet
 
 

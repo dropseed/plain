@@ -9,8 +9,8 @@ from itertools import chain, tee
 from sqlite3 import dbapi2 as Database
 
 from plain.exceptions import ImproperlyConfigured
-from plain.models import IntegrityError
 from plain.models.backends.base.base import BaseDatabaseWrapper
+from plain.models.db import IntegrityError
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 from plain.utils.regex_helper import _lazy_re_compile
 

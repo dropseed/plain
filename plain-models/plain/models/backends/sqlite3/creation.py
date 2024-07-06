@@ -5,8 +5,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from plain.models import NotSupportedError
 from plain.models.backends.base.creation import BaseDatabaseCreation
+from plain.models.db import NotSupportedError
 
 
 class DatabaseCreation(BaseDatabaseCreation):

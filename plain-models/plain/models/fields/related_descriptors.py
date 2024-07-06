@@ -64,20 +64,18 @@ and two directions (forward and reverse) for a total of six combinations.
 """
 
 from plain.exceptions import FieldError
-from plain.models import (
+from plain.models import signals, transaction
+from plain.models.db import (
     DEFAULT_DB_ALIAS,
     NotSupportedError,
-    Q,
-    Window,
     connections,
     router,
-    signals,
-    transaction,
 )
+from plain.models.expressions import Window
 from plain.models.functions import RowNumber
 from plain.models.lookups import GreaterThan, LessThanOrEqual
 from plain.models.query import QuerySet
-from plain.models.query_utils import DeferredAttribute
+from plain.models.query_utils import DeferredAttribute, Q
 from plain.models.utils import AltersData, resolve_callables
 from plain.utils.functional import cached_property
 

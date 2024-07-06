@@ -1,9 +1,9 @@
 from collections import namedtuple
 
-from plain.models import Index
 from plain.models.backends.base.introspection import BaseDatabaseIntrospection
 from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
 from plain.models.backends.base.introspection import TableInfo as BaseTableInfo
+from plain.models.indexes import Index
 
 FieldInfo = namedtuple("FieldInfo", BaseFieldInfo._fields + ("is_autofield", "comment"))
 TableInfo = namedtuple("TableInfo", BaseTableInfo._fields + ("comment",))

@@ -4,7 +4,7 @@ import os
 import sys
 
 from plain.internal.legacy.management.base import OutputWrapper
-from plain.models import NOT_PROVIDED
+from plain.models.fields import NOT_PROVIDED
 from plain.packages import packages
 from plain.utils import timezone
 from plain.utils.version import get_version

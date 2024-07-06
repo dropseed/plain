@@ -11,8 +11,8 @@ import logging
 from collections import namedtuple
 
 from plain.exceptions import FieldError
-from plain.models import DEFAULT_DB_ALIAS, DatabaseError, connections
 from plain.models.constants import LOOKUP_SEP
+from plain.models.db import DEFAULT_DB_ALIAS, DatabaseError, connections
 from plain.utils import tree
 
 logger = logging.getLogger("plain.models")
@@ -116,7 +116,8 @@ class Q(tree.Node):
         matches against the expressions.
         """
         # Avoid circular imports.
-        from plain.models import BooleanField, Value
+        from plain.models.expressions import Value
+        from plain.models.fields import BooleanField
         from plain.models.functions import Coalesce
         from plain.models.sql import Query
         from plain.models.sql.constants import SINGLE

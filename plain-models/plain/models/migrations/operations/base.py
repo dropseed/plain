@@ -1,4 +1,4 @@
-from plain.models import router
+from plain.models.db import router
 
 
 class Operation:
