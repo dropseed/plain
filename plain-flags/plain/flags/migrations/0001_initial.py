@@ -4,7 +4,8 @@ import uuid
 
 import plain.flags.models
 import plain.models.deletion
-from plain.models import migrations, models
+from plain import models
+from plain.models import migrations
 
 
 class Migration(migrations.Migration):

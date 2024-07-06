@@ -2,7 +2,8 @@
 
 import uuid
 
-from plain.models import migrations, models
+from plain import models
+from plain.models import migrations
 
 
 class Migration(migrations.Migration):

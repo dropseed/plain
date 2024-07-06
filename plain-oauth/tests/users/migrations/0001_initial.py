@@ -3,7 +3,8 @@
 import plain.auth.models
 import plain.auth.validators
 import plain.utils.timezone
-from plain.models import migrations, models
+from plain import models
+from plain.models import migrations
 
 
 class Migration(migrations.Migration):

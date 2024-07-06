@@ -162,13 +162,7 @@ class MigrationWriter:
                 imports.remove(line)
                 self.needs_manual_porting = True
 
-        # plain.models.migrations is always used, but models import may not be.
-        # If models import exists, merge it with migrations import.
-        if "from plain import models" in imports:
-            imports.discard("from plain import models")
-            imports.add("from plain.models import migrations, models")
-        else:
-            imports.add("from plain.models import migrations")
+        imports.add("from plain.models import migrations")
 
         # Sort imports by the package / module to be imported (the part after
         # "from" in "from ... import ..." or after "import" in "import ...").
