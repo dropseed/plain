@@ -14,8 +14,8 @@ from xml.dom.minidom import Node, parseString
 
 from jinja2 import Template
 
-from plain.db import DEFAULT_DB_ALIAS, connections, reset_queries
 from plain.exceptions import ImproperlyConfigured
+from plain.models import DEFAULT_DB_ALIAS, connections, reset_queries
 from plain.packages import packages
 from plain.runtime import settings
 from plain.runtime.user_settings import UserSettingsHolder

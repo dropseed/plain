@@ -2,9 +2,9 @@ import json
 import logging
 import threading
 
-from plain.db import connection
 from plain.http import ResponseRedirect
 from plain.json import PlainJSONEncoder
+from plain.models import connection
 from plain.runtime import settings
 from plain.urls import reverse
 

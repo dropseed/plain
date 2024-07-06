@@ -14,7 +14,7 @@ python = "^3.11"
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 plain = {path = "../plain"}
-plain-db = {path = "../plain-db"}
+plain-models = {path = "../plain-models"}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

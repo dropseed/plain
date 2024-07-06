@@ -1,4 +1,4 @@
-from plain.db import models
+from plain import models
 from plain.utils import timezone
 
 

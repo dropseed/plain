@@ -29,7 +29,7 @@ class Node:
     def create(cls, children=None, connector=None, negated=False):
         """
         Create a new instance using Node() instead of __init__() as some
-        subclasses, e.g. plain.db.models.query_utils.Q, may implement a custom
+        subclasses, e.g. plain.models.query_utils.Q, may implement a custom
         __init__() with a signature that conflicts with the one defined in
         Node.__init__().
         """

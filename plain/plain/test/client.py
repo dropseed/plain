@@ -25,7 +25,7 @@ from plain.utils.itercompat import is_iterable
 from plain.utils.regex_helper import _lazy_re_compile
 
 try:
-    from plain.db import close_old_connections
+    from plain.models import close_old_connections
 except ImportError:
 
     def close_old_connections(**kwargs):

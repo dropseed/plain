@@ -2,9 +2,9 @@
 
 import uuid
 
-import plain.db.models.deletion
 import plain.flags.models
-from plain.db import migrations, models
+import plain.models.deletion
+from plain.models import migrations, models
 
 
 class Migration(migrations.Migration):
@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
                 (
                     "flag",
                     models.ForeignKey(
-                        on_delete=plain.db.models.deletion.CASCADE,
+                        on_delete=plain.models.deletion.CASCADE,
                         to="plainflags.flag",
                     ),
                 ),

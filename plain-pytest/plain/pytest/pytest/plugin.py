@@ -275,7 +275,7 @@ class _DatabaseBlockerContextManager:
 
 
 class _DatabaseBlocker:
-    """Manager for plain.db.backends.base.base.BaseDatabaseWrapper.
+    """Manager for plain.models.backends.base.base.BaseDatabaseWrapper.
 
     This is the object returned by plain_db_blocker.
     """
@@ -285,8 +285,8 @@ class _DatabaseBlocker:
         self._real_ensure_connection = None
 
     @property
-    def _dj_db_wrapper(self) -> "plain.db.backends.base.base.BaseDatabaseWrapper":
-        from plain.db.backends.base.base import BaseDatabaseWrapper
+    def _dj_db_wrapper(self) -> "plain.models.backends.base.base.BaseDatabaseWrapper":
+        from plain.models.backends.base.base import BaseDatabaseWrapper
 
         # The first time the _dj_db_wrapper is accessed, we will save a
         # reference to the real implementation.

@@ -1,5 +1,5 @@
+from plain import models
 from plain.auth.models import BaseUser
-from plain.db import models
 
 
 class User(BaseUser):

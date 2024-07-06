@@ -1,6 +1,6 @@
 from typing import Any
 
-from plain.db import models
+from plain import models
 
 
 def coerce_key(key: Any) -> str:

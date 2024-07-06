@@ -3,7 +3,7 @@ import logging
 import traceback
 import uuid
 
-from plain.db import models, transaction
+from plain import models, transaction
 from plain.runtime import settings
 from plain.utils import timezone
 

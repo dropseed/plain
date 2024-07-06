@@ -1,6 +1,6 @@
 from functools import cached_property
 
-from plain.db.forms import ModelForm
+from plain.models.forms import ModelForm
 from plain.staff.admin.cards import Card
 from plain.staff.admin.views import (
     AdminModelDetailView,

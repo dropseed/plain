@@ -20,7 +20,7 @@ type = "directory"
 url = "../plain"
 
 [[package]]
-name = "plain.db"
+name = "plain.models"
 version = "0.0.0"
 description = ""
 optional = false
@@ -33,7 +33,7 @@ sqlparse = ">=0.3.1"
 
 [package.source]
 type = "directory"
-url = "../plain-db"
+url = "../plain-models"
 
 [[package]]
 name = "cffi"

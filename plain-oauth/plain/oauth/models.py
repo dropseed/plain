@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
+from plain import models, transaction
 from plain.auth import get_user_model
-from plain.db import models, transaction
-from plain.db.utils import IntegrityError, OperationalError, ProgrammingError
+from plain.models.db_utils import IntegrityError, OperationalError, ProgrammingError
 from plain.preflight import Error
 from plain.runtime import settings
 from plain.utils import timezone

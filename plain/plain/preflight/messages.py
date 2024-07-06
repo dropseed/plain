@@ -24,7 +24,7 @@ class CheckMessage:
 
     def __str__(self):
         try:
-            from plain.db import models
+            from plain import models
 
             ModelBase = models.base.ModelBase
             using_db = True

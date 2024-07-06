@@ -3,8 +3,7 @@ import inspect
 import logging
 from importlib import import_module
 
-from plain.db import IntegrityError
-from plain.db.models import Model
+from plain.models import IntegrityError, Model
 from plain.utils import timezone
 
 logger = logging.getLogger(__name__)

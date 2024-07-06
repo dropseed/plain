@@ -297,7 +297,7 @@ def _assert_num_queries(
     from plain.test.utils import CaptureQueriesContext
 
     if connection is None:
-        from plain.db import connection as conn
+        from plain.models import connection as conn
     else:
         conn = connection
 

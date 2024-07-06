@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from functools import cached_property
 
-from plain.db import IntegrityError
+from plain.models import IntegrityError
 from plain.utils import timezone
 
 

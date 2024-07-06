@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
+from plain import models
 from plain.auth.views import AuthViewMixin
-from plain.db import models
 from plain.htmx.views import HTMXViewMixin
 from plain.http import Response, ResponseRedirect
 from plain.paginator import Paginator

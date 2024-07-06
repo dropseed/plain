@@ -11,7 +11,7 @@ The `plain dev` command runs a combination of local commands + a Docker containe
 The following processes will run simultaneously (some will only run if they are detected as available):
 
 <!-- - [`manage.py runserver` (and migrations)](#runserver)
-- [`plain-db start --logs`](#plain-db)
+- [`plain-models start --logs`](#plain-models)
 - [`plain-tailwind compile --watch`](#plain-tailwind)
 - [`npm run watch`](#package-json)
 - [`stripe listen --forward-to`](#stripe)
@@ -25,7 +25,7 @@ It also comes with [debugging](#debugging) tools to make local debugging easier 
 pip install plain-dev
 ```
 
-If you have `plain-db` installed (i.e. you're using a database),
+If you have `plain-models` installed (i.e. you're using a database),
 then add `DATABASE_URL` to your `.env` file.
 
 ```sh
@@ -78,9 +78,9 @@ Only supports Postgres currently.
 The key process here is still `manage.py runserver`.
 But, before that runs, it will also wait for the database to be available and run `manage.py migrate`.
 
-### plain-db
+### plain-models
 
-If [`plain-db`](https://github.com/plainpackages/plain-db) is installed, it will automatically start and show the logs of the running database container.
+If [`plain-models`](https://github.com/plainpackages/plain-models) is installed, it will automatically start and show the logs of the running database container.
 
 ### plain-tailwind
 

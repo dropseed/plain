@@ -42,7 +42,7 @@ WSGI_APPLICATION = "wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "plain.db.backends.sqlite3",
+        "ENGINE": "plain.models.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }

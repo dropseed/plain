@@ -1,5 +1,5 @@
 import plain.sessions.models
-from plain.db import migrations, models
+from plain.models import migrations, models
 
 
 class Migration(migrations.Migration):

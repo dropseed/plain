@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING
 
-from plain.db.models import Q
+from plain.models import Q
 from plain.urls import reverse_lazy
 
 from .base import URL_NAMESPACE, AdminDetailView, AdminListView, AdminUpdateView
 
 if TYPE_CHECKING:
-    from plain.db import models
+    from plain import models
     from plain.views import View
 
 

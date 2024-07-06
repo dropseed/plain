@@ -103,7 +103,7 @@ class Dev:
             sys.exit(1)
 
     def add_gunicorn(self):
-        plain_db_installed = find_spec("plain.db") is not None
+        plain_db_installed = find_spec("plain.models") is not None
 
         # TODO not necessarily watching the right .env...
         # could return path from env.load?

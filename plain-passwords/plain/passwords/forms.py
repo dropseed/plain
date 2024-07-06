@@ -1,7 +1,7 @@
 from plain import forms
 from plain.auth import get_user_model
-from plain.db.forms import ModelForm
 from plain.exceptions import ValidationError
+from plain.models.forms import ModelForm
 
 from .core import check_user_password
 from .hashers import check_password

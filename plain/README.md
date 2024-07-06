@@ -18,7 +18,7 @@ With the core `plain` package you can build an app that:
 
 With the official Plain ecosystem packages you can:
 
-- Integrate a full-featured [database ORM](https://plainframework.com/docs/plain-db/)
+- Integrate a full-featured [database ORM](https://plainframework.com/docs/plain-models/)
 - Use a built-in [user authentication](https://plainframework.com/docs/plain-auth/) system
 - [Lint and format code](https://plainframework.com/docs/plain-code/)
 - Run a [database-backed cache](https://plainframework.com/docs/plain-cache/)

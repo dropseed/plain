@@ -63,7 +63,7 @@ class Services:
             ["plain", "dev", "services"], cwd=APP_PATH.parent
         )
 
-        if find_spec("plain.db"):
+        if find_spec("plain.models"):
             time.sleep(0.5)  # Give it a chance to hit on the first try
             subprocess.check_call(["plain", "db", "wait"], env=os.environ)
         else:

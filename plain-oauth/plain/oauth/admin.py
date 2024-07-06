@@ -1,4 +1,4 @@
-from plain.db.models import Count
+from plain.models import Count
 from plain.staff.admin.cards import ChartCard
 from plain.staff.admin.views import (
     AdminModelDetailView,

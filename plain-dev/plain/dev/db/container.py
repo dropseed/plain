@@ -15,7 +15,7 @@ class DBContainer:
         name = os.path.basename(project_root) + "-postgres-1"
 
         if "DATABASE_URL" in os.environ:
-            from plain.db import database_url
+            from plain.models import database_url
 
             postgres_version = os.environ.get("POSTGRES_VERSION")
             parsed_db_url = database_url.parse(os.environ.get("DATABASE_URL"))

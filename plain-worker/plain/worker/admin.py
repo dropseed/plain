@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from plain.db import models
+from plain import models
 from plain.http import ResponseRedirect
 from plain.runtime import settings
 from plain.staff.admin.cards import Card

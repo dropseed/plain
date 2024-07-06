@@ -38,7 +38,7 @@ Create your own user model (`plain create users`).
 
 ```python
 # app/users/models.py
-from plain.db import models
+from plain import models
 from plain.passwords.models import PasswordField
 
 

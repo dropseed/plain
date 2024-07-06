@@ -412,7 +412,7 @@ class BaseCommand:
             sys.exit(e.returncode)
         finally:
             try:
-                from plain.db import connections
+                from plain.models import connections
 
                 connections.close_all()
             except (ImproperlyConfigured, ImportError):
@@ -448,7 +448,7 @@ class BaseCommand:
         if output:
             if self.output_transaction:
                 try:
-                    from plain.db import DEFAULT_DB_ALIAS, connections
+                    from plain.models import DEFAULT_DB_ALIAS, connections
                 except ImportError:
                     self.stdout.write(output)
                     return output
@@ -565,8 +565,8 @@ class BaseCommand:
         migrations in the database.
         """
         try:
-            from plain.db import DEFAULT_DB_ALIAS, connections
-            from plain.db.migrations.executor import MigrationExecutor
+            from plain.models import DEFAULT_DB_ALIAS, connections
+            from plain.models.migrations.executor import MigrationExecutor
         except ImportError:
             return
 

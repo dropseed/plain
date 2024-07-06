@@ -29,7 +29,7 @@ def emit_pre_migrate_signal(verbosity, interactive, db, **kwargs):
                 "Running pre-migrate handlers for application %s" % package_config.label
             )
         try:
-            from plain.db import models
+            from plain import models
         except ImportError:
             continue
         models.signals.pre_migrate.send(
@@ -54,7 +54,7 @@ def emit_post_migrate_signal(verbosity, interactive, db, **kwargs):
                 % package_config.label
             )
         try:
-            from plain.db import models
+            from plain import models
         except ImportError:
             continue
         models.signals.post_migrate.send(

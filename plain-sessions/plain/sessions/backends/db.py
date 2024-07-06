@@ -1,7 +1,7 @@
 import logging
 
-from plain.db import DatabaseError, IntegrityError, router, transaction
 from plain.exceptions import SuspiciousOperation
+from plain.models import DatabaseError, IntegrityError, router, transaction
 from plain.sessions.backends.base import CreateError, SessionBase, UpdateError
 from plain.utils import timezone
 from plain.utils.functional import cached_property

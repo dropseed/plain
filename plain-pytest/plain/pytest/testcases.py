@@ -5,11 +5,11 @@ from contextlib import contextmanager
 from difflib import get_close_matches
 from unittest.suite import _DebugResult
 
-from plain.db import DEFAULT_DB_ALIAS, connections, transaction
 from plain.exceptions import ImproperlyConfigured
 from plain.internal.legacy.management import call_command
 from plain.internal.legacy.management.color import no_style
 from plain.internal.legacy.management.sql import emit_post_migrate_signal
+from plain.models import DEFAULT_DB_ALIAS, connections, transaction
 from plain.packages import packages
 from plain.test.client import Client
 from plain.test.utils import (
