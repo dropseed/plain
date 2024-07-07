@@ -1,16 +1,16 @@
+import importlib.metadata
 import sys
 from os import environ
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from plain.utils.version import get_version
-
 from .user_settings import LazySettings
 
-VERSION = (5, 0, 0, "alpha", 0)
-
-__version__ = get_version(VERSION)
+try:
+    __version__ = importlib.metadata.version("plainframework")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "dev"
 
 
 # Made available without setup or settings
@@ -57,6 +57,5 @@ __all__ = [
     "setup",
     "settings",
     "APP_PATH",
-    "VERSION",
     "__version__",
 ]

@@ -6,7 +6,7 @@ from plain.models import migrations
 from plain.models.migrations.loader import MigrationLoader
 from plain.models.migrations.serializer import Serializer, serializer_factory
 from plain.packages import packages
-from plain.runtime import get_version
+from plain.runtime import __version__
 from plain.utils.inspect import get_func_args
 from plain.utils.module_loading import module_dir
 from plain.utils.timezone import now
@@ -186,7 +186,7 @@ class MigrationWriter:
         # Hinting that goes into comment
         if self.include_header:
             items["migration_header"] = MIGRATION_HEADER_TEMPLATE % {
-                "version": get_version(),
+                "version": __version__,
                 "timestamp": now().strftime("%Y-%m-%d %H:%M"),
             }
         else:

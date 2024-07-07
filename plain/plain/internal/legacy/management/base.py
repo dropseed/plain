@@ -279,7 +279,7 @@ class BaseCommand:
         Plain commands. User-supplied commands can override this method to
         return their own version.
         """
-        return plain.runtime.get_version()
+        return plain.runtime.__version__
 
     def create_parser(self, prog_name, subcommand, **kwargs):
         """

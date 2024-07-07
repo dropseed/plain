@@ -9,8 +9,7 @@ from plain.models.migrations.migration import SwappableTuple
 from plain.models.migrations.optimizer import MigrationOptimizer
 from plain.models.migrations.writer import MigrationWriter
 from plain.packages import packages
-from plain.runtime import settings
-from plain.utils.version import get_version
+from plain.runtime import __version__, settings
 
 
 class Command(BaseCommand):
@@ -147,7 +146,7 @@ class Command(BaseCommand):
                 raise CommandError(
                     "You cannot squash squashed migrations! Please transition it to a "
                     "normal migration first: https://docs.djangoproject.com/en/%s/"
-                    "topics/migrations/#squashing-migrations" % get_version()
+                    "topics/migrations/#squashing-migrations" % __version__
                 )
             operations.extend(smigration.operations)
             for dependency in smigration.dependencies:

@@ -16,7 +16,6 @@ from plain.models.db import connections
 from plain.runtime import settings
 from plain.utils.functional import cached_property
 from plain.utils.safestring import SafeString
-from plain.utils.version import get_version_tuple
 
 try:
     try:
@@ -25,21 +24,6 @@ try:
         import psycopg2 as Database
 except ImportError:
     raise ImproperlyConfigured("Error loading psycopg2 or psycopg module")
-
-
-def psycopg_version():
-    version = Database.__version__.split(" ", 1)[0]
-    return get_version_tuple(version)
-
-
-if psycopg_version() < (2, 8, 4):
-    raise ImproperlyConfigured(
-        f"psycopg2 version 2.8.4 or newer is required; you have {Database.__version__}"
-    )
-if (3,) <= psycopg_version() < (3, 1, 8):
-    raise ImproperlyConfigured(
-        f"psycopg version 3.1.8 or newer is required; you have {Database.__version__}"
-    )
 
 
 from .psycopg_any import IsolationLevel, is_psycopg3  # NOQA isort:skip

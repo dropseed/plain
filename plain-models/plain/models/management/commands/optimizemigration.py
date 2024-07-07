@@ -9,7 +9,7 @@ from plain.models.migrations.loader import MigrationLoader
 from plain.models.migrations.optimizer import MigrationOptimizer
 from plain.models.migrations.writer import MigrationWriter
 from plain.packages import packages
-from plain.utils.version import get_version
+from plain.runtime import __version__
 
 
 class Command(BaseCommand):
@@ -89,7 +89,7 @@ class Command(BaseCommand):
                     "Migration will require manual porting but is already a squashed "
                     "migration.\nTransition to a normal migration first: "
                     "https://docs.djangoproject.com/en/%s/topics/migrations/"
-                    "#squashing-migrations" % get_version()
+                    "#squashing-migrations" % __version__
                 )
             # Make a new migration with those operations.
             subclass = type(

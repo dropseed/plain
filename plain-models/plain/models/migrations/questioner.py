@@ -6,8 +6,8 @@ import sys
 from plain.internal.legacy.management.base import OutputWrapper
 from plain.models.fields import NOT_PROVIDED
 from plain.packages import packages
+from plain.runtime import __version__
 from plain.utils import timezone
-from plain.utils.version import get_version
 
 from .loader import MigrationLoader
 
@@ -277,7 +277,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
     def ask_unique_callable_default_addition(self, field_name, model_name):
         """Adding a unique field with a callable default."""
         if not self.dry_run:
-            version = get_version()
+            version = __version__
             choice = self._choice_input(
                 f"Callable default on unique field {model_name}.{field_name} "
                 f"will not generate unique values upon migrating.\n"
