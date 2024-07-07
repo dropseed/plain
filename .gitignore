@@ -4,3 +4,6 @@
 __pycache__
 *.DS_Store
 .coverage
+
+# Build files from poetry publish
+plain*/dist/
