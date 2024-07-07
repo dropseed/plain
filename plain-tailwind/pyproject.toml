@@ -1,0 +1,39 @@
+[tool.poetry]
+
+name = "plain.tailwind"
+packages = [
+    { include = "plain" },
+]
+
+version = "0.0.0"
+description = "Work library for Plain"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://www.plainpackages.com/"
+documentation = "https://www.plainpackages.com/docs/"
+repository = "https://github.com/plainpackages/plain-tailwind"
+keywords = ["django", "saas", "plain", "framework"]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+click = ">=8.0.0"
+requests = ">=2.0.0"
+tomlkit = "^0.12.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+isort = "^5.10.1"
+black = "^22.3.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

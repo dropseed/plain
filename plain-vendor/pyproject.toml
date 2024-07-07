@@ -1,0 +1,29 @@
+[tool.poetry]
+
+name = "plain.vendor"
+packages = [
+    { include = "plain" },
+]
+
+version = "0.0.0"
+description = ""
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+# readme = "README.md"
+
+# Make the CLI available without adding to INSTALLED_APPS
+[tool.poetry.plugins."plain.cli"]
+"vendor" = "plain.vendor:cli"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+tomlkit = "^0.12.1"
+requests = "*"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

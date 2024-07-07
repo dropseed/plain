@@ -1,0 +1,63 @@
+{% if toolbar.should_render() %}
+<script src="{{ asset('toolbar/toolbar.js') }}"></script>
+<div id="plaintoolbar" class="text-sm py-1.5 text-stone-300 bg-stone-950 fixed bottom-4 max-w-full drop-shadow-md z-30 mx-4 rounded-2xl hidden lg:flex lg:flex-col -translate-x-1/2 left-1/2">
+    <div class="flex justify-between px-4 mx-auto space-x-4">
+        <div class="flex items-center">
+            <svg class="w-4 h-4 width="237" height="237" viewBox="0 0 237 237" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M163.316 15.876C172.248 15.876 180.501 20.641 184.967 28.376L229.783 106C234.249 113.735 234.249 123.265 229.783 131L184.967 208.624C180.501 216.359 172.248 221.124 163.316 221.124L73.6837 221.124C64.7521 221.124 56.4989 216.359 52.0331 208.624L7.21686 131C2.75105 123.265 2.75105 113.735 7.21687 106L52.0331 28.376C56.4989 20.6409 64.7521 15.876 73.6837 15.876L163.316 15.876Z" fill="#8B8276"/>
+                <circle cx="118.5" cy="118.5" r="64.5" fill="#CDC8C2"/>
+            </svg>
+            <code class="ml-2 text-xs whitespace-nowrap text-mono">{{ toolbar.version }}</code>
+
+            {% if request.impersonator is defined %}
+            <div class="flex items-center ml-1 font-light">
+                Impersonating&nbsp;<span class="font-medium">{{ request.user }}</span>
+                </span>
+                <a href="{{ url('impersonate:stop') }}" title="Stop impersonating" class="flex items-center px-1 ml-1 text-red-300 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 bi bi-x-octagon-fill" viewBox="0 0 16 16">
+                        <path d="M11.46.146A.5.5 0 0 0 11.107 0H4.893a.5.5 0 0 0-.353.146L.146 4.54A.5.5 0 0 0 0 4.893v6.214a.5.5 0 0 0 .146.353l4.394 4.394a.5.5 0 0 0 .353.146h6.214a.5.5 0 0 0 .353-.146l4.394-4.394a.5.5 0 0 0 .146-.353V4.893a.5.5 0 0 0-.146-.353L11.46.146zm-6.106 4.5L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 1 1 .708-.708z"/>
+                    </svg>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="flex items-center space-x-4">
+            {% include "querystats/toolbar.html" %}
+
+            <div class="flex items-center space-x-3 transition-all">
+                {% include "toolbar/links.html" %}
+                <button data-plaintoolbar-expand class="hover:text-orange-500" type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M3.646 9.146a.5.5 0 0 1 .708 0L8 12.793l3.646-3.647a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 0-.708zm0-2.292a.5.5 0 0 0 .708 0L8 3.207l3.646 3.647a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 0 0 0 .708z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="plaintoolbar-details" class="hidden p-4 text-sm">
+        <table>
+            <tbody>
+            {% for k, v in toolbar.metadata.items() %}
+            <tr>
+                <td class="pr-2 font-medium whitespace-nowrap">{{ k }}</td>
+                <td class="whitespace-nowrap">{{ v }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if object|default(false) %}
+        <div class="font-mono" title="PK: {{ object.pk|default('unknown') }}">
+            {{ object.__repr__() }}
+        </div>
+        {% endif %}
+
+        <button data-plaintoolbar-hide class="hover:text-red-500" type="button">
+            Hide for 1 hour
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 bi bi-x-circle-fill" viewBox="0 0 16 16">
+                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
+            </svg>
+        </button>
+    </div>
+</div>
+{% endif %}

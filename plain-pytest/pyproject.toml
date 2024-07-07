@@ -1,0 +1,44 @@
+[tool.poetry]
+
+name = "plain.pytest"
+packages = [
+    { include = "plain" },
+]
+
+version = "0.0.0"
+description = "Testing for Plain"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://www.plainpackages.com/"
+documentation = "https://www.plainpackages.com/docs/"
+repository = "https://github.com/plainpackages/plain-pytest"
+keywords = ["django", "saas", "plain", "framework"]
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+]
+
+# Make the CLI available without adding to INSTALLED_APPS
+[tool.poetry.plugins."plain.cli"]
+"test" = "plain.pytest:cli"
+
+# Automatically sets this up with pytest
+[tool.poetry.plugins."pytest11"]
+"plain" = "plain.pytest.pytest.plugin"
+
+
+[tool.poetry.dependencies]
+python = "^3.8"
+click = ">=8.0.0"
+pytest = "^7.0.0"
+
+[tool.poetry.dev-dependencies]
+ipdb = "^0.13.9"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

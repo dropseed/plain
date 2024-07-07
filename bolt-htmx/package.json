@@ -1,9 +1,0 @@
-{
-  "scripts": {
-    "copy-assets": "rm -r bolt/htmx/assets/htmx/src && cp -r node_modules/htmx.org/dist bolt/htmx/assets/htmx/src && rm -r bolt/htmx/assets/htmx/idiomorph && cp -r node_modules/idiomorph/dist bolt/htmx/assets/htmx/idiomorph"
-  },
-  "dependencies": {
-    "htmx.org": "^1.8.5",
-    "idiomorph": "^0.3.0"
-  }
-}

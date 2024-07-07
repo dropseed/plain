@@ -1,0 +1,45 @@
+[tool.poetry]
+
+name = "plain.dev"
+packages = [
+    { include = "plain" },
+]
+
+version = "0.0.0"
+description = "Work library for Plain"
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://www.plainpackages.com/"
+documentation = "https://www.plainpackages.com/docs/"
+repository = "https://github.com/plainpackages/plain-dev"
+
+# Make the CLI available without adding to INSTALLED_APPS
+[tool.poetry.plugins."plain.cli"]
+"dev" = "plain.dev:cli"
+"pre-commit" = "plain.dev.precommit:cli"
+"contrib" = "plain.dev.contribute:cli"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+click = ">=8.0.0"
+honcho = "^1.1.0"
+debugpy = "^1.6.3"
+
+# For local runserver
+gunicorn = ">20"
+
+tomli = {version = "^2.0.1", python = "<3.11"}
+
+# db
+requests = ">=2.0.0"
+psycopg2-binary = "^2.9.3"
+
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+ipdb = "^0.13.9"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

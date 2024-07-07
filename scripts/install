@@ -1,5 +1,5 @@
 #!/bin/sh -e
-cd bolt
+cd plain
 POETRY_VIRTUALENVS_IN_PROJECT=true poetry install
 cd ..
 

@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "plainframework"
+version = "0.0.0"
+description = ""
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+readme = "README.md"
+
+packages = [
+    { include = "plain" },
+]
+
+[tool.poetry.scripts]
+plain = "plain.cli:cli"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+jinja2 = "^3.1.2"
+python-dotenv = "^1.0.0"
+click = ">=8.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.2"
+coverage = "^7.3.2"
+ruff = "^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+extend = "../plain-code/plain/code/ruff_defaults.toml"
+target-version = "py310"
+extend-exclude = ["../plain-pytest/plain/pytest/pytest"]
+
+[tool.plain.code]
+exclude = ["../plain-pytest/plain/pytest/pytest"]
