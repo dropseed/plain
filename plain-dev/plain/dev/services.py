@@ -65,7 +65,7 @@ class Services:
 
         if find_spec("plain.models"):
             time.sleep(0.5)  # Give it a chance to hit on the first try
-            subprocess.check_call(["plain", "db", "wait"], env=os.environ)
+            subprocess.check_call(["plain", "models", "db-wait"], env=os.environ)
         else:
             # A bit of a hack to wait for the services to start
             time.sleep(3)
