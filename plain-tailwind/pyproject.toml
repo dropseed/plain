@@ -8,19 +8,11 @@ packages = [
 version = "0.0.0"
 description = "Work library for Plain"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-license = "MIT"
+license = "BSD-3-Clause"
 readme = "README.md"
-homepage = "https://www.plainpackages.com/"
-documentation = "https://www.plainpackages.com/docs/"
-repository = "https://github.com/plainpackages/plain-tailwind"
-keywords = ["django", "saas", "plain", "framework"]
-classifiers = [
-    "Environment :: Web Environment",
-    "Framework :: Django",
-    "Framework :: Django :: 4",
-    "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
-]
+homepage = "https://plainframework.com"
+documentation = "https://plainframework.com/docs/"
+repository = "https://github.com/dropseed/plain"
 
 [tool.poetry.dependencies]
 python = "^3.8"

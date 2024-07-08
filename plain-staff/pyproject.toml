@@ -8,7 +8,7 @@ packages = [
 version = "0.0.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-license = "MIT"
+license = "BSD-3-Clause"
 # readme = "README.md"
 
 [tool.poetry.dependencies]

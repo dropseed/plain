@@ -8,10 +8,9 @@ packages = [
 version = "0.0.0"
 description = "HTMX integration for Plain"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-license = "MIT"
+license = "BSD-3-Clause"
 readme = "README.md"
 repository = "https://github.com/dropseed/plain"
-keywords = []
 
 [tool.poetry.dependencies]
 python = "^3.8"

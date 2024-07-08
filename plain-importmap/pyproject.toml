@@ -3,12 +3,11 @@ name = "plain.importmap"
 version = "0.0.0"
 description = "JavaScript import maps for Django"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-license = "MIT"
+license = "BSD-3-Clause"
 readme = "README.md"
-homepage = "https://github.com/forgepackages/plain-importmap"
-documentation = "https://github.com/forgepackages/plain-importmap"
-repository = "https://github.com/forgepackages/plain-importmap"
-keywords = ["plain", "javascript", "import", "map", "import-maps"]
+homepage = "https://plainframework.com"
+documentation = "https://plainframework.com/docs/"
+repository = "https://github.com/dropseed/plain"
 packages = [
     { include = "plain" },
 ]

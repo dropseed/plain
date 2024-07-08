@@ -5,14 +5,14 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.0.0"
+version = "0.0.1"
 description = "Work library for Plain"
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-license = "MIT"
+license = "BSD-3-Clause"
 readme = "README.md"
-homepage = "https://www.plainpackages.com/"
-documentation = "https://www.plainpackages.com/docs/"
-repository = "https://github.com/plainpackages/plain-dev"
+homepage = "https://plainframework.com"
+documentation = "https://plainframework.com/docs/"
+repository = "https://github.com/dropseed/plain"
 
 # Make the CLI available without adding to INSTALLED_APPS
 [tool.poetry.plugins."plain.cli"]

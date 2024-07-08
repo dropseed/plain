@@ -3,12 +3,11 @@ name = "plain.oauth"
 version = "0.0.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-license = "MIT"
+license = "BSD-3-Clause"
 readme = "README.md"
-homepage = "https://github.com/forgepackages/plain-oauth"
-documentation = "https://github.com/forgepackages/plain-oauth"
-repository = "https://github.com/forgepackages/plain-oauth"
-keywords = []
+homepage = "https://plainframework.com"
+documentation = "https://plainframework.com/docs/"
+repository = "https://github.com/dropseed/plain"
 packages = [
     { include = "plain" },
 ]
