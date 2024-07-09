@@ -15,7 +15,7 @@ from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
 from plain.runtime import settings
-from plain.signals import got_request_exception, request_finished, request_started
+from plain.signals import got_request_exception, request_started
 from plain.test.utils import ContextList
 from plain.urls import resolve
 from plain.utils.encoding import force_bytes
@@ -23,14 +23,6 @@ from plain.utils.functional import SimpleLazyObject
 from plain.utils.http import urlencode
 from plain.utils.itercompat import is_iterable
 from plain.utils.regex_helper import _lazy_re_compile
-
-try:
-    from plain.models import close_old_connections
-except ImportError:
-
-    def close_old_connections(**kwargs):
-        return None
-
 
 __all__ = (
     "Client",
@@ -109,15 +101,6 @@ class FakePayload(IOBase):
         self.__len += len(content)
 
 
-def closing_iterator_wrapper(iterable, close):
-    try:
-        yield from iterable
-    finally:
-        request_finished.disconnect(close_old_connections)
-        close()  # will fire request_finished
-        request_finished.connect(close_old_connections)
-
-
 def conditional_content_removal(request, response):
     """
     Simulate the behavior of most web servers by removing the content of
@@ -154,9 +137,7 @@ class ClientHandler(BaseHandler):
         if self._middleware_chain is None:
             self.load_middleware()
 
-        request_started.disconnect(close_old_connections)
         request_started.send(sender=self.__class__, environ=environ)
-        request_started.connect(close_old_connections)
         request = WSGIRequest(environ)
         # sneaky little hack so that we can easily get round
         # CsrfViewMiddleware.  This makes life easier, and is probably
@@ -175,14 +156,7 @@ class ClientHandler(BaseHandler):
         response.wsgi_request = request
 
         # Emulate a WSGI server by calling the close method on completion.
-        if response.streaming:
-            response.streaming_content = closing_iterator_wrapper(
-                response.streaming_content, response.close
-            )
-        else:
-            request_finished.disconnect(close_old_connections)
-            response.close()  # will fire request_finished
-            request_finished.connect(close_old_connections)
+        response.close()
 
         return response
 

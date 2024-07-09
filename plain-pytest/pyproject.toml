@@ -20,7 +20,7 @@ repository = "https://github.com/dropseed/plain"
 
 # Automatically sets this up with pytest
 [tool.poetry.plugins."pytest11"]
-"plain" = "plain.pytest.pytest.plugin"
+"plain" = "plain.pytest.plugin"
 
 
 [tool.poetry.dependencies]

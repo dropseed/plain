@@ -12,6 +12,10 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 python = "^3.11"
 sqlparse = ">=0.3.1"
 
+# Automatically sets this up with pytest
+[tool.poetry.plugins."pytest11"]
+"plain.models" = "plain.models.test.pytest"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
