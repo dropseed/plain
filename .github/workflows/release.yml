@@ -16,7 +16,7 @@ jobs:
     # Simplified check to see if "version" was potentially updated anywhere
     # (no harm in running publish anyway, but a waste of resources if it wasn't)
     - id: version-check
-      run: git show **/pyproject.toml | grep 'version'
+      run: git diff HEAD~1 HEAD -- **/pyproject.toml | grep 'version'
       continue-on-error: true
 
     - if: ${{ steps.version-check.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
