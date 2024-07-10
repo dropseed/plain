@@ -5,8 +5,8 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.0.0"
-description = ""
+version = "0.1.0"
+description = "Vendor JS/CSS assets in Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
 # readme = "README.md"

@@ -4,8 +4,8 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.0.0"
-description = ""
+version = "0.1.0"
+description = "Code formatting and linting for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
 # Make the CLI available without adding to INSTALLED_APPS

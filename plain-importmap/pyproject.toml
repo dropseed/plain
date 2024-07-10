@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "plain.importmap"
-version = "0.0.0"
-description = "JavaScript import maps for Django"
+version = "0.1.0"
+description = "JavaScript import maps for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
 readme = "README.md"

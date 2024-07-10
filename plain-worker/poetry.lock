@@ -135,7 +135,7 @@ files = [
 
 [[package]]
 name = "plain-models"
-version = "0.0.0"
+version = "0.1.0"
 description = ""
 optional = false
 python-versions = "^3.11"
@@ -151,7 +151,7 @@ url = "../plain-models"
 
 [[package]]
 name = "plainframework"
-version = "0.0.0"
+version = "0.1.0"
 description = ""
 optional = false
 python-versions = "^3.11"

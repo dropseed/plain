@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "plainframework"
 version = "0.1.0"
-description = ""
+description = "A web framework for building products with Python."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 readme = "README.md"
 

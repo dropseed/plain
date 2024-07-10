@@ -5,8 +5,8 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.0.1"
-description = "Work library for Plain"
+version = "0.1.0"
+description = "Local development tools for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
 readme = "README.md"

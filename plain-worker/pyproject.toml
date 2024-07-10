@@ -4,8 +4,8 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.0.0"
-description = ""
+version = "0.1.0"
+description = "Background job processing for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
 [tool.poetry.dependencies]
