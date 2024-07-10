@@ -12,7 +12,7 @@ license = "BSD-3-Clause"
 # readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 sqlparse = ">=0.2.2"
 # TODO plain-htmx required
 

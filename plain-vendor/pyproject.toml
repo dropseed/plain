@@ -16,7 +16,7 @@ license = "BSD-3-Clause"
 "vendor" = "plain.vendor:cli"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 tomlkit = "^0.12.1"
 requests = "*"
 

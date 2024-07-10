@@ -24,7 +24,7 @@ repository = "https://github.com/dropseed/plain"
 
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 click = ">=8.0.0"
 pytest = ">=7.0.0"
 

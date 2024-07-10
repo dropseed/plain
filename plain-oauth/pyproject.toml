@@ -18,7 +18,7 @@ PLAIN_SETTINGS_MODULE = "tests.settings"
 FAIL_INVALID_TEMPLATE_VARS = true
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"

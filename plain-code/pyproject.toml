@@ -14,7 +14,7 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 "fix" = "plain.code.cli:fix"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 ruff = "^0.1.0"
 
 [tool.poetry.dev-dependencies]

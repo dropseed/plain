@@ -21,7 +21,7 @@ repository = "https://github.com/dropseed/plain"
 "contrib" = "plain.dev.contribute:cli"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 click = ">=8.0.0"
 honcho = "^1.1.0"
 debugpy = "^1.6.3"

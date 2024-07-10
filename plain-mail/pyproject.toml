@@ -12,7 +12,7 @@ license = "BSD-3-Clause"
 # readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

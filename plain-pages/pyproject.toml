@@ -9,7 +9,7 @@ description = "Simplified Markdown-based content for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 mistune = "^3.0.0"
 python-frontmatter = "^1.0.0"
 
