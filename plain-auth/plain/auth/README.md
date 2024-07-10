@@ -1,4 +1,4 @@
-# plain-auth
+# plain.auth
 
 Add users to your app and define which views they can access.
 

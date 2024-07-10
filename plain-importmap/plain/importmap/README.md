@@ -1,4 +1,4 @@
-# plain-importmap
+# plain.importmap
 
 Use import maps in templates.
 

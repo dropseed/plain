@@ -1,4 +1,4 @@
-# plain-impersonate
+# plain.impersonate
 
 See what your users see.
 

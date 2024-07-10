@@ -1,4 +1,4 @@
-# plain-vendor
+# plain.vendor
 
 Download those CDN scripts and styles.
 

@@ -1,4 +1,4 @@
-# plain-oauth
+# plain.oauth
 
 Let users log in with OAuth providers.
 

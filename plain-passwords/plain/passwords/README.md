@@ -1,3 +1,3 @@
-# plain-password
+# plain.password
 
 Password authentication for Plain.

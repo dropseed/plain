@@ -1,4 +1,4 @@
-# plain-elements
+# plain.elements
 
 ## Installation
 

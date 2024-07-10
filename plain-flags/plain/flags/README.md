@@ -1,4 +1,4 @@
-# plain-flags
+# plain.flags
 
 Local feature flags via database models.
 

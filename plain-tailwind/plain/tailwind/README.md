@@ -1,4 +1,4 @@
-# plain-tailwind
+# plain.tailwind
 
 Integrate Tailwind CSS without JavaScript or npm.
 

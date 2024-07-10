@@ -1,4 +1,4 @@
-# plain-models
+# plain.models
 
 Model your data and store it in a database.
 

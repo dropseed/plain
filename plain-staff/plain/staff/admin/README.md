@@ -21,7 +21,7 @@ in addition to models.
 
 ## Dashboards
 
-<!-- # plain-querystats
+<!-- # plain.querystats
 
 On-page database query stats in development and production.
 
@@ -97,7 +97,7 @@ module.exports = {
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
 
 
-# plain-toolbar
+# plain.toolbar
 
 The staff toolbar is enabled for every user who `is_staff`.
 
@@ -153,7 +153,7 @@ module.exports = {
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
 
 
-# plain-requestlog
+# plain.requestlog
 
 The request log stores a local history of HTTP requests and responses during `plain work` (Django runserver).
 
@@ -218,7 +218,7 @@ module.exports = {
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
 
 
-# plain-impersonate
+# plain.impersonate
 
 See what your users see.
 
