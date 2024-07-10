@@ -1,8 +1,5 @@
 name: release
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch: {}
 
 jobs:
@@ -13,24 +10,15 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # Simplified check to see if "version" was potentially updated anywhere
-    # (no harm in running publish anyway, but a waste of resources if it wasn't)
-    - id: version-check
-      run: git show $GITHUB_SHA **/pyproject.toml | grep 'version'
-      continue-on-error: true
+    - run: pipx install poetry
 
-    - if: ${{ steps.version-check.outcome == 'success' || github.event_name == 'workflow_dispatch' }}
-      run: pipx install poetry
-
-    - if: ${{ steps.version-check.outcome == 'success' || github.event_name == 'workflow_dispatch' }}
-      uses: actions/setup-python@v4
+    - uses: actions/setup-python@v4
       with:
         python-version: "3.12"
         cache: poetry
 
     # https://docs.pypi.org/trusted-publishers/using-a-publisher/
-    - if: ${{ steps.version-check.outcome == 'success' || github.event_name == 'workflow_dispatch' }}
-      name: Mint API token
+    - name: Mint API token
       id: mint-token
       run: |
         # retrieve the ambient OIDC token
@@ -48,8 +36,7 @@ jobs:
         # see the next step in the workflow for an example of using this step output
         echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
 
-    - if: ${{ steps.version-check.outcome == 'success' || github.event_name == 'workflow_dispatch' }}
-      name: Publish packages
+    - name: Publish packages
       run: ./scripts/publish
       env:
         POETRY_PYPI_TOKEN_PYPI: ${{ steps.mint-token.outputs.api-token }}
