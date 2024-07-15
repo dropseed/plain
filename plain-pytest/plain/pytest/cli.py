@@ -1,9 +1,9 @@
 import os
-import subprocess
 import sys
 
 import click
 
+import pytest
 from plain.runtime import settings
 
 
@@ -33,16 +33,6 @@ def cli(pytest_args):
 
     click.secho(f"Running pytest with PLAIN_ENV={os.environ['PLAIN_ENV']}", bold=True)
 
-    result = subprocess.run(
-        [
-            "pytest",
-            *pytest_args,
-        ],
-        env={
-            **os.environ,
-        },
-    )
-
-    if result.returncode:
-        # Can be invoked by pre-commit, so only exit if it fails
-        sys.exit(result.returncode)
+    returncode = pytest.main(list(pytest_args))
+    if returncode:
+        sys.exit(returncode)
