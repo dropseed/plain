@@ -1,9 +1,13 @@
 name: release
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - main
 
 jobs:
   release:
+    if: ${{ contains(github.event.commit.message, 'Release') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
