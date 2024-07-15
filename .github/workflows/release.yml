@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    if: ${{ contains(github.event.commit.message, 'Release') || github.event_name == 'workflow_dispatch' }}
+    if: ${{ startsWith(github.event.head_commit.message, 'Release') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
