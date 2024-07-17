@@ -61,7 +61,7 @@ def cli(install):
             check_short("Running plain code checks", "plain", "code", "check")
 
         if Path("poetry.lock").exists():
-            check_short("Checking poetry.lock", "poetry", "lock", "--check")
+            check_short("Checking poetry.lock", "poetry", "check", "--lock")
 
         if plain_db_connected():
             check_short(
