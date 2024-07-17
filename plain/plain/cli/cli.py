@@ -308,7 +308,12 @@ def compile(ctx):
 @plain_cli.command()
 @click.argument("package_name")
 def create(package_name):
-    """Create a new local package"""
+    """
+    Create a new local package.
+
+    The PACKAGE_NAME is typically a plural noun, like "users" or "posts",
+    where you might create a "User" or "Post" model inside of the package.
+    """
     package_dir = plain.runtime.APP_PATH / package_name
     package_dir.mkdir(exist_ok=True)
 
