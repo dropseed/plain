@@ -4,6 +4,6 @@ if [ "$1" = "--check" ]; then
     poetry run ruff check ..
     poetry run ruff format .. --check
 else
-    poetry run ruff --fix-only ..
+    poetry run ruff --fix-only .. --unsafe-fixes
     poetry run ruff format ..
 fi
