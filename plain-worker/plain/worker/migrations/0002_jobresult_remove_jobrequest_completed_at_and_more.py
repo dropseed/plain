@@ -8,7 +8,7 @@ from plain.models import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("plainqueue", "0001_initial"),
+        ("plainworker", "0001_initial"),
     ]
 
     operations = [

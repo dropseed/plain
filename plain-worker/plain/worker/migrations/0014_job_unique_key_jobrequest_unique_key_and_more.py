@@ -6,7 +6,7 @@ from plain.models import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("plainqueue", "0013_alter_job_options_alter_jobresult_options_and_more"),
+        ("plainworker", "0013_alter_job_options_alter_jobresult_options_and_more"),
     ]
 
     operations = [

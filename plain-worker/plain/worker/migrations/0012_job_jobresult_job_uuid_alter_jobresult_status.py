@@ -8,7 +8,7 @@ from plain.models import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("plainqueue", "0011_jobrequest_retries_jobrequest_retry_attempt_and_more"),
+        ("plainworker", "0011_jobrequest_retries_jobrequest_retry_attempt_and_more"),
     ]
 
     operations = [

@@ -5,7 +5,7 @@ from plain.models import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("plainqueue", "0005_remove_jobresult_updated_at"),
+        ("plainworker", "0005_remove_jobresult_updated_at"),
     ]
 
     operations = [
