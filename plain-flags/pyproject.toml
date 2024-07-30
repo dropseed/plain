@@ -11,6 +11,11 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 [tool.poetry.dependencies]
 python = "^3.11"
 
+[tool.poetry.group.dev.dependencies]
+plain = {path = "../plain", develop = true}
+"plain.models" = {path = "../plain-models", develop = true}
+"plain.pytest" = {path = "../plain-pytest", develop = true}
+coverage = "^7.6.0"
 
 [build-system]
 requires = ["poetry-core"]

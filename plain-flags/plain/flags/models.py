@@ -1,8 +1,9 @@
 import re
 import uuid
 
+from plain import models
 from plain.exceptions import ValidationError
-from plain.models import ProgrammingError, models
+from plain.models import ProgrammingError
 from plain.preflight import Info
 from plain.runtime import settings
 

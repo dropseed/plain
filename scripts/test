@@ -1,4 +1,20 @@
 #!/bin/sh -e
-cd plain/tests
-poetry run coverage run -m pytest "$@"
-poetry run coverage html --skip-empty
+
+workflow=".github/workflows/test.yml"
+packages=$(awk -F'[][]' '/package:/ {gsub(/"|,/, "", $2); print $2}' $workflow)
+
+function bold {
+    echo "\033[1m$1\033[0m"
+}
+
+bold "Found packages to test in $workflow: $packages"
+
+for package in $packages;
+do
+    echo
+    bold "Testing $package"
+    cd "$package/tests"
+    poetry run coverage run -m pytest "$@"
+    poetry run coverage html --skip-empty
+    cd ../..
+done
