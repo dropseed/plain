@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import traceback
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -422,6 +423,9 @@ class PlainCommandCollection(click.CommandCollection):
                 fg="red",
                 err=True,
             )
+            print("---")
+            print(traceback.format_exc())
+            print("---")
 
             sources = [
                 EntryPointGroup(),
