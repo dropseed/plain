@@ -1,6 +1,6 @@
 import pytest
 
-from plain.signals import request_finished
+from plain.signals import request_finished, request_started
 
 from .. import transaction
 from ..backends.base.base import BaseDatabaseWrapper
@@ -9,11 +9,6 @@ from .utils import (
     setup_databases,
     teardown_databases,
 )
-
-
-def pytest_configure(config):
-    # Keep connections open during request client / testing
-    request_finished.disconnect(close_old_connections)
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +40,15 @@ def setup_db(request):
     # Set up the test db across the entire session
     _old_db_config = setup_databases(verbosity=verbosity)
 
+    # Keep connections open during request client / testing
+    request_started.disconnect(close_old_connections)
+    request_finished.disconnect(close_old_connections)
+
     yield _old_db_config
+
+    # Put the signals back...
+    request_started.connect(close_old_connections)
+    request_finished.connect(close_old_connections)
 
     # When the test session is done, tear down the test db
     teardown_databases(_old_db_config, verbosity=verbosity)
