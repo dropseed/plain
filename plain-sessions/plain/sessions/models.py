@@ -56,6 +56,3 @@ class Session(models.Model):
     def get_decoded(self):
         session_store_class = self.get_session_store_class()
         return session_store_class().decode(self.session_data)
-
-    class Meta:
-        db_table = "django_session"

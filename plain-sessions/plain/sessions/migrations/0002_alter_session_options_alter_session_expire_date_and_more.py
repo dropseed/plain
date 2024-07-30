@@ -6,7 +6,7 @@ from plain.models import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("sessions", "0001_initial"),
+        ("plainsessions", "0001_initial"),
     ]
 
     operations = [

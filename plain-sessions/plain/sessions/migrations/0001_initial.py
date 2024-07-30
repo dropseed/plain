@@ -26,7 +26,6 @@ class Migration(migrations.Migration):
             ],
             options={
                 "abstract": False,
-                "db_table": "django_session",
             },
             managers=[
                 ("objects", plain.sessions.models.SessionManager()),
