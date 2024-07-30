@@ -6,7 +6,8 @@ import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
 
-from plain import models, transaction
+from plain import models
+from plain.models import transaction
 from plain.runtime import settings
 from plain.signals import request_finished, request_started
 from plain.utils import timezone
