@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from .user_settings import LazySettings
 
 try:
-    __version__ = importlib.metadata.version("plainframework")
+    __version__ = importlib.metadata.version("plain")
 except importlib.metadata.PackageNotFoundError:
     __version__ = "dev"
 
