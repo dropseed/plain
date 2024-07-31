@@ -40,15 +40,22 @@ def check(path):
 
 @cli.command()
 @click.argument("path", default=".")
-def fix(path):
+@click.option("--unsafe-fixes", is_flag=True, help="Apply ruff unsafe fixes")
+def fix(path, unsafe_fixes):
     """Lint and format the given path."""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
 
     for e in get_code_config().get("exclude", []):
         ruff_args.extend(["--exclude", e])
 
-    print_event("Ruff check")
-    result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
+    if unsafe_fixes:
+        print_event("Ruff fix (with unsafe fixes)")
+        result = subprocess.run(
+            ["ruff", "check", path, "--fix", "--unsafe-fixes", *ruff_args]
+        )
+    else:
+        print_event("Ruff fix")
+        result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
 
     if result.returncode != 0:
         sys.exit(result.returncode)
