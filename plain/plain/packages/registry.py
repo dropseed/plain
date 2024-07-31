@@ -363,12 +363,6 @@ class Packages:
         self.clear_cache()
         self.populate(installed)
 
-    def unset_installed_packages(self):
-        """Cancel a previous call to set_installed_packages()."""
-        self.package_configs = self.stored_package_configs.pop()
-        self.packages_ready = self.models_ready = self.ready = True
-        self.clear_cache()
-
     def clear_cache(self):
         """
         Clear all internal caches, for methods that alter the app registry.

@@ -8,6 +8,7 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from importlib import import_module
 from io import BytesIO, IOBase
+from itertools import chain
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
 from plain.http import HttpHeaders, HttpRequest, QueryDict
@@ -16,7 +17,6 @@ from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
 from plain.runtime import settings
 from plain.signals import got_request_exception, request_started
-from plain.test.utils import ContextList
 from plain.urls import resolve
 from plain.utils.encoding import force_bytes
 from plain.utils.functional import SimpleLazyObject
@@ -38,6 +38,41 @@ MULTIPART_CONTENT = "multipart/form-data; boundary=%s" % BOUNDARY
 CONTENT_TYPE_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
 JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
+
+
+class ContextList(list):
+    """
+    A wrapper that provides direct key access to context items contained
+    in a list of context objects.
+    """
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            for subcontext in self:
+                if key in subcontext:
+                    return subcontext[key]
+            raise KeyError(key)
+        else:
+            return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return default
+
+    def __contains__(self, key):
+        try:
+            self[key]
+        except KeyError:
+            return False
+        return True
+
+    def keys(self):
+        """
+        Flattened keys of subcontexts.
+        """
+        return set(chain.from_iterable(d for subcontext in self for d in subcontext))
 
 
 class RedirectCycleError(Exception):

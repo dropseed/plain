@@ -24,3 +24,12 @@ def client() -> Client:
 def request_factory() -> RequestFactory:
     """A Plain RequestFactory instance."""
     return RequestFactory()
+
+
+@pytest.fixture()
+def modify_setting(name, value):
+    """A fixture to temporarily modify a Plain setting."""
+    original_value = getattr(settings, name)
+    setattr(settings, name, value)
+    yield value
+    setattr(settings, name, original_value)
