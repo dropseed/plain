@@ -1,7 +1,13 @@
 #!/bin/sh -e
-cd plain
-POETRY_VIRTUALENVS_IN_PROJECT=true poetry install
-cd ..
+
+for package in plain*;
+do
+    echo ""
+    echo "${BOLD}Installing dependencies for $package${NORMAL}"
+    cd $package
+    POETRY_VIRTUALENVS_IN_PROJECT=true poetry install
+    cd ..
+done
 
 if [ ! -f .git/hooks/pre-commit ]; then
     echo ""
