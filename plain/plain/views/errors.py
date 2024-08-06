@@ -1,4 +1,5 @@
 from plain.http import ResponseBase
+from plain.templates import TemplateFileMissing
 
 from .templates import TemplateView
 
@@ -23,3 +24,9 @@ class ErrorView(TemplateView):
         # Set the status code we want
         response.status_code = self.status_code
         return response
+
+    def get(self):
+        try:
+            return super().get()
+        except TemplateFileMissing:
+            return self.status_code

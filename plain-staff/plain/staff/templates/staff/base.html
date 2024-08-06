@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {%- if title|default('') -%}
+            {{ title }} - Plain Staff
+        {%- else -%}
+            Plain Staff
+        {%- endif -%}
+    </title>
+    {% tailwind_css %}
+    {% htmx_js %}
+    <link href="{{ asset('staff/staff.css') }}" rel="stylesheet">
+    <script src="{{ asset('staff/jquery-3.6.1.slim.min.js') }}"></script>
+    <script src="{{ asset('staff/chart.js') }}" defer></script>
+    <script src="{{ asset('staff/staff.js') }}" defer></script>
+    {% block header_scripts %}{% endblock %}
+</head>
+<body class="flex min-h-screen text-black bg-stone-900">
+    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-6 pt-6 pb-5 overflow-auto lg:flex">
+        <div>
+            <a class="inline-flex items-center font-bold text-stone-300" href="{{ url('staff:index') }}">
+                <svg class="w-5 h-5 mr-2" width="237" height="237" viewBox="0 0 237 237" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M163.316 15.876C172.248 15.876 180.501 20.641 184.967 28.376L229.783 106C234.249 113.735 234.249 123.265 229.783 131L184.967 208.624C180.501 216.359 172.248 221.124 163.316 221.124L73.6837 221.124C64.7521 221.124 56.4989 216.359 52.0331 208.624L7.21686 131C2.75105 123.265 2.75105 113.735 7.21687 106L52.0331 28.376C56.4989 20.6409 64.7521 15.876 73.6837 15.876L163.316 15.876Z" fill="#8B8276"/>
+                    <circle cx="118.5" cy="118.5" r="64.5" fill="#CDC8C2"/>
+                </svg>
+                <span class="sr-only">Staff</span>
+            </a>
+            <div>
+                {% for section, views in admin_registry.get_nav_sections().items() %}
+                <div class="mt-4 text-xs font-semibold tracking-wide uppercase text-stone-500">{{ section }}</div>
+                {% for view in views %}
+                <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
+                    {{ view.get_title() }}
+                </a>
+                {% endfor %}
+                {% endfor %}
+            </div>
+
+            {% if admin_registry.registered_dashboards|length > 1 %}
+            <div class="mt-6">
+                <div class="text-xs tracking-wide text-gray-500">Dashboards</div>
+                {% for view in admin_registry.registered_dashboards %}
+                <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
+                    {{ view.get_title() }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- <div class="mt-6">
+                <div class="text-xs tracking-wide text-stone-500">Pinned</div>
+            </div>
+            <div class="mt-6">
+                <div class="text-xs tracking-wide text-stone-500">Recent</div>
+            </div> -->
+        </div>
+        <div class="flex items-center justify-between mt-8 text-sm text-stone-400">
+            <div class="flex items-center truncate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-person-circle" viewBox="0 0 16 16">
+                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                </svg>
+                <span class="truncate">
+                    {{ request.user }}
+                </span>
+            </div>
+            <a class="ml-2 hover:text-white hover:underline flex-shrink-0" href="{{ url('logout') }}">Log out</a>
+        </div>
+    </div>
+    <div id="admin-content" data-toggle-class="fixed ml-64 -mr-64" class="flex-grow overflow-auto text-black border-l bg-paper lg:rounded-lg lg:mt-3 lg:mb-3 lg:mr-3 lg:ml-64 border-black/10">
+        <div class="flex justify-between px-4 py-4 text-xs border-b border-gray-200 lg:px-8">
+            <div class="flex items-center space-x-2">
+                <button type="button" data-toggle="#admin-sidebar,#admin-content" class="mr-1 lg:hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-5 h-5 bi bi-list" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/>
+                    </svg>
+                    <span class="sr-only">Toggle menu</span>
+                </button>
+                <a class="text-stone-500" href="{{ url ('staff:index') }}">Staff</a>
+                {% for parent in parent_view_classes %}
+                <span class="text-stone-400">/</span>
+                <a class="text-stone-500" href="{{ parent.get_absolute_url() }}">{{ parent.get_title() }}</a>
+                {% endfor %}
+                <span class="text-stone-400">/</span>
+                <a class="text-stone-600" href="{{ request.path }}">{{ title }}</a>
+            </div>
+            <div class="flex items-center space-x-5">
+                <div class="flex justify-end">
+                    <form method="GET" action="{{ url('staff:search') }}" class="flex">
+                        <div class="relative max-w-xs">
+                            <label for="query" class="sr-only">Search</label>
+                            <input
+                                type="text"
+                                name="query"
+                                id="query"
+                                class="block w-full px-3 pl-10 text-sm border-gray-200 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Search everything"
+                                value="{{ global_search_query|default('') }}"
+                                >
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                                <svg class="h-3.5 w-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <a href="/">Back to app</a>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between px-4 mt-8 lg:px-8">
+            <div>
+            {% block header %}
+                <h1 class="text-2xl font-semibold text-stone-700">
+                    {% block title %}{{ title }}{% endblock %}
+                </h1>
+                {% if description %}
+                <p class="mt-2 text-sm text-gray-500">{{ description }}</p>
+                {% elif object|default('') %}
+                <p class="mt-2 text-sm text-gray-500">{{ object.__repr__() }}</p>
+                {% endif %}
+            {% endblock %}
+            </div>
+            <div class="flex space-x-2 text-sm actions">
+                {% block actions %}{% endblock %}
+                {% for link, url in links.items() %}
+                <a href="{{ url }}">{{ link }}</a>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if cards %}
+        <div class="px-4 mt-5 lg:px-8">
+            <div class="flex justify-end">
+                <div class="flex items-center">
+                    <form method="GET">
+                        <span class="text-xs text-gray-600">{{ time_zone }}</span>
+                        <input class="text-sm border-gray-200 rounded-md" type="datetime-local" name="from" value="{{ from_datetime|strftime('%Y-%m-%dT%H:%M') }}" >
+                        <input class="text-sm border-gray-200 rounded-md" type="datetime-local" name="to" value="{{ to_datetime|strftime('%Y-%m-%dT%H:%M') }}" >
+                        <button type="submit" class="px-2 py-1 text-sm border border-gray-200 rounded-md">Go</button>
+                    </form>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 gap-6 mt-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
+                {% for card in cards %}
+                <section class="col-span-{{ card.size.value }}">
+                    {{ render_card(card)|safe }}
+                </section>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <main class="px-4 py-6 lg:px-8">{% block content %}{% endblock %}</main>
+    </div>
+
+    {% toolbar %}
+</body>
+</html>

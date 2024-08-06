@@ -168,7 +168,7 @@ The default settings can be customized if needed:
 DEV_REQUESTS_IGNORE_PATHS = [
     "/sw.js",
     "/favicon.ico",
-    "/admin/jsi18n/",
+    "/staff/jsi18n/",
 ]
 DEV_REQUESTS_MAX = 50
 ```

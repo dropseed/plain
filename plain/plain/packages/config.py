@@ -15,11 +15,11 @@ class PackageConfig:
     migrations_module = "migrations"
 
     def __init__(self, package_name, package_module):
-        # Full Python path to the application e.g. 'plain.staff.admin.admin'.
+        # Full Python path to the application e.g. 'plain.staff.admin'.
         self.name = package_name
 
-        # Root module for the application e.g. <module 'plain.staff.admin.admin'
-        # from 'admin/__init__.py'>.
+        # Root module for the application e.g. <module 'plain.staff.admin'
+        # from 'staff/__init__.py'>.
         self.module = package_module
 
         # Reference to the Packages registry that holds this PackageConfig. Set by the
@@ -43,8 +43,8 @@ class PackageConfig:
         if not hasattr(self, "path"):
             self.path = self._path_from_module(package_module)
 
-        # Module containing models e.g. <module 'plain.staff.admin.models'
-        # from 'admin/models.py'>. Set by import_models().
+        # Module containing models e.g. <module 'plain.staff.models'
+        # from 'staff/models.py'>. Set by import_models().
         # None if the application doesn't have a models module.
         self.models_module = None
 

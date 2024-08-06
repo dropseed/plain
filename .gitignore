@@ -7,3 +7,6 @@ __pycache__
 
 # Build files from poetry publish
 plain*/dist/
+
+# Test apps
+plain*/tests/.plain

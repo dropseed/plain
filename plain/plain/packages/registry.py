@@ -243,7 +243,7 @@ class Packages:
         """
         Check whether an application with this name exists in the registry.
 
-        package_name is the full name of the app e.g. 'plain.staff.admin'.
+        package_name is the full name of the app e.g. 'plain.staff'.
         """
         self.check_packages_ready()
         return any(ac.name == package_name for ac in self.package_configs.values())

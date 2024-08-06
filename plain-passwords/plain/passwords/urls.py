@@ -1,4 +1,4 @@
-# The views used below are normally mapped in the AdminSite instance.
+# The views used below are normally mapped in the StaffSite instance.
 # This URLs file is used to provide a reliable view deployment for test purposes.
 # It is also provided as a convenience to those who want to deploy these URLs
 # elsewhere.

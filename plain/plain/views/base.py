@@ -72,9 +72,6 @@ class View:
         if isinstance(result, ResponseBase):
             return result
 
-        # Allow return of an int (status code)
-        # or tuple (status code, content)?
-
         if isinstance(result, str):
             return Response(result)
 
@@ -83,6 +80,11 @@ class View:
 
         if isinstance(result, dict):
             return JsonResponse(result)
+
+        if isinstance(result, int):
+            return Response(status=result)
+
+        # Allow tuple for (status_code, content)?
 
         raise ValueError(f"Unexpected view return type: {type(result)}")
 

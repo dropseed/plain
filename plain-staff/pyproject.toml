@@ -14,11 +14,20 @@ license = "BSD-3-Clause"
 [tool.poetry.dependencies]
 python = "^3.11"
 sqlparse = ">=0.2.2"
-# TODO plain-htmx required
+"plain.auth" = "<1.0.0"
+"plain.htmx" = "<1.0.0"
+"plain.tailwind" = "<1.0.0"
 
 [tool.poetry.dev-dependencies]
-pytest = "^7.1.2"
-ipdb = "^0.13.9"
+plain = {path = "../plain", develop = true}
+# "plain.sessions" = {path = "../plain-sessions", develop = true}
+"plain.auth" = {path = "../plain-auth", develop = true}
+"plain.sessions" = {path = "../plain-sessions", develop = true}
+"plain.models" = {path = "../plain-models", develop = true}
+"plain.htmx" = {path = "../plain-htmx", develop = true}
+"plain.tailwind" = {path = "../plain-tailwind", develop = true}
+"plain.pytest" = {path = "../plain-pytest", develop = true}
+coverage = "^7.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

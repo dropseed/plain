@@ -1,0 +1,17 @@
+{% extends "staff/cards/base.html" %}
+
+{% block content %}
+
+{% if number is not none %}
+<div class="text-4xl font-bold">
+    {{ number }}
+</div>
+{% endif %}
+
+{% if link %}
+<a href="{{ link }}">{{ text }}</a>
+{% elif text %}
+{{ text }}
+{% endif %}
+
+{% endblock %}

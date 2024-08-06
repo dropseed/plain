@@ -1,0 +1,186 @@
+{% extends "staff/base.html" %}
+
+{% block header_scripts %}
+<script src="{{ asset('staff/list.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+
+{% set create_url = get_create_url() %}
+{% if create_url %}
+<a href="{{ create_url }}">New</a>
+{% endif %}
+
+{% htmxfragment "list" as="section" %}
+
+<header class="flex items-center justify-between">
+    <div class="font-semibold">
+        {% if table_style == "simple" %}
+            {{ title }}
+        {% else %}
+            {% if page.has_other_pages() %}
+            Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
+            {% else %}
+            Showing all {{ page.paginator.count }} results
+            {% endif %}
+        {% endif %}
+    </div>
+    <div class="flex space-x-5">
+        {% if table_style == "simple" %}
+        <a class="text-sm" href="{{ request.get_full_path() }}">View {{ page.paginator.count }} result{{ "s" if page.paginator.count != 1 else "" }}</a>
+        {% else %}
+        {% if actions %}
+        <form method="POST" data-actions-form>
+            {{ csrf_input }}
+            <select name="action_name" class="text-sm border-gray-200 rounded-md">
+                <option value="">Actions</option>
+                {% for action in actions %}
+                <option>{{ action }}</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="action_pks" value="" />
+            <button type="submit" disabled>Apply</button>
+        </form>
+        {% endif %}
+
+        <form method="GET" class="inline-flex">
+            {% if filters %}
+            <select data-autosubmit name="filter" class="text-sm border-gray-200 rounded-md">
+                <option value="">Filters</option>
+                {% for filter in filters %}
+                <option {% if filter == active_filter %}selected{% endif %}>{{ filter }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+
+            {% if show_search %}
+            <div class="flex justify-end">
+                <div class="relative max-w-xs">
+                    <label for="search" class="sr-only">Search</label>
+                    <input
+                        {% if search_query %}value="{{ search_query }}"{% endif %}
+                        type="text"
+                        name="search"
+                        id="search"
+                        class="block w-full px-3 pl-10 text-sm border-gray-200 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="Search"
+                        >
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                        <svg class="h-3.5 w-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </form>
+        {% endif %}
+    </div>
+</header>
+
+<div>
+    <div class="w-full overflow-auto">
+        <table class="text-sm table-auto">
+            <thead>
+                <tr class="bg-stone-100 [&>th]:py-2 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
+                    {% if table_style != "simple" and actions %}<th></th>{% endif %}
+
+                    {% for field in fields %}
+                        {% if order_by_field is defined %}
+                        <th>
+                            {% if table_style == "simple" %}
+                            <div class="font-mono text-xs font-normal text-gray-600">
+                                {{ field }}
+                            </div>
+                            {% else %}
+                            <a
+                                data-merge-params
+                                class="font-mono text-xs font-normal text-gray-600"
+                                href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                                {{ field }}
+                                {% if field == order_by_field %}
+                                {% if order_by_direction == "-" %}
+                                <span class="text-xs">▲</span>
+                                {% else %}
+                                <span class="text-xs">▼</span>
+                                {% endif %}
+                                {% endif %}
+                            </a>
+                            {% endif %}
+                        </th>
+                        {% else %}
+                        <th class="font-mono text-xs font-normal text-gray-600">{{ field }}</th>
+                        {% endif %}
+                    {% endfor %}
+
+                    {# A th that spans any links columns that will be added #}
+                    <th colspan="99"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in objects %}
+                <tr>
+
+                    {% if table_style != "simple" and actions %}
+                    <td class="p-0 pl-1">
+                        <input data-action-checkbox class="rounded-sm" type="checkbox" name="{{ get_object_pk(object) }}" />
+                    </td>
+                    {% endif %}
+
+                    {% for field in fields %}
+                        <td>
+                            <div class="flex">
+                                {% set value = get_field_value(object, field) %}
+                                {% include get_field_value_template(object, field, value) with context %}
+                            </div>
+                        </td>
+                    {% endfor %}
+
+                    {% for text, url in get_object_links(object).items() %}
+                    <td>
+                        <a href="{{ url }}">{{ text }}</a>
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if table_style != "simple" %}
+<footer class="mt-4">
+    <div class="flex items-center justify-between">
+        <div class="py-2 text-sm text-gray-500">
+            {% if page.has_other_pages() %}
+            Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
+            {% else %}
+            Showing all {{ page.paginator.count }} results
+            {% endif %}
+        </div>
+        {% if page.has_other_pages() %}
+        <div class="flex items-center justify-center space-x-2">
+            {% if page.has_previous() %}
+            <a data-merge-params href="?page={{ page.previous_page_number() }}">&lsaquo;</a>
+            {% endif %}
+            <form data-autosubmit method="GET">
+                {% if show_search and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
+                {% if filters and active_filter %}<input type="hidden" name="filter" value="{{ active_filter }}" />{% endif %}
+                <select name="page" class="text-xs border-gray-200 rounded-md">
+                {% for page_num in page.paginator.page_range %}
+                    <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
+                {% endfor %}
+                </select>
+            </form>
+            {% if page.has_next() %}
+            <a data-merge-params href="?page={{ page.next_page_number() }}">&rsaquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</footer>
+{% endif %}
+
+{% endhtmxfragment %}
+
+{% endblock %}
