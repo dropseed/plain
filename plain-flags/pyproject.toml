@@ -3,7 +3,7 @@ name = "plain.flags"
 packages = [
     { include = "plain" },
 ]
-version = "0.1.1"
+version = "0.2.0"
 description = "Feature flags for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
