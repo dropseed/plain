@@ -112,7 +112,6 @@ SECURE_PROXY_SSL_HEADER = None
 # phase the middleware will be applied in reverse order.
 MIDDLEWARE = [
     "plain.middleware.security.SecurityMiddleware",
-    "plain.assets.whitenoise.middleware.WhiteNoiseMiddleware",
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",
     "plain.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -151,22 +150,16 @@ LOGGING = {}
 # ASSETS #
 ###############
 
-ASSETS_BACKEND = "plain.assets.whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-# List of finder classes that know how to find assets files in
-# various locations.
-ASSETS_FINDERS = [
-    "plain.assets.finders.FileSystemFinder",
-    "plain.assets.finders.PackageDirectoriesFinder",
-]
-
 # Absolute path to the directory assets files should be collected to.
 # Example: "/var/www/example.com/assets/"
-ASSETS_ROOT = PLAIN_TEMP_PATH / "assets_collected"
+ASSETS_COMPILED_PATH = PLAIN_TEMP_PATH / "assets" / "compiled"
 
-# URL that handles the assets files served from ASSETS_ROOT.
-# Example: "http://example.com/assets/", "http://assets.example.com/"
-ASSETS_URL = "/assets/"
+# Whether to redirect the original asset path to the fingerprinted path.
+ASSETS_REDIRECT_ORIGINAL = True
+
+# If assets are served by a CDN, use this URL to prefix asset paths.
+# Ex. "https://cdn.example.com/assets/"
+ASSETS_BASE_URL: str = ""
 
 ####################
 # PREFLIGHT CHECKS #

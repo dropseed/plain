@@ -40,8 +40,6 @@ DATABASES = {
 USE_TZ = True
 TIME_ZONE = "UTC"
 
-ASSETS_URL = "/assets/"
-
 AUTH_LOGIN_URL = "login"
 LOGOUT_REDIRECT_URL = "/"
 

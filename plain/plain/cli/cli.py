@@ -1,6 +1,7 @@
 import importlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import traceback
@@ -12,7 +13,9 @@ from click.core import Command, Context
 
 import plain.runtime
 from plain import preflight
+from plain.assets.compile import compile_assets
 from plain.packages import packages
+from plain.runtime import settings
 
 from .formatting import PlainContext
 from .packages import EntryPointGroup, InstalledPackagesGroup
@@ -270,16 +273,44 @@ def preflight_checks(package_label, deploy, fail_level, databases):
 
 
 @plain_cli.command()
-@click.pass_context
-def compile(ctx):
+@click.option(
+    "--keep-original/--no-keep-original",
+    "keep_original",
+    is_flag=True,
+    default=False,
+    help="Keep the original assets",
+)
+@click.option(
+    "--fingerprint/--no-fingerprint",
+    "fingerprint",
+    is_flag=True,
+    default=True,
+    help="Fingerprint the assets",
+)
+@click.option(
+    "--compress/--no-compress",
+    "compress",
+    is_flag=True,
+    default=True,
+    help="Compress the assets",
+)
+def compile(keep_original, fingerprint, compress):
     """Compile static assets"""
 
-    # TODO preflight for assets only?
+    if not keep_original and not fingerprint:
+        click.secho(
+            "You must either keep the original assets or fingerprint them.",
+            fg="red",
+            err=True,
+        )
+        sys.exit(1)
 
     # TODO make this an entrypoint instead
     # Compile our Tailwind CSS (including templates in plain itself)
     if find_spec("plain.tailwind") is not None:
+        click.secho("Compiling Tailwind CSS", bold=True)
         result = subprocess.run(["plain", "tailwind", "compile", "--minify"])
+        print()
         if result.returncode:
             click.secho(
                 f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red"
@@ -295,15 +326,47 @@ def compile(ctx):
             package = json.load(f)
 
         if package.get("scripts", {}).get("compile"):
+            click.secho("Running `npm run compile`", bold=True)
             result = subprocess.run(["npm", "run", "compile"])
+            print()
             if result.returncode:
                 click.secho(
                     f"Error in `npm run compile` (exit {result.returncode})", fg="red"
                 )
                 sys.exit(result.returncode)
 
-    # Run the regular collectstatic
-    ctx.invoke(legacy_alias, legacy_args=["collectstatic", "--noinput"])
+    # Compile our assets
+    compiled_target_dir = settings.ASSETS_COMPILED_PATH
+    click.secho(f"Compiling assets to {compiled_target_dir}", bold=True)
+    if compiled_target_dir.exists():
+        click.secho("(clearing previously compiled assets)")
+        shutil.rmtree(compiled_target_dir)
+    compiled_target_dir.mkdir(parents=True, exist_ok=True)
+
+    total_files = 0
+    total_compiled = 0
+
+    for url_path, resolved_url_path, compiled_paths in compile_assets(
+        target_dir=compiled_target_dir,
+        keep_original=keep_original,
+        fingerprint=fingerprint,
+        compress=compress,
+    ):
+        if url_path == resolved_url_path:
+            click.secho(url_path, bold=True)
+        else:
+            click.secho(url_path, bold=True, nl=False)
+            click.secho(" → ", fg="yellow", nl=False)
+            click.echo(resolved_url_path)
+
+        print("\n".join(f"  {Path(p).relative_to(Path.cwd())}" for p in compiled_paths))
+
+        total_files += 1
+        total_compiled += len(compiled_paths)
+
+    click.secho(
+        f"Compiled {total_files} assets into {total_compiled} files", fg="green"
+    )
 
 
 @plain_cli.command()

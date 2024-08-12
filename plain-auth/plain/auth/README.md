@@ -22,7 +22,6 @@ INSTALLED_PACKAGES = [
 
 MIDDLEWARE = [
     "plain.middleware.security.SecurityMiddleware",
-    "plain.assets.whitenoise.middleware.WhiteNoiseMiddleware",
     "plain.sessions.middleware.SessionMiddleware",  # <--
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",

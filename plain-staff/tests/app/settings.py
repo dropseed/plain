@@ -21,4 +21,3 @@ MIDDLEWARE = [
 ]
 AUTH_LOGIN_URL = "login"
 AUTH_USER_MODEL = "users.User"
-ASSETS_BACKEND = "plain.assets.storage.StaticFilesStorage"

@@ -1,4 +1,4 @@
-from plain.assets import get_asset_url
+from plain.assets.urls import get_asset_url
 from plain.paginator import Paginator
 from plain.utils import timezone
 

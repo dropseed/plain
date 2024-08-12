@@ -8,4 +8,4 @@ def test_plain_cli_help():
 
 def test_plain_cli_compile():
     output = subprocess.check_output(["plain", "compile"])
-    assert b"files copied" in output
+    assert b"Compiled 0 assets into 0 files" in output

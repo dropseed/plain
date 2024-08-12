@@ -29,6 +29,8 @@ def cli(pytest_args):
     #         pytest_args.append("-W")
     #         pytest_args.append("error::DeprecationWarning")
 
+    # has to happen before setup() to be more useful? initial setup() may fail if doesn't have the required variables
+    # or don't set it by default at all... could warn on != TEST?
     os.environ.setdefault("PLAIN_ENV", "test")
 
     click.secho(f"Running pytest with PLAIN_ENV={os.environ['PLAIN_ENV']}", bold=True)
