@@ -150,10 +150,6 @@ LOGGING = {}
 # ASSETS #
 ###############
 
-# Absolute path to the directory assets files should be collected to.
-# Example: "/var/www/example.com/assets/"
-ASSETS_COMPILED_PATH = PLAIN_TEMP_PATH / "assets" / "compiled"
-
 # Whether to redirect the original asset path to the fingerprinted path.
 ASSETS_REDIRECT_ORIGINAL = True
 

@@ -3,6 +3,8 @@ import hashlib
 import os
 import shutil
 
+from plain.runtime import settings
+
 from .finders import find_assets
 from .fingerprints import AssetsFingerprintsManifest
 
@@ -39,6 +41,14 @@ SKIP_COMPRESS_EXTENSIONS = (
     "webm",
     "wmv",
 )
+
+
+def get_compiled_path():
+    """
+    Get the path at runtime to the compiled assets directory.
+    There's no reason currently for this to be a user-facing setting.
+    """
+    return settings.PLAIN_TEMP_PATH / "assets" / "compiled"
 
 
 def compile_assets(*, target_dir, keep_original, fingerprint, compress):

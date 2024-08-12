@@ -13,9 +13,8 @@ from click.core import Command, Context
 
 import plain.runtime
 from plain import preflight
-from plain.assets.compile import compile_assets
+from plain.assets.compile import compile_assets, get_compiled_path
 from plain.packages import packages
-from plain.runtime import settings
 
 from .formatting import PlainContext
 from .packages import EntryPointGroup, InstalledPackagesGroup
@@ -336,18 +335,18 @@ def compile(keep_original, fingerprint, compress):
                 sys.exit(result.returncode)
 
     # Compile our assets
-    compiled_target_dir = settings.ASSETS_COMPILED_PATH
-    click.secho(f"Compiling assets to {compiled_target_dir}", bold=True)
-    if compiled_target_dir.exists():
+    target_dir = get_compiled_path()
+    click.secho(f"Compiling assets to {target_dir}", bold=True)
+    if target_dir.exists():
         click.secho("(clearing previously compiled assets)")
-        shutil.rmtree(compiled_target_dir)
-    compiled_target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(target_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     total_files = 0
     total_compiled = 0
 
     for url_path, resolved_url_path, compiled_paths in compile_assets(
-        target_dir=compiled_target_dir,
+        target_dir=target_dir,
         keep_original=keep_original,
         fingerprint=fingerprint,
         compress=compress,
@@ -365,7 +364,7 @@ def compile(keep_original, fingerprint, compress):
         total_compiled += len(compiled_paths)
 
     click.secho(
-        f"Compiled {total_files} assets into {total_compiled} files", fg="green"
+        f"\nCompiled {total_files} assets into {total_compiled} files", fg="green"
     )
 
 
