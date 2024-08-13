@@ -149,6 +149,12 @@ class AssetView(View):
             if etag := self.get_etag(path):
                 headers.setdefault("ETag", etag)
 
+        if "Content-Disposition" in headers:
+            # This header messes up Safari...
+            # https://github.com/evansd/whitenoise/commit/93657cf88e14b919cb726864814617a6a639e507
+            # At some point, should probably look at not using FileResponse at all?
+            del headers["Content-Disposition"]
+
         return headers
 
     def is_immutable(self, path):
