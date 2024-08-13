@@ -1,4 +1,5 @@
 import functools
+import mimetypes
 import os
 from email.utils import formatdate, parsedate
 from io import BytesIO
@@ -53,9 +54,12 @@ class AssetView(View):
         if not_modified_response := self.get_conditional_response(absolute_path):
             return not_modified_response
 
+        content_type, _ = mimetypes.guess_type(absolute_path)
+
         response = FileResponse(
             open(absolute_path, "rb"),
-            filename=os.path.basename(absolute_path),  # Used for Content-Type
+            filename=os.path.basename(absolute_path),
+            content_type=content_type,
         )
         response.headers = self.update_headers(response.headers, absolute_path)
         return response
