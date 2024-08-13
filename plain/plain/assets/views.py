@@ -15,7 +15,7 @@ from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import View
 
-from .compile import FINGERPRINT_LENGTH
+from .compile import FINGERPRINT_LENGTH, get_compiled_path
 from .finders import find_assets
 from .fingerprints import get_fingerprinted_url_path
 
@@ -62,7 +62,7 @@ class AssetView(View):
 
     def get_asset_path(self, path):
         """Get the path to the compiled asset"""
-        compiled_path = os.path.abspath(settings.ASSETS_COMPILED_PATH)
+        compiled_path = os.path.abspath(get_compiled_path())
         asset_path = os.path.join(compiled_path, path)
 
         # Make sure we don't try to escape the compiled assests path
