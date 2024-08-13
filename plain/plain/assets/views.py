@@ -33,7 +33,7 @@ class AssetView(View):
         # Make a trailing slash work, but we don't expect it
         url_path = url_path.rstrip("/")
 
-        if settings.DEBUG and False:
+        if settings.DEBUG:
             absolute_path = self.get_debug_asset_path(url_path)
         else:
             absolute_path = self.get_asset_path(url_path)
