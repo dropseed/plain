@@ -128,10 +128,8 @@ class AssetView(View):
             headers["Vary"] = vary + ", Accept-Encoding"
 
         # If the file is compressed, tell the browser
-        if path.endswith(".gz"):
-            headers.setdefault("Content-Encoding", "gzip")
-        elif path.endswith(".br"):
-            headers.setdefault("Content-Encoding", "br")
+        if encoding := mimetypes.guess_type(path)[1]:
+            headers.setdefault("Content-Encoding", encoding)
 
         is_immutable = self.is_immutable(path)
 
