@@ -29,9 +29,6 @@ class PasswordField(models.CharField):
     def pre_save(self, model_instance, add):
         value = super().pre_save(model_instance, add)
 
-        # TODO what if they pass in a hashed-looking password?
-        # deal with that in the form itself?
-
         if value and not self._is_hashed(value):
             value = hash_password(value)
             # Set the hashed value back on the instance immediately too
