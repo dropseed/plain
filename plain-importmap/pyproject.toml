@@ -22,10 +22,6 @@ click = "*"
 
 [tool.poetry.group.dev.dependencies]
 plain = { path = "../plain", develop = true }
-black = "^22.1.0"
-Django = "^4.0.0"
-ipdb = "^0.13.9"
-isort = "^5.10.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

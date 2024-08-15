@@ -340,7 +340,7 @@ files = [
 
 [[package]]
 name = "plain"
-version = "0.2.5"
+version = "0.3.0"
 description = "A web framework for building products with Python."
 optional = false
 python-versions = "^3.11"
@@ -358,7 +358,7 @@ url = "../plain"
 
 [[package]]
 name = "plain-auth"
-version = "0.1.0"
+version = "0.2.0"
 description = "User authentication and authorization for Plain."
 optional = false
 python-versions = "^3.11"
@@ -366,6 +366,7 @@ files = []
 develop = true
 
 [package.dependencies]
+plain = "<1.0.0"
 "plain.models" = "<1.0.0"
 "plain.sessions" = "<1.0.0"
 
@@ -375,7 +376,7 @@ url = "../plain-auth"
 
 [[package]]
 name = "plain-models"
-version = "0.1.1"
+version = "0.2.0"
 description = "Database models for Plain."
 optional = false
 python-versions = "^3.11"
@@ -383,6 +384,7 @@ files = []
 develop = true
 
 [package.dependencies]
+plain = "<1.0.0"
 sqlparse = ">=0.3.1"
 
 [package.source]
@@ -391,7 +393,7 @@ url = "../plain-models"
 
 [[package]]
 name = "plain-pytest"
-version = "0.1.2"
+version = "0.2.0"
 description = "Pytest integration for Plain."
 optional = false
 python-versions = "^3.11"
@@ -400,6 +402,7 @@ develop = true
 
 [package.dependencies]
 click = ">=8.0.0"
+plain = "<1.0.0"
 pytest = ">=7.0.0"
 
 [package.source]
@@ -408,12 +411,15 @@ url = "../plain-pytest"
 
 [[package]]
 name = "plain-sessions"
-version = "0.2.0"
+version = "0.3.0"
 description = "Session management for Plain."
 optional = false
 python-versions = "^3.11"
 files = []
 develop = true
+
+[package.dependencies]
+plain = "<1.0.0"
 
 [package.source]
 type = "directory"
@@ -524,4 +530,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "85781895455572b5f592439a885fe694f476f2c8bf47f9d49e837e93304aa7db"
+content-hash = "2ed841b896ff020da2727df158210813469c366b2338d426b0c8fa14b6e85caf"
