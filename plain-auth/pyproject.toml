@@ -3,7 +3,7 @@ name = "plain.auth"
 packages = [
     { include = "plain" },
 ]
-version = "0.1.0"
+version = "0.2.0"
 description = "User authentication and authorization for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
