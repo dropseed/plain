@@ -17,10 +17,12 @@ license = "BSD-3-Clause"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 tomlkit = "^0.12.1"
 requests = "*"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 

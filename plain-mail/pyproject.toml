@@ -13,8 +13,10 @@ license = "BSD-3-Clause"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 

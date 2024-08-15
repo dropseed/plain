@@ -14,8 +14,10 @@ repository = "https://github.com/dropseed/plain"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 
 [tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 black = "^23.1.0"

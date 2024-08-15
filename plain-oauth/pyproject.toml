@@ -19,12 +19,12 @@ FAIL_INVALID_TEMPLATE_VARS = true
 
 [tool.poetry.dependencies]
 python = "^3.11"
-"plain" = "<1.0.0"
+plain = "<1.0.0"
 "plain.auth" = "<1.0.0"
 "plain.models" = "<1.0.0"
 requests = "*"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 plain = {path = "../plain", develop = true}
 "plain.auth" = {path = "../plain-auth", develop = true}
 "plain.sessions" = {path = "../plain-sessions", develop = true}

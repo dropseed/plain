@@ -16,11 +16,13 @@ repository = "https://github.com/dropseed/plain"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 click = ">=8.0.0"
 requests = ">=2.0.0"
 tomlkit = "^0.12.1"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+plain = {path = "../plain", develop = true}
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 isort = "^5.10.1"

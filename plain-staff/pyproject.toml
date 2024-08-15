@@ -14,13 +14,13 @@ license = "BSD-3-Clause"
 [tool.poetry.dependencies]
 python = "^3.11"
 sqlparse = ">=0.2.2"
+plain = "<1.0.0"
 "plain.auth" = "<1.0.0"
 "plain.htmx" = "<1.0.0"
 "plain.tailwind" = "<1.0.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 plain = {path = "../plain", develop = true}
-# "plain.sessions" = {path = "../plain-sessions", develop = true}
 "plain.auth" = {path = "../plain-auth", develop = true}
 "plain.sessions" = {path = "../plain-sessions", develop = true}
 "plain.models" = {path = "../plain-models", develop = true}

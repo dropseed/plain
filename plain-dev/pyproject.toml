@@ -22,6 +22,9 @@ repository = "https://github.com/dropseed/plain"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+
+plain = "<1.0.0"
+
 click = ">=8.0.0"
 honcho = "^1.1.0"
 debugpy = "^1.6.3"
@@ -36,7 +39,9 @@ requests = ">=2.0.0"
 psycopg2-binary = "^2.9.3"
 
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+plain = {path = "../plain", develop = true}
+
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 

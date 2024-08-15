@@ -14,12 +14,14 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 tomli = "*"
 marshmallow = "^3.14.1"
 requests = "*"
 click = "*"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
 black = "^22.1.0"
 Django = "^4.0.0"
 ipdb = "^0.13.9"
