@@ -1,4 +1,3 @@
-from plain.assets.urls import get_asset_url
 from plain.paginator import Paginator
 from plain.utils import timezone
 
@@ -10,8 +9,16 @@ def url(viewname, *args, **kwargs):
     return reverse(viewname, args=args, kwargs=kwargs)
 
 
+def asset(url_path):
+    # An explicit callable we can control, but also delay the import of asset.urls->views->templates
+    # for circular import reasons
+    from plain.assets.urls import get_asset_url
+
+    return get_asset_url(url_path)
+
+
 default_globals = {
-    "asset": get_asset_url,
+    "asset": asset,
     "url": url,
     "Paginator": Paginator,
     "now": timezone.now,
