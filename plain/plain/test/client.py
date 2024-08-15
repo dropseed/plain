@@ -2,7 +2,6 @@ import json
 import mimetypes
 import os
 import sys
-from copy import copy
 from functools import partial
 from http import HTTPStatus
 from http.cookies import SimpleCookie
@@ -194,19 +193,6 @@ class ClientHandler(BaseHandler):
         response.close()
 
         return response
-
-
-def store_rendered_templates(store, signal, sender, template, context, **kwargs):
-    """
-    Store templates and contexts that are rendered.
-
-    The context is copied so that it is an accurate representation at the time
-    of rendering.
-    """
-    store.setdefault("templates", []).append(template)
-    if "context" not in store:
-        store["context"] = ContextList()
-    store["context"].append(copy(context))
 
 
 def encode_multipart(boundary, data):
@@ -683,12 +669,6 @@ class Client(ClientMixin, RequestFactory):
         """
         environ = self._base_environ(**request)
 
-        # Curry a data dictionary into an instance of the template renderer
-        # callback function.
-        data = {}
-        partial(store_rendered_templates, data)
-        "template-render-%s" % id(request)
-        # signals.template_rendered.connect(on_template_render, dispatch_uid=signal_uid)
         # Capture exceptions created by the handler.
         exception_uid = "request-exception-%s" % id(request)
         got_request_exception.connect(self.store_exc_info, dispatch_uid=exception_uid)
@@ -702,20 +682,18 @@ class Client(ClientMixin, RequestFactory):
         # Save the client and request that stimulated the response.
         response.client = self
         response.request = request
-        # Add any rendered template detail to the response.
-        response.templates = data.get("templates", [])
-        response.context = data.get("context")
         response.json = partial(self._parse_json, response)
+
+        # If the request had a user attached, make it available on the response.
+        if hasattr(response.wsgi_request, "user"):
+            response.user = response.wsgi_request.user
+
         # Attach the ResolverMatch instance to the response.
         urlconf = getattr(response.wsgi_request, "urlconf", None)
         response.resolver_match = SimpleLazyObject(
             lambda: resolve(request["PATH_INFO"], urlconf=urlconf),
         )
-        # Flatten a single context. Not really necessary anymore thanks to the
-        # __getattr__ flattening in ContextList, but has some edge case
-        # backwards compatibility implications.
-        if response.context and len(response.context) == 1:
-            response.context = response.context[0]
+
         # Update persistent cookie data.
         if response.cookies:
             self.cookies.update(response.cookies)
