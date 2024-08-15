@@ -91,9 +91,11 @@ class ExampleOAuthProvider(OAuthProvider):
         response.raise_for_status()
         data = response.json()
         return OAuthUser(
+            # The provider ID is required
             id=data["id"],
-            username=data["username"],
+            # And you can populate any of your User model fields with additional kwargs
             email=data["email"],
+            username=data["username"],
         )
 ```
 
@@ -206,13 +208,11 @@ Hello {{ request.user }}!
     {% for connection in request.user.oauth_connections.all %}
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
-        {% if connection.can_be_disconnected %}
         <form action="{% url 'oauth:disconnect' connection.provider_key %}" method="post">
             {{ csrf_input }}
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
         </form>
-        {% endif %}
     </li>
     {% endfor %}
 </ul>

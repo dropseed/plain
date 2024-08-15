@@ -33,13 +33,16 @@ class OAuthToken:
 
 
 class OAuthUser:
-    def __init__(self, *, id: str, email: str, username: str = ""):
-        self.id = id
-        self.username = username
-        self.email = email
+    def __init__(self, *, id: str, **user_model_fields: dict):
+        self.id = id  # ID on the provider's system
+        self.user_model_fields = user_model_fields
 
     def __str__(self):
-        return self.email
+        if "email" in self.user_model_fields:
+            return self.user_model_fields["email"]
+        if "username" in self.user_model_fields:
+            return self.user_model_fields["username"]
+        return str(self.id)
 
 
 class OAuthProvider:
@@ -157,7 +160,7 @@ class OAuthProvider:
             )
             user = connection.user
         else:
-            connection = OAuthConnection.get_or_createuser(
+            connection = OAuthConnection.get_or_create_user(
                 provider_key=self.provider_key,
                 oauth_token=oauth_token,
                 oauth_user=oauth_user,

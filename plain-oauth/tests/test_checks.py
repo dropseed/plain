@@ -1,11 +1,8 @@
-import pytest
-
 from plain.auth import get_user_model
 from plain.oauth.models import OAuthConnection
 
 
-@pytest.mark.plain_db()
-def test_oauth_provider_keys_check_pass(settings):
+def test_oauth_provider_keys_check_pass(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "google": {
             "client_id": "test_client_id",
@@ -17,7 +14,7 @@ def test_oauth_provider_keys_check_pass(settings):
         },
     }
 
-    user = get_user_model().objects.create_user(username="test_user")
+    user = get_user_model().objects.create(username="test_user")
 
     OAuthConnection.objects.create(
         user=user, provider_key="google", provider_user_id="test_provider_user_id"
@@ -27,8 +24,7 @@ def test_oauth_provider_keys_check_pass(settings):
     assert len(errors) == 0
 
 
-@pytest.mark.plain_db()
-def test_oauth_provider_keys_check_fail(settings):
+def test_oauth_provider_keys_check_fail(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "google": {
             "client_id": "test_client_id",
@@ -40,7 +36,7 @@ def test_oauth_provider_keys_check_fail(settings):
         },
     }
 
-    user = get_user_model().objects.create_user(username="test_user")
+    user = get_user_model().objects.create(username="test_user")
 
     OAuthConnection.objects.create(
         user=user, provider_key="google", provider_user_id="test_provider_user_id"

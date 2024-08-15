@@ -5,16 +5,14 @@ Hello {{ request.user }}!
 
 <h2>Existing connections</h2>
 <ul>
-    {% for connection in request.user.oauth_connections.all %}
+    {% for connection in request.user.oauth_connections.all() %}
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
-        {% if connection.can_be_disconnected %}
-        <form action="{% url 'oauth:disconnect' connection.provider_key %}" method="post">
+        <form action="{{ url('oauth:disconnect', connection.provider_key) }}" method="post">
             {{ csrf_input }}
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
         </form>
-        {% endif %}
     </li>
     {% endfor %}
 </ul>
@@ -24,7 +22,7 @@ Hello {{ request.user }}!
     {% for provider_key in oauth_provider_keys %}
     <li>
         {{ provider_key}}
-        <form action="{% url 'oauth:connect' provider_key %}" method="post">
+        <form action="{{ url('oauth:connect', provider_key) }}" method="post">
             {{ csrf_input }}
             <button type="submit">Connect</button>
         </form>

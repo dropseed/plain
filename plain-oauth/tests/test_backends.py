@@ -1,5 +1,3 @@
-import pytest
-
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
@@ -21,8 +19,7 @@ class DummyProvider(OAuthProvider):
         return
 
 
-@pytest.mark.plain_db()
-def test_single_backend(client, settings):
+def test_single_backend(db, client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_backends.DummyProvider",
@@ -43,11 +40,10 @@ def test_single_backend(client, settings):
 
     # Now logged in
     response = client.get("/")
-    assert response.context["user"]
+    assert response.user
 
 
-@pytest.mark.plain_db()
-def test_multiple_backends(client, settings):
+def test_multiple_backends(db, client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_backends.DummyProvider",
@@ -69,4 +65,4 @@ def test_multiple_backends(client, settings):
 
     # Now logged in
     response = client.get("/")
-    assert response.context["user"]
+    assert response.user

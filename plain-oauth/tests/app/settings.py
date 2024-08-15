@@ -1,48 +1,24 @@
 from os import environ
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent
 
 SECRET_KEY = "test"
-
-DEBUG = True
-
 INSTALLED_PACKAGES = [
     "plain.auth",
     "plain.sessions",
-    "users",
+    "plain.models",
     "plain.oauth",
+    "users",
 ]
-
-MIDDLEWARE = [
-    "plain.middleware.security.SecurityMiddleware",
-    "plain.sessions.middleware.SessionMiddleware",
-    "plain.middleware.common.CommonMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
-    "plain.auth.middleware.AuthenticationMiddleware",
-    "plain.middleware.clickjacking.XFrameOptionsMiddleware",
-]
-
-ROOT_URLCONF = "urls"
-
 DATABASES = {
     "default": {
         "ENGINE": "plain.models.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": ":memory:",
     }
 }
-
-USE_TZ = True
-TIME_ZONE = "UTC"
-
+MIDDLEWARE = [
+    "plain.sessions.middleware.SessionMiddleware",
+    "plain.auth.middleware.AuthenticationMiddleware",
+]
 AUTH_LOGIN_URL = "login"
-LOGOUT_REDIRECT_URL = "/"
-
 AUTH_USER_MODEL = "users.User"
 
 # OAuth providers to use for a real, interactive test

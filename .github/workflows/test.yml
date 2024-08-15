@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
-        package: ["plain", "plain-worker", "plain-flags", "plain-sessions", "plain-staff"]
+        package: ["plain", "plain-worker", "plain-flags", "plain-sessions", "plain-staff", "plain-oauth"]
 
     steps:
     - uses: actions/checkout@v3

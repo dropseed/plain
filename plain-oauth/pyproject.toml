@@ -19,17 +19,18 @@ FAIL_INVALID_TEMPLATE_VARS = true
 
 [tool.poetry.dependencies]
 python = "^3.11"
+"plain" = "<1.0.0"
+"plain.auth" = "<1.0.0"
+"plain.models" = "<1.0.0"
+requests = "*"
 
 [tool.poetry.dev-dependencies]
-black = "^22.1.0"
-Django = "^4.0.0"
-pytest = "^7.1.0"
-pytest-django = "^4.5.2"
-ipdb = "^0.13.9"
-requests = "^2.27.1"
-mypy = "*"
-isort = "^5.10.1"
-python-dotenv = "^0.20.0"
+plain = {path = "../plain", develop = true}
+"plain.auth" = {path = "../plain-auth", develop = true}
+"plain.sessions" = {path = "../plain-sessions", develop = true}
+"plain.models" = {path = "../plain-models", develop = true}
+"plain.pytest" = {path = "../plain-pytest", develop = true}
+coverage = "^7.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
