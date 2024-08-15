@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+import os
+import re
+import sys
+
+
+def bump_version(version, bump_type):
+    major, minor, patch = map(int, version.split("."))
+
+    if bump_type == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == "minor":
+        minor += 1
+        patch = 0
+    elif bump_type == "patch":
+        patch += 1
+
+    return f"{major}.{minor}.{patch}"
+
+
+def update_version_in_file(file_path, old_version, new_version):
+    with open(file_path, "r") as file:
+        content = file.read()
+
+    content = content.replace(
+        f'version = "{old_version}"', f'version = "{new_version}"'
+    )
+
+    with open(file_path, "w") as file:
+        file.write(content)
+
+
+def main():
+    bump_type = sys.argv[1]
+
+    for package_dir in os.listdir("."):
+        if os.path.isdir(package_dir) and package_dir.startswith("plain"):
+            pyproject_path = os.path.join(package_dir, "pyproject.toml")
+
+            with open(pyproject_path, "r") as file:
+                content = file.read()
+
+            version_match = re.search(r'version = "(.*?)"', content)
+            if version_match:
+                old_version = version_match.group(1)
+                new_version = bump_version(old_version, bump_type)
+                update_version_in_file(pyproject_path, old_version, new_version)
+                print(f"Bumped {package_dir} from {old_version} to {new_version}")
+
+
+if __name__ == "__main__":
+    main()
