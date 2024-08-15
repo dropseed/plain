@@ -30,9 +30,6 @@ def test_single_backend(db, client, settings):
             },
         }
     }
-    settings.AUTHENTICATION_BACKENDS = [
-        "plain.auth.backends.ModelBackend",
-    ]
 
     response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
     assert response.status_code == 302
@@ -54,10 +51,6 @@ def test_multiple_backends(db, client, settings):
             },
         }
     }
-    settings.AUTHENTICATION_BACKENDS = [
-        "plain.auth.backends.ModelBackend",
-        "plain.auth.backends.ModelBackend",
-    ]
 
     response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
     assert response.status_code == 302
