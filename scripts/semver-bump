@@ -32,23 +32,32 @@ def update_version_in_file(file_path, old_version, new_version):
         file.write(content)
 
 
-def main():
-    bump_type = sys.argv[1]
+def main(bump_type, packages):
 
-    for package_dir in os.listdir("."):
-        if os.path.isdir(package_dir) and package_dir.startswith("plain"):
-            pyproject_path = os.path.join(package_dir, "pyproject.toml")
+    for package_dir in packages:
+        pyproject_path = os.path.join(package_dir, "pyproject.toml")
 
-            with open(pyproject_path, "r") as file:
-                content = file.read()
+        with open(pyproject_path, "r") as file:
+            content = file.read()
 
-            version_match = re.search(r'version = "(.*?)"', content)
-            if version_match:
-                old_version = version_match.group(1)
-                new_version = bump_version(old_version, bump_type)
-                update_version_in_file(pyproject_path, old_version, new_version)
-                print(f"Bumped {package_dir} from {old_version} to {new_version}")
+        version_match = re.search(r'version = "(.*?)"', content)
+        if version_match:
+            old_version = version_match.group(1)
+            new_version = bump_version(old_version, bump_type)
+            update_version_in_file(pyproject_path, old_version, new_version)
+            print(f"Bumped {package_dir} from {old_version} to {new_version}")
 
 
 if __name__ == "__main__":
-    main()
+    bump_type = sys.argv[1]
+
+    if len(sys.argv) > 1:
+        packages = sys.argv[2:]
+    else:
+        packages = [
+            package
+            for package in os.listdir(".")
+            if os.path.isdir(package) and package.startswith("plain")
+        ]
+
+    main(bump_type, packages)
