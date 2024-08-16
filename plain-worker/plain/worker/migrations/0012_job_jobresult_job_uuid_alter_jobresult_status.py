@@ -20,7 +20,6 @@ class Migration(migrations.Migration):
                     models.BigAutoField(
                         auto_created=True,
                         primary_key=True,
-                        serialize=False,
                     ),
                 ),
                 (

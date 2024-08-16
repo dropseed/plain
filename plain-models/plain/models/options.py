@@ -305,7 +305,6 @@ class Options:
     def setup_pk(self, field):
         if not self.pk and field.primary_key:
             self.pk = field
-            field.serialize = False
 
     def __repr__(self):
         return "<Options for %s>" % self.object_name

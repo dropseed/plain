@@ -175,7 +175,6 @@ class Field(RegisterLookupMixin):
         rel=None,
         default=NOT_PROVIDED,
         editable=True,
-        serialize=True,
         choices=None,
         db_column=None,
         db_tablespace=None,
@@ -192,7 +191,6 @@ class Field(RegisterLookupMixin):
         self.is_relation = self.remote_field is not None
         self.default = default
         self.editable = editable
-        self.serialize = serialize
         if isinstance(choices, ChoicesMeta):
             choices = choices.choices
         if isinstance(choices, collections.abc.Iterator):
@@ -530,7 +528,6 @@ class Field(RegisterLookupMixin):
             "db_index": False,
             "default": NOT_PROVIDED,
             "editable": True,
-            "serialize": True,
             "choices": None,
             "db_column": None,
             "db_comment": None,

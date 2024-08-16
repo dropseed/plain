@@ -22,7 +22,6 @@ class Migration(migrations.Migration):
                     models.BigAutoField(
                         auto_created=True,
                         primary_key=True,
-                        serialize=False,
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
