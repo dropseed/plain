@@ -28,7 +28,6 @@ DEFAULT_NAMES = (
     "db_table",
     "db_table_comment",
     "ordering",
-    "unique_together",
     "get_latest_by",
     "order_with_respect_to",
     "package_label",
@@ -47,28 +46,6 @@ DEFAULT_NAMES = (
     "indexes",
     "constraints",
 )
-
-
-def normalize_together(option_together):
-    """
-    option_together can be either a tuple of tuples, or a single
-    tuple of two strings. Normalize it to a tuple of tuples, so that
-    calling code can uniformly expect that.
-    """
-    try:
-        if not option_together:
-            return ()
-        if not isinstance(option_together, tuple | list):
-            raise TypeError
-        first_element = option_together[0]
-        if not isinstance(first_element, tuple | list):
-            option_together = (option_together,)
-        # Normalize everything to tuples
-        return tuple(tuple(ot) for ot in option_together)
-    except TypeError:
-        # If the value of option_together isn't valid, return it
-        # verbatim; this will be picked up by the check framework later.
-        return option_together
 
 
 def make_immutable_fields_list(name, data):
@@ -107,7 +84,6 @@ class Options:
         self._ordering_clash = False
         self.indexes = []
         self.constraints = []
-        self.unique_together = []
         self.select_on_save = False
         self.object_name = None
         self.package_label = package_label
@@ -181,8 +157,6 @@ class Options:
                 elif hasattr(self.meta, attr_name):
                     setattr(self, attr_name, getattr(self.meta, attr_name))
                     self.original_attrs[attr_name] = getattr(self, attr_name)
-
-            self.unique_together = normalize_together(self.unique_together)
 
             # Package label/class name interpolation for names of constraints and
             # indexes.

@@ -69,8 +69,5 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={
-                "unique_together": {("flag", "key")},
-            },
         ),
     ]

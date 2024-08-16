@@ -8,7 +8,7 @@ from plain.exceptions import FieldDoesNotExist
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from plain.models.migrations.utils import field_is_referenced, get_references
-from plain.models.options import DEFAULT_NAMES, normalize_together
+from plain.models.options import DEFAULT_NAMES
 from plain.models.utils import make_model_tuple
 from plain.packages import PackageConfig
 from plain.packages.registry import Packages
@@ -306,14 +306,7 @@ class ProjectState:
                         for from_field_name in from_fields
                     ]
                 )
-        # Fix index/unique_together to refer to the new field.
-        options = model_state.options
-        for option in ("unique_together",):
-            if option in options:
-                options[option] = [
-                    [new_name if n == old_name else n for n in together]
-                    for together in options[option]
-                ]
+
         # Fix to_fields to refer to the new field.
         delay = True
         references = get_references(self, model_key, (old_name, found))
@@ -771,10 +764,7 @@ class ModelState:
             if name in ["packages", "package_label"]:
                 continue
             elif name in model._meta.original_attrs:
-                if name == "unique_together":
-                    ut = model._meta.original_attrs["unique_together"]
-                    options[name] = set(normalize_together(ut))
-                elif name == "indexes":
+                if name == "indexes":
                     indexes = [idx.clone() for idx in model._meta.indexes]
                     for index in indexes:
                         if not index.name:
@@ -789,9 +779,8 @@ class ModelState:
         # If we're ignoring relationships, remove all field-listing model
         # options (that option basically just means "make a stub model")
         if exclude_rels:
-            for key in ["unique_together", "order_with_respect_to"]:
-                if key in options:
-                    del options[key]
+            if "order_with_respect_to" in options:
+                del options["order_with_respect_to"]
         # Private fields are ignored, so remove options that refer to them.
         elif options.get("order_with_respect_to") in {
             field.name for field in model._meta.private_fields

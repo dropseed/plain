@@ -10,10 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterUniqueTogether(
-            name="flagresult",
-            unique_together=set(),
-        ),
         migrations.AddConstraint(
             model_name="flagresult",
             constraint=models.UniqueConstraint(

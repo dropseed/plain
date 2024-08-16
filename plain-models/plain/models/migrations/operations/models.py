@@ -2,7 +2,6 @@ from plain import models
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.state import ModelState
 from plain.models.migrations.utils import field_references, resolve_relation
-from plain.models.options import normalize_together
 from plain.utils.functional import cached_property
 
 from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
@@ -180,22 +179,6 @@ class CreateModel(ModelOperation):
                 ),
             ]
         elif (
-            isinstance(operation, AlterTogetherOptionOperation)
-            and self.name_lower == operation.name_lower
-        ):
-            return [
-                CreateModel(
-                    self.name,
-                    fields=self.fields,
-                    options={
-                        **self.options,
-                        **{operation.option_name: operation.option_value},
-                    },
-                    bases=self.bases,
-                    managers=self.managers,
-                ),
-            ]
-        elif (
             isinstance(operation, AlterOrderWithRespectTo)
             and self.name_lower == operation.name_lower
         ):
@@ -240,22 +223,7 @@ class CreateModel(ModelOperation):
                 ]
             elif isinstance(operation, RemoveField):
                 options = self.options.copy()
-                for option_name in ("unique_together",):
-                    option = options.pop(option_name, None)
-                    if option:
-                        option = set(
-                            filter(
-                                bool,
-                                (
-                                    tuple(
-                                        f for f in fields if f != operation.name_lower
-                                    )
-                                    for fields in option
-                                ),
-                            )
-                        )
-                        if option:
-                            options[option_name] = option
+
                 order_with_respect_to = options.get("order_with_respect_to")
                 if order_with_respect_to == operation.name_lower:
                     del options["order_with_respect_to"]
@@ -274,16 +242,7 @@ class CreateModel(ModelOperation):
                 ]
             elif isinstance(operation, RenameField):
                 options = self.options.copy()
-                for option_name in ("unique_together",):
-                    option = options.get(option_name)
-                    if option:
-                        options[option_name] = {
-                            tuple(
-                                operation.new_name if f == operation.old_name else f
-                                for f in fields
-                            )
-                            for fields in option
-                        }
+
                 order_with_respect_to = options.get("order_with_respect_to")
                 if order_with_respect_to == operation.old_name:
                     options["order_with_respect_to"] = operation.new_name
@@ -559,85 +518,6 @@ class AlterModelTableComment(ModelOptionOperation):
     @property
     def migration_name_fragment(self):
         return f"alter_{self.name_lower}_table_comment"
-
-
-class AlterTogetherOptionOperation(ModelOptionOperation):
-    option_name = None
-
-    def __init__(self, name, option_value):
-        if option_value:
-            option_value = set(normalize_together(option_value))
-        setattr(self, self.option_name, option_value)
-        super().__init__(name)
-
-    @cached_property
-    def option_value(self):
-        return getattr(self, self.option_name)
-
-    def deconstruct(self):
-        kwargs = {
-            "name": self.name,
-            self.option_name: self.option_value,
-        }
-        return (self.__class__.__qualname__, [], kwargs)
-
-    def state_forwards(self, package_label, state):
-        state.alter_model_options(
-            package_label,
-            self.name_lower,
-            {self.option_name: self.option_value},
-        )
-
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        new_model = to_state.packages.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, new_model):
-            old_model = from_state.packages.get_model(package_label, self.name)
-            alter_together = getattr(schema_editor, "alter_%s" % self.option_name)
-            alter_together(
-                new_model,
-                getattr(old_model._meta, self.option_name, set()),
-                getattr(new_model._meta, self.option_name, set()),
-            )
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        return self.database_forwards(
-            package_label, schema_editor, from_state, to_state
-        )
-
-    def references_field(self, model_name, name, package_label):
-        return self.references_model(model_name, package_label) and (
-            not self.option_value
-            or any((name in fields) for fields in self.option_value)
-        )
-
-    def describe(self):
-        return "Alter {} for {} ({} constraint(s))".format(
-            self.option_name,
-            self.name,
-            len(self.option_value or ""),
-        )
-
-    @property
-    def migration_name_fragment(self):
-        return f"alter_{self.name_lower}_{self.option_name}"
-
-    def can_reduce_through(self, operation, package_label):
-        return super().can_reduce_through(operation, package_label) or (
-            isinstance(operation, AlterTogetherOptionOperation)
-            and type(operation) is not type(self)
-        )
-
-
-class AlterUniqueTogether(AlterTogetherOptionOperation):
-    """
-    Change the value of unique_together to the target one.
-    Input value of unique_together must be a set of tuples.
-    """
-
-    option_name = "unique_together"
-
-    def __init__(self, name, unique_together):
-        super().__init__(name, unique_together)
 
 
 class AlterOrderWithRespectTo(ModelOptionOperation):

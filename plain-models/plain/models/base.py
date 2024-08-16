@@ -49,7 +49,6 @@ from plain.models.utils import AltersData, make_model_tuple
 from plain.packages import packages
 from plain.utils.encoding import force_str
 from plain.utils.hashable import make_hashable
-from plain.utils.text import get_text_list
 
 
 class Deferred:
@@ -1162,25 +1161,14 @@ class Model(AltersData, metaclass=ModelBase):
             exclude = set()
         unique_checks = []
 
-        unique_togethers = [(self.__class__, self._meta.unique_together)]
         constraints = []
         if include_meta_constraints:
             constraints = [(self.__class__, self._meta.total_unique_constraints)]
         for parent_class in self._meta.get_parent_list():
-            if parent_class._meta.unique_together:
-                unique_togethers.append(
-                    (parent_class, parent_class._meta.unique_together)
-                )
             if include_meta_constraints and parent_class._meta.total_unique_constraints:
                 constraints.append(
                     (parent_class, parent_class._meta.total_unique_constraints)
                 )
-
-        for model_class, unique_together in unique_togethers:
-            for check in unique_together:
-                if not any(name in exclude for name in check):
-                    # Add the check if the field isn't excluded.
-                    unique_checks.append((model_class, tuple(check)))
 
         if include_meta_constraints:
             for model_class, model_constraints in constraints:
@@ -1264,25 +1252,13 @@ class Model(AltersData, metaclass=ModelBase):
             "unique_check": unique_check,
         }
 
-        # A unique field
-        if len(unique_check) == 1:
-            field = opts.get_field(unique_check[0])
-            params["field_label"] = field.name
-            return ValidationError(
-                message=field.error_messages["unique"],
-                code="unique",
-                params=params,
-            )
-
-        # unique_together
-        else:
-            field_labels = [opts.get_field(f).name for f in unique_check]
-            params["field_labels"] = get_text_list(field_labels, "and")
-            return ValidationError(
-                message="A %(model_name)s with this %(field_labels)s already exists.",
-                code="unique_together",
-                params=params,
-            )
+        field = opts.get_field(unique_check[0])
+        params["field_label"] = field.name
+        return ValidationError(
+            message=field.error_messages["unique"],
+            code="unique",
+            params=params,
+        )
 
     def get_constraints(self):
         constraints = [(self.__class__, self._meta.constraints)]
@@ -1409,7 +1385,6 @@ class Model(AltersData, metaclass=ModelBase):
             if not clash_errors:
                 errors.extend(cls._check_column_name_clashes())
             errors += [
-                *cls._check_unique_together(),
                 *cls._check_indexes(databases),
                 *cls._check_ordering(),
                 *cls._check_constraints(databases),
@@ -1679,35 +1654,6 @@ class Model(AltersData, metaclass=ModelBase):
                 )
             )
         return errors
-
-    @classmethod
-    def _check_unique_together(cls):
-        """Check the value of "unique_together" option."""
-        if not isinstance(cls._meta.unique_together, tuple | list):
-            return [
-                preflight.Error(
-                    "'unique_together' must be a list or tuple.",
-                    obj=cls,
-                    id="models.E010",
-                )
-            ]
-
-        elif any(
-            not isinstance(fields, tuple | list) for fields in cls._meta.unique_together
-        ):
-            return [
-                preflight.Error(
-                    "All 'unique_together' elements must be lists or tuples.",
-                    obj=cls,
-                    id="models.E011",
-                )
-            ]
-
-        else:
-            errors = []
-            for fields in cls._meta.unique_together:
-                errors.extend(cls._check_local_fields(fields, "unique_together"))
-            return errors
 
     @classmethod
     def _check_indexes(cls, databases):

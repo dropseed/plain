@@ -11,10 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterUniqueTogether(
-            name="oauthconnection",
-            unique_together=set(),
-        ),
         migrations.AddConstraint(
             model_name="oauthconnection",
             constraint=models.UniqueConstraint(

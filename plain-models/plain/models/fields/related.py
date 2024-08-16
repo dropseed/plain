@@ -588,9 +588,6 @@ class ForeignObject(RelatedField):
             if getattr(f, "unique", False)
         }
         unique_foreign_fields.update(
-            {frozenset(ut) for ut in self.remote_field.model._meta.unique_together}
-        )
-        unique_foreign_fields.update(
             {
                 frozenset(uc.fields)
                 for uc in self.remote_field.model._meta.total_unique_constraints
@@ -611,8 +608,8 @@ class ForeignObject(RelatedField):
                     ),
                     hint=(
                         "Mark a single field as unique=True or add a set of "
-                        "fields to a unique constraint (via unique_together "
-                        "or a UniqueConstraint (without condition) in the "
+                        "fields to a unique constraint (via "
+                        "a UniqueConstraint (without condition) in the "
                         "model Meta.constraints)."
                     ),
                     obj=self,

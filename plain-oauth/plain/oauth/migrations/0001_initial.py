@@ -47,9 +47,5 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={
-                "ordering": ("provider_key",),
-                "unique_together": {("provider_key", "provider_user_id")},
-            },
         ),
     ]

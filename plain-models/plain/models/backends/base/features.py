@@ -21,9 +21,6 @@ class BaseDatabaseFeatures:
     # databases such as SQL Server do not.
     supports_nullable_unique_constraints = True
 
-    # Does the backend allow inserting duplicate rows when a unique_together
-    # constraint exists and some fields are nullable but not all of them?
-    supports_partially_nullable_unique_constraints = True
     # Does the backend support initially deferrable unique constraints?
     supports_deferrable_unique_constraints = False
 
@@ -297,10 +294,6 @@ class BaseDatabaseFeatures:
     supports_expression_indexes = True
     # Does the backend treat COLLATE as an indexed expression?
     collate_as_index_expression = False
-
-    # Does the database allow more than one constraint or index on the same
-    # field(s)?
-    allows_multiple_constraints_on_same_fields = True
 
     # Does the backend support boolean expressions in SELECT and GROUP BY
     # clauses?
