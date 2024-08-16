@@ -109,7 +109,6 @@ class OAuthConnection(models.Model):
                     user = get_user_model()(
                         **oauth_user.user_model_fields,
                     )
-                    user.full_clean()
                     user.save()
                 except (IntegrityError, ValidationError):
                     raise OAuthUserAlreadyExistsError()

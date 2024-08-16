@@ -416,7 +416,7 @@ class BaseModelForm(BaseForm, AltersData):
             )
         if commit:
             # If committing, save the instance and the m2m data immediately.
-            self.instance.save()
+            self.instance.save(clean_and_validate=False)
             self._save_m2m()
         else:
             # If not committing, add a method to the form to allow deferred

@@ -709,7 +709,13 @@ class Model(AltersData, metaclass=ModelBase):
         return getattr(self, field.attname)
 
     def save(
-        self, force_insert=False, force_update=False, using=None, update_fields=None
+        self,
+        *,
+        clean_and_validate=True,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
     ):
         """
         Save the current instance. Override this in a subclass if you want to
@@ -755,6 +761,9 @@ class Model(AltersData, metaclass=ModelBase):
             if loaded_fields:
                 update_fields = frozenset(loaded_fields)
 
+        if clean_and_validate:
+            self.full_clean(exclude=deferred_fields)
+
         self.save_base(
             using=using,
             force_insert=force_insert,
@@ -766,6 +775,7 @@ class Model(AltersData, metaclass=ModelBase):
 
     def save_base(
         self,
+        *,
         raw=False,
         force_insert=False,
         force_update=False,
@@ -1287,7 +1297,9 @@ class Model(AltersData, metaclass=ModelBase):
         if errors:
             raise ValidationError(errors)
 
-    def full_clean(self, exclude=None, validate_unique=True, validate_constraints=True):
+    def full_clean(
+        self, *, exclude=None, validate_unique=True, validate_constraints=True
+    ):
         """
         Call clean_fields(), clean(), validate_unique(), and
         validate_constraints() on the model. Raise a ValidationError for any
