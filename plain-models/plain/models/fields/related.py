@@ -1216,7 +1216,12 @@ def create_many_to_many_intermediary_model(field, klass):
             "auto_created": klass,
             "package_label": klass._meta.package_label,
             "db_tablespace": klass._meta.db_tablespace,
-            "unique_together": (from_, to),
+            "constraints": [
+                models.UniqueConstraint(
+                    fields=[from_, to],
+                    name=f"{klass._meta.package_label}_{name.lower()}_unique",
+                )
+            ],
             "packages": field.model._meta.packages,
         },
     )
