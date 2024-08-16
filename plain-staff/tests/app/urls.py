@@ -1,3 +1,4 @@
+import plain.assets.urls
 import plain.staff.urls
 from plain.urls import include, path
 from plain.views import View
@@ -15,6 +16,7 @@ class LogoutView(View):
 
 urlpatterns = [
     path("staff/", include(plain.staff.urls)),
+    path("assets/", include(plain.assets.urls)),
     path("login/", LoginView, name="login"),
     path("logout/", LogoutView, name="logout"),
 ]

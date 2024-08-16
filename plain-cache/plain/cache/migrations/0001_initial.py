@@ -18,7 +18,6 @@ class Migration(migrations.Migration):
                     models.BigAutoField(
                         auto_created=True,
                         primary_key=True,
-                        serialize=False,
                     ),
                 ),
                 ("key", models.CharField(max_length=255, unique=True)),

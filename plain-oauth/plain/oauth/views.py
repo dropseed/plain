@@ -2,7 +2,7 @@ import logging
 
 from plain.auth.views import AuthViewMixin
 from plain.http import ResponseBadRequest, ResponseRedirect
-from plain.templates import jinja
+from plain.templates import Template
 from plain.views import View
 
 from .exceptions import (
@@ -38,7 +38,7 @@ class OAuthCallbackView(View):
         try:
             return provider_instance.handle_callback_request(request=request)
         except OAuthUserAlreadyExistsError:
-            template = jinja.get_template("oauth/error.html")
+            template = Template("oauth/error.html")
             return ResponseBadRequest(
                 template.render(
                     {
@@ -47,7 +47,7 @@ class OAuthCallbackView(View):
                 )
             )
         except OAuthStateMismatchError:
-            template = jinja.get_template("oauth/error.html")
+            template = Template("oauth/error.html")
             return ResponseBadRequest(
                 template.render(
                     {
@@ -57,7 +57,7 @@ class OAuthCallbackView(View):
             )
         except OAuthError as e:
             logger.exception("OAuth error")
-            template = jinja.get_template("oauth/error.html")
+            template = Template("oauth/error.html")
             return ResponseBadRequest(template.render({"oauth_error": str(e)}))
 
 

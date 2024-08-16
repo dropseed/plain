@@ -49,7 +49,6 @@ from plain.models.utils import AltersData, make_model_tuple
 from plain.packages import packages
 from plain.utils.encoding import force_str
 from plain.utils.hashable import make_hashable
-from plain.utils.text import get_text_list
 
 
 class Deferred:
@@ -710,7 +709,13 @@ class Model(AltersData, metaclass=ModelBase):
         return getattr(self, field.attname)
 
     def save(
-        self, force_insert=False, force_update=False, using=None, update_fields=None
+        self,
+        *,
+        clean_and_validate=True,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
     ):
         """
         Save the current instance. Override this in a subclass if you want to
@@ -756,6 +761,9 @@ class Model(AltersData, metaclass=ModelBase):
             if loaded_fields:
                 update_fields = frozenset(loaded_fields)
 
+        if clean_and_validate:
+            self.full_clean(exclude=deferred_fields)
+
         self.save_base(
             using=using,
             force_insert=force_insert,
@@ -767,6 +775,7 @@ class Model(AltersData, metaclass=ModelBase):
 
     def save_base(
         self,
+        *,
         raw=False,
         force_insert=False,
         force_update=False,
@@ -1145,15 +1154,9 @@ class Model(AltersData, metaclass=ModelBase):
         Check unique constraints on the model and raise ValidationError if any
         failed.
         """
-        unique_checks, date_checks = self._get_unique_checks(exclude=exclude)
+        unique_checks = self._get_unique_checks(exclude=exclude)
 
-        errors = self._perform_unique_checks(unique_checks)
-        date_errors = self._perform_date_checks(date_checks)
-
-        for k, v in date_errors.items():
-            errors.setdefault(k, []).extend(v)
-
-        if errors:
+        if errors := self._perform_unique_checks(unique_checks):
             raise ValidationError(errors)
 
     def _get_unique_checks(self, exclude=None, include_meta_constraints=False):
@@ -1168,34 +1171,20 @@ class Model(AltersData, metaclass=ModelBase):
             exclude = set()
         unique_checks = []
 
-        unique_togethers = [(self.__class__, self._meta.unique_together)]
         constraints = []
         if include_meta_constraints:
             constraints = [(self.__class__, self._meta.total_unique_constraints)]
         for parent_class in self._meta.get_parent_list():
-            if parent_class._meta.unique_together:
-                unique_togethers.append(
-                    (parent_class, parent_class._meta.unique_together)
-                )
             if include_meta_constraints and parent_class._meta.total_unique_constraints:
                 constraints.append(
                     (parent_class, parent_class._meta.total_unique_constraints)
                 )
-
-        for model_class, unique_together in unique_togethers:
-            for check in unique_together:
-                if not any(name in exclude for name in check):
-                    # Add the check if the field isn't excluded.
-                    unique_checks.append((model_class, tuple(check)))
 
         if include_meta_constraints:
             for model_class, model_constraints in constraints:
                 for constraint in model_constraints:
                     if not any(name in exclude for name in constraint.fields):
                         unique_checks.append((model_class, constraint.fields))
-
-        # These are checks for the unique_for_<date/year/month>.
-        date_checks = []
 
         # Gather a list of checks for fields declared as unique and add them to
         # the list of checks.
@@ -1211,13 +1200,8 @@ class Model(AltersData, metaclass=ModelBase):
                     continue
                 if f.unique:
                     unique_checks.append((model_class, (name,)))
-                if f.unique_for_date and f.unique_for_date not in exclude:
-                    date_checks.append((model_class, "date", name, f.unique_for_date))
-                if f.unique_for_year and f.unique_for_year not in exclude:
-                    date_checks.append((model_class, "year", name, f.unique_for_year))
-                if f.unique_for_month and f.unique_for_month not in exclude:
-                    date_checks.append((model_class, "month", name, f.unique_for_month))
-        return unique_checks, date_checks
+
+        return unique_checks
 
     def _perform_unique_checks(self, unique_checks):
         errors = {}
@@ -1268,54 +1252,6 @@ class Model(AltersData, metaclass=ModelBase):
 
         return errors
 
-    def _perform_date_checks(self, date_checks):
-        errors = {}
-        for model_class, lookup_type, field, unique_for in date_checks:
-            lookup_kwargs = {}
-            # there's a ticket to add a date lookup, we can remove this special
-            # case if that makes it's way in
-            date = getattr(self, unique_for)
-            if date is None:
-                continue
-            if lookup_type == "date":
-                lookup_kwargs["%s__day" % unique_for] = date.day
-                lookup_kwargs["%s__month" % unique_for] = date.month
-                lookup_kwargs["%s__year" % unique_for] = date.year
-            else:
-                lookup_kwargs[f"{unique_for}__{lookup_type}"] = getattr(
-                    date, lookup_type
-                )
-            lookup_kwargs[field] = getattr(self, field)
-
-            qs = model_class._default_manager.filter(**lookup_kwargs)
-            # Exclude the current object from the query if we are editing an
-            # instance (as opposed to creating a new one)
-            if not self._state.adding and self.pk is not None:
-                qs = qs.exclude(pk=self.pk)
-
-            if qs.exists():
-                errors.setdefault(field, []).append(
-                    self.date_error_message(lookup_type, field, unique_for)
-                )
-        return errors
-
-    def date_error_message(self, lookup_type, field_name, unique_for):
-        opts = self._meta
-        field = opts.get_field(field_name)
-        return ValidationError(
-            message=field.error_messages["unique_for_date"],
-            code="unique_for_date",
-            params={
-                "model": self,
-                "model_name": opts.model_name,
-                "lookup_type": lookup_type,
-                "field": field_name,
-                "field_label": field.name,
-                "date_field": unique_for,
-                "date_field_label": opts.get_field(unique_for).name,
-            },
-        )
-
     def unique_error_message(self, model_class, unique_check):
         opts = model_class._meta
 
@@ -1326,25 +1262,13 @@ class Model(AltersData, metaclass=ModelBase):
             "unique_check": unique_check,
         }
 
-        # A unique field
-        if len(unique_check) == 1:
-            field = opts.get_field(unique_check[0])
-            params["field_label"] = field.name
-            return ValidationError(
-                message=field.error_messages["unique"],
-                code="unique",
-                params=params,
-            )
-
-        # unique_together
-        else:
-            field_labels = [opts.get_field(f).name for f in unique_check]
-            params["field_labels"] = get_text_list(field_labels, "and")
-            return ValidationError(
-                message="A %(model_name)s with this %(field_labels)s already exists.",
-                code="unique_together",
-                params=params,
-            )
+        field = opts.get_field(unique_check[0])
+        params["field_label"] = field.name
+        return ValidationError(
+            message=field.error_messages["unique"],
+            code="unique",
+            params=params,
+        )
 
     def get_constraints(self):
         constraints = [(self.__class__, self._meta.constraints)]
@@ -1373,7 +1297,9 @@ class Model(AltersData, metaclass=ModelBase):
         if errors:
             raise ValidationError(errors)
 
-    def full_clean(self, exclude=None, validate_unique=True, validate_constraints=True):
+    def full_clean(
+        self, *, exclude=None, validate_unique=True, validate_constraints=True
+    ):
         """
         Call clean_fields(), clean(), validate_unique(), and
         validate_constraints() on the model. Raise a ValidationError for any
@@ -1471,7 +1397,6 @@ class Model(AltersData, metaclass=ModelBase):
             if not clash_errors:
                 errors.extend(cls._check_column_name_clashes())
             errors += [
-                *cls._check_unique_together(),
                 *cls._check_indexes(databases),
                 *cls._check_ordering(),
                 *cls._check_constraints(databases),
@@ -1741,35 +1666,6 @@ class Model(AltersData, metaclass=ModelBase):
                 )
             )
         return errors
-
-    @classmethod
-    def _check_unique_together(cls):
-        """Check the value of "unique_together" option."""
-        if not isinstance(cls._meta.unique_together, tuple | list):
-            return [
-                preflight.Error(
-                    "'unique_together' must be a list or tuple.",
-                    obj=cls,
-                    id="models.E010",
-                )
-            ]
-
-        elif any(
-            not isinstance(fields, tuple | list) for fields in cls._meta.unique_together
-        ):
-            return [
-                preflight.Error(
-                    "All 'unique_together' elements must be lists or tuples.",
-                    obj=cls,
-                    id="models.E011",
-                )
-            ]
-
-        else:
-            errors = []
-            for fields in cls._meta.unique_together:
-                errors.extend(cls._check_local_fields(fields, "unique_together"))
-            return errors
 
     @classmethod
     def _check_indexes(cls, databases):

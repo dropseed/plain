@@ -126,7 +126,6 @@ class Field(RegisterLookupMixin):
         "null": "This field cannot be null.",
         "blank": "This field cannot be blank.",
         "unique": "A %(model_name)s with this %(field_label)s already exists.",
-        "unique_for_date": "%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s.",
     }
     system_check_deprecated_details = None
     system_check_removed_details = None
@@ -176,10 +175,6 @@ class Field(RegisterLookupMixin):
         rel=None,
         default=NOT_PROVIDED,
         editable=True,
-        serialize=True,
-        unique_for_date=None,
-        unique_for_month=None,
-        unique_for_year=None,
         choices=None,
         db_column=None,
         db_tablespace=None,
@@ -196,10 +191,6 @@ class Field(RegisterLookupMixin):
         self.is_relation = self.remote_field is not None
         self.default = default
         self.editable = editable
-        self.serialize = serialize
-        self.unique_for_date = unique_for_date
-        self.unique_for_month = unique_for_month
-        self.unique_for_year = unique_for_year
         if isinstance(choices, ChoicesMeta):
             choices = choices.choices
         if isinstance(choices, collections.abc.Iterator):
@@ -537,10 +528,6 @@ class Field(RegisterLookupMixin):
             "db_index": False,
             "default": NOT_PROVIDED,
             "editable": True,
-            "serialize": True,
-            "unique_for_date": None,
-            "unique_for_month": None,
-            "unique_for_year": None,
             "choices": None,
             "db_column": None,
             "db_comment": None,

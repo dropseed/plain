@@ -207,8 +207,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             f.column: self.quote_name(f.column)
             for f in model._meta.local_concrete_fields
         }
-        # This maps field names (not columns) for things like unique_together
-        rename_mapping = {}
         # If any of the new or altered fields is introducing a new PK,
         # remove the old one
         restore_pk_field = None
@@ -250,7 +248,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 mapping[new_field.column] = case_sql
             else:
                 mapping[new_field.column] = self.quote_name(old_field.column)
-            rename_mapping[old_field.name] = new_field.name
         # Remove any deleted fields
         if delete_field:
             del body[delete_field.name]
@@ -263,13 +260,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 return self.delete_model(delete_field.remote_field.through)
         # Work inside a new app registry
         packages = Packages()
-
-        # Work out the new value of unique_together, taking renames into
-        # account
-        unique_together = [
-            [rename_mapping.get(n, n) for n in unique]
-            for unique in model._meta.unique_together
-        ]
 
         indexes = model._meta.indexes
         if delete_field:
@@ -292,7 +282,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         meta_contents = {
             "package_label": model._meta.package_label,
             "db_table": model._meta.db_table,
-            "unique_together": unique_together,
             "indexes": indexes,
             "constraints": constraints,
             "packages": packages,
@@ -307,7 +296,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         meta_contents = {
             "package_label": model._meta.package_label,
             "db_table": "new__%s" % strip_quotes(model._meta.db_table),
-            "unique_together": unique_together,
             "indexes": indexes,
             "constraints": constraints,
             "packages": packages,

@@ -165,7 +165,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     ):
         """
         MySQL can remove an implicit FK index on a field when that field is
-        covered by another index like a unique_together. "covered" here means
+        covered by another index. "covered" here means
         that the more complex index has the FK field as its first field (see
         https://bugs.mysql.com/bug.php?id=37910).
 
@@ -205,10 +205,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 self.execute(
                     self._create_index_sql(model, fields=[first_field], suffix="")
                 )
-
-    def _delete_composed_index(self, model, fields, *args):
-        self._create_missing_fk_index(model, fields=fields)
-        return super()._delete_composed_index(model, fields, *args)
 
     def _set_field_new_type_null_status(self, field, new_type):
         """

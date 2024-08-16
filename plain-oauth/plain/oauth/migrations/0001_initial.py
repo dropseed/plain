@@ -22,7 +22,6 @@ class Migration(migrations.Migration):
                     models.BigAutoField(
                         auto_created=True,
                         primary_key=True,
-                        serialize=False,
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
@@ -48,9 +47,5 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={
-                "ordering": ("provider_key",),
-                "unique_together": {("provider_key", "provider_user_id")},
-            },
         ),
     ]

@@ -164,8 +164,8 @@ class MigrationAutodetector:
 
         # Create the renamed fields and store them in self.renamed_fields.
         # They are used by create_altered_indexes(), generate_altered_fields(),
-        # generate_removed_altered_index/unique_together(), and
-        # generate_altered_index/unique_together().
+        # generate_removed_altered_index(), and
+        # generate_altered_index().
         self.create_renamed_fields()
         # Create the altered indexes and store them in self.altered_indexes.
         # This avoids the same computation in generate_removed_indexes()
@@ -178,14 +178,11 @@ class MigrationAutodetector:
         # Generate field renaming operations.
         self.generate_renamed_fields()
         self.generate_renamed_indexes()
-        # Generate removal of foo together.
-        self.generate_removed_altered_unique_together()
         # Generate field operations.
         self.generate_removed_fields()
         self.generate_added_fields()
         self.generate_altered_fields()
         self.generate_altered_order_with_respect_to()
-        self.generate_altered_unique_together()
         self.generate_added_indexes()
         self.generate_added_constraints()
         self.generate_altered_db_table()
@@ -455,15 +452,6 @@ class MigrationAutodetector:
                 and (operation.order_with_respect_to or "").lower()
                 != dependency[2].lower()
             )
-        # Field is removed and part of an index/unique_together
-        elif dependency[2] is not None and dependency[3] == "foo_together_change":
-            return (
-                isinstance(
-                    operation,
-                    operations.AlterUniqueTogether,
-                )
-                and operation.name_lower == dependency[1].lower()
-            )
         # Unknown dependency. Raise an error.
         else:
             raise ValueError(f"Can't handle dependency {dependency!r}")
@@ -578,7 +566,7 @@ class MigrationAutodetector:
         possible).
 
         Defer any model options that refer to collections of fields that might
-        be deferred (e.g. unique_together).
+        be deferred.
         """
         old_keys = self.old_model_keys | self.old_unmanaged_keys
         added_models = self.new_model_keys - old_keys
@@ -602,10 +590,9 @@ class MigrationAutodetector:
                     if getattr(field.remote_field, "through", None):
                         related_fields[field_name] = field
 
-            # Are there indexes/unique_together to defer?
+            # Are there indexes to defer?
             indexes = model_state.options.pop("indexes")
             constraints = model_state.options.pop("constraints")
-            unique_together = model_state.options.pop("unique_together", None)
             order_with_respect_to = model_state.options.pop(
                 "order_with_respect_to", None
             )
@@ -731,15 +718,6 @@ class MigrationAutodetector:
                     ),
                     dependencies=related_dependencies,
                 )
-            if unique_together:
-                self.add_operation(
-                    package_label,
-                    operations.AlterUniqueTogether(
-                        name=model_name,
-                        unique_together=unique_together,
-                    ),
-                    dependencies=related_dependencies,
-                )
 
     def generate_deleted_models(self):
         """
@@ -767,16 +745,7 @@ class MigrationAutodetector:
                         related_fields[field_name] = field
                     if getattr(field.remote_field, "through", None):
                         related_fields[field_name] = field
-            # Generate option removal first
-            unique_together = model_state.options.pop("unique_together", None)
-            if unique_together:
-                self.add_operation(
-                    package_label,
-                    operations.AlterUniqueTogether(
-                        name=model_name,
-                        unique_together=None,
-                    ),
-                )
+
             # Then remove each related field
             for name in sorted(related_fields):
                 self.add_operation(
@@ -1003,11 +972,10 @@ class MigrationAutodetector:
                 name=field_name,
             ),
             # We might need to depend on the removal of an
-            # order_with_respect_to or index/unique_together operation;
+            # order_with_respect_to or index operation;
             # this is safely ignored if there isn't one
             dependencies=[
                 (package_label, model_name, field_name, "order_wrt_unset"),
-                (package_label, model_name, field_name, "foo_together_change"),
             ],
         )
 
@@ -1393,28 +1361,6 @@ class MigrationAutodetector:
                     ),
                     dependencies=dependencies,
                 )
-
-    def generate_removed_altered_unique_together(self):
-        self._generate_removed_altered_foo_together(operations.AlterUniqueTogether)
-
-    def _generate_altered_foo_together(self, operation):
-        for (
-            old_value,
-            new_value,
-            package_label,
-            model_name,
-            dependencies,
-        ) in self._get_altered_foo_together_operations(operation.option_name):
-            removal_value = new_value.intersection(old_value)
-            if new_value != removal_value:
-                self.add_operation(
-                    package_label,
-                    operation(name=model_name, **{operation.option_name: new_value}),
-                    dependencies=dependencies,
-                )
-
-    def generate_altered_unique_together(self):
-        self._generate_altered_foo_together(operations.AlterUniqueTogether)
 
     def generate_altered_db_table(self):
         models_to_check = self.kept_model_keys.union(self.kept_unmanaged_keys)

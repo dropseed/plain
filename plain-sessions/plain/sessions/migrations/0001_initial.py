@@ -14,7 +14,6 @@ class Migration(migrations.Migration):
                     "session_key",
                     models.CharField(
                         max_length=40,
-                        serialize=False,
                         primary_key=True,
                     ),
                 ),

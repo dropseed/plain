@@ -3,14 +3,17 @@ name = "plain.cache"
 packages = [
     { include = "plain" },
 ]
-version = "0.2.0"
+version = "0.4.0"
 description = "Database-backed cache for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 
+[tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
 
 [build-system]
 requires = ["poetry-core"]

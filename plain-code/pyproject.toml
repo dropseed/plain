@@ -4,7 +4,7 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.2.0"
+version = "0.3.0"
 description = "Code formatting and linting for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
@@ -15,9 +15,14 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
+
+plain = "<1.0.0"
+
 ruff = "^0.1.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
+
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 isort = "^5.10.1"

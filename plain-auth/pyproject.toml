@@ -3,17 +3,19 @@ name = "plain.auth"
 packages = [
     { include = "plain" },
 ]
-version = "0.1.0"
+version = "0.2.0"
 description = "User authentication and authorization for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 "plain.models" = "<1.0.0"
 "plain.sessions" = "<1.0.0"
 
 [tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
 "plain.models" = { path = "../plain-models", develop = true }
 "plain.sessions" = { path = "../plain-sessions", develop = true }
 

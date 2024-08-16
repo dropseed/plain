@@ -1,5 +1,6 @@
 import pytest
-from plain.runtime import settings, setup
+from plain.runtime import settings as plain_settings
+from plain.runtime import setup
 from plain.test.client import Client, RequestFactory
 
 
@@ -11,7 +12,7 @@ def pytest_configure(config):
 @pytest.fixture(autouse=True, scope="session")
 def _allowed_hosts_testserver():
     # Add testserver to ALLOWED_HOSTS so the test client can make requests
-    settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, "testserver"]
+    plain_settings.ALLOWED_HOSTS = [*plain_settings.ALLOWED_HOSTS, "testserver"]
 
 
 @pytest.fixture()
@@ -27,9 +28,26 @@ def request_factory() -> RequestFactory:
 
 
 @pytest.fixture()
-def modify_setting(name, value):
-    """A fixture to temporarily modify a Plain setting."""
-    original_value = getattr(settings, name)
-    setattr(settings, name, value)
-    yield value
-    setattr(settings, name, original_value)
+def settings():
+    class SettingsProxy:
+        def __init__(self):
+            self._original = {}
+
+        def __getattr__(self, name):
+            return getattr(plain_settings, name)
+
+        def __setattr__(self, name, value):
+            if name.startswith("_"):
+                super().__setattr__(name, value)
+            else:
+                if name not in self._original:
+                    self._original[name] = getattr(plain_settings, name, None)
+                setattr(plain_settings, name, value)
+
+        def _restore(self):
+            for key, value in self._original.items():
+                setattr(plain_settings, key, value)
+
+    proxy = SettingsProxy()
+    yield proxy
+    proxy._restore()

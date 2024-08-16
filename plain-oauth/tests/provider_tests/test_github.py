@@ -1,5 +1,3 @@
-import pytest
-
 from plain.oauth.providers import OAuthToken, OAuthUser
 from tests.providers.github import GitHubOAuthProvider
 
@@ -19,8 +17,7 @@ class DummyGitHubOAuthProvider(GitHubOAuthProvider):
         )
 
 
-@pytest.mark.plain_db()
-def test_github_provider(client, monkeypatch, settings):
+def test_github_provider(db, client, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "github": {
             "class": "provider_tests.test_github.DummyGitHubOAuthProvider",
@@ -56,7 +53,7 @@ def test_github_provider(client, monkeypatch, settings):
     assert b"Hello userone!\n" in response.content
 
     # Check the user and connection that was created
-    user = response.context["user"]
+    user = response.user
     assert user.username == "userone"
     assert user.email == "user@example.com"
     connections = user.oauth_connections.all()

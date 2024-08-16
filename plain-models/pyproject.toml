@@ -3,14 +3,18 @@ name = "plain.models"
 packages = [
     { include = "plain" },
 ]
-version = "0.1.1"
+version = "0.5.0"
 description = "Database models for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+plain = "<1.0.0"
 sqlparse = ">=0.3.1"
+
+[tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
 
 # Automatically sets this up with pytest
 [tool.poetry.plugins."pytest11"]

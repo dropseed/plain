@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from plain import models
 from plain.auth import get_user_model
+from plain.exceptions import ValidationError
 from plain.models import transaction
 from plain.models.db import IntegrityError, OperationalError, ProgrammingError
 from plain.preflight import Error
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from .providers import OAuthToken, OAuthUser
 
 
-# django check for deploy that ensures all provider keys in db are also in settings?
+# TODO preflight check for deploy that ensures all provider keys in db are also in settings?
 
 
 class OAuthConnection(models.Model):
@@ -40,7 +41,12 @@ class OAuthConnection(models.Model):
     refresh_token_expires_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        unique_together = ("provider_key", "provider_user_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider_key", "provider_user_id"],
+                name="unique_oauth_provider_user_id",
+            )
+        ]
         ordering = ("provider_key",)
 
     def __str__(self):
@@ -84,7 +90,7 @@ class OAuthConnection(models.Model):
         )
 
     @classmethod
-    def get_or_createuser(
+    def get_or_create_user(
         cls, *, provider_key: str, oauth_token: "OAuthToken", oauth_user: "OAuthUser"
     ) -> "OAuthConnection":
         try:
@@ -101,12 +107,10 @@ class OAuthConnection(models.Model):
                 # that to be taken care of on the user model itself
                 try:
                     user = get_user_model()(
-                        username=oauth_user.username,
-                        email=oauth_user.email,
+                        **oauth_user.user_model_fields,
                     )
-                    user.full_clean()
                     user.save()
-                except IntegrityError:
+                except (IntegrityError, ValidationError):
                     raise OAuthUserAlreadyExistsError()
 
                 return cls.connect(

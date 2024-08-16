@@ -22,7 +22,6 @@ class Migration(migrations.Migration):
                     models.BigAutoField(
                         auto_created=True,
                         primary_key=True,
-                        serialize=False,
                     ),
                 ),
                 (
@@ -52,7 +51,6 @@ class Migration(migrations.Migration):
                     models.BigAutoField(
                         auto_created=True,
                         primary_key=True,
-                        serialize=False,
                     ),
                 ),
                 (
@@ -71,8 +69,5 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={
-                "unique_together": {("flag", "key")},
-            },
         ),
     ]

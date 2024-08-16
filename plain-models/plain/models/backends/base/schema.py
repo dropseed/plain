@@ -206,11 +206,6 @@ class BaseDatabaseSchemaEditor:
 
     def table_sql(self, model):
         """Take a model and return its table definition."""
-        # Add any unique_togethers (always deferred, as some fields might be
-        # created afterward, like geometry fields with some backends).
-        for field_names in model._meta.unique_together:
-            fields = [model._meta.get_field(field) for field in field_names]
-            self.deferred_sql.append(self._create_unique_sql(model, fields))
         # Create column SQL, add FK deferreds if needed.
         column_sqls = []
         params = []
@@ -534,60 +529,6 @@ class BaseDatabaseSchemaEditor:
         sql = constraint.remove_sql(model, self)
         if sql:
             self.execute(sql)
-
-    def alter_unique_together(self, model, old_unique_together, new_unique_together):
-        """
-        Deal with a model changing its unique_together. The input
-        unique_togethers must be doubly-nested, not the single-nested
-        ["foo", "bar"] format.
-        """
-        olds = {tuple(fields) for fields in old_unique_together}
-        news = {tuple(fields) for fields in new_unique_together}
-        # Deleted uniques
-        for fields in olds.difference(news):
-            self._delete_composed_index(
-                model,
-                fields,
-                {"unique": True, "primary_key": False},
-                self.sql_delete_unique,
-            )
-        # Created uniques
-        for field_names in news.difference(olds):
-            fields = [model._meta.get_field(field) for field in field_names]
-            self.execute(self._create_unique_sql(model, fields))
-
-    def _delete_composed_index(self, model, fields, constraint_kwargs, sql):
-        meta_constraint_names = {
-            constraint.name for constraint in model._meta.constraints
-        }
-        meta_index_names = {constraint.name for constraint in model._meta.indexes}
-        columns = [model._meta.get_field(field).column for field in fields]
-        constraint_names = self._constraint_names(
-            model,
-            columns,
-            exclude=meta_constraint_names | meta_index_names,
-            **constraint_kwargs,
-        )
-        if (
-            constraint_kwargs.get("unique") is True
-            and constraint_names
-            and self.connection.features.allows_multiple_constraints_on_same_fields
-        ):
-            # Constraint matching the unique_together name.
-            default_name = str(
-                self._unique_constraint_name(model._meta.db_table, columns, quote=False)
-            )
-            if default_name in constraint_names:
-                constraint_names = [default_name]
-        if len(constraint_names) != 1:
-            raise ValueError(
-                "Found wrong number ({}) of constraints for {}({})".format(
-                    len(constraint_names),
-                    model._meta.db_table,
-                    ", ".join(columns),
-                )
-            )
-        self.execute(self._delete_constraint_sql(sql, model, constraint_names[0]))
 
     def alter_db_table(self, model, old_db_table, new_db_table):
         """Rename the table a model points to."""

@@ -84,7 +84,10 @@ class SessionStore(SessionBase):
         try:
             with transaction.atomic(using=using):
                 obj.save(
-                    force_insert=must_create, force_update=not must_create, using=using
+                    clean_and_validate=False,
+                    force_insert=must_create,
+                    force_update=not must_create,
+                    using=using,
                 )
         except IntegrityError:
             if must_create:
