@@ -41,7 +41,12 @@ class OAuthConnection(models.Model):
     refresh_token_expires_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        unique_together = ("provider_key", "provider_user_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider_key", "provider_user_id"],
+                name="unique_oauth_provider_user_id",
+            )
+        ]
         ordering = ("provider_key",)
 
     def __str__(self):

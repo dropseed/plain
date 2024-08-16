@@ -25,7 +25,11 @@ class FlagResult(models.Model):
     value = models.JSONField()
 
     class Meta:
-        unique_together = ("flag", "key")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["flag", "key"], name="unique_flag_result_key"
+            )
+        ]
 
     def __str__(self):
         return self.key
