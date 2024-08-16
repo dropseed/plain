@@ -1145,15 +1145,9 @@ class Model(AltersData, metaclass=ModelBase):
         Check unique constraints on the model and raise ValidationError if any
         failed.
         """
-        unique_checks, date_checks = self._get_unique_checks(exclude=exclude)
+        unique_checks = self._get_unique_checks(exclude=exclude)
 
-        errors = self._perform_unique_checks(unique_checks)
-        date_errors = self._perform_date_checks(date_checks)
-
-        for k, v in date_errors.items():
-            errors.setdefault(k, []).extend(v)
-
-        if errors:
+        if errors := self._perform_unique_checks(unique_checks):
             raise ValidationError(errors)
 
     def _get_unique_checks(self, exclude=None, include_meta_constraints=False):
@@ -1194,9 +1188,6 @@ class Model(AltersData, metaclass=ModelBase):
                     if not any(name in exclude for name in constraint.fields):
                         unique_checks.append((model_class, constraint.fields))
 
-        # These are checks for the unique_for_<date/year/month>.
-        date_checks = []
-
         # Gather a list of checks for fields declared as unique and add them to
         # the list of checks.
 
@@ -1211,13 +1202,8 @@ class Model(AltersData, metaclass=ModelBase):
                     continue
                 if f.unique:
                     unique_checks.append((model_class, (name,)))
-                if f.unique_for_date and f.unique_for_date not in exclude:
-                    date_checks.append((model_class, "date", name, f.unique_for_date))
-                if f.unique_for_year and f.unique_for_year not in exclude:
-                    date_checks.append((model_class, "year", name, f.unique_for_year))
-                if f.unique_for_month and f.unique_for_month not in exclude:
-                    date_checks.append((model_class, "month", name, f.unique_for_month))
-        return unique_checks, date_checks
+
+        return unique_checks
 
     def _perform_unique_checks(self, unique_checks):
         errors = {}
@@ -1267,54 +1253,6 @@ class Model(AltersData, metaclass=ModelBase):
                 )
 
         return errors
-
-    def _perform_date_checks(self, date_checks):
-        errors = {}
-        for model_class, lookup_type, field, unique_for in date_checks:
-            lookup_kwargs = {}
-            # there's a ticket to add a date lookup, we can remove this special
-            # case if that makes it's way in
-            date = getattr(self, unique_for)
-            if date is None:
-                continue
-            if lookup_type == "date":
-                lookup_kwargs["%s__day" % unique_for] = date.day
-                lookup_kwargs["%s__month" % unique_for] = date.month
-                lookup_kwargs["%s__year" % unique_for] = date.year
-            else:
-                lookup_kwargs[f"{unique_for}__{lookup_type}"] = getattr(
-                    date, lookup_type
-                )
-            lookup_kwargs[field] = getattr(self, field)
-
-            qs = model_class._default_manager.filter(**lookup_kwargs)
-            # Exclude the current object from the query if we are editing an
-            # instance (as opposed to creating a new one)
-            if not self._state.adding and self.pk is not None:
-                qs = qs.exclude(pk=self.pk)
-
-            if qs.exists():
-                errors.setdefault(field, []).append(
-                    self.date_error_message(lookup_type, field, unique_for)
-                )
-        return errors
-
-    def date_error_message(self, lookup_type, field_name, unique_for):
-        opts = self._meta
-        field = opts.get_field(field_name)
-        return ValidationError(
-            message=field.error_messages["unique_for_date"],
-            code="unique_for_date",
-            params={
-                "model": self,
-                "model_name": opts.model_name,
-                "lookup_type": lookup_type,
-                "field": field_name,
-                "field_label": field.name,
-                "date_field": unique_for,
-                "date_field_label": opts.get_field(unique_for).name,
-            },
-        )
 
     def unique_error_message(self, model_class, unique_check):
         opts = model_class._meta
