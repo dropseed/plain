@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "plain.oauth"
-version = "0.6.0"
+version = "0.7.0"
 description = "OAuth login and API access for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
