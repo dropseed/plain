@@ -9,6 +9,7 @@ from itertools import chain, islice
 
 import plain.runtime
 from plain import exceptions
+from plain.exceptions import ValidationError
 from plain.models import (
     sql,
     transaction,
@@ -823,7 +824,14 @@ class QuerySet(AltersData):
                 with transaction.atomic(using=self.db):
                     params = dict(resolve_callables(params))
                     return self.create(**params), True
-            except IntegrityError:
+            except (IntegrityError, ValidationError):
+                # Since create() also validates by default,
+                # we can get any kind of ValidationError here,
+                # or it can flow through and get an IntegrityError from the database.
+                # The main thing we're concerned about is uniqueness failures,
+                # but ValidationError could include other things too.
+                # In all cases though it should be fine to try the get() again
+                # and return an existing object.
                 try:
                     return self.get(**kwargs), False
                 except self.model.DoesNotExist:
