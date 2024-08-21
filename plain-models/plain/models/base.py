@@ -1247,13 +1247,35 @@ class Model(AltersData, metaclass=ModelBase):
             "unique_check": unique_check,
         }
 
-        field = opts.get_field(unique_check[0])
-        params["field_label"] = field.name
-        return ValidationError(
-            message=field.error_messages["unique"],
-            code="unique",
-            params=params,
-        )
+        if len(unique_check) == 1:
+            field = opts.get_field(unique_check[0])
+            params["field_label"] = field.name
+            return ValidationError(
+                message=field.error_messages["unique"],
+                code="unique",
+                params=params,
+            )
+        else:
+            field_names = [opts.get_field(f).name for f in unique_check]
+
+            # Put an "and" before the last one
+            field_names[-1] = f"and {field_names[-1]}"
+
+            if len(field_names) > 2:
+                # Comma join if more than 2
+                params["field_label"] = ", ".join(field_names)
+            else:
+                # Just a space if there are only 2
+                params["field_label"] = " ".join(field_names)
+
+            # Use the first field as the message format...
+            message = opts.get_field(unique_check[0]).error_messages["unique"]
+
+            return ValidationError(
+                message=message,
+                code="unique",
+                params=params,
+            )
 
     def get_constraints(self):
         constraints = [(self.__class__, self._meta.constraints)]
