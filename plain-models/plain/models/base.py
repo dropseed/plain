@@ -1159,7 +1159,7 @@ class Model(AltersData, metaclass=ModelBase):
         if errors := self._perform_unique_checks(unique_checks):
             raise ValidationError(errors)
 
-    def _get_unique_checks(self, exclude=None, include_meta_constraints=False):
+    def _get_unique_checks(self, exclude=None):
         """
         Return a list of checks to perform. Since validate_unique() could be
         called from a ModelForm, some fields may have been excluded; we can't
@@ -1170,21 +1170,6 @@ class Model(AltersData, metaclass=ModelBase):
         if exclude is None:
             exclude = set()
         unique_checks = []
-
-        constraints = []
-        if include_meta_constraints:
-            constraints = [(self.__class__, self._meta.total_unique_constraints)]
-        for parent_class in self._meta.get_parent_list():
-            if include_meta_constraints and parent_class._meta.total_unique_constraints:
-                constraints.append(
-                    (parent_class, parent_class._meta.total_unique_constraints)
-                )
-
-        if include_meta_constraints:
-            for model_class, model_constraints in constraints:
-                for constraint in model_constraints:
-                    if not any(name in exclude for name in constraint.fields):
-                        unique_checks.append((model_class, constraint.fields))
 
         # Gather a list of checks for fields declared as unique and add them to
         # the list of checks.
