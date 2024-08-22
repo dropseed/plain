@@ -2,7 +2,6 @@ import datetime
 import decimal
 import uuid
 from functools import lru_cache
-from itertools import chain
 
 from plain import models
 from plain.exceptions import FieldError
@@ -217,26 +216,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         # 512 is large enough to fit the ~330 tables (as of this writing) in
         # Plain's test suite.
         return lru_cache(maxsize=512)(self.__references_graph)
-
-    def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):
-        if tables and allow_cascade:
-            # Simulate TRUNCATE CASCADE by recursively collecting the tables
-            # referencing the tables to be flushed.
-            tables = set(
-                chain.from_iterable(self._references_graph(table) for table in tables)
-            )
-        sql = [
-            "{} {} {};".format(
-                style.SQL_KEYWORD("DELETE"),
-                style.SQL_KEYWORD("FROM"),
-                style.SQL_FIELD(self.quote_name(table)),
-            )
-            for table in tables
-        ]
-        if reset_sequences:
-            sequences = [{"table": table} for table in tables]
-            sql.extend(self.sequence_reset_by_name_sql(style, sequences))
-        return sql
 
     def sequence_reset_by_name_sql(self, style, sequences):
         if not sequences:

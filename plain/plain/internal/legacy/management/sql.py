@@ -3,21 +3,6 @@ import sys
 from plain.packages import packages
 
 
-def sql_flush(style, connection, reset_sequences=True, allow_cascade=False):
-    """
-    Return a list of the SQL statements used to flush the database.
-    """
-    tables = connection.introspection.plain_table_names(
-        only_existing=True, include_views=False
-    )
-    return connection.ops.sql_flush(
-        style,
-        tables,
-        reset_sequences=reset_sequences,
-        allow_cascade=allow_cascade,
-    )
-
-
 def emit_pre_migrate_signal(verbosity, interactive, db, **kwargs):
     # Emit the pre_migrate signal for every application.
     for package_config in packages.get_package_configs():
