@@ -24,7 +24,7 @@ from plain.models.migrations.state import ModelState, ProjectState
 from plain.models.migrations.utils import get_migration_name_timestamp
 from plain.models.migrations.writer import MigrationWriter
 from plain.packages import packages
-from plain.runtime import __version__, settings
+from plain.runtime import settings
 from plain.utils.module_loading import module_has_submodule
 from plain.utils.text import Truncator
 
@@ -988,9 +988,7 @@ def optimize_migration(package_label, migration_name, check, verbosity):
         if migration.replaces:
             raise click.ClickException(
                 "Migration will require manual porting but is already a squashed "
-                "migration.\nTransition to a normal migration first: "
-                f"https://docs.djangoproject.com/en/{__version__}/topics/migrations/"
-                "#squashing-migrations"
+                "migration.\nTransition to a normal migration first."
             )
         # Make a new migration with those operations.
         subclass = type(
@@ -1270,8 +1268,7 @@ def squash_migrations(
         if smigration.replaces:
             raise click.ClickException(
                 "You cannot squash squashed migrations! Please transition it to a "
-                f"normal migration first: https://docs.djangoproject.com/en/{__version__}/"
-                "topics/migrations/#squashing-migrations"
+                "normal migration first"
             )
         operations.extend(smigration.operations)
         for dependency in smigration.dependencies:
