@@ -32,7 +32,7 @@ class BaseDatabaseCreation:
         database already exists. Return the name of the test database created.
         """
         # Don't import plain.internal.legacy.management if it isn't needed.
-        from plain.internal.legacy.management import call_command
+        from plain.models.cli import migrate
 
         test_database_name = self._get_test_db_name()
 
@@ -68,12 +68,18 @@ class BaseDatabaseCreation:
             # We report migrate messages at one level lower than that
             # requested. This ensures we don't get flooded with messages during
             # testing (unless you really ask to be flooded).
-            call_command(
-                "migrate",
-                verbosity=max(verbosity - 1, 0),
-                interactive=False,
+            migrate.callback(
+                package_label=None,
+                migration_name=None,
+                no_input=True,
                 database=self.connection.alias,
+                fake=False,
+                fake_initial=False,
+                plan=False,
+                check_unapplied=False,
                 run_syncdb=True,
+                prune=False,
+                verbosity=max(verbosity - 1, 0),
             )
         finally:
             if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
