@@ -117,9 +117,7 @@ class Dev:
         gunicorn = f"gunicorn --bind 127.0.0.1:{self.port} --reload plain.wsgi:app --timeout 60 --access-logfile - --error-logfile - {reload_extra} --access-logformat '\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'"
 
         if plain_db_installed:
-            runserver_cmd = (
-                f"plain models db-wait && plain legacy migrate && {gunicorn}"
-            )
+            runserver_cmd = f"plain models db-wait && plain migrate && {gunicorn}"
         else:
             runserver_cmd = gunicorn
 

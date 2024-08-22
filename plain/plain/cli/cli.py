@@ -25,26 +25,6 @@ def plain_cli():
     pass
 
 
-@plain_cli.command(
-    "legacy",
-    context_settings={
-        "ignore_unknown_options": True,
-    },
-)
-@click.argument("legacy_args", nargs=-1, type=click.UNPROCESSED)
-def legacy_alias(legacy_args):
-    result = subprocess.run(
-        [
-            "python",
-            "-m",
-            "plain.internal.legacy",
-            *legacy_args,
-        ],
-    )
-    if result.returncode:
-        sys.exit(result.returncode)
-
-
 # @plain_cli.command
 # def docs():
 #     """Open the Forge documentation in your browser"""

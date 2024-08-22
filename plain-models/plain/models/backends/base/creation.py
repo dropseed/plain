@@ -31,7 +31,6 @@ class BaseDatabaseCreation:
         Create a test database, prompting the user for confirmation if the
         database already exists. Return the name of the test database created.
         """
-        # Don't import plain.internal.legacy.management if it isn't needed.
         from plain.models.cli import migrate
 
         test_database_name = self._get_test_db_name()

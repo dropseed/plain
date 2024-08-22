@@ -7,10 +7,6 @@ from itertools import takewhile
 
 import click
 
-from plain.internal.legacy.management.sql import (
-    emit_post_migrate_signal,
-    emit_pre_migrate_signal,
-)
 from plain.models import migrations
 from plain.models.db import DEFAULT_DB_ALIAS, OperationalError, connections, router
 from plain.models.migrations.autodetector import MigrationAutodetector
@@ -555,8 +551,6 @@ def migrate(
 ):
     """Updates database schema. Manages both packages with migrations and those without."""
 
-    interactive = not no_input
-
     def migration_progress_callback(action, migration=None, fake=False):
         if verbosity >= 1:
             compute_time = verbosity > 1
@@ -860,14 +854,6 @@ def migrate(
                 )
 
     pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
-    pre_migrate_packages = pre_migrate_state.packages
-    emit_pre_migrate_signal(
-        verbosity,
-        interactive,
-        connection.alias,
-        packages=pre_migrate_packages,
-        plan=migration_plan,
-    )
 
     # Run the syncdb phase.
     if run_syncdb:
@@ -931,16 +917,6 @@ def migrate(
                 post_migrate_packages.unregister_model(*model_key)
         post_migrate_packages.render_multiple(
             [ModelState.from_model(packages.get_model(*model)) for model in model_keys]
-        )
-
-        # Send the post_migrate signal, so individual packages can do whatever they need
-        # to do at this point.
-        emit_post_migrate_signal(
-            verbosity,
-            interactive,
-            connection.alias,
-            packages=post_migrate_packages,
-            plan=migration_plan,
         )
 
 

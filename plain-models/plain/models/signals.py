@@ -51,6 +51,3 @@ pre_delete = ModelSignal(use_caching=True)
 post_delete = ModelSignal(use_caching=True)
 
 m2m_changed = ModelSignal(use_caching=True)
-
-pre_migrate = Signal()
-post_migrate = Signal()

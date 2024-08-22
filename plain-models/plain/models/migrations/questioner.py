@@ -3,7 +3,6 @@ import importlib
 import os
 import sys
 
-from plain.internal.legacy.management.base import OutputWrapper
 from plain.models.fields import NOT_PROVIDED
 from plain.packages import packages
 from plain.runtime import __version__
@@ -96,7 +95,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         super().__init__(
             defaults=defaults, specified_packages=specified_packages, dry_run=dry_run
         )
-        self.prompt_output = prompt_output or OutputWrapper(sys.stdout)
+        self.prompt_output = prompt_output or sys.stdout
 
     def _boolean_input(self, question, default=None):
         self.prompt_output.write(f"{question} ", ending="")

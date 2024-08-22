@@ -36,10 +36,6 @@ Automatically runs `npm run compile` if you have a `package.json` with `scripts.
 
 Run a Python script in the context of your app.
 
-### `plain legacy`
-
-A temporary holdover for running the old `manage.py` commands that haven't been converted yet.
-
 ### `plain preflight`
 
 Run preflight checks to ensure your app is ready to run.

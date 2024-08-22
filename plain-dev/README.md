@@ -62,8 +62,8 @@ Runs:
 - `plain code check`, if [`plain.code`](https://plainframework.com/docs/plain-code/plain/code/) is installed
 - `poetry check --lock`, if using [Poetry](https://python-poetry.org/)
 - `plain preflight --database default`
-- `plain legacy migrate --check`
-- `plain legacy makemigrations --dry-run --check`
+- `plain migrate --check`
+- `plain makemigrations --dry-run --check`
 - `plain compile`
 - `plain test`
 

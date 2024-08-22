@@ -71,13 +71,10 @@ def cli(install):
                 "--database",
                 "default",
             )
-            check_short(
-                "Checking Plain migrations", "plain", "legacy", "migrate", "--check"
-            )
+            check_short("Checking Plain migrations", "plain", "migrate", "--check")
             check_short(
                 "Checking for Plain models missing migrations",
                 "plain",
-                "legacy",
                 "makemigrations",
                 "--dry-run",
                 "--check",
@@ -102,7 +99,7 @@ def plain_db_connected():
     result = subprocess.run(
         [
             "plain",
-            "legacy",
+            "models",
             "showmigrations",
             "--skip-checks",
         ],
