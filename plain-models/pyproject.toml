@@ -8,6 +8,11 @@ description = "Database models for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
 
+# Make these available at the root level
+[tool.poetry.plugins."plain.cli"]
+"makemigrations" = "plain.models.cli:makemigrations"
+"migrate" = "plain.models.cli:migrate"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 plain = "<1.0.0"
