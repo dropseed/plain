@@ -38,7 +38,7 @@ class MigrationRecorder:
                 class Meta:
                     packages = Packages()
                     package_label = "migrations"
-                    db_table = "django_migrations"
+                    db_table = "plainmigrations"
 
                 def __str__(self):
                     return f"Migration {self.name} for {self.app}"
@@ -54,7 +54,7 @@ class MigrationRecorder:
         return self.Migration.objects.using(self.connection.alias)
 
     def has_table(self):
-        """Return True if the django_migrations table exists."""
+        """Return True if the plainmigrations table exists."""
         with self.connection.cursor() as cursor:
             tables = self.connection.introspection.table_names(cursor)
         return self.Migration._meta.db_table in tables
@@ -71,7 +71,7 @@ class MigrationRecorder:
                 editor.create_model(self.Migration)
         except DatabaseError as exc:
             raise MigrationSchemaMissing(
-                "Unable to create the django_migrations table (%s)" % exc
+                "Unable to create the plainmigrations table (%s)" % exc
             )
 
     def applied_migrations(self):
@@ -85,7 +85,7 @@ class MigrationRecorder:
                 for migration in self.migration_qs
             }
         else:
-            # If the django_migrations table doesn't exist, then no migrations
+            # If the plainmigrations table doesn't exist, then no migrations
             # are applied.
             return {}
 

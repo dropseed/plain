@@ -527,7 +527,7 @@ def makemigrations(
 @click.option(
     "--prune",
     is_flag=True,
-    help="Delete nonexistent migrations from the django_migrations table.",
+    help="Delete nonexistent migrations from the plainmigrations table.",
 )
 @click.option(
     "-v",
