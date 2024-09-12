@@ -110,7 +110,7 @@ class Dependency:
         with open("pyproject.toml") as f:
             pyproject = tomlkit.load(f)
 
-        pyproject["tool"]["plain"]["vendor"]["deps"][self.name] = {
+        pyproject["tool"]["plain"]["vendor"]["dependencies"][self.name] = {
             "url": self.url,
             "installed": self.installed,
         }
