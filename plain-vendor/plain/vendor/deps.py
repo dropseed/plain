@@ -19,6 +19,7 @@ class Dependency:
         self.url = config.get("url", "")
         self.installed = config.get("installed", "")
         self.filename = config.get("filename", "")
+        self.sourcemap = config.get("sourcemap", "")
 
     @staticmethod
     def parse_version_from_url(url):
@@ -110,10 +111,26 @@ class Dependency:
         with open("pyproject.toml") as f:
             pyproject = tomlkit.load(f)
 
-        pyproject["tool"]["plain"]["vendor"]["dependencies"][self.name] = {
-            "url": self.url,
-            "installed": self.installed,
-        }
+        # Force [tool.plain.vendor.dependencies] to be a table
+        dependencies = tomlkit.table()
+        dependencies.update(
+            pyproject.get("tool", {})
+            .get("plain", {})
+            .get("vendor", {})
+            .get("dependencies", {})
+        )
+
+        # Force [tool.plain.vendor.dependencies.{name}] to be an inline table
+        # name = { url = "https://example.com", installed = "1.0.0" }
+        dependencies[self.name] = tomlkit.inline_table()
+        dependencies[self.name]["url"] = self.url
+        dependencies[self.name]["installed"] = self.installed
+        if self.filename:
+            dependencies[self.name]["filename"] = self.filename
+        if self.sourcemap:
+            dependencies[self.name]["sourcemap"] = self.sourcemap
+
+        pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies
 
         with open("pyproject.toml", "w") as f:
             f.write(tomlkit.dumps(pyproject))
@@ -133,6 +150,26 @@ class Dependency:
 
         with open(vendored_path, "wb") as f:
             f.write(response.content)
+
+        # If a sourcemap is requested, download it as well
+        if self.sourcemap:
+            if isinstance(self.sourcemap, str):
+                # Use a specific filename from config
+                sourcemap_filename = self.sourcemap
+            else:
+                # Otherwise, append .map to the URL
+                sourcemap_filename = f"{filename}.map"
+
+            sourcemap_url = "/".join(
+                response.url.split("/")[:-1] + [sourcemap_filename]
+            )
+            sourcemap_response = requests.get(sourcemap_url)
+            sourcemap_response.raise_for_status()
+
+            sourcemap_path = VENDOR_DIR / sourcemap_filename
+
+            with open(sourcemap_path, "wb") as f:
+                f.write(sourcemap_response.content)
 
         return vendored_path
 
