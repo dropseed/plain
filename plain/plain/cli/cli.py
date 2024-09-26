@@ -15,6 +15,7 @@ import plain.runtime
 from plain import preflight
 from plain.assets.compile import compile_assets, get_compiled_path
 from plain.packages import packages
+from plain.utils.crypto import get_random_string
 
 from .formatting import PlainContext
 from .packages import EntryPointGroup, InstalledPackagesGroup
@@ -404,6 +405,18 @@ def setting(setting_name):
         click.echo(setting)
     except AttributeError:
         click.secho(f'Setting "{setting_name}" not found', fg="red")
+
+
+@plain_cli.group()
+def utils():
+    pass
+
+
+@utils.command()
+def generate_secret_key():
+    """Generate a new secret key"""
+    new_secret_key = get_random_string(50)
+    click.echo(new_secret_key)
 
 
 class AppCLIGroup(click.Group):
