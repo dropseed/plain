@@ -15,6 +15,7 @@ from .message import (
     EmailMultiAlternatives,
     SafeMIMEMultipart,
     SafeMIMEText,
+    TemplateEmail,
     forbid_multi_line_headers,
     make_msgid,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "DNS_NAME",
     "EmailMessage",
     "EmailMultiAlternatives",
+    "TemplateEmail",
     "SafeMIMEText",
     "SafeMIMEMultipart",
     "DEFAULT_ATTACHMENT_MIME_TYPE",
