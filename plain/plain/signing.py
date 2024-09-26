@@ -37,12 +37,10 @@ import base64
 import datetime
 import json
 import time
-import warnings
 import zlib
 
 from plain.runtime import settings
 from plain.utils.crypto import constant_time_compare, salted_hmac
-from plain.utils.deprecation import RemovedInDjango51Warning
 from plain.utils.encoding import force_bytes
 from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
@@ -177,17 +175,13 @@ def loads(
 
 
 class Signer:
-    # RemovedInDjango51Warning: When the deprecation ends, replace with:
-    # def __init__(
-    #   self, *, key=None, sep=":", salt=None, algorithm=None, fallback_keys=None
-    # ):
     def __init__(
         self,
-        *args,
+        *,
         key=None,
         sep=":",
         salt=None,
-        algorithm=None,
+        algorithm="sha256",
         fallback_keys=None,
     ):
         self.key = key or settings.SECRET_KEY
@@ -198,20 +192,8 @@ class Signer:
         )
         self.sep = sep
         self.salt = salt or f"{self.__class__.__module__}.{self.__class__.__name__}"
-        self.algorithm = algorithm or "sha256"
-        # RemovedInDjango51Warning.
-        if args:
-            warnings.warn(
-                f"Passing positional arguments to {self.__class__.__name__} is "
-                f"deprecated.",
-                RemovedInDjango51Warning,
-                stacklevel=2,
-            )
-            for arg, attr in zip(
-                args, ["key", "sep", "salt", "algorithm", "fallback_keys"]
-            ):
-                if arg or attr == "sep":
-                    setattr(self, attr, arg)
+        self.algorithm = algorithm
+
         if _SEP_UNSAFE.match(self.sep):
             raise ValueError(
                 "Unsafe Signer separator: %r (cannot be empty or consist of "
