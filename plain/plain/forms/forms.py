@@ -203,7 +203,8 @@ class BaseForm:
             self._errors[field].extend(error_list)
 
             # The field had an error, so removed it from the final data
-            if field in self.cleaned_data:
+            # (we use getattr here so errors can be added to uncleaned forms)
+            if field in getattr(self, "cleaned_data", {}):
                 del self.cleaned_data[field]
 
     def full_clean(self):
