@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "plain.loginlink"
+packages = [
+    { include = "plain" },
+]
+version = "0.1.0"
+description = "Emailed link-based login for Plain."
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+# readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+plain = "<1.0.0"
+plain-mail = "<1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+plain = { path = "../plain", develop = true }
+plain-mail = { path = "../plain-mail", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

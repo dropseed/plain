@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="m-auto text-center">
+    {% if error == "expired" %}
+    <h1 class="text-4xl">Link Expired</h1>
+    {% elif error == "invalid" %}
+    <h1 class="text-4xl">Link Invalid</h1>
+    {% elif error == "changed" %}
+    <h1 class="text-4xl">Link Changed</h1>
+    {% else %}
+    <h1 class="text-4xl">Link Error</h1>
+    {% endif %}
+
+    <a href="{{ login_url }}" class="inline-block mt-4 text-center text-blue-600 hover:underline">Request a new link →</a>
+
+</div>
+{% endblock %}
