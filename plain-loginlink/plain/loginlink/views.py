@@ -1,9 +1,8 @@
 from plain.auth import login, logout
-from plain.exceptions import ValidationError
 from plain.http import ResponseRedirect
-from plain.urls import reverse, reverse_lazy
-from plain.views import FormView, View, TemplateView
 from plain.runtime import settings
+from plain.urls import reverse, reverse_lazy
+from plain.views import FormView, TemplateView, View
 
 from .forms import LoginLinkForm
 from .links import (
