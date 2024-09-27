@@ -5,7 +5,6 @@ from plain.models.backends.utils import split_tzname_delta
 from plain.models.constants import OnConflict
 from plain.models.expressions import Exists, ExpressionWrapper
 from plain.models.lookups import Lookup
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.encoding import force_str
 from plain.utils.regex_helper import _lazy_re_compile
@@ -91,7 +90,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return f"{sign}{offset}" if offset else tzname
 
     def _convert_sql_to_tz(self, sql, params, tzname):
-        if tzname and settings.USE_TZ and self.connection.timezone_name != tzname:
+        if tzname and self.connection.timezone_name != tzname:
             return f"CONVERT_TZ({sql}, %s, %s)", (
                 *params,
                 self.connection.timezone_name,
@@ -230,13 +229,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         # MySQL doesn't support tz-aware datetimes
         if timezone.is_aware(value):
-            if settings.USE_TZ:
-                value = timezone.make_naive(value, self.connection.timezone)
-            else:
-                raise ValueError(
-                    "MySQL backend does not support timezone-aware datetimes when "
-                    "USE_TZ is False."
-                )
+            value = timezone.make_naive(value, self.connection.timezone)
         return str(value)
 
     def adapt_timefield_value(self, value):
@@ -283,8 +276,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if internal_type == "BooleanField":
             converters.append(self.convert_booleanfield_value)
         elif internal_type == "DateTimeField":
-            if settings.USE_TZ:
-                converters.append(self.convert_datetimefield_value)
+            converters.append(self.convert_datetimefield_value)
         elif internal_type == "UUIDField":
             converters.append(self.convert_uuidfield_value)
         return converters

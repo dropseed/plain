@@ -13,7 +13,6 @@ from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.db import DatabaseError as WrappedDatabaseError
 from plain.models.db import connections
-from plain.runtime import settings
 from plain.utils.functional import cached_property
 from plain.utils.safestring import SafeString
 
@@ -213,9 +212,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         if settings_dict["PORT"]:
             conn_params["port"] = settings_dict["PORT"]
         if is_psycopg3:
-            conn_params["context"] = get_adapters_template(
-                settings.USE_TZ, self.timezone
-            )
+            conn_params["context"] = get_adapters_template(self.timezone)
             # Disable prepared statements by default to keep connection poolers
             # working. Can be reenabled via OPTIONS in the settings dict.
             conn_params["prepare_threshold"] = conn_params.pop(
@@ -315,7 +312,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             if self.timezone != tzloader.timezone:
                 register_tzloader(self.timezone, cursor)
         else:
-            cursor.tzinfo_factory = self.tzinfo_factory if settings.USE_TZ else None
+            cursor.tzinfo_factory = self.tzinfo_factory
         return cursor
 
     def tzinfo_factory(self, offset):

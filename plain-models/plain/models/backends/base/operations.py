@@ -7,7 +7,6 @@ import sqlparse
 
 from plain.models.backends import utils
 from plain.models.db import NotSupportedError
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.encoding import force_str
 
@@ -591,10 +590,12 @@ class BaseDatabaseOperations:
         else:
             first = datetime.datetime(value, 1, 1)
             second = datetime.datetime(value, 12, 31, 23, 59, 59, 999999)
-        if settings.USE_TZ:
-            tz = timezone.get_current_timezone()
-            first = timezone.make_aware(first, tz)
-            second = timezone.make_aware(second, tz)
+
+        # Make sure that datetimes are aware in the current timezone
+        tz = timezone.get_current_timezone()
+        first = timezone.make_aware(first, tz)
+        second = timezone.make_aware(second, tz)
+
         first = self.adapt_datetimefield_value(first)
         second = self.adapt_datetimefield_value(second)
         return [first, second]

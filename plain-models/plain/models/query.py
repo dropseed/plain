@@ -37,7 +37,6 @@ from plain.models.utils import (
     create_namedtuple_class,
     resolve_callables,
 )
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.functional import cached_property, partition
 
@@ -1259,11 +1258,10 @@ class QuerySet(AltersData):
             )
         if order not in ("ASC", "DESC"):
             raise ValueError("'order' must be either 'ASC' or 'DESC'.")
-        if settings.USE_TZ:
-            if tzinfo is None:
-                tzinfo = timezone.get_current_timezone()
-        else:
-            tzinfo = None
+
+        if tzinfo is None:
+            tzinfo = timezone.get_current_timezone()
+
         return (
             self.annotate(
                 datetimefield=Trunc(

@@ -9,7 +9,6 @@ import zoneinfo
 from collections import deque
 from contextlib import contextmanager
 
-from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils
 from plain.models.backends.base.validation import BaseDatabaseValidation
 from plain.models.backends.signals import connection_created
@@ -150,9 +149,7 @@ class BaseDatabaseWrapper:
         Plain uses may be constrained by the requirements of other users of
         the database.
         """
-        if not settings.USE_TZ:
-            return None
-        elif self.settings_dict["TIME_ZONE"] is None:
+        if self.settings_dict["TIME_ZONE"] is None:
             return datetime.timezone.utc
         else:
             return zoneinfo.ZoneInfo(self.settings_dict["TIME_ZONE"])
@@ -162,9 +159,7 @@ class BaseDatabaseWrapper:
         """
         Name of the time zone of the database connection.
         """
-        if not settings.USE_TZ:
-            return settings.TIME_ZONE
-        elif self.settings_dict["TIME_ZONE"] is None:
+        if self.settings_dict["TIME_ZONE"] is None:
             return "UTC"
         else:
             return self.settings_dict["TIME_ZONE"]
@@ -238,8 +233,6 @@ class BaseDatabaseWrapper:
 
     def connect(self):
         """Connect to the database. Assume that the connection is closed."""
-        # Check for invalid configurations.
-        self.check_settings()
         # In case the previous connection was closed while in an atomic block
         self.in_atomic_block = False
         self.savepoint_ids = []
@@ -261,13 +254,6 @@ class BaseDatabaseWrapper:
         connection_created.send(sender=self.__class__, connection=self)
 
         self.run_on_commit = []
-
-    def check_settings(self):
-        if self.settings_dict["TIME_ZONE"] is not None and not settings.USE_TZ:
-            raise ImproperlyConfigured(
-                "Connection '%s' cannot set TIME_ZONE because USE_TZ is False."
-                % self.alias
-            )
 
     def ensure_connection(self):
         """Guarantee that a connection to the database is established."""

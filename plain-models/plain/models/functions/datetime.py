@@ -17,7 +17,6 @@ from plain.models.lookups import (
     YearLt,
     YearLte,
 )
-from plain.runtime import settings
 from plain.utils import timezone
 
 
@@ -29,13 +28,10 @@ class TimezoneMixin:
         # applying a function. 2015-12-31 23:00:00 -02:00 is stored in the
         # database as 2016-01-01 01:00:00 +00:00. Any results should be
         # based on the input datetime not the stored datetime.
-        tzname = None
-        if settings.USE_TZ:
-            if self.tzinfo is None:
-                tzname = timezone.get_current_timezone_name()
-            else:
-                tzname = timezone._get_timezone_name(self.tzinfo)
-        return tzname
+        if self.tzinfo is None:
+            return timezone.get_current_timezone_name()
+        else:
+            return timezone._get_timezone_name(self.tzinfo)
 
 
 class Extract(TimezoneMixin, Transform):
@@ -335,9 +331,7 @@ class TruncBase(TimezoneMixin, Transform):
 
     def convert_value(self, value, expression, connection):
         if isinstance(self.output_field, DateTimeField):
-            if not settings.USE_TZ:
-                pass
-            elif value is not None:
+            if value is not None:
                 value = value.replace(tzinfo=None)
                 value = timezone.make_aware(value, self.tzinfo)
             elif not connection.features.has_zoneinfo_database:

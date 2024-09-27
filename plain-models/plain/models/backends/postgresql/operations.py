@@ -11,7 +11,6 @@ from plain.models.backends.postgresql.psycopg_any import (
 )
 from plain.models.backends.utils import split_tzname_delta
 from plain.models.constants import OnConflict
-from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
 
@@ -106,7 +105,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return tzname
 
     def _convert_sql_to_tz(self, sql, params, tzname):
-        if tzname and settings.USE_TZ:
+        if tzname:
             tzname_param = self._prepare_tzname_delta(tzname)
             return f"{sql} AT TIME ZONE %s", (*params, tzname_param)
         return sql, params

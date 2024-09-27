@@ -138,27 +138,6 @@ class override(ContextDecorator):
             _active.value = self.old_timezone
 
 
-# Templates
-
-
-def template_localtime(value, use_tz=None):
-    """
-    Check if value is a datetime and converts it to local time if necessary.
-
-    If use_tz is provided and is not None, that will force the value to
-    be converted (or not), overriding the value of settings.USE_TZ.
-
-    This function is designed for use by the template engine.
-    """
-    should_convert = (
-        isinstance(value, datetime)
-        and (settings.USE_TZ if use_tz is None else use_tz)
-        and not is_naive(value)
-        and getattr(value, "convert_to_local_time", True)
-    )
-    return localtime(value) if should_convert else value
-
-
 # Utilities
 
 
@@ -184,9 +163,9 @@ def localtime(value=None, timezone=None):
 
 def now():
     """
-    Return an aware or naive datetime.datetime, depending on settings.USE_TZ.
+    Return a timezone aware datetime.
     """
-    return datetime.now(tz=timezone.utc if settings.USE_TZ else None)
+    return datetime.now(tz=timezone.utc)
 
 
 # By design, these four functions don't perform any checks on their arguments.

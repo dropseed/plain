@@ -51,7 +51,7 @@ try:
             return dumper
 
     @lru_cache
-    def get_adapters_template(use_tz, timezone):
+    def get_adapters_template(timezone):
         # Create at adapters map extending the base one.
         ctx = adapt.AdaptersMap(adapters)
         # Register a no-op dumper to avoid a round trip from psycopg version 3

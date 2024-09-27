@@ -20,12 +20,9 @@ ALLOWED_HOSTS: list[str] = []
 
 # Local time zone for this installation. All choices can be found here:
 # https://en.wikipedia.org/wiki/List_of_tz_zones_by_name (although not all
-# systems may support all possibilities). When USE_TZ is True, this is
-# interpreted as the default user time zone.
+# systems may support all possibilities). This is interpreted as the default
+# user time zone.
 TIME_ZONE: str = "UTC"
-
-# If you set this to True, Plain will use timezone-aware datetimes.
-USE_TZ = True
 
 # Default charset to use for all Response objects, if a MIME type isn't
 # manually specified. It's used to construct the Content-Type header.

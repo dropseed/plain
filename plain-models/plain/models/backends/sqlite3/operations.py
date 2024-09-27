@@ -9,7 +9,6 @@ from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.constants import OnConflict
 from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.expressions import Col
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 from plain.utils.functional import cached_property
@@ -103,7 +102,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         )
 
     def _convert_tznames_to_sql(self, tzname):
-        if tzname and settings.USE_TZ:
+        if tzname:
             return tzname, self.connection.timezone_name
         return None, None
 
@@ -245,13 +244,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         # SQLite doesn't support tz-aware datetimes
         if timezone.is_aware(value):
-            if settings.USE_TZ:
-                value = timezone.make_naive(value, self.connection.timezone)
-            else:
-                raise ValueError(
-                    "SQLite backend does not support timezone-aware datetimes when "
-                    "USE_TZ is False."
-                )
+            value = timezone.make_naive(value, self.connection.timezone)
 
         return str(value)
 
@@ -290,7 +283,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if value is not None:
             if not isinstance(value, datetime.datetime):
                 value = parse_datetime(value)
-            if settings.USE_TZ and not timezone.is_aware(value):
+            if not timezone.is_aware(value):
                 value = timezone.make_aware(value, self.connection.timezone)
         return value
 
