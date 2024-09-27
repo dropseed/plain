@@ -275,7 +275,7 @@ class Settings:
                 setattr(self, setting, setting_value)
                 self._explicit_settings.add(setting)
 
-        if hasattr(time, "tzset") and self.TIME_ZONE:
+        if hasattr(time, "tzset") and getattr(self, "TIME_ZONE", None):
             # When we can, attempt to validate the timezone. If we can't find
             # this file, no check happens and it's harmless.
             zoneinfo_root = Path("/usr/share/zoneinfo")

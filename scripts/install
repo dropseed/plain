@@ -5,6 +5,7 @@ do
     echo ""
     echo "${BOLD}Installing dependencies for $package${NORMAL}"
     cd $package
+    poetry env use $(uv python find)
     POETRY_VIRTUALENVS_IN_PROJECT=true poetry install
     cd ..
 done

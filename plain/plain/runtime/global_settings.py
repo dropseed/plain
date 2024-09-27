@@ -22,7 +22,7 @@ ALLOWED_HOSTS: list[str] = []
 # https://en.wikipedia.org/wiki/List_of_tz_zones_by_name (although not all
 # systems may support all possibilities). When USE_TZ is True, this is
 # interpreted as the default user time zone.
-TIME_ZONE = "America/Chicago"
+TIME_ZONE: str = "UTC"
 
 # If you set this to True, Plain will use timezone-aware datetimes.
 USE_TZ = True
@@ -75,16 +75,6 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 100
 # (i.e. "/tmp" on *nix systems).
 FILE_UPLOAD_TEMP_DIR = None
 
-# The numeric mode to set newly-uploaded files to. The value should be a mode
-# you'd pass directly to os.chmod; see
-# https://docs.python.org/library/os.html#files-and-directories.
-FILE_UPLOAD_PERMISSIONS = 0o644
-
-# The numeric mode to assign to newly-created directories, when uploading files.
-# The value should be a mode as you'd pass to os.chmod;
-# see https://docs.python.org/library/os.html#files-and-directories.
-FILE_UPLOAD_DIRECTORY_PERMISSIONS = None
-
 # Default X-Frame-Options header value
 X_FRAME_OPTIONS = "DENY"
 
@@ -121,7 +111,7 @@ MIDDLEWARE = [
 # SIGNING #
 ###########
 
-SIGNING_BACKEND = "plain.signing.TimestampSigner"
+COOKIE_SIGNING_BACKEND = "plain.signing.TimestampSigner"
 
 ########
 # CSRF #
@@ -132,7 +122,7 @@ CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52
 CSRF_COOKIE_DOMAIN = None
 CSRF_COOKIE_PATH = "/"
-CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
@@ -178,7 +168,7 @@ SECURE_HSTS_SECONDS = 0
 SECURE_REDIRECT_EXEMPT = []
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_SSL_HOST = None
-SECURE_SSL_REDIRECT = False
+SECURE_SSL_REDIRECT = True
 
 #############
 # Templates #

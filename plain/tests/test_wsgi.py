@@ -14,6 +14,7 @@ def test_wsgi_app():
         {
             "REQUEST_METHOD": "GET",
             "wsgi.input": BytesIO(b""),
+            "wsgi.url_scheme": "https",
         },
         lambda *args: None,
     )
