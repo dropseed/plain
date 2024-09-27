@@ -21,7 +21,8 @@ class LoginLinkForm(forms.Form):
                 request=request, user=user, email=email, expires_in=expires_in
             )
             email = self.get_email_template(
-                email=email, context={"user": user, "url": url}
+                email=email,
+                context={"user": user, "url": url, "expires_in": expires_in},
             )
             return email.send()
 
