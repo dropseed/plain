@@ -1,23 +1,7 @@
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 
-from .. import Error, Warning, register
-
-CROSS_ORIGIN_OPENER_POLICY_VALUES = {
-    "same-origin",
-    "same-origin-allow-popups",
-    "unsafe-none",
-}
-REFERRER_POLICY_VALUES = {
-    "no-referrer",
-    "no-referrer-when-downgrade",
-    "origin",
-    "origin-when-cross-origin",
-    "same-origin",
-    "strict-origin",
-    "strict-origin-when-cross-origin",
-    "unsafe-url",
-}
+from .. import Warning, register
 
 SECRET_KEY_INSECURE_PREFIX = "plain-insecure-"
 SECRET_KEY_MIN_LENGTH = 50
@@ -39,43 +23,6 @@ W001 = Warning(
     "SECURE_CROSS_ORIGIN_OPENER_POLICY, and SECURE_SSL_REDIRECT settings will "
     "have no effect.",
     id="security.W001",
-)
-
-W002 = Warning(
-    "You do not have "
-    "'plain.middleware.clickjacking.XFrameOptionsMiddleware' in your "
-    "MIDDLEWARE, so your pages will not be served with an "
-    "'x-frame-options' header. Unless there is a good reason for your "
-    "site to be served in a frame, you should consider enabling this "
-    "header to help prevent clickjacking attacks.",
-    id="security.W002",
-)
-
-W004 = Warning(
-    "You have not set a value for the SECURE_HSTS_SECONDS setting. "
-    "If your entire site is served only over SSL, you may want to consider "
-    "setting a value and enabling HTTP Strict Transport Security. "
-    "Be sure to read the documentation first; enabling HSTS carelessly "
-    "can cause serious, irreversible problems.",
-    id="security.W004",
-)
-
-W005 = Warning(
-    "You have not set the SECURE_HSTS_INCLUDE_SUBDOMAINS setting to True. "
-    "Without this, your site is potentially vulnerable to attack "
-    "via an insecure connection to a subdomain. Only set this to True if "
-    "you are certain that all subdomains of your domain should be served "
-    "exclusively via SSL.",
-    id="security.W005",
-)
-
-W006 = Warning(
-    "Your SECURE_CONTENT_TYPE_NOSNIFF setting is not set to True, "
-    "so your pages will not be served with an "
-    "'X-Content-Type-Options: nosniff' header. "
-    "You should consider enabling this header to prevent the "
-    "browser from identifying content types incorrectly.",
-    id="security.W006",
 )
 
 W008 = Warning(
@@ -102,34 +49,6 @@ W020 = Warning(
     id="security.W020",
 )
 
-W021 = Warning(
-    "You have not set the SECURE_HSTS_PRELOAD setting to True. Without this, "
-    "your site cannot be submitted to the browser preload list.",
-    id="security.W021",
-)
-
-W022 = Warning(
-    "You have not set the SECURE_REFERRER_POLICY setting. Without this, your "
-    "site will not send a Referrer-Policy header. You should consider "
-    "enabling this header to protect user privacy.",
-    id="security.W022",
-)
-
-E023 = Error(
-    "You have set the SECURE_REFERRER_POLICY setting to an invalid value.",
-    hint="Valid values are: {}.".format(", ".join(sorted(REFERRER_POLICY_VALUES))),
-    id="security.E023",
-)
-
-E024 = Error(
-    "You have set the SECURE_CROSS_ORIGIN_OPENER_POLICY setting to an invalid "
-    "value.",
-    hint="Valid values are: {}.".format(
-        ", ".join(sorted(CROSS_ORIGIN_OPENER_POLICY_VALUES)),
-    ),
-    id="security.E024",
-)
-
 W025 = Warning(SECRET_KEY_WARNING_MSG, id="security.W025")
 
 
@@ -137,56 +56,10 @@ def _security_middleware():
     return "plain.middleware.security.SecurityMiddleware" in settings.MIDDLEWARE
 
 
-def _xframe_middleware():
-    return (
-        "plain.middleware.clickjacking.XFrameOptionsMiddleware" in settings.MIDDLEWARE
-    )
-
-
 @register(deploy=True)
 def check_security_middleware(package_configs, **kwargs):
     passed_check = _security_middleware()
     return [] if passed_check else [W001]
-
-
-@register(deploy=True)
-def check_xframe_options_middleware(package_configs, **kwargs):
-    passed_check = _xframe_middleware()
-    return [] if passed_check else [W002]
-
-
-@register(deploy=True)
-def check_sts(package_configs, **kwargs):
-    passed_check = not _security_middleware() or settings.SECURE_HSTS_SECONDS
-    return [] if passed_check else [W004]
-
-
-@register(deploy=True)
-def check_sts_include_subdomains(package_configs, **kwargs):
-    passed_check = (
-        not _security_middleware()
-        or not settings.SECURE_HSTS_SECONDS
-        or settings.SECURE_HSTS_INCLUDE_SUBDOMAINS is True
-    )
-    return [] if passed_check else [W005]
-
-
-@register(deploy=True)
-def check_sts_preload(package_configs, **kwargs):
-    passed_check = (
-        not _security_middleware()
-        or not settings.SECURE_HSTS_SECONDS
-        or settings.SECURE_HSTS_PRELOAD is True
-    )
-    return [] if passed_check else [W021]
-
-
-@register(deploy=True)
-def check_content_type_nosniff(package_configs, **kwargs):
-    passed_check = (
-        not _security_middleware() or settings.SECURE_CONTENT_TYPE_NOSNIFF is True
-    )
-    return [] if passed_check else [W006]
 
 
 @register(deploy=True)
@@ -239,30 +112,3 @@ def check_debug(package_configs, **kwargs):
 @register(deploy=True)
 def check_allowed_hosts(package_configs, **kwargs):
     return [] if settings.ALLOWED_HOSTS else [W020]
-
-
-@register(deploy=True)
-def check_referrer_policy(package_configs, **kwargs):
-    if _security_middleware():
-        if settings.SECURE_REFERRER_POLICY is None:
-            return [W022]
-        # Support a comma-separated string or iterable of values to allow fallback.
-        if isinstance(settings.SECURE_REFERRER_POLICY, str):
-            values = {v.strip() for v in settings.SECURE_REFERRER_POLICY.split(",")}
-        else:
-            values = set(settings.SECURE_REFERRER_POLICY)
-        if not values <= REFERRER_POLICY_VALUES:
-            return [E023]
-    return []
-
-
-@register(deploy=True)
-def check_cross_origin_opener_policy(package_configs, **kwargs):
-    if (
-        _security_middleware()
-        and settings.SECURE_CROSS_ORIGIN_OPENER_POLICY is not None
-        and settings.SECURE_CROSS_ORIGIN_OPENER_POLICY
-        not in CROSS_ORIGIN_OPENER_POLICY_VALUES
-    ):
-        return [E024]
-    return []

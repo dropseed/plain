@@ -30,7 +30,6 @@ MIDDLEWARE = [
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",
     "plain.auth.middleware.AuthenticationMiddleware",
-    "plain.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "app.urls"

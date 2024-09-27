@@ -72,9 +72,6 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 100
 # (i.e. "/tmp" on *nix systems).
 FILE_UPLOAD_TEMP_DIR = None
 
-# Default X-Frame-Options header value
-X_FRAME_OPTIONS = "DENY"
-
 USE_X_FORWARDED_HOST = False
 USE_X_FORWARDED_PORT = False
 
@@ -101,7 +98,6 @@ MIDDLEWARE = [
     "plain.middleware.security.SecurityMiddleware",
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",
-    "plain.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ###########
@@ -157,15 +153,19 @@ SILENCED_PREFLIGHT_CHECKS = []
 #######################
 # SECURITY MIDDLEWARE #
 #######################
-SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-SECURE_HSTS_PRELOAD = False
-SECURE_HSTS_SECONDS = 0
 SECURE_REDIRECT_EXEMPT = []
-SECURE_REFERRER_POLICY = "same-origin"
 SECURE_SSL_HOST = None
 SECURE_SSL_REDIRECT = True
+
+SECURE_DEFAULT_HEADERS = {
+    # "Content-Security-Policy": "default-src 'self'",
+    # https://hstspreload.org/
+    # "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Referrer-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
 
 #############
 # Templates #
