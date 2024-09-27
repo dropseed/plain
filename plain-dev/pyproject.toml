@@ -32,8 +32,6 @@ debugpy = "^1.6.3"
 # For local runserver
 gunicorn = ">20"
 
-tomli = {version = "^2.0.1", python = "<3.11"}
-
 # db
 requests = ">=2.0.0"
 psycopg = {version = "^3.2.2", extras = ["binary"]}

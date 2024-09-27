@@ -5,17 +5,13 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
+import tomllib
 from honcho.manager import Manager as HonchoManager
 
 from plain.runtime import APP_PATH
 
 from .pid import Pid
 from .utils import has_pyproject_toml
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
 
 
 class Services:

@@ -4,16 +4,12 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
+import click
+import tomllib
+
 from plain.cli.print import print_event
 
 from ..services import Services
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-
-import click
 
 
 def install_git_hook():
