@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .user_settings import LazySettings
+from .user_settings import Settings
 
 try:
     __version__ = importlib.metadata.version("plain")
@@ -18,7 +18,7 @@ APP_PATH = Path.cwd() / "app"
 
 
 # from plain.runtime import settings
-settings = LazySettings()
+settings = Settings()
 
 
 class AppPathNotFound(RuntimeError):
