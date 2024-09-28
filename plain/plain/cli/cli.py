@@ -14,6 +14,7 @@ from click.core import Command, Context
 import plain.runtime
 from plain import preflight
 from plain.assets.compile import compile_assets, get_compiled_path
+from plain.exceptions import ImproperlyConfigured
 from plain.packages import packages
 from plain.utils.crypto import get_random_string
 
@@ -472,16 +473,31 @@ class PlainCommandCollection(click.CommandCollection):
                 EntryPointGroup(),
                 plain_cli,
             ]
-        except Exception as e:
+        except ImproperlyConfigured as e:
             click.secho(
-                f"Error setting up Plain CLI\n{e}",
+                str(e),
                 fg="red",
                 err=True,
             )
+
+            # None of these require the app to be setup
+            sources = [
+                EntryPointGroup(),
+                AppCLIGroup(),
+                plain_cli,
+            ]
+        except Exception as e:
             print("---")
             print(traceback.format_exc())
             print("---")
 
+            click.secho(
+                f"Error: {e}",
+                fg="red",
+                err=True,
+            )
+
+            # None of these require the app to be setup
             sources = [
                 EntryPointGroup(),
                 AppCLIGroup(),
