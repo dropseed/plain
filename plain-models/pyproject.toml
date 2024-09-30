@@ -3,7 +3,7 @@ name = "plain.models"
 packages = [
     { include = "plain" },
 ]
-version = "0.8.0"
+version = "0.9.0"
 description = "Database models for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
