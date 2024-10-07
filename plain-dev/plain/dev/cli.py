@@ -254,7 +254,9 @@ class Dev:
     def add_entrypoints(self):
         for entry_point in entry_points().select(group=ENTRYPOINT_GROUP):
             self.poncho.add_process(
-                f"plain dev entrypoint {entry_point.name}", env=self.plain_env
+                entry_point.name,
+                f"plain dev entrypoint {entry_point.name}",
+                env=self.plain_env,
             )
 
     def add_pyproject_run(self):
