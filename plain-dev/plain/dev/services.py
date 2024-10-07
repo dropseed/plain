@@ -10,7 +10,7 @@ import tomllib
 from plain.runtime import APP_PATH
 
 from .pid import Pid
-from .poncho.manger import Manager as PonchoManager
+from .poncho.manager import Manager as PonchoManager
 from .utils import has_pyproject_toml
 
 
