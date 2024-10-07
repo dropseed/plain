@@ -6,11 +6,11 @@ from pathlib import Path
 
 import click
 import tomllib
-from poncho.poncho import Manager as PonchoManager
 
 from plain.runtime import APP_PATH
 
 from .pid import Pid
+from .poncho.manger import Manager as PonchoManager
 from .utils import has_pyproject_toml
 
 
