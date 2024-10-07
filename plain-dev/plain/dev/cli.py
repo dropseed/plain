@@ -1,10 +1,8 @@
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
-import urllib.request
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -15,6 +13,7 @@ from honcho.manager import Manager as HonchoManager
 from plain.runtime import APP_PATH, settings
 
 from .db import cli as db_cli
+from .mkcert import MkcertManager
 from .pid import Pid
 from .services import Services
 from .utils import has_pyproject_toml, plainpackage_installed
@@ -62,25 +61,20 @@ class Dev:
         }
         self.project_name = os.path.basename(os.getcwd())
         self.domain = f"{self.project_name}.localhost"
-
-        # Paths for mkcert and certificates
-        self.mkcert_dir = Path.home() / ".plain" / "dev"
-        self.mkcert_bin = self.mkcert_dir / "mkcert"
-        self.certs_dir = (
-            Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs"
-        )  # Local project directory for certs
-
-        # Define certificate and key paths with clear filenames
-        self.cert_path = self.certs_dir / f"{self.domain}-cert.pem"
-        self.key_path = self.certs_dir / f"{self.domain}-key.pem"
+        self.ssl_cert_path = None
+        self.ssl_key_path = None
 
     def run(self):
         pid = Pid()
         pid.write()
 
         try:
-            self.setup_mkcert()
-            self.generate_certs()
+            mkcert_manager = MkcertManager()
+            mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
+            self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
+                domain=self.domain,
+                storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
+            )
             self.modify_hosts_file()
             self.add_csrf_trusted_origins()
             self.add_allowed_hosts()
@@ -102,84 +96,6 @@ class Dev:
             return self.manager.returncode
         finally:
             pid.rm()
-
-    def setup_mkcert(self):
-        """Set up mkcert by checking if it's installed or downloading the binary and installing the local CA."""
-        if mkcert_path := shutil.which("mkcert"):
-            # mkcert is already installed somewhere
-            self.mkcert_bin = mkcert_path
-        else:
-            self.mkcert_dir.mkdir(parents=True, exist_ok=True)
-            if not self.mkcert_bin.exists():
-                system = platform.system()
-                arch = platform.machine()
-
-                # Map platform.machine() to mkcert's expected architecture strings
-                arch_map = {
-                    "x86_64": "amd64",
-                    "amd64": "amd64",
-                    "AMD64": "amd64",
-                    "arm64": "arm64",
-                    "aarch64": "arm64",
-                }
-                arch = arch_map.get(
-                    arch.lower(), "amd64"
-                )  # Default to amd64 if unknown
-
-                if system == "Darwin":
-                    os_name = "darwin"
-                elif system == "Linux":
-                    os_name = "linux"
-                elif system == "Windows":
-                    os_name = "windows"
-                else:
-                    click.secho("Unsupported OS", fg="red")
-                    sys.exit(1)
-
-                mkcert_url = f"https://dl.filippo.io/mkcert/latest?for={os_name}/{arch}"
-                click.secho(f"Downloading mkcert from {mkcert_url}...", bold=True)
-                urllib.request.urlretrieve(mkcert_url, self.mkcert_bin)
-                self.mkcert_bin.chmod(0o755)
-            self.mkcert_bin = str(self.mkcert_bin)  # Convert Path object to string
-
-        if not self.is_mkcert_ca_installed():
-            click.secho(
-                "Installing mkcert local CA. You may be prompted for your password.",
-                bold=True,
-            )
-            subprocess.run([self.mkcert_bin, "-install"], check=True)
-
-    def is_mkcert_ca_installed(self):
-        """Check if mkcert local CA is already installed using mkcert -check."""
-        try:
-            result = subprocess.run([self.mkcert_bin, "-check"], capture_output=True)
-            output = result.stdout.decode() + result.stderr.decode()
-            if "The local CA is not installed" in output:
-                return False
-            return True
-        except Exception as e:
-            click.secho(f"Error checking mkcert CA installation: {e}", fg="red")
-            return False
-
-    def generate_certs(self):
-        if self.cert_path.exists() and self.key_path.exists():
-            return
-
-        self.certs_dir.mkdir(parents=True, exist_ok=True)
-
-        # Generate SSL certificates using mkcert
-        click.secho(f"Generating SSL certificates for {self.domain}...", bold=True)
-        subprocess.run(
-            [
-                self.mkcert_bin,
-                "-cert-file",
-                str(self.cert_path),
-                "-key-file",
-                str(self.key_path),
-                self.domain,
-            ],
-            check=True,
-        )
 
     def modify_hosts_file(self):
         """Modify the hosts file to map the custom domain to 127.0.0.1."""
@@ -284,9 +200,9 @@ class Dev:
             "--bind",
             f"{self.domain}:{self.port}",
             "--certfile",
-            str(self.cert_path),
+            str(self.ssl_cert_path),
             "--keyfile",
-            str(self.key_path),
+            str(self.ssl_key_path),
             "--reload",
             "plain.wsgi:app",
             "--timeout",
