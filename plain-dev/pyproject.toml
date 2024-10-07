@@ -26,7 +26,6 @@ python = "^3.11"
 plain = "<1.0.0"
 
 click = ">=8.0.0"
-honcho = "^1.1.0"
 debugpy = "^1.6.3"
 
 # For local runserver

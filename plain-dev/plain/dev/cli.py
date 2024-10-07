@@ -8,13 +8,13 @@ from pathlib import Path
 
 import click
 import tomllib
-from honcho.manager import Manager as HonchoManager
 
 from plain.runtime import APP_PATH, settings
 
 from .db import cli as db_cli
 from .mkcert import MkcertManager
 from .pid import Pid
+from .poncho.manager import Manager as PonchoManager
 from .services import Services
 from .utils import has_pyproject_toml, plainpackage_installed
 
@@ -48,7 +48,7 @@ def services():
 
 class Dev:
     def __init__(self, *, port):
-        self.manager = HonchoManager()
+        self.poncho = PonchoManager()
         self.port = port
         self.plain_env = {
             **os.environ,
@@ -76,9 +76,11 @@ class Dev:
                 storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
             )
             self.modify_hosts_file()
-            self.add_csrf_trusted_origins()
-            self.add_allowed_hosts()
+            self.set_csrf_trusted_origins()
+            self.set_allowed_hosts()
             self.run_preflight()
+
+            # Processes for poncho to run simultaneously
             self.add_gunicorn()
             self.add_tailwind()
             self.add_pyproject_run()
@@ -91,9 +93,9 @@ class Dev:
                 bold=True,
             )
 
-            self.manager.loop()
+            self.poncho.loop()
 
-            return self.manager.returncode
+            return self.poncho.returncode
         finally:
             pid.rm()
 
@@ -152,7 +154,7 @@ class Dev:
                 )
                 sys.exit(1)
 
-    def add_csrf_trusted_origins(self):
+    def set_csrf_trusted_origins(self):
         csrf_trusted_origins = json.dumps(
             [
                 f"https://{self.domain}:{self.port}",
@@ -168,7 +170,7 @@ class Dev:
         self.plain_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
         self.custom_process_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
 
-    def add_allowed_hosts(self):
+    def set_allowed_hosts(self):
         allowed_hosts = json.dumps([self.domain])
 
         click.secho(
@@ -226,13 +228,13 @@ class Dev:
             # Default to two workers to prevent lockups
             self.plain_env["WEB_CONCURRENCY"] = "2"
 
-        self.manager.add_process("plain", runserver_cmd, env=self.plain_env)
+        self.poncho.add_process("plain", runserver_cmd, env=self.plain_env)
 
     def add_tailwind(self):
         if not plainpackage_installed("tailwind"):
             return
 
-        self.manager.add_process("tailwind", "plain tailwind compile --watch")
+        self.poncho.add_process("tailwind", "plain tailwind compile --watch")
 
     def add_pyproject_run(self):
         if not has_pyproject_toml(APP_PATH.parent):
@@ -249,7 +251,7 @@ class Dev:
                 **self.custom_process_env,
                 **data.get("env", {}),
             }
-            self.manager.add_process(name, data["cmd"], env=env)
+            self.poncho.add_process(name, data["cmd"], env=env)
 
     def add_services(self):
         services = Services.get_services(APP_PATH.parent)
@@ -259,7 +261,7 @@ class Dev:
                 "PYTHONUNBUFFERED": "true",
                 **data.get("env", {}),
             }
-            self.manager.add_process(name, data["cmd"], env=env)
+            self.poncho.add_process(name, data["cmd"], env=env)
 
 
 cli.add_command(db_cli)

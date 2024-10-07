@@ -231,23 +231,6 @@ testing = ["coverage", "eventlet", "gevent", "pytest", "pytest-cov"]
 tornado = ["tornado (>=0.2)"]
 
 [[package]]
-name = "honcho"
-version = "1.1.0"
-description = "Honcho: a Python clone of Foreman. For managing Procfile-based applications."
-optional = false
-python-versions = "*"
-files = [
-    {file = "honcho-1.1.0-py2.py3-none-any.whl", hash = "sha256:a4d6e3a88a7b51b66351ecfc6e9d79d8f4b87351db9ad7e923f5632cc498122f"},
-    {file = "honcho-1.1.0.tar.gz", hash = "sha256:c5eca0bded4bef6697a23aec0422fd4f6508ea3581979a3485fc4b89357eb2a9"},
-]
-
-[package.dependencies]
-colorama = {version = "*", markers = "sys_platform == \"win32\""}
-
-[package.extras]
-export = ["jinja2 (>=2.7,<3)"]
-
-[[package]]
 name = "idna"
 version = "3.10"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -819,4 +802,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "d16933f1fe1e904102f21565e82447823af44d49b4deb6e3e3271397c3c12129"
+content-hash = "a6404b694b17184a1e26f52da6846f154437af43bdea56274497309ecbd955ac"
