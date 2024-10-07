@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 import tomllib
-from honcho.manager import Manager as HonchoManager
+from poncho.poncho import Manager as PonchoManager
 
 from plain.runtime import APP_PATH
 
@@ -31,7 +31,7 @@ class Services:
         )
 
     def __init__(self):
-        self.manager = HonchoManager()
+        self.poncho = PonchoManager()
 
     def run(self):
         services = self.get_services(APP_PATH.parent)
@@ -41,9 +41,9 @@ class Services:
                 "PYTHONUNBUFFERED": "true",
                 **data.get("env", {}),
             }
-            self.manager.add_process(name, data["cmd"], env=env)
+            self.poncho.add_process(name, data["cmd"], env=env)
 
-        self.manager.loop()
+        self.poncho.loop()
 
     def __enter__(self):
         if not self.get_services(APP_PATH.parent):
