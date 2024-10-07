@@ -3,6 +3,7 @@ import os
 import platform
 import subprocess
 import sys
+from importlib.metadata import entry_points
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -16,7 +17,9 @@ from .mkcert import MkcertManager
 from .pid import Pid
 from .poncho.manager import Manager as PonchoManager
 from .services import Services
-from .utils import has_pyproject_toml, plainpackage_installed
+from .utils import has_pyproject_toml
+
+ENTRYPOINT_GROUP = "plain.dev"
 
 
 @click.group(invoke_without_command=True)
@@ -44,6 +47,24 @@ def cli(ctx, port):
 def services():
     """Start additional services defined in pyproject.toml"""
     Services().run()
+
+
+@cli.command()
+@click.option(
+    "--list", "-l", "show_list", is_flag=True, help="List available entrypoints"
+)
+@click.argument("entrypoint", required=False)
+def entrypoint(show_list, entrypoint):
+    f"""Entrypoints registered under {ENTRYPOINT_GROUP}"""
+    if not show_list and not entrypoint:
+        click.secho("Please provide an entrypoint name or use --list", fg="red")
+        sys.exit(1)
+
+    for entry_point in entry_points().select(group=ENTRYPOINT_GROUP):
+        if show_list:
+            click.echo(entry_point.name)
+        elif entrypoint == entry_point.name:
+            entry_point.load()()
 
 
 class Dev:
@@ -82,7 +103,7 @@ class Dev:
 
             # Processes for poncho to run simultaneously
             self.add_gunicorn()
-            self.add_tailwind()
+            self.add_entrypoints()
             self.add_pyproject_run()
             self.add_services()
 
@@ -230,11 +251,11 @@ class Dev:
 
         self.poncho.add_process("plain", runserver_cmd, env=self.plain_env)
 
-    def add_tailwind(self):
-        if not plainpackage_installed("tailwind"):
-            return
-
-        self.poncho.add_process("tailwind", "plain tailwind compile --watch")
+    def add_entrypoints(self):
+        for entry_point in entry_points().select(group=ENTRYPOINT_GROUP):
+            self.poncho.add_process(
+                f"plain dev entrypoint {entry_point.name}", env=self.plain_env
+            )
 
     def add_pyproject_run(self):
         if not has_pyproject_toml(APP_PATH.parent):

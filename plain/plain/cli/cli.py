@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+from importlib.metadata import entry_points
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -286,17 +287,10 @@ def compile(keep_original, fingerprint, compress):
         )
         sys.exit(1)
 
-    # TODO make this an entrypoint instead
-    # Compile our Tailwind CSS (including templates in plain itself)
-    if find_spec("plain.tailwind") is not None:
-        click.secho("Compiling Tailwind CSS", bold=True)
-        result = subprocess.run(["plain", "tailwind", "compile", "--minify"])
+    for entry_point in entry_points(group="plain.assets.compile"):
+        click.secho(f"Running {entry_point.name}", bold=True)
+        result = entry_point.load()()
         print()
-        if result.returncode:
-            click.secho(
-                f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red"
-            )
-            sys.exit(result.returncode)
 
     # TODO also look in [tool.plain.compile.run]
 
