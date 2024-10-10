@@ -1,3 +1,5 @@
+import re
+
 from plain.http import ResponsePermanentRedirect
 from plain.runtime import settings
 from plain.urls import is_valid_path
@@ -7,6 +9,11 @@ from plain.utils.http import escape_leading_slashes
 class CommonMiddleware:
     """
     "Common" middleware for taking care of some basic operations:
+
+        - Redirecting to HTTPS: Based on the HTTPS_REDIRECT_ENABLED setting,
+            redirect to HTTPS if the request is not secure.
+
+        - Default response headers: Add default headers to responses.
 
         - URL rewriting: Based on the APPEND_SLASH setting,
           append missing slashes.
@@ -26,15 +33,24 @@ class CommonMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
+        # Settings for https (compile regexes once)
+        self.https_redirect_enabled = settings.HTTPS_REDIRECT_ENABLED
+        self.https_redirect_host = settings.HTTPS_REDIRECT_HOST
+        self.https_redirect_exempt = [
+            re.compile(r) for r in settings.HTTPS_REDIRECT_EXEMPT
+        ]
+
     def __call__(self, request):
         """
         Rewrite the URL based on settings.APPEND_SLASH
         """
 
+        if redirect_response := self.maybe_https_redirect(request):
+            return redirect_response
+
         response = self.get_response(request)
 
-        for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():
-            response.headers.setdefault(header, value)
+        self.set_default_headers(response)
 
         """
         When the status code of the response is 404, it may redirect to a path
@@ -51,6 +67,20 @@ class CommonMiddleware:
             response.headers["Content-Length"] = str(len(response.content))
 
         return response
+
+    def maybe_https_redirect(self, request):
+        path = request.path.lstrip("/")
+        if (
+            self.https_redirect_enabled
+            and not request.is_https()
+            and not any(pattern.search(path) for pattern in self.https_redirect_exempt)
+        ):
+            host = self.https_redirect_host or request.get_host()
+            return ResponsePermanentRedirect(f"https://{host}{request.get_full_path()}")
+
+    def set_default_headers(self, response):
+        for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():
+            response.headers.setdefault(header, value)
 
     def should_redirect_with_slash(self, request):
         """

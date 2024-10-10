@@ -49,7 +49,6 @@ INSTALLED_PACKAGES = [
 ]
 
 MIDDLEWARE = [
-    "plain.middleware.https.HttpsRedirectMiddleware",
     "plain.sessions.middleware.SessionMiddleware",
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",

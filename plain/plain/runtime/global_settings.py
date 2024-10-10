@@ -45,6 +45,11 @@ DEFAULT_RESPONSE_HEADERS = {
     "X-Frame-Options": "DENY",
 }
 
+# Whether to redirect all non-HTTPS requests to HTTPS.
+HTTPS_REDIRECT_ENABLED = True
+HTTPS_REDIRECT_EXEMPT = []
+HTTPS_REDIRECT_HOST = None
+
 # A secret key for this particular Plain installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Plain will complain
 # loudly.
@@ -106,7 +111,6 @@ SECURE_PROXY_SSL_HEADER = None
 # middleware will be applied in the order given, and in the response
 # phase the middleware will be applied in reverse order.
 MIDDLEWARE = [
-    "plain.middleware.https.HttpsRedirectMiddleware",
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",
 ]
@@ -160,13 +164,6 @@ ASSETS_BASE_URL: str = ""
 # serious issues like errors and criticals does not result in hiding the
 # message, but Plain will not stop you from e.g. running server.
 SILENCED_PREFLIGHT_CHECKS = []
-
-#######################
-# HTTPS MIDDLEWARE #
-#######################
-HTTPS_REDIRECT_ENABLED = True
-HTTPS_REDIRECT_EXEMPT = []
-HTTPS_REDIRECT_HOST = None
 
 #############
 # Templates #

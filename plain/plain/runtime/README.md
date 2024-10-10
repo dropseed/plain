@@ -54,7 +54,6 @@ SECRET_KEY = environ["SECRET_KEY"]
 DEBUG = environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
 
 MIDDLEWARE = [
-    "plain.middleware.https.HttpsRedirectMiddleware",
     "plain.sessions.middleware.SessionMiddleware",
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",

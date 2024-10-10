@@ -16,6 +16,7 @@ SECRET_KEY_WARNING_MSG = (
     f"vulnerable to attack."
 )
 
+# TODO
 W001 = Warning(
     "You do not have 'plain.middleware.https.HttpsRedirectMiddleware' "
     "in your MIDDLEWARE so the SECURE_HSTS_SECONDS, "
@@ -50,22 +51,6 @@ W020 = Warning(
 )
 
 W025 = Warning(SECRET_KEY_WARNING_MSG, id="security.W025")
-
-
-def _security_middleware():
-    return "plain.middleware.https.HttpsRedirectMiddleware" in settings.MIDDLEWARE
-
-
-@register(deploy=True)
-def check_security_middleware(package_configs, **kwargs):
-    passed_check = _security_middleware()
-    return [] if passed_check else [W001]
-
-
-@register(deploy=True)
-def check_ssl_redirect(package_configs, **kwargs):
-    passed_check = not _security_middleware() or settings.HTTPS_REDIRECT_ENABLED is True
-    return [] if passed_check else [W008]
 
 
 def _check_secret_key(secret_key):
