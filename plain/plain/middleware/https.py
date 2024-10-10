@@ -4,12 +4,12 @@ from plain.http import ResponsePermanentRedirect
 from plain.runtime import settings
 
 
-class SecurityMiddleware:
+class HttpsRedirectMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.redirect = settings.SECURE_SSL_REDIRECT
-        self.redirect_host = settings.SECURE_SSL_HOST
-        self.redirect_exempt = [re.compile(r) for r in settings.SECURE_REDIRECT_EXEMPT]
+        self.redirect = settings.HTTPS_REDIRECT_ENABLED
+        self.redirect_host = settings.HTTPS_REDIRECT_HOST
+        self.redirect_exempt = [re.compile(r) for r in settings.HTTPS_REDIRECT_EXEMPT]
 
     def __call__(self, request):
         path = request.path.lstrip("/")

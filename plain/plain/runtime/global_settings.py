@@ -106,7 +106,7 @@ SECURE_PROXY_SSL_HEADER = None
 # middleware will be applied in the order given, and in the response
 # phase the middleware will be applied in reverse order.
 MIDDLEWARE = [
-    "plain.middleware.security.SecurityMiddleware",
+    "plain.middleware.https.HttpsRedirectMiddleware",
     "plain.middleware.common.CommonMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",
 ]
@@ -162,11 +162,11 @@ ASSETS_BASE_URL: str = ""
 SILENCED_PREFLIGHT_CHECKS = []
 
 #######################
-# SECURITY MIDDLEWARE #
+# HTTPS MIDDLEWARE #
 #######################
-SECURE_REDIRECT_EXEMPT = []
-SECURE_SSL_HOST = None
-SECURE_SSL_REDIRECT = True
+HTTPS_REDIRECT_ENABLED = True
+HTTPS_REDIRECT_EXEMPT = []
+HTTPS_REDIRECT_HOST = None
 
 #############
 # Templates #

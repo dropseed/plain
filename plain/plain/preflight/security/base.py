@@ -17,16 +17,16 @@ SECRET_KEY_WARNING_MSG = (
 )
 
 W001 = Warning(
-    "You do not have 'plain.middleware.security.SecurityMiddleware' "
+    "You do not have 'plain.middleware.https.HttpsRedirectMiddleware' "
     "in your MIDDLEWARE so the SECURE_HSTS_SECONDS, "
     "SECURE_CONTENT_TYPE_NOSNIFF, SECURE_REFERRER_POLICY, "
-    "SECURE_CROSS_ORIGIN_OPENER_POLICY, and SECURE_SSL_REDIRECT settings will "
+    "SECURE_CROSS_ORIGIN_OPENER_POLICY, and HTTPS_REDIRECT_ENABLED settings will "
     "have no effect.",
     id="security.W001",
 )
 
 W008 = Warning(
-    "Your SECURE_SSL_REDIRECT setting is not set to True. "
+    "Your HTTPS_REDIRECT_ENABLED setting is not set to True. "
     "Unless your site should be available over both SSL and non-SSL "
     "connections, you may want to either set this setting True "
     "or configure a load balancer or reverse-proxy server "
@@ -53,7 +53,7 @@ W025 = Warning(SECRET_KEY_WARNING_MSG, id="security.W025")
 
 
 def _security_middleware():
-    return "plain.middleware.security.SecurityMiddleware" in settings.MIDDLEWARE
+    return "plain.middleware.https.HttpsRedirectMiddleware" in settings.MIDDLEWARE
 
 
 @register(deploy=True)
@@ -64,7 +64,7 @@ def check_security_middleware(package_configs, **kwargs):
 
 @register(deploy=True)
 def check_ssl_redirect(package_configs, **kwargs):
-    passed_check = not _security_middleware() or settings.SECURE_SSL_REDIRECT is True
+    passed_check = not _security_middleware() or settings.HTTPS_REDIRECT_ENABLED is True
     return [] if passed_check else [W008]
 
 
