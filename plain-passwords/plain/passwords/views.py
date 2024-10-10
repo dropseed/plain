@@ -62,7 +62,7 @@ def update_session_auth_hash(request, user):
 
 #     def form_valid(self, form):
 #         opts = {
-#             "use_https": self.request.is_secure(),
+#             "use_https": self.request.is_https(),
 #             "token_generator": self.token_generator,
 #             "from_email": self.from_email,
 #             "email_template_name": self.email_template_name,

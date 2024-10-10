@@ -15,7 +15,7 @@ class HttpsRedirectMiddleware:
         path = request.path.lstrip("/")
         if (
             self.redirect
-            and not request.is_secure()
+            and not request.is_https()
             and not any(pattern.search(path) for pattern in self.redirect_exempt)
         ):
             host = self.redirect_host or request.get_host()

@@ -289,7 +289,7 @@ class CsrfViewMiddleware:
             pass
         else:
             good_origin = "{}://{}".format(
-                "https" if request.is_secure() else "http",
+                "https" if request.is_https() else "http",
                 good_host,
             )
             if request_origin == good_origin:
@@ -435,7 +435,7 @@ class CsrfViewMiddleware:
                 return self._reject(
                     request, REASON_BAD_ORIGIN % request.META["HTTP_ORIGIN"]
                 )
-        elif request.is_secure():
+        elif request.is_https():
             # If the Origin header wasn't provided, reject HTTPS requests if
             # the Referer header doesn't match an allowed value.
             #
