@@ -33,6 +33,9 @@ class CommonMiddleware:
 
         response = self.get_response(request)
 
+        for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():
+            response.headers.setdefault(header, value)
+
         """
         When the status code of the response is 404, it may redirect to a path
         with an appended slash if should_redirect_with_slash() returns True.

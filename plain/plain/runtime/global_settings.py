@@ -34,6 +34,17 @@ INSTALLED_PACKAGES: list = []
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
 
+# Default headers for all responses.
+DEFAULT_RESPONSE_HEADERS = {
+    # "Content-Security-Policy": "default-src 'self'",
+    # https://hstspreload.org/
+    # "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Referrer-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+
 # A secret key for this particular Plain installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Plain will complain
 # loudly.
@@ -156,16 +167,6 @@ SILENCED_PREFLIGHT_CHECKS = []
 SECURE_REDIRECT_EXEMPT = []
 SECURE_SSL_HOST = None
 SECURE_SSL_REDIRECT = True
-
-SECURE_DEFAULT_HEADERS = {
-    # "Content-Security-Policy": "default-src 'self'",
-    # https://hstspreload.org/
-    # "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-    "Cross-Origin-Opener-Policy": "same-origin",
-    "Referrer-Policy": "same-origin",
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-}
 
 #############
 # Templates #

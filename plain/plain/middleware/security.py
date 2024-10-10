@@ -11,8 +11,6 @@ class SecurityMiddleware:
         self.redirect_host = settings.SECURE_SSL_HOST
         self.redirect_exempt = [re.compile(r) for r in settings.SECURE_REDIRECT_EXEMPT]
 
-        self.default_headers = settings.SECURE_DEFAULT_HEADERS
-
     def __call__(self, request):
         path = request.path.lstrip("/")
         if (
@@ -23,9 +21,4 @@ class SecurityMiddleware:
             host = self.redirect_host or request.get_host()
             return ResponsePermanentRedirect(f"https://{host}{request.get_full_path()}")
 
-        response = self.get_response(request)
-
-        for header, value in self.default_headers.items():
-            response.headers.setdefault(header, value)
-
-        return response
+        return self.get_response(request)
