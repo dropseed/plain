@@ -81,38 +81,22 @@ class Dev:
             "PYTHONPATH": os.path.join(APP_PATH.parent, "app"),
         }
         self.project_name = os.path.basename(os.getcwd())
+        self.domain = f"{self.project_name}.localhost"
         self.ssl_cert_path = None
         self.ssl_key_path = None
-
-        self.is_codespace = "CODESPACES" in os.environ
-
-        if self.is_codespace:
-            codespace_name = os.environ["CODESPACE_NAME"]
-            codespace_forward_domain = os.environ[
-                "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"
-            ]
-            self.domain = f"{codespace_name}-{self.port}.{codespace_forward_domain}"
-            self.url = f"https://{self.domain}/"
-            self.gunicorn_bind = f"127.0.0.1:{self.port}"
-        else:
-            self.domain = f"{self.project_name}.localhost"
-            self.url = f"https://{self.domain}:{self.port}/"
-            self.gunicorn_bind = f"{self.domain}:{self.port}"
 
     def run(self):
         pid = Pid()
         pid.write()
 
         try:
-            if not self.is_codespace:
-                mkcert_manager = MkcertManager()
-                mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
-                self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
-                    domain=self.domain,
-                    storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
-                )
-                self.modify_hosts_file()
-
+            mkcert_manager = MkcertManager()
+            mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
+            self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
+                domain=self.domain,
+                storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
+            )
+            self.modify_hosts_file()
             self.set_csrf_and_allowed_hosts()
             self.run_preflight()
 
@@ -123,8 +107,9 @@ class Dev:
             self.add_services()
 
             # Output the clickable link before starting the manager loop
+            url = f"https://{self.domain}:{self.port}/"
             click.secho(
-                f"\nYour app will run at: {click.style(self.url, fg='green', underline=True)}\n",
+                f"\nYour app will run at: {click.style(url, fg='green', underline=True)}\n",
                 bold=True,
             )
 
@@ -230,7 +215,11 @@ class Dev:
         gunicorn_cmd = [
             "gunicorn",
             "--bind",
-            self.gunicorn_bind,
+            f"{self.domain}:{self.port}",
+            "--certfile",
+            str(self.ssl_cert_path),
+            "--keyfile",
+            str(self.ssl_key_path),
             "--reload",
             "plain.wsgi:app",
             "--timeout",
@@ -245,15 +234,6 @@ class Dev:
             "--log-config-json",
             str(Path(__file__).parent / "gunicorn_logging.json"),
         ]
-
-        if self.ssl_cert_path and self.ssl_key_path:
-            gunicorn_cmd += [
-                "--certfile",
-                str(self.ssl_cert_path),
-                "--keyfile",
-                str(self.ssl_key_path),
-            ]
-
         gunicorn = " ".join(gunicorn_cmd)
 
         if plain_db_installed:
