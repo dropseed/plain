@@ -93,7 +93,7 @@ class Dev:
             ]
             self.domain = f"{codespace_name}-{self.port}.{codespace_forward_domain}"
             self.url = f"https://{self.domain}/"
-            self.gunicorn_bind = str(self.port)
+            self.gunicorn_bind = f"127.0.0.1:{self.port}"
         else:
             self.domain = f"{self.project_name}.localhost"
             self.url = f"https://{self.domain}:{self.port}/"
