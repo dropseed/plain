@@ -130,6 +130,14 @@ class Dependency:
         if self.sourcemap:
             dependencies[self.name]["sourcemap"] = self.sourcemap
 
+        # Have to give it the right structure in case they don't exist
+        if "tool" not in pyproject:
+            pyproject["tool"] = tomlkit.table()
+        if "plain" not in pyproject["tool"]:
+            pyproject["tool"]["plain"] = tomlkit.table()
+        if "vendor" not in pyproject["tool"]["plain"]:
+            pyproject["tool"]["plain"]["vendor"] = tomlkit.table()
+
         pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies
 
         with open("pyproject.toml", "w") as f:
