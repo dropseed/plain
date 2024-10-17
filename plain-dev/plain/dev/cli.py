@@ -97,8 +97,7 @@ class Dev:
                 storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
             )
             self.modify_hosts_file()
-            self.set_csrf_trusted_origins()
-            self.set_allowed_hosts()
+            self.set_csrf_and_allowed_hosts()
             self.run_preflight()
 
             # Processes for poncho to run simultaneously
@@ -110,9 +109,11 @@ class Dev:
             # Output the clickable link before starting the manager loop
             url = f"https://{self.domain}:{self.port}/"
             click.secho(
-                f"\nYour application is running at: {click.style(url, fg='green', underline=True)}\n",
+                f"\nYour app will run at: {click.style(url, fg='green', underline=True)}\n",
                 bold=True,
             )
+
+            click.secho("Starting services (Ctrl+C to stop):", italic=True, dim=True)
 
             self.poncho.loop()
 
@@ -156,12 +157,12 @@ class Dev:
 
                 # Entry does not exist; append it using sudo
                 click.secho(
-                    "Modifying /etc/hosts file. You may be prompted for your password.",
+                    "Modifying /etc/hosts file. You may be prompted for your password.\n",
                     bold=True,
                 )
                 cmd = f"echo '{hosts_entry}' | sudo tee -a {hosts_path} >/dev/null"
                 subprocess.run(cmd, shell=True, check=True)
-                click.secho(f"Added {self.domain} to {hosts_path}", bold=True)
+                click.secho(f"Added {self.domain} to {hosts_path}\n", bold=True)
             except PermissionError:
                 click.secho(
                     "Permission denied while accessing hosts file.",
@@ -175,35 +176,28 @@ class Dev:
                 )
                 sys.exit(1)
 
-    def set_csrf_trusted_origins(self):
+    def set_csrf_and_allowed_hosts(self):
         csrf_trusted_origins = json.dumps(
             [
                 f"https://{self.domain}:{self.port}",
             ]
         )
-
-        click.secho(
-            f"Automatically set PLAIN_CSRF_TRUSTED_ORIGINS={click.style(csrf_trusted_origins, underline=True)}",
-            bold=True,
-        )
+        allowed_hosts = json.dumps([self.domain])
 
         # Set environment variables
         self.plain_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
         self.custom_process_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
 
-    def set_allowed_hosts(self):
-        allowed_hosts = json.dumps([self.domain])
-
-        click.secho(
-            f"Automatically set PLAIN_ALLOWED_HOSTS={click.style(allowed_hosts, underline=True)}",
-            bold=True,
-        )
-
-        # Set environment variables
         self.plain_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
         self.custom_process_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
 
+        click.secho(
+            f"Automatically set PLAIN_ALLOWED_HOSTS={allowed_hosts} PLAIN_CSRF_TRUSTED_ORIGINS={csrf_trusted_origins}",
+            dim=True,
+        )
+
     def run_preflight(self):
+        click.echo()
         if subprocess.run(["plain", "preflight"], env=self.plain_env).returncode:
             click.secho("Preflight check failed!", fg="red")
             sys.exit(1)
@@ -237,6 +231,8 @@ class Dev:
             *reload_extra.split(),
             "--access-logformat",
             "'\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'",
+            "--log-config-json",
+            str(Path(__file__).parent / "gunicorn_logging.json"),
         ]
         gunicorn = " ".join(gunicorn_cmd)
 

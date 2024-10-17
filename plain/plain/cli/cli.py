@@ -251,7 +251,7 @@ def preflight_checks(package_label, deploy, fail_level, databases):
             msg = header + body + footer
             click.echo(msg, err=True)
         else:
-            click.echo("Preflight check identified no issues.", err=True)
+            click.secho("✔ Preflight check identified no issues.", err=True, fg="green")
 
 
 @plain_cli.command()
