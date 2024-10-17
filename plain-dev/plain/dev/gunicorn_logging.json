@@ -13,7 +13,7 @@
             "handlers": [
                 "error_console"
             ],
-            "propagate": true,
+            "propagate": false,
             "qualname": "gunicorn.error"
         },
         "gunicorn.access": {
@@ -21,7 +21,7 @@
             "handlers": [
                 "console"
             ],
-            "propagate": true,
+            "propagate": false,
             "qualname": "gunicorn.access"
         }
     },
