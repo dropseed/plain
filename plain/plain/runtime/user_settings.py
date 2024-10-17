@@ -41,7 +41,7 @@ class Settings:
 
         # Determine the settings module
         if self._settings_module is None:
-            self._settings_module = os.environ.get(ENVIRONMENT_VARIABLE, "settings")
+            self._settings_module = os.environ.get(ENVIRONMENT_VARIABLE, "app.settings")
 
         # First load the global settings from plain
         self._load_module_settings(

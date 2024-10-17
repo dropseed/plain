@@ -16,7 +16,6 @@ except importlib.metadata.PackageNotFoundError:
 # Made available without setup or settings
 APP_PATH = Path.cwd() / "app"
 
-
 # from plain.runtime import settings
 settings = Settings()
 
@@ -38,9 +37,11 @@ def setup():
             "No app directory found. Are you sure you're in a Plain project?"
         )
 
-    # Automatically put the app dir on the Python path for convenience
-    if APP_PATH not in sys.path:
-        sys.path.insert(0, APP_PATH.as_posix())
+    # Automatically put the project dir on the Python path
+    # which doesn't otherwise happen when you run `plain` commands.
+    # This makes "app.<module>" imports and relative imports work.
+    if APP_PATH.parent not in sys.path:
+        sys.path.insert(0, APP_PATH.parent.as_posix())
 
     # Load .env files automatically before settings
     if app_env := environ.get("PLAIN_ENV", ""):

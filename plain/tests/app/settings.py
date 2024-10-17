@@ -2,7 +2,7 @@ SECRET_KEY = "secret"
 DEBUG = True
 
 INSTALLED_PACKAGES = [
-    "test",
+    "app.test",
 ]
 
 EXPLICIT_SETTING = "explicitly changed"

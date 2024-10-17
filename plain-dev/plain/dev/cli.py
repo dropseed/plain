@@ -78,7 +78,6 @@ class Dev:
         self.custom_process_env = {
             **self.plain_env,
             "PORT": str(self.port),
-            "PYTHONPATH": os.path.join(APP_PATH.parent, "app"),
         }
         self.project_name = os.path.basename(os.getcwd())
         self.domain = f"{self.project_name}.localhost"

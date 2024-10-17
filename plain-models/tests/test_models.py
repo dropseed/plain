@@ -1,5 +1,5 @@
 import pytest
-from examples.models import Car
+from app.examples.models import Car
 
 from plain.exceptions import ValidationError
 

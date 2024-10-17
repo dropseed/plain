@@ -6,7 +6,7 @@ INSTALLED_PACKAGES = [
     "plain.htmx",
     "plain.tailwind",
     "plain.staff",
-    "users",
+    "app.users",
 ]
 DATABASES = {
     "default": {

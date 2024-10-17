@@ -59,7 +59,7 @@ SECRET_KEY: str
 # secret key rotation.
 SECRET_KEY_FALLBACKS: list[str] = []
 
-ROOT_URLCONF = "urls"
+ROOT_URLCONF = "app.urls"
 
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [

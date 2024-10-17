@@ -1,7 +1,7 @@
 SECRET_KEY = "test"
 INSTALLED_PACKAGES = [
     "plain.models",
-    "examples",
+    "app.examples",
 ]
 DATABASES = {
     "default": {
