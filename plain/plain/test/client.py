@@ -379,7 +379,7 @@ class RequestFactory:
         # Refs comment in `get_bytes_from_wsgi()`.
         return path.decode("iso-8859-1")
 
-    def get(self, path, data=None, secure=False, *, headers=None, **extra):
+    def get(self, path, data=None, secure=True, *, headers=None, **extra):
         """Construct a GET request."""
         data = {} if data is None else data
         return self.generic(
@@ -398,7 +398,7 @@ class RequestFactory:
         path,
         data=None,
         content_type=MULTIPART_CONTENT,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -417,7 +417,7 @@ class RequestFactory:
             **extra,
         )
 
-    def head(self, path, data=None, secure=False, *, headers=None, **extra):
+    def head(self, path, data=None, secure=True, *, headers=None, **extra):
         """Construct a HEAD request."""
         data = {} if data is None else data
         return self.generic(
@@ -431,7 +431,7 @@ class RequestFactory:
             },
         )
 
-    def trace(self, path, secure=False, *, headers=None, **extra):
+    def trace(self, path, secure=True, *, headers=None, **extra):
         """Construct a TRACE request."""
         return self.generic("TRACE", path, secure=secure, headers=headers, **extra)
 
@@ -440,7 +440,7 @@ class RequestFactory:
         path,
         data="",
         content_type="application/octet-stream",
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -455,7 +455,7 @@ class RequestFactory:
         path,
         data="",
         content_type="application/octet-stream",
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -471,7 +471,7 @@ class RequestFactory:
         path,
         data="",
         content_type="application/octet-stream",
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -487,7 +487,7 @@ class RequestFactory:
         path,
         data="",
         content_type="application/octet-stream",
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -504,7 +504,7 @@ class RequestFactory:
         path,
         data="",
         content_type="application/octet-stream",
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -704,7 +704,7 @@ class Client(ClientMixin, RequestFactory):
         path,
         data=None,
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -725,7 +725,7 @@ class Client(ClientMixin, RequestFactory):
         data=None,
         content_type=MULTIPART_CONTENT,
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -752,7 +752,7 @@ class Client(ClientMixin, RequestFactory):
         path,
         data=None,
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -775,7 +775,7 @@ class Client(ClientMixin, RequestFactory):
         data="",
         content_type="application/octet-stream",
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -803,7 +803,7 @@ class Client(ClientMixin, RequestFactory):
         data="",
         content_type="application/octet-stream",
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -831,7 +831,7 @@ class Client(ClientMixin, RequestFactory):
         data="",
         content_type="application/octet-stream",
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -859,7 +859,7 @@ class Client(ClientMixin, RequestFactory):
         data="",
         content_type="application/octet-stream",
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
@@ -886,7 +886,7 @@ class Client(ClientMixin, RequestFactory):
         path,
         data="",
         follow=False,
-        secure=False,
+        secure=True,
         *,
         headers=None,
         **extra,
