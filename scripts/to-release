@@ -46,8 +46,8 @@ def get_commits_since_version_change(repo_path, package_path):
         last_version_commit = commits[-1] if commits else None
 
     if last_version_commit:
-        # Get all commits since the last version change
-        log_command = f'git log --format="%H %s" {last_version_commit}..HEAD -- {package_path.relative_to(repo_path)}'
+        # Get all commits since the last version change, excluding changes in the tests directory
+        log_command = f'git log --format="%H %s" {last_version_commit}..HEAD -- {package_path.relative_to(repo_path)} ":(exclude){package_path.relative_to(repo_path)}/tests"'
         commits_since_version_change = run_git_command(log_command, repo_path).split('\n')
         return [commit.split(' ', 1) for commit in commits_since_version_change if commit]
     else:
