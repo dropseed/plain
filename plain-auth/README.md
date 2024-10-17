@@ -23,10 +23,8 @@ INSTALLED_PACKAGES = [
 ]
 
 MIDDLEWARE = [
-    "plain.sessions.middleware.SessionMiddleware",  # <--
-    "plain.middleware.common.CommonMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
-    "plain.auth.middleware.AuthenticationMiddleware",  # <--
+    "plain.sessions.middleware.SessionMiddleware",
+    "plain.auth.middleware.AuthenticationMiddleware",
 ]
 
 AUTH_USER_MODEL = "users.User"

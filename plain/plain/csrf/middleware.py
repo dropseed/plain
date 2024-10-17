@@ -9,7 +9,7 @@ import string
 from collections import defaultdict
 from urllib.parse import urlparse
 
-from plain.exceptions import DisallowedHost, ImproperlyConfigured
+from plain.exceptions import DisallowedHost
 from plain.http import HttpHeaders, UnreadablePostError
 from plain.logs import log_response
 from plain.runtime import settings
@@ -242,44 +242,31 @@ class CsrfViewMiddleware:
         If the CSRF_USE_SESSIONS setting is false, raises InvalidTokenFormat if
         the request's secret has invalid characters or an invalid length.
         """
-        if settings.CSRF_USE_SESSIONS:
-            try:
-                csrf_secret = request.session.get(CSRF_SESSION_KEY)
-            except AttributeError:
-                raise ImproperlyConfigured(
-                    "CSRF_USE_SESSIONS is enabled, but request.session is not "
-                    "set. SessionMiddleware must appear before CsrfViewMiddleware "
-                    "in MIDDLEWARE."
-                )
+        try:
+            csrf_secret = request.COOKIES[settings.CSRF_COOKIE_NAME]
+        except KeyError:
+            csrf_secret = None
         else:
-            try:
-                csrf_secret = request.COOKIES[settings.CSRF_COOKIE_NAME]
-            except KeyError:
-                csrf_secret = None
-            else:
-                # This can raise InvalidTokenFormat.
-                _check_token_format(csrf_secret)
+            # This can raise InvalidTokenFormat.
+            _check_token_format(csrf_secret)
+
         if csrf_secret is None:
             return None
         return csrf_secret
 
     def _set_csrf_cookie(self, request, response):
-        if settings.CSRF_USE_SESSIONS:
-            if request.session.get(CSRF_SESSION_KEY) != request.META["CSRF_COOKIE"]:
-                request.session[CSRF_SESSION_KEY] = request.META["CSRF_COOKIE"]
-        else:
-            response.set_cookie(
-                settings.CSRF_COOKIE_NAME,
-                request.META["CSRF_COOKIE"],
-                max_age=settings.CSRF_COOKIE_AGE,
-                domain=settings.CSRF_COOKIE_DOMAIN,
-                path=settings.CSRF_COOKIE_PATH,
-                secure=settings.CSRF_COOKIE_SECURE,
-                httponly=settings.CSRF_COOKIE_HTTPONLY,
-                samesite=settings.CSRF_COOKIE_SAMESITE,
-            )
-            # Set the Vary header since content varies with the CSRF cookie.
-            patch_vary_headers(response, ("Cookie",))
+        response.set_cookie(
+            settings.CSRF_COOKIE_NAME,
+            request.META["CSRF_COOKIE"],
+            max_age=settings.CSRF_COOKIE_AGE,
+            domain=settings.CSRF_COOKIE_DOMAIN,
+            path=settings.CSRF_COOKIE_PATH,
+            secure=settings.CSRF_COOKIE_SECURE,
+            httponly=settings.CSRF_COOKIE_HTTPONLY,
+            samesite=settings.CSRF_COOKIE_SAMESITE,
+        )
+        # Set the Vary header since content varies with the CSRF cookie.
+        patch_vary_headers(response, ("Cookie",))
 
     def _origin_verified(self, request):
         request_origin = request.META["HTTP_ORIGIN"]
@@ -331,11 +318,7 @@ class CsrfViewMiddleware:
         ):
             return
         # Allow matching the configured cookie domain.
-        good_referer = (
-            settings.SESSION_COOKIE_DOMAIN
-            if settings.CSRF_USE_SESSIONS
-            else settings.CSRF_COOKIE_DOMAIN
-        )
+        good_referer = settings.CSRF_COOKIE_DOMAIN
         if good_referer is None:
             # If no cookie domain is configured, allow matching the current
             # host:port exactly if it's permitted by ALLOWED_HOSTS.

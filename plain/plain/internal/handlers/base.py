@@ -13,6 +13,15 @@ from .exception import convert_exception_to_response
 logger = logging.getLogger("plain.request")
 
 
+# These middleware classes are always used by Plain.
+BUILTIN_MIDDLEWARE = [
+    "plain.internal.middleware.headers.DefaultHeadersMiddleware",
+    "plain.internal.middleware.https.HttpsRedirectMiddleware",
+    "plain.internal.middleware.slash.RedirectSlashMiddleware",
+    "plain.csrf.middleware.CsrfViewMiddleware",
+]
+
+
 class BaseHandler:
     _view_middleware = None
     _middleware_chain = None
@@ -27,7 +36,10 @@ class BaseHandler:
 
         get_response = self._get_response
         handler = convert_exception_to_response(get_response)
-        for middleware_path in reversed(settings.MIDDLEWARE):
+
+        middlewares = reversed(BUILTIN_MIDDLEWARE + settings.MIDDLEWARE)
+
+        for middleware_path in middlewares:
             middleware = import_string(middleware_path)
             mw_instance = middleware(handler)
 

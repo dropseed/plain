@@ -55,8 +55,6 @@ DEBUG = environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
 
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
-    "plain.middleware.common.CommonMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
     "plain.auth.middleware.AuthenticationMiddleware",
 ]
 

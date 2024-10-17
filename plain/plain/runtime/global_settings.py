@@ -29,7 +29,7 @@ TIME_ZONE: str = "UTC"
 DEFAULT_CHARSET = "utf-8"
 
 # List of strings representing installed packages.
-INSTALLED_PACKAGES: list = []
+INSTALLED_PACKAGES: list[str] = []
 
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
@@ -110,10 +110,7 @@ SECURE_PROXY_SSL_HEADER = None
 # List of middleware to use. Order is important; in the request phase, these
 # middleware will be applied in the order given, and in the response
 # phase the middleware will be applied in reverse order.
-MIDDLEWARE = [
-    "plain.middleware.common.CommonMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
-]
+MIDDLEWARE: list[str] = []
 
 ###########
 # SIGNING #
@@ -135,7 +132,6 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 CSRF_TRUSTED_ORIGINS: list[str] = []
-CSRF_USE_SESSIONS = False
 
 ###########
 # LOGGING #
