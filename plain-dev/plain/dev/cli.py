@@ -93,9 +93,11 @@ class Dev:
             ]
             self.domain = f"{codespace_name}-{self.port}.{codespace_forward_domain}"
             self.url = f"https://{self.domain}/"
+            self.gunicorn_bind = str(self.port)
         else:
             self.domain = f"{self.project_name}.localhost"
             self.url = f"https://{self.domain}:{self.port}/"
+            self.gunicorn_bind = f"{self.domain}:{self.port}"
 
     def run(self):
         pid = Pid()
@@ -228,11 +230,7 @@ class Dev:
         gunicorn_cmd = [
             "gunicorn",
             "--bind",
-            f"{self.domain}:{self.port}",
-            "--certfile",
-            str(self.ssl_cert_path),
-            "--keyfile",
-            str(self.ssl_key_path),
+            self.gunicorn_bind,
             "--reload",
             "plain.wsgi:app",
             "--timeout",
@@ -247,6 +245,15 @@ class Dev:
             "--log-config-json",
             str(Path(__file__).parent / "gunicorn_logging.json"),
         ]
+
+        if self.ssl_cert_path and self.ssl_key_path:
+            gunicorn_cmd += [
+                "--certfile",
+                str(self.ssl_cert_path),
+                "--keyfile",
+                str(self.ssl_key_path),
+            ]
+
         gunicorn = " ".join(gunicorn_cmd)
 
         if plain_db_installed:
