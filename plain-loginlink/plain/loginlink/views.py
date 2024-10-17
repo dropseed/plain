@@ -32,6 +32,13 @@ class LoginLinkFormView(FormView):
 class LoginLinkSentView(TemplateView):
     template_name = "loginlink/sent.html"
 
+    def get(self):
+        # Redirect if the user is already logged in
+        if self.request.user:
+            return ResponseRedirect("/")
+
+        return super().get()
+
 
 class LoginLinkFailedView(TemplateView):
     template_name = "loginlink/failed.html"
