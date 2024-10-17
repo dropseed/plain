@@ -90,13 +90,21 @@ class Dev:
         pid.write()
 
         try:
-            mkcert_manager = MkcertManager()
-            mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
-            self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
-                domain=self.domain,
-                storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
-            )
-            self.modify_hosts_file()
+            if "CODESPACES" in os.environ:
+                codespace_name = os.environ["CODESPACE_NAME"]
+                codespace_forward_domain = os.environ[
+                    "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"
+                ]
+                self.domain = f"https://{codespace_name}.{codespace_forward_domain}"
+            else:
+                mkcert_manager = MkcertManager()
+                mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
+                self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
+                    domain=self.domain,
+                    storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
+                )
+                self.modify_hosts_file()
+
             self.set_csrf_and_allowed_hosts()
             self.run_preflight()
 
