@@ -230,7 +230,7 @@ class Dev:
             "-",
             *reload_extra.split(),
             "--access-logformat",
-            "'\"%(r)s\" status=%(s)s length=%(b)s dur=%(M)sms'",
+            "'\"%(r)s\" status=%(s)s length=%(b)s time=%(M)sms'",
             "--log-config-json",
             str(Path(__file__).parent / "gunicorn_logging.json"),
         ]
