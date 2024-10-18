@@ -101,7 +101,7 @@ HTTP_ERROR_VIEWS: dict[int] = {}
 # that header/value, request.is_https() will return True.
 # WARNING! Only set this if you fully understand what you're doing. Otherwise,
 # you may be opening yourself up to a security risk.
-SECURE_PROXY_SSL_HEADER = None
+HTTPS_PROXY_HEADER = None
 
 ##############
 # MIDDLEWARE #

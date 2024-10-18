@@ -267,12 +267,12 @@ class HttpRequest:
 
     @property
     def scheme(self):
-        if settings.SECURE_PROXY_SSL_HEADER:
+        if settings.HTTPS_PROXY_HEADER:
             try:
-                header, secure_value = settings.SECURE_PROXY_SSL_HEADER
+                header, secure_value = settings.HTTPS_PROXY_HEADER
             except ValueError:
                 raise ImproperlyConfigured(
-                    "The SECURE_PROXY_SSL_HEADER setting must be a tuple containing "
+                    "The HTTPS_PROXY_HEADER setting must be a tuple containing "
                     "two values."
                 )
             header_value = self.META.get(header)

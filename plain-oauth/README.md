@@ -299,5 +299,5 @@ then the callback URL might be automatically built as `http` instead of `https`.
 This is the Django setting you're probably looking for:
 
 ```python
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+HTTPS_PROXY_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 ```
