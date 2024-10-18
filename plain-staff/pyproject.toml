@@ -5,7 +5,7 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.4.0"
+version = "0.4.1"
 description = "Staff dashboard and tools for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
