@@ -4,37 +4,27 @@ from typing import TYPE_CHECKING
 
 from jinja2 import nodes
 from jinja2.ext import Extension
-from jinja2.loaders import FileSystemLoader
 
 from plain.runtime import settings
 from plain.utils.functional import cached_property
 
 if TYPE_CHECKING:
-    from jinja2 import Environment
+    pass
 
 
-class ElementsLoader(FileSystemLoader):
-    def get_source(self, environment: "Environment", template: str):
-        contents, path, uptodate = super().get_source(environment, template)
-
-        # Clear elements cache if it looks like a element changed
-        # if os.path.splitext(path)[1] == ".html" and "elements" in path and "template_elements" in self.__dict__:
-        #     del self.__dict__["template_elements"]
-
-        # If it's html or markdown, replace element tags
-        if os.path.splitext(path)[1] in [".html", ".md"]:
-            self._elements_environment = (
-                environment  # Save this so we can use it in template_elements
-            )
-            contents = self.replace_template_element_tags(contents)
-
-        return contents, path, uptodate
+class ElementsExtension(Extension):
+    def preprocess(self, source, name, filename=None):
+        if os.path.splitext(filename)[1] in [".html", ".md"]:
+            return self.replace_template_element_tags(source)
+        return source
 
     @cached_property
     def template_elements(self):
         elements = []
 
-        for searchpath in self.searchpath:
+        loader = self.environment.loader
+
+        for searchpath in loader.searchpath:
             elements_dir = os.path.join(searchpath, "elements")
             if os.path.isdir(elements_dir):
                 for root, dirs, files in os.walk(elements_dir):
@@ -109,7 +99,7 @@ class ElementsLoader(FileSystemLoader):
                     "html_name": element_name,
                 },
             )
-            self._elements_environment.add_extension(NamedElementExtension)
+            self.environment.add_extension(NamedElementExtension)
 
         return elements
 
@@ -166,3 +156,8 @@ class ElementsLoader(FileSystemLoader):
             )
 
         return contents
+
+
+extensions = [
+    ElementsExtension,
+]
