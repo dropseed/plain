@@ -28,6 +28,7 @@ python = "^3.11"
 plain = "<1.0.0"
 click = ">=8.0.0"
 pytest = ">=7.0.0"
+python-dotenv = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 plain = {path = "../plain", develop = true}

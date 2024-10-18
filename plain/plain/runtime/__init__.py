@@ -1,9 +1,7 @@
 import importlib.metadata
 import sys
-from os import environ
+from importlib.metadata import entry_points
 from pathlib import Path
-
-from dotenv import load_dotenv
 
 from .user_settings import Settings
 
@@ -29,6 +27,11 @@ def setup():
     Configure the settings (this happens as a side effect of accessing the
     first setting), configure logging and populate the app registry.
     """
+
+    # Packages can hook into the setup process through an entrypoint.
+    for entry_point in entry_points().select(group="plain.setup"):
+        entry_point.load()()
+
     from plain.logs import configure_logging
     from plain.packages import packages
 
@@ -42,12 +45,6 @@ def setup():
     # This makes "app.<module>" imports and relative imports work.
     if APP_PATH.parent not in sys.path:
         sys.path.insert(0, APP_PATH.parent.as_posix())
-
-    # Load .env files automatically before settings
-    if app_env := environ.get("PLAIN_ENV", ""):
-        load_dotenv(f".env.{app_env}")
-    else:
-        load_dotenv(".env")
 
     configure_logging(settings.LOGGING)
 

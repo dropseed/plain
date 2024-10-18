@@ -20,6 +20,9 @@ repository = "https://github.com/dropseed/plain"
 "pre-commit" = "plain.dev.precommit:cli"
 "contrib" = "plain.dev.contribute:cli"
 
+[tool.poetry.plugins."plain.setup"]
+"dev-dotenv" = "plain.dev.entrypoints:load_dotenv_file"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 
@@ -27,6 +30,8 @@ plain = "<1.0.0"
 
 click = ">=8.0.0"
 debugpy = "^1.6.3"
+
+python-dotenv = "^1.0.0"
 
 # For local runserver
 gunicorn = ">20"
