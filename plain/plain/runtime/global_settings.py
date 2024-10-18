@@ -50,6 +50,20 @@ HTTPS_REDIRECT_ENABLED = True
 HTTPS_REDIRECT_EXEMPT = []
 HTTPS_REDIRECT_HOST = None
 
+# If your Plain app is behind a proxy that sets a header to specify secure
+# connections, AND that proxy ensures that user-submitted headers with the
+# same name are ignored (so that people can't spoof it), set this value to
+# a tuple of (header_name, header_value). For any requests that come in with
+# that header/value, request.is_https() will return True.
+# WARNING! Only set this if you fully understand what you're doing. Otherwise,
+# you may be opening yourself up to a security risk.
+HTTPS_PROXY_HEADER = None
+
+# Whether to use the X-Forwarded-Host and X-Forwarded-Port headers
+# when determining the host and port for the request.
+USE_X_FORWARDED_HOST = False
+USE_X_FORWARDED_PORT = False
+
 # A secret key for this particular Plain installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Plain will complain
 # loudly.
@@ -88,20 +102,8 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 100
 # (i.e. "/tmp" on *nix systems).
 FILE_UPLOAD_TEMP_DIR = None
 
-USE_X_FORWARDED_HOST = False
-USE_X_FORWARDED_PORT = False
-
 # User-defined overrides for error views by status code
 HTTP_ERROR_VIEWS: dict[int] = {}
-
-# If your Plain app is behind a proxy that sets a header to specify secure
-# connections, AND that proxy ensures that user-submitted headers with the
-# same name are ignored (so that people can't spoof it), set this value to
-# a tuple of (header_name, header_value). For any requests that come in with
-# that header/value, request.is_https() will return True.
-# WARNING! Only set this if you fully understand what you're doing. Otherwise,
-# you may be opening yourself up to a security risk.
-HTTPS_PROXY_HEADER = None
 
 ##############
 # MIDDLEWARE #
