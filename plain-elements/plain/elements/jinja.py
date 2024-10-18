@@ -1,15 +1,11 @@
 import os
 import re
-from typing import TYPE_CHECKING
 
 from jinja2 import nodes
 from jinja2.ext import Extension
 
 from plain.runtime import settings
 from plain.utils.functional import cached_property
-
-if TYPE_CHECKING:
-    pass
 
 
 class ElementsExtension(Extension):
