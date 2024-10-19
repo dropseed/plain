@@ -1159,7 +1159,7 @@ class Model(AltersData, metaclass=ModelBase):
         if errors := self._perform_unique_checks(unique_checks):
             raise ValidationError(errors)
 
-    def _get_unique_checks(self, exclude=None, include_meta_constraints=False):
+    def _get_unique_checks(self, exclude=None):
         """
         Return a list of checks to perform. Since validate_unique() could be
         called from a ModelForm, some fields may have been excluded; we can't
@@ -1170,21 +1170,6 @@ class Model(AltersData, metaclass=ModelBase):
         if exclude is None:
             exclude = set()
         unique_checks = []
-
-        constraints = []
-        if include_meta_constraints:
-            constraints = [(self.__class__, self._meta.total_unique_constraints)]
-        for parent_class in self._meta.get_parent_list():
-            if include_meta_constraints and parent_class._meta.total_unique_constraints:
-                constraints.append(
-                    (parent_class, parent_class._meta.total_unique_constraints)
-                )
-
-        if include_meta_constraints:
-            for model_class, model_constraints in constraints:
-                for constraint in model_constraints:
-                    if not any(name in exclude for name in constraint.fields):
-                        unique_checks.append((model_class, constraint.fields))
 
         # Gather a list of checks for fields declared as unique and add them to
         # the list of checks.
@@ -1262,13 +1247,35 @@ class Model(AltersData, metaclass=ModelBase):
             "unique_check": unique_check,
         }
 
-        field = opts.get_field(unique_check[0])
-        params["field_label"] = field.name
-        return ValidationError(
-            message=field.error_messages["unique"],
-            code="unique",
-            params=params,
-        )
+        if len(unique_check) == 1:
+            field = opts.get_field(unique_check[0])
+            params["field_label"] = field.name
+            return ValidationError(
+                message=field.error_messages["unique"],
+                code="unique",
+                params=params,
+            )
+        else:
+            field_names = [opts.get_field(f).name for f in unique_check]
+
+            # Put an "and" before the last one
+            field_names[-1] = f"and {field_names[-1]}"
+
+            if len(field_names) > 2:
+                # Comma join if more than 2
+                params["field_label"] = ", ".join(field_names)
+            else:
+                # Just a space if there are only 2
+                params["field_label"] = " ".join(field_names)
+
+            # Use the first field as the message format...
+            message = opts.get_field(unique_check[0]).error_messages["unique"]
+
+            return ValidationError(
+                message=message,
+                code="unique",
+                params=params,
+            )
 
     def get_constraints(self):
         constraints = [(self.__class__, self._meta.constraints)]

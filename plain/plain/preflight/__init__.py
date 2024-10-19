@@ -14,7 +14,6 @@ from .messages import (
 from .registry import register, run_checks
 
 # Import these to force registration of checks
-import plain.preflight.compatibility.django_4_0  # NOQA isort:skip
 import plain.preflight.files  # NOQA isort:skip
 import plain.preflight.security.base  # NOQA isort:skip
 import plain.preflight.security.csrf  # NOQA isort:skip

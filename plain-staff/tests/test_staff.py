@@ -1,4 +1,4 @@
-from users.models import User
+from app.users.models import User
 
 
 def test_staff_login_required(db, client):

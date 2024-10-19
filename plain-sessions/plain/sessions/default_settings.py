@@ -5,7 +5,7 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 * 2
 # A string like "example.com", or None for standard domain cookie.
 SESSION_COOKIE_DOMAIN = None
 # Whether the session cookie should be secure (https:// only).
-SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = True
 # The path of the session cookie.
 SESSION_COOKIE_PATH = "/"
 # Whether to use the HttpOnly flag.

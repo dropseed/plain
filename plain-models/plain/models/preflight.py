@@ -256,7 +256,7 @@ def check_database_tables(package_configs, **kwargs):
         model_tables = connection.introspection.plain_table_names()
 
         unknown_tables = set(db_tables) - set(model_tables)
-        unknown_tables.discard("django_migrations")  # Know this could be there
+        unknown_tables.discard("plainmigrations")  # Know this could be there
         if unknown_tables:
             table_names = ", ".join(unknown_tables)
             specific_hint = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'

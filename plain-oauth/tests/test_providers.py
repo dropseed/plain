@@ -68,7 +68,7 @@ def test_dummy_signup(db, client, settings):
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=http%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url
@@ -148,7 +148,7 @@ def test_dummy_login_connection(db, client, settings):
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=http%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url
@@ -215,7 +215,7 @@ def test_dummy_login_without_connection(db, client, settings):
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=http%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url
@@ -253,7 +253,7 @@ def test_dummy_connect(db, client, settings):
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=http%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url

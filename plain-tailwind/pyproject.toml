@@ -5,7 +5,7 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.2.0"
+version = "0.3.1"
 description = "Integrate Tailwind CSS with Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
@@ -13,6 +13,12 @@ readme = "README.md"
 homepage = "https://plainframework.com"
 documentation = "https://plainframework.com/docs/"
 repository = "https://github.com/dropseed/plain"
+
+[tool.poetry.plugins."plain.dev"]
+"tailwind" = "plain.tailwind.entrypoints:run_dev_compile"
+
+[tool.poetry.plugins."plain.assets.compile"]
+"tailwind" = "plain.tailwind.entrypoints:run_compile"
 
 [tool.poetry.dependencies]
 python = "^3.11"

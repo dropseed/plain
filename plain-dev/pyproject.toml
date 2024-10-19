@@ -5,7 +5,7 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.2.0"
+version = "0.11.0"
 description = "Local development tools for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
@@ -20,23 +20,25 @@ repository = "https://github.com/dropseed/plain"
 "pre-commit" = "plain.dev.precommit:cli"
 "contrib" = "plain.dev.contribute:cli"
 
+[tool.poetry.plugins."plain.setup"]
+"dev-dotenv" = "plain.dev.entrypoints:load_dotenv_file"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 
 plain = "<1.0.0"
 
 click = ">=8.0.0"
-honcho = "^1.1.0"
 debugpy = "^1.6.3"
+
+python-dotenv = "^1.0.0"
 
 # For local runserver
 gunicorn = ">20"
 
-tomli = {version = "^2.0.1", python = "<3.11"}
-
 # db
 requests = ">=2.0.0"
-psycopg2-binary = "^2.9.3"
+psycopg = {version = "^3.2.2", extras = ["binary"]}
 
 
 [tool.poetry.group.dev.dependencies]

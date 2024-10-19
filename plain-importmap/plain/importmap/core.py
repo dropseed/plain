@@ -49,7 +49,7 @@ class Importmap:
         self.map_dev = {}
 
     def load(self):
-        # TODO django check to compare lock and config hash
+        # TODO preflight check to compare lock and config hash
 
         self.config = self.load_config()
 

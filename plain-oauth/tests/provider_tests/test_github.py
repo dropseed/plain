@@ -39,7 +39,7 @@ def test_github_provider(db, client, settings):
     assert response.status_code == 302
     assert (
         response.url
-        == "https://github.com/login/oauth/authorize?client_id=test_id&redirect_uri=http%3A%2F%2Ftestserver%2Foauth%2Fgithub%2Fcallback%2F&response_type=code&scope=user&state=dummy_state"
+        == "https://github.com/login/oauth/authorize?client_id=test_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fgithub%2Fcallback%2F&response_type=code&scope=user&state=dummy_state"
     )
 
     # GitHub redirects to the callback url

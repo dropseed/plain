@@ -12,17 +12,17 @@ VENDOR_DIR = APP_ASSETS_DIR / "vendor"
 
 @click.group()
 def cli():
+    """Vendor CSS/JS from a CDN"""
     pass
 
 
 @cli.command()
-@click.option("--clear", is_flag=True, help="Clear all existing vendored dependencies")
-def install(clear):
-    if clear:
-        click.secho("Clearing existing vendored dependencies...", bold=True)
-        if VENDOR_DIR.exists():
-            for path in VENDOR_DIR.iterdir():
-                path.unlink()
+def sync():
+    """Clear vendored assets and re-download"""
+    click.secho("Clearing existing vendored dependencies...", bold=True)
+    if VENDOR_DIR.exists():
+        for path in VENDOR_DIR.iterdir():
+            path.unlink()
 
     deps = get_deps()
     if not deps:
@@ -52,7 +52,9 @@ def install(clear):
 
 
 @cli.command()
-def update():
+@click.argument("name", nargs=-1, default=None)
+def update(name):
+    """Update vendored dependencies in pyproject.toml"""
     deps = get_deps()
     if not deps:
         click.echo(
@@ -61,6 +63,15 @@ def update():
         return
 
     errors = []
+
+    if name:
+        deps = [dep for dep in deps if dep.name in name]
+        if len(deps) != len(name):
+            not_found = set(name) - {dep.name for dep in deps}
+            click.secho(
+                f"Some dependencies not found: {", ".join(not_found)}", fg="red"
+            )
+            exit(1)
 
     for dep in deps:
         click.secho(f"Updating {dep.name} {dep.installed}...", bold=True, nl=False)
@@ -82,11 +93,13 @@ def update():
 @cli.command()
 @click.argument("url")
 @click.option("--name", help="Name of the dependency")
-def add(url, name):
+@click.option("--sourcemap/--no-sourcemap", default=True, help="Download sourcemap")
+def add(url, name, sourcemap):
+    """Add a new vendored dependency to pyproject.toml"""
     if not name:
         name = url.split("/")[-1]
 
-    dep = Dependency(name, url=url)
+    dep = Dependency(name, url=url, sourcemap=sourcemap)
 
     click.secho(f"Installing {dep.name}...", bold=True, nl=False)
 

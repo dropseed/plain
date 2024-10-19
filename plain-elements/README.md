@@ -6,5 +6,8 @@
 
 ```python
 # settings.py
-JINJA_LOADER = "plain.elements.ElementsLoader"
+INSTALLED_PACKAGES = [
+    # ...
+    "plain.elements",
+]
 ```

@@ -276,12 +276,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         ) in cursor.fetchall():
             if index not in constraints:
                 basic_index = (
-                    type_ == self.index_default_access_method
-                    and
-                    # '_btree' references
-                    # django.contrib.postgres.indexes.BTreeIndex.suffix.
-                    not index.endswith("_btree")
-                    and options is None
+                    type_ == self.index_default_access_method and options is None
                 )
                 constraints[index] = {
                     "columns": columns if columns != [None] else [],

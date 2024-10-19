@@ -46,7 +46,6 @@ for key in SCHEMES.keys():
     urlparse.uses_netloc.append(key)
 
 
-# From https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 class DBConfig(TypedDict, total=False):
     AUTOCOMMIT: bool
     CONN_MAX_AGE: int | None

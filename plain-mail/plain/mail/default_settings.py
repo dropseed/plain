@@ -2,7 +2,11 @@
 # The default is to use the SMTP backend.
 # Third-party backends can be specified by providing a Python path
 # to a module that defines an EmailBackend class.
-EMAIL_BACKEND: str = "plain.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND: str
+
+# Default email address to use for various automated correspondence from
+# the site managers.
+DEFAULT_FROM_EMAIL: str
 
 # Host for sending email.
 EMAIL_HOST: str = "localhost"
@@ -21,7 +25,3 @@ EMAIL_USE_SSL: bool = False
 EMAIL_SSL_CERTFILE: str = None
 EMAIL_SSL_KEYFILE: str = None
 EMAIL_TIMEOUT: int = None
-
-# Default email address to use for various automated correspondence from
-# the site managers.
-DEFAULT_FROM_EMAIL: str = "webmaster@localhost"

@@ -3,10 +3,8 @@ import importlib
 import os
 import sys
 
-from plain.internal.legacy.management.base import OutputWrapper
 from plain.models.fields import NOT_PROVIDED
 from plain.packages import packages
-from plain.runtime import __version__
 from plain.utils import timezone
 
 from .loader import MigrationLoader
@@ -96,7 +94,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         super().__init__(
             defaults=defaults, specified_packages=specified_packages, dry_run=dry_run
         )
-        self.prompt_output = prompt_output or OutputWrapper(sys.stdout)
+        self.prompt_output = prompt_output or sys.stdout
 
     def _boolean_input(self, question, default=None):
         self.prompt_output.write(f"{question} ", ending="")
@@ -277,17 +275,13 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
     def ask_unique_callable_default_addition(self, field_name, model_name):
         """Adding a unique field with a callable default."""
         if not self.dry_run:
-            version = __version__
             choice = self._choice_input(
                 f"Callable default on unique field {model_name}.{field_name} "
                 f"will not generate unique values upon migrating.\n"
                 f"Please choose how to proceed:\n",
                 [
-                    f"Continue making this migration as the first step in "
-                    f"writing a manual migration to generate unique values "
-                    f"described here: "
-                    f"https://docs.djangoproject.com/en/{version}/howto/"
-                    f"writing-migrations/#migrations-that-add-unique-fields.",
+                    "Continue making this migration as the first step in "
+                    "writing a manual migration to generate unique values.",
                     "Quit and edit field options in models.py.",
                 ],
             )

@@ -1,0 +1,46 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "root": {
+        "level": "INFO",
+        "handlers": [
+            "console"
+        ]
+    },
+    "loggers": {
+        "gunicorn.error": {
+            "level": "INFO",
+            "handlers": [
+                "error_console"
+            ],
+            "propagate": false,
+            "qualname": "gunicorn.error"
+        },
+        "gunicorn.access": {
+            "level": "INFO",
+            "handlers": [
+                "console"
+            ],
+            "propagate": false,
+            "qualname": "gunicorn.access"
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "generic",
+            "stream": "ext://sys.stdout"
+        },
+        "error_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "generic",
+            "stream": "ext://sys.stderr"
+        }
+    },
+    "formatters": {
+        "generic": {
+            "format": "[%(process)d] [%(levelname)s] %(message)s",
+            "class": "logging.Formatter"
+        }
+    }
+}

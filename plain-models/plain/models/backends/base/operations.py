@@ -5,10 +5,8 @@ from importlib import import_module
 
 import sqlparse
 
-from plain.models import transaction
 from plain.models.backends import utils
 from plain.models.db import NotSupportedError
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.encoding import force_str
 
@@ -421,36 +419,6 @@ class BaseDatabaseOperations:
         """
         return ""
 
-    def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):
-        """
-        Return a list of SQL statements required to remove all data from
-        the given database tables (without actually removing the tables
-        themselves).
-
-        The `style` argument is a Style object as returned by either
-        color_style() or no_style() in plain.internal.legacy.management.color.
-
-        If `reset_sequences` is True, the list includes SQL statements required
-        to reset the sequences.
-
-        The `allow_cascade` argument determines whether truncation may cascade
-        to tables with foreign keys pointing the tables being truncated.
-        PostgreSQL requires a cascade even if these tables are empty.
-        """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations must provide an sql_flush() method"
-        )
-
-    def execute_sql_flush(self, sql_list):
-        """Execute a list of SQL statements to flush the database."""
-        with transaction.atomic(
-            using=self.connection.alias,
-            savepoint=self.connection.features.can_rollback_ddl,
-        ):
-            with self.connection.cursor() as cursor:
-                for sql in sql_list:
-                    cursor.execute(sql)
-
     def sequence_reset_by_name_sql(self, style, sequences):
         """
         Return a list of the SQL statements required to reset sequences
@@ -622,10 +590,12 @@ class BaseDatabaseOperations:
         else:
             first = datetime.datetime(value, 1, 1)
             second = datetime.datetime(value, 12, 31, 23, 59, 59, 999999)
-        if settings.USE_TZ:
-            tz = timezone.get_current_timezone()
-            first = timezone.make_aware(first, tz)
-            second = timezone.make_aware(second, tz)
+
+        # Make sure that datetimes are aware in the current timezone
+        tz = timezone.get_current_timezone()
+        first = timezone.make_aware(first, tz)
+        second = timezone.make_aware(second, tz)
+
         first = self.adapt_datetimefield_value(first)
         second = self.adapt_datetimefield_value(second)
         return [first, second]

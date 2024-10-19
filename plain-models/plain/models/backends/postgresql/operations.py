@@ -11,7 +11,6 @@ from plain.models.backends.postgresql.psycopg_any import (
 )
 from plain.models.backends.utils import split_tzname_delta
 from plain.models.constants import OnConflict
-from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
 
@@ -106,7 +105,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return tzname
 
     def _convert_sql_to_tz(self, sql, params, tzname):
-        if tzname and settings.USE_TZ:
+        if tzname:
             tzname_param = self._prepare_tzname_delta(tzname)
             return f"{sql} AT TIME ZONE %s", (*params, tzname_param)
         return sql, params
@@ -206,22 +205,6 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def set_time_zone_sql(self):
         return "SELECT set_config('TimeZone', %s, false)"
-
-    def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):
-        if not tables:
-            return []
-
-        # Perform a single SQL 'TRUNCATE x, y, z...;' statement. It allows us
-        # to truncate tables referenced by a foreign key in any other table.
-        sql_parts = [
-            style.SQL_KEYWORD("TRUNCATE"),
-            ", ".join(style.SQL_FIELD(self.quote_name(table)) for table in tables),
-        ]
-        if reset_sequences:
-            sql_parts.append(style.SQL_KEYWORD("RESTART IDENTITY"))
-        if allow_cascade:
-            sql_parts.append(style.SQL_KEYWORD("CASCADE"))
-        return ["%s;" % " ".join(sql_parts)]
 
     def sequence_reset_by_name_sql(self, style, sequences):
         # 'ALTER SEQUENCE sequence_name RESTART WITH 1;'... style SQL statements

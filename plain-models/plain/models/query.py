@@ -9,6 +9,7 @@ from itertools import chain, islice
 
 import plain.runtime
 from plain import exceptions
+from plain.exceptions import ValidationError
 from plain.models import (
     sql,
     transaction,
@@ -36,7 +37,6 @@ from plain.models.utils import (
     create_namedtuple_class,
     resolve_callables,
 )
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.functional import cached_property, partition
 
@@ -823,7 +823,14 @@ class QuerySet(AltersData):
                 with transaction.atomic(using=self.db):
                     params = dict(resolve_callables(params))
                     return self.create(**params), True
-            except IntegrityError:
+            except (IntegrityError, ValidationError):
+                # Since create() also validates by default,
+                # we can get any kind of ValidationError here,
+                # or it can flow through and get an IntegrityError from the database.
+                # The main thing we're concerned about is uniqueness failures,
+                # but ValidationError could include other things too.
+                # In all cases though it should be fine to try the get() again
+                # and return an existing object.
                 try:
                     return self.get(**kwargs), False
                 except self.model.DoesNotExist:
@@ -1251,11 +1258,10 @@ class QuerySet(AltersData):
             )
         if order not in ("ASC", "DESC"):
             raise ValueError("'order' must be either 'ASC' or 'DESC'.")
-        if settings.USE_TZ:
-            if tzinfo is None:
-                tzinfo = timezone.get_current_timezone()
-        else:
-            tzinfo = None
+
+        if tzinfo is None:
+            tzinfo = timezone.get_current_timezone()
+
         return (
             self.annotate(
                 datetimefield=Trunc(

@@ -3,10 +3,15 @@ name = "plain.models"
 packages = [
     { include = "plain" },
 ]
-version = "0.5.0"
+version = "0.9.0"
 description = "Database models for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
+
+# Make these available at the root level
+[tool.poetry.plugins."plain.cli"]
+"makemigrations" = "plain.models.cli:makemigrations"
+"migrate" = "plain.models.cli:migrate"
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -15,6 +20,8 @@ sqlparse = ">=0.3.1"
 
 [tool.poetry.group.dev.dependencies]
 plain = { path = "../plain", develop = true }
+"plain.pytest" = {path = "../plain-pytest", develop = true}
+coverage = "^7.6.0"
 
 # Automatically sets this up with pytest
 [tool.poetry.plugins."pytest11"]

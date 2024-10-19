@@ -5,7 +5,6 @@ from plain.models.backends.utils import split_tzname_delta
 from plain.models.constants import OnConflict
 from plain.models.expressions import Exists, ExpressionWrapper
 from plain.models.lookups import Lookup
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.encoding import force_str
 from plain.utils.regex_helper import _lazy_re_compile
@@ -91,7 +90,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return f"{sign}{offset}" if offset else tzname
 
     def _convert_sql_to_tz(self, sql, params, tzname):
-        if tzname and settings.USE_TZ and self.connection.timezone_name != tzname:
+        if tzname and self.connection.timezone_name != tzname:
             return f"CONVERT_TZ({sql}, %s, %s)", (
                 *params,
                 self.connection.timezone_name,
@@ -200,35 +199,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         ]
         return "RETURNING %s" % ", ".join(columns), ()
 
-    def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):
-        if not tables:
-            return []
-
-        sql = ["SET FOREIGN_KEY_CHECKS = 0;"]
-        if reset_sequences:
-            # It's faster to TRUNCATE tables that require a sequence reset
-            # since ALTER TABLE AUTO_INCREMENT is slower than TRUNCATE.
-            sql.extend(
-                "{} {};".format(
-                    style.SQL_KEYWORD("TRUNCATE"),
-                    style.SQL_FIELD(self.quote_name(table_name)),
-                )
-                for table_name in tables
-            )
-        else:
-            # Otherwise issue a simple DELETE since it's faster than TRUNCATE
-            # and preserves sequences.
-            sql.extend(
-                "{} {} {};".format(
-                    style.SQL_KEYWORD("DELETE"),
-                    style.SQL_KEYWORD("FROM"),
-                    style.SQL_FIELD(self.quote_name(table_name)),
-                )
-                for table_name in tables
-            )
-        sql.append("SET FOREIGN_KEY_CHECKS = 1;")
-        return sql
-
     def sequence_reset_by_name_sql(self, style, sequences):
         return [
             "{} {} {} {} = 1;".format(
@@ -259,13 +229,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         # MySQL doesn't support tz-aware datetimes
         if timezone.is_aware(value):
-            if settings.USE_TZ:
-                value = timezone.make_naive(value, self.connection.timezone)
-            else:
-                raise ValueError(
-                    "MySQL backend does not support timezone-aware datetimes when "
-                    "USE_TZ is False."
-                )
+            value = timezone.make_naive(value, self.connection.timezone)
         return str(value)
 
     def adapt_timefield_value(self, value):
@@ -312,8 +276,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if internal_type == "BooleanField":
             converters.append(self.convert_booleanfield_value)
         elif internal_type == "DateTimeField":
-            if settings.USE_TZ:
-                converters.append(self.convert_datetimefield_value)
+            converters.append(self.convert_datetimefield_value)
         elif internal_type == "UUIDField":
             converters.append(self.convert_uuidfield_value)
         return converters

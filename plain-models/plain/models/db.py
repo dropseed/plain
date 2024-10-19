@@ -9,7 +9,7 @@ from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
 
 DEFAULT_DB_ALIAS = "default"
-PLAIN_VERSION_PICKLE_KEY = "_django_version"
+PLAIN_VERSION_PICKLE_KEY = "_plain_version"
 
 
 class Error(Exception):
@@ -68,7 +68,7 @@ class DatabaseErrorWrapper:
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
             return
-        for dj_exc_type in (
+        for plain_exc_type in (
             DataError,
             OperationalError,
             IntegrityError,
@@ -79,14 +79,14 @@ class DatabaseErrorWrapper:
             InterfaceError,
             Error,
         ):
-            db_exc_type = getattr(self.wrapper.Database, dj_exc_type.__name__)
+            db_exc_type = getattr(self.wrapper.Database, plain_exc_type.__name__)
             if issubclass(exc_type, db_exc_type):
-                dj_exc_value = dj_exc_type(*exc_value.args)
+                plain_exc_value = plain_exc_type(*exc_value.args)
                 # Only set the 'errors_occurred' flag for errors that may make
                 # the connection unusable.
-                if dj_exc_type not in (DataError, IntegrityError):
+                if plain_exc_type not in (DataError, IntegrityError):
                     self.wrapper.errors_occurred = True
-                raise dj_exc_value.with_traceback(traceback) from exc_value
+                raise plain_exc_value.with_traceback(traceback) from exc_value
 
     def __call__(self, func):
         # Note that we are intentionally not using @wraps here for performance

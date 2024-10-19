@@ -4,16 +4,12 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
+import click
+import tomllib
+
 from plain.cli.print import print_event
 
 from ..services import Services
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-
-import click
 
 
 def install_git_hook():
@@ -71,13 +67,10 @@ def cli(install):
                 "--database",
                 "default",
             )
-            check_short(
-                "Checking Plain migrations", "plain", "legacy", "migrate", "--check"
-            )
+            check_short("Checking Plain migrations", "plain", "migrate", "--check")
             check_short(
                 "Checking for Plain models missing migrations",
                 "plain",
-                "legacy",
                 "makemigrations",
                 "--dry-run",
                 "--check",
@@ -102,7 +95,7 @@ def plain_db_connected():
     result = subprocess.run(
         [
             "plain",
-            "legacy",
+            "models",
             "showmigrations",
             "--skip-checks",
         ],

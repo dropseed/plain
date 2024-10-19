@@ -5,7 +5,7 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.2.0"
+version = "0.3.0"
 description = "Pytest integration for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
@@ -28,6 +28,7 @@ python = "^3.11"
 plain = "<1.0.0"
 click = ">=8.0.0"
 pytest = ">=7.0.0"
+python-dotenv = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 plain = {path = "../plain", develop = true}

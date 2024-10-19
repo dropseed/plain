@@ -1,3 +1,5 @@
+from html.parser import HTMLParser
+
 import mistune
 from pygments import highlight
 from pygments.formatters import html
@@ -11,7 +13,8 @@ class PagesRenderer(mistune.HTMLRenderer):
         """Automatically add an ID to headings if one is not provided."""
 
         if "id" not in attrs:
-            attrs["id"] = slugify(text)
+            inner_text = get_inner_text(text)
+            attrs["id"] = slugify(inner_text)
 
         return super().heading(text, level, **attrs)
 
@@ -32,3 +35,19 @@ def render_markdown(content):
         renderer=renderer, plugins=["strikethrough", "table"]
     )
     return markdown(content)
+
+
+class InnerTextParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.text_content = []
+
+    def handle_data(self, data):
+        # Collect all text data
+        self.text_content.append(data.strip())
+
+
+def get_inner_text(html_content):
+    parser = InnerTextParser()
+    parser.feed(html_content)
+    return " ".join([text for text in parser.text_content if text])

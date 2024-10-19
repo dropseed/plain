@@ -20,22 +20,49 @@ ALLOWED_HOSTS: list[str] = []
 
 # Local time zone for this installation. All choices can be found here:
 # https://en.wikipedia.org/wiki/List_of_tz_zones_by_name (although not all
-# systems may support all possibilities). When USE_TZ is True, this is
-# interpreted as the default user time zone.
-TIME_ZONE = "America/Chicago"
-
-# If you set this to True, Plain will use timezone-aware datetimes.
-USE_TZ = True
+# systems may support all possibilities). This is interpreted as the default
+# user time zone.
+TIME_ZONE: str = "UTC"
 
 # Default charset to use for all Response objects, if a MIME type isn't
 # manually specified. It's used to construct the Content-Type header.
 DEFAULT_CHARSET = "utf-8"
 
 # List of strings representing installed packages.
-INSTALLED_PACKAGES: list = []
+INSTALLED_PACKAGES: list[str] = []
 
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
+
+# Default headers for all responses.
+DEFAULT_RESPONSE_HEADERS = {
+    # "Content-Security-Policy": "default-src 'self'",
+    # https://hstspreload.org/
+    # "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Referrer-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+
+# Whether to redirect all non-HTTPS requests to HTTPS.
+HTTPS_REDIRECT_ENABLED = True
+HTTPS_REDIRECT_EXEMPT = []
+HTTPS_REDIRECT_HOST = None
+
+# If your Plain app is behind a proxy that sets a header to specify secure
+# connections, AND that proxy ensures that user-submitted headers with the
+# same name are ignored (so that people can't spoof it), set this value to
+# a tuple of (header_name, header_value). For any requests that come in with
+# that header/value, request.is_https() will return True.
+# WARNING! Only set this if you fully understand what you're doing. Otherwise,
+# you may be opening yourself up to a security risk.
+HTTPS_PROXY_HEADER = None
+
+# Whether to use the X-Forwarded-Host and X-Forwarded-Port headers
+# when determining the host and port for the request.
+USE_X_FORWARDED_HOST = False
+USE_X_FORWARDED_PORT = False
 
 # A secret key for this particular Plain installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Plain will complain
@@ -46,7 +73,7 @@ SECRET_KEY: str
 # secret key rotation.
 SECRET_KEY_FALLBACKS: list[str] = []
 
-ROOT_URLCONF = "urls"
+ROOT_URLCONF = "app.urls"
 
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [
@@ -75,33 +102,8 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 100
 # (i.e. "/tmp" on *nix systems).
 FILE_UPLOAD_TEMP_DIR = None
 
-# The numeric mode to set newly-uploaded files to. The value should be a mode
-# you'd pass directly to os.chmod; see
-# https://docs.python.org/library/os.html#files-and-directories.
-FILE_UPLOAD_PERMISSIONS = 0o644
-
-# The numeric mode to assign to newly-created directories, when uploading files.
-# The value should be a mode as you'd pass to os.chmod;
-# see https://docs.python.org/library/os.html#files-and-directories.
-FILE_UPLOAD_DIRECTORY_PERMISSIONS = None
-
-# Default X-Frame-Options header value
-X_FRAME_OPTIONS = "DENY"
-
-USE_X_FORWARDED_HOST = False
-USE_X_FORWARDED_PORT = False
-
 # User-defined overrides for error views by status code
 HTTP_ERROR_VIEWS: dict[int] = {}
-
-# If your Plain app is behind a proxy that sets a header to specify secure
-# connections, AND that proxy ensures that user-submitted headers with the
-# same name are ignored (so that people can't spoof it), set this value to
-# a tuple of (header_name, header_value). For any requests that come in with
-# that header/value, request.is_secure() will return True.
-# WARNING! Only set this if you fully understand what you're doing. Otherwise,
-# you may be opening yourself up to a security risk.
-SECURE_PROXY_SSL_HEADER = None
 
 ##############
 # MIDDLEWARE #
@@ -110,18 +112,13 @@ SECURE_PROXY_SSL_HEADER = None
 # List of middleware to use. Order is important; in the request phase, these
 # middleware will be applied in the order given, and in the response
 # phase the middleware will be applied in reverse order.
-MIDDLEWARE = [
-    "plain.middleware.security.SecurityMiddleware",
-    "plain.middleware.common.CommonMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
-    "plain.middleware.clickjacking.XFrameOptionsMiddleware",
-]
+MIDDLEWARE: list[str] = []
 
 ###########
 # SIGNING #
 ###########
 
-SIGNING_BACKEND = "plain.signing.TimestampSigner"
+COOKIE_SIGNING_BACKEND = "plain.signing.TimestampSigner"
 
 ########
 # CSRF #
@@ -132,12 +129,11 @@ CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52
 CSRF_COOKIE_DOMAIN = None
 CSRF_COOKIE_PATH = "/"
-CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 CSRF_TRUSTED_ORIGINS: list[str] = []
-CSRF_USE_SESSIONS = False
 
 ###########
 # LOGGING #
@@ -166,19 +162,6 @@ ASSETS_BASE_URL: str = ""
 # serious issues like errors and criticals does not result in hiding the
 # message, but Plain will not stop you from e.g. running server.
 SILENCED_PREFLIGHT_CHECKS = []
-
-#######################
-# SECURITY MIDDLEWARE #
-#######################
-SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-SECURE_HSTS_PRELOAD = False
-SECURE_HSTS_SECONDS = 0
-SECURE_REDIRECT_EXEMPT = []
-SECURE_REFERRER_POLICY = "same-origin"
-SECURE_SSL_HOST = None
-SECURE_SSL_REDIRECT = False
 
 #############
 # Templates #

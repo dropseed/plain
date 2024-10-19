@@ -1,6 +1,6 @@
 from pprint import pformat
 
-from markupsafe import escape
+from markupsafe import Markup, escape
 
 from plain.http import Response
 from plain.views.exceptions import ResponseException
@@ -18,6 +18,8 @@ def dd(obj):
 
     response = Response()
     response.status_code = 500
-    response.content = escape(dump_str)
+    response.content = (
+        Markup("<pre><code>") + escape(dump_str) + Markup("</code></pre>")
+    )
     response.content_type = "text/html"
     raise ResponseException(response)

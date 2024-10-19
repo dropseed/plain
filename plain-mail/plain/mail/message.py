@@ -15,7 +15,9 @@ from io import BytesIO, StringIO
 from pathlib import Path
 
 from plain.runtime import settings
+from plain.templates import Template, TemplateFileMissing
 from plain.utils.encoding import force_str, punycode
+from plain.utils.html import strip_tags
 
 from .utils import DNS_NAME
 
@@ -492,3 +494,68 @@ class EmailMultiAlternatives(EmailMessage):
             for alternative in self.alternatives:
                 msg.attach(self._create_mime_attachment(*alternative))
         return msg
+
+
+class TemplateEmail(EmailMultiAlternatives):
+    def __init__(
+        self,
+        *,
+        template,
+        context=None,
+        subject="",
+        from_email=None,
+        to=None,
+        bcc=None,
+        connection=None,
+        attachments=None,
+        headers=None,
+        alternatives=None,
+        cc=None,
+        reply_to=None,
+    ):
+        self.template = template
+        self.context = context or {}
+
+        self.body_html, body = self.render_content()
+
+        super().__init__(
+            subject=subject,
+            body=body,
+            from_email=from_email,
+            to=to,
+            bcc=bcc,
+            connection=connection,
+            attachments=attachments,
+            headers=headers,
+            alternatives=alternatives,
+            cc=cc,
+            reply_to=reply_to,
+        )
+
+        self.attach_alternative(self.body_html, "text/html")
+
+    def get_template_context(self):
+        return self.context
+
+    def render_content(self):
+        context = self.get_template_context()
+        html_content = self.render_html(context)
+
+        try:
+            plain_content = self.render_plain(context)
+        except TemplateFileMissing:
+            plain_content = strip_tags(html_content)
+
+        return html_content, plain_content
+
+    def render_plain(self, context):
+        return Template(self.get_plain_template_name()).render(context)
+
+    def render_html(self, context):
+        return Template(self.get_html_template_name()).render(context)
+
+    def get_plain_template_name(self):
+        return f"mail/{self.template}.txt"
+
+    def get_html_template_name(self):
+        return f"mail/{self.template}.html"

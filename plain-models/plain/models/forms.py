@@ -22,10 +22,7 @@ __all__ = (
     "fields_for_model",
     "ModelChoiceField",
     "ModelMultipleChoiceField",
-    "ALL_FIELDS",
 )
-
-ALL_FIELDS = "__all__"
 
 
 def construct_instance(form, instance, fields=None):
@@ -180,7 +177,7 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
         # of ('foo',)
         for opt in ["fields"]:
             value = getattr(opts, opt)
-            if isinstance(value, str) and value != ALL_FIELDS:
+            if isinstance(value, str):
                 msg = (
                     f"{new_class.__name__}.Meta.{opt} cannot be a string. "
                     f"Did you mean to type: ('{value}',)?"
@@ -195,11 +192,6 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
                     "is prohibited; form %s "
                     "needs updating." % name
                 )
-
-            if opts.fields == ALL_FIELDS:
-                # Sentinel for fields_for_model to indicate "get the list of
-                # fields from the model"
-                opts.fields = None
 
             fields = fields_for_model(
                 opts.model,

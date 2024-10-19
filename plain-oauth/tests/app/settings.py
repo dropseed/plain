@@ -6,7 +6,7 @@ INSTALLED_PACKAGES = [
     "plain.sessions",
     "plain.models",
     "plain.oauth",
-    "users",
+    "app.users",
 ]
 DATABASES = {
     "default": {

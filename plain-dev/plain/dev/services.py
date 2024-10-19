@@ -5,17 +5,13 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
-from honcho.manager import Manager as HonchoManager
+import tomllib
 
 from plain.runtime import APP_PATH
 
 from .pid import Pid
+from .poncho.manager import Manager as PonchoManager
 from .utils import has_pyproject_toml
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
 
 
 class Services:
@@ -35,7 +31,7 @@ class Services:
         )
 
     def __init__(self):
-        self.manager = HonchoManager()
+        self.poncho = PonchoManager()
 
     def run(self):
         services = self.get_services(APP_PATH.parent)
@@ -45,9 +41,9 @@ class Services:
                 "PYTHONUNBUFFERED": "true",
                 **data.get("env", {}),
             }
-            self.manager.add_process(name, data["cmd"], env=env)
+            self.poncho.add_process(name, data["cmd"], env=env)
 
-        self.manager.loop()
+        self.poncho.loop()
 
     def __enter__(self):
         if not self.get_services(APP_PATH.parent):

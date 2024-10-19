@@ -14,7 +14,6 @@ from urllib.parse import urlsplit, urlunsplit
 
 from plain import validators
 from plain.exceptions import ValidationError
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.dateparse import parse_datetime, parse_duration
 from plain.utils.duration import duration_string
@@ -1001,7 +1000,7 @@ def from_current_timezone(value):
     When time zone support is enabled, convert naive datetimes
     entered in the current time zone to aware datetimes.
     """
-    if settings.USE_TZ and value is not None and timezone.is_naive(value):
+    if value is not None and timezone.is_naive(value):
         current_timezone = timezone.get_current_timezone()
         try:
             if timezone._datetime_ambiguous_or_imaginary(value, current_timezone):
@@ -1025,6 +1024,6 @@ def to_current_timezone(value):
     When time zone support is enabled, convert aware datetimes
     to naive datetimes in the current time zone for display.
     """
-    if settings.USE_TZ and value is not None and timezone.is_aware(value):
+    if value is not None and timezone.is_aware(value):
         return timezone.make_naive(value)
     return value

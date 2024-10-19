@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+from importlib.metadata import entry_points
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -14,7 +15,9 @@ from click.core import Command, Context
 import plain.runtime
 from plain import preflight
 from plain.assets.compile import compile_assets, get_compiled_path
+from plain.exceptions import ImproperlyConfigured
 from plain.packages import packages
+from plain.utils.crypto import get_random_string
 
 from .formatting import PlainContext
 from .packages import EntryPointGroup, InstalledPackagesGroup
@@ -23,26 +26,6 @@ from .packages import EntryPointGroup, InstalledPackagesGroup
 @click.group()
 def plain_cli():
     pass
-
-
-@plain_cli.command(
-    "legacy",
-    context_settings={
-        "ignore_unknown_options": True,
-    },
-)
-@click.argument("legacy_args", nargs=-1, type=click.UNPROCESSED)
-def legacy_alias(legacy_args):
-    result = subprocess.run(
-        [
-            "python",
-            "-m",
-            "plain.internal.legacy",
-            *legacy_args,
-        ],
-    )
-    if result.returncode:
-        sys.exit(result.returncode)
 
 
 # @plain_cli.command
@@ -268,7 +251,7 @@ def preflight_checks(package_label, deploy, fail_level, databases):
             msg = header + body + footer
             click.echo(msg, err=True)
         else:
-            click.echo("Preflight check identified no issues.", err=True)
+            click.secho("✔ Preflight check identified no issues.", err=True, fg="green")
 
 
 @plain_cli.command()
@@ -304,17 +287,10 @@ def compile(keep_original, fingerprint, compress):
         )
         sys.exit(1)
 
-    # TODO make this an entrypoint instead
-    # Compile our Tailwind CSS (including templates in plain itself)
-    if find_spec("plain.tailwind") is not None:
-        click.secho("Compiling Tailwind CSS", bold=True)
-        result = subprocess.run(["plain", "tailwind", "compile", "--minify"])
+    for entry_point in entry_points(group="plain.assets.compile"):
+        click.secho(f"Running {entry_point.name}", bold=True)
+        result = entry_point.load()()
         print()
-        if result.returncode:
-            click.secho(
-                f"Error compiling Tailwind CSS (exit {result.returncode})", fg="red"
-            )
-            sys.exit(result.returncode)
 
     # TODO also look in [tool.plain.compile.run]
 
@@ -426,6 +402,18 @@ def setting(setting_name):
         click.secho(f'Setting "{setting_name}" not found', fg="red")
 
 
+@plain_cli.group()
+def utils():
+    pass
+
+
+@utils.command()
+def generate_secret_key():
+    """Generate a new secret key"""
+    new_secret_key = get_random_string(50)
+    click.echo(new_secret_key)
+
+
 class AppCLIGroup(click.Group):
     """
     Loads app.cli if it exists as `plain app`
@@ -479,16 +467,31 @@ class PlainCommandCollection(click.CommandCollection):
                 EntryPointGroup(),
                 plain_cli,
             ]
-        except Exception as e:
+        except ImproperlyConfigured as e:
             click.secho(
-                f"Error setting up Plain CLI\n{e}",
+                str(e),
                 fg="red",
                 err=True,
             )
+
+            # None of these require the app to be setup
+            sources = [
+                EntryPointGroup(),
+                AppCLIGroup(),
+                plain_cli,
+            ]
+        except Exception as e:
             print("---")
             print(traceback.format_exc())
             print("---")
 
+            click.secho(
+                f"Error: {e}",
+                fg="red",
+                err=True,
+            )
+
+            # None of these require the app to be setup
             sources = [
                 EntryPointGroup(),
                 AppCLIGroup(),

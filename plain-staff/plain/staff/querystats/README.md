@@ -26,12 +26,8 @@ INSTALLED_PACKAGES = [
 ]
 
 MIDDLEWARE = [
-    "plain.middleware.security.SecurityMiddleware",
     "plain.sessions.middleware.SessionMiddleware",
-    "plain.middleware.common.CommonMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
     "plain.auth.middleware.AuthenticationMiddleware",
-    "plain.middleware.clickjacking.XFrameOptionsMiddleware",
 
     "plain.staff.querystats.QueryStatsMiddleware",
     # Put additional middleware below querystats

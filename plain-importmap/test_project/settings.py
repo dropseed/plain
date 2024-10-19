@@ -25,12 +25,8 @@ INSTALLED_PACKAGES = [
 ]
 
 MIDDLEWARE = [
-    "plain.middleware.security.SecurityMiddleware",
     "plain.sessions.middleware.SessionMiddleware",
-    "plain.middleware.common.CommonMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
     "plain.auth.middleware.AuthenticationMiddleware",
-    "plain.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "app.urls"
@@ -57,5 +53,3 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 
 USE_L10N = True
-
-USE_TZ = True

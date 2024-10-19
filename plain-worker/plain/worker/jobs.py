@@ -153,7 +153,7 @@ class Job(metaclass=JobType):
                 return running
 
         try:
-            return JobRequest.objects.create(
+            job_request = JobRequest(
                 job_class=self._job_class_str(),
                 parameters=parameters,
                 start_at=start_at,
@@ -164,6 +164,10 @@ class Job(metaclass=JobType):
                 retry_attempt=retry_attempt,
                 unique_key=unique_key,
             )
+            job_request.save(
+                clean_and_validate=False
+            )  # So IntegrityError is raised on unique instead of potentially confusing ValidationError...
+            return job_request
         except IntegrityError as e:
             logger.warning("Job already in progress: %s", e)
             # Try to return the _in_progress list again

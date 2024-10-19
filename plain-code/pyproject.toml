@@ -15,19 +15,11 @@ authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-
 plain = "<1.0.0"
-
 ruff = "^0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 plain = { path = "../plain", develop = true }
-
-pytest = "^7.1.2"
-ipdb = "^0.13.9"
-isort = "^5.10.1"
-black = "^23.1.0"
-pytest-django = "^4.5.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

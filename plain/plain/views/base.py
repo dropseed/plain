@@ -15,6 +15,10 @@ logger = logging.getLogger("plain.request")
 
 
 class View:
+    request: HttpRequest
+    url_args: tuple
+    url_kwargs: dict
+
     def __init__(self, *args, **kwargs) -> None:
         # Views can customize their init, which receives
         # the args and kwargs from as_view()

@@ -8,9 +8,7 @@ def bump_version(version, bump_type):
     major, minor, patch = map(int, version.split("."))
 
     if bump_type == "major":
-        major += 1
-        minor = 0
-        patch = 0
+        raise Exception("Major bump not supported -- do this by hand")
     elif bump_type == "minor":
         minor += 1
         patch = 0

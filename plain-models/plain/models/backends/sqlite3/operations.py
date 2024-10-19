@@ -2,7 +2,6 @@ import datetime
 import decimal
 import uuid
 from functools import lru_cache
-from itertools import chain
 
 from plain import models
 from plain.exceptions import FieldError
@@ -10,7 +9,6 @@ from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.constants import OnConflict
 from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.expressions import Col
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 from plain.utils.functional import cached_property
@@ -104,7 +102,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         )
 
     def _convert_tznames_to_sql(self, tzname):
-        if tzname and settings.USE_TZ:
+        if tzname:
             return tzname, self.connection.timezone_name
         return None, None
 
@@ -218,26 +216,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Plain's test suite.
         return lru_cache(maxsize=512)(self.__references_graph)
 
-    def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):
-        if tables and allow_cascade:
-            # Simulate TRUNCATE CASCADE by recursively collecting the tables
-            # referencing the tables to be flushed.
-            tables = set(
-                chain.from_iterable(self._references_graph(table) for table in tables)
-            )
-        sql = [
-            "{} {} {};".format(
-                style.SQL_KEYWORD("DELETE"),
-                style.SQL_KEYWORD("FROM"),
-                style.SQL_FIELD(self.quote_name(table)),
-            )
-            for table in tables
-        ]
-        if reset_sequences:
-            sequences = [{"table": table} for table in tables]
-            sql.extend(self.sequence_reset_by_name_sql(style, sequences))
-        return sql
-
     def sequence_reset_by_name_sql(self, style, sequences):
         if not sequences:
             return []
@@ -266,13 +244,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         # SQLite doesn't support tz-aware datetimes
         if timezone.is_aware(value):
-            if settings.USE_TZ:
-                value = timezone.make_naive(value, self.connection.timezone)
-            else:
-                raise ValueError(
-                    "SQLite backend does not support timezone-aware datetimes when "
-                    "USE_TZ is False."
-                )
+            value = timezone.make_naive(value, self.connection.timezone)
 
         return str(value)
 
@@ -311,7 +283,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         if value is not None:
             if not isinstance(value, datetime.datetime):
                 value = parse_datetime(value)
-            if settings.USE_TZ and not timezone.is_aware(value):
+            if not timezone.is_aware(value):
                 value = timezone.make_aware(value, self.connection.timezone)
         return value
 
