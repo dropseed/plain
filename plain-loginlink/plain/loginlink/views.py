@@ -71,4 +71,7 @@ class LoginLinkLoginView(View):
 
         login(self.request, user)
 
+        if next_url := self.request.GET.get("next"):
+            return ResponseRedirect(next_url)
+
         return ResponseRedirect(self.success_url)
