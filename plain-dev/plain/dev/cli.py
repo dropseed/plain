@@ -71,6 +71,13 @@ class Dev:
     def __init__(self, *, port):
         self.poncho = PonchoManager()
         self.port = port
+        self.project_name = os.path.basename(os.getcwd())
+        self.domain = f"{self.project_name}.localhost"
+        self.ssl_cert_path = None
+        self.ssl_key_path = None
+
+        self.url = f"https://{self.domain}:{self.port}"
+
         self.plain_env = {
             **os.environ,
             "PYTHONUNBUFFERED": "true",
@@ -78,11 +85,8 @@ class Dev:
         self.custom_process_env = {
             **self.plain_env,
             "PORT": str(self.port),
+            "PLAIN_DEV_URL": self.url,
         }
-        self.project_name = os.path.basename(os.getcwd())
-        self.domain = f"{self.project_name}.localhost"
-        self.ssl_cert_path = None
-        self.ssl_key_path = None
 
     def run(self):
         pid = Pid()
@@ -106,9 +110,8 @@ class Dev:
             self.add_services()
 
             # Output the clickable link before starting the manager loop
-            url = f"https://{self.domain}:{self.port}/"
             click.secho(
-                f"\nYour app will run at: {click.style(url, fg='green', underline=True)}\n",
+                f"\nYour app will run at: {click.style(self.url, fg='green', underline=True)}\n",
                 bold=True,
             )
 
@@ -156,7 +159,7 @@ class Dev:
 
                 # Entry does not exist; append it using sudo
                 click.secho(
-                    "Modifying /etc/hosts file. You may be prompted for your password.\n",
+                    f"Adding {self.domain} to /etc/hosts file. You may be prompted for your password.\n",
                     bold=True,
                 )
                 cmd = f"echo '{hosts_entry}' | sudo tee -a {hosts_path} >/dev/null"
@@ -178,7 +181,7 @@ class Dev:
     def set_csrf_and_allowed_hosts(self):
         csrf_trusted_origins = json.dumps(
             [
-                f"https://{self.domain}:{self.port}",
+                self.url,
             ]
         )
         allowed_hosts = json.dumps([self.domain])
@@ -255,6 +258,7 @@ class Dev:
             )
 
     def add_pyproject_run(self):
+        """Additional processes that only run during `plain dev`."""
         if not has_pyproject_toml(APP_PATH.parent):
             return
 
@@ -272,6 +276,7 @@ class Dev:
             self.poncho.add_process(name, data["cmd"], env=env)
 
     def add_services(self):
+        """Services are things that also run during tests (like a database), and are critical for the app to function."""
         services = Services.get_services(APP_PATH.parent)
         for name, data in services.items():
             env = {
