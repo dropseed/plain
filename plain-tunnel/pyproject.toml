@@ -5,7 +5,7 @@ packages = [
     { include = "plain" },
 ]
 
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 license = "BSD-3-Clause"
@@ -13,6 +13,11 @@ readme = "README.md"
 homepage = "https://plainframework.com"
 documentation = "https://plainframework.com/docs/"
 repository = "https://github.com/dropseed/plain"
+
+# Make it also available as plain-tunnel,
+# so tools like pipx and uvx can run it independently
+[tool.poetry.scripts]
+"plain-tunnel" = "plain.tunnel.cli:cli"
 
 # Make the CLI available without adding to INSTALLED_APPS
 [tool.poetry.plugins."plain.cli"]
