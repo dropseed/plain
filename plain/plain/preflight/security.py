@@ -1,7 +1,8 @@
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 
-from .. import Warning, register
+from .messages import Warning
+from .registry import register
 
 SECRET_KEY_INSECURE_PREFIX = "plain-insecure-"
 SECRET_KEY_MIN_LENGTH = 50
