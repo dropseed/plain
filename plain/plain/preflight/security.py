@@ -16,40 +16,6 @@ SECRET_KEY_WARNING_MSG = (
     f"vulnerable to attack."
 )
 
-# TODO
-W001 = Warning(
-    "You do not have 'plain.middleware.https.HttpsRedirectMiddleware' "
-    "in your MIDDLEWARE so the SECURE_HSTS_SECONDS, "
-    "SECURE_CONTENT_TYPE_NOSNIFF, SECURE_REFERRER_POLICY, "
-    "SECURE_CROSS_ORIGIN_OPENER_POLICY, and HTTPS_REDIRECT_ENABLED settings will "
-    "have no effect.",
-    id="security.W001",
-)
-
-W008 = Warning(
-    "Your HTTPS_REDIRECT_ENABLED setting is not set to True. "
-    "Unless your site should be available over both SSL and non-SSL "
-    "connections, you may want to either set this setting True "
-    "or configure a load balancer or reverse-proxy server "
-    "to redirect all connections to HTTPS.",
-    id="security.W008",
-)
-
-W009 = Warning(
-    SECRET_KEY_WARNING_MSG % "SECRET_KEY",
-    id="security.W009",
-)
-
-W018 = Warning(
-    "You should not have DEBUG set to True in deployment.",
-    id="security.W018",
-)
-
-W020 = Warning(
-    "ALLOWED_HOSTS must not be empty in deployment.",
-    id="security.W020",
-)
-
 W025 = Warning(SECRET_KEY_WARNING_MSG, id="security.W025")
 
 
@@ -69,7 +35,16 @@ def check_secret_key(package_configs, **kwargs):
         passed_check = False
     else:
         passed_check = _check_secret_key(secret_key)
-    return [] if passed_check else [W009]
+    return (
+        []
+        if passed_check
+        else [
+            Warning(
+                SECRET_KEY_WARNING_MSG % "SECRET_KEY",
+                id="security.W009",
+            )
+        ]
+    )
 
 
 @register(deploy=True)
@@ -91,9 +66,27 @@ def check_secret_key_fallbacks(package_configs, **kwargs):
 @register(deploy=True)
 def check_debug(package_configs, **kwargs):
     passed_check = not settings.DEBUG
-    return [] if passed_check else [W018]
+    return (
+        []
+        if passed_check
+        else [
+            Warning(
+                "You should not have DEBUG set to True in deployment.",
+                id="security.W018",
+            )
+        ]
+    )
 
 
 @register(deploy=True)
 def check_allowed_hosts(package_configs, **kwargs):
-    return [] if settings.ALLOWED_HOSTS else [W020]
+    return (
+        []
+        if settings.ALLOWED_HOSTS
+        else [
+            Warning(
+                "ALLOWED_HOSTS must not be empty in deployment.",
+                id="security.W020",
+            )
+        ]
+    )

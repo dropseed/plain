@@ -15,8 +15,7 @@ from .registry import register, run_checks
 
 # Import these to force registration of checks
 import plain.preflight.files  # NOQA isort:skip
-import plain.preflight.security.base  # NOQA isort:skip
-import plain.preflight.security.csrf  # NOQA isort:skip
+import plain.preflight.security  # NOQA isort:skip
 import plain.preflight.urls  # NOQA isort:skip
 
 
