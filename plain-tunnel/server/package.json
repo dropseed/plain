@@ -1,0 +1,14 @@
+{
+  "name": "plaintunnel",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "wrangler": "3.84.0"
+  },
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --var LOCALHOST_DEV:true",
+    "deploy": "wrangler deploy",
+    "fix": "npx @biomejs/biome check --fix --unsafe worker.js"
+  }
+}

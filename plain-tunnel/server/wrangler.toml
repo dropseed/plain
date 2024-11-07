@@ -1,0 +1,15 @@
+name = "plaintunnel"
+main = "worker.js"
+compatibility_date = "2023-10-30"  # Use the current date
+
+workers_dev = false  # Disable the .workers.dev subdomain
+route = { pattern = "*.plaintunnel.com/*", zone_name = "plaintunnel.com" }
+
+[durable_objects]
+bindings = [
+  { name = "TUNNEL_NAMESPACE", class_name = "Tunnel" }
+]
+
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["Tunnel"]

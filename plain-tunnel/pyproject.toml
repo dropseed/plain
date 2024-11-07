@@ -1,0 +1,32 @@
+[tool.poetry]
+
+name = "plain.tunnel"
+packages = [
+    { include = "plain" },
+]
+
+version = "0.1.0"
+description = ""
+authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+license = "BSD-3-Clause"
+readme = "README.md"
+homepage = "https://plainframework.com"
+documentation = "https://plainframework.com/docs/"
+repository = "https://github.com/dropseed/plain"
+
+# Make the CLI available without adding to INSTALLED_APPS
+[tool.poetry.plugins."plain.cli"]
+"tunnel" = "plain.tunnel:cli"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+plain = "<1.0.0"
+click = ">=8.0.0"
+websockets = "*"
+
+[tool.poetry.group.dev.dependencies]
+plain = {path = "../plain", develop = true}
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
