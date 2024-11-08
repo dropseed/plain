@@ -3,7 +3,7 @@ name = "plain.loginlink"
 packages = [
     { include = "plain" },
 ]
-version = "0.4.0"
+version = "0.4.1"
 description = "Emailed link-based login for Plain."
 authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
 # readme = "README.md"
