@@ -6,7 +6,7 @@ EMAIL_BACKEND: str
 
 EMAIL_DEFAULT_FROM: str
 
-EMAIL_DEFAULT_REPLY_TO: str = None
+EMAIL_DEFAULT_REPLY_TO: list[str] = None
 
 # Host for sending email.
 EMAIL_HOST: str = "localhost"
