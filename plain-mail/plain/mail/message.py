@@ -237,8 +237,8 @@ class EmailMessage:
                 raise TypeError('"reply_to" argument must be a list or tuple')
             self.reply_to = list(reply_to)
         else:
-            self.reply_to = []
-        self.from_email = from_email or settings.DEFAULT_FROM_EMAIL
+            self.reply_to = settings.EMAIL_DEFAULT_REPLY_TO or []
+        self.from_email = from_email or settings.EMAIL_DEFAULT_FROM
         self.subject = subject
         self.body = body or ""
         self.attachments = []

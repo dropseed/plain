@@ -4,9 +4,9 @@
 # to a module that defines an EmailBackend class.
 EMAIL_BACKEND: str
 
-# Default email address to use for various automated correspondence from
-# the site managers.
-DEFAULT_FROM_EMAIL: str
+EMAIL_DEFAULT_FROM: str
+
+EMAIL_DEFAULT_REPLY_TO: str = None
 
 # Host for sending email.
 EMAIL_HOST: str = "localhost"
