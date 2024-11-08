@@ -25,9 +25,15 @@ class LoginLinkForm(forms.Form):
             if next_url := self.cleaned_data.get("next"):
                 url += f"?next={next_url}"
 
-            email = TemplateEmail(
-                template="loginlink",
-                to=[email],
+            email = self.get_template_email(
+                email=email,
                 context={"user": user, "url": url, "expires_in": expires_in},
             )
             return email.send()
+
+    def get_template_email(self, *, email, context):
+        return TemplateEmail(
+            template="loginlink",
+            to=[email],
+            context=context,
+        )
