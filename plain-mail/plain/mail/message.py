@@ -516,7 +516,13 @@ class TemplateEmail(EmailMultiAlternatives):
         self.template = template
         self.context = context or {}
 
-        self.body_html, body = self.render_content()
+        # Run this once for all uses of the context
+        render_context = self.get_template_context()
+
+        self.body_html, body = self.render_content(render_context)
+
+        if not subject:
+            subject = self.render_subject(render_context)
 
         super().__init__(
             subject=subject,
@@ -535,10 +541,10 @@ class TemplateEmail(EmailMultiAlternatives):
         self.attach_alternative(self.body_html, "text/html")
 
     def get_template_context(self):
+        """Subclasses can override this method to add context data."""
         return self.context
 
-    def render_content(self):
-        context = self.get_template_context()
+    def render_content(self, context):
         html_content = self.render_html(context)
 
         try:
@@ -554,8 +560,18 @@ class TemplateEmail(EmailMultiAlternatives):
     def render_html(self, context):
         return Template(self.get_html_template_name()).render(context)
 
+    def render_subject(self, context):
+        try:
+            subject = Template(self.get_subject_template_name()).render(context)
+            return subject.strip()
+        except TemplateFileMissing:
+            return ""
+
     def get_plain_template_name(self):
         return f"mail/{self.template}.txt"
 
     def get_html_template_name(self):
         return f"mail/{self.template}.html"
+
+    def get_subject_template_name(self):
+        return f"mail/{self.template}.subject.txt"
