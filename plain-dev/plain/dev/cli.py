@@ -30,15 +30,32 @@ ENTRYPOINT_GROUP = "plain.dev"
     default=8443,
     type=int,
     help="Port to run the web server on",
-    envvar="PORT",
 )
-def cli(ctx, port):
+@click.option(
+    "--hostname",
+    "-h",
+    default=None,
+    type=str,
+    help="Hostname to run the web server on",
+)
+@click.option(
+    "--log-level",
+    "-l",
+    default="info",
+    type=click.Choice(["debug", "info", "warning", "error", "critical"]),
+    help="Log level",
+)
+def cli(ctx, port, hostname, log_level):
     """Start local development"""
 
     if ctx.invoked_subcommand:
         return
 
-    returncode = Dev(port=port).run()
+    if not hostname:
+        project_name = os.path.basename(os.getcwd())
+        hostname = f"{project_name}.localhost"
+
+    returncode = Dev(port=port, hostname=hostname, log_level=log_level).run()
     if returncode:
         sys.exit(returncode)
 
@@ -68,19 +85,23 @@ def entrypoint(show_list, entrypoint):
 
 
 class Dev:
-    def __init__(self, *, port):
-        self.poncho = PonchoManager()
+    def __init__(self, *, port, hostname, log_level):
         self.port = port
-        self.project_name = os.path.basename(os.getcwd())
-        self.domain = f"{self.project_name}.localhost"
-        self.ssl_cert_path = None
-        self.ssl_key_path = None
+        self.hostname = hostname
+        self.log_level = log_level
 
-        self.url = f"https://{self.domain}:{self.port}"
+        self.poncho = PonchoManager()
+
+        self.ssl_key_path = None
+        self.ssl_cert_path = None
+
+        self.url = f"https://{self.hostname}:{self.port}"
 
         self.plain_env = {
-            **os.environ,
             "PYTHONUNBUFFERED": "true",
+            "PLAIN_LOG_LEVEL": self.log_level.upper(),
+            "APP_LOG_LEVEL": self.log_level.upper(),
+            **os.environ,
         }
         self.custom_process_env = {
             **self.plain_env,
@@ -96,7 +117,7 @@ class Dev:
             mkcert_manager = MkcertManager()
             mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
             self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
-                domain=self.domain,
+                domain=self.hostname,
                 storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
             )
             self.modify_hosts_file()
@@ -126,7 +147,7 @@ class Dev:
     def modify_hosts_file(self):
         """Modify the hosts file to map the custom domain to 127.0.0.1."""
         entry_identifier = "# Added by plain"
-        hosts_entry = f"127.0.0.1 {self.domain}  {entry_identifier}"
+        hosts_entry = f"127.0.0.1 {self.hostname}  {entry_identifier}"
 
         if platform.system() == "Windows":
             hosts_path = Path(r"C:\Windows\System32\drivers\etc\hosts")
@@ -140,7 +161,7 @@ class Dev:
                 # Entry does not exist; add it
                 with hosts_path.open("a") as f:
                     f.write(f"{hosts_entry}\n")
-                click.secho(f"Added {self.domain} to {hosts_path}", bold=True)
+                click.secho(f"Added {self.hostname} to {hosts_path}", bold=True)
             except PermissionError:
                 click.secho(
                     "Permission denied while modifying hosts file. Please run the script as an administrator.",
@@ -159,12 +180,12 @@ class Dev:
 
                 # Entry does not exist; append it using sudo
                 click.secho(
-                    f"Adding {self.domain} to /etc/hosts file. You may be prompted for your password.\n",
+                    f"Adding {self.hostname} to /etc/hosts file. You may be prompted for your password.\n",
                     bold=True,
                 )
                 cmd = f"echo '{hosts_entry}' | sudo tee -a {hosts_path} >/dev/null"
                 subprocess.run(cmd, shell=True, check=True)
-                click.secho(f"Added {self.domain} to {hosts_path}\n", bold=True)
+                click.secho(f"Added {self.hostname} to {hosts_path}\n", bold=True)
             except PermissionError:
                 click.secho(
                     "Permission denied while accessing hosts file.",
@@ -184,7 +205,7 @@ class Dev:
                 self.url,
             ]
         )
-        allowed_hosts = json.dumps([self.domain])
+        allowed_hosts = json.dumps([self.hostname])
 
         # Set environment variables
         self.plain_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
@@ -217,7 +238,7 @@ class Dev:
         gunicorn_cmd = [
             "gunicorn",
             "--bind",
-            f"{self.domain}:{self.port}",
+            f"{self.hostname}:{self.port}",
             "--certfile",
             str(self.ssl_cert_path),
             "--keyfile",
@@ -226,6 +247,8 @@ class Dev:
             "plain.wsgi:app",
             "--timeout",
             "60",
+            "--log-level",
+            self.log_level,
             "--access-logfile",
             "-",
             "--error-logfile",
