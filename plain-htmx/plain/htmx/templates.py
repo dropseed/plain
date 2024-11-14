@@ -3,9 +3,11 @@ from jinja2 import meta, nodes
 from jinja2.ext import Extension
 
 from plain.runtime import settings
+from plain.templates import register_template_extension
 from plain.templates.jinja.extensions import InclusionTagExtension
 
 
+@register_template_extension
 class HTMXJSExtension(InclusionTagExtension):
     tags = {"htmx_js"}
     template_name = "htmx/js.html"
@@ -18,6 +20,7 @@ class HTMXJSExtension(InclusionTagExtension):
         }
 
 
+@register_template_extension
 class HTMXFragmentExtension(Extension):
     tags = {"htmxfragment"}
 
@@ -149,9 +152,3 @@ def find_template_fragment(template: jinja2.Template, fragment_name: str):
     # Create a new template from the node
     template_node = jinja2.nodes.Template(callblock_node.body)
     return template.environment.from_string(template_node)
-
-
-extensions = [
-    HTMXJSExtension,
-    HTMXFragmentExtension,
-]

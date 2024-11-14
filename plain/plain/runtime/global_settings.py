@@ -167,5 +167,4 @@ SILENCED_PREFLIGHT_CHECKS = []
 # Templates #
 #############
 
-JINJA_LOADER = "jinja2.loaders.FileSystemLoader"
-JINJA_ENVIRONMENT = "plain.templates.jinja.defaults.create_default_environment"
+TEMPLATES_JINJA_ENVIRONMENT = "plain.templates.jinja.DefaultEnvironment"

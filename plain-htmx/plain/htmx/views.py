@@ -2,7 +2,7 @@ import re
 
 from plain.utils.cache import patch_vary_headers
 
-from .jinja import render_template_fragment
+from .templates import render_template_fragment
 
 
 class HTMXViewMixin:

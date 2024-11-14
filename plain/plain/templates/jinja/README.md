@@ -105,25 +105,11 @@ TODO - example middleware, `|localtime` filter
 
 ## Settings
 
-Most Jinja customization happens in `jinja.py` at the root of your app or in `INSTALLED_PACKAGES`.
+Most Jinja customization happens in `templates.py` at the root of your app or in `INSTALLED_PACKAGES`.
 But if you need to further customize the environment,
-you can define your own callable which will be used to create the Jinja environment.
+you can define your own class via `TEMPLATES_JINJA_ENVIRONMENT`.
 
-```python
-# app/settings.py
-JINJA_ENVIRONMENT = "myjinja.create_environment"
-```
-
-```python
-# app/myjinja.py
-from jinja2 import Environment
-
-
-def create_environment():
-    return Environment(
-        # ...
-    )
-```
+TODO
 
 ## HTML Components
 

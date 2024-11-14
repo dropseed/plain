@@ -5,9 +5,11 @@ from jinja2 import nodes
 from jinja2.ext import Extension
 
 from plain.runtime import settings
+from plain.templates import register_template_extension
 from plain.utils.functional import cached_property
 
 
+@register_template_extension
 class ElementsExtension(Extension):
     def preprocess(self, source, name, filename=None):
         if os.path.splitext(filename)[1] in [".html", ".md"]:
@@ -152,8 +154,3 @@ class ElementsExtension(Extension):
             )
 
         return contents
-
-
-extensions = [
-    ElementsExtension,
-]

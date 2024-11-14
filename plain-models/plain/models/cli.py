@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 import time
-from importlib import import_module
 from itertools import takewhile
 
 import click
@@ -25,7 +24,6 @@ from plain.models.migrations.utils import get_migration_name_timestamp
 from plain.models.migrations.writer import MigrationWriter
 from plain.packages import packages
 from plain.runtime import settings
-from plain.utils.module_loading import module_has_submodule
 from plain.utils.text import Truncator
 
 
@@ -659,12 +657,6 @@ def migrate(
             action = " -> " + action
         truncated = Truncator(action)
         return prefix + operation.describe() + truncated.chars(40), is_error
-
-    # Import the 'management' module within each installed package, to register
-    # dispatcher events.
-    for package_config in packages.get_package_configs():
-        if module_has_submodule(package_config.module, "management"):
-            import_module(".management", package_config.name)
 
     # Get the database we're operating from
     connection = connections[database]
