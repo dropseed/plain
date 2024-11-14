@@ -7,11 +7,11 @@ import click
 
 @click.command("contribute")
 @click.option("--repo", default="../plain", help="Path to the plain repo")
-@click.argument("package")
-def cli(package, repo):
-    """Contribute to plain by linking a package locally."""
+@click.argument("packages", nargs=-1)
+def cli(packages, repo):
+    """Contribute to plain by linking packages locally."""
 
-    if package == "reset":
+    if "reset" in packages:
         click.secho("Undoing any changes to pyproject.toml and uv.lock", bold=True)
         result = subprocess.run(["git", "checkout", "pyproject.toml", "uv.lock"])
         if result.returncode:
@@ -46,33 +46,28 @@ def cli(package, repo):
     )
     click.secho(f"Using repo at {repo} ({repo_branch} branch)", bold=True)
 
-    click.secho(f"Linking {package} to {repo}", bold=True)
-    if package == "plain" or package.startswith("plain-"):
-        result = subprocess.run(
-            [
-                "uv",
-                "add",
-                "--editable",
-                "--dev",
-                str(repo / package),  # Link a subdirectory
-            ]
-        )
+    plain_packages = []
+    plainx_packages = []
+
+    for package in packages:
+        package = package.replace(".", "-")
+        click.secho(f"Linking {package} to {repo}", bold=True)
+        if package == "plain" or package.startswith("plain-"):
+            plain_packages.append(str(repo / package))
+        elif package.startswith("plainx-"):
+            plainx_packages.append(str(repo))
+        else:
+            click.secho(f"Unknown package {package}", fg="red")
+            sys.exit(2)
+
+    if plain_packages:
+        result = subprocess.run(["uv", "add", "--editable", "--dev"] + plain_packages)
         if result.returncode:
-            click.secho("Failed to link the package", fg="red")
+            click.secho("Failed to link plain packages", fg="red")
             sys.exit(result.returncode)
-    elif package.startswith("plainx-"):
-        result = subprocess.run(
-            [
-                "uv",
-                "add",
-                "--editable",
-                "--dev",
-                str(repo),
-            ]
-        )
+
+    if plainx_packages:
+        result = subprocess.run(["uv", "add", "--editable", "--dev"] + plainx_packages)
         if result.returncode:
-            click.secho("Failed to link the package", fg="red")
+            click.secho("Failed to link plainx packages", fg="red")
             sys.exit(result.returncode)
-    else:
-        click.secho(f"Unknown package {package}", fg="red")
-        sys.exit(2)
