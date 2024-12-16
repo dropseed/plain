@@ -1,1 +1,1 @@
-FLAGS_MODULE: str = "flags"
+FLAGS_MODULE: str = "app.flags"
