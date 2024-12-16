@@ -446,8 +446,6 @@ class PlainCommandCollection(click.CommandCollection):
         sources = []
 
         try:
-            # Setup has to run before the installed packages CLI work
-            # and it also does the .env file loading right now...
             plain.runtime.setup()
 
             sources = [
@@ -457,6 +455,7 @@ class PlainCommandCollection(click.CommandCollection):
                 plain_cli,
             ]
         except plain.runtime.AppPathNotFound:
+            # Allow some commands to work regardless of being in a valid app
             click.secho(
                 "Plain `app` directory not found. Some commands may be missing.",
                 fg="yellow",
@@ -468,19 +467,16 @@ class PlainCommandCollection(click.CommandCollection):
                 plain_cli,
             ]
         except ImproperlyConfigured as e:
+            # Show what was configured incorrectly and exit
             click.secho(
                 str(e),
                 fg="red",
                 err=True,
             )
 
-            # None of these require the app to be setup
-            sources = [
-                EntryPointGroup(),
-                AppCLIGroup(),
-                plain_cli,
-            ]
+            exit(1)
         except Exception as e:
+            # Show the exception and exit
             print("---")
             print(traceback.format_exc())
             print("---")
@@ -491,12 +487,7 @@ class PlainCommandCollection(click.CommandCollection):
                 err=True,
             )
 
-            # None of these require the app to be setup
-            sources = [
-                EntryPointGroup(),
-                AppCLIGroup(),
-                plain_cli,
-            ]
+            exit(1)
 
         super().__init__(*args, **kwargs)
 
