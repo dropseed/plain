@@ -209,23 +209,38 @@ class TunnelClient:
 
         self.logger.debug(f"Forwarding request to: {forward_url}")
 
-        # Forward the request to the destination URL using urllib
+        # Create a custom SSL context to ignore SSL verification (if needed)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        # Prepare the request
+        req = urllib.request.Request(
+            url=forward_url,
+            method=request_metadata["method"],
+            data=body_data if body_data else None,
+            headers=request_metadata["headers"],  # Headers set directly on the request
+        )
+
+        # Override the HTTPErrorProcessor to stop processing redirects
+        class NoRedirectProcessor(urllib.request.HTTPErrorProcessor):
+            def http_response(self, request, response):
+                return response
+
+            https_response = http_response
+
+        # Create a custom opener that uses the NoRedirectProcessor
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPHandler(),
+            urllib.request.HTTPSHandler(
+                context=ssl_context
+            ),  # Pass the SSL context here
+            NoRedirectProcessor(),
+        )
+
         try:
-            # Create a custom SSL context to ignore SSL verification (if needed)
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-
-            # Prepare the request
-            req = urllib.request.Request(
-                url=forward_url,
-                method=request_metadata["method"],
-                data=body_data if body_data else None,
-                headers=request_metadata["headers"],
-            )
-
-            # Make the request
-            with urllib.request.urlopen(req, context=ssl_context) as response:
+            # Make the request using our custom opener
+            with opener.open(req) as response:
                 response_body = response.read()
                 response_headers = dict(response.getheaders())
                 response_status = response.getcode()
