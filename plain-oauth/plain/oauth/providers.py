@@ -107,6 +107,7 @@ class OAuthProvider:
 
         state = request.GET["state"]
         expected_state = request.session.pop(SESSION_STATE_KEY)
+        request.session.save()  # Make sure the pop is saved (won't save on an exception)
         if not secrets.compare_digest(state, expected_state):
             raise OAuthStateMismatchError()
 
