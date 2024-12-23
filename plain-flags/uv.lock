@@ -115,7 +115,7 @@ wheels = [
 
 [[package]]
 name = "plain-flags"
-version = "0.7.2"
+version = "0.7.3"
 source = { editable = "." }
 dependencies = [
     { name = "plain" },
@@ -138,7 +138,7 @@ dev = [
 
 [[package]]
 name = "plain-models"
-version = "0.10.0"
+version = "0.10.1"
 source = { editable = "../plain-models" }
 dependencies = [
     { name = "plain" },
@@ -156,7 +156,7 @@ dev = [{ name = "plain-pytest", editable = "../plain-pytest" }]
 
 [[package]]
 name = "plain-pytest"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "../plain-pytest" }
 dependencies = [
     { name = "click" },

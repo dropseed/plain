@@ -115,7 +115,7 @@ wheels = [
 
 [[package]]
 name = "plain-models"
-version = "0.10.0"
+version = "0.10.1"
 source = { editable = "../plain-models" }
 dependencies = [
     { name = "plain" },
@@ -133,7 +133,7 @@ dev = [{ name = "plain-pytest", editable = "../plain-pytest" }]
 
 [[package]]
 name = "plain-worker"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "." }
 dependencies = [
     { name = "plain" },

@@ -115,7 +115,7 @@ wheels = [
 
 [[package]]
 name = "plain-models"
-version = "0.10.0"
+version = "0.10.1"
 source = { editable = "../plain-models" }
 dependencies = [
     { name = "plain" },
@@ -133,7 +133,7 @@ dev = [{ name = "plain-pytest", editable = "../plain-pytest" }]
 
 [[package]]
 name = "plain-pytest"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "../plain-pytest" }
 dependencies = [
     { name = "click" },
@@ -152,7 +152,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-sessions"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "." }
 dependencies = [
     { name = "plain" },

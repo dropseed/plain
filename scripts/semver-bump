@@ -2,6 +2,7 @@
 import os
 import re
 import sys
+import subprocess
 
 
 def bump_version(version, bump_type):
@@ -46,6 +47,7 @@ def main(bump_type, packages):
             new_version = bump_version(old_version, bump_type)
             update_version_in_file(pyproject_path, old_version, new_version)
             print(f"Bumped {package_dir} from {old_version} to {new_version}")
+            subprocess.run(["uv", "sync"], cwd=package_dir)
 
 
 if __name__ == "__main__":

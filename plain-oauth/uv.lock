@@ -214,7 +214,7 @@ wheels = [
 
 [[package]]
 name = "plain-oauth"
-version = "0.7.4"
+version = "0.7.5"
 source = { editable = "." }
 dependencies = [
     { name = "plain" },
@@ -241,7 +241,7 @@ dev = [{ name = "plain-pytest", editable = "../plain-pytest" }]
 
 [[package]]
 name = "plain-pytest"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "../plain-pytest" }
 dependencies = [
     { name = "click" },
