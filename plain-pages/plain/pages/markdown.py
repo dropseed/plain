@@ -14,6 +14,9 @@ class PagesRenderer(mistune.HTMLRenderer):
 
         if "id" not in attrs:
             inner_text = get_inner_text(text)
+            inner_text = inner_text.replace(
+                ".", "-"
+            )  # Replace dots with hyphens (slugify won't)
             attrs["id"] = slugify(inner_text)
 
         return super().heading(text, level, **attrs)
