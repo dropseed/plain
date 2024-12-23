@@ -27,7 +27,7 @@ class SQLiteNumericMixin:
         sql, params = self.as_sql(compiler, connection, **extra_context)
         try:
             if self.output_field.get_internal_type() == "DecimalField":
-                sql = "CAST(%s AS NUMERIC)" % sql
+                sql = f"CAST({sql} AS NUMERIC)"
         except FieldError:
             pass
         return sql, params
@@ -333,11 +333,8 @@ class BaseExpression:
             for source in sources_iter:
                 if not isinstance(output_field, source.__class__):
                     raise FieldError(
-                        "Expression contains mixed types: {}, {}. You must "
-                        "set output_field.".format(
-                            output_field.__class__.__name__,
-                            source.__class__.__name__,
-                        )
+                        f"Expression contains mixed types: {output_field.__class__.__name__}, {source.__class__.__name__}. You must "
+                        "set output_field."
                     )
             return output_field
 
@@ -1077,7 +1074,7 @@ class RawSQL(Expression):
         return f"{self.__class__.__name__}({self.sql}, {self.params})"
 
     def as_sql(self, compiler, connection):
-        return "(%s)" % self.sql, self.params
+        return f"({self.sql})", self.params
 
     def get_group_by_cols(self):
         return [self]
@@ -1198,7 +1195,7 @@ class ExpressionList(Func):
     def __init__(self, *expressions, **extra):
         if not expressions:
             raise ValueError(
-                "%s requires at least one expression." % self.__class__.__name__
+                f"{self.__class__.__name__} requires at least one expression."
             )
         super().__init__(*expressions, **extra)
 
@@ -1581,9 +1578,7 @@ class OrderBy(Expression):
         self.expression = expression
 
     def __repr__(self):
-        return "{}({}, descending={})".format(
-            self.__class__.__name__, self.expression, self.descending
-        )
+        return f"{self.__class__.__name__}({self.expression}, descending={self.descending})"
 
     def set_source_expressions(self, exprs):
         self.expression = exprs[0]
@@ -1595,18 +1590,18 @@ class OrderBy(Expression):
         template = template or self.template
         if connection.features.supports_order_by_nulls_modifier:
             if self.nulls_last:
-                template = "%s NULLS LAST" % template
+                template = f"{template} NULLS LAST"
             elif self.nulls_first:
-                template = "%s NULLS FIRST" % template
+                template = f"{template} NULLS FIRST"
         else:
             if self.nulls_last and not (
                 self.descending and connection.features.order_by_nulls_first
             ):
-                template = "%%(expression)s IS NULL, %s" % template
+                template = f"%(expression)s IS NULL, {template}"
             elif self.nulls_first and not (
                 not self.descending and connection.features.order_by_nulls_first
             ):
-                template = "%%(expression)s IS NOT NULL, %s" % template
+                template = f"%(expression)s IS NOT NULL, {template}"
         connection.ops.check_expression_support(self)
         expression_sql, params = compiler.compile(self.expression)
         placeholders = {
@@ -1662,8 +1657,7 @@ class Window(SQLiteNumericMixin, Expression):
 
         if not getattr(expression, "window_compatible", False):
             raise ValueError(
-                "Expression '%s' isn't compatible with OVER clauses."
-                % expression.__class__.__name__
+                f"Expression '{expression.__class__.__name__}' isn't compatible with OVER clauses."
             )
 
         if self.partition_by is not None:
@@ -1800,14 +1794,14 @@ class WindowFrame(Expression):
 
     def __str__(self):
         if self.start.value is not None and self.start.value < 0:
-            start = "%d %s" % (abs(self.start.value), connection.ops.PRECEDING)
+            start = "%d %s" % (abs(self.start.value), connection.ops.PRECEDING)  # noqa: UP031
         elif self.start.value is not None and self.start.value == 0:
             start = connection.ops.CURRENT_ROW
         else:
             start = connection.ops.UNBOUNDED_PRECEDING
 
         if self.end.value is not None and self.end.value > 0:
-            end = "%d %s" % (self.end.value, connection.ops.FOLLOWING)
+            end = "%d %s" % (self.end.value, connection.ops.FOLLOWING)  # noqa: UP031
         elif self.end.value is not None and self.end.value == 0:
             end = connection.ops.CURRENT_ROW
         else:

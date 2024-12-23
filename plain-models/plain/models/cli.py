@@ -53,8 +53,7 @@ def db_shell(database, parameters):
         # which case this error message would be inaccurate. Still, this
         # message catches the common case.
         click.secho(
-            "You appear not to have the %r program installed or on your path."
-            % connection.client.executable_name,
+            f"You appear not to have the {connection.client.executable_name!r} program installed or on your path.",
             fg="red",
             err=True,
         )
@@ -680,8 +679,8 @@ def migrate(
         )
         raise click.ClickException(
             "Conflicting migrations detected; multiple leaf nodes in the "
-            "migration graph: (%s).\nTo fix them run "
-            "'python manage.py makemigrations --merge'" % name_str
+            f"migration graph: ({name_str}).\nTo fix them run "
+            "'python manage.py makemigrations --merge'"
         )
 
     # If they supplied command line arguments, work out what they mean.

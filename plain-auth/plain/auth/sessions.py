@@ -98,8 +98,7 @@ def get_user_model():
         )
     except LookupError:
         raise ImproperlyConfigured(
-            "AUTH_USER_MODEL refers to model '%s' that has not been installed"
-            % settings.AUTH_USER_MODEL
+            f"AUTH_USER_MODEL refers to model '{settings.AUTH_USER_MODEL}' that has not been installed"
         )
 
 

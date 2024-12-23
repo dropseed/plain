@@ -53,7 +53,7 @@ def wrap(text, width):
                         yield line
                         line = ""
                         break
-                yield "%s\n" % line[: space - 1]
+                yield f"{line[: space - 1]}\n"
                 line = line[space:]
                 max_width = min((line.endswith("\n") and width + 1 or width), width)
             if line:
@@ -224,7 +224,7 @@ class Truncator(SimpleLazyObject):
             out += truncate_text
         # Close any tags still open
         for tag in open_tags:
-            out += "</%s>" % tag
+            out += f"</{tag}>"
         # Return string
         return out
 
@@ -242,7 +242,7 @@ def get_valid_filename(name):
     s = str(name).strip().replace(" ", "_")
     s = re.sub(r"(?u)[^-\w.]", "", s)
     if s in {"", ".", ".."}:
-        raise SuspiciousFileOperation("Could not derive file name from '%s'" % name)
+        raise SuspiciousFileOperation(f"Could not derive file name from '{name}'")
     return s
 
 
@@ -407,9 +407,9 @@ def unescape_string_literal(s):
         "'ab' c"
     """
     if not s or s[0] not in "\"'" or s[-1] != s[0]:
-        raise ValueError("Not a string literal: %r" % s)
+        raise ValueError(f"Not a string literal: {s!r}")
     quote = s[0]
-    return s[1:-1].replace(r"\%s" % quote, quote).replace(r"\\", "\\")
+    return s[1:-1].replace(rf"\{quote}", quote).replace(r"\\", "\\")
 
 
 @keep_lazy_text
@@ -475,9 +475,9 @@ def pluralize_lazy(singular, plural, number):
                         return values[number]
                     except KeyError:
                         raise KeyError(
-                            "Your dictionary lacks key '%s'. Please provide "
+                            f"Your dictionary lacks key '{number}'. Please provide "
                             "it, because it is required to determine whether "
-                            "string is singular or plural." % number
+                            "string is singular or plural."
                         )
 
                 def _translate(self, number_value):

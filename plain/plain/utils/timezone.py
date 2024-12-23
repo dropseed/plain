@@ -5,7 +5,7 @@ Timezone-related classes and functions.
 import functools
 import zoneinfo
 from contextlib import ContextDecorator
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 from threading import local
 
 from plain.runtime import settings
@@ -33,7 +33,7 @@ def get_fixed_timezone(offset):
     if isinstance(offset, timedelta):
         offset = offset.total_seconds() // 60
     sign = "-" if offset < 0 else "+"
-    hhmm = "%02d%02d" % divmod(abs(offset), 60)
+    hhmm = "%02d%02d" % divmod(abs(offset), 60)  # noqa: UP031
     name = sign + hhmm
     return timezone(timedelta(minutes=offset), name)
 
@@ -95,7 +95,7 @@ def activate(timezone):
     elif isinstance(timezone, str):
         _active.value = zoneinfo.ZoneInfo(timezone)
     else:
-        raise ValueError("Invalid timezone: %r" % timezone)
+        raise ValueError(f"Invalid timezone: {timezone!r}")
 
 
 def deactivate():
@@ -165,7 +165,7 @@ def now():
     """
     Return a timezone aware datetime.
     """
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 # By design, these four functions don't perform any checks on their arguments.
@@ -204,7 +204,7 @@ def make_aware(value, timezone=None):
         timezone = get_current_timezone()
     # Check that we won't overwrite the timezone of an aware datetime.
     if is_aware(value):
-        raise ValueError("make_aware expects a naive datetime, got %s" % value)
+        raise ValueError(f"make_aware expects a naive datetime, got {value}")
     # This may be wrong around DST changes!
     return value.replace(tzinfo=timezone)
 

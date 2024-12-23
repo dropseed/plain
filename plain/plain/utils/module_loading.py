@@ -23,7 +23,7 @@ def import_string(dotted_path):
     try:
         module_path, class_name = dotted_path.rsplit(".", 1)
     except ValueError as err:
-        raise ImportError("%s doesn't look like a module path" % dotted_path) from err
+        raise ImportError(f"{dotted_path} doesn't look like a module path") from err
 
     try:
         return cached_import(module_path, class_name)
@@ -66,4 +66,4 @@ def module_dir(module):
         filename = getattr(module, "__file__", None)
         if filename is not None:
             return os.path.dirname(filename)
-    raise ValueError("Cannot determine directory containing %s" % module)
+    raise ValueError(f"Cannot determine directory containing {module}")

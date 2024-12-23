@@ -125,7 +125,7 @@ class CursorDebugWrapper(CursorWrapper):
             self.db.queries_log.append(
                 {
                     "sql": f"{times} times: {sql}" if many else sql,
-                    "time": "%.3f" % duration,
+                    "time": f"{duration:.3f}",
                 }
             )
             logger.debug(
@@ -154,8 +154,8 @@ def debug_transaction(connection, sql):
             duration = stop - start
             connection.queries_log.append(
                 {
-                    "sql": "%s" % sql,
-                    "time": "%.3f" % duration,
+                    "sql": f"{sql}",
+                    "time": f"{duration:.3f}",
                 }
             )
             logger.debug(
@@ -273,7 +273,7 @@ def truncate_name(identifier, length=None, hash_len=4):
 
     digest = names_digest(name, length=hash_len)
     return "{}{}{}".format(
-        '%s"."' % namespace if namespace else "",
+        f'{namespace}"."' if namespace else "",
         name[: length - hash_len],
         digest,
     )

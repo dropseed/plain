@@ -1,9 +1,9 @@
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import click
-import tomllib
 
 from plain.cli.print import print_event
 
@@ -41,18 +41,26 @@ def check(path):
 @cli.command()
 @click.argument("path", default=".")
 @click.option("--unsafe-fixes", is_flag=True, help="Apply ruff unsafe fixes")
-def fix(path, unsafe_fixes):
+@click.option("--add-noqa", is_flag=True, help="Add noqa comments to suppress errors")
+def fix(path, unsafe_fixes, add_noqa):
     """Lint and format the given path."""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
 
     for e in get_code_config().get("exclude", []):
         ruff_args.extend(["--exclude", e])
 
+    if unsafe_fixes and add_noqa:
+        print("Cannot use both --unsafe-fixes and --add-noqa")
+        sys.exit(1)
+
     if unsafe_fixes:
         print_event("Ruff fix (with unsafe fixes)")
         result = subprocess.run(
             ["ruff", "check", path, "--fix", "--unsafe-fixes", *ruff_args]
         )
+    elif add_noqa:
+        print_event("Ruff fix (add noqa)")
+        result = subprocess.run(["ruff", "check", path, "--add-noqa", *ruff_args])
     else:
         print_event("Ruff fix")
         result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])

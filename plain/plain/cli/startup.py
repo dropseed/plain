@@ -10,9 +10,9 @@ def _print_bold(s):
 
 
 def _print_italic(s):
-    print("\x1B[3m", end="")
+    print("\x1b[3m", end="")
     print(s)
-    print("\x1B[0m", end="")
+    print("\x1b[0m", end="")
 
 
 _print_bold("\n⬣ Welcome to the Plain shell! ⬣")

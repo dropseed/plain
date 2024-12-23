@@ -12,14 +12,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-    - uses: actions/checkout@v3
-
-    - run: pipx install poetry
-
-    - uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-        cache: poetry
+    - uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+    - name: Set up Python
+      run: uv python install
 
     # https://docs.pypi.org/trusted-publishers/using-a-publisher/
     - name: Mint API token
@@ -43,4 +40,4 @@ jobs:
     - name: Publish packages
       run: ./scripts/publish
       env:
-        POETRY_PYPI_TOKEN_PYPI: ${{ steps.mint-token.outputs.api-token }}
+        UV_PUBLISH_TOKEN: ${{ steps.mint-token.outputs.api-token }}

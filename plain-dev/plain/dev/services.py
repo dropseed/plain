@@ -1,11 +1,11 @@
 import os
 import subprocess
 import time
+import tomllib
 from importlib.util import find_spec
 from pathlib import Path
 
 import click
-import tomllib
 
 from plain.runtime import APP_PATH
 

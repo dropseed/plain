@@ -289,11 +289,11 @@ class DeleteModel(ModelOperation):
         return True
 
     def describe(self):
-        return "Delete model %s" % self.name
+        return f"Delete model {self.name}"
 
     @property
     def migration_name_fragment(self):
-        return "delete_%s" % self.name_lower
+        return f"delete_{self.name_lower}"
 
 
 class RenameModel(ModelOperation):
@@ -477,7 +477,7 @@ class AlterModelTable(ModelOptionOperation):
 
     @property
     def migration_name_fragment(self):
-        return "alter_%s_table" % self.name_lower
+        return f"alter_{self.name_lower}_table"
 
 
 class AlterModelTableComment(ModelOptionOperation):
@@ -578,14 +578,13 @@ class AlterOrderWithRespectTo(ModelOptionOperation):
         )
 
     def describe(self):
-        return "Set order_with_respect_to on {} to {}".format(
-            self.name,
-            self.order_with_respect_to,
+        return (
+            f"Set order_with_respect_to on {self.name} to {self.order_with_respect_to}"
         )
 
     @property
     def migration_name_fragment(self):
-        return "alter_%s_order_with_respect_to" % self.name_lower
+        return f"alter_{self.name_lower}_order_with_respect_to"
 
 
 class AlterModelOptions(ModelOptionOperation):
@@ -632,11 +631,11 @@ class AlterModelOptions(ModelOptionOperation):
         pass
 
     def describe(self):
-        return "Change Meta options on %s" % self.name
+        return f"Change Meta options on {self.name}"
 
     @property
     def migration_name_fragment(self):
-        return "alter_%s_options" % self.name_lower
+        return f"alter_{self.name_lower}_options"
 
 
 class AlterModelManagers(ModelOptionOperation):
@@ -661,11 +660,11 @@ class AlterModelManagers(ModelOptionOperation):
         pass
 
     def describe(self):
-        return "Change managers on %s" % self.name
+        return f"Change managers on {self.name}"
 
     @property
     def migration_name_fragment(self):
-        return "alter_%s_managers" % self.name_lower
+        return f"alter_{self.name_lower}_managers"
 
 
 class IndexOperation(Operation):
@@ -684,7 +683,7 @@ class AddIndex(IndexOperation):
         if not index.name:
             raise ValueError(
                 "Indexes passed to AddIndex operations require a name "
-                "argument. %r doesn't have one." % index
+                f"argument. {index!r} doesn't have one."
             )
         self.index = index
 

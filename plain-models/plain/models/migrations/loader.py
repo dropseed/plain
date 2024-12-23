@@ -121,22 +121,20 @@ class MigrationLoader:
                 except ImportError as e:
                     if "bad magic number" in str(e):
                         raise ImportError(
-                            "Couldn't import %r as it appears to be a stale "
-                            ".pyc file." % migration_path
+                            f"Couldn't import {migration_path!r} as it appears to be a stale "
+                            ".pyc file."
                         ) from e
                     else:
                         raise
                 if not hasattr(migration_module, "Migration"):
                     raise BadMigrationError(
-                        "Migration {} in app {} has no Migration class".format(
-                            migration_name, package_config.label
-                        )
+                        f"Migration {migration_name} in app {package_config.label} has no Migration class"
                     )
-                self.disk_migrations[
-                    package_config.label, migration_name
-                ] = migration_module.Migration(
-                    migration_name,
-                    package_config.label,
+                self.disk_migrations[package_config.label, migration_name] = (
+                    migration_module.Migration(
+                        migration_name,
+                        package_config.label,
+                    )
                 )
 
     def get_migration(self, package_label, name_prefix):
@@ -156,9 +154,7 @@ class MigrationLoader:
                 results.append((migration_package_label, migration_name))
         if len(results) > 1:
             raise AmbiguityError(
-                "There is more than one migration for '{}' with the prefix '{}'".format(
-                    package_label, name_prefix
-                )
+                f"There is more than one migration for '{package_label}' with the prefix '{name_prefix}'"
             )
         elif not results:
             raise KeyError(
@@ -193,10 +189,8 @@ class MigrationLoader:
                 if self.ignore_no_migrations:
                     return None
                 else:
-                    raise ValueError(
-                        "Dependency on app with no migrations: %s" % key[0]
-                    )
-        raise ValueError("Dependency on unknown app: %s" % key[0])
+                    raise ValueError(f"Dependency on app with no migrations: {key[0]}")
+        raise ValueError(f"Dependency on unknown app: {key[0]}")
 
     def add_internal_dependencies(self, key, migration):
         """
@@ -295,12 +289,10 @@ class MigrationLoader:
                 if not is_replaced:
                     tries = ", ".join("{}.{}".format(*c) for c in candidates)
                     raise NodeNotFoundError(
-                        "Migration {0} depends on nonexistent node ('{1}', '{2}'). "
-                        "Plain tried to replace migration {1}.{2} with any of [{3}] "
+                        f"Migration {exc.origin} depends on nonexistent node ('{exc.node[0]}', '{exc.node[1]}'). "
+                        f"Plain tried to replace migration {exc.node[0]}.{exc.node[1]} with any of [{tries}] "
                         "but wasn't able to because some of the replaced migrations "
-                        "are already applied.".format(
-                            exc.origin, exc.node[0], exc.node[1], tries
-                        ),
+                        "are already applied.",
                         exc.node,
                     ) from exc
             raise
@@ -327,14 +319,8 @@ class MigrationLoader:
                         ):
                             continue
                     raise InconsistentMigrationHistory(
-                        "Migration {}.{} is applied before its dependency "
-                        "{}.{} on database '{}'.".format(
-                            migration[0],
-                            migration[1],
-                            parent[0],
-                            parent[1],
-                            connection.alias,
-                        )
+                        f"Migration {migration[0]}.{migration[1]} is applied before its dependency "
+                        f"{parent[0]}.{parent[1]} on database '{connection.alias}'."
                     )
 
     def detect_conflicts(self):

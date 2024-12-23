@@ -1,28 +1,18 @@
-[tool.poetry]
-
+[project]
 name = "plain.htmx"
-packages = [
-    { include = "plain" },
-]
-
 version = "0.3.0"
 description = "HTMX integration for Plain."
-authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"
-repository = "https://github.com/dropseed/plain"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-plain = "<1.0.0"
-
-[tool.poetry.group.dev.dependencies]
-plain = { path = "../plain", develop = true }
-pytest = "^7.1.2"
-ipdb = "^0.13.9"
-black = "^23.1.0"
-isort = "^5.10.1"
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

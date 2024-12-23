@@ -133,8 +133,8 @@ class MigrationGraph:
             replacement_node = self.node_map[replacement]
         except KeyError as err:
             raise NodeNotFoundError(
-                "Unable to find replacement node {!r}. It was either never added"
-                " to the migration graph, or has been removed.".format(replacement),
+                f"Unable to find replacement node {replacement!r}. It was either never added"
+                " to the migration graph, or has been removed.",
                 replacement,
             ) from err
         for replaced_key in replaced:
@@ -168,10 +168,8 @@ class MigrationGraph:
             replacement_node = self.node_map.pop(replacement)
         except KeyError as err:
             raise NodeNotFoundError(
-                "Unable to remove replacement node {!r}. It was either never added"
-                " to the migration graph, or has been removed already.".format(
-                    replacement
-                ),
+                f"Unable to remove replacement node {replacement!r}. It was either never added"
+                " to the migration graph, or has been removed already.",
                 replacement,
             ) from err
         replaced_nodes = set()

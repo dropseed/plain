@@ -4,5 +4,3 @@ dependencies:
   path: .
   settings:
     before_commit: npm run copy-static
-- type: python
-  path: poetry.lock

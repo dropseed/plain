@@ -35,7 +35,7 @@ class PackageConfig:
             self.label = package_name.rpartition(".")[2]
         if not self.label.isidentifier():
             raise ImproperlyConfigured(
-                "The app label '%s' is not a valid Python identifier." % self.label
+                f"The app label '{self.label}' is not a valid Python identifier."
             )
 
         # Filesystem path to the application directory e.g.
@@ -71,15 +71,15 @@ class PackageConfig:
                 paths = list(set(paths))
         if len(paths) > 1:
             raise ImproperlyConfigured(
-                "The app module {!r} has multiple filesystem locations ({!r}); "
+                f"The app module {module!r} has multiple filesystem locations ({paths!r}); "
                 "you must configure this app with an PackageConfig subclass "
-                "with a 'path' class attribute.".format(module, paths)
+                "with a 'path' class attribute."
             )
         elif not paths:
             raise ImproperlyConfigured(
-                "The app module %r has no filesystem location, "
+                f"The app module {module!r} has no filesystem location, "
                 "you must configure this app with an PackageConfig subclass "
-                "with a 'path' class attribute." % module
+                "with a 'path' class attribute."
             )
         return paths[0]
 
@@ -170,7 +170,7 @@ class PackageConfig:
                 ]
                 msg = f"Module '{mod_path}' does not contain a '{cls_name}' class."
                 if candidates:
-                    msg += " Choices are: %s." % ", ".join(candidates)
+                    msg += " Choices are: {}.".format(", ".join(candidates))
                 raise ImportError(msg)
             else:
                 # Re-trigger the module import exception.
@@ -179,9 +179,7 @@ class PackageConfig:
         # Check for obvious errors. (This check prevents duck typing, but
         # it could be removed if it became a problem in practice.)
         if not issubclass(package_config_class, PackageConfig):
-            raise ImproperlyConfigured(
-                "'%s' isn't a subclass of PackageConfig." % entry
-            )
+            raise ImproperlyConfigured(f"'{entry}' isn't a subclass of PackageConfig.")
 
         # Obtain package name here rather than in PackageClass.__init__ to keep
         # all error checking for entries in INSTALLED_PACKAGES in one place.
@@ -189,18 +187,14 @@ class PackageConfig:
             try:
                 package_name = package_config_class.name
             except AttributeError:
-                raise ImproperlyConfigured("'%s' must supply a name attribute." % entry)
+                raise ImproperlyConfigured(f"'{entry}' must supply a name attribute.")
 
         # Ensure package_name points to a valid module.
         try:
             package_module = import_module(package_name)
         except ImportError:
             raise ImproperlyConfigured(
-                "Cannot import '{}'. Check that '{}.{}.name' is correct.".format(
-                    package_name,
-                    package_config_class.__module__,
-                    package_config_class.__qualname__,
-                )
+                f"Cannot import '{package_name}'. Check that '{package_config_class.__module__}.{package_config_class.__qualname__}.name' is correct."
             )
 
         # Entry is a path to an app config class.

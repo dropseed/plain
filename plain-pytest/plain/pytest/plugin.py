@@ -15,19 +15,19 @@ def _allowed_hosts_testserver():
     plain_settings.ALLOWED_HOSTS = [*plain_settings.ALLOWED_HOSTS, "testserver"]
 
 
-@pytest.fixture()
+@pytest.fixture
 def client() -> Client:
     """A Plain test client instance."""
     return Client()
 
 
-@pytest.fixture()
+@pytest.fixture
 def request_factory() -> RequestFactory:
     """A Plain RequestFactory instance."""
     return RequestFactory()
 
 
-@pytest.fixture()
+@pytest.fixture
 def settings():
     class SettingsProxy:
         def __init__(self):

@@ -69,7 +69,7 @@ def reverse(viewname, urlconf=None, args=None, kwargs=None, using_namespace=None
                         )
                     )
                 else:
-                    raise NoReverseMatch("%s is not a registered namespace" % key)
+                    raise NoReverseMatch(f"{key} is not a registered namespace")
         if ns_pattern:
             resolver = get_ns_resolver(
                 ns_pattern, resolver, tuple(ns_converters.items())

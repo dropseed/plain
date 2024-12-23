@@ -7,7 +7,7 @@ from plain.exceptions import SuspiciousFileOperation
 def validate_file_name(name, allow_relative_path=False):
     # Remove potentially dangerous names
     if os.path.basename(name) in {"", ".", ".."}:
-        raise SuspiciousFileOperation("Could not derive file name from '%s'" % name)
+        raise SuspiciousFileOperation(f"Could not derive file name from '{name}'")
 
     if allow_relative_path:
         # Use PurePosixPath() because this branch is checked only in
@@ -16,10 +16,10 @@ def validate_file_name(name, allow_relative_path=False):
         path = pathlib.PurePosixPath(name)
         if path.is_absolute() or ".." in path.parts:
             raise SuspiciousFileOperation(
-                "Detected path traversal attempt in '%s'" % name
+                f"Detected path traversal attempt in '{name}'"
             )
     elif name != os.path.basename(name):
-        raise SuspiciousFileOperation("File name '%s' includes path elements" % name)
+        raise SuspiciousFileOperation(f"File name '{name}' includes path elements")
 
     return name
 

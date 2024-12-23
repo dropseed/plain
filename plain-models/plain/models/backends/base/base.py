@@ -150,7 +150,7 @@ class BaseDatabaseWrapper:
         the database.
         """
         if self.settings_dict["TIME_ZONE"] is None:
-            return datetime.timezone.utc
+            return datetime.UTC
         else:
             return zoneinfo.ZoneInfo(self.settings_dict["TIME_ZONE"])
 
@@ -172,8 +172,8 @@ class BaseDatabaseWrapper:
     def queries(self):
         if len(self.queries_log) == self.queries_log.maxlen:
             warnings.warn(
-                "Limit for query logging exceeded, only the last {} queries "
-                "will be returned.".format(self.queries_log.maxlen)
+                f"Limit for query logging exceeded, only the last {self.queries_log.maxlen} queries "
+                "will be returned."
             )
         return list(self.queries_log)
 
@@ -372,7 +372,7 @@ class BaseDatabaseWrapper:
         tid = str(thread_ident).replace("-", "")
 
         self.savepoint_state += 1
-        sid = "s%s_x%d" % (tid, self.savepoint_state)
+        sid = "s%s_x%d" % (tid, self.savepoint_state)  # noqa: UP031
 
         self.validate_thread_sharing()
         self._savepoint(sid)
@@ -620,10 +620,8 @@ class BaseDatabaseWrapper:
             raise DatabaseError(
                 "DatabaseWrapper objects created in a "
                 "thread can only be used in that same thread. The object "
-                "with alias '{}' was created in thread id {} and this is "
-                "thread id {}.".format(
-                    self.alias, self._thread_ident, _thread.get_ident()
-                )
+                f"with alias '{self.alias}' was created in thread id {self._thread_ident} and this is "
+                f"thread id {_thread.get_ident()}."
             )
 
     # ##### Miscellaneous #####

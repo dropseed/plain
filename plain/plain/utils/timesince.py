@@ -63,7 +63,7 @@ def timesince(d, now=None, reversed=False, time_strings=None, depth=2):
     if now and not isinstance(now, datetime.datetime):
         now = datetime.datetime(now.year, now.month, now.day)
 
-    now = now or datetime.datetime.now(datetime.timezone.utc if is_aware(d) else None)
+    now = now or datetime.datetime.now(datetime.UTC if is_aware(d) else None)
 
     if reversed:
         d, now = now, d

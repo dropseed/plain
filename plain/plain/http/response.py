@@ -72,7 +72,7 @@ class ResponseHeaders(CaseInsensitiveMapping):
             if mime_encode:
                 value = Header(value, "utf-8", maxlinelen=sys.maxsize).encode()
             else:
-                e.reason += ", HTTP response headers must be in %s format" % charset
+                e.reason += f", HTTP response headers must be in {charset} format"
                 raise
         return value
 
@@ -181,7 +181,7 @@ class ResponseBase:
     @property
     def _content_type_for_repr(self):
         return (
-            ', "%s"' % self.headers["Content-Type"]
+            ', "{}"'.format(self.headers["Content-Type"])
             if "Content-Type" in self.headers
             else ""
         )
@@ -236,8 +236,8 @@ class ResponseBase:
         if expires is not None:
             if isinstance(expires, datetime.datetime):
                 if timezone.is_naive(expires):
-                    expires = timezone.make_aware(expires, datetime.timezone.utc)
-                delta = expires - datetime.datetime.now(tz=datetime.timezone.utc)
+                    expires = timezone.make_aware(expires, datetime.UTC)
+                delta = expires - datetime.datetime.now(tz=datetime.UTC)
                 # Add one second so the date matches exactly (a fraction of
                 # time gets lost between converting to a timedelta and
                 # then the date string).
@@ -332,14 +332,14 @@ class ResponseBase:
         signals.request_finished.send(sender=self._handler_class)
 
     def write(self, content):
-        raise OSError("This %s instance is not writable" % self.__class__.__name__)
+        raise OSError(f"This {self.__class__.__name__} instance is not writable")
 
     def flush(self):
         pass
 
     def tell(self):
         raise OSError(
-            "This %s instance cannot tell its position" % self.__class__.__name__
+            f"This {self.__class__.__name__} instance cannot tell its position"
         )
 
     # These methods partially implement a stream-like object interface.
@@ -355,7 +355,7 @@ class ResponseBase:
         return False
 
     def writelines(self, lines):
-        raise OSError("This %s instance is not writable" % self.__class__.__name__)
+        raise OSError(f"This {self.__class__.__name__} instance is not writable")
 
 
 class Response(ResponseBase):
@@ -390,7 +390,7 @@ class Response(ResponseBase):
         return obj_dict
 
     def __repr__(self):
-        return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {
+        return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__name__,
             "status_code": self.status_code,
             "content_type": self._content_type_for_repr,
@@ -461,7 +461,7 @@ class StreamingResponse(ResponseBase):
         self.streaming_content = streaming_content
 
     def __repr__(self):
-        return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {
+        return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__qualname__,
             "status_code": self.status_code,
             "content_type": self._content_type_for_repr,
@@ -470,8 +470,8 @@ class StreamingResponse(ResponseBase):
     @property
     def content(self):
         raise AttributeError(
-            "This %s instance has no `content` attribute. Use "
-            "`streaming_content` instead." % self.__class__.__name__
+            f"This {self.__class__.__name__} instance has no `content` attribute. Use "
+            "`streaming_content` instead."
         )
 
     @property
@@ -586,14 +586,14 @@ class ResponseRedirectBase(Response):
         parsed = urlparse(str(redirect_to))
         if parsed.scheme and parsed.scheme not in self.allowed_schemes:
             raise DisallowedRedirect(
-                "Unsafe redirect to URL with protocol '%s'" % parsed.scheme
+                f"Unsafe redirect to URL with protocol '{parsed.scheme}'"
             )
 
     url = property(lambda self: self["Location"])
 
     def __repr__(self):
         return (
-            '<%(cls)s status_code=%(status_code)d%(content_type)s, url="%(url)s">'
+            '<%(cls)s status_code=%(status_code)d%(content_type)s, url="%(url)s">'  # noqa: UP031
             % {
                 "cls": self.__class__.__name__,
                 "status_code": self.status_code,
@@ -661,7 +661,7 @@ class ResponseNotAllowed(Response):
         self["Allow"] = ", ".join(permitted_methods)
 
     def __repr__(self):
-        return "<%(cls)s [%(methods)s] status_code=%(status_code)d%(content_type)s>" % {
+        return "<%(cls)s [%(methods)s] status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__name__,
             "status_code": self.status_code,
             "content_type": self._content_type_for_repr,

@@ -1,0 +1,87 @@
+[project]
+name = "plain-workspace"
+version = "0.0.0"
+requires-python = ">=3.11"
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.1.0",
+    "ipdb>=0.13.9",
+    "plain",
+    # "plain-auth",
+    # "plain-cache",
+    # "plain-code",
+    # "plain-dev",
+    # "plain-elements",
+    # "plain-flags",
+    # "plain-htmx",
+    # "plain-importmap",
+    # "plain-loginlink",
+    # "plain-mail",
+    # "plain-models",
+    # "plain-oauth",
+    # "plain-pages",
+    # "plain-passwords",
+    # "plain-pytest",
+    # "plain-sessions",
+    # "plain-staff",
+    # "plain-tailwind",
+    # "plain-tunnel",
+    # "plain-vendor",
+    # "plain-worker",
+]
+
+[tool.uv.sources]
+plain = { workspace = true }
+plain-auth = { workspace = true }
+plain-cache = { workspace = true }
+plain-code = { workspace = true }
+plain-dev = { workspace = true }
+plain-elements = { workspace = true }
+plain-flags = { workspace = true }
+plain-htmx = { workspace = true }
+plain-importmap = { workspace = true }
+plain-loginlink = { workspace = true }
+plain-mail = { workspace = true }
+plain-models = { workspace = true }
+plain-oauth = { workspace = true }
+plain-pages = { workspace = true }
+plain-passwords = { workspace = true }
+plain-pytest = { workspace = true }
+plain-sessions = { workspace = true }
+plain-staff = { workspace = true }
+plain-tailwind = { workspace = true }
+plain-tunnel = { workspace = true }
+plain-vendor = { workspace = true }
+plain-worker = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "plain",
+    "plain-auth",
+    "plain-cache",
+    "plain-code",
+    "plain-dev",
+    "plain-elements",
+    "plain-flags",
+    "plain-htmx",
+    "plain-importmap",
+    "plain-loginlink",
+    "plain-mail",
+    "plain-models",
+    "plain-oauth",
+    "plain-pages",
+    "plain-passwords",
+    "plain-pytest",
+    "plain-sessions",
+    "plain-staff",
+    "plain-tailwind",
+    "plain-tunnel",
+    "plain-vendor",
+    "plain-worker",
+]
+
+[tool.ruff]
+extend = "plain-code/plain/code/ruff_defaults.toml"
+target-version = "py311"
+extend-exclude = ["plain-pytest/plain/pytest/pytest"]

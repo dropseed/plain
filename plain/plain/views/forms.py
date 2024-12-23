@@ -20,8 +20,8 @@ class FormView(TemplateView):
         """Return an instance of the form to be used in this view."""
         if not self.form_class:
             raise ImproperlyConfigured(
-                "No form class provided. Define {cls}.form_class or override "
-                "{cls}.get_form().".format(cls=self.__class__.__name__)
+                f"No form class provided. Define {self.__class__.__name__}.form_class or override "
+                f"{self.__class__.__name__}.get_form()."
             )
         return self.form_class(**self.get_form_kwargs())
 

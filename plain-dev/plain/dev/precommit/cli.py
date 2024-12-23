@@ -1,11 +1,11 @@
 import os
 import subprocess
 import sys
+import tomllib
 from importlib.util import find_spec
 from pathlib import Path
 
 import click
-import tomllib
 
 from plain.cli.print import print_event
 
@@ -56,8 +56,8 @@ def cli(install):
         if find_spec("plain.code"):
             check_short("Running plain code checks", "plain", "code", "check")
 
-        if Path("poetry.lock").exists():
-            check_short("Checking poetry.lock", "poetry", "check", "--lock")
+        if Path("uv.lock").exists():
+            check_short("Checking uv.lock", "uv", "lock", "--locked")
 
         if plain_db_connected():
             check_short(

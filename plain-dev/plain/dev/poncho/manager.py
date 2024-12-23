@@ -91,7 +91,7 @@ class Manager:
         """
 
         def _terminate(signum, frame):
-            self._system_print("%s received\n" % SIGNALS[signum]["name"])
+            self._system_print("{} received\n".format(SIGNALS[signum]["name"]))
             self.returncode = SIGNALS[signum]["rc"]
             self.terminate()
 

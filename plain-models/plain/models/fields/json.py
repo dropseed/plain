@@ -65,7 +65,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
             ):
                 errors.append(
                     preflight.Error(
-                        "%s does not support JSONFields." % connection.display_name,
+                        f"{connection.display_name} does not support JSONFields.",
                         obj=self.model,
                         id="fields.E180",
                     )
@@ -160,7 +160,7 @@ def compile_json_path(key_transforms, include_root=True):
             path.append(".")
             path.append(json.dumps(key_transform))
         else:
-            path.append("[%s]" % num)
+            path.append(f"[{num}]")
     return "".join(path)
 
 
@@ -199,7 +199,7 @@ class HasKeyLookup(PostgresOperatorLookup):
 
     def compile_json_path_final_key(self, key_transform):
         # Compile the final key without interpreting ints as array elements.
-        return ".%s" % json.dumps(key_transform)
+        return f".{json.dumps(key_transform)}"
 
     def as_sql(self, compiler, connection, template=None):
         # Process JSON path from the left-hand side.
@@ -228,7 +228,7 @@ class HasKeyLookup(PostgresOperatorLookup):
             rhs_params.append(lhs_json_path + rhs_json_path)
         # Add condition for each key.
         if self.logical_operator:
-            sql = "(%s)" % self.logical_operator.join([sql] * len(rhs_params))
+            sql = f"({self.logical_operator.join([sql] * len(rhs_params))})"
         return sql, tuple(lhs_params) + tuple(rhs_params)
 
     def as_mysql(self, compiler, connection):
@@ -287,13 +287,13 @@ class CaseInsensitiveMixin:
     def process_lhs(self, compiler, connection):
         lhs, lhs_params = super().process_lhs(compiler, connection)
         if connection.vendor == "mysql":
-            return "LOWER(%s)" % lhs, lhs_params
+            return f"LOWER({lhs})", lhs_params
         return lhs, lhs_params
 
     def process_rhs(self, compiler, connection):
         rhs, rhs_params = super().process_rhs(compiler, connection)
         if connection.vendor == "mysql":
-            return "LOWER(%s)" % rhs, rhs_params
+            return f"LOWER({rhs})", rhs_params
         return rhs, rhs_params
 
 
@@ -344,7 +344,7 @@ class KeyTransform(Transform):
     def as_mysql(self, compiler, connection):
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
         json_path = compile_json_path(key_transforms)
-        return "JSON_EXTRACT(%s, %%s)" % lhs, tuple(params) + (json_path,)
+        return f"JSON_EXTRACT({lhs}, %s)", tuple(params) + (json_path,)
 
     def as_postgresql(self, compiler, connection):
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
@@ -378,11 +378,11 @@ class KeyTextTransform(KeyTransform):
         if connection.mysql_is_mariadb:
             # MariaDB doesn't support -> and ->> operators (see MDEV-13594).
             sql, params = super().as_mysql(compiler, connection)
-            return "JSON_UNQUOTE(%s)" % sql, params
+            return f"JSON_UNQUOTE({sql})", params
         else:
             lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
             json_path = compile_json_path(key_transforms)
-            return "(%s ->> %%s)" % lhs, tuple(params) + (json_path,)
+            return f"({lhs} ->> %s)", tuple(params) + (json_path,)
 
     @classmethod
     def from_lookup(cls, lookup):
@@ -450,7 +450,7 @@ class KeyTransformIn(lookups.In):
             ):
                 sql = "JSON_EXTRACT(%s, '$')"
         if connection.vendor == "mysql" and connection.mysql_is_mariadb:
-            sql = "JSON_UNQUOTE(%s)" % sql
+            sql = f"JSON_UNQUOTE({sql})"
         return sql, params
 
 

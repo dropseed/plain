@@ -18,6 +18,6 @@ def clear_expired():
         engine.SessionStore.clear_expired()
     except NotImplementedError:
         raise NotImplementedError(
-            "Session engine '%s' doesn't support clearing expired "
-            "sessions." % settings.SESSION_ENGINE
+            f"Session engine '{settings.SESSION_ENGINE}' doesn't support clearing expired "
+            "sessions."
         )

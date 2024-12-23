@@ -198,7 +198,7 @@ class MultiValueDict(dict):
     def update(self, *args, **kwargs):
         """Extend rather than replace existing key lists."""
         if len(args) > 1:
-            raise TypeError("update expected at most 1 argument, got %d" % len(args))
+            raise TypeError("update expected at most 1 argument, got %d" % len(args))  # noqa: UP031
         if args:
             arg = args[0]
             if isinstance(arg, MultiValueDict):
@@ -340,6 +340,6 @@ class CaseInsensitiveMapping(Mapping):
                 )
             if not isinstance(elem[0], str):
                 raise ValueError(
-                    "Element key %r invalid, only strings are allowed" % elem[0]
+                    f"Element key {elem[0]!r} invalid, only strings are allowed"
                 )
             yield elem

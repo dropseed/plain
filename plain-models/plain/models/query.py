@@ -333,10 +333,8 @@ class QuerySet(AltersData):
         if pickled_version:
             if pickled_version != plain.runtime.__version__:
                 warnings.warn(
-                    "Pickled queryset instance's Plain version {} does not "
-                    "match the current version {}.".format(
-                        pickled_version, plain.runtime.__version__
-                    ),
+                    f"Pickled queryset instance's Plain version {pickled_version} does not "
+                    f"match the current version {plain.runtime.__version__}.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -384,8 +382,7 @@ class QuerySet(AltersData):
         """Retrieve an item or slice from the set of results."""
         if not isinstance(k, int | slice):
             raise TypeError(
-                "QuerySet indices must be integers or slices, not %s."
-                % type(k).__name__
+                f"QuerySet indices must be integers or slices, not {type(k).__name__}."
             )
         if (isinstance(k, int) and k < 0) or (
             isinstance(k, slice)
@@ -553,8 +550,8 @@ class QuerySet(AltersData):
         """
         if self.query.combinator and (args or kwargs):
             raise NotSupportedError(
-                "Calling QuerySet.get(...) with filters after %s() is not "
-                "supported." % self.query.combinator
+                f"Calling QuerySet.get(...) with filters after {self.query.combinator}() is not "
+                "supported."
             )
         clone = self._chain() if self.query.combinator else self.filter(*args, **kwargs)
         if self.query.can_filter() and not self.query.distinct_fields:
@@ -571,7 +568,7 @@ class QuerySet(AltersData):
             return clone._result_cache[0]
         if not num:
             raise self.model.DoesNotExist(
-                "%s matching query does not exist." % self.model._meta.object_name
+                f"{self.model._meta.object_name} matching query does not exist."
             )
         raise self.model.MultipleObjectsReturned(
             "get() returned more than one {} -- it returned {}!".format(
@@ -984,8 +981,7 @@ class QuerySet(AltersData):
             and self.query.distinct_fields != (field_name,)
         ):
             raise ValueError(
-                "in_bulk()'s field_name must be a unique field but %r isn't."
-                % field_name
+                f"in_bulk()'s field_name must be a unique field but {field_name!r} isn't."
             )
         if id_list is not None:
             if not id_list:
@@ -1474,8 +1470,8 @@ class QuerySet(AltersData):
             try:
                 if arg.default_alias in kwargs:
                     raise ValueError(
-                        "The named annotation '%s' conflicts with the "
-                        "default name for another annotation." % arg.default_alias
+                        f"The named annotation '{arg.default_alias}' conflicts with the "
+                        "default name for another annotation."
                     )
             except TypeError:
                 raise TypeError("Complex annotations require an alias")
@@ -1497,8 +1493,7 @@ class QuerySet(AltersData):
         for alias, annotation in annotations.items():
             if alias in names:
                 raise ValueError(
-                    "The annotation '%s' conflicts with a field on "
-                    "the model." % alias
+                    f"The annotation '{alias}' conflicts with a field on " "the model."
                 )
             if isinstance(annotation, FilteredRelation):
                 clone.query.add_filtered_relation(annotation, alias)
@@ -1772,8 +1767,7 @@ class QuerySet(AltersData):
             or set(self.query.annotation_select) != set(other.query.annotation_select)
         ):
             raise TypeError(
-                "Merging '%s' classes must involve the same values in each case."
-                % self.__class__.__name__
+                f"Merging '{self.__class__.__name__}' classes must involve the same values in each case."
             )
 
     def _merge_known_related_objects(self, other):
@@ -1825,9 +1819,7 @@ class QuerySet(AltersData):
     def _not_support_combined_queries(self, operation_name):
         if self.query.combinator:
             raise NotSupportedError(
-                "Calling QuerySet.{}() after {}() is not supported.".format(
-                    operation_name, self.query.combinator
-                )
+                f"Calling QuerySet.{operation_name}() after {self.query.combinator}() is not supported."
             )
 
     def _check_operator_queryset(self, other, operator_):
@@ -2097,9 +2089,8 @@ def prefetch_related_objects(model_instances, *related_lookups):
         if lookup.prefetch_to in done_queries:
             if lookup.queryset is not None:
                 raise ValueError(
-                    "'%s' lookup was already seen with a different queryset. "
+                    f"'{lookup.prefetch_to}' lookup was already seen with a different queryset. "
                     "You may need to adjust the ordering of your lookups."
-                    % lookup.prefetch_to
                 )
 
             continue
@@ -2152,12 +2143,8 @@ def prefetch_related_objects(model_instances, *related_lookups):
 
             if not attr_found:
                 raise AttributeError(
-                    "Cannot find '{}' on {} object, '{}' is an invalid "
-                    "parameter to prefetch_related()".format(
-                        through_attr,
-                        first_obj.__class__.__name__,
-                        lookup.prefetch_through,
-                    )
+                    f"Cannot find '{through_attr}' on {first_obj.__class__.__name__} object, '{lookup.prefetch_through}' is an invalid "
+                    "parameter to prefetch_related()"
                 )
 
             if level == len(through_attrs) - 1 and prefetcher is None:
@@ -2165,9 +2152,9 @@ def prefetch_related_objects(model_instances, *related_lookups):
                 # prefetching, otherwise there is no point adding it and the
                 # developer asking for it has made a mistake.
                 raise ValueError(
-                    "'%s' does not resolve to an item that supports "
+                    f"'{lookup.prefetch_through}' does not resolve to an item that supports "
                     "prefetching - this is an invalid parameter to "
-                    "prefetch_related()." % lookup.prefetch_through
+                    "prefetch_related()."
                 )
 
             obj_to_fetch = None

@@ -178,7 +178,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             )
         if len(settings_dict["NAME"] or "") > self.ops.max_name_length():
             raise ImproperlyConfigured(
-                "The database name '%s' (%d characters) is longer than "
+                "The database name '%s' (%d characters) is longer than "  # noqa: UP031
                 "PostgreSQL's limit of %d characters. Supply a shorter NAME "
                 "in settings.DATABASES."
                 % (
@@ -328,7 +328,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         task_ident = "sync"
         # Use that and the thread ident to get a unique name
         return self._cursor(
-            name="_plain_curs_%d_%s_%d"
+            name="_plain_curs_%d_%s_%d"  # noqa: UP031
             % (
                 # Avoid reusing name in other threads / tasks
                 threading.current_thread().ident,
@@ -450,5 +450,5 @@ else:
                 return self.cursor.copy_expert(sql, file, *args)
 
         def copy_to(self, file, table, *args, **kwargs):
-            with self.debug_sql(sql="COPY %s TO STDOUT" % table):
+            with self.debug_sql(sql=f"COPY {table} TO STDOUT"):
                 return self.cursor.copy_to(file, table, *args, **kwargs)

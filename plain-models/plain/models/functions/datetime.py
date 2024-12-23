@@ -93,15 +93,13 @@ class Extract(TimezoneMixin, Transform):
                 "TimeField, or DurationField."
             )
         # Passing dates to functions expecting datetimes is most likely a mistake.
-        if type(field) == DateField and copy.lookup_name in (
+        if type(field) == DateField and copy.lookup_name in (  # noqa: E721
             "hour",
             "minute",
             "second",
         ):
             raise ValueError(
-                "Cannot extract time component '{}' from DateField '{}'.".format(
-                    copy.lookup_name, field.name
-                )
+                f"Cannot extract time component '{copy.lookup_name}' from DateField '{field.name}'."
             )
         if isinstance(field, DurationField) and copy.lookup_name in (
             "year",
@@ -113,9 +111,7 @@ class Extract(TimezoneMixin, Transform):
             "quarter",
         ):
             raise ValueError(
-                "Cannot extract component '{}' from DurationField '{}'.".format(
-                    copy.lookup_name, field.name
-                )
+                f"Cannot extract component '{copy.lookup_name}' from DurationField '{field.name}'."
             )
         return copy
 
@@ -284,7 +280,7 @@ class TruncBase(TimezoneMixin, Transform):
         # DateTimeField is a subclass of DateField so this works for both.
         if not isinstance(field, DateField | TimeField):
             raise TypeError(
-                "%r isn't a DateField, TimeField, or DateTimeField." % field.name
+                f"{field.name!r} isn't a DateField, TimeField, or DateTimeField."
             )
         # If self.output_field was None, then accessing the field will trigger
         # the resolver to assign it to self.lhs.output_field.
@@ -303,7 +299,7 @@ class TruncBase(TimezoneMixin, Transform):
         has_explicit_output_field = (
             class_output_field or field.__class__ is not copy.output_field.__class__
         )
-        if type(field) == DateField and (
+        if type(field) == DateField and (  # noqa: E721
             isinstance(output_field, DateTimeField)
             or copy.kind in ("hour", "minute", "second", "time")
         ):

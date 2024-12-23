@@ -69,8 +69,8 @@ class DatabaseOperations(BaseDatabaseOperations):
             # PostgreSQL configuration so we need to explicitly cast them.
             # We must also remove components of the type within brackets:
             # varchar(255) -> varchar.
-            return (
-                "CAST(%%s AS %s)" % output_field.db_type(self.connection).split("(")[0]
+            return "CAST(%s AS {})".format(
+                output_field.db_type(self.connection).split("(")[0]
             )
         return "%s"
 
@@ -185,7 +185,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         # Use UPPER(x) for case-insensitive lookups; it's faster.
         if lookup_type in ("iexact", "icontains", "istartswith", "iendswith"):
-            lookup = "UPPER(%s)" % lookup
+            lookup = f"UPPER({lookup})"
 
         return lookup
 
@@ -198,7 +198,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def quote_name(self, name):
         if name.startswith('"') and name.endswith('"'):
             return name  # Quoting once is enough.
-        return '"%s"' % name
+        return f'"{name}"'
 
     def compose_sql(self, sql, params):
         return mogrify(sql, params, self.connection)
@@ -226,9 +226,9 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def tablespace_sql(self, tablespace, inline=False):
         if inline:
-            return "USING INDEX TABLESPACE %s" % self.quote_name(tablespace)
+            return f"USING INDEX TABLESPACE {self.quote_name(tablespace)}"
         else:
-            return "TABLESPACE %s" % self.quote_name(tablespace)
+            return f"TABLESPACE {self.quote_name(tablespace)}"
 
     def sequence_reset_sql(self, style, model_list):
         from plain import models
@@ -282,7 +282,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def distinct_sql(self, fields, params):
         if fields:
             params = [param for param_list in params for param in param_list]
-            return (["DISTINCT ON (%s)" % ", ".join(fields)], params)
+            return (["DISTINCT ON ({})".format(", ".join(fields))], params)
         else:
             return ["DISTINCT"], []
 
@@ -307,17 +307,14 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not fields:
             return "", ()
         columns = [
-            "{}.{}".format(
-                self.quote_name(field.model._meta.db_table),
-                self.quote_name(field.column),
-            )
+            f"{self.quote_name(field.model._meta.db_table)}.{self.quote_name(field.column)}"
             for field in fields
         ]
-        return "RETURNING %s" % ", ".join(columns), ()
+        return "RETURNING {}".format(", ".join(columns)), ()
 
     def bulk_insert_sql(self, fields, placeholder_rows):
         placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
-        values_sql = ", ".join("(%s)" % sql for sql in placeholder_rows_sql)
+        values_sql = ", ".join(f"({sql})" for sql in placeholder_rows_sql)
         return "VALUES " + values_sql
 
     if is_psycopg3:
@@ -371,7 +368,9 @@ class DatabaseOperations(BaseDatabaseOperations):
         if format:
             extra["FORMAT"] = format
         if extra:
-            prefix += " (%s)" % ", ".join("{} {}".format(*i) for i in extra.items())
+            prefix += " ({})".format(
+                ", ".join("{} {}".format(*i) for i in extra.items())
+            )
         return prefix
 
     def on_conflict_suffix_sql(self, fields, on_conflict, update_fields, unique_fields):

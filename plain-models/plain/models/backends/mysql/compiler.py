@@ -36,8 +36,7 @@ class SQLDeleteCompiler(compiler.SQLDeleteCompiler, SQLCompiler):
             # and the subquery wrapping (necessary to emulate QUALIFY).
             return super().as_sql()
         result = [
-            "DELETE %s FROM"
-            % self.quote_name_unless_alias(self.query.get_initial_alias())
+            f"DELETE {self.quote_name_unless_alias(self.query.get_initial_alias())} FROM"
         ]
         from_sql, params = self.get_from_clause()
         result.extend(from_sql)
@@ -46,7 +45,7 @@ class SQLDeleteCompiler(compiler.SQLDeleteCompiler, SQLCompiler):
         except FullResultSet:
             pass
         else:
-            result.append("WHERE %s" % where_sql)
+            result.append(f"WHERE {where_sql}")
             params.extend(where_params)
         return " ".join(result), tuple(params)
 

@@ -41,10 +41,7 @@ class BaseDatabaseCreation:
                 action = "Using existing"
 
             self.log(
-                "{} test database for alias {}...".format(
-                    action,
-                    self._get_database_display_str(verbosity, test_database_name),
-                )
+                f"{action} test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
             )
 
         # We could skip this call if keepdb is True, but we instead
@@ -163,7 +160,7 @@ class BaseDatabaseCreation:
         """
         return "'{}'{}".format(
             self.connection.alias,
-            (" ('%s')" % database_name) if verbosity >= 2 else "",
+            (f" ('{database_name}')") if verbosity >= 2 else "",
         )
 
     def _get_test_db_name(self):
@@ -199,11 +196,11 @@ class BaseDatabaseCreation:
                 if keepdb:
                     return test_database_name
 
-                self.log("Got an error creating the test database: %s" % e)
+                self.log(f"Got an error creating the test database: {e}")
                 if not autoclobber:
                     confirm = input(
                         "Type 'yes' if you would like to try deleting the test "
-                        "database '%s', or 'no' to cancel: " % test_database_name
+                        f"database '{test_database_name}', or 'no' to cancel: "
                     )
                 if autoclobber or confirm == "yes":
                     try:
@@ -220,7 +217,7 @@ class BaseDatabaseCreation:
                         )
                         self._execute_create_test_db(cursor, test_db_params, keepdb)
                     except Exception as e:
-                        self.log("Got an error recreating the test database: %s" % e)
+                        self.log(f"Got an error recreating the test database: {e}")
                         sys.exit(2)
                 else:
                     self.log("Tests cancelled.")
@@ -239,10 +236,7 @@ class BaseDatabaseCreation:
             if keepdb:
                 action = "Using existing clone"
             self.log(
-                "{} for alias {}...".format(
-                    action,
-                    self._get_database_display_str(verbosity, source_database_name),
-                )
+                f"{action} for alias {self._get_database_display_str(verbosity, source_database_name)}..."
             )
 
         # We could skip this call if keepdb is True, but we instead
@@ -289,10 +283,7 @@ class BaseDatabaseCreation:
             if keepdb:
                 action = "Preserving"
             self.log(
-                "{} test database for alias {}...".format(
-                    action,
-                    self._get_database_display_str(verbosity, test_database_name),
-                )
+                f"{action} test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
             )
 
         # if we want to preserve the database
@@ -315,7 +306,7 @@ class BaseDatabaseCreation:
         # connected to it.
         with self._nodb_cursor() as cursor:
             cursor.execute(
-                "DROP DATABASE %s" % self.connection.ops.quote_name(test_database_name)
+                f"DROP DATABASE {self.connection.ops.quote_name(test_database_name)}"
             )
 
     def sql_table_creation_suffix(self):

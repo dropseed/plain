@@ -172,7 +172,7 @@ class BaseForm:
         if not isinstance(error, ValidationError):
             raise TypeError(
                 "The argument `error` must be an instance of "
-                "`ValidationError`, not `%s`." % type(error).__name__
+                f"`ValidationError`, not `{type(error).__name__}`."
             )
 
         if hasattr(error, "error_dict"):
@@ -221,9 +221,9 @@ class BaseForm:
         self._post_clean()
 
     def _field_data_value(self, field, html_name):
-        if hasattr(self, "parse_%s" % html_name):
+        if hasattr(self, f"parse_{html_name}"):
             # Allow custom parsing from form data/files at the form level
-            return getattr(self, "parse_%s" % html_name)()
+            return getattr(self, f"parse_{html_name}")()
 
         return field.value_from_form_data(self.data, self.files, html_name)
 
@@ -242,8 +242,8 @@ class BaseForm:
                 else:
                     value = field.clean(value)
                 self.cleaned_data[name] = value
-                if hasattr(self, "clean_%s" % name):
-                    value = getattr(self, "clean_%s" % name)()
+                if hasattr(self, f"clean_{name}"):
+                    value = getattr(self, f"clean_{name}")()
                     self.cleaned_data[name] = value
             except ValidationError as e:
                 self.add_error(name, e)

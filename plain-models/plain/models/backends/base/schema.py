@@ -221,7 +221,7 @@ class BaseDatabaseSchemaEditor:
             # Autoincrement SQL (for backends with inline variant).
             col_type_suffix = field.db_type_suffix(connection=self.connection)
             if col_type_suffix:
-                definition += " %s" % col_type_suffix
+                definition += f" {col_type_suffix}"
             params.extend(extra_params)
             # FK.
             if field.remote_field and field.db_constraint:
@@ -603,9 +603,7 @@ class BaseDatabaseSchemaEditor:
                 namespace, _ = split_identifier(model._meta.db_table)
                 definition += " " + self.sql_create_column_inline_fk % {
                     "name": self._fk_constraint_name(model, field, constraint_suffix),
-                    "namespace": "%s." % self.quote_name(namespace)
-                    if namespace
-                    else "",
+                    "namespace": f"{self.quote_name(namespace)}." if namespace else "",
                     "column": self.quote_name(field.column),
                     "to_table": self.quote_name(to_table),
                     "to_column": self.quote_name(to_column),
@@ -706,10 +704,8 @@ class BaseDatabaseSchemaEditor:
             new_type is None and new_field.remote_field is None
         ):
             raise ValueError(
-                "Cannot alter field {} into {} - they do not properly define "
-                "db_type (are you using a badly-written custom field?)".format(
-                    old_field, new_field
-                ),
+                f"Cannot alter field {old_field} into {new_field} - they do not properly define "
+                "db_type (are you using a badly-written custom field?)",
             )
         elif (
             old_type is None
@@ -736,9 +732,9 @@ class BaseDatabaseSchemaEditor:
             return
         elif old_type is None or new_type is None:
             raise ValueError(
-                "Cannot alter field {} into {} - they are not compatible types "
+                f"Cannot alter field {old_field} into {new_field} - they are not compatible types "
                 "(you cannot alter to or from M2M fields, or add or remove "
-                "through= on M2M fields)".format(old_field, new_field)
+                "through= on M2M fields)"
             )
 
         self._alter_field(
@@ -792,11 +788,7 @@ class BaseDatabaseSchemaEditor:
             )
             if strict and len(fk_names) != 1:
                 raise ValueError(
-                    "Found wrong number ({}) of foreign key constraints for {}.{}".format(
-                        len(fk_names),
-                        model._meta.db_table,
-                        old_field.column,
-                    )
+                    f"Found wrong number ({len(fk_names)}) of foreign key constraints for {model._meta.db_table}.{old_field.column}"
                 )
             for fk_name in fk_names:
                 fks_dropped.add((old_field.column,))
@@ -818,11 +810,7 @@ class BaseDatabaseSchemaEditor:
             )
             if strict and len(constraint_names) != 1:
                 raise ValueError(
-                    "Found wrong number ({}) of unique constraints for {}.{}".format(
-                        len(constraint_names),
-                        model._meta.db_table,
-                        old_field.column,
-                    )
+                    f"Found wrong number ({len(constraint_names)}) of unique constraints for {model._meta.db_table}.{old_field.column}"
                 )
             for constraint_name in constraint_names:
                 self.execute(self._delete_unique_sql(model, constraint_name))
@@ -893,11 +881,7 @@ class BaseDatabaseSchemaEditor:
             )
             if strict and len(constraint_names) != 1:
                 raise ValueError(
-                    "Found wrong number ({}) of check constraints for {}.{}".format(
-                        len(constraint_names),
-                        model._meta.db_table,
-                        old_field.column,
-                    )
+                    f"Found wrong number ({len(constraint_names)}) of check constraints for {model._meta.db_table}.{old_field.column}"
                 )
             for constraint_name in constraint_names:
                 self.execute(self._delete_check_sql(model, constraint_name))
@@ -1275,9 +1259,8 @@ class BaseDatabaseSchemaEditor:
         and a unique digest and suffix.
         """
         _, table_name = split_identifier(table_name)
-        hash_suffix_part = "{}{}".format(
-            names_digest(table_name, *column_names, length=8),
-            suffix,
+        hash_suffix_part = (
+            f"{names_digest(table_name, *column_names, length=8)}{suffix}"
         )
         max_length = self.connection.ops.max_name_length() or 200
         # If everything fits into max_length, use that name.
@@ -1298,7 +1281,7 @@ class BaseDatabaseSchemaEditor:
         # Prepend D if needed to prevent the name from starting with an
         # underscore or a number (not permitted on Oracle).
         if index_name[0] == "_" or index_name[0].isdigit():
-            index_name = "D%s" % index_name[:-1]
+            index_name = f"D{index_name[:-1]}"
         return index_name
 
     def _get_index_tablespace_sql(self, model, fields, db_tablespace=None):
@@ -1717,10 +1700,7 @@ class BaseDatabaseSchemaEditor:
         constraint_names = self._constraint_names(model, primary_key=True)
         if strict and len(constraint_names) != 1:
             raise ValueError(
-                "Found wrong number ({}) of PK constraints for {}".format(
-                    len(constraint_names),
-                    model._meta.db_table,
-                )
+                f"Found wrong number ({len(constraint_names)}) of PK constraints for {model._meta.db_table}"
             )
         for constraint_name in constraint_names:
             self.execute(self._delete_primary_key_sql(model, constraint_name))

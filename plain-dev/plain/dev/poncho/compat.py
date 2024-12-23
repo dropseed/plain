@@ -2,6 +2,7 @@
 Compatibility layer and utilities, mostly for proper Windows and Python 3
 support.
 """
+
 import errno
 import os
 import signal

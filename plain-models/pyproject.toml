@@ -1,32 +1,35 @@
-[tool.poetry]
+[project]
 name = "plain.models"
-packages = [
-    { include = "plain" },
-]
 version = "0.10.0"
 description = "Database models for Plain."
-authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-# readme = "README.md"
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "sqlparse>=0.3.1",
+]
 
 # Make these available at the root level
-[tool.poetry.plugins."plain.cli"]
+[project.entry-points."plain.cli"]
 "makemigrations" = "plain.models.cli:makemigrations"
 "migrate" = "plain.models.cli:migrate"
 
-[tool.poetry.dependencies]
-python = "^3.11"
-plain = "<1.0.0"
-sqlparse = ">=0.3.1"
-
-[tool.poetry.group.dev.dependencies]
-plain = { path = "../plain", develop = true }
-"plain.pytest" = {path = "../plain-pytest", develop = true}
-coverage = "^7.6.0"
-
 # Automatically sets this up with pytest
-[tool.poetry.plugins."pytest11"]
+[project.entry-points."pytest11"]
 "plain.models" = "plain.models.test.pytest"
 
+[tool.uv]
+dev-dependencies = [
+    "plain.pytest<1.0.0",
+]
+
+[tool.uv.sources]
+"plain.pytest" = {path = "../plain-pytest", editable = true}
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

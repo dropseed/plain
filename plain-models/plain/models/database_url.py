@@ -75,9 +75,7 @@ def config(
     s = os.environ.get(env, default)
 
     if s is None:
-        logging.warning(
-            "No %s environment variable set, and so no databases setup" % env
-        )
+        logging.warning(f"No {env} environment variable set, and so no databases setup")
 
     if s:
         return parse(

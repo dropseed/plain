@@ -342,7 +342,7 @@ class MigrationAutodetector:
                             {"operations": [], "dependencies": []},
                         )
                         instance = subclass(
-                            "auto_%i"
+                            "auto_%i"  # noqa: UP031
                             % (len(self.migrations.get(package_label, [])) + 1),
                             package_label,
                         )
@@ -361,8 +361,7 @@ class MigrationAutodetector:
                     chop_mode = True
                 else:
                     raise ValueError(
-                        "Cannot resolve operation dependencies: %r"
-                        % self.generated_operations
+                        f"Cannot resolve operation dependencies: {self.generated_operations!r}"
                     )
             num_ops = new_num_ops
 
@@ -542,16 +541,13 @@ class MigrationAutodetector:
                                 ),
                                 dependencies=dependencies,
                             )
-                            self.renamed_models[
-                                package_label, model_name
-                            ] = rem_model_name
-                            renamed_models_rel_key = "{}.{}".format(
-                                rem_model_state.package_label,
-                                rem_model_state.name_lower,
+                            self.renamed_models[package_label, model_name] = (
+                                rem_model_name
                             )
-                            self.renamed_models_rel[
-                                renamed_models_rel_key
-                            ] = f"{model_state.package_label}.{model_state.name_lower}"
+                            renamed_models_rel_key = f"{rem_model_state.package_label}.{rem_model_state.name_lower}"
+                            self.renamed_models_rel[renamed_models_rel_key] = (
+                                f"{model_state.package_label}.{model_state.name_lower}"
+                            )
                             self.old_model_keys.remove(
                                 (rem_package_label, rem_model_name)
                             )
@@ -1526,7 +1522,7 @@ class MigrationAutodetector:
             for i, migration in enumerate(migrations):
                 if i == 0 and app_leaf:
                     migration.dependencies.append(app_leaf)
-                new_name_parts = ["%04i" % next_number]
+                new_name_parts = ["%04i" % next_number]  # noqa: UP031
                 if migration_name:
                     new_name_parts.append(migration_name)
                 elif i == 0 and not app_leaf:

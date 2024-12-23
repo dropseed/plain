@@ -1,23 +1,27 @@
-[tool.poetry]
+[project]
 name = "plain.sessions"
-packages = [
-    { include = "plain" },
-]
 version = "0.6.0"
 description = "Session management for Plain."
-authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
-# readme = "README.md"
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-plain = "<1.0.0"
+[tool.uv]
+dev-dependencies = [
+    "plain.models<1.0.0",
+    "plain.pytest<1.0.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-plain = {path = "../plain", develop = true}
-"plain.models" = {path = "../plain-models", develop = true}
-"plain.pytest" = {path = "../plain-pytest", develop = true}
-coverage = "^7.6.0"
+[tool.uv.sources]
+"plain.models" = {path = "../plain-models", editable = true}
+"plain.pytest" = {path = "../plain-pytest", editable = true}
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -46,8 +46,8 @@ def check_url_namespaces_unique(package_configs, **kwargs):
     for namespace in non_unique_namespaces:
         errors.append(
             Warning(
-                "URL namespace '{}' isn't unique. You may not be able to reverse "
-                "all URLs in this namespace".format(namespace),
+                f"URL namespace '{namespace}' isn't unique. You may not be able to reverse "
+                "all URLs in this namespace",
                 id="urls.W005",
             )
         )
@@ -92,8 +92,8 @@ def get_warning_for_invalid_pattern(pattern):
 
     return [
         Error(
-            "Your URL pattern {!r} is invalid. Ensure that urlpatterns is a list "
-            "of path() and/or re_path() instances.".format(pattern),
+            f"Your URL pattern {pattern!r} is invalid. Ensure that urlpatterns is a list "
+            "of path() and/or re_path() instances.",
             hint=hint,
             id="urls.E004",
         )

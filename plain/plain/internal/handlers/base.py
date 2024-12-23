@@ -45,7 +45,7 @@ class BaseHandler:
 
             if mw_instance is None:
                 raise ImproperlyConfigured(
-                    "Middleware factory %s returned None." % middleware_path
+                    f"Middleware factory {middleware_path} returned None."
                 )
 
             if hasattr(mw_instance, "process_view"):
@@ -126,14 +126,10 @@ class BaseHandler:
             if isinstance(callback, types.FunctionType):  # FBV
                 name = f"The view {callback.__module__}.{callback.__name__}"
             else:  # CBV
-                name = "The view {}.{}.__call__".format(
-                    callback.__module__,
-                    callback.__class__.__name__,
-                )
+                name = f"The view {callback.__module__}.{callback.__class__.__name__}.__call__"
         if response is None:
             raise ValueError(
-                "%s didn't return a Response object. It returned None "
-                "instead." % name
+                f"{name} didn't return a Response object. It returned None " "instead."
             )
 
 

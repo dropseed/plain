@@ -122,11 +122,7 @@ class ForeignObjectRel(FieldCacheMixin):
         return self.field.db_type
 
     def __repr__(self):
-        return "<{}: {}.{}>".format(
-            type(self).__name__,
-            self.related_model._meta.package_label,
-            self.related_model._meta.model_name,
-        )
+        return f"<{type(self).__name__}: {self.related_model._meta.package_label}.{self.related_model._meta.model_name}>"
 
     @property
     def identity(self):
@@ -292,7 +288,7 @@ class ManyToOneRel(ForeignObjectRel):
         field = self.model._meta.get_field(self.field_name)
         if not field.concrete:
             raise exceptions.FieldDoesNotExist(
-                "No related field named '%s'" % self.field_name
+                f"No related field named '{self.field_name}'"
             )
         return field
 

@@ -33,7 +33,7 @@ __all__ = (
 
 
 BOUNDARY = "BoUnDaRyStRiNg"
-MULTIPART_CONTENT = "multipart/form-data; boundary=%s" % BOUNDARY
+MULTIPART_CONTENT = f"multipart/form-data; boundary={BOUNDARY}"
 CONTENT_TYPE_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
 JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
@@ -218,8 +218,8 @@ def encode_multipart(boundary, data):
     for key, value in data.items():
         if value is None:
             raise TypeError(
-                "Cannot encode None for key '%s' as POST data. Did you mean "
-                "to pass an empty string or omit the value?" % key
+                f"Cannot encode None for key '{key}' as POST data. Did you mean "
+                "to pass an empty string or omit the value?"
             )
         elif is_file(value):
             lines.extend(encode_file(boundary, key, value))
@@ -231,8 +231,8 @@ def encode_multipart(boundary, data):
                     lines.extend(
                         to_bytes(val)
                         for val in [
-                            "--%s" % boundary,
-                            'Content-Disposition: form-data; name="%s"' % key,
+                            f"--{boundary}",
+                            f'Content-Disposition: form-data; name="{key}"',
                             "",
                             item,
                         ]
@@ -241,8 +241,8 @@ def encode_multipart(boundary, data):
             lines.extend(
                 to_bytes(val)
                 for val in [
-                    "--%s" % boundary,
-                    'Content-Disposition: form-data; name="%s"' % key,
+                    f"--{boundary}",
+                    f'Content-Disposition: form-data; name="{key}"',
                     "",
                     value,
                 ]
@@ -250,7 +250,7 @@ def encode_multipart(boundary, data):
 
     lines.extend(
         [
-            to_bytes("--%s--" % boundary),
+            to_bytes(f"--{boundary}--"),
             b"",
         ]
     )
@@ -277,11 +277,11 @@ def encode_file(boundary, key, file):
         content_type = "application/octet-stream"
     filename = filename or key
     return [
-        to_bytes("--%s" % boundary),
+        to_bytes(f"--{boundary}"),
         to_bytes(
             f'Content-Disposition: form-data; name="{key}"; filename="{filename}"'
         ),
-        to_bytes("Content-Type: %s" % content_type),
+        to_bytes(f"Content-Type: {content_type}"),
         b"",
         to_bytes(file.read()),
     ]
@@ -617,8 +617,9 @@ class ClientMixin:
         if not hasattr(response, "_json"):
             if not JSON_CONTENT_TYPE_RE.match(response.get("Content-Type")):
                 raise ValueError(
-                    'Content-Type header is "%s", not "application/json"'
-                    % response.get("Content-Type")
+                    'Content-Type header is "{}", not "application/json"'.format(
+                        response.get("Content-Type")
+                    )
                 )
             response._json = json.loads(
                 response.content.decode(response.charset), **extra
@@ -670,7 +671,7 @@ class Client(ClientMixin, RequestFactory):
         environ = self._base_environ(**request)
 
         # Capture exceptions created by the handler.
-        exception_uid = "request-exception-%s" % id(request)
+        exception_uid = f"request-exception-{id(request)}"
         got_request_exception.connect(self.store_exc_info, dispatch_uid=exception_uid)
         try:
             response = self.handler(environ)

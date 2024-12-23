@@ -86,5 +86,5 @@ def method_decorator(decorator, name=""):
         update_wrapper(_dec, decorator)
     # Change the name to aid debugging.
     obj = decorator if hasattr(decorator, "__name__") else decorator.__class__
-    _dec.__name__ = "method_decorator(%s)" % obj.__name__
+    _dec.__name__ = f"method_decorator({obj.__name__})"
     return _dec
