@@ -58,7 +58,7 @@ Runs:
 
 - Custom commands defined in `pyproject.toml` at `tool.plain.pre-commit.run`
 - `plain code check`, if [`plain.code`](https://plainframework.com/docs/plain-code/plain/code/) is installed
-- `poetry check --lock`, if using [Poetry](https://python-poetry.org/)
+- `uv lock --locked`, if using uv
 - `plain preflight --database default`
 - `plain migrate --check`
 - `plain makemigrations --dry-run --check`
