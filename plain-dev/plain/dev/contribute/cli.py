@@ -7,11 +7,14 @@ import click
 
 @click.command("contribute")
 @click.option("--repo", default="../plain", help="Path to the plain repo")
+@click.option(
+    "--reset", is_flag=True, help="Undo any changes to pyproject.toml and uv.lock"
+)
 @click.argument("packages", nargs=-1)
-def cli(packages, repo):
+def cli(packages, repo, reset):
     """Contribute to plain by linking packages locally."""
 
-    if "reset" in packages:
+    if reset:
         click.secho("Undoing any changes to pyproject.toml and uv.lock", bold=True)
         result = subprocess.run(["git", "checkout", "pyproject.toml", "uv.lock"])
         if result.returncode:
