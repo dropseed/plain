@@ -1,0 +1,3 @@
+#!/bin/sh -e
+cd plain-code
+uv run plain code fix ..
