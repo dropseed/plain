@@ -54,7 +54,7 @@ def setup_db(request):
     teardown_databases(_old_db_config, verbosity=verbosity)
 
 
-@pytest.fixture()
+@pytest.fixture
 def db(setup_db):
     # Set .cursor() back to the original implementation
     BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._old_cursor

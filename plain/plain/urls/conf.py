@@ -1,4 +1,5 @@
 """Functions for use in URLsconfs."""
+
 from functools import partial
 
 from plain.exceptions import ImproperlyConfigured
@@ -24,7 +25,7 @@ def include(arg, namespace=None):
                     "provides a namespace."
                 )
             raise ImproperlyConfigured(
-                "Passing a %d-tuple to include() is not supported. Pass a "
+                "Passing a %d-tuple to include() is not supported. Pass a "  # noqa: UP031
                 "2-tuple containing the list of patterns and default_namespace, and "
                 "provide the namespace argument to include() instead." % len(arg)
             )

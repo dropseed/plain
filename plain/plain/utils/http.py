@@ -51,8 +51,8 @@ def urlencode(query, doseq=False):
     for key, value in query:
         if value is None:
             raise TypeError(
-                "Cannot encode None for key '%s' in a query string. Did you "
-                "mean to pass an empty string or omit the value?" % key
+                f"Cannot encode None for key '{key}' in a query string. Did you "
+                "mean to pass an empty string or omit the value?"
             )
         elif not doseq or isinstance(value, str | bytes):
             query_val = value
@@ -68,9 +68,9 @@ def urlencode(query, doseq=False):
                 for item in itr:
                     if item is None:
                         raise TypeError(
-                            "Cannot encode None for key '%s' in a query "
+                            f"Cannot encode None for key '{key}' in a query "
                             "string. Did you mean to pass an empty string or "
-                            "omit the value?" % key
+                            "omit the value?"
                         )
                     elif not isinstance(item, bytes):
                         item = str(item)
@@ -110,9 +110,9 @@ def parse_http_date(date):
         if m is not None:
             break
     else:
-        raise ValueError("%r is not in a valid HTTP date format" % date)
+        raise ValueError(f"{date!r} is not in a valid HTTP date format")
     try:
-        tz = datetime.timezone.utc
+        tz = datetime.UTC
         year = int(m["year"])
         if year < 100:
             current_year = datetime.datetime.now(tz=tz).year
@@ -131,7 +131,7 @@ def parse_http_date(date):
         result = datetime.datetime(year, month, day, hour, min, sec, tzinfo=tz)
         return int(result.timestamp())
     except Exception as exc:
-        raise ValueError("%r is not a valid date" % date) from exc
+        raise ValueError(f"{date!r} is not a valid date") from exc
 
 
 def parse_http_date_safe(date):
@@ -216,7 +216,7 @@ def quote_etag(etag_str):
     if ETAG_MATCH.match(etag_str):
         return etag_str
     else:
-        return '"%s"' % etag_str
+        return f'"{etag_str}"'
 
 
 def is_same_domain(host, pattern):

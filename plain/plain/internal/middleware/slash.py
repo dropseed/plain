@@ -34,7 +34,7 @@ class RedirectSlashMiddleware:
         if settings.APPEND_SLASH and not request.path_info.endswith("/"):
             urlconf = getattr(request, "urlconf", None)
             if not is_valid_path(request.path_info, urlconf):
-                match = is_valid_path("%s/" % request.path_info, urlconf)
+                match = is_valid_path(f"{request.path_info}/", urlconf)
                 if match:
                     view = match.func
                     return getattr(view, "should_append_slash", True)
@@ -52,13 +52,10 @@ class RedirectSlashMiddleware:
         new_path = escape_leading_slashes(new_path)
         if settings.DEBUG and request.method in ("POST", "PUT", "PATCH"):
             raise RuntimeError(
-                "You called this URL via {method}, but the URL doesn't end "
+                f"You called this URL via {request.method}, but the URL doesn't end "
                 "in a slash and you have APPEND_SLASH set. Plain can't "
-                "redirect to the slash URL while maintaining {method} data. "
-                "Change your form to point to {url} (note the trailing "
-                "slash), or set APPEND_SLASH=False in your Plain settings.".format(
-                    method=request.method,
-                    url=request.get_host() + new_path,
-                )
+                f"redirect to the slash URL while maintaining {request.method} data. "
+                f"Change your form to point to {request.get_host() + new_path} (note the trailing "
+                "slash), or set APPEND_SLASH=False in your Plain settings."
             )
         return new_path

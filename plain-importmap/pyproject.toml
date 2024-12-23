@@ -1,28 +1,21 @@
-[tool.poetry]
+[project]
 name = "plain.importmap"
 version = "0.3.0"
 description = "JavaScript import maps for Plain."
-authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"
-homepage = "https://plainframework.com"
-documentation = "https://plainframework.com/docs/"
-repository = "https://github.com/dropseed/plain"
-packages = [
-    { include = "plain" },
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "tomli>=2.0.0",
+    "marshmallow>=3.14.1",
+    "requests>=2.0.0",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-plain = "<1.0.0"
-tomli = "*"
-marshmallow = "^3.14.1"
-requests = "*"
-click = "*"
-
-[tool.poetry.group.dev.dependencies]
-plain = { path = "../plain", develop = true }
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -14,7 +14,6 @@ do
     echo
     bold "Testing $package"
     cd "$package/tests"
-    poetry run coverage run -m pytest "$@"
-    poetry run coverage html --skip-empty
+    uv run pytest "$@"
     cd ../..
 done

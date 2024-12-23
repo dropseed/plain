@@ -534,9 +534,9 @@ class ProjectState:
         app_models = {}
         for model in packages.get_models(include_swapped=True):
             model_state = ModelState.from_model(model)
-            app_models[
-                (model_state.package_label, model_state.name_lower)
-            ] = model_state
+            app_models[(model_state.package_label, model_state.name_lower)] = (
+                model_state
+            )
         return cls(app_models)
 
     def __eq__(self, other):
@@ -632,10 +632,9 @@ class StatePackages(Packages):
                         new_unrendered_models.append(model)
                 if len(new_unrendered_models) == len(unrendered_models):
                     raise InvalidBasesError(
-                        "Cannot resolve bases for %r\nThis can happen if you are "
+                        f"Cannot resolve bases for {new_unrendered_models!r}\nThis can happen if you are "
                         "inheriting models from an app with migrations (e.g. "
                         "contrib.auth)\n in an app with no migrations"
-                        % new_unrendered_models
                     )
                 unrendered_models = new_unrendered_models
 
@@ -697,25 +696,25 @@ class ModelState:
             # Sanity-check that fields are NOT already bound to a model.
             if hasattr(field, "model"):
                 raise ValueError(
-                    'ModelState.fields cannot be bound to a model - "%s" is.' % name
+                    f'ModelState.fields cannot be bound to a model - "{name}" is.'
                 )
             # Sanity-check that relation fields are NOT referring to a model class.
             if field.is_relation and hasattr(field.related_model, "_meta"):
                 raise ValueError(
-                    'ModelState.fields cannot refer to a model class - "%s.to" does. '
-                    "Use a string reference instead." % name
+                    f'ModelState.fields cannot refer to a model class - "{name}.to" does. '
+                    "Use a string reference instead."
                 )
             if field.many_to_many and hasattr(field.remote_field.through, "_meta"):
                 raise ValueError(
-                    'ModelState.fields cannot refer to a model class - "%s.through" '
-                    "does. Use a string reference instead." % name
+                    f'ModelState.fields cannot refer to a model class - "{name}.through" '
+                    "does. Use a string reference instead."
                 )
         # Sanity-check that indexes have their name set.
         for index in self.options["indexes"]:
             if not index.name:
                 raise ValueError(
                     "Indexes passed to ModelState require a name attribute. "
-                    "%r doesn't have one." % index
+                    f"{index!r} doesn't have one."
                 )
 
     @cached_property
@@ -751,11 +750,7 @@ class ModelState:
                     fields.append((name, field.clone()))
                 except TypeError as e:
                     raise TypeError(
-                        "Couldn't reconstruct m2m field {} on {}: {}".format(
-                            name,
-                            model._meta.object_name,
-                            e,
-                        )
+                        f"Couldn't reconstruct m2m field {name} on {model._meta.object_name}: {e}"
                     )
         # Extract the options
         options = {}

@@ -188,20 +188,20 @@ class Index:
                 "longer than 3 characters?"
             )
         if self.name[0] == "_" or self.name[0].isdigit():
-            self.name = "D%s" % self.name[1:]
+            self.name = f"D{self.name[1:]}"
 
     def __repr__(self):
         return "<{}:{}{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
-            "" if not self.fields else " fields=%s" % repr(self.fields),
-            "" if not self.expressions else " expressions=%s" % repr(self.expressions),
-            "" if not self.name else " name=%s" % repr(self.name),
+            "" if not self.fields else f" fields={repr(self.fields)}",
+            "" if not self.expressions else f" expressions={repr(self.expressions)}",
+            "" if not self.name else f" name={repr(self.name)}",
             ""
             if self.db_tablespace is None
-            else " db_tablespace=%s" % repr(self.db_tablespace),
-            "" if self.condition is None else " condition=%s" % self.condition,
-            "" if not self.include else " include=%s" % repr(self.include),
-            "" if not self.opclasses else " opclasses=%s" % repr(self.opclasses),
+            else f" db_tablespace={repr(self.db_tablespace)}",
+            "" if self.condition is None else f" condition={self.condition}",
+            "" if not self.include else f" include={repr(self.include)}",
+            "" if not self.opclasses else f" opclasses={repr(self.opclasses)}",
         )
 
     def __eq__(self, other):
@@ -248,17 +248,25 @@ class IndexExpression(Func):
         wrapper_types = [type(wrapper) for wrapper in wrappers]
         if len(wrapper_types) != len(set(wrapper_types)):
             raise ValueError(
-                "Multiple references to %s can't be used in an indexed "
-                "expression."
-                % ", ".join(
-                    [wrapper_cls.__qualname__ for wrapper_cls in self.wrapper_classes]
+                "Multiple references to {} can't be used in an indexed "
+                "expression.".format(
+                    ", ".join(
+                        [
+                            wrapper_cls.__qualname__
+                            for wrapper_cls in self.wrapper_classes
+                        ]
+                    )
                 )
             )
         if expressions[1 : len(wrappers) + 1] != wrappers:
             raise ValueError(
-                "%s must be topmost expressions in an indexed expression."
-                % ", ".join(
-                    [wrapper_cls.__qualname__ for wrapper_cls in self.wrapper_classes]
+                "{} must be topmost expressions in an indexed expression.".format(
+                    ", ".join(
+                        [
+                            wrapper_cls.__qualname__
+                            for wrapper_cls in self.wrapper_classes
+                        ]
+                    )
                 )
             )
         # Wrap expressions in parentheses if they are not column references.

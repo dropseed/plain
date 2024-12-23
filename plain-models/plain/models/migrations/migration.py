@@ -105,7 +105,7 @@ class Migration:
             # there instead
             if collect_sql:
                 schema_editor.collected_sql.append("--")
-                schema_editor.collected_sql.append("-- %s" % operation.describe())
+                schema_editor.collected_sql.append(f"-- {operation.describe()}")
                 schema_editor.collected_sql.append("--")
                 if not operation.reduces_to_sql:
                     schema_editor.collected_sql.append(
@@ -170,7 +170,7 @@ class Migration:
         for operation, to_state, from_state in to_run:
             if collect_sql:
                 schema_editor.collected_sql.append("--")
-                schema_editor.collected_sql.append("-- %s" % operation.describe())
+                schema_editor.collected_sql.append(f"-- {operation.describe()}")
                 schema_editor.collected_sql.append("--")
                 if not operation.reduces_to_sql:
                     schema_editor.collected_sql.append(
@@ -210,7 +210,7 @@ class Migration:
         fragments = [re.sub(r"\W+", "_", name) for name in raw_fragments if name]
 
         if not fragments or len(fragments) != len(self.operations):
-            return "auto_%s" % get_migration_name_timestamp()
+            return f"auto_{get_migration_name_timestamp()}"
 
         name = fragments[0]
         for fragment in fragments[1:]:

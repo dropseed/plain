@@ -171,7 +171,9 @@ class Options:
             # Any leftover attributes must be invalid.
             if meta_attrs != {}:
                 raise TypeError(
-                    "'class Meta' got invalid attribute(s): %s" % ",".join(meta_attrs)
+                    "'class Meta' got invalid attribute(s): {}".format(
+                        ",".join(meta_attrs)
+                    )
                 )
 
         del self.meta
@@ -281,7 +283,7 @@ class Options:
             self.pk = field
 
     def __repr__(self):
-        return "<Options for %s>" % self.object_name
+        return f"<Options for {self.object_name}>"
 
     def __str__(self):
         return self.label_lower
@@ -551,9 +553,9 @@ class Options:
             # unavailable, therefore we throw a FieldDoesNotExist exception.
             if not self.packages.models_ready:
                 raise FieldDoesNotExist(
-                    "{} has no field named '{}'. The app cache isn't ready yet, "
+                    f"{self.object_name} has no field named '{field_name}'. The app cache isn't ready yet, "
                     "so if this is an auto-created related field, it won't "
-                    "be available yet.".format(self.object_name, field_name)
+                    "be available yet."
                 )
 
         try:

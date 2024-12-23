@@ -46,8 +46,7 @@ def file_move_safe(
     try:
         if not allow_overwrite and os.access(new_file_name, os.F_OK):
             raise FileExistsError(
-                "Destination file %s exists and allow_overwrite is False."
-                % new_file_name
+                f"Destination file {new_file_name} exists and allow_overwrite is False."
             )
 
         os.rename(old_file_name, new_file_name)

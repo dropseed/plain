@@ -2,6 +2,7 @@
 Useful auxiliary data structures for query construction. Not useful outside
 the SQL domain.
 """
+
 from plain.exceptions import FullResultSet
 from plain.models.sql.constants import INNER, LOUTER
 
@@ -82,12 +83,7 @@ class Join:
         # Add a join condition for each pair of joining columns.
         for lhs_col, rhs_col in self.join_cols:
             join_conditions.append(
-                "{}.{} = {}.{}".format(
-                    qn(self.parent_alias),
-                    qn2(lhs_col),
-                    qn(self.table_alias),
-                    qn2(rhs_col),
-                )
+                f"{qn(self.parent_alias)}.{qn2(lhs_col)} = {qn(self.table_alias)}.{qn2(rhs_col)}"
             )
 
         # Add a single condition inside parentheses for whatever
@@ -97,7 +93,7 @@ class Join:
         )
         if extra_cond:
             extra_sql, extra_params = compiler.compile(extra_cond)
-            join_conditions.append("(%s)" % extra_sql)
+            join_conditions.append(f"({extra_sql})")
             params.extend(extra_params)
         if self.filtered_relation:
             try:
@@ -105,18 +101,18 @@ class Join:
             except FullResultSet:
                 pass
             else:
-                join_conditions.append("(%s)" % extra_sql)
+                join_conditions.append(f"({extra_sql})")
                 params.extend(extra_params)
         if not join_conditions:
             # This might be a rel on the other end of an actual declared field.
             declared_field = getattr(self.join_field, "field", self.join_field)
             raise ValueError(
-                "Join generated an empty ON clause. %s did not yield either "
-                "joining columns or extra restrictions." % declared_field.__class__
+                f"Join generated an empty ON clause. {declared_field.__class__} did not yield either "
+                "joining columns or extra restrictions."
             )
         on_clause_sql = " AND ".join(join_conditions)
         alias_str = (
-            "" if self.table_alias == self.table_name else (" %s" % self.table_alias)
+            "" if self.table_alias == self.table_name else (f" {self.table_alias}")
         )
         sql = f"{self.join_type} {qn(self.table_name)}{alias_str} ON ({on_clause_sql})"
         return sql, params
@@ -192,7 +188,7 @@ class BaseTable:
 
     def as_sql(self, compiler, connection):
         alias_str = (
-            "" if self.table_alias == self.table_name else (" %s" % self.table_alias)
+            "" if self.table_alias == self.table_name else (f" {self.table_alias}")
         )
         base_sql = compiler.quote_name_unless_alias(self.table_name)
         return base_sql + alias_str, []

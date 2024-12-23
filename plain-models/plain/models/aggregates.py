@@ -1,6 +1,7 @@
 """
 Classes to represent the definitions of aggregate functions.
 """
+
 from plain.exceptions import FieldError, FullResultSet
 from plain.models.expressions import Case, Func, Star, Value, When
 from plain.models.fields import IntegerField
@@ -35,7 +36,7 @@ class Aggregate(Func):
         self, *expressions, distinct=False, filter=None, default=None, **extra
     ):
         if distinct and not self.allow_distinct:
-            raise TypeError("%s does not allow distinct." % self.__class__.__name__)
+            raise TypeError(f"{self.__class__.__name__} does not allow distinct.")
         if default is not None and self.empty_result_set_value is not None:
             raise TypeError(f"{self.__class__.__name__} does not allow default.")
         self.distinct = distinct

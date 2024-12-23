@@ -1,34 +1,30 @@
-[tool.poetry]
-
+[project]
 name = "plain.staff"
-packages = [
-    { include = "plain" },
-]
-
 version = "0.5.0"
 description = "Staff dashboard and tools for Plain."
-authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
-# readme = "README.md"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "plain.auth<1.0.0",
+    "plain.htmx<1.0.0",
+    "plain.tailwind<1.0.0",
+    "sqlparse>=0.2.2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-sqlparse = ">=0.2.2"
-plain = "<1.0.0"
-"plain.auth" = "<1.0.0"
-"plain.htmx" = "<1.0.0"
-"plain.tailwind" = "<1.0.0"
+[tool.uv]
+dev-dependencies = [
+    "plain.pytest<1.0.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-plain = {path = "../plain", develop = true}
-"plain.auth" = {path = "../plain-auth", develop = true}
-"plain.sessions" = {path = "../plain-sessions", develop = true}
-"plain.models" = {path = "../plain-models", develop = true}
-"plain.htmx" = {path = "../plain-htmx", develop = true}
-"plain.tailwind" = {path = "../plain-tailwind", develop = true}
-"plain.pytest" = {path = "../plain-pytest", develop = true}
-coverage = "^7.6.0"
+[tool.uv.sources]
+"plain.pytest" = {path = "../plain-pytest", editable = true}
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

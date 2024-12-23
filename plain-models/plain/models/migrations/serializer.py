@@ -66,8 +66,8 @@ class DatetimeDatetimeSerializer(BaseSerializer):
     """For datetime.datetime."""
 
     def serialize(self):
-        if self.value.tzinfo is not None and self.value.tzinfo != datetime.timezone.utc:
-            self.value = self.value.astimezone(datetime.timezone.utc)
+        if self.value.tzinfo is not None and self.value.tzinfo != datetime.UTC:
+            self.value = self.value.astimezone(datetime.UTC)
         imports = ["import datetime"]
         return repr(self.value), set(imports)
 
@@ -97,9 +97,9 @@ class DeconstructableSerializer(BaseSerializer):
         module, name = path.rsplit(".", 1)
         if module == "plain.models":
             imports = {"from plain import models"}
-            name = "models.%s" % name
+            name = f"models.{name}"
         else:
-            imports = {"import %s" % module}
+            imports = {f"import {module}"}
             name = path
         return name, imports
 
@@ -117,7 +117,7 @@ class DictionarySerializer(BaseSerializer):
             imports.update(k_imports)
             imports.update(v_imports)
             strings.append((k_string, v_string))
-        return "{%s}" % (", ".join(f"{k}: {v}" for k, v in strings)), imports
+        return "{{{}}}".format(", ".join(f"{k}: {v}" for k, v in strings)), imports
 
 
 class EnumSerializer(BaseSerializer):
@@ -135,7 +135,7 @@ class EnumSerializer(BaseSerializer):
                     for item in members
                 ]
             ),
-            {"import %s" % module},
+            {f"import {module}"},
         )
 
 
@@ -159,19 +159,19 @@ class FunctionTypeSerializer(BaseSerializer):
             klass = self.value.__self__
             module = klass.__module__
             return f"{module}.{klass.__name__}.{self.value.__name__}", {
-                "import %s" % module
+                f"import {module}"
             }
         # Further error checking
         if self.value.__name__ == "<lambda>":
             raise ValueError("Cannot serialize function: lambda")
         if self.value.__module__ is None:
-            raise ValueError("Cannot serialize function %r: No module" % self.value)
+            raise ValueError(f"Cannot serialize function {self.value!r}: No module")
 
         module_name = self.value.__module__
 
         if "<" not in self.value.__qualname__:  # Qualname can include <locals>
             return f"{module_name}.{self.value.__qualname__}", {
-                "import %s" % self.value.__module__
+                f"import {self.value.__module__}"
             }
 
         raise ValueError(
@@ -190,12 +190,7 @@ class FunctoolsPartialSerializer(BaseSerializer):
         # Add any imports needed by arguments
         imports = {"import functools", *func_imports, *args_imports, *keywords_imports}
         return (
-            "functools.{}({}, *{}, **{})".format(
-                self.value.__class__.__name__,
-                func_string,
-                args_string,
-                keywords_string,
-            ),
+            f"functools.{self.value.__class__.__name__}({func_string}, *{args_string}, **{keywords_string})",
             imports,
         )
 
@@ -225,7 +220,7 @@ class ModelManagerSerializer(DeconstructableSerializer):
         as_manager, manager_path, qs_path, args, kwargs = self.value.deconstruct()
         if as_manager:
             name, imports = self._serialize_path(qs_path)
-            return "%s.as_manager()" % name, imports
+            return f"{name}.as_manager()", imports
         else:
             return self.serialize_deconstructed(manager_path, args, kwargs)
 
@@ -265,7 +260,7 @@ class RegexSerializer(BaseSerializer):
         args = [regex_pattern]
         if flags:
             args.append(regex_flags)
-        return "re.compile(%s)" % ", ".join(args), imports
+        return "re.compile({})".format(", ".join(args)), imports
 
 
 class SequenceSerializer(BaseSequenceSerializer):
@@ -282,7 +277,7 @@ class SetSerializer(BaseSequenceSerializer):
 
 class SettingsReferenceSerializer(BaseSerializer):
     def serialize(self):
-        return "settings.%s" % self.value.setting_name, {
+        return f"settings.{self.value.setting_name}", {
             "from plain.runtime import settings"
         }
 
@@ -308,12 +303,12 @@ class TypeSerializer(BaseSerializer):
             if module == builtins.__name__:
                 return self.value.__name__, set()
             else:
-                return f"{module}.{self.value.__qualname__}", {"import %s" % module}
+                return f"{module}.{self.value.__qualname__}", {f"import {module}"}
 
 
 class UUIDSerializer(BaseSerializer):
     def serialize(self):
-        return "uuid.%s" % repr(self.value), {"import uuid"}
+        return f"uuid.{repr(self.value)}", {"import uuid"}
 
 
 class Serializer:
@@ -349,7 +344,7 @@ class Serializer:
     def register(cls, type_, serializer):
         if not issubclass(serializer, BaseSerializer):
             raise ValueError(
-                "'%s' must inherit from 'BaseSerializer'." % serializer.__name__
+                f"'{serializer.__name__}' must inherit from 'BaseSerializer'."
             )
         cls._registry[type_] = serializer
 
@@ -381,6 +376,6 @@ def serializer_factory(value):
         if isinstance(value, type_):
             return serializer_cls(value)
     raise ValueError(
-        "Cannot serialize: %r\nThere are some values Plain cannot serialize into "
-        "migration files." % value
+        f"Cannot serialize: {value!r}\nThere are some values Plain cannot serialize into "
+        "migration files."
     )

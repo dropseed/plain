@@ -196,8 +196,8 @@ class Signer:
 
         if _SEP_UNSAFE.match(self.sep):
             raise ValueError(
-                "Unsafe Signer separator: %r (cannot be empty or consist of "
-                "only A-z0-9-_=)" % sep,
+                f"Unsafe Signer separator: {sep!r} (cannot be empty or consist of "
+                "only A-z0-9-_=)",
             )
 
     def signature(self, value, key=None):
@@ -209,12 +209,12 @@ class Signer:
 
     def unsign(self, signed_value):
         if self.sep not in signed_value:
-            raise BadSignature('No "%s" found in value' % self.sep)
+            raise BadSignature(f'No "{self.sep}" found in value')
         value, sig = signed_value.rsplit(self.sep, 1)
         for key in [self.key, *self.fallback_keys]:
             if constant_time_compare(sig, self.signature(value, key)):
                 return value
-        raise BadSignature('Signature "%s" does not match' % sig)
+        raise BadSignature(f'Signature "{sig}" does not match')
 
     def sign_object(self, obj, serializer=JSONSerializer, compress=False):
         """

@@ -139,13 +139,13 @@ class CheckConstraint(BaseConstraint):
             (
                 ""
                 if self.violation_error_code is None
-                else " violation_error_code=%r" % self.violation_error_code
+                else f" violation_error_code={self.violation_error_code!r}"
             ),
             (
                 ""
                 if self.violation_error_message is None
                 or self.violation_error_message == self.default_violation_error_message
-                else " violation_error_message=%r" % self.violation_error_message
+                else f" violation_error_message={self.violation_error_message!r}"
             ),
         )
 
@@ -321,23 +321,23 @@ class UniqueConstraint(BaseConstraint):
     def __repr__(self):
         return "<{}:{}{}{}{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
-            "" if not self.fields else " fields=%s" % repr(self.fields),
-            "" if not self.expressions else " expressions=%s" % repr(self.expressions),
-            " name=%s" % repr(self.name),
-            "" if self.condition is None else " condition=%s" % self.condition,
-            "" if self.deferrable is None else " deferrable=%r" % self.deferrable,
-            "" if not self.include else " include=%s" % repr(self.include),
-            "" if not self.opclasses else " opclasses=%s" % repr(self.opclasses),
+            "" if not self.fields else f" fields={repr(self.fields)}",
+            "" if not self.expressions else f" expressions={repr(self.expressions)}",
+            f" name={repr(self.name)}",
+            "" if self.condition is None else f" condition={self.condition}",
+            "" if self.deferrable is None else f" deferrable={self.deferrable!r}",
+            "" if not self.include else f" include={repr(self.include)}",
+            "" if not self.opclasses else f" opclasses={repr(self.opclasses)}",
             (
                 ""
                 if self.violation_error_code is None
-                else " violation_error_code=%r" % self.violation_error_code
+                else f" violation_error_code={self.violation_error_code!r}"
             ),
             (
                 ""
                 if self.violation_error_message is None
                 or self.violation_error_message == self.default_violation_error_message
-                else " violation_error_message=%r" % self.violation_error_message
+                else f" violation_error_message={self.violation_error_message!r}"
             ),
         )
 

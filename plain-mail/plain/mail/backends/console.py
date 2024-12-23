@@ -1,6 +1,7 @@
 """
 Email backend that writes messages to console instead of sending them.
 """
+
 import sys
 import threading
 
@@ -20,7 +21,7 @@ class EmailBackend(BaseEmailBackend):
             msg.get_charset().get_output_charset() if msg.get_charset() else "utf-8"
         )
         msg_data = msg_data.decode(charset)
-        self.stream.write("%s\n" % msg_data)
+        self.stream.write(f"{msg_data}\n")
         self.stream.write("-" * 79)
         self.stream.write("\n")
 

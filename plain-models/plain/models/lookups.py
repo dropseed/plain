@@ -120,7 +120,7 @@ class Lookup(Expression):
             # precedence but avoid double wrapping as it can be misinterpreted
             # on some backends (e.g. subqueries on SQLite).
             if sql and sql[0] != "(":
-                sql = "(%s)" % sql
+                sql = f"({sql})"
             return sql, params
         else:
             return self.get_db_prep_lookup(value, connection)
@@ -474,7 +474,7 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
         return super().process_rhs(compiler, connection)
 
     def get_rhs_op(self, connection, rhs):
-        return "IN %s" % rhs
+        return f"IN {rhs}"
 
     def as_sql(self, compiler, connection):
         max_in_list_size = connection.ops.max_in_list_size()
@@ -497,7 +497,7 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
         for offset in range(0, len(rhs_params), max_in_list_size):
             if offset > 0:
                 in_clause_elements.append(" OR ")
-            in_clause_elements.append("%s IN (" % lhs)
+            in_clause_elements.append(f"{lhs} IN (")
             params.extend(lhs_params)
             sqls = rhs[offset : offset + max_in_list_size]
             sqls_params = rhs_params[offset : offset + max_in_list_size]
@@ -592,9 +592,9 @@ class IsNull(BuiltinLookup):
             )
         sql, params = self.process_lhs(compiler, connection)
         if self.rhs:
-            return "%s IS NULL" % sql, params
+            return f"{sql} IS NULL", params
         else:
-            return "%s IS NOT NULL" % sql, params
+            return f"{sql} IS NOT NULL", params
 
 
 @Field.register_lookup

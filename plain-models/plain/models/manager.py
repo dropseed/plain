@@ -183,7 +183,7 @@ class ManagerDescriptor:
     def __get__(self, instance, cls=None):
         if instance is not None:
             raise AttributeError(
-                "Manager isn't accessible via %s instances" % cls.__name__
+                f"Manager isn't accessible via {cls.__name__} instances"
             )
 
         if cls._meta.abstract:
@@ -193,10 +193,7 @@ class ManagerDescriptor:
 
         if cls._meta.swapped:
             raise AttributeError(
-                "Manager isn't available; '{}' has been swapped for '{}'".format(
-                    cls._meta.label,
-                    cls._meta.swapped,
-                )
+                f"Manager isn't available; '{cls._meta.label}' has been swapped for '{cls._meta.swapped}'"
             )
 
         return cls._meta.managers_map[self.manager.name]

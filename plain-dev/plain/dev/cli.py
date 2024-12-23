@@ -4,12 +4,12 @@ import os
 import platform
 import subprocess
 import sys
+import tomllib
 from importlib.metadata import entry_points
 from importlib.util import find_spec
 from pathlib import Path
 
 import click
-import tomllib
 
 from plain.runtime import APP_PATH, settings
 

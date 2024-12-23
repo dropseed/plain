@@ -125,7 +125,7 @@ class RunSQL(Operation):
                     if elements == 2:
                         sql, params = sql
                     else:
-                        raise ValueError("Expected a 2-tuple but got %d" % elements)
+                        raise ValueError("Expected a 2-tuple but got %d" % elements)  # noqa: UP031
                 schema_editor.execute(sql, params=params)
         elif sqls != RunSQL.noop:
             statements = schema_editor.connection.ops.prepare_sql_script(sqls)

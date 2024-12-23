@@ -104,7 +104,7 @@ def load_backend(backend_name):
     backend name, or raise an error if it doesn't exist.
     """
     try:
-        return import_module("%s.base" % backend_name)
+        return import_module(f"{backend_name}.base")
     except ImportError as e_user:
         # The database backend wasn't found. Display a helpful error message
         # listing all built-in database backends.
@@ -115,9 +115,7 @@ def load_backend(backend_name):
             for _, name, ispkg in pkgutil.iter_modules(plain.models.backends.__path__)
             if ispkg and name not in {"base", "dummy"}
         ]
-        if backend_name not in [
-            "plain.models.backends.%s" % b for b in builtin_backends
-        ]:
+        if backend_name not in [f"plain.models.backends.{b}" for b in builtin_backends]:
             backend_reprs = map(repr, sorted(builtin_backends))
             raise ImproperlyConfigured(
                 "{!r} isn't an available database backend or couldn't be "

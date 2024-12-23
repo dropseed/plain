@@ -4,6 +4,7 @@ Multi-part parsing for file uploads.
 Exposes one class, ``MultiPartParser``, which feeds chunks of uploaded data to
 file upload handlers for processing.
 """
+
 import base64
 import binascii
 import collections
@@ -70,14 +71,13 @@ class MultiPartParser:
         # Content-Type should contain multipart and the boundary information.
         content_type = META.get("CONTENT_TYPE", "")
         if not content_type.startswith("multipart/"):
-            raise MultiPartParserError("Invalid Content-Type: %s" % content_type)
+            raise MultiPartParserError(f"Invalid Content-Type: {content_type}")
 
         try:
             content_type.encode("ascii")
         except UnicodeEncodeError:
             raise MultiPartParserError(
-                "Invalid non-ASCII Content-Type in multipart: %s"
-                % force_str(content_type)
+                f"Invalid non-ASCII Content-Type in multipart: {force_str(content_type)}"
             )
 
         # Parse the header to get the boundary to split the parts.
@@ -85,7 +85,7 @@ class MultiPartParser:
         boundary = opts.get("boundary")
         if not boundary or not self.boundary_re.fullmatch(boundary):
             raise MultiPartParserError(
-                "Invalid boundary in multipart: %s" % force_str(boundary)
+                f"Invalid boundary in multipart: {force_str(boundary)}"
             )
 
         # Content-Length should contain the length of the body we are about
@@ -97,7 +97,7 @@ class MultiPartParser:
 
         if content_length < 0:
             # This means we shouldn't continue...raise an error.
-            raise MultiPartParserError("Invalid content length: %r" % content_length)
+            raise MultiPartParserError(f"Invalid content length: {content_length!r}")
 
         self._boundary = boundary.encode("ascii")
         self._input_data = input_data

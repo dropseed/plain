@@ -40,9 +40,7 @@ def check_all_models(package_configs=None, **kwargs):
         if not inspect.ismethod(model.check):
             errors.append(
                 Error(
-                    "The '{}.check()' class method is currently overridden by {!r}.".format(
-                        model.__name__, model.check
-                    ),
+                    f"The '{model.__name__}.check()' class method is currently overridden by {model.check!r}.",
                     obj=model,
                     id="models.E020",
                 )
@@ -67,9 +65,7 @@ def check_all_models(package_configs=None, **kwargs):
             model_labels_str = ", ".join(model_labels)
             errors.append(
                 error_class(
-                    "db_table '{}' is used by multiple models: {}.".format(
-                        db_table, model_labels_str
-                    ),
+                    f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
                     obj=db_table,
                     hint=(error_hint % model_labels_str) if error_hint else None,
                     id=error_id,
@@ -151,7 +147,7 @@ def _check_lazy_references(packages, ignore=None):
             packages.get_package_config(model_key[0])
             model_error = "app '{}' doesn't provide model '{}'".format(*model_key)
         except LookupError:
-            model_error = "app '%s' isn't installed" % model_key[0]
+            model_error = f"app '{model_key[0]}' isn't installed"
         return model_error
 
     # Here are several functions which return CheckMessage instances for the
@@ -181,14 +177,11 @@ def _check_lazy_references(packages, ignore=None):
         # The receiver is either a function or an instance of class
         # defining a `__call__` method.
         if isinstance(receiver, types.FunctionType):
-            description = "The function '%s'" % receiver.__name__
+            description = f"The function '{receiver.__name__}'"
         elif isinstance(receiver, types.MethodType):
-            description = "Bound method '{}.{}'".format(
-                receiver.__self__.__class__.__name__,
-                receiver.__name__,
-            )
+            description = f"Bound method '{receiver.__self__.__class__.__name__}.{receiver.__name__}'"
         else:
-            description = "An instance of class '%s'" % receiver.__class__.__name__
+            description = f"An instance of class '{receiver.__class__.__name__}'"
         signal_name = model_signals.get(func.__self__, "unknown")
         params = {
             "model": ".".join(model_key),

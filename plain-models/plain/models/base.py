@@ -222,12 +222,8 @@ class ModelBase(type):
                 for field in parent_fields:
                     if field.name in field_names:
                         raise FieldError(
-                            "Local field {!r} in class {!r} clashes with field of "
-                            "the same name from base class {!r}.".format(
-                                field.name,
-                                name,
-                                base.__name__,
-                            )
+                            f"Local field {field.name!r} in class {name!r} clashes with field of "
+                            f"the same name from base class {base.__name__!r}."
                         )
                     else:
                         inherited_attributes.add(field.name)
@@ -238,7 +234,7 @@ class ModelBase(type):
                 if base_key in parent_links:
                     field = parent_links[base_key]
                 else:
-                    attr_name = "%s_ptr" % base._meta.model_name
+                    attr_name = f"{base._meta.model_name}_ptr"
                     field = OneToOneField(
                         base,
                         on_delete=CASCADE,
@@ -287,12 +283,8 @@ class ModelBase(type):
                 if field.name in field_names:
                     if not base._meta.abstract:
                         raise FieldError(
-                            "Local field {!r} in class {!r} clashes with field of "
-                            "the same name from base class {!r}.".format(
-                                field.name,
-                                name,
-                                base.__name__,
-                            )
+                            f"Local field {field.name!r} in class {name!r} clashes with field of "
+                            f"the same name from base class {base.__name__!r}."
                         )
                 else:
                     field = copy.deepcopy(field)
@@ -359,8 +351,8 @@ class ModelBase(type):
         if not opts.managers:
             if any(f.name == "objects" for f in opts.fields):
                 raise ValueError(
-                    "Model %s must specify a custom Manager, because it has a "
-                    "field named 'objects'." % cls.__name__
+                    f"Model {cls.__name__} must specify a custom Manager, because it has a "
+                    "field named 'objects'."
                 )
             manager = Manager()
             manager.auto_created = True
@@ -646,8 +638,8 @@ class Model(AltersData, metaclass=ModelBase):
                 return
             if any(LOOKUP_SEP in f for f in fields):
                 raise ValueError(
-                    'Found "%s" in fields argument. Relations and transforms '
-                    "are not allowed in fields." % LOOKUP_SEP
+                    f'Found "{LOOKUP_SEP}" in fields argument. Relations and transforms '
+                    "are not allowed in fields."
                 )
 
         hints = {"instance": self}
@@ -746,8 +738,9 @@ class Model(AltersData, metaclass=ModelBase):
             if non_model_fields:
                 raise ValueError(
                     "The following fields do not exist in this model, are m2m "
-                    "fields, or are non-concrete fields: %s"
-                    % ", ".join(non_model_fields)
+                    "fields, or are non-concrete fields: {}".format(
+                        ", ".join(non_model_fields)
+                    )
                 )
 
         # If saving to the same database, and this model is deferred, then
@@ -1030,8 +1023,8 @@ class Model(AltersData, metaclass=ModelBase):
                     if not field.remote_field.multiple:
                         field.remote_field.delete_cached_value(obj)
                     raise ValueError(
-                        "{}() prohibited to prevent data loss due to unsaved "
-                        "related object '{}'.".format(operation_name, field.name)
+                        f"{operation_name}() prohibited to prevent data loss due to unsaved "
+                        f"related object '{field.name}'."
                     )
                 elif getattr(self, field.attname) in field.empty_values:
                     # Set related object if it has been saved after an
@@ -1062,8 +1055,8 @@ class Model(AltersData, metaclass=ModelBase):
     def delete(self, using=None, keep_parents=False):
         if self.pk is None:
             raise ValueError(
-                "{} object can't be deleted because its {} attribute is set "
-                "to None.".format(self._meta.object_name, self._meta.pk.attname)
+                f"{self._meta.object_name} object can't be deleted because its {self._meta.pk.attname} attribute is set "
+                "to None."
             )
         using = using or router.db_for_write(self.__class__, instance=self)
         collector = Collector(using=using, origin=self)
@@ -1092,17 +1085,17 @@ class Model(AltersData, metaclass=ModelBase):
             self.__class__._default_manager.using(self._state.db)
             .filter(**kwargs)
             .filter(q)
-            .order_by(f"{order}{field.name}", "%spk" % order)
+            .order_by(f"{order}{field.name}", f"{order}pk")
         )
         try:
             return qs[0]
         except IndexError:
             raise self.DoesNotExist(
-                "%s matching query does not exist." % self.__class__._meta.object_name
+                f"{self.__class__._meta.object_name} matching query does not exist."
             )
 
     def _get_next_or_previous_in_order(self, is_next):
-        cachename = "__%s_order_cache" % is_next
+        cachename = f"__{is_next}_order_cache"
         if not hasattr(self, cachename):
             op = "gt" if is_next else "lt"
             order = "_order" if is_next else "-_order"
@@ -1112,7 +1105,7 @@ class Model(AltersData, metaclass=ModelBase):
                 self.__class__._default_manager.filter(**filter_args)
                 .filter(
                     **{
-                        "_order__%s" % op: self.__class__._default_manager.values(
+                        f"_order__{op}": self.__class__._default_manager.values(
                             "_order"
                         ).filter(**{self._meta.pk.name: self.pk})
                     }
@@ -1136,7 +1129,7 @@ class Model(AltersData, metaclass=ModelBase):
     def prepare_database_save(self, field):
         if self.pk is None:
             raise ValueError(
-                "Unsaved model instance %r cannot be used in an ORM query." % self
+                f"Unsaved model instance {self!r} cannot be used in an ORM query."
             )
         return getattr(self, field.remote_field.get_related_field().attname)
 
@@ -1445,8 +1438,7 @@ class Model(AltersData, metaclass=ModelBase):
             except ValueError:
                 errors.append(
                     preflight.Error(
-                        "'%s' is not of the form 'package_label.package_name'."
-                        % cls._meta.swappable,
+                        f"'{cls._meta.swappable}' is not of the form 'package_label.package_name'.",
                         id="models.E001",
                     )
                 )
@@ -1454,10 +1446,8 @@ class Model(AltersData, metaclass=ModelBase):
                 package_label, model_name = cls._meta.swapped.split(".")
                 errors.append(
                     preflight.Error(
-                        "'{}' references '{}.{}', which has not been "
-                        "installed, or is abstract.".format(
-                            cls._meta.swappable, package_label, model_name
-                        ),
+                        f"'{cls._meta.swappable}' references '{package_label}.{model_name}', which has not been "
+                        "installed, or is abstract.",
                         id="models.E002",
                     )
                 )
@@ -1507,8 +1497,7 @@ class Model(AltersData, metaclass=ModelBase):
                 errors.append(
                     preflight.Error(
                         "The model has two identical many-to-many relations "
-                        "through the intermediate model '%s'."
-                        % f.remote_field.through._meta.label,
+                        f"through the intermediate model '{f.remote_field.through._meta.label}'.",
                         obj=cls,
                         id="models.E003",
                     )
@@ -1603,8 +1592,8 @@ class Model(AltersData, metaclass=ModelBase):
             if column_name and column_name in used_column_names:
                 errors.append(
                     preflight.Error(
-                        "Field '{}' has column name '{}' that is used by "
-                        "another field.".format(f.name, column_name),
+                        f"Field '{f.name}' has column name '{column_name}' that is used by "
+                        "another field.",
                         hint="Specify a 'db_column' for the field.",
                         obj=cls,
                         id="models.E007",
@@ -1622,8 +1611,8 @@ class Model(AltersData, metaclass=ModelBase):
         if model_name.startswith("_") or model_name.endswith("_"):
             errors.append(
                 preflight.Error(
-                    "The model name '%s' cannot start or end with an underscore "
-                    "as it collides with the query lookup syntax." % model_name,
+                    f"The model name '{model_name}' cannot start or end with an underscore "
+                    "as it collides with the query lookup syntax.",
                     obj=cls,
                     id="models.E023",
                 )
@@ -1631,8 +1620,8 @@ class Model(AltersData, metaclass=ModelBase):
         elif LOOKUP_SEP in model_name:
             errors.append(
                 preflight.Error(
-                    "The model name '%s' cannot contain double underscores as "
-                    "it collides with the query lookup syntax." % model_name,
+                    f"The model name '{model_name}' cannot contain double underscores as "
+                    "it collides with the query lookup syntax.",
                     obj=cls,
                     id="models.E024",
                 )
@@ -1652,8 +1641,8 @@ class Model(AltersData, metaclass=ModelBase):
             if accessor in property_names:
                 errors.append(
                     preflight.Error(
-                        "The property '%s' clashes with a related field "
-                        "accessor." % accessor,
+                        f"The property '{accessor}' clashes with a related field "
+                        "accessor.",
                         obj=cls,
                         id="models.E025",
                     )
@@ -1685,8 +1674,8 @@ class Model(AltersData, metaclass=ModelBase):
             if index.name[0] == "_" or index.name[0].isdigit():
                 errors.append(
                     preflight.Error(
-                        "The index name '%s' cannot start with an underscore "
-                        "or a number." % index.name,
+                        f"The index name '{index.name}' cannot start with an underscore "
+                        "or a number.",
                         obj=cls,
                         id="models.E033",
                     ),
@@ -1694,7 +1683,7 @@ class Model(AltersData, metaclass=ModelBase):
             if len(index.name) > index.max_name_length:
                 errors.append(
                     preflight.Error(
-                        "The index name '%s' cannot be longer than %d "
+                        "The index name '%s' cannot be longer than %d "  # noqa: UP031
                         "characters." % (index.name, index.max_name_length),
                         obj=cls,
                         id="models.E034",
@@ -1715,8 +1704,7 @@ class Model(AltersData, metaclass=ModelBase):
             ) and any(index.condition is not None for index in cls._meta.indexes):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support indexes with conditions."
-                        % connection.display_name,
+                        f"{connection.display_name} does not support indexes with conditions.",
                         hint=(
                             "Conditions will be ignored. Silence this warning "
                             "if you don't care about it."
@@ -1731,8 +1719,7 @@ class Model(AltersData, metaclass=ModelBase):
             ) and any(index.include for index in cls._meta.indexes):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support indexes with non-key columns."
-                        % connection.display_name,
+                        f"{connection.display_name} does not support indexes with non-key columns.",
                         hint=(
                             "Non-key columns will be ignored. Silence this "
                             "warning if you don't care about it."
@@ -1747,8 +1734,7 @@ class Model(AltersData, metaclass=ModelBase):
             ) and any(index.contains_expressions for index in cls._meta.indexes):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support indexes on expressions."
-                        % connection.display_name,
+                        f"{connection.display_name} does not support indexes on expressions.",
                         hint=(
                             "An index won't be created. Silence this warning "
                             "if you don't care about it."
@@ -1793,12 +1779,8 @@ class Model(AltersData, metaclass=ModelBase):
                 if isinstance(field.remote_field, models.ManyToManyRel):
                     errors.append(
                         preflight.Error(
-                            "'{}' refers to a ManyToManyField '{}', but "
-                            "ManyToManyFields are not permitted in '{}'.".format(
-                                option,
-                                field_name,
-                                option,
-                            ),
+                            f"'{option}' refers to a ManyToManyField '{field_name}', but "
+                            f"ManyToManyFields are not permitted in '{option}'.",
                             obj=cls,
                             id="models.E013",
                         )
@@ -1806,8 +1788,8 @@ class Model(AltersData, metaclass=ModelBase):
                 elif field not in cls._meta.local_fields:
                     errors.append(
                         preflight.Error(
-                            "'{}' refers to field '{}' which is not local to model "
-                            "'{}'.".format(option, field_name, cls._meta.object_name),
+                            f"'{option}' refers to field '{field_name}' which is not local to model "
+                            f"'{cls._meta.object_name}'.",
                             hint="This issue may be caused by multi-table inheritance.",
                             obj=cls,
                             id="models.E016",
@@ -1884,7 +1866,7 @@ class Model(AltersData, metaclass=ModelBase):
                         errors.append(
                             preflight.Error(
                                 "'ordering' refers to the nonexistent field, "
-                                "related field, or lookup '%s'." % field,
+                                f"related field, or lookup '{field}'.",
                                 obj=cls,
                                 id="models.E015",
                             )
@@ -1915,7 +1897,7 @@ class Model(AltersData, metaclass=ModelBase):
             errors.append(
                 preflight.Error(
                     "'ordering' refers to the nonexistent field, related "
-                    "field, or lookup '%s'." % invalid_field,
+                    f"field, or lookup '{invalid_field}'.",
                     obj=cls,
                     id="models.E015",
                 )
@@ -1966,10 +1948,8 @@ class Model(AltersData, metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Error(
-                        'Autogenerated column name too long for field "{}". '
-                        'Maximum length is "{}" for database "{}".'.format(
-                            column_name, allowed_len, db_alias
-                        ),
+                        f'Autogenerated column name too long for field "{column_name}". '
+                        f'Maximum length is "{allowed_len}" for database "{db_alias}".',
                         hint="Set the column name manually using 'db_column'.",
                         obj=cls,
                         id="models.E018",
@@ -1993,9 +1973,7 @@ class Model(AltersData, metaclass=ModelBase):
                     errors.append(
                         preflight.Error(
                             "Autogenerated column name too long for M2M field "
-                            '"{}". Maximum length is "{}" for database "{}".'.format(
-                                rel_name, allowed_len, db_alias
-                            ),
+                            f'"{rel_name}". Maximum length is "{allowed_len}" for database "{db_alias}".',
                             hint=(
                                 "Use 'through' to create a separate model for "
                                 "M2M and then set column_name using 'db_column'."
@@ -2039,8 +2017,7 @@ class Model(AltersData, metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support check constraints."
-                        % connection.display_name,
+                        f"{connection.display_name} does not support check constraints.",
                         hint=(
                             "A constraint won't be created. Silence this "
                             "warning if you don't care about it."
@@ -2059,8 +2036,8 @@ class Model(AltersData, metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support unique constraints with "
-                        "conditions." % connection.display_name,
+                        f"{connection.display_name} does not support unique constraints with "
+                        "conditions.",
                         hint=(
                             "A constraint won't be created. Silence this "
                             "warning if you don't care about it."
@@ -2080,8 +2057,7 @@ class Model(AltersData, metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support deferrable unique constraints."
-                        % connection.display_name,
+                        f"{connection.display_name} does not support deferrable unique constraints.",
                         hint=(
                             "A constraint won't be created. Silence this "
                             "warning if you don't care about it."
@@ -2099,8 +2075,8 @@ class Model(AltersData, metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support unique constraints with non-key "
-                        "columns." % connection.display_name,
+                        f"{connection.display_name} does not support unique constraints with non-key "
+                        "columns.",
                         hint=(
                             "A constraint won't be created. Silence this "
                             "warning if you don't care about it."
@@ -2119,8 +2095,8 @@ class Model(AltersData, metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        "%s does not support unique constraints on "
-                        "expressions." % connection.display_name,
+                        f"{connection.display_name} does not support unique constraints on "
+                        "expressions.",
                         hint=(
                             "A constraint won't be created. Silence this "
                             "warning if you don't care about it."
@@ -2207,8 +2183,7 @@ class Model(AltersData, metaclass=ModelBase):
                 ):
                     errors.append(
                         preflight.Error(
-                            "'constraints' refers to the joined field '%s'."
-                            % LOOKUP_SEP.join([field_name] + lookups),
+                            f"'constraints' refers to the joined field '{LOOKUP_SEP.join([field_name] + lookups)}'.",
                             obj=cls,
                             id="models.E041",
                         )
@@ -2243,12 +2218,12 @@ def method_get_order(self, ordered_obj):
 def make_foreign_order_accessors(model, related_model):
     setattr(
         related_model,
-        "get_%s_order" % model.__name__.lower(),
+        f"get_{model.__name__.lower()}_order",
         partialmethod(method_get_order, model),
     )
     setattr(
         related_model,
-        "set_%s_order" % model.__name__.lower(),
+        f"set_{model.__name__.lower()}_order",
         partialmethod(method_set_order, model),
     )
 

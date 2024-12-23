@@ -230,7 +230,7 @@ class Field(RegisterLookupMixin):
         name = getattr(self, "name", None)
         if name is not None:
             return f"<{path}: {name}>"
-        return "<%s>" % path
+        return f"<{path}>"
 
     def check(self, **kwargs):
         return [
@@ -260,7 +260,7 @@ class Field(RegisterLookupMixin):
         elif LOOKUP_SEP in self.name:
             return [
                 preflight.Error(
-                    'Field names must not contain "%s".' % LOOKUP_SEP,
+                    f'Field names must not contain "{LOOKUP_SEP}".',
                     obj=self,
                     id="fields.E002",
                 )
@@ -335,7 +335,7 @@ class Field(RegisterLookupMixin):
             if self.max_length is not None and choice_max_length > self.max_length:
                 return [
                     preflight.Error(
-                        "'max_length' is too small to fit the longest value "
+                        "'max_length' is too small to fit the longest value "  # noqa: UP031
                         "in 'choices' (%d characters)." % choice_max_length,
                         obj=self,
                         id="fields.E009",
@@ -441,8 +441,8 @@ class Field(RegisterLookupMixin):
                 preflight.Error(
                     self.system_check_removed_details.get(
                         "msg",
-                        "%s has been removed except for support in historical "
-                        "migrations." % self.__class__.__name__,
+                        f"{self.__class__.__name__} has been removed except for support in historical "
+                        "migrations.",
                     ),
                     hint=self.system_check_removed_details.get("hint"),
                     obj=self,
@@ -453,7 +453,7 @@ class Field(RegisterLookupMixin):
             return [
                 preflight.Warning(
                     self.system_check_deprecated_details.get(
-                        "msg", "%s has been deprecated." % self.__class__.__name__
+                        "msg", f"{self.__class__.__name__} has been deprecated."
                     ),
                     hint=self.system_check_deprecated_details.get("hint"),
                     obj=self,
@@ -864,10 +864,10 @@ class Field(RegisterLookupMixin):
             # this class, but don't check methods derived from inheritance, to
             # allow overriding inherited choices. For more complex inheritance
             # structures users should override contribute_to_class().
-            if "get_%s_display" % self.name not in cls.__dict__:
+            if f"get_{self.name}_display" not in cls.__dict__:
                 setattr(
                     cls,
-                    "get_%s_display" % self.name,
+                    f"get_{self.name}_display",
                     partialmethod(cls._get_FIELD_display, field=self),
                 )
 
@@ -1101,8 +1101,8 @@ class CharField(Field):
             ):
                 errors.append(
                     preflight.Error(
-                        "%s does not support a database collation on "
-                        "CharFields." % connection.display_name,
+                        f"{connection.display_name} does not support a database collation on "
+                        "CharFields.",
                         obj=self,
                         id="fields.E190",
                     ),
@@ -1156,7 +1156,7 @@ class CommaSeparatedIntegerField(CharField):
 
 def _to_naive(value):
     if timezone.is_aware(value):
-        value = timezone.make_naive(value, datetime.timezone.utc)
+        value = timezone.make_naive(value, datetime.UTC)
     return value
 
 
@@ -1328,14 +1328,14 @@ class DateField(DateTimeCheckMixin, Field):
         if not self.null:
             setattr(
                 cls,
-                "get_next_by_%s" % self.name,
+                f"get_next_by_{self.name}",
                 partialmethod(
                     cls._get_next_or_previous_by_FIELD, field=self, is_next=True
                 ),
             )
             setattr(
                 cls,
-                "get_previous_by_%s" % self.name,
+                f"get_previous_by_{self.name}",
                 partialmethod(
                     cls._get_next_or_previous_by_FIELD, field=self, is_next=False
                 ),
@@ -1397,10 +1397,8 @@ class DateTimeField(DateField):
             # do much about it, so we let the exceptions percolate up the
             # call stack.
             warnings.warn(
-                "DateTimeField {}.{} received a naive datetime "
-                "({}) while time zone support is active.".format(
-                    self.model.__name__, self.name, value
-                ),
+                f"DateTimeField {self.model.__name__}.{self.name} received a naive datetime "
+                f"({value}) while time zone support is active.",
                 RuntimeWarning,
             )
             default_timezone = timezone.get_default_timezone()
@@ -1745,8 +1743,7 @@ class IntegerField(Field):
         if self.max_length is not None:
             return [
                 preflight.Warning(
-                    "'max_length' is ignored when used with %s."
-                    % self.__class__.__name__,
+                    f"'max_length' is ignored when used with {self.__class__.__name__}.",
                     hint="Remove 'max_length' from field",
                     obj=self,
                     id="fields.W122",
@@ -2081,8 +2078,8 @@ class TextField(Field):
             ):
                 errors.append(
                     preflight.Error(
-                        "%s does not support a database collation on "
-                        "TextFields." % connection.display_name,
+                        f"{connection.display_name} does not support a database collation on "
+                        "TextFields.",
                         obj=self,
                         id="fields.E190",
                     ),
@@ -2384,8 +2381,7 @@ class AutoFieldMixin:
     def contribute_to_class(self, cls, name, **kwargs):
         if cls._meta.auto_field:
             raise ValueError(
-                "Model %s can't have more than one auto-generated field."
-                % cls._meta.label
+                f"Model {cls._meta.label} can't have more than one auto-generated field."
             )
         super().contribute_to_class(cls, name, **kwargs)
         cls._meta.auto_field = self

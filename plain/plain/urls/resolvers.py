@@ -5,6 +5,7 @@ URLResolver is the main class here. Its resolve() method takes a URL (as
 a string) and returns a ResolverMatch object which provides access to all
 attributes of the resolved URL match.
 """
+
 import functools
 import inspect
 import re
@@ -145,11 +146,9 @@ class CheckURLMixin:
             "/"
         ):
             warning = Warning(
-                "Your URL pattern {} has a route beginning with a '/'. Remove this "
+                f"Your URL pattern {self.describe()} has a route beginning with a '/'. Remove this "
                 "slash as it is unnecessary. If this pattern is targeted in an "
-                "include(), ensure the include() pattern has a trailing '/'.".format(
-                    self.describe()
-                ),
+                "include(), ensure the include() pattern has a trailing '/'.",
                 id="urls.W002",
             )
             return [warning]
@@ -194,9 +193,9 @@ class RegexPattern(CheckURLMixin):
         if regex_pattern.endswith("$") and not regex_pattern.endswith(r"\$"):
             return [
                 Warning(
-                    "Your URL pattern {} uses include with a route ending with a '$'. "
+                    f"Your URL pattern {self.describe()} uses include with a route ending with a '$'. "
                     "Remove the dollar from the route to avoid problems including "
-                    "URLs.".format(self.describe()),
+                    "URLs.",
                     id="urls.W001",
                 )
             ]
@@ -238,16 +237,16 @@ def _route_to_regex(route, is_endpoint=False):
             break
         elif not set(match.group()).isdisjoint(string.whitespace):
             raise ImproperlyConfigured(
-                "URL route '%s' cannot contain whitespace in angle brackets "
-                "<…>." % original_route
+                f"URL route '{original_route}' cannot contain whitespace in angle brackets "
+                "<…>."
             )
         parts.append(re.escape(route[: match.start()]))
         route = route[match.end() :]
         parameter = match["parameter"]
         if not parameter.isidentifier():
             raise ImproperlyConfigured(
-                "URL route '{}' uses parameter name {!r} which isn't a valid "
-                "Python identifier.".format(original_route, parameter)
+                f"URL route '{original_route}' uses parameter name {parameter!r} which isn't a valid "
+                "Python identifier."
             )
         raw_converter = match["converter"]
         if raw_converter is None:
@@ -257,9 +256,7 @@ def _route_to_regex(route, is_endpoint=False):
             converter = get_converter(raw_converter)
         except KeyError as e:
             raise ImproperlyConfigured(
-                "URL route {!r} uses invalid converter {!r}.".format(
-                    original_route, raw_converter
-                )
+                f"URL route {original_route!r} uses invalid converter {raw_converter!r}."
             ) from e
         converters[parameter] = converter
         parts.append("(?P<" + parameter + ">" + converter.regex + ")")
@@ -297,9 +294,9 @@ class RoutePattern(CheckURLMixin):
         if "(?P<" in route or route.startswith("^") or route.endswith("$"):
             warnings.append(
                 Warning(
-                    "Your URL pattern {} has a route that contains '(?P<', begins "
+                    f"Your URL pattern {self.describe()} has a route that contains '(?P<', begins "
                     "with a '^', or ends with a '$'. This was likely an oversight "
-                    "when migrating to plain.urls.path().".format(self.describe()),
+                    "when migrating to plain.urls.path().",
                     id="2_0.W001",
                 )
             )
@@ -334,8 +331,8 @@ class URLPattern:
         """
         if self.pattern.name is not None and ":" in self.pattern.name:
             warning = Warning(
-                "Your URL pattern {} has a name including a ':'. Remove the colon, to "
-                "avoid ambiguous namespace references.".format(self.pattern.describe()),
+                f"Your URL pattern {self.pattern.describe()} has a name including a ':'. Remove the colon, to "
+                "avoid ambiguous namespace references.",
                 id="urls.W003",
             )
             return [warning]
@@ -349,12 +346,8 @@ class URLPattern:
         if inspect.isclass(view) and issubclass(view, View):
             return [
                 Error(
-                    "Your URL pattern {} has an invalid view, pass {}.as_view() "
-                    "instead of {}.".format(
-                        self.pattern.describe(),
-                        view.__name__,
-                        view.__name__,
-                    ),
+                    f"Your URL pattern {self.pattern.describe()} has an invalid view, pass {view.__name__}.as_view() "
+                    f"instead of {view.__name__}.",
                     id="urls.E009",
                 )
             ]
@@ -422,16 +415,10 @@ class URLResolver:
     def __repr__(self):
         if isinstance(self.urlconf_name, list) and self.urlconf_name:
             # Don't bother to output the whole list, it can be huge
-            urlconf_repr = "<%s list>" % self.urlconf_name[0].__class__.__name__
+            urlconf_repr = f"<{self.urlconf_name[0].__class__.__name__} list>"
         else:
             urlconf_repr = repr(self.urlconf_name)
-        return "<{} {} ({}:{}) {}>".format(
-            self.__class__.__name__,
-            urlconf_repr,
-            self.default_namespace,
-            self.namespace,
-            self.pattern.describe(),
-        )
+        return f"<{self.__class__.__name__} {urlconf_repr} ({self.default_namespace}:{self.namespace}) {self.pattern.describe()}>"
 
     def check(self):
         messages = []
@@ -714,10 +701,10 @@ class URLResolver:
             if args:
                 arg_msg = f"arguments '{args}'"
             elif kwargs:
-                arg_msg = "keyword arguments '%s'" % kwargs
+                arg_msg = f"keyword arguments '{kwargs}'"
             else:
                 arg_msg = "no arguments"
-            msg = "Reverse for '%s' with %s not found. %d pattern(s) tried: %s" % (
+            msg = "Reverse for '%s' with %s not found. %d pattern(s) tried: %s" % (  # noqa: UP031
                 lookup_view_s,
                 arg_msg,
                 len(patterns),

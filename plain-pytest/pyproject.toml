@@ -1,38 +1,29 @@
-[tool.poetry]
-
+[project]
 name = "plain.pytest"
-packages = [
-    { include = "plain" },
-]
-
 version = "0.3.0"
 description = "Pytest integration for Plain."
-authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"
-homepage = "https://plainframework.com"
-documentation = "https://plainframework.com/docs/"
-repository = "https://github.com/dropseed/plain"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "click>=8.0.0",
+    "pytest>=7.0.0",
+    "python-dotenv~=1.0.0",
+]
 
 # Make the CLI available without adding to INSTALLED_APPS
-[tool.poetry.plugins."plain.cli"]
+[project.entry-points."plain.cli"]
 "test" = "plain.pytest:cli"
 
 # Automatically sets this up with pytest
-[tool.poetry.plugins."pytest11"]
+[project.entry-points."pytest11"]
 "plain" = "plain.pytest.plugin"
 
-
-[tool.poetry.dependencies]
-python = "^3.11"
-plain = "<1.0.0"
-click = ">=8.0.0"
-pytest = ">=7.0.0"
-python-dotenv = "^1.0.0"
-
-[tool.poetry.group.dev.dependencies]
-plain = {path = "../plain", develop = true}
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

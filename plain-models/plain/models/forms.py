@@ -2,6 +2,7 @@
 Helper functions for creating Form classes from Plain models
 and database field objects.
 """
+
 from itertools import chain
 
 from plain.exceptions import (
@@ -125,8 +126,8 @@ def fields_for_model(
         if not getattr(f, "editable", False):
             if fields is not None and f.name in fields:
                 raise FieldError(
-                    "'{}' cannot be specified for {} model form as it is a "
-                    "non-editable field".format(f.name, model.__name__)
+                    f"'{f.name}' cannot be specified for {model.__name__} model form as it is a "
+                    "non-editable field"
                 )
             continue
         if fields is not None and f.name not in fields:
@@ -189,8 +190,8 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
             if opts.fields is None:
                 raise ImproperlyConfigured(
                     "Creating a ModelForm without the 'fields' attribute "
-                    "is prohibited; form %s "
-                    "needs updating." % name
+                    f"is prohibited; form {name} "
+                    "needs updating."
                 )
 
             fields = fields_for_model(
@@ -680,7 +681,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
                     code="invalid_pk_value",
                     params={"pk": pk},
                 )
-        qs = self.queryset.filter(**{"%s__in" % key: value})
+        qs = self.queryset.filter(**{f"{key}__in": value})
         pks = {str(getattr(o, key)) for o in qs}
         for val in value:
             if str(val) not in pks:

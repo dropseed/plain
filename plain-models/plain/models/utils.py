@@ -20,8 +20,8 @@ def make_model_tuple(model):
         return model_tuple
     except (ValueError, AssertionError):
         raise ValueError(
-            "Invalid model reference '%s'. String model references "
-            "must be of the form 'package_label.ModelName'." % model
+            f"Invalid model reference '{model}'. String model references "
+            "must be of the form 'package_label.ModelName'."
         )
 
 

@@ -54,8 +54,8 @@ class CheckRegistry:
             new_errors = check(package_configs=package_configs, databases=databases)
             if not is_iterable(new_errors):
                 raise TypeError(
-                    "The function %r did not return a list. All functions "
-                    "registered with the checks registry must return a list." % check,
+                    f"The function {check!r} did not return a list. All functions "
+                    "registered with the checks registry must return a list.",
                 )
             errors.extend(new_errors)
         return errors

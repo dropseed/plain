@@ -2,6 +2,7 @@
 Default Plain settings. Override these with settings in the module pointed to
 by the PLAIN_SETTINGS_MODULE environment variable.
 """
+
 from pathlib import Path
 
 from plain.runtime import APP_PATH as default_app_path

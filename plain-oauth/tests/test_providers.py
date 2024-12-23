@@ -16,10 +16,10 @@ class DummyProvider(OAuthProvider):
             access_token="refreshed_dummy_access_token",
             refresh_token="refreshed_dummy_refresh_token",
             access_token_expires_at=datetime.datetime(
-                2029, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+                2029, 1, 1, 0, 0, tzinfo=datetime.UTC
             ),
             refresh_token_expires_at=datetime.datetime(
-                2029, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+                2029, 1, 2, 0, 0, tzinfo=datetime.UTC
             ),
         )
 
@@ -28,10 +28,10 @@ class DummyProvider(OAuthProvider):
             access_token="dummy_access_token",
             refresh_token="dummy_refresh_token",
             access_token_expires_at=datetime.datetime(
-                2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+                2020, 1, 1, 0, 0, tzinfo=datetime.UTC
             ),
             refresh_token_expires_at=datetime.datetime(
-                2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+                2020, 1, 2, 0, 0, tzinfo=datetime.UTC
             ),
         )
 
@@ -92,10 +92,10 @@ def test_dummy_signup(db, client, settings):
     assert connections[0].access_token == "dummy_access_token"
     assert connections[0].refresh_token == "dummy_refresh_token"
     assert connections[0].access_token_expires_at == datetime.datetime(
-        2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+        2020, 1, 1, 0, 0, tzinfo=datetime.UTC
     )
     assert connections[0].refresh_token_expires_at == datetime.datetime(
-        2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+        2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
     assert get_user_model().objects.count() == 1
@@ -128,10 +128,10 @@ def test_dummy_login_connection(db, client, settings):
         access_token="dummy_access_token",
         refresh_token="dummy_refresh_token",
         access_token_expires_at=datetime.datetime(
-            2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+            2020, 1, 1, 0, 0, tzinfo=datetime.UTC
         ),
         refresh_token_expires_at=datetime.datetime(
-            2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+            2020, 1, 2, 0, 0, tzinfo=datetime.UTC
         ),
     )
 
@@ -172,10 +172,10 @@ def test_dummy_login_connection(db, client, settings):
     assert connections[0].access_token == "dummy_access_token"
     assert connections[0].refresh_token == "dummy_refresh_token"
     assert connections[0].access_token_expires_at == datetime.datetime(
-        2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+        2020, 1, 1, 0, 0, tzinfo=datetime.UTC
     )
     assert connections[0].refresh_token_expires_at == datetime.datetime(
-        2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+        2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
     assert get_user_model().objects.count() == 1
@@ -273,10 +273,10 @@ def test_dummy_connect(db, client, settings):
     assert connections[0].access_token == "dummy_access_token"
     assert connections[0].refresh_token == "dummy_refresh_token"
     assert connections[0].access_token_expires_at == datetime.datetime(
-        2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+        2020, 1, 1, 0, 0, tzinfo=datetime.UTC
     )
     assert connections[0].refresh_token_expires_at == datetime.datetime(
-        2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+        2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
     assert get_user_model().objects.count() == 1
@@ -465,10 +465,10 @@ def test_dummy_refresh(db, settings, monkeypatch):
         access_token="dummy_access_token",
         refresh_token="dummy_refresh_token",
         access_token_expires_at=datetime.datetime(
-            2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+            2020, 1, 1, 0, 0, tzinfo=datetime.UTC
         ),
         refresh_token_expires_at=datetime.datetime(
-            2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+            2020, 1, 2, 0, 0, tzinfo=datetime.UTC
         ),
     )
 
@@ -478,8 +478,8 @@ def test_dummy_refresh(db, settings, monkeypatch):
     assert connection.access_token == "refreshed_dummy_access_token"
     assert connection.refresh_token == "refreshed_dummy_refresh_token"
     assert connection.access_token_expires_at == datetime.datetime(
-        2029, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+        2029, 1, 1, 0, 0, tzinfo=datetime.UTC
     )
     assert connection.refresh_token_expires_at == datetime.datetime(
-        2029, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+        2029, 1, 2, 0, 0, tzinfo=datetime.UTC
     )

@@ -6,7 +6,7 @@ __pycache__
 *.DS_Store
 .coverage
 
-# Build files from poetry publish
+# Build files from publish
 plain*/dist/
 
 # Test apps

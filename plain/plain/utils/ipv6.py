@@ -30,7 +30,7 @@ def clean_ipv6_address(
     if unpack_ipv4 and addr.ipv4_mapped:
         return str(addr.ipv4_mapped)
     elif addr.ipv4_mapped:
-        return "::ffff:%s" % str(addr.ipv4_mapped)
+        return f"::ffff:{str(addr.ipv4_mapped)}"
 
     return str(addr)
 

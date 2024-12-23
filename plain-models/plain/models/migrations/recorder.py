@@ -71,7 +71,7 @@ class MigrationRecorder:
                 editor.create_model(self.Migration)
         except DatabaseError as exc:
             raise MigrationSchemaMissing(
-                "Unable to create the plainmigrations table (%s)" % exc
+                f"Unable to create the plainmigrations table ({exc})"
             )
 
     def applied_migrations(self):

@@ -6,6 +6,7 @@ themselves do not have to (and could be backed by things other than SQL
 databases). The abstraction barrier only works one way: this module has to know
 all about the internals of models in order to get the information it needs.
 """
+
 import copy
 import difflib
 import functools
@@ -146,7 +147,7 @@ class RawQuery:
         elif params_type is None:
             params = None
         else:
-            raise RuntimeError("Unexpected params type: %s" % params_type)
+            raise RuntimeError(f"Unexpected params type: {params_type}")
 
         self.cursor = connection.cursor()
         self.cursor.execute(self.sql, params)
@@ -394,7 +395,7 @@ class Query(BaseExpression):
                 self, allow_joins=True, reuse=None, summarize=True
             )
             if not aggregate.contains_aggregate:
-                raise TypeError("%s is not an aggregate expression" % alias)
+                raise TypeError(f"{alias} is not an aggregate expression")
             aggregates[alias] = aggregate
         # Existing usage of aggregation can be determined by the presence of
         # selected aggregates but also by filters against aliased aggregates.
@@ -784,7 +785,7 @@ class Query(BaseExpression):
 
         # Create a new alias for this table.
         if alias_list:
-            alias = "%s%d" % (self.alias_prefix, len(self.alias_map) + 1)
+            alias = "%s%d" % (self.alias_prefix, len(self.alias_map) + 1)  # noqa: UP031
             alias_list.append(alias)
         else:
             # The first occurrence of a table uses the table name directly.
@@ -962,7 +963,7 @@ class Query(BaseExpression):
             exclude = {}
         self.change_aliases(
             {
-                alias: "%s%d" % (self.alias_prefix, pos)
+                alias: "%s%d" % (self.alias_prefix, pos)  # noqa: UP031
                 for pos, alias in enumerate(self.alias_map)
                 if alias not in exclude
             }
@@ -1149,7 +1150,7 @@ class Query(BaseExpression):
                 query.clear_ordering(force=False)
         sql, params = self.get_compiler(connection=connection).as_sql()
         if self.subquery:
-            sql = "(%s)" % sql
+            sql = f"({sql})"
         return sql, params
 
     def resolve_lookup_value(self, value, can_reuse, allow_joins):
@@ -1190,9 +1191,7 @@ class Query(BaseExpression):
         field_parts = lookup_splitted[0 : len(lookup_splitted) - len(lookup_parts)]
         if len(lookup_parts) > 1 and not field_parts:
             raise FieldError(
-                'Invalid lookup "{}" for model {}".'.format(
-                    lookup, self.get_meta().model.__name__
-                )
+                f'Invalid lookup "{lookup}" for model {self.get_meta().model.__name__}".'
             )
         return lookup_parts, field_parts, False
 
@@ -1221,9 +1220,7 @@ class Query(BaseExpression):
                 and not check_rel_lookup_compatibility(value.model, opts, field)
             ):
                 raise ValueError(
-                    'Cannot use QuerySet for "{}": Use a QuerySet for "{}".'.format(
-                        value.model._meta.object_name, opts.object_name
-                    )
+                    f'Cannot use QuerySet for "{value.model._meta.object_name}": Use a QuerySet for "{opts.object_name}".'
                 )
             elif hasattr(value, "_meta"):
                 self.check_query_object_type(value, opts, field)
@@ -1304,12 +1301,14 @@ class Query(BaseExpression):
                 name, output_field.get_lookups()
             )
             if suggested_lookups:
-                suggestion = ", perhaps you meant %s?" % " or ".join(suggested_lookups)
+                suggestion = ", perhaps you meant {}?".format(
+                    " or ".join(suggested_lookups)
+                )
             else:
                 suggestion = "."
             raise FieldError(
-                "Unsupported lookup '{}' for {} or join on the field not "
-                "permitted{}".format(name, output_field.__name__, suggestion)
+                f"Unsupported lookup '{name}' for {output_field.__name__} or join on the field not "
+                f"permitted{suggestion}"
             )
 
     def build_filter(
@@ -1376,7 +1375,7 @@ class Query(BaseExpression):
             return WhereNode([condition], connector=AND), []
         arg, value = filter_expr
         if not arg:
-            raise FieldError("Cannot parse keyword query %r" % arg)
+            raise FieldError(f"Cannot parse keyword query {arg!r}")
         lookups, parts, reffed_expression = self.solve_lookup_type(arg, summarize)
 
         if check_filterable:
@@ -1581,7 +1580,7 @@ class Query(BaseExpression):
         if relation_lookup_parts:
             raise ValueError(
                 "FilteredRelation's relation_name cannot contain lookups "
-                "(got %r)." % filtered_relation.relation_name
+                f"(got {filtered_relation.relation_name!r})."
             )
         for lookup in chain(lookups):
             lookup_parts, lookup_field_parts, _ = self.solve_lookup_type(lookup)
@@ -1592,9 +1591,7 @@ class Query(BaseExpression):
                     if relation_field_parts[idx] != lookup_field_part:
                         raise ValueError(
                             "FilteredRelation's condition doesn't support "
-                            "relations outside the {!r} (got {!r}).".format(
-                                filtered_relation.relation_name, lookup
-                            )
+                            f"relations outside the {filtered_relation.relation_name!r} (got {lookup!r})."
                         )
                 else:
                     raise ValueError(
@@ -1653,10 +1650,10 @@ class Query(BaseExpression):
                 # relations and therefore cannot be used for reverse querying.
                 if field.is_relation and not field.related_model:
                     raise FieldError(
-                        "Field %r does not generate an automatic reverse "
+                        f"Field {name!r} does not generate an automatic reverse "
                         "relation and therefore cannot be used for reverse "
                         "querying. If it is a GenericForeignKey, consider "
-                        "adding a GenericRelation." % name
+                        "adding a GenericRelation."
                     )
                 try:
                     model = field.model._meta.concrete_model
@@ -1714,8 +1711,8 @@ class Query(BaseExpression):
                 targets = (field,)
                 if fail_on_missing and pos + 1 != len(names):
                     raise FieldError(
-                        "Cannot resolve keyword {!r} into field. Join on '{}'"
-                        " not permitted.".format(names[pos + 1], name)
+                        f"Cannot resolve keyword {names[pos + 1]!r} into field. Join on '{name}'"
+                        " not permitted."
                     )
                 break
         return path, final_field, targets, names[pos + 1 :]
@@ -1915,8 +1912,8 @@ class Query(BaseExpression):
                 # that case we need to return a Ref to the subquery's annotation.
                 if name not in self.annotation_select:
                     raise FieldError(
-                        "Cannot aggregate over the '%s' alias. Use annotate() "
-                        "to promote it." % name
+                        f"Cannot aggregate over the '{name}' alias. Use annotate() "
+                        "to promote it."
                     )
                 return Ref(name, self.annotation_select[name])
             else:
@@ -2004,7 +2001,7 @@ class Query(BaseExpression):
 
         if contains_louter:
             or_null_condition, _ = self.build_filter(
-                ("%s__isnull" % trimmed_prefix, True),
+                (f"{trimmed_prefix}__isnull", True),
                 current_negated=True,
                 branch_negated=True,
                 can_reuse=can_reuse,
@@ -2126,7 +2123,7 @@ class Query(BaseExpression):
             if cols:
                 self.set_select(cols)
         except MultiJoin:
-            raise FieldError("Invalid field name: '%s'" % name)
+            raise FieldError(f"Invalid field name: '{name}'")
         except FieldError:
             if LOOKUP_SEP in name:
                 # For lookups spanning over relationships, show the error
@@ -2134,8 +2131,8 @@ class Query(BaseExpression):
                 raise
             elif name in self.annotations:
                 raise FieldError(
-                    "Cannot select the '%s' alias. Use annotate() to promote "
-                    "it." % name
+                    f"Cannot select the '{name}' alias. Use annotate() to promote "
+                    "it."
                 )
             else:
                 names = sorted(
@@ -2179,10 +2176,10 @@ class Query(BaseExpression):
             if getattr(item, "contains_aggregate", False):
                 raise FieldError(
                     "Using an aggregate in order_by() without also including "
-                    "it in annotate() is not allowed: %s" % item
+                    f"it in annotate() is not allowed: {item}"
                 )
         if errors:
-            raise FieldError("Invalid order_by arguments: %s" % errors)
+            raise FieldError(f"Invalid order_by arguments: {errors}")
         if ordering:
             self.order_by += ordering
         else:

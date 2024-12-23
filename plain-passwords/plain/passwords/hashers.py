@@ -62,7 +62,7 @@ def hash_password(password, salt=None, hasher="default"):
     """
     if not isinstance(password, bytes | str):
         raise TypeError(
-            "Password must be a string or bytes, got %s." % type(password).__qualname__
+            f"Password must be a string or bytes, got {type(password).__qualname__}."
         )
     hasher = get_hasher(hasher)
     salt = salt or hasher.salt()
@@ -77,7 +77,7 @@ def get_hashers():
         hasher = hasher_cls()
         if not getattr(hasher, "algorithm"):
             raise ImproperlyConfigured(
-                "hasher doesn't specify an algorithm name: %s" % hasher_path
+                f"hasher doesn't specify an algorithm name: {hasher_path}"
             )
         hashers.append(hasher)
     return hashers
@@ -107,9 +107,9 @@ def get_hasher(algorithm="default"):
             return hashers[algorithm]
         except KeyError:
             raise ValueError(
-                "Unknown password hashing algorithm '%s'. "
+                f"Unknown password hashing algorithm '{algorithm}'. "
                 "Did you specify it in the PASSWORD_HASHERS "
-                "setting?" % algorithm
+                "setting?"
             )
 
 
@@ -178,7 +178,7 @@ class BasePasswordHasher:
                 )
             return module
         raise ValueError(
-            "Hasher %r doesn't specify a library attribute" % self.__class__.__name__
+            f"Hasher {self.__class__.__name__!r} doesn't specify a library attribute"
         )
 
     def salt(self):
@@ -274,7 +274,7 @@ class PBKDF2PasswordHasher(BasePasswordHasher):
         iterations = iterations or self.iterations
         hash = pbkdf2(password, salt, iterations, digest=self.digest)
         hash = base64.b64encode(hash).decode("ascii").strip()
-        return "%s$%d$%s$%s" % (self.algorithm, iterations, salt, hash)
+        return "%s$%d$%s$%s" % (self.algorithm, iterations, salt, hash)  # noqa: UP031
 
     def decode(self, encoded):
         algorithm, iterations, salt, hash = encoded.split("$", 3)
@@ -542,7 +542,7 @@ class ScryptPasswordHasher(BasePasswordHasher):
             dklen=64,
         )
         hash_ = base64.b64encode(hash_).decode("ascii").strip()
-        return "%s$%d$%s$%d$%d$%s" % (self.algorithm, n, salt, r, p, hash_)
+        return "%s$%d$%s$%d$%d$%s" % (self.algorithm, n, salt, r, p, hash_)  # noqa: UP031
 
     def decode(self, encoded):
         algorithm, work_factor, salt, block_size, parallelism, hash_ = encoded.split(

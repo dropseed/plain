@@ -24,7 +24,7 @@ class OperationWriter:
                 _arg_value, list | tuple | dict
             ):
                 if isinstance(_arg_value, dict):
-                    self.feed("%s={" % _arg_name)
+                    self.feed(f"{_arg_name}={{")
                     self.indent()
                     for key, value in _arg_value.items():
                         key_string, key_imports = MigrationWriter.serialize(key)
@@ -34,7 +34,7 @@ class OperationWriter:
                             self.feed(f"{key_string}: {args[0]}")
                             for arg in args[1:-1]:
                                 self.feed(arg)
-                            self.feed("%s," % args[-1])
+                            self.feed(f"{args[-1]},")
                         else:
                             self.feed(f"{key_string}: {arg_string},")
                         imports.update(key_imports)
@@ -42,7 +42,7 @@ class OperationWriter:
                     self.unindent()
                     self.feed("},")
                 else:
-                    self.feed("%s=[" % _arg_name)
+                    self.feed(f"{_arg_name}=[")
                     self.indent()
                     for item in _arg_value:
                         arg_string, arg_imports = MigrationWriter.serialize(item)
@@ -50,9 +50,9 @@ class OperationWriter:
                         if len(args) > 1:
                             for arg in args[:-1]:
                                 self.feed(arg)
-                            self.feed("%s," % args[-1])
+                            self.feed(f"{args[-1]},")
                         else:
-                            self.feed("%s," % arg_string)
+                            self.feed(f"{arg_string},")
                         imports.update(arg_imports)
                     self.unindent()
                     self.feed("],")
@@ -63,7 +63,7 @@ class OperationWriter:
                     self.feed(f"{_arg_name}={args[0]}")
                     for arg in args[1:-1]:
                         self.feed(arg)
-                    self.feed("%s," % args[-1])
+                    self.feed(f"{args[-1]},")
                 else:
                     self.feed(f"{_arg_name}={arg_string},")
                 imports.update(arg_imports)
@@ -76,9 +76,9 @@ class OperationWriter:
         # We can just use the fact we already have that imported,
         # otherwise, we need to add an import for the operation class.
         if getattr(migrations, name, None) == self.operation.__class__:
-            self.feed("migrations.%s(" % name)
+            self.feed(f"migrations.{name}(")
         else:
-            imports.add("import %s" % (self.operation.__class__.__module__))
+            imports.add(f"import {self.operation.__class__.__module__}")
             self.feed(f"{self.operation.__class__.__module__}.{name}(")
 
         self.indent()
@@ -145,12 +145,11 @@ class MigrationWriter:
         for dependency in self.migration.dependencies:
             if dependency[0] == "__setting__":
                 dependencies.append(
-                    "        migrations.swappable_dependency(settings.%s),"
-                    % dependency[1]
+                    f"        migrations.swappable_dependency(settings.{dependency[1]}),"
                 )
                 imports.add("from plain.runtime import settings")
             else:
-                dependencies.append("        %s," % self.serialize(dependency)[0])
+                dependencies.append(f"        {self.serialize(dependency)[0]},")
         items["dependencies"] = "\n".join(dependencies) + "\n" if dependencies else ""
 
         # Format imports nicely, swapping imports of functions from migration files
@@ -176,12 +175,12 @@ class MigrationWriter:
                 "\n\n# Functions from the following migrations need manual "
                 "copying.\n# Move them and any dependencies into this file, "
                 "then update the\n# RunPython operations to refer to the local "
-                "versions:\n# %s"
-            ) % "\n# ".join(sorted(migration_imports))
+                "versions:\n# {}"
+            ).format("\n# ".join(sorted(migration_imports)))
         # If there's a replaces, make a string for it
         if self.migration.replaces:
             items["replaces_str"] = (
-                "\n    replaces = %s\n" % self.serialize(self.migration.replaces)[0]
+                f"\n    replaces = {self.serialize(self.migration.replaces)[0]}\n"
             )
         # Hinting that goes into comment
         if self.include_header:
@@ -205,9 +204,9 @@ class MigrationWriter:
 
         if migrations_package_name is None:
             raise ValueError(
-                "Plain can't create migrations for app '%s' because "
+                f"Plain can't create migrations for app '{self.migration.package_label}' because "
                 "migrations have been disabled via the MIGRATION_MODULES "
-                "setting." % self.migration.package_label
+                "setting."
             )
 
         # See if we can import the migrations module directly
@@ -250,8 +249,8 @@ class MigrationWriter:
         else:
             raise ValueError(
                 "Could not locate an appropriate location to create "
-                "migrations package %s. Make sure the toplevel "
-                "package exists and can be imported." % migrations_package_name
+                f"migrations package {migrations_package_name}. Make sure the toplevel "
+                "package exists and can be imported."
             )
 
         final_dir = os.path.join(base_dir, *missing_dirs)
@@ -265,7 +264,7 @@ class MigrationWriter:
 
     @property
     def filename(self):
-        return "%s.py" % self.migration.name
+        return f"{self.migration.name}.py"
 
     @property
     def path(self):

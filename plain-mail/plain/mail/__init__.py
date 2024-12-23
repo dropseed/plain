@@ -1,6 +1,7 @@
 """
 Tools for sending email.
 """
+
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 

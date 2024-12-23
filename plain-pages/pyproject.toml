@@ -1,24 +1,19 @@
-[tool.poetry]
+[project]
 name = "plain.pages"
-packages = [
-    { include = "plain" },
-]
-
 version = "0.3.0"
 description = "Simplified Markdown-based content for Plain."
-authors = ["Dave Gaeddert <dave.gaeddert@dropseed.dev>"]
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "mistune>=3.0.0",
+    "python-frontmatter>=1.0.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-
-plain = "<1.0.0"
-
-mistune = "^3.0.0"
-python-frontmatter = "^1.0.0"
-
-[tool.poetry.group.dev.dependencies]
-plain = { path = "../plain", develop = true }
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

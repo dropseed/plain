@@ -156,7 +156,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return cursor.fetchall()
 
     def format_for_duration_arithmetic(self, sql):
-        return "INTERVAL %s MICROSECOND" % sql
+        return f"INTERVAL {sql} MICROSECOND"
 
     def force_no_ordering(self):
         """
@@ -183,7 +183,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def quote_name(self, name):
         if name.startswith("`") and name.endswith("`"):
             return name  # Quoting once is enough.
-        return "`%s`" % name
+        return f"`{name}`"
 
     def return_insert_columns(self, fields):
         # MySQL and MariaDB < 10.5.0 don't support an INSERT...RETURNING
@@ -191,13 +191,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not fields:
             return "", ()
         columns = [
-            "{}.{}".format(
-                self.quote_name(field.model._meta.db_table),
-                self.quote_name(field.column),
-            )
+            f"{self.quote_name(field.model._meta.db_table)}.{self.quote_name(field.column)}"
             for field in fields
         ]
-        return "RETURNING %s" % ", ".join(columns), ()
+        return "RETURNING {}".format(", ".join(columns)), ()
 
     def sequence_reset_by_name_sql(self, style, sequences):
         return [
@@ -254,17 +251,17 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def bulk_insert_sql(self, fields, placeholder_rows):
         placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
-        values_sql = ", ".join("(%s)" % sql for sql in placeholder_rows_sql)
+        values_sql = ", ".join(f"({sql})" for sql in placeholder_rows_sql)
         return "VALUES " + values_sql
 
     def combine_expression(self, connector, sub_expressions):
         if connector == "^":
-            return "POW(%s)" % ",".join(sub_expressions)
+            return "POW({})".format(",".join(sub_expressions))
         # Convert the result to a signed integer since MySQL's binary operators
         # return an unsigned integer.
         elif connector in ("&", "|", "<<", "#"):
             connector = "^" if connector == "#" else connector
-            return "CONVERT(%s, SIGNED)" % connector.join(sub_expressions)
+            return f"CONVERT({connector.join(sub_expressions)}, SIGNED)"
         elif connector == ">>":
             lhs, rhs = sub_expressions
             return f"FLOOR({lhs} / POW(2, {rhs}))"
@@ -340,7 +337,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             )
         if format and not (analyze and not self.connection.mysql_is_mariadb):
             # Only MariaDB supports the analyze option with formats.
-            prefix += " FORMAT=%s" % format
+            prefix += f" FORMAT={format}"
         return prefix
 
     def regex_lookup(self, lookup_type):
@@ -351,7 +348,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return "%s REGEXP %s"
 
         match_option = "c" if lookup_type == "regex" else "i"
-        return "REGEXP_LIKE(%%s, %%s, '%s')" % match_option
+        return f"REGEXP_LIKE(%s, %s, '{match_option}')"
 
     def insert_statement(self, on_conflict=None):
         if on_conflict == OnConflict.IGNORE:

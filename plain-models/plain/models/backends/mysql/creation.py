@@ -12,9 +12,9 @@ class DatabaseCreation(BaseDatabaseCreation):
         suffix = []
         test_settings = self.connection.settings_dict["TEST"]
         if test_settings["CHARSET"]:
-            suffix.append("CHARACTER SET %s" % test_settings["CHARSET"])
+            suffix.append("CHARACTER SET {}".format(test_settings["CHARSET"]))
         if test_settings["COLLATION"]:
-            suffix.append("COLLATE %s" % test_settings["COLLATION"])
+            suffix.append("COLLATE {}".format(test_settings["COLLATION"]))
         return " ".join(suffix)
 
     def _execute_create_test_db(self, cursor, parameters, keepdb=False):
@@ -23,7 +23,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         except Exception as e:
             if len(e.args) < 1 or e.args[0] != 1007:
                 # All errors except "database exists" (1007) cancel tests.
-                self.log("Got an error creating the test database: %s" % e)
+                self.log(f"Got an error creating the test database: {e}")
                 sys.exit(2)
             else:
                 raise
@@ -54,7 +54,7 @@ class DatabaseCreation(BaseDatabaseCreation):
                     cursor.execute("DROP DATABASE {dbname}".format(**test_db_params))
                     self._execute_create_test_db(cursor, test_db_params, keepdb)
                 except Exception as e:
-                    self.log("Got an error recreating the test database: %s" % e)
+                    self.log(f"Got an error recreating the test database: {e}")
                     sys.exit(2)
         self._clone_db(source_database_name, target_database_name)
 

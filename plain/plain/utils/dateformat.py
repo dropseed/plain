@@ -10,6 +10,7 @@ Usage:
 7th October 2003 11:39
 >>>
 """
+
 import calendar
 from datetime import date, datetime, time
 from email.utils import format_datetime as format_datetime_rfc5322
@@ -42,7 +43,7 @@ class Formatter:
                 if type(self.data) is date and hasattr(TimeFormat, piece):
                     raise TypeError(
                         "The format for date objects may not contain "
-                        "time-related format specifiers (found '%s')." % piece
+                        f"time-related format specifiers (found '{piece}')."
                     )
                 pieces.append(str(getattr(self, piece)()))
             elif piece:
@@ -103,7 +104,7 @@ class TimeFormat(Formatter):
         """
         hour = self.data.hour % 12 or 12
         minute = self.data.minute
-        return "%d:%02d" % (hour, minute) if minute else hour
+        return "%d:%02d" % (hour, minute) if minute else hour  # noqa: UP031
 
     def g(self):
         "Hour, 12-hour format without leading zeros; i.e. '1' to '12'"
@@ -115,15 +116,15 @@ class TimeFormat(Formatter):
 
     def h(self):
         "Hour, 12-hour format; i.e. '01' to '12'"
-        return "%02d" % (self.data.hour % 12 or 12)
+        return "%02d" % (self.data.hour % 12 or 12)  # noqa: UP031
 
     def H(self):
         "Hour, 24-hour format; i.e. '00' to '23'"
-        return "%02d" % self.data.hour
+        return "%02d" % self.data.hour  # noqa: UP031
 
     def i(self):
         "Minutes; i.e. '00' to '59'"
-        return "%02d" % self.data.minute
+        return "%02d" % self.data.minute  # noqa: UP031
 
     def O(self):  # NOQA: E743, E741
         """
@@ -138,7 +139,7 @@ class TimeFormat(Formatter):
         seconds = offset.days * 86400 + offset.seconds
         sign = "-" if seconds < 0 else "+"
         seconds = abs(seconds)
-        return "%s%02d%02d" % (sign, seconds // 3600, (seconds // 60) % 60)
+        return "%s%02d%02d" % (sign, seconds // 3600, (seconds // 60) % 60)  # noqa: UP031
 
     def P(self):
         """
@@ -155,7 +156,7 @@ class TimeFormat(Formatter):
 
     def s(self):
         "Seconds; i.e. '00' to '59'"
-        return "%02d" % self.data.second
+        return "%02d" % self.data.second  # noqa: UP031
 
     def T(self):
         """
@@ -170,7 +171,7 @@ class TimeFormat(Formatter):
 
     def u(self):
         "Microseconds; i.e. '000000' to '999999'"
-        return "%06d" % self.data.microsecond
+        return "%06d" % self.data.microsecond  # noqa: UP031
 
     def Z(self):
         """
@@ -206,7 +207,7 @@ class DateFormat(TimeFormat):
 
     def d(self):
         "Day of the month, 2 digits with leading zeros; i.e. '01' to '31'"
-        return "%02d" % self.data.day
+        return "%02d" % self.data.day  # noqa: UP031
 
     def D(self):
         "Day of the week, textual, 3 letters; e.g. 'Fri'"
@@ -240,7 +241,7 @@ class DateFormat(TimeFormat):
 
     def m(self):
         "Month; i.e. '01' to '12'"
-        return "%02d" % self.data.month
+        return "%02d" % self.data.month  # noqa: UP031
 
     def M(self):
         "Month, textual, 3 letters; e.g. 'Jan'"
@@ -306,11 +307,11 @@ class DateFormat(TimeFormat):
 
     def y(self):
         """Year, 2 digits with leading zeros; e.g. '99'."""
-        return "%02d" % (self.data.year % 100)
+        return "%02d" % (self.data.year % 100)  # noqa: UP031
 
     def Y(self):
         """Year, 4 digits with leading zeros; e.g. '1999'."""
-        return "%04d" % self.data.year
+        return "%04d" % self.data.year  # noqa: UP031
 
     def z(self):
         """Day of the year, i.e. 1 to 366."""

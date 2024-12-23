@@ -321,11 +321,7 @@ class RenameField(FieldOperation):
 
     @property
     def migration_name_fragment(self):
-        return "rename_{}_{}_{}".format(
-            self.old_name_lower,
-            self.model_name_lower,
-            self.new_name_lower,
-        )
+        return f"rename_{self.old_name_lower}_{self.model_name_lower}_{self.new_name_lower}"
 
     def references_field(self, model_name, name, package_label):
         return self.references_model(model_name, package_label) and (

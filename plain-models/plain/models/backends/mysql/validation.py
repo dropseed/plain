@@ -14,17 +14,12 @@ class DatabaseValidation(BaseDatabaseValidation):
         ):
             return [
                 preflight.Warning(
-                    "{} Strict Mode is not set for database connection '{}'".format(
-                        self.connection.display_name, self.connection.alias
-                    ),
+                    f"{self.connection.display_name} Strict Mode is not set for database connection '{self.connection.alias}'",
                     hint=(
-                        "{}'s Strict Mode fixes many data integrity problems in "
-                        "{}, such as data truncation upon insertion, by "
+                        f"{self.connection.display_name}'s Strict Mode fixes many data integrity problems in "
+                        f"{self.connection.display_name}, such as data truncation upon insertion, by "
                         "escalating warnings into errors. It is strongly "
-                        "recommended you activate it.".format(
-                            self.connection.display_name,
-                            self.connection.display_name,
-                        ),
+                        "recommended you activate it.",
                     ),
                     id="mysql.W002",
                 )
@@ -46,8 +41,8 @@ class DatabaseValidation(BaseDatabaseValidation):
         ):
             errors.append(
                 preflight.Warning(
-                    "%s may not allow unique CharFields to have a max_length "
-                    "> 255." % self.connection.display_name,
+                    f"{self.connection.display_name} may not allow unique CharFields to have a max_length "
+                    "> 255.",
                     obj=field,
                     id="mysql.W003",
                 )
@@ -56,9 +51,7 @@ class DatabaseValidation(BaseDatabaseValidation):
         if field.db_index and field_type.lower() in self.connection._limited_data_types:
             errors.append(
                 preflight.Warning(
-                    "{} does not support a database index on {} columns.".format(
-                        self.connection.display_name, field_type
-                    ),
+                    f"{self.connection.display_name} does not support a database index on {field_type} columns.",
                     hint=(
                         "An index won't be created. Silence this warning if "
                         "you don't care about it."

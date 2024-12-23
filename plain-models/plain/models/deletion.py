@@ -39,12 +39,8 @@ def CASCADE(collector, field, sub_objs, using):
 
 def PROTECT(collector, field, sub_objs, using):
     raise ProtectedError(
-        "Cannot delete some instances of model '{}' because they are "
-        "referenced through a protected foreign key: '{}.{}'".format(
-            field.remote_field.model.__name__,
-            sub_objs[0].__class__.__name__,
-            field.name,
-        ),
+        f"Cannot delete some instances of model '{field.remote_field.model.__name__}' because they are "
+        f"referenced through a protected foreign key: '{sub_objs[0].__class__.__name__}.{field.name}'",
         sub_objs,
     )
 

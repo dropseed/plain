@@ -81,7 +81,7 @@ class HttpRequest:
 
     def __repr__(self):
         if self.method is None or not self.get_full_path():
-            return "<%s>" % self.__class__.__name__
+            return f"<{self.__class__.__name__}>"
         return f"<{self.__class__.__name__}: {self.method} {self.get_full_path()!r}>"
 
     def __getstate__(self):
@@ -157,9 +157,9 @@ class HttpRequest:
         if domain and validate_host(domain, allowed_hosts):
             return host
         else:
-            msg = "Invalid HTTP_HOST header: %r." % host
+            msg = f"Invalid HTTP_HOST header: {host!r}."
             if domain:
-                msg += " You may need to add %r to ALLOWED_HOSTS." % domain
+                msg += f" You may need to add {domain!r} to ALLOWED_HOSTS."
             else:
                 msg += (
                     " The domain name provided is not valid according to RFC 1034/1035."
@@ -227,7 +227,7 @@ class HttpRequest:
         if location is None:
             # Make it an absolute url (but schemeless and domainless) for the
             # edge case that the path starts with '//'.
-            location = "//%s" % self.get_full_path()
+            location = f"//{self.get_full_path()}"
         else:
             # Coerce lazy locations.
             location = str(location)
@@ -671,7 +671,7 @@ class MediaType:
         params_str = "".join(f"; {k}={v}" for k, v in self.params.items())
         return "{}{}{}".format(
             self.main_type,
-            ("/%s" % self.sub_type) if self.sub_type else "",
+            (f"/{self.sub_type}") if self.sub_type else "",
             params_str,
         )
 

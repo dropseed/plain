@@ -57,14 +57,14 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         elif isinstance(value, Decimal | float | int):
             return str(value)
         elif isinstance(value, str):
-            return "'%s'" % value.replace("'", "''")
+            return "'{}'".format(value.replace("'", "''"))
         elif value is None:
             return "NULL"
         elif isinstance(value, bytes | bytearray | memoryview):
             # Bytes are only allowed for BLOB fields, encoded as string
             # literals containing hexadecimal data and preceded by a single "X"
             # character.
-            return "X'%s'" % value.hex()
+            return f"X'{value.hex()}'"
         else:
             raise ValueError(
                 f"Cannot quote parameter value {value!r} of type {type(value)}"
@@ -106,12 +106,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         ):
             if self.connection.in_atomic_block:
                 raise NotSupportedError(
-                    (
-                        "Renaming the %r table while in a transaction is not "
-                        "supported on SQLite < 3.26 because it would break referential "
-                        "integrity. Try adding `atomic = False` to the Migration class."
-                    )
-                    % old_db_table
+                    f"Renaming the {old_db_table!r} table while in a transaction is not "
+                    "supported on SQLite < 3.26 because it would break referential "
+                    "integrity. Try adding `atomic = False` to the Migration class."
                 )
             self.connection.enable_constraint_checking()
             super().alter_db_table(model, old_db_table, new_db_table)
@@ -134,11 +131,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         ):
             if self.connection.in_atomic_block:
                 raise NotSupportedError(
-                    (
-                        "Renaming the {!r}.{!r} column while in a transaction is not "
-                        "supported on SQLite < 3.26 because it would break referential "
-                        "integrity. Try adding `atomic = False` to the Migration class."
-                    ).format(model._meta.db_table, old_field_name)
+                    f"Renaming the {model._meta.db_table!r}.{old_field_name!r} column while in a transaction is not "
+                    "supported on SQLite < 3.26 because it would break referential "
+                    "integrity. Try adding `atomic = False` to the Migration class."
                 )
             with atomic(self.connection.alias):
                 super().alter_field(model, old_field, new_field, strict=strict)
@@ -150,7 +145,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         0
                     ]
                     cursor.execute("PRAGMA writable_schema = 1")
-                    references_template = ' REFERENCES "%s" ("%%s") ' % table_name
+                    references_template = f' REFERENCES "{table_name}" ("%s") '
                     new_column_name = new_field.get_attname_column()[1]
                     search = references_template % old_column_name
                     replacement = references_template % new_column_name
@@ -158,7 +153,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         "UPDATE sqlite_master SET sql = replace(sql, %s, %s)",
                         (search, replacement),
                     )
-                    cursor.execute("PRAGMA schema_version = %d" % (schema_version + 1))
+                    cursor.execute("PRAGMA schema_version = %d" % (schema_version + 1))  # noqa: UP031
                     cursor.execute("PRAGMA writable_schema = 0")
                     # The integrity check will raise an exception and rollback
                     # the transaction if the sqlite_master updates corrupt the
@@ -241,10 +236,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             mapping.pop(old_field.column, None)
             body[new_field.name] = new_field
             if old_field.null and not new_field.null:
-                case_sql = "coalesce({col}, {default})".format(
-                    col=self.quote_name(old_field.column),
-                    default=self.prepare_default(self.effective_default(new_field)),
-                )
+                case_sql = f"coalesce({self.quote_name(old_field.column)}, {self.prepare_default(self.effective_default(new_field))})"
                 mapping[new_field.column] = case_sql
             else:
                 mapping[new_field.column] = self.quote_name(old_field.column)
@@ -295,7 +287,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         body_copy = copy.deepcopy(body)
         meta_contents = {
             "package_label": model._meta.package_label,
-            "db_table": "new__%s" % strip_quotes(model._meta.db_table),
+            "db_table": f"new__{strip_quotes(model._meta.db_table)}",
             "indexes": indexes,
             "constraints": constraints,
             "packages": packages,
@@ -303,7 +295,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         meta = type("Meta", (), meta_contents)
         body_copy["Meta"] = meta
         body_copy["__module__"] = model.__module__
-        new_model = type("New%s" % model._meta.object_name, model.__bases__, body_copy)
+        new_model = type(f"New{model._meta.object_name}", model.__bases__, body_copy)
 
         # Create a new table with the updated schema.
         self.create_model(new_model)

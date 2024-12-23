@@ -43,7 +43,7 @@ _js_escapes = {
 }
 
 # Escape every ASCII character with a value less than 32.
-_js_escapes.update((ord("%c" % z), "\\u%04X" % z) for z in range(32))
+_js_escapes.update((ord("%c" % z), f"\\u{z:04X}") for z in range(32))  # noqa: UP031
 
 
 @keep_lazy(SafeString)
@@ -132,9 +132,9 @@ def linebreaks(value, autoescape=False):
     value = normalize_newlines(value)
     paras = re.split("\n{2,}", str(value))
     if autoescape:
-        paras = ["<p>%s</p>" % escape(p).replace("\n", "<br>") for p in paras]
+        paras = ["<p>{}</p>".format(escape(p).replace("\n", "<br>")) for p in paras]
     else:
-        paras = ["<p>%s</p>" % p.replace("\n", "<br>") for p in paras]
+        paras = ["<p>{}</p>".format(p.replace("\n", "<br>")) for p in paras]
     return "\n\n".join(paras)
 
 
@@ -148,10 +148,10 @@ class MLStripper(HTMLParser):
         self.fed.append(d)
 
     def handle_entityref(self, name):
-        self.fed.append("&%s;" % name)
+        self.fed.append(f"&{name};")
 
     def handle_charref(self, name):
-        self.fed.append("&#%s;" % name)
+        self.fed.append(f"&#{name};")
 
     def get_data(self):
         return "".join(self.fed)
@@ -293,7 +293,7 @@ class Urlizer:
             if self.simple_url_re.match(middle):
                 url = smart_urlquote(html.unescape(middle))
             elif self.simple_url_2_re.match(middle):
-                url = smart_urlquote("http://%s" % html.unescape(middle))
+                url = smart_urlquote(f"http://{html.unescape(middle)}")
             elif ":" not in middle and self.is_email_simple(middle):
                 local, domain = middle.rsplit("@", 1)
                 try:
@@ -328,7 +328,7 @@ class Urlizer:
     def trim_url(self, x, *, limit):
         if limit is None or len(x) <= limit:
             return x
-        return "%s…" % x[: max(0, limit - 1)]
+        return f"{x[: max(0, limit - 1)]}…"
 
     def trim_punctuation(self, word):
         """

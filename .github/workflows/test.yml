@@ -12,28 +12,27 @@ jobs:
         package: ["plain", "plain-worker", "plain-flags", "plain-sessions", "plain-staff", "plain-oauth", "plain-models"]
 
     steps:
-    - uses: actions/checkout@v3
-    - run: pipx install poetry
-    - uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: poetry
+    - uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+    - name: Set up Python
+      run: uv python install ${{ matrix.python-version }}
 
     - working-directory: ${{ matrix.package }}
-      run: poetry install
+      run: uv sync
 
     - working-directory: ${{ matrix.package }}/tests
-      run: poetry run pytest
+      run: uv run pytest
 
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - run: pipx install poetry
-    - uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
-        cache: poetry
-    - run: poetry install
-      working-directory: plain
-    - run: ./scripts/ruff --check
+    - uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+    - name: Set up Python
+      run: uv python install
+    - working-directory: plain-code
+      run: uv sync
+    - working-directory: plain-code
+      run: uv run plain code check ..

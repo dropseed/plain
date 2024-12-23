@@ -3,7 +3,7 @@
 for package_dir in plain*; do
     cd $package_dir
     rm -rf dist
-    poetry build
-    poetry publish --no-interaction --skip-existing
+    uv build
+    uv publish --no-progress
     cd ..
 done

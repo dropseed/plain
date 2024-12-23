@@ -90,7 +90,7 @@ class Packages:
                 if package_config.label in self.package_configs:
                     raise ImproperlyConfigured(
                         "Package labels aren't unique, "
-                        "duplicates: %s" % package_config.label
+                        f"duplicates: {package_config.label}"
                     )
 
                 self.package_configs[package_config.label] = package_config
@@ -103,8 +103,9 @@ class Packages:
             duplicates = [name for name, count in counts.most_common() if count > 1]
             if duplicates:
                 raise ImproperlyConfigured(
-                    "Package names aren't unique, "
-                    "duplicates: %s" % ", ".join(duplicates)
+                    "Package names aren't unique, " "duplicates: {}".format(
+                        ", ".join(duplicates)
+                    )
                 )
 
             self.packages_ready = True
@@ -154,10 +155,10 @@ class Packages:
         try:
             return self.package_configs[package_label]
         except KeyError:
-            message = "No installed app with label '%s'." % package_label
+            message = f"No installed app with label '{package_label}'."
             for package_config in self.get_package_configs():
                 if package_config.name == package_label:
-                    message += " Did you mean '%s'?" % package_config.label
+                    message += f" Did you mean '{package_config.label}'?"
                     break
             raise LookupError(message)
 
@@ -223,17 +224,15 @@ class Packages:
                 and model.__module__ == app_models[model_name].__module__
             ):
                 warnings.warn(
-                    "Model '{}.{}' was already registered. Reloading models is not "
+                    f"Model '{package_label}.{model_name}' was already registered. Reloading models is not "
                     "advised as it can lead to inconsistencies, most notably with "
-                    "related models.".format(package_label, model_name),
+                    "related models.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
             else:
                 raise RuntimeError(
-                    "Conflicting '{}' models in application '{}': {} and {}.".format(
-                        model_name, package_label, app_models[model_name], model
-                    )
+                    f"Conflicting '{model_name}' models in application '{package_label}': {app_models[model_name]} and {model}."
                 )
         app_models[model_name] = model
         self.do_pending_operations(model)
@@ -321,8 +320,9 @@ class Packages:
         }
         if not available.issubset(installed):
             raise ValueError(
-                "Available packages isn't a subset of installed packages, extra packages: %s"
-                % ", ".join(available - installed)
+                "Available packages isn't a subset of installed packages, extra packages: {}".format(
+                    ", ".join(available - installed)
+                )
             )
 
         self.stored_package_configs.append(self.package_configs)

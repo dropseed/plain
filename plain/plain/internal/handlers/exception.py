@@ -85,9 +85,7 @@ def response_for_exception(request, exc):
 
         # The request logger receives events for any problematic request
         # The security logger receives events for all SuspiciousOperations
-        security_logger = logging.getLogger(
-            "plain.security.%s" % exc.__class__.__name__
-        )
+        security_logger = logging.getLogger(f"plain.security.{exc.__class__.__name__}")
         security_logger.error(
             str(exc),
             exc_info=exc,

@@ -186,7 +186,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def quote_name(self, name):
         if name.startswith('"') and name.endswith('"'):
             return name  # Quoting once is enough.
-        return '"%s"' % name
+        return f'"{name}"'
 
     def no_limit_value(self):
         return -1
@@ -229,7 +229,10 @@ class DatabaseOperations(BaseDatabaseOperations):
                 style.SQL_FIELD(self.quote_name("name")),
                 style.SQL_KEYWORD("IN"),
                 ", ".join(
-                    ["'%s'" % sequence_info["table"] for sequence_info in sequences]
+                    [
+                        "'{}'".format(sequence_info["table"])
+                        for sequence_info in sequences
+                    ]
                 ),
             ),
         ]
@@ -339,18 +342,18 @@ class DatabaseOperations(BaseDatabaseOperations):
         # SQLite doesn't have a ^ operator, so use the user-defined POWER
         # function that's registered in connect().
         if connector == "^":
-            return "POWER(%s)" % ",".join(sub_expressions)
+            return "POWER({})".format(",".join(sub_expressions))
         elif connector == "#":
-            return "BITXOR(%s)" % ",".join(sub_expressions)
+            return "BITXOR({})".format(",".join(sub_expressions))
         return super().combine_expression(connector, sub_expressions)
 
     def combine_duration_expression(self, connector, sub_expressions):
         if connector not in ["+", "-", "*", "/"]:
-            raise DatabaseError("Invalid connector for timedelta: %s." % connector)
-        fn_params = ["'%s'" % connector] + sub_expressions
+            raise DatabaseError(f"Invalid connector for timedelta: {connector}.")
+        fn_params = [f"'{connector}'"] + sub_expressions
         if len(fn_params) > 3:
             raise ValueError("Too many params for timedelta operations.")
-        return "plain_format_dtdelta(%s)" % ", ".join(fn_params)
+        return "plain_format_dtdelta({})".format(", ".join(fn_params))
 
     def integer_field_range(self, internal_type):
         # SQLite doesn't enforce any integer constraints, but sqlite3 supports
@@ -381,13 +384,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not fields:
             return "", ()
         columns = [
-            "{}.{}".format(
-                self.quote_name(field.model._meta.db_table),
-                self.quote_name(field.column),
-            )
+            f"{self.quote_name(field.model._meta.db_table)}.{self.quote_name(field.column)}"
             for field in fields
         ]
-        return "RETURNING %s" % ", ".join(columns), ()
+        return "RETURNING {}".format(", ".join(columns)), ()
 
     def on_conflict_suffix_sql(self, fields, on_conflict, update_fields, unique_fields):
         if (

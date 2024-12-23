@@ -233,7 +233,7 @@ class BaseDatabaseOperations:
         """
         return "FOR{} UPDATE{}{}{}".format(
             " NO KEY" if no_key else "",
-            " OF %s" % ", ".join(of) if of else "",
+            " OF {}".format(", ".join(of)) if of else "",
             " NOWAIT" if nowait else "",
             " SKIP LOCKED" if skip_locked else "",
         )
@@ -252,8 +252,8 @@ class BaseDatabaseOperations:
         return " ".join(
             sql
             for sql in (
-                ("LIMIT %d" % limit) if limit else None,
-                ("OFFSET %d" % offset) if offset else None,
+                ("LIMIT %d" % limit) if limit else None,  # noqa: UP031
+                ("OFFSET %d" % offset) if offset else None,  # noqa: UP031
             )
             if sql
         )
@@ -397,19 +397,19 @@ class BaseDatabaseOperations:
         "uses_savepoints" feature is True. The "sid" parameter is a string
         for the savepoint id.
         """
-        return "SAVEPOINT %s" % self.quote_name(sid)
+        return f"SAVEPOINT {self.quote_name(sid)}"
 
     def savepoint_commit_sql(self, sid):
         """
         Return the SQL for committing the given savepoint.
         """
-        return "RELEASE SAVEPOINT %s" % self.quote_name(sid)
+        return f"RELEASE SAVEPOINT {self.quote_name(sid)}"
 
     def savepoint_rollback_sql(self, sid):
         """
         Return the SQL for rolling back the given savepoint.
         """
-        return "ROLLBACK TO SAVEPOINT %s" % self.quote_name(sid)
+        return f"ROLLBACK TO SAVEPOINT {self.quote_name(sid)}"
 
     def set_time_zone_sql(self):
         """
@@ -638,7 +638,7 @@ class BaseDatabaseOperations:
         can vary between backends (e.g., Oracle with %% and &) and between
         subexpression types (e.g., date expressions).
         """
-        conn = " %s " % connector
+        conn = f" {connector} "
         return conn.join(sub_expressions)
 
     def combine_duration_expression(self, connector, sub_expressions):
@@ -672,20 +672,19 @@ class BaseDatabaseOperations:
             rhs_sql, rhs_params = rhs
             return f"({lhs_sql} - {rhs_sql})", (*lhs_params, *rhs_params)
         raise NotSupportedError(
-            "This backend does not support %s subtraction." % internal_type
+            f"This backend does not support {internal_type} subtraction."
         )
 
     def window_frame_start(self, start):
         if isinstance(start, int):
             if start < 0:
-                return "%d %s" % (abs(start), self.PRECEDING)
+                return "%d %s" % (abs(start), self.PRECEDING)  # noqa: UP031
             elif start == 0:
                 return self.CURRENT_ROW
         elif start is None:
             return self.UNBOUNDED_PRECEDING
         raise ValueError(
-            "start argument must be a negative integer, zero, or None, but got '%s'."
-            % start
+            f"start argument must be a negative integer, zero, or None, but got '{start}'."
         )
 
     def window_frame_end(self, end):
@@ -693,12 +692,11 @@ class BaseDatabaseOperations:
             if end == 0:
                 return self.CURRENT_ROW
             elif end > 0:
-                return "%d %s" % (end, self.FOLLOWING)
+                return "%d %s" % (end, self.FOLLOWING)  # noqa: UP031
         elif end is None:
             return self.UNBOUNDED_FOLLOWING
         raise ValueError(
-            "end argument must be a positive integer, zero, or None, but got '%s'."
-            % end
+            f"end argument must be a positive integer, zero, or None, but got '{end}'."
         )
 
     def window_frame_rows_start_end(self, start=None, end=None):
@@ -716,8 +714,8 @@ class BaseDatabaseOperations:
             (start and start < 0) or (end and end > 0)
         ):
             raise NotSupportedError(
-                "%s only supports UNBOUNDED together with PRECEDING and "
-                "FOLLOWING." % self.connection.display_name
+                f"{self.connection.display_name} only supports UNBOUNDED together with PRECEDING and "
+                "FOLLOWING."
             )
         return start_, end_
 
@@ -730,16 +728,20 @@ class BaseDatabaseOperations:
             supported_formats = self.connection.features.supported_explain_formats
             normalized_format = format.upper()
             if normalized_format not in supported_formats:
-                msg = "%s is not a recognized format." % normalized_format
+                msg = f"{normalized_format} is not a recognized format."
                 if supported_formats:
-                    msg += " Allowed formats: %s" % ", ".join(sorted(supported_formats))
+                    msg += " Allowed formats: {}".format(
+                        ", ".join(sorted(supported_formats))
+                    )
                 else:
                     msg += (
                         f" {self.connection.display_name} does not support any formats."
                     )
                 raise ValueError(msg)
         if options:
-            raise ValueError("Unknown options: %s" % ", ".join(sorted(options.keys())))
+            raise ValueError(
+                "Unknown options: {}".format(", ".join(sorted(options.keys())))
+            )
         return self.explain_prefix
 
     def insert_statement(self, on_conflict=None):

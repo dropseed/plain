@@ -48,7 +48,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             cause = e.__cause__
             if cause and not isinstance(cause, errors.DuplicateDatabase):
                 # All errors except "database already exists" cancel tests.
-                self.log("Got an error creating the test database: %s" % e)
+                self.log(f"Got an error creating the test database: {e}")
                 sys.exit(2)
             elif not keepdb:
                 # If the database should be kept, ignore "database already
@@ -82,5 +82,5 @@ class DatabaseCreation(BaseDatabaseCreation):
                     cursor.execute("DROP DATABASE {dbname}".format(**test_db_params))
                     self._execute_create_test_db(cursor, test_db_params, keepdb)
                 except Exception as e:
-                    self.log("Got an error cloning the test database: %s" % e)
+                    self.log(f"Got an error cloning the test database: {e}")
                     sys.exit(2)

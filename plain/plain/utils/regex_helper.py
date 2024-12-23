@@ -5,6 +5,7 @@ Used internally by Plain and not intended for external use.
 This is not, and is not intended to be, a complete reg-exp decompiler. It
 should be good enough for a large class of URLS, however.
 """
+
 import re
 
 from plain.utils.functional import SimpleLazyObject
@@ -111,9 +112,9 @@ def normalize(pattern):
                 ch, escaped = next(pattern_iter)
                 if ch != "?" or escaped:
                     # A positional group
-                    name = "_%d" % num_args
+                    name = "_%d" % num_args  # noqa: UP031
                     num_args += 1
-                    result.append(Group((("%%(%s)s" % name), name)))
+                    result.append(Group(((f"%({name})s"), name)))
                     walk_to_end(ch, pattern_iter)
                 else:
                     ch, escaped = next(pattern_iter)
@@ -127,12 +128,12 @@ def normalize(pattern):
                     elif ch != "P":
                         # Anything else, other than a named group, is something
                         # we cannot reverse.
-                        raise ValueError("Non-reversible reg-exp portion: '(?%s'" % ch)
+                        raise ValueError(f"Non-reversible reg-exp portion: '(?{ch}'")
                     else:
                         ch, escaped = next(pattern_iter)
                         if ch not in ("<", "="):
                             raise ValueError(
-                                "Non-reversible reg-exp portion: '(?P%s'" % ch
+                                f"Non-reversible reg-exp portion: '(?P{ch}'"
                             )
                         # We are in a named capturing group. Extra the name and
                         # then skip to the end.
@@ -150,10 +151,10 @@ def normalize(pattern):
                         # Named backreferences have already consumed the
                         # parenthesis.
                         if terminal_char != ")":
-                            result.append(Group((("%%(%s)s" % param), param)))
+                            result.append(Group(((f"%({param})s"), param)))
                             walk_to_end(ch, pattern_iter)
                         else:
-                            result.append(Group((("%%(%s)s" % param), None)))
+                            result.append(Group(((f"%({param})s"), None)))
             elif ch in "*?+{":
                 # Quantifiers affect the previous item in the result list.
                 count, ch = get_quantifier(ch, pattern_iter)

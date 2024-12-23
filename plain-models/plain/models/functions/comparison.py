@@ -1,4 +1,5 @@
 """Database functions that do comparisons or type conversions."""
+
 from plain.models.db import NotSupportedError
 from plain.models.expressions import Func, Value
 from plain.models.fields import TextField
@@ -88,7 +89,7 @@ class Collate(Func):
 
     def __init__(self, expression, collation):
         if not (collation and self.collation_re.match(collation)):
-            raise ValueError("Invalid collation name: %r." % collation)
+            raise ValueError(f"Invalid collation name: {collation!r}.")
         self.collation = collation
         super().__init__(expression)
 

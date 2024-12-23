@@ -232,10 +232,10 @@ def preflight_checks(package_label, deploy, fail_level, databases):
             if visible_issue_count == 0
             else "1 issue"
             if visible_issue_count == 1
-            else "%s issues" % visible_issue_count,
+            else f"{visible_issue_count} issues",
             len(all_issues) - visible_issue_count,
         )
-        msg = click.style("SystemCheckError: %s" % header, fg="red") + body + footer
+        msg = click.style(f"SystemCheckError: {header}", fg="red") + body + footer
         raise click.ClickException(msg)
     else:
         if visible_issue_count:
@@ -245,7 +245,7 @@ def preflight_checks(package_label, deploy, fail_level, databases):
                 if visible_issue_count == 0
                 else "1 issue"
                 if visible_issue_count == 1
-                else "%s issues" % visible_issue_count,
+                else f"{visible_issue_count} issues",
                 len(all_issues) - visible_issue_count,
             )
             msg = header + body + footer

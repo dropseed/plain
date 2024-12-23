@@ -92,8 +92,8 @@ class UpdateQuery(Query):
             model = field.model._meta.concrete_model
             if not direct or (field.is_relation and field.many_to_many):
                 raise FieldError(
-                    "Cannot update model field %r (only non-relations and "
-                    "foreign keys permitted)." % field
+                    f"Cannot update model field {field!r} (only non-relations and "
+                    "foreign keys permitted)."
                 )
             if model is not self.get_meta().concrete_model:
                 self.add_related_update(model, field, val)
