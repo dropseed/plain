@@ -7,6 +7,7 @@ import re
 import sys
 import time
 from email.header import Header
+from functools import cached_property
 from http.client import responses
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse
@@ -422,6 +423,10 @@ class Response(ResponseBase):
             content = self.make_bytes(value)
         # Create a list of properly encoded bytestrings to support write().
         self._container = [content]
+
+    @cached_property
+    def text(self):
+        return self.content.decode(self.charset or "utf-8")
 
     def __iter__(self):
         return iter(self._container)
