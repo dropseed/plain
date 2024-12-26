@@ -196,17 +196,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         ]
         return "RETURNING {}".format(", ".join(columns)), ()
 
-    def sequence_reset_by_name_sql(self, style, sequences):
-        return [
-            "{} {} {} {} = 1;".format(
-                style.SQL_KEYWORD("ALTER"),
-                style.SQL_KEYWORD("TABLE"),
-                style.SQL_FIELD(self.quote_name(sequence_info["table"])),
-                style.SQL_FIELD("AUTO_INCREMENT"),
-            )
-            for sequence_info in sequences
-        ]
-
     def validate_autopk_value(self, value):
         # Zero in AUTO_INCREMENT field does not work without the
         # NO_AUTO_VALUE_ON_ZERO SQL mode.

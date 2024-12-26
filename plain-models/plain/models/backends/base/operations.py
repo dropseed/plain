@@ -344,13 +344,6 @@ class BaseDatabaseOperations:
             if statement
         ]
 
-    def process_clob(self, value):
-        """
-        Return the value of a CLOB column, for backends that return a locator
-        object that requires additional processing.
-        """
-        return value
-
     def return_insert_columns(self, fields):
         """
         For backends that support returning columns as part of an insert query,
@@ -418,36 +411,6 @@ class BaseDatabaseOperations:
         Return '' if the backend doesn't support time zones.
         """
         return ""
-
-    def sequence_reset_by_name_sql(self, style, sequences):
-        """
-        Return a list of the SQL statements required to reset sequences
-        passed in `sequences`.
-
-        The `style` argument is a Style object as returned by either
-        color_style() or no_style() in plain.internal.legacy.management.color.
-        """
-        return []
-
-    def sequence_reset_sql(self, style, model_list):
-        """
-        Return a list of the SQL statements required to reset sequences for
-        the given models.
-
-        The `style` argument is a Style object as returned by either
-        color_style() or no_style() in plain.internal.legacy.management.color.
-        """
-        return []  # No sequence reset required by default.
-
-    def start_transaction_sql(self):
-        """Return the SQL statement required to start a transaction."""
-        return "BEGIN;"
-
-    def end_transaction_sql(self, success=True):
-        """Return the SQL statement required to end a transaction."""
-        if not success:
-            return "ROLLBACK;"
-        return "COMMIT;"
 
     def tablespace_sql(self, tablespace, inline=False):
         """

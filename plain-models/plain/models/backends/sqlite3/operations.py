@@ -216,27 +216,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Plain's test suite.
         return lru_cache(maxsize=512)(self.__references_graph)
 
-    def sequence_reset_by_name_sql(self, style, sequences):
-        if not sequences:
-            return []
-        return [
-            "{} {} {} {} = 0 {} {} {} ({});".format(
-                style.SQL_KEYWORD("UPDATE"),
-                style.SQL_TABLE(self.quote_name("sqlite_sequence")),
-                style.SQL_KEYWORD("SET"),
-                style.SQL_FIELD(self.quote_name("seq")),
-                style.SQL_KEYWORD("WHERE"),
-                style.SQL_FIELD(self.quote_name("name")),
-                style.SQL_KEYWORD("IN"),
-                ", ".join(
-                    [
-                        "'{}'".format(sequence_info["table"])
-                        for sequence_info in sequences
-                    ]
-                ),
-            ),
-        ]
-
     def adapt_datetimefield_value(self, value):
         if value is None:
             return None
