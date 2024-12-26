@@ -20,13 +20,22 @@ class LoginLinkFormView(FormView):
     def get(self):
         # Redirect if the user is already logged in
         if self.request.user:
-            return ResponseRedirect(self.success_url)
+            form = self.get_form()
+            return ResponseRedirect(self.get_success_url(form))
 
         return super().get()
 
     def form_valid(self, form):
         form.maybe_send_link(self.request)
         return super().form_valid(form)
+
+    def get_success_url(self, form):
+        if next_url := form.cleaned_data.get("next"):
+            # Keep the next URL in the query string so the sent
+            # view can redirect to it if reloaded and logged in already.
+            return f"{self.success_url}?next={next_url}"
+        else:
+            return self.success_url
 
 
 class LoginLinkSentView(TemplateView):
@@ -35,7 +44,8 @@ class LoginLinkSentView(TemplateView):
     def get(self):
         # Redirect if the user is already logged in
         if self.request.user:
-            return ResponseRedirect("/")
+            next_url = self.request.GET.get("next", "/")
+            return ResponseRedirect(next_url)
 
         return super().get()
 
