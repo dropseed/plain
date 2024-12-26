@@ -93,7 +93,7 @@ class CreateView(ObjectTemplateViewMixin, FormView):
         self.object = None
 
     # TODO? would rather you have to specify this...
-    def get_success_url(self):
+    def get_success_url(self, form):
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
             url = self.success_url.format(**self.object.__dict__)
@@ -126,7 +126,7 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
         self.load_object()
         return super().post()
 
-    def get_success_url(self):
+    def get_success_url(self, form):
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
             url = self.success_url.format(**self.object.__dict__)

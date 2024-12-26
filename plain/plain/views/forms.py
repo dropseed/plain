@@ -40,7 +40,7 @@ class FormView(TemplateView):
             )
         return kwargs
 
-    def get_success_url(self) -> str:
+    def get_success_url(self, form: "BaseForm") -> str:
         """Return the URL to redirect to after processing a valid form."""
         if not self.success_url:
             raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
@@ -48,7 +48,7 @@ class FormView(TemplateView):
 
     def form_valid(self, form: "BaseForm") -> Response:
         """If the form is valid, redirect to the supplied URL."""
-        return ResponseRedirect(self.get_success_url())
+        return ResponseRedirect(self.get_success_url(form))
 
     def form_invalid(self, form: "BaseForm") -> Response:
         """If the form is invalid, render the invalid form."""
