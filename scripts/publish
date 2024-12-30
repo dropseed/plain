@@ -1,14 +1,15 @@
 #!/bin/sh -e
 
 for package_dir in plain*; do
-    cd $package_dir
+    cd "$package_dir"
     rm -rf dist
     uv build
-    publish_output=$(uv publish --no-progress 2>&1)
-    publish_exit_code=$?
-    echo "$publish_output"
-    if [ $publish_exit_code -ne 0 ]; then
-        echo "$publish_output" | grep -q "already exists" || exit $publish_exit_code
+
+    # Run uv publish and capture exit code while displaying output in real-time
+    if ! uv publish --no-progress 2>&1 | tee /dev/stderr | grep -q "already exists"; then
+        echo "Publish failed with an unexpected error."
+        exit 1
     fi
+
     cd ..
 done
