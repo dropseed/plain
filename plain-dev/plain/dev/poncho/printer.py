@@ -1,7 +1,4 @@
-import sys
 from collections import namedtuple
-
-from .compat import ON_WINDOWS
 
 Message = namedtuple("Message", "type data time name color")
 
@@ -15,26 +12,17 @@ class Printer:
 
     def __init__(
         self,
-        output=sys.stdout,
+        print_func,
         time_format="%H:%M:%S",
         width=0,
         color=True,
         prefix=True,
     ):
-        self.output = output
+        self.print_func = print_func
         self.time_format = time_format
         self.width = width
         self.color = color
         self.prefix = prefix
-
-        try:
-            # We only want to print colored messages if the given output supports
-            # ANSI escape sequences. Usually, testing if it is a TTY is safe enough.
-            self._colors_supported = self.output.isatty()
-        except AttributeError:
-            # If the given output does not implement isatty(), we assume that it
-            # is not able to handle ANSI escape sequences.
-            self._colors_supported = False
 
     def write(self, message):
         if message.type != "line":
@@ -58,28 +46,14 @@ class Printer:
             if self.prefix:
                 time_formatted = message.time.strftime(self.time_format)
                 prefix = f"{time_formatted} {name}| "
-                if self.color and self._colors_supported and message.color:
+                if self.color and message.color:
                     prefix = _color_string(message.color, prefix)
-            print(prefix + line, file=self.output, flush=True)
 
-
-def _ansi(code):
-    return f"\033[{code}m"
+            self.print_func(prefix + line)
 
 
 def _color_string(color, s):
+    def _ansi(code):
+        return f"\033[{code}m"
+
     return f"{_ansi(0)}{_ansi(color)}{s}{_ansi(0)}"
-
-
-if ON_WINDOWS:
-    # The colorama package provides transparent support for ANSI color codes
-    # on Win32 platforms. We try and import and configure that, but fall back
-    # to no color if we fail.
-    try:
-        import colorama
-    except ImportError:
-
-        def _color_string(color, s):
-            return s
-    else:
-        colorama.init()

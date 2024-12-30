@@ -10,6 +10,7 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
+from rich.console import Console
 
 from plain.runtime import APP_PATH, settings
 
@@ -17,6 +18,7 @@ from .db import cli as db_cli
 from .mkcert import MkcertManager
 from .pid import Pid
 from .poncho.manager import Manager as PonchoManager
+from .poncho.printer import Printer
 from .services import Services
 from .utils import has_pyproject_toml
 
@@ -91,8 +93,6 @@ class Dev:
         self.hostname = hostname
         self.log_level = log_level
 
-        self.poncho = PonchoManager()
-
         self.ssl_key_path = None
         self.ssl_cert_path = None
 
@@ -109,6 +109,9 @@ class Dev:
             "PORT": str(self.port),
             "PLAIN_DEV_URL": self.url,
         }
+
+        self.console = Console(markup=False, highlight=False)
+        self.poncho = PonchoManager(printer=Printer(lambda s: self.console.out(s)))
 
     def run(self):
         pid = Pid()
@@ -133,15 +136,10 @@ class Dev:
             self.add_pyproject_run()
             self.add_services()
 
-            # Output the clickable link before starting the manager loop
-            click.secho(
-                f"\nYour app will run at: {click.style(self.url, fg='green', underline=True)}\n",
-                bold=True,
-            )
+            click.secho("\nStarting services (Ctrl+C to stop):", italic=True, dim=True)
 
-            click.secho("Starting services (Ctrl+C to stop):", italic=True, dim=True)
-
-            self.poncho.loop()
+            with self.console.status(self.url):
+                self.poncho.loop()
 
             return self.poncho.returncode
         finally:
