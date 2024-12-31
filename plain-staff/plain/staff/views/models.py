@@ -40,9 +40,21 @@ class StaffModelListView(StaffListView):
     queryset_order = []
     search_fields: list = ["pk"]
 
+    def get_title(self) -> str:
+        if title := super().get_title():
+            return title
+
+        return self.model._meta.model_name.capitalize() + "s"
+
     @classmethod
-    def get_title(cls) -> str:
-        return getattr(cls, "title", cls.model._meta.model_name.capitalize() + "s")
+    def get_nav_title(cls) -> str:
+        if cls.nav_title:
+            return cls.nav_title
+
+        if cls.title:
+            return cls.title
+
+        return cls.model._meta.model_name.capitalize() + "s"
 
     @classmethod
     def get_slug(cls) -> str:
@@ -109,9 +121,8 @@ class StaffModelDetailView(StaffDetailView):
     model: "models.Model"
     fields: list = []
 
-    @classmethod
-    def get_title(cls) -> str:
-        return getattr(cls, "title", cls.model._meta.model_name.capitalize())
+    def get_title(self) -> str:
+        return str(self.object)
 
     @classmethod
     def get_slug(cls) -> str:
@@ -153,9 +164,11 @@ class StaffModelUpdateView(StaffUpdateView):
     form_class = None  # TODO type annotation
     success_url = "."  # Redirect back to the same update page by default
 
-    @classmethod
-    def get_title(cls) -> str:
-        return getattr(cls, "title", f"Update {cls.model._meta.model_name}")
+    def get_title(self) -> str:
+        if title := super().get_title():
+            return title
+
+        return f"Update {self.object}"
 
     @classmethod
     def get_slug(cls) -> str:

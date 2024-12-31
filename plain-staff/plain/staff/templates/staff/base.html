@@ -33,7 +33,7 @@
                 <div class="mt-4 text-xs font-semibold tracking-wide uppercase text-stone-500">{{ section }}</div>
                 {% for view in views %}
                 <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
-                    {{ view.get_title() }}
+                    {{ view.get_nav_title() }}
                 </a>
                 {% endfor %}
                 {% endfor %}
@@ -44,7 +44,7 @@
                 <div class="text-xs tracking-wide text-gray-500">Dashboards</div>
                 {% for view in admin_registry.registered_dashboards %}
                 <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
-                    {{ view.get_title() }}
+                    {{ view.get_nav_title() }}
                 </a>
                 {% endfor %}
             </div>
@@ -82,7 +82,7 @@
                 <a class="text-stone-500" href="{{ url ('staff:index') }}">Staff</a>
                 {% for parent in parent_view_classes %}
                 <span class="text-stone-400">/</span>
-                <a class="text-stone-500" href="{{ parent.get_absolute_url() }}">{{ parent.get_title() }}</a>
+                <a class="text-stone-500" href="{{ parent.get_absolute_url() }}">{{ parent.get_nav_title() }}</a>
                 {% endfor %}
                 <span class="text-stone-400">/</span>
                 <a class="text-stone-600" href="{{ request.path }}">{{ title }}</a>
@@ -115,14 +115,19 @@
         <div class="flex items-center justify-between px-4 mt-8 lg:px-8">
             <div>
             {% block header %}
-                <h1 class="text-2xl font-semibold text-stone-700">
-                    {% block title %}{{ title }}{% endblock %}
-                </h1>
-                {% if description %}
-                <p class="mt-2 text-sm text-gray-500">{{ description }}</p>
-                {% elif object|default('') %}
-                <p class="mt-2 text-sm text-gray-500">{{ object.__repr__() }}</p>
-                {% endif %}
+                <div class="flex items-center">
+                    {% block image %}
+                        {% if image %}
+                        <img src="{{ image.src }}" alt="{{ image.alt }}" class="h-20 rounded mr-3">
+                        {% endif %}
+                    {% endblock %}
+                    <div>
+                        <h1 class="text-4xl font-semibold text-stone-700">
+                            {% block title %}{{ title }}{% endblock %}
+                        </h1>
+                        {% if description %}<p class="mt-2 text-sm text-gray-500">{{ description }}</p>{% endif %}
+                    </div>
+                </div>
             {% endblock %}
             </div>
             <div class="flex space-x-2 text-sm actions">

@@ -18,6 +18,7 @@ from plain.views import (
 )
 
 from .registry import registry
+from .types import Img
 
 if TYPE_CHECKING:
     from ..cards import Card
@@ -29,10 +30,11 @@ URL_NAMESPACE = "staff"
 class StaffView(AuthViewMixin, TemplateView):
     staff_required = True
 
-    title: str
+    title: str = ""
     slug: str = ""
     path: str = ""
     description: str = ""
+    image: Img | None = None
 
     # Leave empty to hide from nav
     #
@@ -40,6 +42,7 @@ class StaffView(AuthViewMixin, TemplateView):
     # which importantly effects the (future) recent pages list
     # so you can also use this for pages that can never be bookmarked
     nav_section = "App"
+    nav_title = ""
 
     links: dict[str] = {}
 
@@ -53,6 +56,7 @@ class StaffView(AuthViewMixin, TemplateView):
     def get_template_context(self):
         context = super().get_template_context()
         context["title"] = self.get_title()
+        context["image"] = self.get_image()
         context["slug"] = self.get_slug()
         context["description"] = self.get_description()
         context["links"] = self.get_links()
@@ -77,20 +81,38 @@ class StaffView(AuthViewMixin, TemplateView):
         return f"view_{cls.get_slug()}"
 
     @classmethod
-    def get_title(cls) -> str:
-        return cls.title
-
-    @classmethod
     def get_slug(cls) -> str:
-        return cls.slug or slugify(cls.get_title())
+        if cls.slug:
+            return cls.slug
 
-    @classmethod
-    def get_description(cls) -> str:
-        return cls.description
+        if cls.title:
+            return slugify(cls.title)
+
+        raise NotImplementedError(
+            f"Please set a slug on the {cls} class or implement get_slug()."
+        )
+
+    # Can actually use @classmethod, @staticmethod or regular method for these?
+    def get_title(self) -> str:
+        return self.title
+
+    def get_image(self) -> Img | None:
+        return self.image
+
+    def get_description(self) -> str:
+        return self.description
 
     @classmethod
     def get_path(cls) -> str:
-        return cls.path or cls.get_slug()
+        if cls.path:
+            return cls.path
+
+        if slug := cls.get_slug():
+            return slug
+
+        raise NotImplementedError(
+            f"Please set a path on the {cls} class or implement get_slug() or get_path()."
+        )
 
     @classmethod
     def get_parent_view_classes(cls) -> list["StaffView"]:
@@ -111,6 +133,18 @@ class StaffView(AuthViewMixin, TemplateView):
             return ""
 
         return cls.nav_section
+
+    @classmethod
+    def get_nav_title(cls) -> str:
+        if cls.nav_title:
+            return cls.nav_title
+
+        if cls.title:
+            return cls.title
+
+        raise NotImplementedError(
+            f"Please set a title or nav_title on the {cls} class or implement get_nav_title()."
+        )
 
     @classmethod
     def get_absolute_url(cls) -> str:
@@ -290,6 +324,9 @@ class StaffDetailView(StaffView, DetailView):
 
         return super().get_template_names()
 
+    def get_description(self):
+        return repr(self.object)
+
     def get_field_value(self, obj, field: str):
         return getattr(obj, field)
 
@@ -312,6 +349,9 @@ class StaffUpdateView(StaffView, UpdateView):
 
     def get_detail_url(self, obj) -> str | None:
         return None
+
+    def get_description(self):
+        return repr(self.object)
 
 
 class StaffCreateView(StaffView, CreateView):

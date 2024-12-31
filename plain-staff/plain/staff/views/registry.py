@@ -56,9 +56,9 @@ class StaffViewRegistry:
                 sections[section] = []
             sections[section].append(view)
 
-        # Sort each section by title
+        # Sort each section by nav_title
         for section in sections.values():
-            section.sort(key=lambda v: v.get_title())
+            section.sort(key=lambda v: v.get_nav_title())
 
         # Sort sections dictionary by key
         sections = dict(sorted(sections.items()))
@@ -102,7 +102,8 @@ class StaffViewRegistry:
             for view in self.registered_views
             if getattr(view, "allow_global_search", False)
         ]
-        views.sort(key=lambda v: v.get_title())
+        # Sort by slug since title isn't required by all views
+        views.sort(key=lambda v: v.get_slug())
         return views
 
     def get_model_detail_url(self, instance):
