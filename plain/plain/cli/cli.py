@@ -422,21 +422,17 @@ class AppCLIGroup(click.Group):
     MODULE_NAME = "app.cli"
 
     def list_commands(self, ctx):
-        try:
-            find_spec(self.MODULE_NAME)
+        if find_spec(self.MODULE_NAME):
             return ["app"]
-        except ModuleNotFoundError:
+        else:
             return []
 
     def get_command(self, ctx, name):
         if name != "app":
             return
 
-        try:
-            cli = importlib.import_module(self.MODULE_NAME)
-            return cli.cli
-        except ModuleNotFoundError:
-            return
+        cli = importlib.import_module(self.MODULE_NAME)
+        return cli.cli
 
 
 class PlainCommandCollection(click.CommandCollection):

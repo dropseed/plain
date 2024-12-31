@@ -4,6 +4,7 @@ import os
 import time
 import types
 import typing
+from importlib.util import find_spec
 from pathlib import Path
 
 from plain.exceptions import ImproperlyConfigured
@@ -101,12 +102,11 @@ class Settings:
 
     def _load_default_settings(self, settings_module):
         for entry in getattr(settings_module, "INSTALLED_PACKAGES", []):
-            try:
-                if isinstance(entry, PackageConfig):
-                    app_settings = entry.module.default_settings
-                else:
-                    app_settings = importlib.import_module(f"{entry}.default_settings")
-            except ModuleNotFoundError:
+            if isinstance(entry, PackageConfig):
+                app_settings = entry.module.default_settings
+            elif find_spec(f"{entry}.default_settings"):
+                app_settings = importlib.import_module(f"{entry}.default_settings")
+            else:
                 continue
 
             self._load_module_settings(app_settings)

@@ -36,10 +36,14 @@ class InstalledPackagesGroup(click.Group):
     def get_command(self, ctx, name):
         # Try it as plain.x and just x (we don't know ahead of time which it is, but prefer plain.x)
         for n in [self.PLAIN_APPS_PREFIX + name, name]:
-            try:
-                cli = importlib.import_module(f"{n}.{self.MODULE_NAME}")
-            except ModuleNotFoundError:
+            if not find_spec(n):
+                # plain.<name> doesn't exist at all
                 continue
+
+            if not find_spec(f"{n}.{self.MODULE_NAME}"):
+                continue
+
+            cli = importlib.import_module(f"{n}.{self.MODULE_NAME}")
 
             # Get the app's cli.py group
             try:

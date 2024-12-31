@@ -1,4 +1,5 @@
 from importlib import import_module
+from importlib.util import find_spec
 
 from plain.packages import PackageConfig, packages
 
@@ -10,15 +11,13 @@ class Config(PackageConfig):
     label = "plainstaff"
 
     def ready(self):
+        def _import_if_exists(module_name):
+            if find_spec(module_name):
+                import_module(module_name)
+
         # Trigger register calls to fire by importing the modules
         for package_config in packages.get_package_configs():
-            try:
-                import_module(f"{package_config.name}.{MODULE_NAME}")
-            except ModuleNotFoundError:
-                pass
+            _import_if_exists(f"{package_config.name}.{MODULE_NAME}")
 
         # Also trigger for the root app/staff.py module
-        try:
-            import_module(MODULE_NAME)
-        except ModuleNotFoundError:
-            pass
+        _import_if_exists(f"app.{MODULE_NAME}")
