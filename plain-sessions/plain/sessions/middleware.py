@@ -1,22 +1,21 @@
 import time
-from importlib import import_module
 
 from plain.runtime import settings
 from plain.sessions.backends.base import UpdateError
 from plain.sessions.exceptions import SessionInterrupted
 from plain.utils.cache import patch_vary_headers
 from plain.utils.http import http_date
+from plain.utils.module_loading import import_string
 
 
 class SessionMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        engine = import_module(settings.SESSION_ENGINE)
-        self.SessionStore = engine.SessionStore
+        self.Session = import_string(settings.SESSION_CLASS)
 
     def __call__(self, request):
         session_key = request.COOKIES.get(settings.SESSION_COOKIE_NAME)
-        request.session = self.SessionStore(session_key)
+        request.session = self.Session(session_key)
 
         response = self.get_response(request)
 

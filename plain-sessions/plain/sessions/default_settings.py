@@ -18,4 +18,4 @@ SESSION_SAVE_EVERY_REQUEST = False
 # Whether a user's session cookie expires when the web browser is closed.
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 # The module to store session data
-SESSION_ENGINE = "plain.sessions.backends.db"
+SESSION_CLASS = "plain.sessions.backends.db.SessionStore"

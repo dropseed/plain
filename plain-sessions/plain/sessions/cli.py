@@ -1,8 +1,7 @@
-from importlib import import_module
-
 import click
 
 from plain.runtime import settings
+from plain.utils.module_loading import import_string
 
 
 @click.group()
@@ -13,11 +12,11 @@ def cli():
 
 @cli.command()
 def clear_expired():
-    engine = import_module(settings.SESSION_ENGINE)
+    Session = import_string(settings.SESSION_CLASS)
     try:
-        engine.SessionStore.clear_expired()
+        Session.clear_expired()
     except NotImplementedError:
         raise NotImplementedError(
-            f"Session engine '{settings.SESSION_ENGINE}' doesn't support clearing expired "
+            f"Session '{settings.SESSION_CLASS}' doesn't support clearing expired "
             "sessions."
         )

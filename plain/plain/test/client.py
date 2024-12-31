@@ -5,7 +5,6 @@ import sys
 from functools import partial
 from http import HTTPStatus
 from http.cookies import SimpleCookie
-from importlib import import_module
 from io import BytesIO, IOBase
 from itertools import chain
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
@@ -21,6 +20,7 @@ from plain.utils.encoding import force_bytes
 from plain.utils.functional import SimpleLazyObject
 from plain.utils.http import urlencode
 from plain.utils.itercompat import is_iterable
+from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
 
 __all__ = (
@@ -562,11 +562,11 @@ class ClientMixin:
     @property
     def session(self):
         """Return the current session variables."""
-        engine = import_module(settings.SESSION_ENGINE)
+        Session = import_string(settings.SESSION_CLASS)
         cookie = self.cookies.get(settings.SESSION_COOKIE_NAME)
         if cookie:
-            return engine.SessionStore(cookie.value)
-        session = engine.SessionStore()
+            return Session(cookie.value)
+        session = Session()
         session.save()
         self.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
         return session
@@ -582,8 +582,8 @@ class ClientMixin:
         if self.session:
             request.session = self.session
         else:
-            engine = import_module(settings.SESSION_ENGINE)
-            request.session = engine.SessionStore()
+            Session = import_string(settings.SESSION_CLASS)
+            request.session = Session()
         login(request, user)
         # Save the session values.
         request.session.save()
@@ -608,8 +608,8 @@ class ClientMixin:
             request.session = self.session
             request.user = get_user(request)
         else:
-            engine = import_module(settings.SESSION_ENGINE)
-            request.session = engine.SessionStore()
+            Session = import_string(settings.SESSION_CLASS)
+            request.session = Session()
         logout(request)
         self.cookies = SimpleCookie()
 
