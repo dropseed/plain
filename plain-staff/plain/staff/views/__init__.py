@@ -17,6 +17,7 @@ from .registry import (
     register_view,
     register_viewset,
 )
+from .types import Img
 
 __all__ = [
     "StaffView",
@@ -32,4 +33,5 @@ __all__ = [
     "register_view",
     "register_dashboard",
     "get_model_detail_url",
+    "Img",
 ]

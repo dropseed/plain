@@ -32,6 +32,11 @@ tr:last-child td {
     border-bottom: none;
 }
 
+table img {
+    height: 1.2rem;
+    border-radius: 2px;
+}
+
 main a {
     color: rgb(37, 99, 235);
 }
