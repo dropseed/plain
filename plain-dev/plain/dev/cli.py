@@ -10,7 +10,9 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
+from rich.columns import Columns
 from rich.console import Console
+from rich.text import Text
 
 from plain.runtime import APP_PATH, settings
 
@@ -75,7 +77,7 @@ def services():
 )
 @click.argument("entrypoint", required=False)
 def entrypoint(show_list, entrypoint):
-    f"""Entrypoints registered under {ENTRYPOINT_GROUP}"""
+    """Entrypoints registered under plain.dev"""
     if not show_list and not entrypoint:
         click.secho("Please provide an entrypoint name or use --list", fg="red")
         sys.exit(1)
@@ -97,6 +99,7 @@ class Dev:
         self.ssl_cert_path = None
 
         self.url = f"https://{self.hostname}:{self.port}"
+        self.tunnel_url = os.environ.get("PLAIN_DEV_TUNNEL_URL", "")
 
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
@@ -136,9 +139,38 @@ class Dev:
             self.add_pyproject_run()
             self.add_services()
 
-            click.secho("\nStarting services (Ctrl+C to stop):", italic=True, dim=True)
+            click.secho("\nStarting dev...", italic=True, dim=True)
 
-            with self.console.status(self.url):
+            if self.tunnel_url:
+                status_bar = Columns(
+                    [
+                        Text.from_markup(
+                            f"[bold]Tunnel URL[/bold] [underline][link={self.tunnel_url}]{self.tunnel_url}[/link][/underline]"
+                        ),
+                        Text.from_markup(
+                            f"[dim][bold]Localhost URL[/bold] [link={self.url}]{self.url}[/link][/dim]"
+                        ),
+                        Text.from_markup(
+                            "[dim]Press [bold]Ctrl+C[/bold] to stop[/dim]",
+                            justify="right",
+                        ),
+                    ],
+                    expand=True,
+                )
+            else:
+                status_bar = Columns(
+                    [
+                        Text.from_markup(
+                            f"[bold]Localhost URL[/bold] [underline][link={self.url}]{self.url}[/link][/underline]"
+                        ),
+                        Text.from_markup(
+                            "[dim][bold]Ctrl+C[/bold] to stop[/dim]", justify="right"
+                        ),
+                    ],
+                    expand=True,
+                )
+
+            with self.console.status(status_bar):
                 self.poncho.loop()
 
             return self.poncho.returncode
