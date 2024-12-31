@@ -19,12 +19,19 @@
     {% block header_scripts %}{% endblock %}
 </head>
 <body class="flex min-h-screen text-black bg-stone-900">
-    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-6 pt-6 pb-5 overflow-auto lg:flex">
+    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-5 pt-6 pb-5 overflow-auto lg:flex">
         <div>
             <a class="inline-flex items-center font-bold text-stone-300" href="{{ url('staff:index') }}">
-                <svg class="w-5 h-5 mr-2" width="237" height="237" viewBox="0 0 237 237" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M163.316 15.876C172.248 15.876 180.501 20.641 184.967 28.376L229.783 106C234.249 113.735 234.249 123.265 229.783 131L184.967 208.624C180.501 216.359 172.248 221.124 163.316 221.124L73.6837 221.124C64.7521 221.124 56.4989 216.359 52.0331 208.624L7.21686 131C2.75105 123.265 2.75105 113.735 7.21687 106L52.0331 28.376C56.4989 20.6409 64.7521 15.876 73.6837 15.876L163.316 15.876Z" fill="#8B8276"/>
-                    <circle cx="118.5" cy="118.5" r="64.5" fill="#CDC8C2"/>
+                <svg class="w-5 h-5 mr-2" width="413" height="317" viewBox="0 0 413 317" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clip-path="url(#clip0_2005_53)">
+                    <path d="M401.485 152.733C258.83 95.7073 207.048 170.216 13 152.733V303.998H401.485V152.733Z" fill="#CDC8C2"/>
+                    <rect x="6.5" y="6.5" width="401.485" height="304" rx="10.5" stroke="#CDC8C2" stroke-width="13"/>
+                    </g>
+                    <defs>
+                    <clipPath id="clip0_2005_53">
+                    <rect width="413" height="317" fill="white"/>
+                    </clipPath>
+                    </defs>
                 </svg>
                 <span class="sr-only">Staff</span>
             </a>
