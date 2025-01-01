@@ -43,7 +43,7 @@ def setup():
     # Automatically put the project dir on the Python path
     # which doesn't otherwise happen when you run `plain` commands.
     # This makes "app.<module>" imports and relative imports work.
-    if APP_PATH.parent not in sys.path:
+    if APP_PATH.parent.as_posix() not in sys.path:
         sys.path.insert(0, APP_PATH.parent.as_posix())
 
     configure_logging(settings.LOGGING)
