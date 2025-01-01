@@ -2,7 +2,6 @@ import datetime
 import multiprocessing
 import queue
 import signal
-import sys
 
 from .color import get_colors
 from .compat import ProcessManager
@@ -54,7 +53,7 @@ class Manager:
         self._clock = datetime.datetime
         self._procmgr = ProcessManager()
 
-        self._printer = printer if printer is not None else Printer(sys.stdout)
+        self._printer = printer if printer is not None else Printer(lambda s: print(s))
         self._printer.width = len(SYSTEM_PRINTER_NAME)
 
         self._process_ctor = Process
