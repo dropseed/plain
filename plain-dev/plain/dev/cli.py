@@ -145,13 +145,13 @@ class Dev:
                 status_bar = Columns(
                     [
                         Text.from_markup(
-                            f"[bold]Tunnel URL[/bold] [underline][link={self.tunnel_url}]{self.tunnel_url}[/link][/underline]"
+                            f"[bold]Tunnel[/bold] [underline][link={self.tunnel_url}]{self.tunnel_url}[/link][/underline]"
                         ),
                         Text.from_markup(
-                            f"[dim][bold]Localhost URL[/bold] [link={self.url}]{self.url}[/link][/dim]"
+                            f"[dim][bold]Server[/bold] [link={self.url}]{self.url}[/link][/dim]"
                         ),
                         Text.from_markup(
-                            "[dim]Press [bold]Ctrl+C[/bold] to stop[/dim]",
+                            "[dim][bold]Ctrl+C[/bold] to stop[/dim]",
                             justify="right",
                         ),
                     ],
@@ -161,7 +161,7 @@ class Dev:
                 status_bar = Columns(
                     [
                         Text.from_markup(
-                            f"[bold]Localhost URL[/bold] [underline][link={self.url}]{self.url}[/link][/underline]"
+                            f"[bold]Server[/bold] [underline][link={self.url}]{self.url}[/link][/underline]"
                         ),
                         Text.from_markup(
                             "[dim][bold]Ctrl+C[/bold] to stop[/dim]", justify="right"
