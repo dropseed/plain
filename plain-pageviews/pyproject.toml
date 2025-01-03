@@ -1,0 +1,18 @@
+[project]
+name = "plain.pageviews"
+version = "0.1.0"
+description = "Basic pageview analytics for Plain."
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "plain.models<1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
