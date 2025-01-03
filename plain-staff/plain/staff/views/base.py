@@ -206,6 +206,8 @@ class StaffListView(HTMXViewMixin, StaffView):
         context["get_field_value_template"] = self.get_field_value_template
 
         context["get_create_url"] = self.get_create_url
+        context["get_detail_url"] = self.get_detail_url
+        context["get_update_url"] = self.get_update_url
         context["get_object_links"] = self.get_object_links
 
         return context

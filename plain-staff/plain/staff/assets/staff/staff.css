@@ -46,10 +46,35 @@ main a:hover {
 }
 
 .actions a, .actions button {
-    padding: 0.5rem 1rem;
-    color: white;
-    background-color: rgb(30, 28, 21);
-    border-radius: 999px;
+    display: inline-block;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    text-align: center;
+    text-decoration: none;
+    background-color: #1A1817;
+    border: 1px solid #3f3d3b;
+    border-radius: 6px;
+    transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
+    cursor: pointer;
+
+    &:hover {
+        background-color: #2a2928;
+        border-color: #504e4c;
+        transform: translateY(-1px);
+    }
+
+    &:active {
+        background-color: #141312;
+        border-color: #3f3d3b;
+        transform: translateY(0);
+    }
+
+    &:focus {
+        outline: 2px solid #e5e7eb;
+        outline-offset: 2px;
+    }
 }
 
 section {

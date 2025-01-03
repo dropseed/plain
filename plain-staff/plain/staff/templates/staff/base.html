@@ -16,24 +16,29 @@
     <script src="{{ asset('staff/jquery-3.6.1.slim.min.js') }}"></script>
     <script src="{{ asset('staff/chart.js') }}" defer></script>
     <script src="{{ asset('staff/staff.js') }}" defer></script>
+    <script src="{{ asset('staff/popper.min.js') }}" defer></script>
+    <script src="{{ asset('staff/tippy-bundle.umd.min.js') }}" defer></script>
     {% block header_scripts %}{% endblock %}
 </head>
 <body class="flex min-h-screen text-black bg-stone-900">
-    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-5 pt-6 pb-5 overflow-auto lg:flex">
-        <div>
-            <a class="inline-flex items-center font-bold text-stone-300" href="{{ url('staff:index') }}">
+    <div id="admin-sidebar" data-toggle-class="hidden" class="fixed flex-col justify-between flex-shrink-0 hidden w-64 h-full px-5 overflow-auto lg:flex">
+        <div class="sticky top-0 bg-stone-900 pt-6 pb-2">
+            <a class="inline-flex items-center text-stone-300" href="{{ url('staff:index') }}">
                 <svg class="w-5 h-5 mr-2" width="160" height="125" viewBox="0 0 160 125" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="4.78467" y="4.79785" width="150.978" height="115.404" rx="5" stroke="#ffffff" stroke-width="8"/>
                     <path d="M151.762 60.3705C99.2596 39.3233 80.202 66.8232 8.78467 60.3705V116.2H151.762V60.3705Z" fill="#ffffff"/>
                     <path d="M51.104 8.08887H108.179V10.7668C108.179 12.6998 106.612 14.2668 104.679 14.2668H54.604C52.671 14.2668 51.104 12.6998 51.104 10.7668V8.08887Z" fill="#ffffff" stroke="#ffffff"/>
                 </svg>
-                <span class="sr-only">Staff</span>
+                <span class="text-stone-400">Staff</span>
             </a>
+        </div>
+
+        <div class="flex-grow">
             <div>
                 {% for section, views in admin_registry.get_nav_sections().items() %}
                 <div class="mt-4 text-xs font-semibold tracking-wide uppercase text-stone-500">{{ section }}</div>
                 {% for view in views %}
-                <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
+                <a class="flex items-center px-2 py-1 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
                     {{ view.get_nav_title() }}
                 </a>
                 {% endfor %}
@@ -44,7 +49,7 @@
             <div class="mt-6">
                 <div class="text-xs tracking-wide text-gray-500">Dashboards</div>
                 {% for view in admin_registry.registered_dashboards %}
-                <a class="flex items-center px-2 py-1.5 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
+                <a class="flex items-center px-2 py-1 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400 hover:bg-white/5" href="{{ view.get_absolute_url() }}">
                     {{ view.get_nav_title() }}
                 </a>
                 {% endfor %}
@@ -58,7 +63,7 @@
                 <div class="text-xs tracking-wide text-stone-500">Recent</div>
             </div> -->
         </div>
-        <div class="flex items-center justify-between mt-8 text-sm text-stone-400">
+        <div class="flex items-center justify-between mt-8 text-sm pb-5 pt-3 text-stone-400 sticky bottom-0 bg-stone-900">
             <div class="flex items-center truncate">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-2 bi bi-person-circle" viewBox="0 0 16 16">
                     <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
@@ -122,7 +127,7 @@
                         <img src="{{ image.src }}" alt="{{ image.alt }}" class="h-20 rounded mr-3">
                         {% endif %}
                     {% endblock %}
-                    <div>
+                    <div class="max-w-prose break-all">
                         <h1 class="text-4xl font-semibold text-stone-700">
                             {% block title %}{{ title }}{% endblock %}
                         </h1>

@@ -7,10 +7,10 @@
         <h2 class="text-2xl font-semibold">Fields</h2>
     </header>
     <div>
-        <dl class="text-sm w-full">
+        <dl class="text-sm w-full grid grid-cols-[max-content,1fr] gap-y-4 gap-x-8" style="grid-template-columns: max-content 1fr;">
             {% for field in fields %}
-            <dt class="mt-2.5"><code>{{ field }}</code></dt>
-            <dd>{{ get_field_value(object, field) }}</dd>
+            <dt class="font-semibold"><code>{{ field }}</code></dt>
+            <dd class=""><code>{{ get_field_value(object, field) }}</code></dd>
             {% endfor %}
         </dl>
     </div>

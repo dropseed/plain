@@ -11,10 +11,9 @@ Search
 {% block content %}
 
 {% if global_search_query %}
-<div class="mt-6">
+<div class="*:mt-14 *:empty:mt-0">
     {% for view in searchable_views %}
     <div
-        class="*:mb-14"
         hx-get="{{ view.get_absolute_url() }}?search={{ global_search_query }}&page_size=5"
         hx-trigger="plainhtmx:load from:body"
         plain-hx-fragment="list">

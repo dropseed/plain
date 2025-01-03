@@ -16,7 +16,7 @@
 <header class="flex items-center justify-between">
     <div class="font-semibold">
         {% if table_style == "simple" %}
-            {{ title }}
+            <div class="mb-3">{{ title }}</div>
         {% else %}
             {% if page.has_other_pages() %}
             Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
@@ -121,6 +121,8 @@
                 {% for object in objects %}
                 <tr>
 
+                    {% set row_url = get_detail_url(object) or get_update_url(object) %}
+
                     {% if table_style != "simple" and actions %}
                     <td class="p-0 pl-1">
                         <input data-action-checkbox class="rounded-sm" type="checkbox" name="{{ get_object_pk(object) }}" />
@@ -128,19 +130,34 @@
                     {% endif %}
 
                     {% for field in fields %}
-                        <td>
-                            <div class="flex">
-                                {% set value = get_field_value(object, field) %}
-                                {% include get_field_value_template(object, field, value) with context %}
-                            </div>
-                        </td>
-                    {% endfor %}
-
-                    {% for text, url in get_object_links(object).items() %}
-                    <td>
-                        <a href="{{ url }}">{{ text }}</a>
+                    {# Make every column clickable if it doesn't contain a link already #}
+                    <td data-column-autolink="{{ row_url }}">
+                        <div class="flex">
+                            {% set value = get_field_value(object, field) %}
+                            {% include get_field_value_template(object, field, value) with context %}
+                        </div>
                     </td>
                     {% endfor %}
+
+                    {% set object_links = get_object_links(object) %}
+                    {% if object_links %}
+                    <td class="py-0">
+                        <button data-dropdown class="inline-flex rounded-md border border-transparent hover:border-gray-300 hover:shadow-sm px-3 py-1.5 hover:bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
+                                <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
+                            </svg>
+                            <template>
+                                <div class="py-1">
+                                    {% for text, url in object_links.items() %}
+                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+                                        {{ text }}
+                                    </a>
+                                    {% endfor %}
+                                </div>
+                            </template>
+                        </button>
+                    </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
