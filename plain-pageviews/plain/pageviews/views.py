@@ -27,7 +27,7 @@ class TrackView(CsrfExemptViewMixin, View):
         if session := getattr(self.request, "session", None):
             session_key = session.session_key
         else:
-            session_key = None
+            session_key = ""
 
         Pageview.objects.create(
             user_id=user_id,
