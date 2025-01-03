@@ -8,7 +8,7 @@ from .models import Pageview
 
 class TrackView(CsrfExemptViewMixin, View):
     def post(self):
-        if hasattr(self.request, "impersonator"):
+        if getattr(self.request, "impersonator", None):
             # Don't track page views if we're impersonating a user
             return 200
 
@@ -19,13 +19,13 @@ class TrackView(CsrfExemptViewMixin, View):
         referrer = data["referrer"]
         timestamp = data["timestamp"]
 
-        if hasattr(self.request, "user"):
-            user_id = self.request.user.pk
+        if user := getattr(self.request, "user", None):
+            user_id = user.pk
         else:
             user_id = ""
 
-        if hasattr(self.request, "session"):
-            session_key = self.request.session.session_key
+        if session := getattr(self.request, "session", None):
+            session_key = session.session_key
         else:
             session_key = None
 
