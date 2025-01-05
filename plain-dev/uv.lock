@@ -80,15 +80,6 @@ wheels = [
 ]
 
 [[package]]
-name = "debugpy"
-version = "1.6.7.post1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0b/c8/b6978e56c917c2fe5096cd83d81bab8ac08ceb1f9a4b9373ad5b066a3265/debugpy-1.6.7.post1.zip", hash = "sha256:fe87ec0182ef624855d05e6ed7e0b7cb1359d2ffa2a925f8ec2d22e98b75d0ca", size = 4664667 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/72/cb3a101717d81ab1f97ee38a409be9740e7256bc25074e48fd634055261f/debugpy-1.6.7.post1-py2.py3-none-any.whl", hash = "sha256:1093a5c541af079c13ac8c70ab8b24d1d35c8cacb676306cf11e57f699c02926", size = 4872783 },
-]
-
-[[package]]
 name = "gunicorn"
 version = "23.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -214,11 +205,10 @@ wheels = [
 
 [[package]]
 name = "plain-dev"
-version = "0.18.1"
+version = "0.19.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
-    { name = "debugpy" },
     { name = "gunicorn" },
     { name = "plain" },
     { name = "psycopg", extra = ["binary"] },
@@ -230,7 +220,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
-    { name = "debugpy", specifier = "~=1.6.3" },
     { name = "gunicorn", specifier = ">20" },
     { name = "plain", specifier = "<1.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = "~=3.2.2" },
