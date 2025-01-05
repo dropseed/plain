@@ -9,7 +9,6 @@ requires-python = ">=3.11"
 dependencies = [
     "plain<1.0.0",
     "click>=8.0.0",
-    "debugpy~=1.6.3",
     "python-dotenv~=1.0.0",
     "gunicorn>20",
     "requests>=2.0.0",
@@ -24,7 +23,7 @@ dependencies = [
 "contrib" = "plain.dev.contribute:cli"
 
 [project.entry-points."plain.setup"]
-"dev-dotenv" = "plain.dev.entrypoints:load_dotenv_file"
+"dev-setup" = "plain.dev.entrypoints:setup"
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]
