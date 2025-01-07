@@ -9,12 +9,6 @@ class DefaultHeadersMiddleware:
         response = self.get_response(request)
 
         for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():
-            # Since we don't have a good way to *remote* default response headers,
-            # use allow users to set them to an empty string to indicate they should be removed.
-            if header in response.headers and response.headers[header] == "":
-                del response.headers[header]
-                continue
-
             response.headers.setdefault(header, value)
 
         # Add the Content-Length header to non-streaming responses if not

@@ -42,6 +42,9 @@ class View:
             except ResponseException as e:
                 return e.response
 
+        # Copy possible attributes set by decorators, e.g. @csrf_exempt, from
+        # the dispatch method.
+        view.__dict__.update(cls.get_response.__dict__)
         view.view_class = cls
 
         return view
