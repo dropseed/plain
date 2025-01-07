@@ -75,13 +75,21 @@ window.addEventListener('message', (event) => {
     }
 });
 
-container.appendChild(iframe);
+iframe.onload = () => {
+    iframeLoaded = false;  // Make sure subsequent loads are treated as new
 
-// If the iframe hasn't send a loaded message after 5 seconds, render an error emssage
-setTimeout(() => {
-    if (!iframeLoaded) {
-        error.style.display = 'block';
-        loading.style.display = 'none';
-        iframe.style.display = 'none';
-    }
-}, 5000);
+    error.style.display = 'none';
+    loading.style.display = 'flex';
+    iframe.style.display = 'none';
+
+    // If the iframe hasn't send a loaded message after 5 seconds, render an error emssage
+    setTimeout(() => {
+        if (!iframeLoaded) {
+            error.style.display = 'block';
+            loading.style.display = 'none';
+            iframe.style.display = 'none';
+        }
+    }, 5000);
+};
+
+container.appendChild(iframe);
