@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if success %}
+    {% include success_template_name %}
+{% else %}
+    {% include form_template_name %}
+{% endif %}
+
+{% endblock %}

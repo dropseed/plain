@@ -1,0 +1,13 @@
+<html>
+    <head>
+        {% tailwind_css %}
+        <script src="{{ asset('support/iframe.js') }}"></script>
+    </head>
+    <body>
+        {% if success %}
+            {% include success_template_name %}
+        {% else %}
+            {% include form_template_name %}
+        {% endif %}
+    </body>
+</html>
