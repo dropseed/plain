@@ -180,6 +180,9 @@ class CsrfViewMiddleware:
                 # saved anyways.
                 request.META["CSRF_COOKIE"] = csrf_secret
 
+        if csrf_response := self._get_csrf_response(request):
+            return csrf_response
+
         response = self.get_response(request)
 
         if request.META.get("CSRF_COOKIE_NEEDS_UPDATE"):
@@ -395,21 +398,14 @@ class CsrfViewMiddleware:
             reason = self._bad_token_message("incorrect", token_source)
             raise RejectRequest(reason)
 
-    def process_view(self, request, callback, callback_args, callback_kwargs):
+    def _get_csrf_response(self, request):
         # Wait until request.META["CSRF_COOKIE"] has been manipulated before
         # bailing out, so that get_token still works
-        if getattr(callback, "csrf_exempt", False):
+        if getattr(request, "csrf_exempt", True):
             return None
 
         # Assume that anything not defined as 'safe' by RFC 9110 needs protection
         if request.method in ("GET", "HEAD", "OPTIONS", "TRACE"):
-            return None
-
-        if getattr(request, "_dont_enforce_csrf_checks", False):
-            # Mechanism to turn off CSRF checks for test suite. It comes after
-            # the creation of CSRF cookies, so that everything else continues
-            # to work exactly the same (e.g. cookies are sent, etc.), but
-            # before any branches that call the _reject method.
             return None
 
         # Reject the request if the Origin header doesn't match an allowed

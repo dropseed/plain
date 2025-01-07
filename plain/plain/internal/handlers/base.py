@@ -23,7 +23,6 @@ BUILTIN_MIDDLEWARE = [
 
 
 class BaseHandler:
-    _view_middleware = None
     _middleware_chain = None
 
     def load_middleware(self):
@@ -32,8 +31,6 @@ class BaseHandler:
 
         Must be called after the environment is fixed (see __call__ in subclasses).
         """
-        self._view_middleware = []
-
         get_response = self._get_response
         handler = convert_exception_to_response(get_response)
 
@@ -46,12 +43,6 @@ class BaseHandler:
             if mw_instance is None:
                 raise ImproperlyConfigured(
                     f"Middleware factory {middleware_path} returned None."
-                )
-
-            if hasattr(mw_instance, "process_view"):
-                self._view_middleware.insert(
-                    0,
-                    mw_instance.process_view,
                 )
 
             handler = convert_exception_to_response(mw_instance)
@@ -82,19 +73,9 @@ class BaseHandler:
         template_response middleware. This method is everything that happens
         inside the request/response middleware.
         """
-        response = None
         callback, callback_args, callback_kwargs = self.resolve_request(request)
 
-        # Apply view middleware
-        for middleware_method in self._view_middleware:
-            response = middleware_method(
-                request, callback, callback_args, callback_kwargs
-            )
-            if response:
-                break
-
-        if response is None:
-            response = callback(request, *callback_args, **callback_kwargs)
+        response = callback(request, *callback_args, **callback_kwargs)
 
         # Complain if the view returned None (a common error).
         self.check_response(response, callback)

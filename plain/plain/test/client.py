@@ -177,7 +177,7 @@ class ClientHandler(BaseHandler):
         # CsrfViewMiddleware.  This makes life easier, and is probably
         # required for backwards compatibility with external tests against
         # admin views.
-        request._dont_enforce_csrf_checks = not self.enforce_csrf_checks
+        request.csrf_exempt = not self.enforce_csrf_checks
 
         # Request goes through middleware.
         response = self.get_response(request)
