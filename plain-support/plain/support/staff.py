@@ -1,3 +1,4 @@
+from plain.staff.cards import Card
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
@@ -9,7 +10,7 @@ from .models import SupportFormEntry
 
 
 @register_viewset
-class PageviewStaff(StaffModelViewset):
+class SupportFormEntryStaff(StaffModelViewset):
     class ListView(StaffModelListView):
         model = SupportFormEntry
         nav_section = "Support"
@@ -18,3 +19,15 @@ class PageviewStaff(StaffModelViewset):
 
     class DetailView(StaffModelDetailView):
         model = SupportFormEntry
+
+
+class UserSupportFormEntriesCard(Card):
+    title = "Recent support"
+    template_name = "support/card.html"
+
+    def get_template_context(self):
+        context = super().get_template_context()
+
+        context["entries"] = SupportFormEntry.objects.filter(user=self.view.object)
+
+        return context

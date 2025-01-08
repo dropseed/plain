@@ -1,0 +1,23 @@
+{% extends "staff/cards/base.html" %}
+
+{% block content %}
+
+<div class="w-full space-y-2 overflow-auto max-h-60 flex-grow">
+    {% for entry in entries %}
+    <div class="flex space-x-2 text-sm">
+        <a
+            class="flex-shrink-0 text-stone-500 tabular-nums hover:underline"
+            href="{{ entry|get_admin_model_detail_url }}"
+            title="{{ entry.created_at }}">
+            {{ entry.created_at|timesince(format="short", depth=1) }}
+        </a>
+        <a
+            class="overflow-hidden hover:underline text-ellipsis whitespace-nowrap"
+            href="{{ entry|get_admin_model_detail_url }}">
+            {{ entry.message|truncate(100) }}
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

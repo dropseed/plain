@@ -16,15 +16,6 @@ class PageviewStaff(StaffModelViewset):
         nav_section = "Pageviews"
         title = "Pageviews"
         fields = ["user_id", "url", "timestamp", "session_key"]
-        # search_fields = ["uuid", "url", "session_key"]
-        # ordering = ["-timestamp"]
-        # list_display = ["uuid", "user", "url", "timestamp", "session_key"]
-        # list_filter = ["user", "url", "timestamp", "session_key"]
-        # date_hierarchy = "timestamp"
-        # actions = ["delete_selected"]
-
-        # def get_queryset(self, request):
-        #     return super().get_queryset(request).select_related("user")
 
     class DetailView(StaffModelDetailView):
         model = Pageview
