@@ -64,16 +64,19 @@ class StaffView(AuthViewMixin, TemplateView):
         context["admin_registry"] = registry
         context["cards"] = self.get_cards()
         context["render_card"] = self.render_card
-        context["from_datetime"] = self.datetime_range.start
-        context["to_datetime"] = self.datetime_range.end
         context["time_zone"] = timezone.get_current_timezone_name()
+
+        if any(x.datetime_range for x in context["cards"]):
+            context["from_datetime"] = self.current_datetime_range.start
+            context["to_datetime"] = self.current_datetime_range.end
+
         return context
 
     def get_response(self):
         default_range = DatetimeRangeAliases.to_range(self.default_datetime_range)
         from_datetime = self.request.GET.get("from", default_range.start)
         to_datetime = self.request.GET.get("to", default_range.end)
-        self.datetime_range = DatetimeRange(from_datetime, to_datetime)
+        self.current_datetime_range = DatetimeRange(from_datetime, to_datetime)
         return super().get_response()
 
     @classmethod
@@ -161,7 +164,7 @@ class StaffView(AuthViewMixin, TemplateView):
         # response = card.as_view()(self.request)
         # response.render()
         # content = response.content.decode()
-        return card().render(self, self.request, self.datetime_range)
+        return card().render(self, self.request, self.current_datetime_range)
 
 
 class StaffListView(HTMXViewMixin, StaffView):

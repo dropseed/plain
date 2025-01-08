@@ -5,6 +5,7 @@ from .base import Card
 
 class ChartCard(Card):
     template_name = "staff/cards/chart.html"
+    datetime_range = True
 
     def get_template_context(self):
         context = super().get_template_context()
@@ -20,7 +21,9 @@ class DailyTrendCard(ChartCard):
         raise NotImplementedError
 
     def get_chart_data(self) -> dict:
-        date_labels = [date.strftime("%Y-%m-%d") for date in self.datetime_range]
+        date_labels = [
+            date.strftime("%Y-%m-%d") for date in self.current_datetime_range
+        ]
         date_values = self.get_values()
         # Convert all to dates
         # date_values = {
@@ -28,7 +31,7 @@ class DailyTrendCard(ChartCard):
         #     for date, value in date_values.items()
         # }
 
-        for date in self.datetime_range:
+        for date in self.current_datetime_range:
             if date not in date_values:
                 date_values[date] = 0
 

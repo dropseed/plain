@@ -29,26 +29,31 @@ class Card:
     link: str = ""
     number: int | None = None
 
-    # All cards can utilize a date range
-    # which by default is the range of the page it's on
-    fixed_datetime_range: DatetimeRangeAliases | DatetimeRange | None = None
+    # By default a card doesn't care about dates.
+    # Use True to use the page date range.
+    # Use an alias to use a fixed date range.
+    datetime_range: bool | DatetimeRange | DatetimeRangeAliases = False
 
     # These will be accessible at render time
     view: View
     request: HttpRequest
-    datetime_range: DatetimeRange
+    current_datetime_range: DatetimeRange | None
 
     def render(self, view, request, datetime_range):
         self.view = view
         self.request = request
 
-        if self.fixed_datetime_range:
-            self.datetime_range = DatetimeRangeAliases.to_range(
-                self.fixed_datetime_range
+        if self.datetime_range is True:
+            self.current_datetime_range = datetime_range
+        elif isinstance(self.datetime_range, DatetimeRangeAliases):
+            self.current_datetime_range = DatetimeRangeAliases.to_range(
+                self.datetime_range
             )
-            # If fixed, show that on the card too (I guess you could use description for this)
+        elif isinstance(self.datetime_range, DatetimeRange):
+            self.current_datetime_range = self.datetime_range
         else:
-            self.datetime_range = datetime_range
+            self.current_datetime_range = None
+
         return Template(self.template_name).render(self.get_template_context())
 
     @classmethod
@@ -63,7 +68,7 @@ class Card:
         context["number"] = self.get_number()
         context["text"] = self.get_text()
         context["link"] = self.get_link()
-        context["fixed_datetime_range"] = self.fixed_datetime_range
+        context["datetime_range"] = self.datetime_range
         return context
 
     def get_title(self) -> str:

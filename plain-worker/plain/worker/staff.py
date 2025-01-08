@@ -39,11 +39,12 @@ def _td_format(td_object):
 class SuccessfulJobsCard(Card):
     title = "Successful Jobs"
     text = "View"
+    datetime_range = True
 
     def get_number(self):
         return (
             JobResult.objects.successful()
-            .filter(created_at__range=self.datetime_range.as_tuple())
+            .filter(created_at__range=self.current_datetime_range.as_tuple())
             .count()
         )
 
@@ -54,11 +55,12 @@ class SuccessfulJobsCard(Card):
 class ErroredJobsCard(Card):
     title = "Errored Jobs"
     text = "View"
+    datetime_range = True
 
     def get_number(self):
         return (
             JobResult.objects.errored()
-            .filter(created_at__range=self.datetime_range.as_tuple())
+            .filter(created_at__range=self.current_datetime_range.as_tuple())
             .count()
         )
 
@@ -69,6 +71,7 @@ class ErroredJobsCard(Card):
 class LostJobsCard(Card):
     title = "Lost Jobs"
     text = "View"  # TODO make not required - just an icon?
+    datetime_range = True
 
     def get_description(self):
         delta = timedelta(seconds=settings.WORKER_JOBS_LOST_AFTER)
@@ -77,7 +80,7 @@ class LostJobsCard(Card):
     def get_number(self):
         return (
             JobResult.objects.lost()
-            .filter(created_at__range=self.datetime_range.as_tuple())
+            .filter(created_at__range=self.current_datetime_range.as_tuple())
             .count()
         )
 
@@ -88,11 +91,12 @@ class LostJobsCard(Card):
 class RetriedJobsCard(Card):
     title = "Retried Jobs"
     text = "View"  # TODO make not required - just an icon?
+    datetime_range = True
 
     def get_number(self):
         return (
             JobResult.objects.retried()
-            .filter(created_at__range=self.datetime_range.as_tuple())
+            .filter(created_at__range=self.current_datetime_range.as_tuple())
             .count()
         )
 
@@ -102,6 +106,7 @@ class RetriedJobsCard(Card):
 
 class WaitingJobsCard(Card):
     title = "Waiting Jobs"
+    datetime_range = True
 
     def get_number(self):
         return Job.objects.waiting().count()
@@ -109,6 +114,7 @@ class WaitingJobsCard(Card):
 
 class RunningJobsCard(Card):
     title = "Running Jobs"
+    datetime_range = True
 
     def get_number(self):
         return Job.objects.running().count()

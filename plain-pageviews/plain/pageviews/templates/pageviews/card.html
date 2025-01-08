@@ -6,16 +6,16 @@
     {% for pageview in pageviews %}
     <div class="flex space-x-2 text-sm">
         <a
-            class="flex-shrink-0 text-stone-500 tabular-nums hover:underline"
-            href="{{ pageview|get_admin_model_detail_url }}"
-            title="{{ pageview.timestamp }}">
-            {{ pageview.timestamp|timesince(format="short", depth=1) }}
-        </a>
-        <a
             class="overflow-hidden hover:underline text-ellipsis whitespace-nowrap"
             title="{{ pageview.title }} ({{ pageview.url }})"
             href="{{ pageview.url }}">
             {{ pageview.title }}
+        </a>
+        <a
+            class="flex-shrink-0 text-stone-500 tabular-nums hover:underline"
+            href="{{ pageview|get_admin_model_detail_url }}"
+            title="{{ pageview.timestamp }}">
+            {{ pageview.timestamp|timesince(format="short", depth=1) }}
         </a>
     </div>
     {% endfor %}

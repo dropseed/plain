@@ -1,9 +1,5 @@
 {% block header %}
 <header>
-    {% if fixed_datetime_range %}
-    <p>{{ fixed_datetime_range }}</p>
-    {% endif %}
-
     <h2 class="text-sm font-semibold">{{ title }}</h2>
 
     {% if description %}<p class="mt-1 text-xs text-gray-500">{{ description }}</p>{% endif %}
