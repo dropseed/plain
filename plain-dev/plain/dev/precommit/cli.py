@@ -96,8 +96,7 @@ def plain_db_connected():
         [
             "plain",
             "models",
-            "showmigrations",
-            "--skip-checks",
+            "show-migrations",
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
