@@ -82,14 +82,14 @@ iframe.onload = () => {
     loading.style.display = 'flex';
     iframe.style.display = 'none';
 
-    // If the iframe hasn't send a loaded message after 5 seconds, render an error emssage
+    // If the iframe hasn't send a loaded message after 10 seconds, render an error emssage
     setTimeout(() => {
         if (!iframeLoaded) {
             error.style.display = 'block';
             loading.style.display = 'none';
             iframe.style.display = 'none';
         }
-    }, 5000);
+    }, 10000);
 };
 
 container.appendChild(iframe);
