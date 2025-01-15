@@ -12,13 +12,14 @@ def dd(*objs):
 
     Dump the object and raise a ResponseException with the dump as the response content.
     """
+
+    print(f"Dumping objects:\n{'\n'.join([pformat(obj) for obj in objs])}")
+
     dump_strs = [
         Markup("<pre><code>") + escape(pformat(obj)) + Markup("</code></pre>")
         for obj in objs
     ]
     combined_dump_str = Markup("\n\n").join(dump_strs)
-
-    print(f"Dumping objects:\n{combined_dump_str}")
 
     response = Response()
     response.status_code = 500
