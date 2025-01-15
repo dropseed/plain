@@ -44,11 +44,11 @@
         {% endif %}
 
         <form method="GET" class="inline-flex space-x-5">
-            {% if filters %}
-            <select data-autosubmit name="filter" class="text-sm border-gray-200 rounded-md">
-                <option value="">Filters</option>
-                {% for filter in filters %}
-                <option {% if filter == active_filter %}selected{% endif %}>{{ filter }}</option>
+            {% if displays %}
+            <select data-autosubmit name="display" class="text-sm border-gray-200 rounded-md">
+                <option value="">Displays</option>
+                {% for display in displays %}
+                <option {% if display == current_display %}selected{% endif %}>{{ display }}</option>
                 {% endfor %}
             </select>
             {% endif %}
@@ -182,7 +182,7 @@
             {% endif %}
             <form data-autosubmit method="GET">
                 {% if show_search and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
-                {% if filters and active_filter %}<input type="hidden" name="filter" value="{{ active_filter }}" />{% endif %}
+                {% if displays and current_display %}<input type="hidden" name="display" value="{{ current_display }}" />{% endif %}
                 <select name="page" class="text-xs border-gray-200 rounded-md">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>

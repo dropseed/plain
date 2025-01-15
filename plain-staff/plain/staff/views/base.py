@@ -156,7 +156,7 @@ class StaffListView(HTMXViewMixin, StaffView):
     template_name = "staff/list.html"
     fields: list[str]
     actions: list[str] = []
-    filters: list[str] = []
+    displays: list[str] = []
     page_size = 100
     show_search = False
     allow_global_search = False
@@ -165,9 +165,9 @@ class StaffListView(HTMXViewMixin, StaffView):
         context = super().get_template_context()
 
         # Make this available on self for usage in get_objects and other methods
-        self.filter = self.request.GET.get("filter", "")
+        self.display = self.request.GET.get("display", "")
 
-        # Make this available to get_filters and stuff
+        # Make this available to get_displays and stuff
         self.objects = self.get_objects()
 
         page_size = self.request.GET.get("page_size", self.page_size)
@@ -179,9 +179,9 @@ class StaffListView(HTMXViewMixin, StaffView):
         context["objects"] = self._page  # alias
         context["fields"] = self.get_fields()
         context["actions"] = self.get_actions()
-        context["filters"] = self.get_filters()
+        context["displays"] = self.get_displays()
 
-        context["active_filter"] = self.filter
+        context["current_display"] = self.display
 
         # Implement search yourself in get_objects
         context["search_query"] = self.request.GET.get("search", "")
@@ -247,8 +247,8 @@ class StaffListView(HTMXViewMixin, StaffView):
     def get_actions(self) -> dict[str]:
         return self.actions.copy()  # Avoid mutating the class attribute itself
 
-    def get_filters(self) -> list[str]:
-        return self.filters.copy()  # Avoid mutating the class attribute itself
+    def get_displays(self) -> list[str]:
+        return self.displays.copy()  # Avoid mutating the class attribute itself
 
     def get_field_value(self, obj, field: str):
         # Try basic dict lookup first

@@ -43,7 +43,7 @@ class SuccessfulJobsCard(Card):
         return JobResult.objects.successful().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?filter=Successful"
+        return JobResultViewset.ListView.get_absolute_url() + "?display=Successful"
 
 
 class ErroredJobsCard(Card):
@@ -54,7 +54,7 @@ class ErroredJobsCard(Card):
         return JobResult.objects.errored().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?filter=Errored"
+        return JobResultViewset.ListView.get_absolute_url() + "?display=Errored"
 
 
 class LostJobsCard(Card):
@@ -69,7 +69,7 @@ class LostJobsCard(Card):
         return JobResult.objects.lost().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?filter=Lost"
+        return JobResultViewset.ListView.get_absolute_url() + "?display=Lost"
 
 
 class RetriedJobsCard(Card):
@@ -80,7 +80,7 @@ class RetriedJobsCard(Card):
         return JobResult.objects.retried().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?filter=Retried"
+        return JobResultViewset.ListView.get_absolute_url() + "?display=Retried"
 
 
 class WaitingJobsCard(Card):
@@ -199,21 +199,21 @@ class JobResultViewset(StaffModelViewset):
                     output_field=models.BooleanField(),
                 ),
             )
-            if self.filter == "Successful":
+            if self.display == "Successful":
                 return queryset.successful()
-            if self.filter == "Errored":
+            if self.display == "Errored":
                 return queryset.errored()
-            if self.filter == "Cancelled":
+            if self.display == "Cancelled":
                 return queryset.cancelled()
-            if self.filter == "Lost":
+            if self.display == "Lost":
                 return queryset.lost()
-            if self.filter == "Retried":
+            if self.display == "Retried":
                 return queryset.retried()
             return queryset
 
         def get_fields(self):
             fields = super().get_fields()
-            if self.filter == "Retried":
+            if self.display == "Retried":
                 fields.append("retries")
                 fields.append("retry_attempt")
             return fields
