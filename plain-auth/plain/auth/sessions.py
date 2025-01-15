@@ -62,6 +62,8 @@ def login(request, user):
             # session. Most likely this means the password was changed.
             request.session.flush()
     else:
+        # Invalidate the current session key and generate a new one to enhance security,
+        # typically done after user login to prevent session fixation attacks.
         request.session.cycle_key()
 
     request.session[USER_ID_SESSION_KEY] = user._meta.pk.value_to_string(user)
