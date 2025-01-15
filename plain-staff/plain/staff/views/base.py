@@ -51,7 +51,7 @@ class StaffView(AuthViewMixin, TemplateView):
     template_name = "staff/page.html"
     cards: list["Card"] = []
 
-    default_datetime_range = DatetimeRangeAliases.LAST_365_DAYS
+    default_datetime_range = DatetimeRangeAliases.SINCE_365_DAYS_AGO
 
     def get_template_context(self):
         context = super().get_template_context()

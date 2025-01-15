@@ -203,7 +203,7 @@ class JobResultViewset(StaffModelViewset):
             "Retry",
         ]
         allow_global_search = False
-        default_datetime_range = DatetimeRangeAliases.LAST_30_DAYS
+        default_datetime_range = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
         def get_description(self):
             delta = timedelta(seconds=settings.WORKER_JOBS_CLEARABLE_AFTER)

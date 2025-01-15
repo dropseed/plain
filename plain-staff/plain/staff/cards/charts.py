@@ -1,5 +1,8 @@
 import datetime
 
+from plain.models import Count
+from plain.models.functions import TruncDate
+
 from .base import Card
 
 
@@ -17,8 +20,28 @@ class ChartCard(Card):
 
 
 class DailyTrendCard(ChartCard):
+    model = None
+    datetime_field = None
+
     def get_values(self) -> dict[datetime.date, int]:
-        raise NotImplementedError
+        if not self.model or not self.datetime_field:
+            raise NotImplementedError(
+                "model and datetime_field must be set, or get_values must be overridden"
+            )
+
+        filter_kwargs = {
+            f"{self.datetime_field}__range": self.current_datetime_range.as_tuple()
+        }
+
+        counts_by_date = (
+            self.model.objects.filter(**filter_kwargs)
+            .annotate(chart_date=TruncDate(self.datetime_field))
+            .values("chart_date")
+            .annotate(chart_date_count=Count("id"))
+            .order_by("chart_date")
+        )
+
+        return {row["chart_date"]: row["chart_date_count"] for row in counts_by_date}
 
     def get_chart_data(self) -> dict:
         date_labels = [
