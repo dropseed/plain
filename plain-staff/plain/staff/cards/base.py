@@ -1,7 +1,6 @@
 from enum import Enum
 
 from plain.http import HttpRequest
-from plain.staff.dates import DatetimeRange, DatetimeRangeAliases
 from plain.templates import Template
 from plain.utils.text import slugify
 from plain.views import View
@@ -29,31 +28,13 @@ class Card:
     link: str = ""
     number: int | None = None
 
-    # By default a card doesn't care about dates.
-    # Use True to use the page date range.
-    # Use an alias to use a fixed date range.
-    datetime_range: bool | DatetimeRange | DatetimeRangeAliases = False
-
     # These will be accessible at render time
     view: View
     request: HttpRequest
-    current_datetime_range: DatetimeRange | None
 
-    def render(self, view, request, datetime_range):
+    def render(self, view, request):
         self.view = view
         self.request = request
-
-        if self.datetime_range is True:
-            self.current_datetime_range = datetime_range
-        elif isinstance(self.datetime_range, DatetimeRangeAliases):
-            self.current_datetime_range = DatetimeRangeAliases.to_range(
-                self.datetime_range
-            )
-        elif isinstance(self.datetime_range, DatetimeRange):
-            self.current_datetime_range = self.datetime_range
-        else:
-            self.current_datetime_range = None
-
         return Template(self.template_name).render(self.get_template_context())
 
     @classmethod
@@ -68,7 +49,6 @@ class Card:
         context["number"] = self.get_number()
         context["text"] = self.get_text()
         context["link"] = self.get_link()
-        context["datetime_range"] = self.datetime_range
         return context
 
     def get_title(self) -> str:

@@ -2,21 +2,4 @@
 
 {% block content %}
 
-{% if dashboards %}
-<div class="mt-6">
-    <h2>Dashboards</h2>
-    <div class="grid grid-cols-4 gap-6 mt-4">
-        {% for view in dashboards %}
-        <a class="p-4 border rounded" href="{{ view.get_absolute_url() }}">
-            {{ view.get_nav_title() }}
-        </a>
-        {% endfor %}
-    </div>
-</div>
-{% else %}
-<div class="my-6 text-center text-stone-500 font-light">
-    No registered dashboards yet.
-</div>
-{% endif %}
-
 {% endblock %}

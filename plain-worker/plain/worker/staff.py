@@ -4,7 +4,6 @@ from plain import models
 from plain.http import ResponseRedirect
 from plain.runtime import settings
 from plain.staff.cards import Card
-from plain.staff.dates import DatetimeRangeAliases
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
@@ -39,14 +38,9 @@ def _td_format(td_object):
 class SuccessfulJobsCard(Card):
     title = "Successful Jobs"
     text = "View"
-    datetime_range = True
 
     def get_number(self):
-        return (
-            JobResult.objects.successful()
-            .filter(created_at__range=self.current_datetime_range.as_tuple())
-            .count()
-        )
+        return JobResult.objects.successful().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_absolute_url() + "?filter=Successful"
@@ -55,14 +49,9 @@ class SuccessfulJobsCard(Card):
 class ErroredJobsCard(Card):
     title = "Errored Jobs"
     text = "View"
-    datetime_range = True
 
     def get_number(self):
-        return (
-            JobResult.objects.errored()
-            .filter(created_at__range=self.current_datetime_range.as_tuple())
-            .count()
-        )
+        return JobResult.objects.errored().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_absolute_url() + "?filter=Errored"
@@ -71,18 +60,13 @@ class ErroredJobsCard(Card):
 class LostJobsCard(Card):
     title = "Lost Jobs"
     text = "View"  # TODO make not required - just an icon?
-    datetime_range = True
 
     def get_description(self):
         delta = timedelta(seconds=settings.WORKER_JOBS_LOST_AFTER)
         return f"Jobs are considered lost after {_td_format(delta)}"
 
     def get_number(self):
-        return (
-            JobResult.objects.lost()
-            .filter(created_at__range=self.current_datetime_range.as_tuple())
-            .count()
-        )
+        return JobResult.objects.lost().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_absolute_url() + "?filter=Lost"
@@ -91,14 +75,9 @@ class LostJobsCard(Card):
 class RetriedJobsCard(Card):
     title = "Retried Jobs"
     text = "View"  # TODO make not required - just an icon?
-    datetime_range = True
 
     def get_number(self):
-        return (
-            JobResult.objects.retried()
-            .filter(created_at__range=self.current_datetime_range.as_tuple())
-            .count()
-        )
+        return JobResult.objects.retried().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_absolute_url() + "?filter=Retried"
@@ -106,7 +85,6 @@ class RetriedJobsCard(Card):
 
 class WaitingJobsCard(Card):
     title = "Waiting Jobs"
-    datetime_range = True
 
     def get_number(self):
         return Job.objects.waiting().count()
@@ -114,7 +92,6 @@ class WaitingJobsCard(Card):
 
 class RunningJobsCard(Card):
     title = "Running Jobs"
-    datetime_range = True
 
     def get_number(self):
         return Job.objects.running().count()
@@ -203,7 +180,6 @@ class JobResultViewset(StaffModelViewset):
             "Retry",
         ]
         allow_global_search = False
-        default_datetime_range = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
         def get_description(self):
             delta = timedelta(seconds=settings.WORKER_JOBS_CLEARABLE_AFTER)

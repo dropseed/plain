@@ -2,6 +2,7 @@ import datetime
 
 from plain.models import Count
 from plain.models.functions import TruncDate
+from plain.staff.dates import DatetimeRangeAliases
 
 from .base import Card
 
@@ -29,9 +30,11 @@ class DailyTrendCard(ChartCard):
                 "model and datetime_field must be set, or get_values must be overridden"
             )
 
-        filter_kwargs = {
-            f"{self.datetime_field}__range": self.current_datetime_range.as_tuple()
-        }
+        datetime_range = DatetimeRangeAliases.to_range(
+            DatetimeRangeAliases.SINCE_30_DAYS_AGO
+        ).as_tuple()
+
+        filter_kwargs = {f"{self.datetime_field}__range": datetime_range}
 
         counts_by_date = (
             self.model.objects.filter(**filter_kwargs)
@@ -44,9 +47,11 @@ class DailyTrendCard(ChartCard):
         return {row["chart_date"]: row["chart_date_count"] for row in counts_by_date}
 
     def get_chart_data(self) -> dict:
-        date_labels = [
-            date.strftime("%Y-%m-%d") for date in self.current_datetime_range
-        ]
+        datetime_range = DatetimeRangeAliases.to_range(
+            DatetimeRangeAliases.SINCE_30_DAYS_AGO
+        )
+
+        date_labels = [date.strftime("%Y-%m-%d") for date in datetime_range]
         date_values = self.get_values()
         # Convert all to dates
         # date_values = {
@@ -54,7 +59,7 @@ class DailyTrendCard(ChartCard):
         #     for date, value in date_values.items()
         # }
 
-        for date in self.current_datetime_range:
+        for date in datetime_range:
             if date not in date_values:
                 date_values[date] = 0
 

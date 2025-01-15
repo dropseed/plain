@@ -5,7 +5,6 @@ from plain.auth.views import AuthViewMixin
 from plain.htmx.views import HTMXViewMixin
 from plain.http import Response, ResponseRedirect
 from plain.paginator import Paginator
-from plain.staff.dates import DatetimeRange, DatetimeRangeAliases
 from plain.urls import reverse
 from plain.utils import timezone
 from plain.utils.text import slugify
@@ -51,8 +50,6 @@ class StaffView(AuthViewMixin, TemplateView):
     template_name = "staff/page.html"
     cards: list["Card"] = []
 
-    default_datetime_range = DatetimeRangeAliases.SINCE_365_DAYS_AGO
-
     def get_template_context(self):
         context = super().get_template_context()
         context["title"] = self.get_title()
@@ -65,19 +62,7 @@ class StaffView(AuthViewMixin, TemplateView):
         context["cards"] = self.get_cards()
         context["render_card"] = self.render_card
         context["time_zone"] = timezone.get_current_timezone_name()
-
-        if any(x.datetime_range for x in context["cards"]):
-            context["from_datetime"] = self.current_datetime_range.start
-            context["to_datetime"] = self.current_datetime_range.end
-
         return context
-
-    def get_response(self):
-        default_range = DatetimeRangeAliases.to_range(self.default_datetime_range)
-        from_datetime = self.request.GET.get("from", default_range.start)
-        to_datetime = self.request.GET.get("to", default_range.end)
-        self.current_datetime_range = DatetimeRange(from_datetime, to_datetime)
-        return super().get_response()
 
     @classmethod
     def view_name(cls) -> str:
@@ -164,7 +149,7 @@ class StaffView(AuthViewMixin, TemplateView):
         # response = card.as_view()(self.request)
         # response.render()
         # content = response.content.decode()
-        return card().render(self, self.request, self.current_datetime_range)
+        return card().render(self, self.request)
 
 
 class StaffListView(HTMXViewMixin, StaffView):

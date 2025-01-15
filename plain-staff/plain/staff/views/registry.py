@@ -5,23 +5,12 @@ class StaffViewRegistry:
     def __init__(self):
         # View classes that will be added to the admin automatically
         self.registered_views = set()
-        self.registered_dashboards = set()
 
     def register_view(self, view=None):
         def inner(view):
             self.registered_views.add(view)
             # TODO do this somewhere else...
             # self.registered_views = set(self.registered_views, key=lambda v: v.title)
-            return view
-
-        if callable(view):
-            return inner(view)
-        else:
-            return inner
-
-    def register_dashboard(self, view=None):
-        def inner(view):
-            self.registered_dashboards.add(view)
             return view
 
         if callable(view):
@@ -91,9 +80,6 @@ class StaffViewRegistry:
         for view in self.registered_views:
             add_view_path(view, f"p/{view.get_path()}")
 
-        for view in self.registered_dashboards:
-            add_view_path(view, f"dashboards/{view.get_path()}")
-
         return urlpatterns
 
     def get_searchable_views(self):
@@ -127,6 +113,5 @@ class StaffViewRegistry:
 
 registry = StaffViewRegistry()
 register_view = registry.register_view
-register_dashboard = registry.register_dashboard
 register_viewset = registry.register_viewset
 get_model_detail_url = registry.get_model_detail_url
