@@ -16,6 +16,7 @@ class PageviewStaff(StaffModelViewset):
         nav_section = "Pageviews"
         title = "Pageviews"
         fields = ["user_id", "url", "timestamp", "session_key"]
+        search_fields = ["pk", "user_id", "url", "session_key"]
 
     class DetailView(StaffModelDetailView):
         model = Pageview
