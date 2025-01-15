@@ -42,6 +42,15 @@ jQuery(function($) {
         });
     }
 
+    function createTooltips(target) {
+        $(target).find("[data-tooltip]").each(function() {
+            tippy(this, {
+                content: this.dataset.tooltip,
+                duration: 100,
+            });
+        });
+    }
+
     function autolinkColumns(target) {
         $(target).find("[data-column-autolink]").each(function() {
             var $this = $(this);
@@ -57,12 +66,14 @@ jQuery(function($) {
     }
 
     createDropdowns(document);
+    createTooltips(document);
     autolinkColumns(document);
 
     // Search uses htmx to load elements,
     // so we need to hook those up too.
     htmx.on("htmx:afterSwap", function(evt) {
         createDropdowns(evt.detail.target);
+        createTooltips(evt.detail.target);
         autolinkColumns(evt.detail.target);
     });
 });
