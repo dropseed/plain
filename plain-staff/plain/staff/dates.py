@@ -32,6 +32,9 @@ class DatetimeRangeAliases(Enum):
     NEXT_QUARTER = "Next Quarter"
     NEXT_YEAR = "Next Year"
 
+    # TODO doesn't include anything less than a day...
+    # ex. SINCE_1_HOUR_AGO = "Since 1 Hour Ago"
+
     @classmethod
     def to_range(cls, value: str) -> (datetime.datetime, datetime.datetime):
         now = timezone.localtime()
