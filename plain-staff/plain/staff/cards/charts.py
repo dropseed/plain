@@ -23,6 +23,10 @@ class ChartCard(Card):
 class DailyTrendCard(ChartCard):
     model = None
     datetime_field = None
+    datetime_range = DatetimeRangeAliases.SINCE_30_DAYS_AGO
+
+    def get_description(self):
+        return self.datetime_range.value
 
     def get_values(self) -> dict[datetime.date, int]:
         if not self.model or not self.datetime_field:
@@ -30,9 +34,7 @@ class DailyTrendCard(ChartCard):
                 "model and datetime_field must be set, or get_values must be overridden"
             )
 
-        datetime_range = DatetimeRangeAliases.to_range(
-            DatetimeRangeAliases.SINCE_30_DAYS_AGO
-        ).as_tuple()
+        datetime_range = DatetimeRangeAliases.to_range(self.datetime_range).as_tuple()
 
         filter_kwargs = {f"{self.datetime_field}__range": datetime_range}
 
@@ -47,9 +49,7 @@ class DailyTrendCard(ChartCard):
         return {row["chart_date"]: row["chart_date_count"] for row in counts_by_date}
 
     def get_chart_data(self) -> dict:
-        datetime_range = DatetimeRangeAliases.to_range(
-            DatetimeRangeAliases.SINCE_30_DAYS_AGO
-        )
+        datetime_range = DatetimeRangeAliases.to_range(self.datetime_range)
 
         date_labels = [date.strftime("%Y-%m-%d") for date in datetime_range]
         date_values = self.get_values()
