@@ -1,4 +1,4 @@
-from plain.staff.cards import Card
+from plain.staff.cards import Card, DailyTrendCard
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
@@ -9,6 +9,13 @@ from plain.staff.views import (
 from .models import Pageview
 
 
+class DailyPageviewsCard(DailyTrendCard):
+    title = "Daily pageviews"
+    model = Pageview
+    datetime_field = "timestamp"
+    size = DailyTrendCard.Sizes.FULL
+
+
 @register_viewset
 class PageviewStaff(StaffModelViewset):
     class ListView(StaffModelListView):
@@ -17,6 +24,7 @@ class PageviewStaff(StaffModelViewset):
         title = "Pageviews"
         fields = ["user_id", "url", "timestamp", "session_key"]
         search_fields = ["pk", "user_id", "url", "session_key"]
+        cards = [DailyPageviewsCard]
 
     class DetailView(StaffModelDetailView):
         model = Pageview
