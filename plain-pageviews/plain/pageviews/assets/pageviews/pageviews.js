@@ -8,11 +8,16 @@
   }
 
   // Get the tracking URL from the data-track-url attribute
-  const trackUrl = scriptTag.getAttribute("data-track-url");
+  let trackUrl = scriptTag.getAttribute("data-track-url");
 
   if (!trackUrl) {
-    console.error("Missing 'data-track-url' attribute in the <script> tag.");
-    return;
+    const defaultTrackPath = "/pageviews/track/";
+    try {
+      const scriptUrl = new URL(scriptTag.src);
+      trackUrl = `${scriptUrl.origin}${defaultTrackPath}`;
+    } catch (error) {
+      trackUrl = defaultTrackPath;
+    }
   }
 
   // Function to send a pageview event using the Beacon API
