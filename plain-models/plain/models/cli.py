@@ -118,11 +118,6 @@ def db_wait():
     help="Exit with a non-zero status if model changes are missing migrations and don't actually write them.",
 )
 @click.option(
-    "--update",
-    is_flag=True,
-    help="Merge model changes into the latest migration and optimize the resulting operations.",
-)
-@click.option(
     "-v",
     "--verbosity",
     type=int,
@@ -130,7 +125,7 @@ def db_wait():
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
 def makemigrations(
-    package_labels, dry_run, merge, empty, no_input, name, check, update, verbosity
+    package_labels, dry_run, merge, empty, no_input, name, check, verbosity
 ):
     """Creates new migration(s) for packages."""
 
@@ -197,77 +192,6 @@ def makemigrations(
                         level=3,
                     )
                     log(writer.as_string(), level=3)
-
-    def write_to_last_migration_files(changes):
-        """Write changes to the last migration file for each package."""
-        loader = MigrationLoader(connections[DEFAULT_DB_ALIAS])
-        new_changes = {}
-        update_previous_migration_paths = {}
-        for package_label, package_migrations in changes.items():
-            leaf_migration_nodes = loader.graph.leaf_nodes(app=package_label)
-            if len(leaf_migration_nodes) == 0:
-                raise click.ClickException(
-                    f"Package {package_label} has no migration, cannot update last migration."
-                )
-            leaf_migration_node = leaf_migration_nodes[0]
-            leaf_migration = loader.graph.nodes[leaf_migration_node]
-
-            if leaf_migration.replaces:
-                raise click.ClickException(
-                    f"Cannot update squash migration '{leaf_migration}'."
-                )
-            if leaf_migration_node in loader.applied_migrations:
-                raise click.ClickException(
-                    f"Cannot update applied migration '{leaf_migration}'."
-                )
-
-            depending_migrations = [
-                migration
-                for migration in loader.disk_migrations.values()
-                if leaf_migration_node in migration.dependencies
-            ]
-            if depending_migrations:
-                formatted_migrations = ", ".join(
-                    [f"'{migration}'" for migration in depending_migrations]
-                )
-                raise click.ClickException(
-                    f"Cannot update migration '{leaf_migration}' that migrations "
-                    f"{formatted_migrations} depend on."
-                )
-
-            for migration in package_migrations:
-                leaf_migration.operations.extend(migration.operations)
-                for dependency in migration.dependencies:
-                    if isinstance(dependency, SwappableTuple):
-                        if settings.AUTH_USER_MODEL == dependency.setting:
-                            leaf_migration.dependencies.append(
-                                ("__setting__", "AUTH_USER_MODEL")
-                            )
-                        else:
-                            leaf_migration.dependencies.append(dependency)
-                    elif dependency[0] != migration.package_label:
-                        leaf_migration.dependencies.append(dependency)
-
-            optimizer = MigrationOptimizer()
-            leaf_migration.operations = optimizer.optimize(
-                leaf_migration.operations, package_label
-            )
-
-            previous_migration_path = MigrationWriter(leaf_migration).path
-            suggested_name = (
-                leaf_migration.name[:4] + "_" + leaf_migration.suggest_name()
-            )
-            new_name = (
-                suggested_name
-                if leaf_migration.name != suggested_name
-                else leaf_migration.name + "_updated"
-            )
-            leaf_migration.name = new_name
-
-            new_changes[package_label] = [leaf_migration]
-            update_previous_migration_paths[package_label] = previous_migration_path
-
-        write_migration_files(new_changes, update_previous_migration_paths)
 
     def handle_merge(loader, conflicts):
         """Handle merging conflicting migrations."""
@@ -478,10 +402,8 @@ def makemigrations(
     else:
         if check_changes:
             sys.exit(1)
-        if update:
-            write_to_last_migration_files(changes)
-        else:
-            write_migration_files(changes)
+
+        write_migration_files(changes)
 
 
 @cli.command()
