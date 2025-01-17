@@ -1,6 +1,7 @@
 {% if toolbar.should_render() %}
+{% set exception=toolbar.request_exception() %}
 <script src="{{ asset('toolbar/toolbar.js') }}"></script>
-<div id="plaintoolbar" class="text-sm py-1.5 text-stone-300 bg-stone-950 fixed bottom-4 max-w-full drop-shadow-md z-30 mx-4 rounded-2xl hidden lg:flex lg:flex-col -translate-x-1/2 left-1/2">
+<div id="plaintoolbar" class="text-sm py-1.5 text-stone-300 bg-stone-950 fixed bottom-3 mx-3 max-w-full drop-shadow-md z-30 rounded-2xl lg:flex lg:flex-col -translate-x-1/2 left-1/2">
     <div class="flex justify-between px-4 mx-auto space-x-4">
         <div class="flex items-center">
             <svg class="h-4 w-4" width="160" height="125" viewBox="0 0 160 125" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -35,7 +36,25 @@
             </div>
         </div>
     </div>
-    <div id="plaintoolbar-details" class="hidden p-4 text-sm">
+    <div id="plaintoolbar-details" class="{% if not exception %}hidden{% endif %} p-4 text-sm space-y-2">
+
+        {% if exception %}
+        <div class="p-2 border-amber-500 border rounded">
+            <div class="text-amber-500 text-lg flex justify-between items-center">
+                <div>
+                    <span class="font-bold">Exception</span>
+                    {{ exception }}
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-5 h-5 bi bi-exclamation-triangle-fill" viewBox="0 0 16 16">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+                </svg>
+            </div>
+            <div class="text-amber-400 text-xs mt-3 bg-white/5 p-2 rounded overflow-auto">
+                <pre><code>{{ exception._traceback_string }}</code></pre>
+            </div>
+        </div>
+        {% endif %}
+
         <table>
             <tbody>
             {% for k, v in toolbar.metadata.items() %}
@@ -54,10 +73,7 @@
         {% endif %}
 
         <button data-plaintoolbar-hide class="hover:text-red-500" type="button">
-            Hide for 1 hour
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 bi bi-x-circle-fill" viewBox="0 0 16 16">
-                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
-            </svg>
+            Hide toolbar for 1 hour
         </button>
     </div>
 </div>
