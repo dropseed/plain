@@ -58,7 +58,15 @@ def cli(ctx, port, hostname, log_level):
         return
 
     if not hostname:
-        project_name = os.path.basename(os.getcwd())
+        project_name = os.path.basename(
+            os.getcwd()
+        )  # Use the directory name by default
+
+        if has_pyproject_toml(APP_PATH.parent):
+            with open(Path(APP_PATH.parent, "pyproject.toml"), "rb") as f:
+                pyproject = tomllib.load(f)
+                project_name = pyproject.get("project", {}).get("name", project_name)
+
         hostname = f"{project_name}.localhost"
 
     returncode = Dev(port=port, hostname=hostname, log_level=log_level).run()
