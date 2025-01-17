@@ -55,7 +55,7 @@ def patch_cache_control(response, **kwargs):
             return f"{t[0]}={t[1]}"
 
     cc = defaultdict(set)
-    if response.get("Cache-Control"):
+    if response.headers.get("Cache-Control"):
         for field in cc_delim_re.split(response.headers["Cache-Control"]):
             directive, value = dictitem(field)
             if directive == "no-cache":
@@ -102,7 +102,7 @@ def get_max_age(response):
     Return the max-age from the response Cache-Control header as an integer,
     or None if it wasn't found or wasn't an integer.
     """
-    if not response.has_header("Cache-Control"):
+    if "Cache-Control" not in response.headers:
         return
     cc = dict(
         _to_tuple(el) for el in cc_delim_re.split(response.headers["Cache-Control"])
@@ -146,7 +146,7 @@ def _not_modified(request, response=None):
             "Last-Modified",
             "Vary",
         ):
-            if header in response:
+            if header in response.headers:
                 new_response.headers[header] = response.headers[header]
 
         # Preserve cookies as per the cookie specification: "If a proxy server
@@ -278,7 +278,7 @@ def patch_response_headers(response, cache_timeout=None):
         cache_timeout = settings.CACHE_MIDDLEWARE_SECONDS
     if cache_timeout < 0:
         cache_timeout = 0  # Can't have max-age negative
-    if not response.has_header("Expires"):
+    if "Expires" not in response.headers:
         response.headers["Expires"] = http_date(time.time() + cache_timeout)
     patch_cache_control(response, max_age=cache_timeout)
 
@@ -303,7 +303,7 @@ def patch_vary_headers(response, newheaders):
     # Note that we need to keep the original order intact, because cache
     # implementations may rely on the order of the Vary contents in, say,
     # computing an MD5 hash.
-    if response.has_header("Vary"):
+    if "Vary" in response.headers:
         vary_headers = cc_delim_re.split(response.headers["Vary"])
     else:
         vary_headers = []

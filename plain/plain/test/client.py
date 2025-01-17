@@ -615,10 +615,10 @@ class ClientMixin:
 
     def _parse_json(self, response, **extra):
         if not hasattr(response, "_json"):
-            if not JSON_CONTENT_TYPE_RE.match(response.get("Content-Type")):
+            if not JSON_CONTENT_TYPE_RE.match(response.headers.get("Content-Type")):
                 raise ValueError(
                     'Content-Type header is "{}", not "application/json"'.format(
-                        response.get("Content-Type")
+                        response.headers.get("Content-Type")
                     )
                 )
             response._json = json.loads(

@@ -187,27 +187,6 @@ class ResponseBase:
             else ""
         )
 
-    def __setitem__(self, header, value):
-        self.headers[header] = value
-
-    def __delitem__(self, header):
-        del self.headers[header]
-
-    def __getitem__(self, header):
-        return self.headers[header]
-
-    def has_header(self, header):
-        """Case-insensitive check for a header."""
-        return header in self.headers
-
-    __contains__ = has_header
-
-    def items(self):
-        return self.headers.items()
-
-    def get(self, header, alternate=None):
-        return self.headers.get(header, alternate)
-
     def set_cookie(
         self,
         key,
@@ -271,10 +250,6 @@ class ResponseBase:
             if samesite.lower() not in ("lax", "none", "strict"):
                 raise ValueError('samesite must be "lax", "none", or "strict".')
             self.cookies[key]["samesite"] = samesite
-
-    def setdefault(self, key, value):
-        """Set a header unless it has already been set."""
-        self.headers.setdefault(key, value)
 
     def set_signed_cookie(self, key, value, salt="", **kwargs):
         value = signing.get_cookie_signer(salt=key + salt).sign(value)
@@ -587,14 +562,14 @@ class ResponseRedirectBase(Response):
 
     def __init__(self, redirect_to, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self["Location"] = iri_to_uri(redirect_to)
+        self.headers["Location"] = iri_to_uri(redirect_to)
         parsed = urlparse(str(redirect_to))
         if parsed.scheme and parsed.scheme not in self.allowed_schemes:
             raise DisallowedRedirect(
                 f"Unsafe redirect to URL with protocol '{parsed.scheme}'"
             )
 
-    url = property(lambda self: self["Location"])
+    url = property(lambda self: self.headers["Location"])
 
     def __repr__(self):
         return (
@@ -627,7 +602,7 @@ class ResponseNotModified(Response):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        del self["content-type"]
+        del self.headers["content-type"]
 
     @Response.content.setter
     def content(self, value):
@@ -663,14 +638,14 @@ class ResponseNotAllowed(Response):
 
     def __init__(self, permitted_methods, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self["Allow"] = ", ".join(permitted_methods)
+        self.headers["Allow"] = ", ".join(permitted_methods)
 
     def __repr__(self):
         return "<%(cls)s [%(methods)s] status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__name__,
             "status_code": self.status_code,
             "content_type": self._content_type_for_repr,
-            "methods": self["Allow"],
+            "methods": self.headers["Allow"],
         }
 
 

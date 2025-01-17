@@ -19,7 +19,7 @@ class DefaultHeadersMiddleware:
 
         # Add the Content-Length header to non-streaming responses if not
         # already set.
-        if not response.streaming and not response.has_header("Content-Length"):
+        if not response.streaming and "Content-Length" not in response.headers:
             response.headers["Content-Length"] = str(len(response.content))
 
         return response

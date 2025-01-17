@@ -262,7 +262,7 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 
         # Tell HTMX to do a client-side redirect when it receives the response
         response = HttpResponse(status=204)
-        response["HX-Redirect"] = "/"
+        response.headers["HX-Redirect"] = "/"
         return response
 ```
 

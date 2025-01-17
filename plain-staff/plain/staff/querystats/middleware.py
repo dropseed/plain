@@ -64,7 +64,7 @@ class QueryStatsMiddleware:
 
             # Make current querystats available on the current page
             # by using the server timing API which can be parsed client-side
-            response["Server-Timing"] = _local.querystats.as_server_timing()
+            response.headers["Server-Timing"] = _local.querystats.as_server_timing()
 
             if request.GET.get("querystats") == "store":
                 request.session["querystats"] = json.dumps(
