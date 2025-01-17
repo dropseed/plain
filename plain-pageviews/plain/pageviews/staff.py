@@ -1,4 +1,4 @@
-from plain.staff.cards import Card, DailyTrendCard
+from plain.staff.cards import Card, TrendCard
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
@@ -9,11 +9,11 @@ from plain.staff.views import (
 from .models import Pageview
 
 
-class DailyPageviewsCard(DailyTrendCard):
+class DailyPageviewsCard(TrendCard):
     title = "Daily pageviews"
     model = Pageview
     datetime_field = "timestamp"
-    size = DailyTrendCard.Sizes.FULL
+    size = TrendCard.Sizes.FULL
 
 
 @register_viewset

@@ -165,12 +165,59 @@ class DatetimeRange:
     def total_days(self):
         return (self.end - self.start).days
 
-    def __iter__(self):
-        # Iters days currently... probably should have an iter_days method instead
+    def iter_days(self):
+        """Yields each day in the range."""
         return iter(
             self.start.date() + datetime.timedelta(days=i)
             for i in range(0, self.total_days())
         )
+
+    def iter_weeks(self):
+        """Yields the start of each week in the range."""
+        current = self.start - datetime.timedelta(days=self.start.weekday())
+        current = current.replace(hour=0, minute=0, second=0, microsecond=0)
+        while current <= self.end:
+            next_week = current + datetime.timedelta(weeks=1)
+            yield current
+            current = next_week
+
+    def iter_months(self):
+        """Yields the start of each month in the range."""
+        current = self.start.replace(day=1)
+        current = current.replace(hour=0, minute=0, second=0, microsecond=0)
+        while current <= self.end:
+            if current.month == 12:
+                next_month = current.replace(year=current.year + 1, month=1)
+            else:
+                next_month = current.replace(month=current.month + 1)
+            yield current
+            current = next_month
+
+    def iter_quarters(self):
+        """Yields the start of each quarter in the range."""
+        current = self.start.replace(month=((self.start.month - 1) // 3) * 3 + 1, day=1)
+        current = current.replace(hour=0, minute=0, second=0, microsecond=0)
+        while current <= self.end:
+            next_quarter_month = ((current.month - 1) // 3 + 1) * 3 + 1
+            if next_quarter_month > 12:
+                next_quarter_month -= 12
+                next_year = current.year + 1
+            else:
+                next_year = current.year
+            next_quarter = datetime.datetime(
+                next_year, next_quarter_month, 1, tzinfo=current.tzinfo
+            )
+            yield current
+            current = next_quarter
+
+    def iter_years(self):
+        """Yields the start of each year in the range."""
+        current = self.start.replace(month=1, day=1)
+        current = current.replace(hour=0, minute=0, second=0, microsecond=0)
+        while current <= self.end:
+            next_year = current.replace(year=current.year + 1)
+            yield current
+            current = next_year
 
     def __repr__(self):
         return f"DatetimeRange({self.start}, {self.end})"

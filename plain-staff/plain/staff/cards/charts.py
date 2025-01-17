@@ -1,15 +1,21 @@
-import datetime
+import enum
+from collections import defaultdict
 
 from plain.models import Count
-from plain.models.functions import TruncDate
-from plain.staff.dates import DatetimeRangeAliases
+from plain.models.functions import (
+    TruncDate,
+    TruncMonth,
+    TruncQuarter,
+    TruncWeek,
+    TruncYear,
+)
+from plain.staff.dates import DatetimeRange, DatetimeRangeAliases
 
 from .base import Card
 
 
 class ChartCard(Card):
     template_name = "staff/cards/chart.html"
-    datetime_range = True
 
     def get_template_context(self):
         context = super().get_template_context()
@@ -20,59 +26,94 @@ class ChartCard(Card):
         raise NotImplementedError
 
 
-class DailyTrendCard(ChartCard):
+class TrendCard(ChartCard):
+    """
+    A card that renders a trend chart.
+    Primarily intended for use with models, but it can also be customized.
+    """
+
     model = None
     datetime_field = None
     datetime_range = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
-    def get_description(self):
+    class Buckets(enum.Enum):
+        DAY = "day"
+        WEEK = "week"
+        MONTH = "month"
+        QUARTER = "quarter"
+        YEAR = "year"
+
+    bucket_by = Buckets.DAY
+
+    def get_description(self) -> str:
         return self.datetime_range.value
 
-    def get_values(self) -> dict[datetime.date, int]:
+    def get_trend_datetime_range(self) -> DatetimeRange:
+        return DatetimeRangeAliases.to_range(self.datetime_range)
+
+    def get_trend_data(self) -> list[int | float]:
         if not self.model or not self.datetime_field:
             raise NotImplementedError(
                 "model and datetime_field must be set, or get_values must be overridden"
             )
 
-        datetime_range = DatetimeRangeAliases.to_range(self.datetime_range).as_tuple()
+        datetime_range = self.get_trend_datetime_range()
 
-        filter_kwargs = {f"{self.datetime_field}__range": datetime_range}
+        filter_kwargs = {f"{self.datetime_field}__range": datetime_range.as_tuple()}
+
+        truncator = {
+            self.Buckets.DAY: TruncDate,
+            self.Buckets.WEEK: TruncWeek,
+            self.Buckets.MONTH: TruncMonth,
+            self.Buckets.QUARTER: TruncQuarter,
+            self.Buckets.YEAR: TruncYear,
+        }[self.bucket_by]
 
         counts_by_date = (
             self.model.objects.filter(**filter_kwargs)
-            .annotate(chart_date=TruncDate(self.datetime_field))
+            .annotate(chart_date=truncator(self.datetime_field))
             .values("chart_date")
             .annotate(chart_date_count=Count("id"))
-            .order_by("chart_date")
         )
 
-        return {row["chart_date"]: row["chart_date_count"] for row in counts_by_date}
+        # Will do the zero filling for us on key access
+        date_values = defaultdict(int)
+
+        for row in counts_by_date:
+            date_values[row["chart_date"]] = row["chart_date_count"]
+
+        # Now get the filled data for our date range
+        iterator = {
+            self.Buckets.DAY: datetime_range.iter_days,
+            self.Buckets.WEEK: datetime_range.iter_weeks,
+            self.Buckets.MONTH: datetime_range.iter_months,
+            self.Buckets.QUARTER: datetime_range.iter_quarters,
+            self.Buckets.YEAR: datetime_range.iter_years,
+        }[self.bucket_by]
+        return [date_values[date] for date in iterator()]
+
+    def get_trend_labels(self) -> list[str]:
+        datetime_range = self.get_trend_datetime_range()
+        iterator = {
+            self.Buckets.DAY: datetime_range.iter_days,
+            self.Buckets.WEEK: datetime_range.iter_weeks,
+            self.Buckets.MONTH: datetime_range.iter_months,
+            self.Buckets.QUARTER: datetime_range.iter_quarters,
+            self.Buckets.YEAR: datetime_range.iter_years,
+        }[self.bucket_by]
+        return [date.strftime("%Y-%m-%d") for date in iterator()]
 
     def get_chart_data(self) -> dict:
-        datetime_range = DatetimeRangeAliases.to_range(self.datetime_range)
-
-        date_labels = [date.strftime("%Y-%m-%d") for date in datetime_range]
-        date_values = self.get_values()
-        # Convert all to dates
-        # date_values = {
-        #     date.date() if isinstance(date, datetime.datetime) else date: value
-        #     for date, value in date_values.items()
-        # }
-
-        for date in datetime_range:
-            if date not in date_values:
-                date_values[date] = 0
-
-        # Sort the date values
-        data = [date_values[date] for date in sorted(date_values.keys())]
+        trend_labels = self.get_trend_labels()
+        trend_data = self.get_trend_data()
 
         return {
             "type": "bar",
             "data": {
-                "labels": date_labels,
+                "labels": trend_labels,
                 "datasets": [
                     {
-                        "data": data,
+                        "data": trend_data,
                     }
                 ],
             },
