@@ -60,7 +60,7 @@ class StaffView(AuthViewMixin, TemplateView):
         context["parent_view_classes"] = self.get_parent_view_classes()
         context["admin_registry"] = registry
         context["cards"] = self.get_cards()
-        context["render_card"] = self.render_card
+        context["render_card"] = lambda card: card().render(self, self.request)
         context["time_zone"] = timezone.get_current_timezone_name()
         return context
 
@@ -143,13 +143,6 @@ class StaffView(AuthViewMixin, TemplateView):
 
     def get_cards(self):
         return self.cards.copy()
-
-    def render_card(self, card: "Card"):
-        """Render card as a subview"""
-        # response = card.as_view()(self.request)
-        # response.render()
-        # content = response.content.decode()
-        return card().render(self, self.request)
 
 
 class StaffListView(HTMXViewMixin, StaffView):

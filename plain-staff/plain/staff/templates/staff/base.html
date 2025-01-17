@@ -137,9 +137,7 @@
         <div class="px-4 mt-5 lg:px-8">
             <div class="grid grid-cols-1 gap-6 mt-4 sm:grid-cols-2 lg:grid-cols-4">
                 {% for card in cards %}
-                <section class="col-span-{{ card.size.value }}">
                     {{ render_card(card)|safe }}
-                </section>
                 {% endfor %}
             </div>
         </div>

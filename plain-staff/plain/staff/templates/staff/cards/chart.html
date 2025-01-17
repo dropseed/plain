@@ -4,11 +4,22 @@
 <canvas id="card-chart-{{ slug }}"></canvas>
 {{ chart_data|json_script(slug) }}
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('card-chart-{{ slug }}');
+  (function() {
+    function renderChart() {
+      const ctx = document.getElementById('card-chart-{{ slug }}');
 
-    const data = JSON.parse(document.getElementById('{{ slug }}').textContent);
-    new Chart(ctx, data);
-  });
+      const data = JSON.parse(document.getElementById('{{ slug }}').textContent);
+
+      if (ctx._chart) {
+        ctx._chart.destroy();
+      }
+
+      const chart = new Chart(ctx, data);
+      ctx._chart = chart;
+    }
+
+    document.addEventListener('DOMContentLoaded', renderChart);
+    document.addEventListener('htmx:afterSwap', renderChart);
+  })();
 </script>
 {% endblock %}

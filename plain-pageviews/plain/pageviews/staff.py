@@ -9,8 +9,8 @@ from plain.staff.views import (
 from .models import Pageview
 
 
-class DailyPageviewsCard(TrendCard):
-    title = "Daily pageviews"
+class PageviewsTrendCard(TrendCard):
+    title = "Pageviews trend"
     model = Pageview
     datetime_field = "timestamp"
     size = TrendCard.Sizes.FULL
@@ -24,7 +24,7 @@ class PageviewStaff(StaffModelViewset):
         title = "Pageviews"
         fields = ["user_id", "url", "timestamp", "session_key"]
         search_fields = ["pk", "user_id", "url", "session_key"]
-        cards = [DailyPageviewsCard]
+        cards = [PageviewsTrendCard]
 
     class DetailView(StaffModelDetailView):
         model = Pageview

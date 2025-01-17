@@ -1,11 +1,30 @@
-{% block header %}
-<header>
-    <h2 class="text-sm font-semibold">{{ title }}</h2>
+<section
+    id="card-{{ slug }}"
+    hx-target="this"
+    hx-select="#card-{{ slug }}"
+    hx-swap="outerHTML"
+    class="col-span-{{ size.value }}">
+    {% block header %}
+    <header class="flex justify-between items-center">
+        <div>
+            <h2 class="text-sm font-semibold">{{ title }}</h2>
+            {% if description %}<p class="mt-1 text-xs text-gray-500">{{ description }}</p>{% endif %}
+        </div>
 
-    {% if description %}<p class="mt-1 text-xs text-gray-500">{{ description }}</p>{% endif %}
-</header>
-{% endblock %}
+        {% if displays %}
+        <select
+            hx-get
+            name="{{ slug }}.display"
+            class="text-sm border-gray-200 rounded-md">
+            <option value="">(Reset to default)</option>
+            {% for display in displays %}
+            <option {% if display == current_display %}selected{% endif %}>{{ display }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+    </header>
+    {% endblock %}
 
-<div>
-{% block content %}{% endblock %}
-</div>
+    <div>
+    {% block content %}{% endblock %}
+</section>

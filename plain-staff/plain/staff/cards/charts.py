@@ -1,15 +1,11 @@
-import enum
 from collections import defaultdict
 
 from plain.models import Count
 from plain.models.functions import (
     TruncDate,
     TruncMonth,
-    TruncQuarter,
-    TruncWeek,
-    TruncYear,
 )
-from plain.staff.dates import DatetimeRange, DatetimeRangeAliases
+from plain.staff.dates import DatetimeRangeAliases
 
 from .base import Card
 
@@ -34,22 +30,18 @@ class TrendCard(ChartCard):
 
     model = None
     datetime_field = None
-    datetime_range = DatetimeRangeAliases.SINCE_30_DAYS_AGO
+    default_display = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
-    class Buckets(enum.Enum):
-        DAY = "day"
-        WEEK = "week"
-        MONTH = "month"
-        QUARTER = "quarter"
-        YEAR = "year"
+    displays = DatetimeRangeAliases
 
-    bucket_by = Buckets.DAY
+    def get_description(self):
+        datetime_range = DatetimeRangeAliases.to_range(self.get_current_display())
+        return f"{datetime_range.start} to {datetime_range.end}"
 
-    def get_description(self) -> str:
-        return self.datetime_range.value
-
-    def get_trend_datetime_range(self) -> DatetimeRange:
-        return DatetimeRangeAliases.to_range(self.datetime_range)
+    def get_current_display(self):
+        if s := super().get_current_display():
+            return DatetimeRangeAliases.from_value(s)
+        return self.default_display
 
     def get_trend_data(self) -> list[int | float]:
         if not self.model or not self.datetime_field:
@@ -57,17 +49,16 @@ class TrendCard(ChartCard):
                 "model and datetime_field must be set, or get_values must be overridden"
             )
 
-        datetime_range = self.get_trend_datetime_range()
+        datetime_range = DatetimeRangeAliases.to_range(self.get_current_display())
 
         filter_kwargs = {f"{self.datetime_field}__range": datetime_range.as_tuple()}
 
-        truncator = {
-            self.Buckets.DAY: TruncDate,
-            self.Buckets.WEEK: TruncWeek,
-            self.Buckets.MONTH: TruncMonth,
-            self.Buckets.QUARTER: TruncQuarter,
-            self.Buckets.YEAR: TruncYear,
-        }[self.bucket_by]
+        if datetime_range.total_days() < 300:
+            truncator = TruncDate
+            iterator = datetime_range.iter_days
+        else:
+            truncator = TruncMonth
+            iterator = datetime_range.iter_months
 
         counts_by_date = (
             self.model.objects.filter(**filter_kwargs)
@@ -82,30 +73,46 @@ class TrendCard(ChartCard):
         for row in counts_by_date:
             date_values[row["chart_date"]] = row["chart_date_count"]
 
-        # Now get the filled data for our date range
-        iterator = {
-            self.Buckets.DAY: datetime_range.iter_days,
-            self.Buckets.WEEK: datetime_range.iter_weeks,
-            self.Buckets.MONTH: datetime_range.iter_months,
-            self.Buckets.QUARTER: datetime_range.iter_quarters,
-            self.Buckets.YEAR: datetime_range.iter_years,
-        }[self.bucket_by]
-        return [date_values[date] for date in iterator()]
-
-    def get_trend_labels(self) -> list[str]:
-        datetime_range = self.get_trend_datetime_range()
-        iterator = {
-            self.Buckets.DAY: datetime_range.iter_days,
-            self.Buckets.WEEK: datetime_range.iter_weeks,
-            self.Buckets.MONTH: datetime_range.iter_months,
-            self.Buckets.QUARTER: datetime_range.iter_quarters,
-            self.Buckets.YEAR: datetime_range.iter_years,
-        }[self.bucket_by]
-        return [date.strftime("%Y-%m-%d") for date in iterator()]
+        return {date.strftime("%Y-%m-%d"): date_values[date] for date in iterator()}
 
     def get_chart_data(self) -> dict:
-        trend_labels = self.get_trend_labels()
-        trend_data = self.get_trend_data()
+        data = self.get_trend_data()
+        trend_labels = list(data.keys())
+        trend_data = list(data.values())
+
+        def calculate_trend_line(data):
+            """
+            Calculate a trend line using basic linear regression.
+            :param data: A list of numeric values representing the y-axis.
+            :return: A list of trend line values (same length as data).
+            """
+            if not data or len(data) < 2:
+                return (
+                    data  # Return the data as-is if not enough points for a trend line
+                )
+
+            n = len(data)
+            x = list(range(n))
+            y = data
+
+            # Calculate the means of x and y
+            x_mean = sum(x) / n
+            y_mean = sum(y) / n
+
+            # Calculate the slope (m) and y-intercept (b) of the line: y = mx + b
+            numerator = sum((x[i] - x_mean) * (y[i] - y_mean) for i in range(n))
+            denominator = sum((x[i] - x_mean) ** 2 for i in range(n))
+            slope = numerator / denominator if denominator != 0 else 0
+            intercept = y_mean - slope * x_mean
+
+            # Calculate the trend line values
+            trend = [slope * xi + intercept for xi in x]
+
+            # if it's all zeros, return nothing
+            if all(v == 0 for v in trend):
+                return []
+
+            return trend
 
         return {
             "type": "bar",
@@ -114,7 +121,15 @@ class TrendCard(ChartCard):
                 "datasets": [
                     {
                         "data": trend_data,
-                    }
+                    },
+                    {
+                        "data": calculate_trend_line(trend_data),
+                        "type": "line",
+                        "borderColor": "rgba(0, 0, 0, 0.3)",
+                        "borderWidth": 2,
+                        "fill": False,
+                        "pointRadius": 0,  # Optional: Hide points
+                    },
                 ],
             },
             # Hide the label

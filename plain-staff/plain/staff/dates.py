@@ -1,4 +1,5 @@
 import datetime
+from calendar import monthrange
 from enum import Enum
 
 from plain.utils import timezone
@@ -35,54 +36,74 @@ class DatetimeRangeAliases(Enum):
     # TODO doesn't include anything less than a day...
     # ex. SINCE_1_HOUR_AGO = "Since 1 Hour Ago"
 
+    def __str__(self):
+        return self.value
+
     @classmethod
-    def to_range(cls, value: str) -> (datetime.datetime, datetime.datetime):
+    def from_value(cls, value):
+        for member in cls:
+            if member.value == value:
+                return member
+        raise ValueError(f"{value} is not a valid value for {cls.__name__}")
+
+    @classmethod
+    def to_range(cls, value: str) -> tuple[datetime.datetime, datetime.datetime]:
         now = timezone.localtime()
-        start_of_week = now - datetime.timedelta(days=now.weekday())
-        start_of_month = now.replace(day=1)
-        start_of_quarter = now.replace(month=((now.month - 1) // 3) * 3 + 1, day=1)
-        start_of_year = now.replace(month=1, day=1)
+        start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_week = start_of_today - datetime.timedelta(
+            days=start_of_today.weekday()
+        )
+        start_of_month = start_of_today.replace(day=1)
+        start_of_quarter = start_of_today.replace(
+            month=((start_of_today.month - 1) // 3) * 3 + 1, day=1
+        )
+        start_of_year = start_of_today.replace(month=1, day=1)
+
+        def end_of_day(dt):
+            return dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        def end_of_month(dt):
+            last_day = monthrange(dt.year, dt.month)[1]
+            return end_of_day(dt.replace(day=last_day))
+
+        def end_of_quarter(dt):
+            end_month = ((dt.month - 1) // 3 + 1) * 3
+            return end_of_month(dt.replace(month=end_month))
+
+        def end_of_year(dt):
+            return end_of_month(dt.replace(month=12))
 
         if value == cls.TODAY:
-            return DatetimeRange(now, now)
+            return DatetimeRange(start_of_today, end_of_day(now))
         if value == cls.THIS_WEEK:
             return DatetimeRange(
-                start_of_week, start_of_week + datetime.timedelta(days=6)
+                start_of_week, end_of_day(start_of_week + datetime.timedelta(days=6))
             )
         if value == cls.THIS_WEEK_TO_DATE:
             return DatetimeRange(start_of_week, now)
         if value == cls.THIS_MONTH:
-            return DatetimeRange(
-                start_of_month, start_of_month + datetime.timedelta(days=31)
-            )
+            return DatetimeRange(start_of_month, end_of_month(start_of_month))
         if value == cls.THIS_MONTH_TO_DATE:
             return DatetimeRange(start_of_month, now)
         if value == cls.THIS_QUARTER:
-            return DatetimeRange(
-                start_of_quarter, start_of_quarter + datetime.timedelta(days=90)
-            )
+            return DatetimeRange(start_of_quarter, end_of_quarter(start_of_quarter))
         if value == cls.THIS_QUARTER_TO_DATE:
             return DatetimeRange(start_of_quarter, now)
         if value == cls.THIS_YEAR:
-            return DatetimeRange(
-                start_of_year,
-                start_of_year.replace(year=start_of_year.year + 1)
-                - datetime.timedelta(days=1),
-            )
+            return DatetimeRange(start_of_year, end_of_year(start_of_year))
         if value == cls.THIS_YEAR_TO_DATE:
             return DatetimeRange(start_of_year, now)
         if value == cls.LAST_WEEK:
+            last_week_start = start_of_week - datetime.timedelta(days=7)
             return DatetimeRange(
-                start_of_week - datetime.timedelta(days=7),
-                start_of_week - datetime.timedelta(days=1),
+                last_week_start,
+                end_of_day(last_week_start + datetime.timedelta(days=6)),
             )
         if value == cls.LAST_WEEK_TO_DATE:
             return DatetimeRange(start_of_week - datetime.timedelta(days=7), now)
         if value == cls.LAST_MONTH:
             last_month = (start_of_month - datetime.timedelta(days=1)).replace(day=1)
-            return DatetimeRange(
-                last_month, last_month.replace(day=1) + datetime.timedelta(days=31)
-            )
+            return DatetimeRange(last_month, end_of_month(last_month))
         if value == cls.LAST_MONTH_TO_DATE:
             last_month = (start_of_month - datetime.timedelta(days=1)).replace(day=1)
             return DatetimeRange(last_month, now)
@@ -90,9 +111,7 @@ class DatetimeRangeAliases(Enum):
             last_quarter = (start_of_quarter - datetime.timedelta(days=1)).replace(
                 day=1
             )
-            return DatetimeRange(
-                last_quarter, last_quarter + datetime.timedelta(days=90)
-            )
+            return DatetimeRange(last_quarter, end_of_quarter(last_quarter))
         if value == cls.LAST_QUARTER_TO_DATE:
             last_quarter = (start_of_quarter - datetime.timedelta(days=1)).replace(
                 day=1
@@ -100,7 +119,7 @@ class DatetimeRangeAliases(Enum):
             return DatetimeRange(last_quarter, now)
         if value == cls.LAST_YEAR:
             last_year = start_of_year.replace(year=start_of_year.year - 1)
-            return DatetimeRange(last_year, start_of_year - datetime.timedelta(days=1))
+            return DatetimeRange(last_year, end_of_year(last_year))
         if value == cls.LAST_YEAR_TO_DATE:
             last_year = start_of_year.replace(year=start_of_year.year - 1)
             return DatetimeRange(last_year, now)
@@ -113,28 +132,24 @@ class DatetimeRangeAliases(Enum):
         if value == cls.SINCE_365_DAYS_AGO:
             return DatetimeRange(now - datetime.timedelta(days=365), now)
         if value == cls.NEXT_WEEK:
+            next_week_start = start_of_week + datetime.timedelta(days=7)
             return DatetimeRange(
-                start_of_week + datetime.timedelta(days=7),
-                start_of_week + datetime.timedelta(days=13),
+                next_week_start,
+                end_of_day(next_week_start + datetime.timedelta(days=6)),
             )
         if value == cls.NEXT_4_WEEKS:
-            return DatetimeRange(now, now + datetime.timedelta(days=28))
+            return DatetimeRange(now, end_of_day(now + datetime.timedelta(days=28)))
         if value == cls.NEXT_MONTH:
             next_month = (start_of_month + datetime.timedelta(days=31)).replace(day=1)
-            return DatetimeRange(next_month, next_month + datetime.timedelta(days=31))
+            return DatetimeRange(next_month, end_of_month(next_month))
         if value == cls.NEXT_QUARTER:
             next_quarter = (start_of_quarter + datetime.timedelta(days=90)).replace(
                 day=1
             )
-            return DatetimeRange(
-                next_quarter, next_quarter + datetime.timedelta(days=90)
-            )
+            return DatetimeRange(next_quarter, end_of_quarter(next_quarter))
         if value == cls.NEXT_YEAR:
             next_year = start_of_year.replace(year=start_of_year.year + 1)
-            return DatetimeRange(
-                next_year,
-                next_year.replace(year=next_year.year + 1) - datetime.timedelta(days=1),
-            )
+            return DatetimeRange(next_year, end_of_year(next_year))
         raise ValueError(f"Invalid range: {value}")
 
 
@@ -149,12 +164,16 @@ class DatetimeRange:
         if isinstance(self.end, str) and self.end:
             self.end = datetime.datetime.fromisoformat(self.end)
 
-        if isinstance(self.start, datetime.date):
+        if isinstance(self.start, datetime.date) and not isinstance(
+            self.start, datetime.datetime
+        ):
             self.start = timezone.localtime().replace(
                 year=self.start.year, month=self.start.month, day=self.start.day
             )
 
-        if isinstance(self.end, datetime.date):
+        if isinstance(self.end, datetime.date) and not isinstance(
+            self.start, datetime.datetime
+        ):
             self.end = timezone.localtime().replace(
                 year=self.end.year, month=self.end.month, day=self.end.day
             )
