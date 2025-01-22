@@ -3,6 +3,8 @@ import importlib
 import os
 import sys
 
+import click
+
 from plain.models.fields import NOT_PROVIDED
 from plain.packages import packages
 from plain.utils import timezone
@@ -88,40 +90,24 @@ class MigrationQuestioner:
 
 
 class InteractiveMigrationQuestioner(MigrationQuestioner):
-    def __init__(
-        self, defaults=None, specified_packages=None, dry_run=None, prompt_output=None
-    ):
+    def __init__(self, defaults=None, specified_packages=None, dry_run=None):
         super().__init__(
             defaults=defaults, specified_packages=specified_packages, dry_run=dry_run
         )
-        self.prompt_output = prompt_output or sys.stdout
 
     def _boolean_input(self, question, default=None):
-        self.prompt_output.write(f"{question} ", ending="")
-        result = input()
-        if not result and default is not None:
-            return default
-        while not result or result[0].lower() not in "yn":
-            self.prompt_output.write("Please answer yes or no: ", ending="")
-            result = input()
-        return result[0].lower() == "y"
+        return click.confirm(question, default=default)
 
     def _choice_input(self, question, choices):
-        self.prompt_output.write(f"{question}")
-        for i, choice in enumerate(choices):
-            self.prompt_output.write(f" {i + 1}) {choice}")
-        self.prompt_output.write("Select an option: ", ending="")
-        result = input()
-        while True:
-            try:
-                value = int(result)
-            except ValueError:
-                pass
-            else:
-                if 0 < value <= len(choices):
-                    return value
-            self.prompt_output.write("Please select a valid option: ", ending="")
-            result = input()
+        choice_map = {str(i + 1): choice for i, choice in enumerate(choices)}
+        choice_map_str = "\n".join(
+            [f"{i}) {choice}" for i, choice in choice_map.items()]
+        )
+        choice = click.prompt(
+            f"{question}\n{choice_map_str}\nSelect an option",
+            type=click.Choice(choice_map.keys()),
+        )
+        return int(choice)
 
     def _ask_default(self, default=""):
         """
@@ -131,28 +117,27 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         string) which will be shown to the user and used as the return value
         if the user doesn't provide any other input.
         """
-        self.prompt_output.write("Please enter the default value as valid Python.")
+        click.echo("Please enter the default value as valid Python.")
         if default:
-            self.prompt_output.write(
+            click.echo(
                 f"Accept the default '{default}' by pressing 'Enter' or "
                 f"provide another value."
             )
-        self.prompt_output.write(
+        click.echo(
             "The datetime and plain.utils.timezone modules are available, so "
             "it is possible to provide e.g. timezone.now as a value."
         )
-        self.prompt_output.write("Type 'exit' to exit this prompt")
+        click.echo("Type 'exit' to exit this prompt")
         while True:
             if default:
                 prompt = f"[default: {default}] >>> "
             else:
                 prompt = ">>> "
-            self.prompt_output.write(prompt, ending="")
-            code = input()
+            code = click.prompt(prompt, default=default, show_default=False)
             if not code and default:
                 code = default
             if not code:
-                self.prompt_output.write(
+                click.echo(
                     "Please enter some code, or 'exit' (without quotes) to exit."
                 )
             elif code == "exit":
@@ -161,7 +146,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 try:
                     return eval(code, {}, {"datetime": datetime, "timezone": timezone})
                 except (SyntaxError, NameError) as e:
-                    self.prompt_output.write(f"Invalid input: {e}")
+                    click.echo(f"Invalid input: {e}")
 
     def ask_not_null_addition(self, field_name, model_name):
         """Adding a NOT NULL field to a model."""
@@ -216,7 +201,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
 
     def ask_rename(self, model_name, old_name, new_name, field_instance):
         """Was this field really renamed?"""
-        msg = "Was %s.%s renamed to %s.%s (a %s)? [y/N]"
+        msg = "Was %s.%s renamed to %s.%s (a %s)?"
         return self._boolean_input(
             msg
             % (
@@ -226,12 +211,12 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 new_name,
                 field_instance.__class__.__name__,
             ),
-            False,
+            default=False,
         )
 
     def ask_rename_model(self, old_model_state, new_model_state):
         """Was this model really renamed?"""
-        msg = "Was the model %s.%s renamed to %s? [y/N]"
+        msg = "Was the model %s.%s renamed to %s?"
         return self._boolean_input(
             msg
             % (
@@ -239,7 +224,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 old_model_state.name,
                 new_model_state.name,
             ),
-            False,
+            default=False,
         )
 
     def ask_merge(self, package_label):
@@ -247,9 +232,9 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
             (
                 "\nMerging will only work if the operations printed above do not conflict\n"
                 "with each other (working on different fields or models)\n"
-                "Should these migration branches be merged? [y/N]"
+                "Should these migration branches be merged?"
             ),
-            False,
+            default=False,
         )
 
     def ask_auto_now_add_addition(self, field_name, model_name):
