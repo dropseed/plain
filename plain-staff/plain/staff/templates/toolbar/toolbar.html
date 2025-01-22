@@ -1,7 +1,7 @@
 {% if toolbar.should_render() %}
 {% set exception=toolbar.request_exception() %}
 <script src="{{ asset('toolbar/toolbar.js') }}"></script>
-<div id="plaintoolbar" class="text-sm py-1.5 text-stone-300 bg-stone-950 fixed bottom-3 mx-3 max-w-full drop-shadow-md z-30 rounded-2xl lg:flex lg:flex-col -translate-x-1/2 left-1/2">
+<div id="plaintoolbar" class="text-sm py-1.5 text-stone-300 bg-stone-950 fixed bottom-3 mx-3 max-w-full drop-shadow-md z-30 rounded-2xl lg:flex lg:flex-col -translate-x-1/2 left-1/2 max-h-[90vh]">
     <div class="flex justify-between px-4 mx-auto space-x-4">
         <div class="flex items-center">
             <svg class="h-4 w-4" width="160" height="125" viewBox="0 0 160 125" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -36,7 +36,7 @@
             </div>
         </div>
     </div>
-    <div id="plaintoolbar-details" class="{% if not exception %}hidden{% endif %} p-4 text-sm space-y-2">
+    <div id="plaintoolbar-details" class="{% if not exception %}hidden{% endif %} p-4 overflow-auto text-sm space-y-2">
 
         {% if exception %}
         <div class="p-2 border-amber-500 border rounded">
