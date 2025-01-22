@@ -24,7 +24,7 @@ class LoginRequired(Exception):
 class AuthViewMixin:
     login_required = True
     staff_required = False
-    login_url = None
+    login_url = settings.AUTH_LOGIN_URL
 
     def check_auth(self) -> None:
         """
@@ -61,24 +61,27 @@ class AuthViewMixin:
         try:
             self.check_auth()
         except LoginRequired as e:
-            # Ideally this could be handled elsewhere... like PermissionDenied
-            # also seems like this code is used multiple places anyway...
-            # could be easier to get redirect query param
-            path = self.request.build_absolute_uri()
-            resolved_login_url = reverse(e.login_url)
-            # If the login url is the same scheme and net location then use the
-            # path as the "next" url.
-            login_scheme, login_netloc = urlparse(resolved_login_url)[:2]
-            current_scheme, current_netloc = urlparse(path)[:2]
-            if (not login_scheme or login_scheme == current_scheme) and (
-                not login_netloc or login_netloc == current_netloc
-            ):
-                path = self.request.get_full_path()
-            return redirect_to_login(
-                path,
-                resolved_login_url,
-                e.redirect_field_name,
-            )
+            if self.login_url:
+                # Ideally this could be handled elsewhere... like PermissionDenied
+                # also seems like this code is used multiple places anyway...
+                # could be easier to get redirect query param
+                path = self.request.build_absolute_uri()
+                resolved_login_url = reverse(e.login_url)
+                # If the login url is the same scheme and net location then use the
+                # path as the "next" url.
+                login_scheme, login_netloc = urlparse(resolved_login_url)[:2]
+                current_scheme, current_netloc = urlparse(path)[:2]
+                if (not login_scheme or login_scheme == current_scheme) and (
+                    not login_netloc or login_netloc == current_netloc
+                ):
+                    path = self.request.get_full_path()
+                return redirect_to_login(
+                    path,
+                    resolved_login_url,
+                    e.redirect_field_name,
+                )
+            else:
+                raise PermissionDenied("Login required")
 
         return super().get_response()  # type: ignore
 
