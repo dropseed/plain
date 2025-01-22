@@ -115,7 +115,7 @@ wheels = [
 
 [[package]]
 name = "plain-api"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "plain" },
@@ -123,7 +123,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-models" },
+    { name = "plain-auth" },
     { name = "plain-pytest" },
 ]
 
@@ -132,27 +132,39 @@ requires-dist = [{ name = "plain", specifier = "<1.0.0" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "plain-models", editable = "../plain-models" },
+    { name = "plain-auth", editable = "../plain-auth" },
     { name = "plain-pytest", editable = "../plain-pytest" },
 ]
 
 [[package]]
-name = "plain-models"
-version = "0.11.1"
-source = { editable = "../plain-models" }
+name = "plain-auth"
+version = "0.3.1"
+source = { editable = "../plain-auth" }
 dependencies = [
     { name = "plain" },
-    { name = "sqlparse" },
+    { name = "plain-models" },
+    { name = "plain-sessions" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", specifier = "<1.0.0" },
-    { name = "sqlparse", specifier = ">=0.3.1" },
+    { name = "plain-models", specifier = "<1.0.0" },
+    { name = "plain-sessions", specifier = "<1.0.0" },
 ]
 
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "../plain-pytest" }]
+[[package]]
+name = "plain-models"
+version = "0.11.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "plain" },
+    { name = "sqlparse" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e5/93/25618aed5eda2f26e55268273f065e4914cd6efddf523dedcb80e7f77dc9/plain_models-0.11.1.tar.gz", hash = "sha256:292bb64c6a93ef28c4ade764db6a421afd7626b101f0b302ab6b401ce2870003", size = 391913 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/43/3728df24062b51e41a8b6a6acb6c7faeb522f0160fc34eb7f543208af692/plain_models-0.11.1-py3-none-any.whl", hash = "sha256:f7510354b372f0e998fefc7112e483d73d0436046dcb61455867be7a31264257", size = 439851 },
+]
 
 [[package]]
 name = "plain-pytest"
@@ -171,6 +183,18 @@ requires-dist = [
     { name = "plain", specifier = "<1.0.0" },
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "python-dotenv", specifier = "~=1.0.0" },
+]
+
+[[package]]
+name = "plain-sessions"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "plain" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/24/9f/dd7ee85aeca3e2d35d025644006547c7febf4e6b9827ae838df0f63ac9a6/plain_sessions-0.7.0.tar.gz", hash = "sha256:580d8a90cb9272870a41a65c0d4f5b609d1fb10c721ea73ab47a9397e02d5e68", size = 16587 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/e5/d50308b1039cd3573a5b03464021e521390c172c09d84ebf547dcc5ca024/plain_sessions-0.7.0-py3-none-any.whl", hash = "sha256:ad12acb6ae587abd187c57c59bca711ebdb895781a01c1eac42aea335f19c232", size = 13610 },
 ]
 
 [[package]]
