@@ -125,22 +125,7 @@ class OpenAPISchema(dict):
 
         operations = {}
 
-        known_http_method_names = [
-            "get",
-            "post",
-            "put",
-            "patch",
-            "delete",
-            # Don't care about these ones...
-            # "head",
-            # "options",
-            # "trace",
-        ]
-
-        for method in known_http_method_names:
-            if not hasattr(view_class, method):
-                continue
-
+        for method in view_class.allowed_http_methods:
             if responses := self.responses_from_class_method(view_class, method):
                 operations[method] = {
                     "responses": responses,

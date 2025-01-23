@@ -19,6 +19,18 @@ class View:
     url_args: tuple
     url_kwargs: dict
 
+    # By default, any of these are allowed if a method is defined for it.
+    allowed_http_methods = [
+        "get",
+        "post",
+        "put",
+        "patch",
+        "delete",
+        "head",
+        "options",
+        "trace",
+    ]
+
     def __init__(self, *args, **kwargs) -> None:
         # Views can customize their init, which receives
         # the args and kwargs from as_view()
@@ -57,7 +69,7 @@ class View:
 
         handler = getattr(self, self.request.method.lower(), None)
 
-        if not handler:
+        if not handler or self.request.method.lower() not in self.allowed_http_methods:
             logger.warning(
                 "Method Not Allowed (%s): %s",
                 self.request.method,
@@ -100,14 +112,4 @@ class View:
         return response
 
     def _allowed_methods(self) -> list[str]:
-        known_http_method_names = [
-            "get",
-            "post",
-            "put",
-            "patch",
-            "delete",
-            "head",
-            "options",
-            "trace",
-        ]
-        return [m.upper() for m in known_http_method_names if hasattr(self, m)]
+        return [m.upper() for m in self.allowed_http_methods if hasattr(self, m)]

@@ -72,6 +72,9 @@ class APIAuthViewMixin(AuthViewMixin):
 
 
 class APIBaseView(View):
+    # Empty by default, so you need to specifically enable the methods you want.
+    allowed_http_methods = []
+
     form_class: type["BaseForm"] | None = None
 
     def object_to_dict(self, obj):  # Intentionally untyped
