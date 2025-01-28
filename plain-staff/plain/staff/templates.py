@@ -16,7 +16,7 @@ class ToolbarExtension(InclusionTagExtension):
             cls = import_string(settings.TOOLBAR_CLASS)
         else:
             cls = settings.TOOLBAR_CLASS
-        context.vars["toolbar"] = cls(request=context.get("request"))
+        context.vars["toolbar"] = cls(request=context["request"])
         return context
 
 
