@@ -27,6 +27,10 @@ class PagesRegistry:
                 url_path = os.path.splitext(relative_path)[0]
                 absolute_path = os.path.join(root, file)
 
+                # Skip template files
+                if ".template." in absolute_path:
+                    continue
+
                 if os.path.basename(url_path) == "index":
                     url_path = os.path.dirname(url_path)
 
