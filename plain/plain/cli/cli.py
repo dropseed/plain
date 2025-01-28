@@ -1,9 +1,9 @@
 import importlib
-import json
 import os
 import shutil
 import subprocess
 import sys
+import tomllib
 import traceback
 from importlib.metadata import entry_points
 from importlib.util import find_spec
@@ -292,22 +292,23 @@ def compile(keep_original, fingerprint, compress):
         result = entry_point.load()()
         print()
 
-    # TODO also look in [tool.plain.compile.run]
+    pyproject_path = plain.runtime.APP_PATH.parent / "pyproject.toml"
+    if pyproject_path.exists():
+        with pyproject_path.open("rb") as f:
+            pyproject = tomllib.load(f)
 
-    # Run a "compile" script from package.json automatically
-    package_json = Path("package.json")
-    if package_json.exists():
-        with package_json.open() as f:
-            package = json.load(f)
-
-        if package.get("scripts", {}).get("compile"):
-            click.secho("Running `npm run compile`", bold=True)
-            result = subprocess.run(["npm", "run", "compile"])
+        for name, data in (
+            pyproject.get("tool", {})
+            .get("plain", {})
+            .get("compile", {})
+            .get("run", {})
+            .items()
+        ):
+            click.secho(f"Running {name} from pyproject.toml", bold=True)
+            result = subprocess.run(data["cmd"], shell=True)
             print()
             if result.returncode:
-                click.secho(
-                    f"Error in `npm run compile` (exit {result.returncode})", fg="red"
-                )
+                click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)
 
     # Compile our assets
