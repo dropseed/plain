@@ -28,8 +28,11 @@ class AssetView(View):
     This class could be subclassed to further tweak the responses or behavior.
     """
 
+    def get_url_path(self):
+        return self.url_kwargs["path"]
+
     def get(self):
-        url_path = self.url_kwargs["path"]
+        url_path = self.get_url_path()
 
         # Make a trailing slash work, but we don't expect it
         url_path = url_path.rstrip("/")
