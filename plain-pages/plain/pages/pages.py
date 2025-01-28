@@ -81,7 +81,12 @@ class Page:
         if os.path.basename(url_path) == "index":
             url_path = os.path.dirname(url_path)
 
-        return url_path + "/"  # With trailing slash
+        # The root url should stay an empty string
+        if not url_path:
+            return ""
+
+        # Everything else should get a trailing slash
+        return url_path + "/"
 
     def get_template_name(self):
         if template_name := self.vars.get("template_name"):
