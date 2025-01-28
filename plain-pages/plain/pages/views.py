@@ -32,6 +32,7 @@ class PageView(PageViewMixin, TemplateView):
     def get_template_context(self):
         context = super().get_template_context()
         context["page"] = self.page
+        self.page.set_template_context(context)  # Pass the standard context through
         return context
 
 

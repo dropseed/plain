@@ -12,6 +12,10 @@ class Page:
     def __init__(self, relative_path, absolute_path):
         self.relative_path = relative_path
         self.absolute_path = absolute_path
+        self._template_context = {}
+
+    def set_template_context(self, context):
+        self._template_context = context
 
     @cached_property
     def _frontmatter(self):
@@ -34,7 +38,7 @@ class Page:
 
         if not self.vars.get("render_plain", False):
             template = Template(os.path.join("pages", self.relative_path))
-            content = template.render({})
+            content = template.render(self._template_context)
             # Strip the frontmatter again, since it was in the template file itself
             _, content = frontmatter.parse(content)
 
