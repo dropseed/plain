@@ -9,8 +9,7 @@ from .markdown import render_markdown
 
 
 class Page:
-    def __init__(self, url_path, relative_path, absolute_path):
-        self.url_path = url_path
+    def __init__(self, relative_path, absolute_path):
         self.relative_path = relative_path
         self.absolute_path = absolute_path
 
@@ -39,30 +38,64 @@ class Page:
             # Strip the frontmatter again, since it was in the template file itself
             _, content = frontmatter.parse(content)
 
-        if self.content_type == "markdown":
+        if self.is_markdown():
             content = render_markdown(content)
 
         return content
 
-    @property
-    def content_type(self):
+    def is_markdown(self):
         extension = os.path.splitext(self.absolute_path)[1]
+        return extension == ".md"
 
-        # Explicitly define the known content types that we intend to handle
-        # (others will still pass through)
-        if extension == ".md":
-            return "markdown"
+    def is_template(self):
+        return ".template." in os.path.basename(self.absolute_path)
 
-        if extension == ".html":
-            return "html"
+    def is_asset(self):
+        extension = os.path.splitext(self.absolute_path)[1]
+        return extension.lower() in (
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",
+            ".svg",
+            ".js",
+            ".css",
+            ".ico",
+        )
 
-        if extension == ".redirect":
-            return "redirect"
+    def is_redirect(self):
+        extension = os.path.splitext(self.absolute_path)[1]
+        return extension == ".redirect"
 
-        return extension.lstrip(".")
+    def get_url_path(self) -> str | None:
+        if self.is_template():
+            return None
+
+        if self.is_asset():
+            return self.relative_path
+
+        url_path = os.path.splitext(self.relative_path)[0]
+
+        # If it's an index.html or something, the url is the parent dir
+        if os.path.basename(url_path) == "index":
+            url_path = os.path.dirname(url_path)
+
+        return url_path + "/"  # With trailing slash
 
     def get_template_name(self):
         if template_name := self.vars.get("template_name"):
             return template_name
 
-        return f"{self.content_type}.html"
+        return ""
+
+    def get_view_class(self):
+        from .views import PageAssetView, PageRedirectView, PageView
+
+        if self.is_redirect():
+            return PageRedirectView
+
+        if self.is_asset():
+            return PageAssetView
+
+        return PageView

@@ -1,14 +1,13 @@
+from plain.assets.views import AssetView
 from plain.http import Http404, ResponsePermanentRedirect, ResponseRedirect
 from plain.utils.functional import cached_property
-from plain.views import TemplateView
+from plain.views import TemplateView, View
 
 from .exceptions import PageNotFoundError, RedirectPageError
 from .registry import registry
 
 
-class PageView(TemplateView):
-    template_name = "page.html"
-
+class PageViewMixin:
     @cached_property
     def page(self):
         # Passed manually by the kwargs in the path definition
@@ -18,6 +17,10 @@ class PageView(TemplateView):
             return registry.get_page(url_path)
         except PageNotFoundError:
             raise Http404()
+
+
+class PageView(PageViewMixin, TemplateView):
+    template_name = "page.html"
 
     def get_template_names(self) -> list[str]:
         """
@@ -31,18 +34,29 @@ class PageView(TemplateView):
         context["page"] = self.page
         return context
 
+
+class PageRedirectView(PageViewMixin, View):
     def get(self):
-        if self.page.content_type == "redirect":
-            url = self.page.vars.get("url")
+        # Passed manually by the kwargs in the path definition
+        url_path = self.url_kwargs.get("url_path", "index")
 
-            if not url:
-                raise RedirectPageError(
-                    f"Redirect page {self.page.url_path} is missing a url"
-                )
+        url = self.page.vars.get("url")
 
-            if self.page.vars.get("temporary", True):
-                return ResponseRedirect(url)
-            else:
-                return ResponsePermanentRedirect(url)
+        if not url:
+            raise RedirectPageError(f"Redirect page {url_path} is missing a url")
 
-        return super().get()
+        if self.page.vars.get("temporary", True):
+            return ResponseRedirect(url)
+        else:
+            return ResponsePermanentRedirect(url)
+
+
+class PageAssetView(PageViewMixin, AssetView):
+    def get_url_path(self):
+        return self.url_kwargs["url_path"]
+
+    def get_asset_path(self, path):
+        return self.page.absolute_path
+
+    def get_debug_asset_path(self, path):
+        return self.page.absolute_path
