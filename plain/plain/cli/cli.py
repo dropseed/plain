@@ -287,11 +287,7 @@ def compile(keep_original, fingerprint, compress):
         )
         sys.exit(1)
 
-    for entry_point in entry_points(group="plain.assets.compile"):
-        click.secho(f"Running {entry_point.name}", bold=True)
-        result = entry_point.load()()
-        print()
-
+    # Run user-defined compile commands first
     pyproject_path = plain.runtime.APP_PATH.parent / "pyproject.toml"
     if pyproject_path.exists():
         with pyproject_path.open("rb") as f:
@@ -310,6 +306,12 @@ def compile(keep_original, fingerprint, compress):
             if result.returncode:
                 click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)
+
+    # Then run installed package compile steps (like tailwind, typically should run last...)
+    for entry_point in entry_points(group="plain.assets.compile"):
+        click.secho(f"Running {entry_point.name}", bold=True)
+        result = entry_point.load()()
+        print()
 
     # Compile our assets
     target_dir = get_compiled_path()
