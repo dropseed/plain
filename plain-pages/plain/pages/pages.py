@@ -8,6 +8,10 @@ from plain.utils.functional import cached_property
 from .markdown import render_markdown
 
 
+class PageRenderError(Exception):
+    pass
+
+
 class Page:
     def __init__(self, relative_path, absolute_path):
         self.relative_path = relative_path
@@ -38,7 +42,13 @@ class Page:
 
         if not self.vars.get("render_plain", False):
             template = Template(os.path.join("pages", self.relative_path))
-            content = template.render(self._template_context)
+
+            try:
+                content = template.render(self._template_context)
+            except Exception as e:
+                # Throw our own error so we don't get shadowed by the Jinja error
+                raise PageRenderError(f"Error rendering page {self.relative_path}: {e}")
+
             # Strip the frontmatter again, since it was in the template file itself
             _, content = frontmatter.parse(content)
 
