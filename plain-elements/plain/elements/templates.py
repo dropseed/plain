@@ -12,8 +12,13 @@ from plain.utils.functional import cached_property
 @register_template_extension
 class ElementsExtension(Extension):
     def preprocess(self, source, name, filename=None):
+        if not filename:
+            # Assume we want to use it...
+            return self.replace_template_element_tags(source)
+
         if os.path.splitext(filename)[1] in [".html", ".md"]:
             return self.replace_template_element_tags(source)
+
         return source
 
     @cached_property
