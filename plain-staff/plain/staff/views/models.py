@@ -106,7 +106,10 @@ class StaffModelListView(StaffListView):
         return queryset
 
     def get_field_value(self, obj, field: str):
-        return get_model_field(obj, field)
+        try:
+            return super().get_field_value(obj, field)
+        except AttributeError:
+            return get_model_field(obj, field)
 
     def get_field_value_template(self, obj, field: str, value):
         templates = super().get_field_value_template(obj, field, value)
@@ -140,7 +143,10 @@ class StaffModelDetailView(StaffDetailView):
         return context
 
     def get_field_value(self, obj, field: str):
-        return get_model_field(obj, field)
+        try:
+            return super().get_field_value(obj, field)
+        except AttributeError:
+            return get_model_field(obj, field)
 
     def get_object(self):
         return self.model.objects.get(pk=self.url_kwargs["pk"])

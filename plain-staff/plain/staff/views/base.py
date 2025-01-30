@@ -244,9 +244,12 @@ class StaffListView(HTMXViewMixin, StaffView):
         return self.displays.copy()  # Avoid mutating the class attribute itself
 
     def get_field_value(self, obj, field: str):
-        # Try basic dict lookup first
-        if field in obj:
-            return obj[field]
+        try:
+            # Try basic dict lookup first
+            if field in obj:
+                return obj[field]
+        except TypeError:
+            pass
 
         # Try dot notation
         if "." in field:
@@ -254,7 +257,13 @@ class StaffListView(HTMXViewMixin, StaffView):
             return self.get_field_value(obj[field], subfield)
 
         # Try regular object attribute
-        return getattr(obj, field)
+        attr = getattr(obj, field)
+
+        # Call if it's callable
+        if callable(attr):
+            return attr()
+        else:
+            return attr
 
     def get_object_pk(self, obj):
         try:
