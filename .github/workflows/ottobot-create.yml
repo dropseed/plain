@@ -3,6 +3,7 @@ name: ottobot-create
 on:
   schedule:
     - cron: "0 20 * * *"  # 2pm Central (20:00 UTC)
+  workflow_dispatch: {}
 
 jobs:
   create-pr:
