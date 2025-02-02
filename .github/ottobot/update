@@ -16,5 +16,6 @@ files=$(git diff --name-only HEAD^ HEAD)
 uvx --from aider-chat aider \
     -c ./.github/ottobot/aider.yml \
     --restore-chat-history \
+    --yes-always \
     --message "$instructions $comment" \
     $files
