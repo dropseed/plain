@@ -15,10 +15,15 @@ compile_readme() {
     code_base_dir=$(dirname "$code_readme")
 
     # support ../ and other paths...
-
-    # Find and replace any "](./" markdown links and replace with a full github.com url
     docs_url="https://plainframework.com/docs"
-    sed -i '' -e "s#](\./\([^)]*\))#]($docs_url/$code_base_dir/\1)#g" "$package_readme"
+
+    if [ "$(uname)" = "Darwin" ]; then
+        SED_CMD=(sed -i '' -e)
+    else
+        SED_CMD=(sed -i -e)
+    fi
+
+    "${SED_CMD[@]}" "s#](\./\([^)]*\))#]($docs_url/$code_base_dir/\1)#g" "$package_readme"
 }
 
 compile_readme "plain/README.md" "plain/plain/README.md"
