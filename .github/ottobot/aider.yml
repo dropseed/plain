@@ -2,8 +2,8 @@ model: o1-preview
 editor-model: o1-preview
 weak-model: o1-mini
 map-tokens: 8192
-input-history-file: .github/ottobot/.aider.input.history
-chat-history-file: .github/ottobot/.aider.chat.history.md
+input-history-file: .github/ottobot/.cache/.aider.input.history
+chat-history-file: .github/ottobot/.cache/.aider.chat.history.md
 commit-prompt: |
   You are an expert software engineer that generates concise, \
   one-line Git commit messages based on the provided diffs.

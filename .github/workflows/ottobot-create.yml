@@ -27,14 +27,21 @@ jobs:
           git checkout -b "$BRANCH"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
+      # Cache aider cache, input, and chat history files for this branch
+      # - name: Cache Aider cache, input, and chat history files
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: .aider.tags.cache.v3
+      #     key:
+
       - name: Run ottobot/create script
         run: ./.github/ottobot/create
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Run compile-readme script and commit changes
+      - name: Run compile-readmes script and commit changes
         run: |
-          ./scripts/compile-readme
+          ./scripts/compile-readmes
           git add .
           git commit -m "Compile updated READMEs"
 
