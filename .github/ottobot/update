@@ -1,4 +1,4 @@
-#/bin/sh -e
+#/bin/bash -e
 
 comment="$1"
 instructions=$(cat << 'EOF'
@@ -11,7 +11,7 @@ EOF
 )
 
 # Get the files modified in the previous commit
-files=$(git diff --name-only HEAD^ HEAD)
+files=$(git diff --name-only HEAD^ HEAD | grep /plain/)
 
 uvx --from aider-chat aider \
     -c ./.github/ottobot/aider.yml \

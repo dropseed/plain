@@ -52,4 +52,4 @@ jobs:
       - name: Create Pull Request
         run: |
           gh auth login --with-token < <(echo "${{ secrets.GITHUB_TOKEN }}")
-          gh pr create --fill --base main --head ${{ steps.create_branch.outputs.branch }}
+          gh pr create --fill-first --base main --head ${{ steps.create_branch.outputs.branch }} --label ottobot --reviewer davegaeddert
