@@ -1,0 +1,26 @@
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  update-pr:
+    if: ${{ github.event.review.state == 'changes_requested' && startsWith(github.event.pull_request.head.ref, 'ottobot-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run ottobot/update script with review comment
+        run: ./.github/ottobot/update "${{ github.event.review.body }}"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run compile-readme script and commit changes
+        run: |
+          ./scripts/compile-readme
+          git add .
+          git commit -m "Compile updated READMEs"
+
+      - name: Push branch
+        run: |
+          git push origin ${{ steps.create_branch.outputs.branch }}

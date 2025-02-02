@@ -1,0 +1,42 @@
+on:
+  schedule:
+    - cron: "0 20 * * *"  # 2pm Central (20:00 UTC)
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Git user
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+
+      - name: Create unique branch
+        id: create_branch
+        run: |
+          BRANCH="ottobot-$GITHUB_RUN_NUMBER"
+          git checkout -b "$BRANCH"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Run ottobot/create script
+        run: ./.github/ottobot/create
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run compile-readme script and commit changes
+        run: |
+          ./scripts/compile-readme
+          git add .
+          git commit -m "Compile updated READMEs"
+
+      - name: Push branch
+        run: |
+          git push origin ${{ steps.create_branch.outputs.branch }}
+
+      - name: Create Pull Request
+        run: |
+          gh auth login --with-token < <(echo "${{ secrets.GITHUB_TOKEN }}")
+          gh pr create --fill --base main --head ${{ steps.create_branch.outputs.branch }}

@@ -3,3 +3,20 @@
 # plain.password
 
 Password authentication for Plain.
+
+## Usage
+
+To enable password authentication in your Plain application, add the `PasswordLoginView` to your `urls.py`:
+
+```python
+# app/urls.py
+from plain.urls import path
+from plain.passwords.views import PasswordLoginView
+
+urlpatterns = [
+    path('login/', PasswordLoginView.as_view(), name='login'),
+    # ...
+]
+```
+
+This sets up a basic login view where users can authenticate using their username and password.

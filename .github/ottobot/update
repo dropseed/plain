@@ -1,0 +1,20 @@
+#/bin/sh -e
+
+comment="$1"
+instructions=$(cat << 'EOF'
+You are being given feedback by the user on the changes in your last commit.
+You should respond by making adjustments in a new commit.
+Don't change anything that isn't directly related to what is being asked.
+
+Review from the user:
+EOF
+)
+
+# Get the files modified in the previous commit
+files=$(git diff --name-only HEAD^ HEAD)
+
+uvx --from aider-chat aider \
+    -c ./.github/ottobot/aider.yml \
+    --restore-chat-history \
+    --message "$instructions $comment" \
+    $files

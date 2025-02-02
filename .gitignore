@@ -11,3 +11,6 @@ plain*/dist/
 
 # Test apps
 plain*/tests/.plain
+
+# Ottobot
+.aider*
