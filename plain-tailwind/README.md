@@ -118,3 +118,15 @@ If possible, you should add `static/dist/tailwind.css` to your `.gitignore` and 
 When you run `plain tailwind compile`, it will automatically check whether the Tailwind standalone CLI has been installed, and install it if it isn't.
 
 When using Plain on Heroku, we do this for you automatically in our [Plain buildpack](https://github.com/plainpackages/heroku-buildpack-plain/blob/master/bin/files/post_compile).
+
+## FAQs
+
+### How do I change the input and output paths for Tailwind CSS?
+
+By default, the input file is `static/src/tailwind.css` and the output file is `static/dist/tailwind.css`. If you need to use different paths, you can specify the `--input` and `--output` options when running the compile command:
+
+```sh
+plain tailwind compile --input path/to/your/input.css --output path/to/your/output.css
+```
+
+Remember to update your templates to reference the new output CSS file.
