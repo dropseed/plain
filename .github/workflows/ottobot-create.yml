@@ -43,7 +43,7 @@ jobs:
         run: |
           ./scripts/compile-readmes
           git add .
-          git commit -m "Compile updated READMEs"
+          git diff --quiet && git commit -m "Compile updated READMEs" || echo "No changes to commit."
 
       - name: Push branch
         run: |
