@@ -31,6 +31,5 @@ With the official Plain ecosystem packages you can:
 - Run tests with [pytest](https://plainframework.com/docs/plain-test/)
 - Run a [background job worker](https://plainframework.com/docs/plain-worker/)
 - Build [staff tooling and admin dashboards](https://plainframework.com/docs/plain-staff/)
-- Serve [static pages](https://plainframework.com/docs/plain-pages/) with dynamic content
 
 Learn more at [plainframework.com](https://plainframework.com).
