@@ -8,9 +8,7 @@ APP_ASSETS_DIR = APP_PATH / "assets"
 SKIP_ASSETS = (".DS_Store", ".gitignore")
 
 
-def find_assets():
-    assets_map = {}
-
+def iter_assets():
     class Asset:
         def __init__(self, *, url_path, absolute_path):
             self.url_path = url_path
@@ -19,7 +17,7 @@ def find_assets():
         def __str__(self):
             return self.url_path
 
-    def iter_directory(path):
+    def _iter_assets_dir(path):
         for root, _, files in os.walk(path):
             for f in files:
                 if f in SKIP_ASSETS:
@@ -28,14 +26,17 @@ def find_assets():
                 url_path = os.path.relpath(abs_path, path)
                 yield url_path, abs_path
 
+    for asset_dir in iter_asset_dirs():
+        for url_path, abs_path in _iter_assets_dir(asset_dir):
+            yield Asset(url_path=url_path, absolute_path=abs_path)
+
+
+def iter_asset_dirs():
     # Iterate the installed package assets, in order
     for pkg in packages.get_package_configs():
-        pkg_assets_dir = os.path.join(pkg.path, "assets")
-        for url_path, abs_path in iter_directory(pkg_assets_dir):
-            assets_map[url_path] = Asset(url_path=url_path, absolute_path=abs_path)
+        asset_dir = os.path.join(pkg.path, "assets")
+        if os.path.exists(asset_dir):
+            yield asset_dir
 
     # The app/assets take priority over everything
-    for url_path, abs_path in iter_directory(APP_ASSETS_DIR):
-        assets_map[url_path] = Asset(url_path=url_path, absolute_path=abs_path)
-
-    return assets_map
+    yield APP_ASSETS_DIR
