@@ -1,0 +1,25 @@
+[project]
+name = "plain.esbuild"
+version = "0.0.0"
+description = ""
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+license = "BSD-3-Clause"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "watchfiles>=1.0.4",
+]
+
+[project.entry-points."plain.dev"]
+"esbuild" = "plain.esbuild.entrypoints:run_dev_compile"
+
+[project.entry-points."plain.assets.compile"]
+"esbuild" = "plain.esbuild.entrypoints:run_compile"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
