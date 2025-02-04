@@ -23,9 +23,12 @@ class Dependency:
 
     @staticmethod
     def parse_version_from_url(url):
-        match = re.search(r"\d+\.\d+\.\d+", url)
-        if match:
+        if match := re.search(r"\d+\.\d+\.\d+", url):
             return match.group(0)
+
+        if match := re.search(r"\d+\.\d+", url):
+            return match.group(0)
+
         return ""
 
     def __str__(self):
@@ -102,8 +105,11 @@ class Dependency:
 
         vendored_path = self.vendor(response)
         self.installed = version
-        # If the exact version was in the string, replace it with {version} placeholder
-        self.url = self.url.replace(self.installed, "{version}")
+
+        if self.installed:
+            # If the exact version was in the string, replace it with {version} placeholder
+            self.url = self.url.replace(self.installed, "{version}")
+
         self.save_config()
         return vendored_path
 

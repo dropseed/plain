@@ -101,7 +101,7 @@ def add(url, name, sourcemap):
 
     dep = Dependency(name, url=url, sourcemap=sourcemap)
 
-    click.secho(f"Installing {dep.name}...", bold=True, nl=False)
+    click.secho(f"Installing {dep.name}", bold=True, nl=False)
 
     try:
         vendored_path = dep.update()
@@ -113,3 +113,9 @@ def add(url, name, sourcemap):
 
     click.secho(f" {dep.installed}", fg="green", nl=False)
     click.secho(f" -> {vendored_path}")
+
+    if not dep.installed:
+        click.secho(
+            "No version was parsed from the url. You can configure it manually if you need to.",
+            fg="yellow",
+        )
