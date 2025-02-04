@@ -11,6 +11,7 @@ def esbuild(input_path, output_path, *, minify=True):
     print(f"Building {os.path.relpath(input_path)} to {os.path.relpath(output_path)}")
 
     cmd = [
+        "npx",
         "esbuild",
         input_path,
         "--bundle",
