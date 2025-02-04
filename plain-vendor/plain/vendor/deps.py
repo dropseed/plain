@@ -13,6 +13,20 @@ from .exceptions import (
 VENDOR_DIR = APP_ASSETS_DIR / "vendor"
 
 
+def iter_next_version(version):
+    if len(version.split(".")) == 2:
+        major, minor = version.split(".")
+        yield f"{int(major) + 1}.0"
+        yield f"{major}.{int(minor) + 1}"
+    elif len(version.split(".")) == 3:
+        major, minor, patch = version.split(".")
+        yield f"{int(major) + 1}.0.0"
+        yield f"{major}.{int(minor) + 1}.0"
+        yield f"{major}.{minor}.{int(patch) + 1}"
+    else:
+        raise ValueError(f"Unable to iterate next version for {version}")
+
+
 class Dependency:
     def __init__(self, name, **config):
         self.name = name
@@ -83,21 +97,13 @@ class Dependency:
         else:
             version, response = try_version("latest")  # A lot of CDNs support this
             if not version:
-                # Try bumping semver major version
-                current_major = self.installed.split(".")[0]
-                version, response = try_version(f"{int(current_major) + 1}.0.0")
-            if not version:
-                # Try bumping semver minor version
-                current_minor = self.installed.split(".")[1]
-                version, response = try_version(
-                    f"{current_major}.{int(current_minor) + 1}.0"
-                )
-            if not version:
-                # Try bumping semver patch version
-                current_patch = self.installed.split(".")[2]
-                version, response = try_version(
-                    f"{current_major}.{current_minor}.{int(current_patch) + 1}"
-                )
+                # Try the next few versions
+                for v in iter_next_version(self.installed):
+                    version, response = try_version(v)
+                    if version:
+                        break
+
+                    # TODO ideally this would keep going -- if we move to 2.0, and no 3.0, try 2.1, 2.2, etc.
 
         if not version:
             # Use the currently installed version if we found nothing else
