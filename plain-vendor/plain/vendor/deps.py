@@ -56,7 +56,7 @@ class Dependency:
         response.raise_for_status()
 
         content_type = response.headers.get("content-type")
-        if content_type not in (
+        if content_type.lower() not in (
             "application/javascript; charset=utf-8",
             "text/javascript; charset=utf-8",
             "application/json; charset=utf-8",
