@@ -36,4 +36,4 @@ jobs:
 
       - name: Push branch
         run: |
-          git push origin HEAD:$GITHUB_HEAD_REF
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
