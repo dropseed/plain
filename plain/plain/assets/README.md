@@ -92,3 +92,18 @@ If you need the originals for any reason, you can use `plain compile --keep-orig
 ### What about source maps or imported css files?
 
 TODO
+# Tailwind CSS Configuration
+
+The input and output paths for Tailwind CSS are managed via the `TAILWIND_SRC_PATH` and `TAILWIND_DIST_PATH` settings in your `settings.py` file. By default, these settings are defined in `default_settings.py` of the `plain-tailwind` package.
+
+```python
+# settings.py
+
+# Path to your Tailwind source CSS file
+TAILWIND_SRC_PATH = "assets/css/tailwind.src.css"
+
+# Path where the compiled Tailwind CSS should be output
+TAILWIND_DIST_PATH = "assets/css/tailwind.css"
+```
+
+For default values and additional configuration, see `default_settings.py` in the `plain-tailwind` package.
