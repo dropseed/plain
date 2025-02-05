@@ -11,9 +11,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # Check out the branch that triggered the workflow
-      - run: git checkout ${{ github.event.pull_request.head.ref }}
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v2
