@@ -2,6 +2,7 @@ import sys
 import traceback
 
 from plain.runtime import settings
+from plain.urls.exceptions import Resolver404
 
 
 class Toolbar:
@@ -28,9 +29,8 @@ class Toolbar:
         # We can capture the exception currently being handled here, if any.
         exception = sys.exception()
 
-        if exception:
+        if exception and not isinstance(exception, Resolver404):
             exception._traceback_string = "".join(
                 traceback.format_tb(exception.__traceback__)
             )
-
-        return exception
+            return exception
