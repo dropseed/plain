@@ -20,7 +20,8 @@ jobs:
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
 
-      - run: git merge origin/main
+      # Rebase so we keep our changes on top of the latest main
+      - run: git rebase origin/main -X theirs
 
       - name: Install uv
         uses: astral-sh/setup-uv@v2
@@ -44,4 +45,4 @@ jobs:
           git add .
           git diff --quiet && git commit -m "Compile updated READMEs" || echo "No changes to commit."
 
-      - run: git push origin
+      - run: git push origin --force-with-lease ${{ github.event.pull_request.head.ref }}
