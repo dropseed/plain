@@ -7,7 +7,7 @@ from plain.runtime import settings
 class Toolbar:
     def __init__(self, request):
         self.request = request
-        self.version = "dev"
+        self.version = settings.TOOLBAR_VERSION
         self.metadata = {
             "Request ID": request.unique_id,
         }

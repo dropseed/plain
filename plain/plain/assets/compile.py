@@ -5,7 +5,7 @@ import shutil
 
 from plain.runtime import settings
 
-from .finders import find_assets
+from .finders import iter_assets
 from .fingerprints import AssetsFingerprintsManifest
 
 FINGERPRINT_LENGTH = 7
@@ -54,7 +54,8 @@ def get_compiled_path():
 def compile_assets(*, target_dir, keep_original, fingerprint, compress):
     manifest = AssetsFingerprintsManifest()
 
-    for url_path, asset in find_assets().items():
+    for asset in iter_assets():
+        url_path = asset.url_path
         resolved_path, compiled_paths = compile_asset(
             asset=asset,
             target_dir=target_dir,

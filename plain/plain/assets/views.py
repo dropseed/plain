@@ -17,7 +17,7 @@ from plain.urls import reverse
 from plain.views import View
 
 from .compile import FINGERPRINT_LENGTH, get_compiled_path
-from .finders import find_assets
+from .finders import iter_assets
 from .fingerprints import get_fingerprinted_url_path
 
 
@@ -80,8 +80,9 @@ class AssetView(View):
 
     def get_debug_asset_path(self, path):
         """Make a "live" check to find the uncompiled asset in the filesystem"""
-        if asset := find_assets().get(path):
-            return asset.absolute_path
+        for asset in iter_assets():
+            if asset.url_path == path:
+                return asset.absolute_path
 
     def check_asset_path(self, path):
         if not path:
