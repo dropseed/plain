@@ -1,0 +1,12 @@
+{% extends "staff/form.html" %}
+
+{% block form_content %}
+<div class="space-y-4">
+    <staff.InputField label="From pattern" field=form.from_pattern />
+    <staff.InputField label="To pattern" field=form.to_pattern />
+    <staff.CheckboxField label="Use regular expressions" field=form.is_regex />
+    <staff.InputField label="HTTP status code" field=form.http_status />
+    <staff.InputField label="Order" field=form.order />
+    <staff.CheckboxField label="Enabled" field=form.enabled />
+</div>
+{% endblock %}
