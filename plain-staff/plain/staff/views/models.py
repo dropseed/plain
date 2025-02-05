@@ -1,9 +1,17 @@
 from typing import TYPE_CHECKING
 
+from plain import models
 from plain.models import Q
 from plain.urls import reverse_lazy
 
-from .base import URL_NAMESPACE, StaffDetailView, StaffListView, StaffUpdateView
+from .base import (
+    URL_NAMESPACE,
+    StaffCreateView,
+    StaffDeleteView,
+    StaffDetailView,
+    StaffListView,
+    StaffUpdateView,
+)
 
 if TYPE_CHECKING:
     from plain import models
@@ -152,17 +160,45 @@ class StaffModelDetailView(StaffDetailView):
         return self.model.objects.get(pk=self.url_kwargs["pk"])
 
     def get_template_names(self) -> list[str]:
-        return super().get_template_names() + [
-            "staff/detail.html",
-        ]
+        template_names = super().get_template_names()
 
-    def get_links(self):
-        links = super().get_links()
-        if hasattr(self.object, "get_absolute_url"):
-            links["View in app"] = self.object.get_absolute_url()
-        if update_url := self.get_update_url(self.object):
-            links["Update"] = update_url
-        return links
+        if not self.template_name and isinstance(self.object, models.Model):
+            object_meta = self.object._meta
+            template_names = [
+                f"staff/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+            ] + template_names
+
+        return template_names
+
+
+class StaffModelCreateView(StaffCreateView):
+    model: "models.Model"
+    form_class = None  # TODO type annotation
+
+    def get_title(self) -> str:
+        if title := super().get_title():
+            return title
+
+        return f"Create {self.model._meta.model_name}"
+
+    @classmethod
+    def get_slug(cls) -> str:
+        return f"{cls.model._meta.model_name}_create"
+
+    @classmethod
+    def get_path(cls) -> str:
+        return f"{cls.model._meta.model_name}/create/"
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+
+        if not self.template_name and isinstance(self.object, models.Model):
+            object_meta = self.object._meta
+            template_names = [
+                f"staff/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+            ] + template_names
+
+        return template_names
 
 
 class StaffModelUpdateView(StaffUpdateView):
@@ -187,13 +223,34 @@ class StaffModelUpdateView(StaffUpdateView):
     def get_object(self):
         return self.model.objects.get(pk=self.url_kwargs["pk"])
 
-    def get_links(self):
-        links = super().get_links()
-        if hasattr(self.object, "get_absolute_url"):
-            links["View in app"] = self.object.get_absolute_url()
-        if detail_url := self.get_detail_url(self.object):
-            links["Detail"] = detail_url
-        return links
+    def get_template_names(self):
+        template_names = super().get_template_names()
+
+        if not self.template_name and isinstance(self.object, models.Model):
+            object_meta = self.object._meta
+            template_names = [
+                f"staff/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+            ] + template_names
+
+        return template_names
+
+
+class StaffModelDeleteView(StaffDeleteView):
+    model: "models.Model"
+
+    def get_title(self) -> str:
+        return f"Delete {self.object}"
+
+    @classmethod
+    def get_slug(cls) -> str:
+        return f"{cls.model._meta.model_name}_delete"
+
+    @classmethod
+    def get_path(cls) -> str:
+        return f"{cls.model._meta.model_name}/<int:pk>/delete/"
+
+    def get_object(self):
+        return self.model.objects.get(pk=self.url_kwargs["pk"])
 
 
 class StaffModelViewset:
@@ -201,40 +258,73 @@ class StaffModelViewset:
     def get_views(cls) -> list["View"]:
         views = []
 
-        if hasattr(cls, "ListView") and hasattr(cls, "DetailView"):
-            cls.ListView.get_detail_url = lambda self, obj: reverse_lazy(
-                f"{URL_NAMESPACE}:{cls.DetailView.view_name()}",
-                kwargs={"pk": obj.pk},
-            )
+        if hasattr(cls, "ListView"):
 
-            cls.DetailView.parent_view_class = cls.ListView
+            def get_list_url(self):
+                return reverse_lazy(f"{URL_NAMESPACE}:{cls.ListView.view_name()}")
 
-        if hasattr(cls, "ListView") and hasattr(cls, "UpdateView"):
-            cls.ListView.get_update_url = lambda self, obj: reverse_lazy(
-                f"{URL_NAMESPACE}:{cls.UpdateView.view_name()}",
-                kwargs={"pk": obj.pk},
-            )
+            for v in ["CreateView", "DetailView", "UpdateView", "DeleteView"]:
+                if other_class := getattr(cls, v, None):
+                    other_class.get_list_url = get_list_url
+                    other_class.parent_view_class = cls.ListView
 
-            cls.UpdateView.parent_view_class = cls.ListView
+        if hasattr(cls, "CreateView"):
 
-        if hasattr(cls, "DetailView") and hasattr(cls, "UpdateView"):
-            cls.DetailView.get_update_url = lambda self, obj: reverse_lazy(
-                f"{URL_NAMESPACE}:{cls.UpdateView.view_name()}",
-                kwargs={"pk": obj.pk},
-            )
+            def get_create_url(self):
+                return reverse_lazy(f"{URL_NAMESPACE}:{cls.CreateView.view_name()}")
 
-            cls.UpdateView.get_detail_url = lambda self, obj: reverse_lazy(
-                f"{URL_NAMESPACE}:{cls.DetailView.view_name()}",
-                kwargs={"pk": obj.pk},
-            )
+            if hasattr(cls, "ListView"):
+                cls.ListView.get_create_url = get_create_url
+
+        if hasattr(cls, "DetailView"):
+
+            def get_detail_url(self, obj):
+                return reverse_lazy(
+                    f"{URL_NAMESPACE}:{cls.DetailView.view_name()}",
+                    kwargs={"pk": obj.pk},
+                )
+
+            for v in ["ListView", "UpdateView", "DeleteView"]:
+                if other_class := getattr(cls, v, None):
+                    other_class.get_detail_url = get_detail_url
+
+        if hasattr(cls, "UpdateView"):
+
+            def get_update_url(self, obj):
+                return reverse_lazy(
+                    f"{URL_NAMESPACE}:{cls.UpdateView.view_name()}",
+                    kwargs={"pk": obj.pk},
+                )
+
+            for v in ["ListView", "DetailView", "DeleteView"]:
+                if other_class := getattr(cls, v, None):
+                    other_class.get_update_url = get_update_url
+
+        if hasattr(cls, "DeleteView"):
+
+            def get_delete_url(self, obj):
+                return reverse_lazy(
+                    f"{URL_NAMESPACE}:{cls.DeleteView.view_name()}",
+                    kwargs={"pk": obj.pk},
+                )
+
+            for v in ["ListView", "DetailView", "UpdateView"]:
+                if other_class := getattr(cls, v, None):
+                    other_class.get_delete_url = get_delete_url
 
         if hasattr(cls, "ListView"):
             views.append(cls.ListView)
+
+        if hasattr(cls, "CreateView"):
+            views.append(cls.CreateView)
 
         if hasattr(cls, "DetailView"):
             views.append(cls.DetailView)
 
         if hasattr(cls, "UpdateView"):
             views.append(cls.UpdateView)
+
+        if hasattr(cls, "DeleteView"):
+            views.append(cls.DeleteView)
 
         return views

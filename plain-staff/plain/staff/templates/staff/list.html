@@ -6,11 +6,6 @@
 
 {% block content %}
 
-{% set create_url = get_create_url() %}
-{% if create_url %}
-<a href="{{ create_url }}">New</a>
-{% endif %}
-
 {% htmxfragment "list" as="section" %}
 
 <header class="flex items-center justify-between">
@@ -121,7 +116,7 @@
                 {% for object in objects %}
                 <tr>
 
-                    {% set row_url = get_detail_url(object) or get_update_url(object) %}
+                    {% set row_url = get_object_url(object) %}
 
                     {% if table_style != "simple" and actions %}
                     <td class="p-0 pl-1">

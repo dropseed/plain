@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from plain import models
 from plain.auth.views import AuthViewMixin
 from plain.htmx.views import HTMXViewMixin
 from plain.http import Response, ResponseRedirect
@@ -186,9 +185,7 @@ class StaffListView(HTMXViewMixin, StaffView):
         context["get_field_value"] = self.get_field_value
         context["get_field_value_template"] = self.get_field_value_template
 
-        context["get_create_url"] = self.get_create_url
-        context["get_detail_url"] = self.get_detail_url
-        context["get_update_url"] = self.get_update_url
+        context["get_object_url"] = self.get_object_url
         context["get_object_links"] = self.get_object_links
 
         return context
@@ -288,12 +285,35 @@ class StaffListView(HTMXViewMixin, StaffView):
     def get_update_url(self, obj) -> str | None:
         return None
 
+    def get_delete_url(self, obj) -> str | None:
+        return None
+
+    def get_object_url(self, obj) -> str | None:
+        if url := self.get_detail_url(obj):
+            return url
+        if url := self.get_update_url(obj):
+            return url
+        if url := self.get_delete_url(obj):
+            return url
+        return None
+
     def get_object_links(self, obj) -> dict[str]:
         links = {}
         if self.get_detail_url(obj):
             links["Detail"] = self.get_detail_url(obj)
         if self.get_update_url(obj):
             links["Update"] = self.get_update_url(obj)
+        if self.get_delete_url(obj):
+            links["Delete"] = self.get_delete_url(obj)
+        return links
+
+    def get_links(self):
+        links = super().get_links()
+
+        # Not tied to a specific object
+        if create_url := self.get_create_url():
+            links["Create"] = create_url
+
         return links
 
 
@@ -307,14 +327,9 @@ class StaffDetailView(StaffView, DetailView):
         return context
 
     def get_template_names(self) -> list[str]:
-        # TODO move these to model views
-        if not self.template_name and isinstance(self.object, models.Model):
-            object_meta = self.object._meta
-            return [
-                f"staff/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
-            ]
-
-        return super().get_template_names()
+        return super().get_template_names() + [
+            "staff/detail.html",
+        ]
 
     def get_description(self):
         return repr(self.object)
@@ -325,40 +340,112 @@ class StaffDetailView(StaffView, DetailView):
     def get_update_url(self, obj) -> str | None:
         return None
 
+    def get_delete_url(self, obj) -> str | None:
+        return None
+
+    def get_list_url(self) -> str | None:
+        return None
+
+    def get_links(self):
+        links = super().get_links()
+        if hasattr(self.object, "get_absolute_url"):
+            links["View in app"] = self.object.get_absolute_url()
+        if update_url := self.get_update_url(self.object):
+            links["Update"] = update_url
+        if delete_url := self.get_delete_url(self.object):
+            links["Delete"] = delete_url
+        return links
+
+    def get_success_url(self, form):
+        if detail_url := self.get_detail_url(self.object):
+            return detail_url
+
+        if list_url := self.get_list_url():
+            return list_url
+
+        if update_url := self.get_update_url(self.object):
+            return update_url
+
+        return super().get_success_url(form)
+
 
 class StaffUpdateView(StaffView, UpdateView):
     template_name = None
     nav_section = ""
 
     def get_template_names(self) -> list[str]:
-        if not self.template_name and isinstance(self.object, models.Model):
-            object_meta = self.object._meta
-            return [
-                f"staff/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
-            ]
-
-        return super().get_template_names()
+        return super().get_template_names() + [
+            "staff/update.html",
+        ]
 
     def get_detail_url(self, obj) -> str | None:
         return None
 
+    def get_delete_url(self, obj) -> str | None:
+        return None
+
+    def get_list_url(self) -> str | None:
+        return None
+
     def get_description(self):
         return repr(self.object)
+
+    def get_links(self):
+        links = super().get_links()
+
+        if hasattr(self.object, "get_absolute_url"):
+            links["View in app"] = self.object.get_absolute_url()
+
+        if detail_url := self.get_detail_url(self.object):
+            links["Detail"] = detail_url
+
+        if delete_url := self.get_delete_url(self.object):
+            links["Delete"] = delete_url
+
+        return links
 
 
 class StaffCreateView(StaffView, CreateView):
     template_name = None
 
     def get_template_names(self) -> list[str]:
-        if not self.template_name and isinstance(self.object, models.Model):
-            object_meta = self.object._meta
-            return [
-                f"staff/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
-            ]
+        return super().get_template_names() + [
+            "staff/create.html",
+        ]
 
-        return super().get_template_names()
+    def get_list_url(self) -> str | None:
+        return None
 
 
 class StaffDeleteView(StaffView, DeleteView):
-    template_name = "staff/confirm_delete.html"
+    template_name = "staff/delete.html"
     nav_section = ""
+
+    def get_detail_url(self, obj) -> str | None:
+        return None
+
+    def get_update_url(self, obj) -> str | None:
+        return None
+
+    def get_list_url(self) -> str | None:
+        return None
+
+    def get_links(self):
+        links = super().get_links()
+
+        if hasattr(self.object, "get_absolute_url"):
+            links["View in app"] = self.object.get_absolute_url()
+
+        if detail_url := self.get_detail_url(self.object):
+            links["Detail"] = detail_url
+
+        if update_url := self.get_update_url(self.object):
+            links["Update"] = update_url
+
+        return links
+
+    def get_success_url(self, form):
+        if list_url := self.get_list_url():
+            return list_url
+
+        return super().get_success_url(form)

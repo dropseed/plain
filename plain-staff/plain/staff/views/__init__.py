@@ -1,4 +1,5 @@
 from .base import (
+    StaffCreateView,
     StaffDeleteView,
     StaffDetailView,
     StaffListView,
@@ -6,6 +7,8 @@ from .base import (
     StaffView,
 )
 from .models import (
+    StaffModelCreateView,
+    StaffModelDeleteView,
     StaffModelDetailView,
     StaffModelListView,
     StaffModelUpdateView,
@@ -21,13 +24,16 @@ from .types import Img
 __all__ = [
     "StaffView",
     "StaffListView",
-    "StaffDetailView",
+    "StaffCreateView",
     "StaffUpdateView",
+    "StaffDetailView",
     "StaffDeleteView",
     "StaffModelViewset",
     "StaffModelListView",
+    "StaffModelCreateView",
     "StaffModelDetailView",
     "StaffModelUpdateView",
+    "StaffModelDeleteView",
     "register_viewset",
     "register_view",
     "get_model_detail_url",
