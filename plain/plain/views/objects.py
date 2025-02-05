@@ -80,6 +80,8 @@ class CreateView(ObjectTemplateViewMixin, FormView):
     View for creating a new object, with a response rendered by a template.
     """
 
+    template_name_suffix = "_form"
+
     def post(self) -> Response:
         """
         Handle POST requests: instantiate a form instance with the passed
