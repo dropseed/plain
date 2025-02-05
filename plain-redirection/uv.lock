@@ -96,20 +96,6 @@ wheels = [
 ]
 
 [[package]]
-name = "plain-auth"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-models" },
-    { name = "plain-sessions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/99/d4/d7c56e1b8579344ee4346c7fa328109d17798294fbb8d6e3231a63afbccb/plain_auth-0.3.1.tar.gz", hash = "sha256:ad27f84ea5fca2901329203b5fb6372ef951376ab1bfad77b8e754eb3093eb7f", size = 13057 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/35/fc4430b2b65adbb8451c0d8c0392a6377bea29c4abb089c4bf2f7b3e3505/plain_auth-0.3.1-py3-none-any.whl", hash = "sha256:c673e1de341430cd1573aa82e7a3fda1213fad6458519303bede38dd8aef2121", size = 10527 },
-]
-
-[[package]]
 name = "plain-models"
 version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -123,31 +109,17 @@ wheels = [
 ]
 
 [[package]]
-name = "plain-sessions"
-version = "0.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "plain" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/24/9f/dd7ee85aeca3e2d35d025644006547c7febf4e6b9827ae838df0f63ac9a6/plain_sessions-0.7.0.tar.gz", hash = "sha256:580d8a90cb9272870a41a65c0d4f5b609d1fb10c721ea73ab47a9397e02d5e68", size = 16587 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/e5/d50308b1039cd3573a5b03464021e521390c172c09d84ebf547dcc5ca024/plain_sessions-0.7.0-py3-none-any.whl", hash = "sha256:ad12acb6ae587abd187c57c59bca711ebdb895781a01c1eac42aea335f19c232", size = 13610 },
-]
-
-[[package]]
-name = "plain-support"
-version = "0.1.2"
+name = "plain-redirection"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "plain" },
-    { name = "plain-auth" },
     { name = "plain-models" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", specifier = "<1.0.0" },
-    { name = "plain-auth", specifier = "<1.0.0" },
     { name = "plain-models", specifier = "<1.0.0" },
 ]
 
