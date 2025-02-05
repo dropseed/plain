@@ -14,11 +14,16 @@ logger = logging.getLogger("plain.request")
 
 
 # These middleware classes are always used by Plain.
-BUILTIN_MIDDLEWARE = [
-    "plain.internal.middleware.headers.DefaultHeadersMiddleware",
-    "plain.internal.middleware.https.HttpsRedirectMiddleware",
+BUILTIN_BEFORE_MIDDLEWARE = [
+    "plain.internal.middleware.headers.DefaultHeadersMiddleware",  # Runs after response, to set missing headers
+    "plain.internal.middleware.https.HttpsRedirectMiddleware",  # Runs before response, to redirect to HTTPS quickly
+    "plain.csrf.middleware.CsrfViewMiddleware",  # Runs before and after get_response...
+]
+
+BUILTIN_AFTER_MIDDLEWARE = [
+    # Want this to run first (when reversed) so the slash middleware
+    # can immediately redirect to the slash-appended path if there is one.
     "plain.internal.middleware.slash.RedirectSlashMiddleware",
-    "plain.csrf.middleware.CsrfViewMiddleware",
 ]
 
 
@@ -34,7 +39,9 @@ class BaseHandler:
         get_response = self._get_response
         handler = convert_exception_to_response(get_response)
 
-        middlewares = reversed(BUILTIN_MIDDLEWARE + settings.MIDDLEWARE)
+        middlewares = reversed(
+            BUILTIN_BEFORE_MIDDLEWARE + settings.MIDDLEWARE + BUILTIN_AFTER_MIDDLEWARE
+        )
 
         for middleware_path in middlewares:
             middleware = import_string(middleware_path)
