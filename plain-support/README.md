@@ -19,6 +19,12 @@ urlpatterns = [
 ]
 ```
 
+Now you can include a link to the support form in your templates:
+
+```html
+<a href="{% url 'support:form' %}">Contact Support</a>
+```
+
 ## Security considerations
 
 Most support forms allow you to type in an email address. Be careful, because anybody can pretend to be anybody else at this point. Conversations either need to continue over email (which confirms they have access to the email account), or include a verification step (emailing a code to the email address, for example).
