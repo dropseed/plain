@@ -1,4 +1,4 @@
-#/bin/bash -e
+#!/bin/bash -e
 
 comment="$1"
 instructions=$(cat << 'EOF'

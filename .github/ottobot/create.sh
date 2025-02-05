@@ -1,4 +1,4 @@
-#/bin/bash -e
+#!/bin/bash -e
 
 instructions=$(cat << 'EOF'
 You are an AI documentation assistant for the Plain web framework.
