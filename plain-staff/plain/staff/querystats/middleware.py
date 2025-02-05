@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import threading
 
 from plain.http import ResponseRedirect
@@ -36,6 +37,16 @@ class QueryStatsJSONEncoder(PlainJSONEncoder):
 class QueryStatsMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
+        self.ignore_url_patterns = [
+            re.compile(url) for url in settings.QUERYSTATS_IGNORE_URLS
+        ]
+
+    def should_ignore_request(self, request):
+        for url in self.ignore_url_patterns:
+            if url.match(request.path):
+                return True
+
+        return False
 
     def __call__(self, request):
         if request.GET.get("querystats") == "disable":
@@ -51,7 +62,7 @@ class QueryStatsMiddleware:
             # but we don't have to wrap everything else unless we are staff or debug
             is_staff = self.is_staff_request(request)
 
-        if settings.DEBUG or is_staff:
+        if (settings.DEBUG or is_staff) and not self.should_ignore_request(request):
             # Persist it on the thread
             _local.querystats = querystats
 
