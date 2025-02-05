@@ -1,10 +1,4 @@
-#/bin/sh -e
-
-# Pick a random README.md file in the repo that is inside a plain/<pkg> directory
-readmes=$(find . -name README.md | grep /plain/ | grep -v .venv | grep -v .pytest_cache | grep -v ./plain/README.md)
-readme=$(echo "$readmes" | shuf -n 1)
-
-example_readme="plain/plain/assets/README.md"
+#/bin/bash -e
 
 instructions=$(cat << 'EOF'
 You are an AI documentation assistant for the Plain web framework.
@@ -52,6 +46,12 @@ Your mission:
 ---
 EOF
 )
+
+# Pick a random README.md file in the repo that is inside a plain/<pkg> directory
+readmes=$(find . -name README.md | grep /plain/ | grep -v .venv | grep -v .pytest_cache | grep -v ./plain/README.md)
+readme=$(echo "$readmes" | shuf -n 1)
+
+example_readme="plain/plain/assets/README.md"
 
 uvx --from aider-chat aider \
     -c ./.github/ottobot/aider.yml \
