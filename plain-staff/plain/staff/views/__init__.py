@@ -1,18 +1,17 @@
-from .base import (
-    StaffCreateView,
-    StaffDeleteView,
-    StaffDetailView,
-    StaffListView,
-    StaffUpdateView,
-    StaffView,
-)
+from .base import StaffView
 from .models import (
     StaffModelCreateView,
     StaffModelDeleteView,
     StaffModelDetailView,
     StaffModelListView,
     StaffModelUpdateView,
-    StaffModelViewset,
+)
+from .objects import (
+    StaffCreateView,
+    StaffDeleteView,
+    StaffDetailView,
+    StaffListView,
+    StaffUpdateView,
 )
 from .registry import (
     get_model_detail_url,
@@ -20,6 +19,7 @@ from .registry import (
     register_viewset,
 )
 from .types import Img
+from .viewsets import StaffViewset
 
 __all__ = [
     "StaffView",
@@ -28,7 +28,7 @@ __all__ = [
     "StaffUpdateView",
     "StaffDetailView",
     "StaffDeleteView",
-    "StaffModelViewset",
+    "StaffViewset",
     "StaffModelListView",
     "StaffModelCreateView",
     "StaffModelDetailView",

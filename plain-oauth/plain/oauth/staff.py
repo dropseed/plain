@@ -3,7 +3,7 @@ from plain.staff.cards import ChartCard
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
-    StaffModelViewset,
+    StaffViewset,
     register_viewset,
 )
 
@@ -34,7 +34,7 @@ class ProvidersChartCard(ChartCard):
 
 
 @register_viewset
-class OAuthConnectionViewset(StaffModelViewset):
+class OAuthConnectionViewset(StaffViewset):
     class ListView(StaffModelListView):
         nav_section = "OAuth"
         model = OAuthConnection

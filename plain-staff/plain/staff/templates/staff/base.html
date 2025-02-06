@@ -43,7 +43,7 @@
             {#
             {% for parent in parent_view_classes %}
             <span class="text-stone-400">/</span>
-            <a class="text-stone-500" href="{{ parent.get_absolute_url() }}">{{ parent.get_nav_title() }}</a>
+            <a class="text-stone-500" href="{{ parent.get_view_url() }}">{{ parent.get_nav_title() }}</a>
             {% endfor %}
             <span class="text-stone-400">/</span>
             <a class="text-stone-600" href="{{ request.path }}">{{ title }}</a>
@@ -81,7 +81,7 @@
                     {% for section, views in admin_registry.get_nav_sections().items() %}
                     <div class="mt-4 text-xs tracking-wide uppercase text-stone-300/90">{{ section }}</div>
                     {% for view in views %}
-                    {% set url = view.get_absolute_url() %}
+                    {% set url = view.get_view_url() %}
                     <a
                         {% if url == request.path %}data-active{% endif %}
                         class="data-[active]:bg-white/20 data-[active]:text-white flex items-center px-2 py-1 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400/80 hover:bg-white/5"

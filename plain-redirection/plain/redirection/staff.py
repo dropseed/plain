@@ -7,7 +7,7 @@ from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
     StaffModelUpdateView,
-    StaffModelViewset,
+    StaffViewset,
     register_viewset,
 )
 
@@ -28,7 +28,7 @@ class RedirectForm(ModelForm):
 
 
 @register_viewset
-class RedirectStaff(StaffModelViewset):
+class RedirectStaff(StaffViewset):
     class ListView(StaffModelListView):
         model = Redirect
         nav_section = "Redirection"
@@ -53,7 +53,7 @@ class RedirectStaff(StaffModelViewset):
 
 
 @register_viewset
-class RedirectLogStaff(StaffModelViewset):
+class RedirectLogStaff(StaffViewset):
     class ListView(StaffModelListView):
         model = RedirectLog
         nav_section = "Redirection"
@@ -75,7 +75,7 @@ class RedirectLogStaff(StaffModelViewset):
 
 
 @register_viewset
-class NotFoundLogStaff(StaffModelViewset):
+class NotFoundLogStaff(StaffViewset):
     class ListView(StaffModelListView):
         model = NotFoundLog
         nav_section = "Redirection"

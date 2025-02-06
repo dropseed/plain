@@ -2,7 +2,7 @@ from plain.staff.cards import Card, TrendCard
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
-    StaffModelViewset,
+    StaffViewset,
     register_viewset,
 )
 
@@ -17,7 +17,7 @@ class PageviewsTrendCard(TrendCard):
 
 
 @register_viewset
-class PageviewStaff(StaffModelViewset):
+class PageviewStaff(StaffViewset):
     class ListView(StaffModelListView):
         model = Pageview
         nav_section = "Pageviews"

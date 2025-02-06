@@ -6,7 +6,7 @@ from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
     StaffModelUpdateView,
-    StaffModelViewset,
+    StaffViewset,
     register_viewset,
 )
 
@@ -28,7 +28,7 @@ class UnusedFlagsCard(Card):
 
 
 @register_viewset
-class FlagStaff(StaffModelViewset):
+class FlagStaff(StaffViewset):
     class ListView(StaffModelListView):
         model = Flag
         fields = ["name", "enabled", "created_at__date", "used_at__date", "uuid"]
@@ -47,7 +47,7 @@ class FlagResultForm(ModelForm):
 
 
 @register_viewset
-class FlagResultStaff(StaffModelViewset):
+class FlagResultStaff(StaffViewset):
     class ListView(StaffModelListView):
         model = FlagResult
         title = "Flag results"

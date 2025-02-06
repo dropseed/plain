@@ -16,7 +16,7 @@ class StaffIndexView(StaffView):
         # Slight hack to redirect to the first view that doesn't
         # require any url params...
         if views := registry.get_searchable_views():
-            return ResponseRedirect(list(views)[0].get_absolute_url())
+            return ResponseRedirect(list(views)[0].get_view_url())
 
         return super().get()
 

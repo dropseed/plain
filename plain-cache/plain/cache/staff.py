@@ -2,13 +2,13 @@ from plain.cache.models import CachedItem
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
-    StaffModelViewset,
+    StaffViewset,
     register_viewset,
 )
 
 
 @register_viewset
-class CachedItemViewset(StaffModelViewset):
+class CachedItemViewset(StaffViewset):
     class ListView(StaffModelListView):
         nav_section = "Cache"
         model = CachedItem

@@ -2,10 +2,8 @@ from typing import TYPE_CHECKING
 
 from plain import models
 from plain.models import Q
-from plain.urls import reverse_lazy
 
-from .base import (
-    URL_NAMESPACE,
+from .objects import (
     StaffCreateView,
     StaffDeleteView,
     StaffDetailView,
@@ -15,7 +13,6 @@ from .base import (
 
 if TYPE_CHECKING:
     from plain import models
-    from plain.views import View
 
 
 def get_model_field(instance, field):
@@ -251,80 +248,3 @@ class StaffModelDeleteView(StaffDeleteView):
 
     def get_object(self):
         return self.model.objects.get(pk=self.url_kwargs["pk"])
-
-
-class StaffModelViewset:
-    @classmethod
-    def get_views(cls) -> list["View"]:
-        views = []
-
-        if hasattr(cls, "ListView"):
-
-            def get_list_url(self):
-                return reverse_lazy(f"{URL_NAMESPACE}:{cls.ListView.view_name()}")
-
-            for v in ["CreateView", "DetailView", "UpdateView", "DeleteView"]:
-                if other_class := getattr(cls, v, None):
-                    other_class.get_list_url = get_list_url
-                    other_class.parent_view_class = cls.ListView
-
-        if hasattr(cls, "CreateView"):
-
-            def get_create_url(self):
-                return reverse_lazy(f"{URL_NAMESPACE}:{cls.CreateView.view_name()}")
-
-            if hasattr(cls, "ListView"):
-                cls.ListView.get_create_url = get_create_url
-
-        if hasattr(cls, "DetailView"):
-
-            def get_detail_url(self, obj):
-                return reverse_lazy(
-                    f"{URL_NAMESPACE}:{cls.DetailView.view_name()}",
-                    kwargs={"pk": obj.pk},
-                )
-
-            for v in ["ListView", "UpdateView", "DeleteView"]:
-                if other_class := getattr(cls, v, None):
-                    other_class.get_detail_url = get_detail_url
-
-        if hasattr(cls, "UpdateView"):
-
-            def get_update_url(self, obj):
-                return reverse_lazy(
-                    f"{URL_NAMESPACE}:{cls.UpdateView.view_name()}",
-                    kwargs={"pk": obj.pk},
-                )
-
-            for v in ["ListView", "DetailView", "DeleteView"]:
-                if other_class := getattr(cls, v, None):
-                    other_class.get_update_url = get_update_url
-
-        if hasattr(cls, "DeleteView"):
-
-            def get_delete_url(self, obj):
-                return reverse_lazy(
-                    f"{URL_NAMESPACE}:{cls.DeleteView.view_name()}",
-                    kwargs={"pk": obj.pk},
-                )
-
-            for v in ["ListView", "DetailView", "UpdateView"]:
-                if other_class := getattr(cls, v, None):
-                    other_class.get_delete_url = get_delete_url
-
-        if hasattr(cls, "ListView"):
-            views.append(cls.ListView)
-
-        if hasattr(cls, "CreateView"):
-            views.append(cls.CreateView)
-
-        if hasattr(cls, "DetailView"):
-            views.append(cls.DetailView)
-
-        if hasattr(cls, "UpdateView"):
-            views.append(cls.UpdateView)
-
-        if hasattr(cls, "DeleteView"):
-            views.append(cls.DeleteView)
-
-        return views

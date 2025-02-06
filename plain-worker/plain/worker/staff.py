@@ -7,7 +7,7 @@ from plain.staff.cards import Card
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
-    StaffModelViewset,
+    StaffViewset,
     register_viewset,
 )
 
@@ -43,7 +43,7 @@ class SuccessfulJobsCard(Card):
         return JobResult.objects.successful().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?display=Successful"
+        return JobResultViewset.ListView.get_view_url() + "?display=Successful"
 
 
 class ErroredJobsCard(Card):
@@ -54,7 +54,7 @@ class ErroredJobsCard(Card):
         return JobResult.objects.errored().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?display=Errored"
+        return JobResultViewset.ListView.get_view_url() + "?display=Errored"
 
 
 class LostJobsCard(Card):
@@ -69,7 +69,7 @@ class LostJobsCard(Card):
         return JobResult.objects.lost().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?display=Lost"
+        return JobResultViewset.ListView.get_view_url() + "?display=Lost"
 
 
 class RetriedJobsCard(Card):
@@ -80,7 +80,7 @@ class RetriedJobsCard(Card):
         return JobResult.objects.retried().count()
 
     def get_link(self):
-        return JobResultViewset.ListView.get_absolute_url() + "?display=Retried"
+        return JobResultViewset.ListView.get_view_url() + "?display=Retried"
 
 
 class WaitingJobsCard(Card):
@@ -98,7 +98,7 @@ class RunningJobsCard(Card):
 
 
 @register_viewset
-class JobRequestViewset(StaffModelViewset):
+class JobRequestViewset(StaffViewset):
     class ListView(StaffModelListView):
         nav_section = "Worker"
         model = JobRequest
@@ -116,7 +116,7 @@ class JobRequestViewset(StaffModelViewset):
 
 
 @register_viewset
-class JobViewset(StaffModelViewset):
+class JobViewset(StaffViewset):
     class ListView(StaffModelListView):
         nav_section = "Worker"
         model = Job
@@ -143,7 +143,7 @@ class JobViewset(StaffModelViewset):
 
 
 @register_viewset
-class JobResultViewset(StaffModelViewset):
+class JobResultViewset(StaffViewset):
     class ListView(StaffModelListView):
         nav_section = "Worker"
         model = JobResult

@@ -2,7 +2,7 @@ from plain.staff.cards import Card
 from plain.staff.views import (
     StaffModelDetailView,
     StaffModelListView,
-    StaffModelViewset,
+    StaffViewset,
     register_viewset,
 )
 
@@ -10,7 +10,7 @@ from .models import SupportFormEntry
 
 
 @register_viewset
-class SupportFormEntryStaff(StaffModelViewset):
+class SupportFormEntryStaff(StaffViewset):
     class ListView(StaffModelListView):
         model = SupportFormEntry
         nav_section = "Support"
