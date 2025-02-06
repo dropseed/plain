@@ -13,12 +13,12 @@ def _get_client_ip(request):
 class Redirect(models.Model):
     from_pattern = models.CharField(max_length=255, unique=True)
     to_pattern = models.CharField(max_length=255)
-    http_status = models.IntegerField(
+    http_status = models.PositiveSmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    order = models.IntegerField(default=0)
+    order = models.PositiveSmallIntegerField(default=0, db_index=True)
     enabled = models.BooleanField(default=True)
     is_regex = models.BooleanField(default=False)
 
@@ -69,7 +69,7 @@ class RedirectLog(models.Model):
     # The actuals that were used to redirect
     from_url = models.URLField()
     to_url = models.URLField()
-    http_status = models.IntegerField(default=301)
+    http_status = models.PositiveSmallIntegerField(default=301)
 
     # Request metadata
     ip_address = models.GenericIPAddressField()
