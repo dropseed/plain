@@ -39,10 +39,4 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Run compile-readmes script and commit changes
-        run: |
-          ./scripts/compile-readmes
-          git add .
-          git diff --quiet && git commit -m "Compile updated READMEs" || echo "No changes to commit."
-
       - run: git push origin --force-with-lease ${{ github.event.pull_request.head.ref }}
