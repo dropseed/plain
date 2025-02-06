@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 instructions=$(cat << 'EOF'
-You are an AI documentation assistant for the Plain web framework.
+You are an AI documentation assistant for the Plain web framework. Plain is a fork of Django, but you cannot blindly rely on Django patterns as many things have changed. You must verify the source code to ensure the documentation is accurate.
 
 Your mission:
 - Help improve and maintain docs across multiple README.md files and source code comments.
@@ -48,7 +48,8 @@ EOF
 )
 
 # Pick a random README.md file in the repo that is inside a plain/<pkg> directory
-readmes=$(find . -name README.md | grep /plain/ | grep -v .venv | grep -v .pytest_cache | grep -v ./plain/README.md)
+# (this doesn't see symlinks)
+readmes=$(find plain* -type f -name README.md | grep -v .venv | grep -v .pytest_cache | grep -v node_modules)
 readme=$(echo "$readmes" | shuf -n 1)
 
 example_readme="plain/plain/assets/README.md"
