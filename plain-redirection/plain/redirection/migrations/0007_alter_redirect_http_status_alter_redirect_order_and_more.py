@@ -5,25 +5,24 @@ from plain.models import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('plainredirection', '0006_alter_notfoundlog_user_agent_and_more'),
+        ("plainredirection", "0006_alter_notfoundlog_user_agent_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='redirect',
-            name='http_status',
+            model_name="redirect",
+            name="http_status",
             field=models.PositiveSmallIntegerField(default=301),
         ),
         migrations.AlterField(
-            model_name='redirect',
-            name='order',
+            model_name="redirect",
+            name="order",
             field=models.PositiveSmallIntegerField(db_index=True, default=0),
         ),
         migrations.AlterField(
-            model_name='redirectlog',
-            name='http_status',
+            model_name="redirectlog",
+            name="http_status",
             field=models.PositiveSmallIntegerField(default=301),
         ),
     ]
