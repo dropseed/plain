@@ -74,7 +74,7 @@ class RedirectLog(models.Model):
     # Request metadata
     ip_address = models.GenericIPAddressField()
     user_agent = models.CharField(max_length=255)
-    referer = models.URLField(null=True, blank=True)
+    referer = models.CharField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -109,7 +109,7 @@ class NotFoundLog(models.Model):
     # Request metadata
     ip_address = models.GenericIPAddressField()
     user_agent = models.CharField(max_length=255)
-    referer = models.URLField(null=True, blank=True)
+    referer = models.CharField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
