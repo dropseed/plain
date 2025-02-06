@@ -410,6 +410,12 @@ class StaffCreateView(StaffView, CreateView):
     def get_list_url(self) -> str | None:
         return None
 
+    def get_success_url(self, form):
+        if list_url := self.get_list_url():
+            return list_url
+
+        return super().get_success_url(form)
+
 
 class StaffDeleteView(StaffView, DeleteView):
     template_name = "staff/delete.html"
