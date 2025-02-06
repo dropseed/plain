@@ -34,6 +34,8 @@ class RedirectStaff(StaffModelViewset):
         nav_section = "Redirection"
         title = "Redirects"
         fields = ["from_pattern", "to_pattern", "http_status", "order", "enabled"]
+        search_fields = ["from_pattern", "to_pattern"]
+        allow_global_search = False
 
     class DetailView(StaffModelDetailView):
         model = Redirect
@@ -65,6 +67,8 @@ class RedirectLogStaff(StaffModelViewset):
             "ip_address",
             "referer",
         ]
+        search_fields = ["from_url", "to_url", "user_agent", "ip_address", "referer"]
+        allow_global_search = False
 
     class DetailView(StaffModelDetailView):
         model = RedirectLog
@@ -77,6 +81,8 @@ class NotFoundLogStaff(StaffModelViewset):
         nav_section = "Redirection"
         title = "404 logs"
         fields = ["created_at", "url", "user_agent", "ip_address", "referer"]
+        search_fields = ["url", "user_agent", "ip_address", "referer"]
+        allow_global_search = False
 
     class DetailView(StaffModelDetailView):
         model = NotFoundLog
