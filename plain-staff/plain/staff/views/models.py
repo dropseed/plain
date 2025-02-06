@@ -179,7 +179,7 @@ class StaffModelCreateView(StaffCreateView):
         if title := super().get_title():
             return title
 
-        return f"Create {self.model._meta.model_name}"
+        return f"New {self.model._meta.model_name}"
 
     @classmethod
     def get_slug(cls) -> str:
@@ -192,10 +192,10 @@ class StaffModelCreateView(StaffCreateView):
     def get_template_names(self):
         template_names = super().get_template_names()
 
-        if not self.template_name and isinstance(self.object, models.Model):
-            object_meta = self.object._meta
+        if not self.template_name and issubclass(self.model, models.Model):
+            model_meta = self.model._meta
             template_names = [
-                f"staff/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
+                f"staff/{model_meta.package_label}/{model_meta.model_name}{self.template_name_suffix}.html"
             ] + template_names
 
         return template_names

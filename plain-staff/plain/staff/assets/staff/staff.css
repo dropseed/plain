@@ -20,13 +20,13 @@ table th a {
 }
 
 tbody tr:hover {
-    background-color: rgb(249, 250, 251);
+    background-color: rgb(255, 255, 255, 0.1);
 }
 
 td {
     padding: 0.5rem 0.5rem;
     white-space: nowrap;
-    border-bottom: 1px solid rgb(229, 231, 235);
+    border-bottom: 1px solid rgb(255, 255, 255, 0.1);
 }
 tr:last-child td {
     border-bottom: none;
@@ -53,7 +53,7 @@ main a:hover {
     color: #ffffff;
     text-align: center;
     text-decoration: none;
-    background-color: #1A1817;
+    background-color: #2a2826;
     border: 1px solid #3f3d3b;
     border-radius: 6px;
     transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
@@ -77,11 +77,13 @@ main a:hover {
     }
 }
 
+/* Cards use these? */
 section {
-    border: rgba(0, 0, 0, 0.2) 1px solid;
+    border: rgba(255, 255, 255, 0.1) 1px solid;
     border-radius: 0.275rem;
     overflow: auto;
-    background-color: white;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.8);
     display: flex;
     flex-direction: column;
 }
@@ -89,21 +91,15 @@ section {
 section > header {
     padding: 0.5rem;
     /* background-color: #FFFCF0; */
-    border-bottom: rgba(0, 0, 0, 0.2) 1px solid;
+    border-bottom: rgba(255, 255, 255, 0.05) 1px solid;
 }
 
 section > div {
-    padding: 0.5rem;
+    padding: 0.75rem 0.5rem;
     flex-grow: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     overflow: auto;
-}
-
-section > footer {
-    padding: 0.5rem;
-    /* background-color: #FFFCF0; */
-    border-top: rgba(0, 0, 0, 0.2) 1px solid;
 }

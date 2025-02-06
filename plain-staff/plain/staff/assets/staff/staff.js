@@ -30,12 +30,12 @@ jQuery(function($) {
                 arrow: false,
                 appendTo: () => document.body,
                 onCreate: (instance) => {
-                    instance.popper.classList.add("*:bg-white")
+                    instance.popper.classList.add("*:bg-white/15")
                     instance.popper.classList.add("*:w-48")
                     instance.popper.classList.add("*:rounded-md")
                     instance.popper.classList.add("*:shadow-lg")
                     instance.popper.classList.add("*:ring-1")
-                    instance.popper.classList.add("*:ring-black")
+                    instance.popper.classList.add("*:ring-white")
                     instance.popper.classList.add("*:ring-opacity-5")
                 },
             });
@@ -60,7 +60,7 @@ jQuery(function($) {
             }
             var $link = $(document.createElement("a"));
             $link.attr("href", $this.data("column-autolink"));
-            $link.addClass("flex p-2 -m-2 text-black hover:no-underline");
+            $link.addClass("flex p-2 -m-2 text-white/80 hover:no-underline");
             $(this).wrapInner($link);
         })
     }

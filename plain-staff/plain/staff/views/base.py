@@ -300,9 +300,9 @@ class StaffListView(HTMXViewMixin, StaffView):
     def get_object_links(self, obj) -> dict[str]:
         links = {}
         if self.get_detail_url(obj):
-            links["Detail"] = self.get_detail_url(obj)
+            links["View"] = self.get_detail_url(obj)
         if self.get_update_url(obj):
-            links["Update"] = self.get_update_url(obj)
+            links["Edit"] = self.get_update_url(obj)
         if self.get_delete_url(obj):
             links["Delete"] = self.get_delete_url(obj)
         return links
@@ -312,7 +312,7 @@ class StaffListView(HTMXViewMixin, StaffView):
 
         # Not tied to a specific object
         if create_url := self.get_create_url():
-            links["Create"] = create_url
+            links["New"] = create_url
 
         return links
 
@@ -348,12 +348,16 @@ class StaffDetailView(StaffView, DetailView):
 
     def get_links(self):
         links = super().get_links()
+
         if hasattr(self.object, "get_absolute_url"):
             links["View in app"] = self.object.get_absolute_url()
+
         if update_url := self.get_update_url(self.object):
-            links["Update"] = update_url
+            links["Edit"] = update_url
+
         if delete_url := self.get_delete_url(self.object):
             links["Delete"] = delete_url
+
         return links
 
     def get_success_url(self, form):
@@ -372,11 +376,6 @@ class StaffDetailView(StaffView, DetailView):
 class StaffUpdateView(StaffView, UpdateView):
     template_name = None
     nav_section = ""
-
-    def get_template_names(self) -> list[str]:
-        return super().get_template_names() + [
-            "staff/update.html",
-        ]
 
     def get_detail_url(self, obj) -> str | None:
         return None
@@ -397,7 +396,7 @@ class StaffUpdateView(StaffView, UpdateView):
             links["View in app"] = self.object.get_absolute_url()
 
         if detail_url := self.get_detail_url(self.object):
-            links["Detail"] = detail_url
+            links["View"] = detail_url
 
         if delete_url := self.get_delete_url(self.object):
             links["Delete"] = delete_url
@@ -408,11 +407,6 @@ class StaffUpdateView(StaffView, UpdateView):
 class StaffCreateView(StaffView, CreateView):
     template_name = None
 
-    def get_template_names(self) -> list[str]:
-        return super().get_template_names() + [
-            "staff/create.html",
-        ]
-
     def get_list_url(self) -> str | None:
         return None
 
@@ -420,6 +414,9 @@ class StaffCreateView(StaffView, CreateView):
 class StaffDeleteView(StaffView, DeleteView):
     template_name = "staff/delete.html"
     nav_section = ""
+
+    def get_description(self):
+        return repr(self.object)
 
     def get_detail_url(self, obj) -> str | None:
         return None
@@ -437,10 +434,10 @@ class StaffDeleteView(StaffView, DeleteView):
             links["View in app"] = self.object.get_absolute_url()
 
         if detail_url := self.get_detail_url(self.object):
-            links["Detail"] = detail_url
+            links["View"] = detail_url
 
         if update_url := self.get_update_url(self.object):
-            links["Update"] = update_url
+            links["Edit"] = update_url
 
         return links
 

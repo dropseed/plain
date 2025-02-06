@@ -20,7 +20,7 @@
     <script src="{{ asset('staff/tippy-bundle.umd.min.js') }}" defer></script>
     {% block header_scripts %}{% endblock %}
 </head>
-<body class="flex min-h-screen text-black bg-stone-900">
+<body class="flex min-h-screen bg-stone-950">
 
     <nav class="fixed top-0 left-0 right-0 h-14 px-4 py-2 flex items-center justify-evenly text-sm text-white/70">
         <div class="flex items-center space-x-2">
@@ -75,11 +75,11 @@
     </nav>
 
     <div class="fixed top-14 bottom-2 left-2 right-2">
-        <aside id="admin-sidebar" data-toggle-class="hidden" class="flex-col bg-stone-900 z-50 border-r border-white/10 lg:border-none justify-between flex-shrink-0 hidden w-52 pl-3.5 pr-5 pt-2 overflow-auto lg:flex absolute top-0 bottom-0">
+        <aside id="admin-sidebar" data-toggle-class="hidden" class="flex-col bg-stone-950 z-50 border-r border-white/10 lg:border-none justify-between flex-shrink-0 hidden w-52 pl-3.5 pr-5 pt-2 overflow-auto lg:flex absolute top-0 bottom-0">
             <div class="flex-grow">
                 <div>
                     {% for section, views in admin_registry.get_nav_sections().items() %}
-                    <div class="mt-4 text-xs font-semibold tracking-wide uppercase text-stone-300/90">{{ section }}</div>
+                    <div class="mt-4 text-xs tracking-wide uppercase text-stone-300/90">{{ section }}</div>
                     {% for view in views %}
                     {% set url = view.get_absolute_url() %}
                     <a
@@ -99,7 +99,7 @@
                     <div class="text-xs tracking-wide text-stone-500">Recent</div>
                 </div> -->
             </div>
-            <div class="flex items-center justify-between mt-8 text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-900">
+            <div class="flex items-center justify-between mt-8 text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-950">
                 <div class="flex items-center truncate">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-6 h-6 mr-1.5 bi bi-person-circle" viewBox="0 0 16 16">
                         <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
@@ -113,8 +113,8 @@
             </div>
         </aside>
 
-        <div id="admin-content" data-toggle-class="x" class="lg:absolute top-0 bottom-0 right-0 left-52 bg-[#fefdfb] border border-white text-black rounded-lg overflow-auto">
-            <div class="flex items-center justify-between px-4 lg:px-8 sticky top-0 bg-[#fefdfb] border-b border-stone-200 py-2 lg:py-4">
+        <div id="admin-content" data-toggle-class="x" class="lg:absolute top-0 bottom-0 right-0 left-52 bg-stone-900 border border-white/5 text-white rounded-lg overflow-auto">
+            <div class="flex items-center justify-between px-4 lg:px-8 sticky z-10 top-0 bg-stone-900 border-b border-white/10 py-2 lg:py-3">
                 <div>
                 {% block header %}
                     <div class="flex items-center">
@@ -124,7 +124,7 @@
                             {% endif %}
                         {% endblock %}
                         <div class="max-w-prose break-all">
-                            <h1 class="text-xl font-semibold text-stone-700">
+                            <h1 class="text-xl text-white/90">
                                 {% block title %}{{ title }}{% endblock %}
                             </h1>
                             {% if description %}<p class="mt-1 text-sm text-gray-500">{{ description }}</p>{% endif %}
@@ -150,7 +150,7 @@
             </div>
             {% endif %}
 
-            <main class="px-4 py-6 lg:px-8">{% block content %}{% endblock %}</main>
+            <main class="px-4 py-6 lg:px-8 text-white/70">{% block content %}{% endblock %}</main>
         </div>
 
     </div>
