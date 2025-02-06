@@ -1,5 +1,6 @@
 from plain.exceptions import ImproperlyConfigured, ObjectDoesNotExist
-from plain.http import Http404, Response, ResponseRedirect
+from plain.forms import Form
+from plain.http import Http404, Response
 
 from .forms import FormView
 from .templates import TemplateView
@@ -154,13 +155,30 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
         return kwargs
 
 
-class DeleteView(ObjectTemplateViewMixin, TemplateView):
+class DeleteView(ObjectTemplateViewMixin, FormView):
     """
     View for deleting an object retrieved with self.get_object(), with a
     response rendered by a template.
     """
 
+    class EmptyDeleteForm(Form):
+        def __init__(self, instance, *args, **kwargs):
+            self.instance = instance
+            super().__init__(*args, **kwargs)
+
+        def save(self):
+            self.instance.delete()
+
+    form_class = EmptyDeleteForm
     template_name_suffix = "_confirm_delete"
+
+    def post(self) -> Response:
+        """
+        Handle POST requests: instantiate a form instance with the passed
+        POST variables and then check if it's valid.
+        """
+        self.load_object()
+        return super().post()
 
     def get_form_kwargs(self):
         """Return the keyword arguments for instantiating the form."""
@@ -168,16 +186,10 @@ class DeleteView(ObjectTemplateViewMixin, TemplateView):
         kwargs.update({"instance": self.object})
         return kwargs
 
-    def get_success_url(self):
-        if self.success_url:
-            return self.success_url.format(**self.object.__dict__)
-        else:
-            raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
-
-    def post(self):
-        self.load_object()
-        self.object.delete()
-        return ResponseRedirect(self.get_success_url())
+    def form_valid(self, form):
+        """If the form is valid, save the associated model."""
+        form.save()
+        return super().form_valid(form)
 
 
 class ListView(TemplateView):
