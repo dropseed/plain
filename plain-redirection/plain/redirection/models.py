@@ -67,8 +67,8 @@ class RedirectLog(models.Model):
     redirect = models.ForeignKey(Redirect, on_delete=models.CASCADE)
 
     # The actuals that were used to redirect
-    from_url = models.URLField()
-    to_url = models.URLField()
+    from_url = models.URLField(max_length=512)
+    to_url = models.URLField(max_length=512)
     http_status = models.PositiveSmallIntegerField(default=301)
 
     # Request metadata
@@ -104,7 +104,7 @@ class RedirectLog(models.Model):
 
 
 class NotFoundLog(models.Model):
-    url = models.URLField()
+    url = models.URLField(max_length=512)
 
     # Request metadata
     ip_address = models.GenericIPAddressField()
