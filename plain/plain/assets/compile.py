@@ -111,7 +111,7 @@ def compile_asset(*, asset, target_dir, keep_original, fingerprint, compress):
 
         resolved_url_path = os.path.relpath(fingerprinted_path, target_dir)
 
-    if compress and extension not in SKIP_COMPRESS_EXTENSIONS:
+    if compress and extension.lower() not in SKIP_COMPRESS_EXTENSIONS:
         for path in compiled_paths.copy():
             gzip_path = f"{path}.gz"
             with gzip.GzipFile(gzip_path, "wb") as f:
