@@ -116,3 +116,11 @@ If possible, you should add `static/dist/tailwind.css` to your `.gitignore` and 
 When you run `plain tailwind compile`, it will automatically check whether the Tailwind standalone CLI has been installed, and install it if it isn't.
 
 When using Plain on Heroku, we do this for you automatically in our [Plain buildpack](https://github.com/plainpackages/heroku-buildpack-plain/blob/master/bin/files/post_compile).
+
+## FAQs
+
+### How do I customize Tailwind's configuration?
+
+You can customize Tailwind by editing the `tailwind.config.js` file in your project root. This file was created when you ran `plain tailwind init`. In this file, you can change theme settings, add plugins, and configure the paths to your templates and any other files that use Tailwind classes.
+
+Make sure the `content` field in your `tailwind.config.js` includes all paths to your templates and source files so that Tailwind can properly generate the CSS.
