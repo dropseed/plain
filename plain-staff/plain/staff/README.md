@@ -12,10 +12,36 @@ in addition to models.
 - diy forms
 - detached from login (do your own login (oauth, passkeys, etc))
 
+
 ## Installation
 
-- install plain.staff and plain.htmx, add plain.staff.admin and plain.htmx to installed packages
-- add url
+Install `plain.staff` and `plain.htmx` packages:
+
+```bash
+pip install plain.staff plain.htmx
+```
+
+Add `plain.staff` and `plain.htmx` to your `INSTALLED_PACKAGES` in `settings.py`:
+
+```python
+# settings.py
+INSTALLED_PACKAGES += [
+    "plain.staff",
+    "plain.htmx",
+]
+```
+
+Include the staff URLs in your `urls.py`:
+
+```python
+# urls.py
+from plain.urls import include, path
+
+urlpatterns = [
+    # ...
+    path("staff/", include("plain.staff.urls")),
+]
+```
 
 ## Models in the admin
 
