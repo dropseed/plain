@@ -73,7 +73,6 @@ class Options:
         self._get_fields_cache = {}
         self.local_fields = []
         self.local_many_to_many = []
-        self.private_fields = []
         self.local_managers = []
         self.base_manager_name = None
         self.default_manager_name = None
@@ -249,9 +248,7 @@ class Options:
         # the "creation_counter" attribute of the field.
         # Move many-to-many related fields from self.fields into
         # self.many_to_many.
-        if private:
-            self.private_fields.append(field)
-        elif field.is_relation and field.many_to_many:
+        if field.is_relation and field.many_to_many:
             bisect.insort(self.local_many_to_many, field)
         else:
             bisect.insort(self.local_fields, field)
@@ -825,13 +822,6 @@ class Options:
         if forward:
             fields += self.local_fields
             fields += self.local_many_to_many
-            # Private fields are recopied to each child model, and they get a
-            # different model as field.model in each child. Hence we have to
-            # add the private fields separately from the topmost call. If we
-            # did this recursively similar to local_fields, we would get field
-            # instances with field.model != self.model.
-            if topmost_call:
-                fields += self.private_fields
 
         # In order to avoid list manipulation. Always
         # return a shallow copy of the results

@@ -219,13 +219,6 @@ class Collector:
                 related.field.remote_field.on_delete is DO_NOTHING
                 for related in get_candidate_relations_to_delete(opts)
             )
-            and (
-                # Something like generic foreign key.
-                not any(
-                    hasattr(field, "bulk_related_objects")
-                    for field in opts.private_fields
-                )
-            )
         )
 
     def get_del_batches(self, objs, fields):
@@ -365,13 +358,6 @@ class Collector:
             for batch in batches:
                 sub_objs = self.related_objects(related_model, related_fields, batch)
                 self.fast_deletes.append(sub_objs)
-        for field in model._meta.private_fields:
-            if hasattr(field, "bulk_related_objects"):
-                # It's something like generic foreign key.
-                sub_objs = field.bulk_related_objects(new_objs, self.using)
-                self.collect(
-                    sub_objs, source=model, nullable=True, fail_on_restricted=False
-                )
 
         if fail_on_restricted:
             # Raise an error if collected restricted objects (RESTRICT) aren't

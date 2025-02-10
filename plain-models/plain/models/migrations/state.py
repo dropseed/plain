@@ -776,11 +776,6 @@ class ModelState:
         if exclude_rels:
             if "order_with_respect_to" in options:
                 del options["order_with_respect_to"]
-        # Private fields are ignored, so remove options that refer to them.
-        elif options.get("order_with_respect_to") in {
-            field.name for field in model._meta.private_fields
-        }:
-            del options["order_with_respect_to"]
 
         def flatten_bases(model):
             bases = []

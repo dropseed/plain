@@ -184,7 +184,6 @@ class ModelBase(type):
         new_fields = chain(
             new_class._meta.local_fields,
             new_class._meta.local_many_to_many,
-            new_class._meta.private_fields,
         )
         field_names = {f.name for f in new_fields}
 
@@ -276,21 +275,6 @@ class ModelBase(type):
 
                 # Pass any non-abstract parent classes onto child.
                 new_class._meta.parents.update(base_parents)
-
-            # Inherit private fields (like GenericForeignKey) from the parent
-            # class
-            for field in base._meta.private_fields:
-                if field.name in field_names:
-                    if not base._meta.abstract:
-                        raise FieldError(
-                            f"Local field {field.name!r} in class {name!r} clashes with field of "
-                            f"the same name from base class {base.__name__!r}."
-                        )
-                else:
-                    field = copy.deepcopy(field)
-                    if not base._meta.abstract:
-                        field.mti_inherited = True
-                    new_class.add_to_class(field.name, field)
 
         # Copy indexes so that index names are unique when models extend an
         # abstract model.
@@ -676,11 +660,6 @@ class Model(AltersData, metaclass=ModelBase):
             if field.is_cached(self):
                 field.delete_cached_value(self)
 
-        # Clear cached private relations.
-        for field in self._meta.private_fields:
-            if field.is_relation and field.is_cached(self):
-                field.delete_cached_value(self)
-
         self._state.db = db_instance._state.db
 
     def serializable_value(self, field_name):
@@ -1036,21 +1015,6 @@ class Model(AltersData, metaclass=ModelBase):
                     self, field.attname
                 ):
                     field.delete_cached_value(self)
-        # GenericForeignKeys are private.
-        for field in self._meta.private_fields:
-            if fields and field not in fields:
-                continue
-            if (
-                field.is_relation
-                and field.is_cached(self)
-                and hasattr(field, "fk_field")
-            ):
-                obj = field.get_cached_value(self, default=None)
-                if obj and obj.pk is None:
-                    raise ValueError(
-                        f"{operation_name}() prohibited to prevent data loss due to "
-                        f"unsaved related object '{field.name}'."
-                    )
 
     def delete(self, using=None, keep_parents=False):
         if self.pk is None:
