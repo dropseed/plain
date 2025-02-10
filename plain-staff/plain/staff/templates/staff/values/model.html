@@ -1,0 +1,15 @@
+{% if value %}
+
+{% with url = value|get_admin_model_detail_url %}
+    {% if url %}
+    <a href="{{ url }}" class="hover:underline">{{ value }}</a>
+    {% elif value.get_absolute_url is defined %}
+    <a href="{{ value.get_absolute_url() }}" class="hover:underline">{{ value }}</a>
+    {% else %}
+    <div>{{ value }}</div>
+    {% endif %}
+{% endwith %}
+
+{% else %}
+<span class="italic">None</span>
+{% endif %}

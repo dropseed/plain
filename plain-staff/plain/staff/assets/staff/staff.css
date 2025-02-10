@@ -1,6 +1,9 @@
 /*
 These standard CSS rules are intended to make it easier for the
 end-user to drop in HTML elements and have a decent, consistent starting point.
+
+We shouldn't use many custom classes in here (like .btn) because the user
+could unintentionally overwrite those since our CSS is combined.
  */
 table {
     width: 100%;
@@ -45,7 +48,7 @@ main a:hover {
     text-decoration: underline;
 }
 
-.actions a, .actions button {
+.actions a, .actions button, main button {
     display: inline-block;
     padding: 8px 16px;
     font-size: 14px;

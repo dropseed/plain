@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from plain import models
-from plain.models import Q
+from plain.models import Manager, Q
 
 from .objects import (
     StaffCreateView,
@@ -32,7 +32,13 @@ def get_model_field(instance, field):
 
         return result
 
-    return getattr(instance, field)
+    attr = getattr(instance, field)
+
+    if isinstance(attr, Manager):
+        # Automatically get .all() of related managers
+        return attr.all()
+
+    return attr
 
 
 class StaffModelListView(StaffListView):
@@ -113,7 +119,7 @@ class StaffModelListView(StaffListView):
     def get_field_value(self, obj, field: str):
         try:
             return super().get_field_value(obj, field)
-        except AttributeError:
+        except (AttributeError, TypeError):
             return get_model_field(obj, field)
 
     def get_field_value_template(self, obj, field: str, value):
@@ -127,7 +133,6 @@ class StaffModelListView(StaffListView):
 
 class StaffModelDetailView(StaffDetailView):
     model: "models.Model"
-    fields: list = []
 
     def get_title(self) -> str:
         return str(self.object)
@@ -140,17 +145,16 @@ class StaffModelDetailView(StaffDetailView):
     def get_path(cls) -> str:
         return f"{cls.model._meta.model_name}/<int:pk>/"
 
-    def get_template_context(self):
-        context = super().get_template_context()
-        context["fields"] = self.fields or ["pk"] + [
-            f.name for f in self.object._meta.get_fields() if not f.remote_field
-        ]
-        return context
+    def get_fields(self):
+        if fields := super().get_fields():
+            return fields
+
+        return ["pk"] + [f.name for f in self.object._meta.get_fields() if f.concrete]
 
     def get_field_value(self, obj, field: str):
         try:
             return super().get_field_value(obj, field)
-        except AttributeError:
+        except (AttributeError, TypeError):
             return get_model_field(obj, field)
 
     def get_object(self):

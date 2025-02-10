@@ -1,5 +1,6 @@
 from plain.htmx.views import HTMXViewMixin
 from plain.http import Response, ResponseRedirect
+from plain.models import Model
 from plain.paginator import Paginator
 from plain.views import (
     CreateView,
@@ -215,10 +216,13 @@ class StaffCreateView(StaffView, CreateView):
 class StaffDetailView(StaffView, DetailView):
     template_name = None
     nav_section = ""
+    fields: list[str] = []
 
     def get_template_context(self):
         context = super().get_template_context()
         context["get_field_value"] = self.get_field_value
+        context["get_field_value_template"] = self.get_field_value_template
+        context["fields"] = self.get_fields()
         return context
 
     def get_template_names(self) -> list[str]:
@@ -230,7 +234,45 @@ class StaffDetailView(StaffView, DetailView):
         return repr(self.object)
 
     def get_field_value(self, obj, field: str):
-        return getattr(obj, field)
+        try:
+            # Try basic dict lookup first
+            if field in obj:
+                return obj[field]
+        except TypeError:
+            pass
+
+        # Try dot notation
+        if "." in field:
+            field, subfield = field.split(".", 1)
+            return self.get_field_value(obj[field], subfield)
+
+        # Try regular object attribute
+        attr = getattr(obj, field)
+
+        # Call if it's callable
+        if callable(attr):
+            return attr()
+        else:
+            return attr
+
+    def get_field_value_template(self, obj, field: str, value):
+        templates = []
+
+        # By type name
+        type_str = type(value).__name__.lower()
+        templates.append(f"staff/values/{type_str}.html")
+
+        # By field name
+        templates.append(f"staff/values/{field}.html")
+
+        # As any model
+        if isinstance(value, Model):
+            templates.append("staff/values/model.html")
+
+        # Default
+        templates.append("staff/values/default.html")
+
+        return templates
 
     def get_list_url(self) -> str | None:
         return None
@@ -246,6 +288,9 @@ class StaffDetailView(StaffView, DetailView):
 
     def get_delete_url(self, obj) -> str | None:
         return None
+
+    def get_fields(self):
+        return self.fields.copy()  # Avoid mutating the class attribute itself
 
     def get_links(self):
         links = super().get_links()

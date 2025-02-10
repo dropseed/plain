@@ -96,7 +96,7 @@ class StaffViewRegistry:
         from plain.staff.views.base import URL_NAMESPACE
         from plain.staff.views.models import StaffModelDetailView
 
-        if not instance.pk:
+        if not getattr(instance, "pk", None):
             # Has to actually be in the db
             return
 
