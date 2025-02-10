@@ -32,7 +32,9 @@ class PagesRegistry:
                 name = "index"
             else:
                 url = url_path
-                name = url_path
+                # The named urls shouldn't end with a trailing slash,
+                # so you can just do {% url 'pages:about' %} instead of {% url 'pages:about/' %}
+                name = url_path.rstrip("/")
 
             page = self.get_page(url_path)
             view_class = page.get_view_class()
