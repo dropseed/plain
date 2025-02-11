@@ -350,7 +350,6 @@ def compile(keep_original, fingerprint, compress):
     # environment.compile_templates() but it needs a target, ignore_errors=False
 
 
-
 @plain_cli.command()
 @click.argument("package_name")
 def create(package_name):

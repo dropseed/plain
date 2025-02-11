@@ -25,6 +25,7 @@ def compile(minify):
                 minify=minify,
             ):
                 returncode = 1
+            print()
 
     if returncode:
         exit(returncode)

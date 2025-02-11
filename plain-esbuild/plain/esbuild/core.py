@@ -8,7 +8,7 @@ def esbuild(input_path, output_path, *, minify=True):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    print(f"Building {os.path.relpath(input_path)} to {os.path.relpath(output_path)}")
+    print(f"Building {os.path.relpath(input_path)}")
 
     cmd = [
         "npx",
