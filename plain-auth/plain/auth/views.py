@@ -23,7 +23,7 @@ class LoginRequired(Exception):
 
 class AuthViewMixin:
     login_required = True
-    staff_required = False
+    admin_required = False
     login_url = settings.AUTH_LOGIN_URL
 
     def check_auth(self) -> None:
@@ -42,14 +42,14 @@ class AuthViewMixin:
             raise LoginRequired(login_url=self.login_url)
 
         if impersonator := getattr(self.request, "impersonator", None):
-            # Impersonators should be able to view staff pages while impersonating.
-            # There's probably never a case where an impersonator isn't staff, but it can be configured.
-            if self.staff_required and not impersonator.is_staff:
+            # Impersonators should be able to view admin pages while impersonating.
+            # There's probably never a case where an impersonator isn't admin, but it can be configured.
+            if self.admin_required and not impersonator.is_admin:
                 raise PermissionDenied(
                     "You do not have permission to access this page."
                 )
-        elif self.staff_required and not self.request.user.is_staff:
-            # Show a 404 so we don't expose staff urls to non-staff users
+        elif self.admin_required and not self.request.user.is_admin:
+            # Show a 404 so we don't expose admin urls to non-admin users
             raise Http404()
 
     def get_response(self) -> Response:

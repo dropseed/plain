@@ -1,0 +1,35 @@
+{% extends "admin/cards/base.html" %}
+
+{% block content %}
+<div class="flex-grow w-full">
+  <table>
+    {% if headers %}
+    <thead>
+      <tr>
+        {% for header in headers %}
+        <th>{{ header }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    {% endif %}
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        {% for cell in row %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if footers %}
+    <tfoot>
+      <tr>
+        {% for footer in footers %}
+        <td>{{ footer }}</td>
+        {% endfor %}
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endblock %}

@@ -20,7 +20,7 @@ members = [
     "plain-passwords",
     "plain-pytest",
     "plain-sessions",
-    "plain-staff",
+    "plain-admin",
     "plain-tailwind",
     "plain-tunnel",
     "plain-vendor",
@@ -673,9 +673,9 @@ dependencies = [
 requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
-name = "plain-staff"
+name = "plain-admin"
 version = "0.5.0"
-source = { editable = "plain-staff" }
+source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },

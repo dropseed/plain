@@ -58,7 +58,7 @@ def hash_password(password, salt=None, hasher="default"):
     Same as encode() but generate a new random salt. If password is None then
     return a concatenation of UNUSABLE_PASSWORD_PREFIX and a random string,
     which disallows logins. Additional random string reduces chances of gaining
-    access to staff or superuser accounts. See ticket #20079 for more info.
+    access to admin or superuser accounts. See ticket #20079 for more info.
     """
     if not isinstance(password, bytes | str):
         raise TypeError(

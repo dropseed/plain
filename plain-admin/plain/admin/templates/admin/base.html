@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {%- if title|default('') -%}
+            {{ title }} - Plain Admin
+        {%- else -%}
+            Plain Admin
+        {%- endif -%}
+    </title>
+    {% tailwind_css %}
+    {% htmx_js %}
+    <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
+    <script src="{{ asset('admin/jquery-3.6.1.slim.min.js') }}"></script>
+    <script src="{{ asset('admin/chart.js') }}" defer></script>
+    <script src="{{ asset('admin/admin.js') }}" defer></script>
+    <script src="{{ asset('admin/popper.min.js') }}" defer></script>
+    <script src="{{ asset('admin/tippy-bundle.umd.min.js') }}" defer></script>
+    {% block header_scripts %}{% endblock %}
+</head>
+<body class="flex min-h-screen bg-stone-950">
+
+    <nav class="fixed top-0 left-0 right-0 h-14 px-4 py-2 flex items-center justify-evenly text-sm text-white/70">
+        <div class="flex items-center space-x-2">
+            <button type="button" data-toggle="#admin-sidebar,#admin-content" class="mr-1 lg:hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-5 h-5 bi bi-list" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/>
+                </svg>
+                <span class="sr-only">Toggle menu</span>
+            </button>
+
+            <a class="inline-flex items-center text-stone-300" href="{{ url('admin:index') }}">
+                <svg class="w-5 h-5 mr-2" width="160" height="125" viewBox="0 0 160 125" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4.78467" y="4.79785" width="150.978" height="115.404" rx="5" stroke="#ffffff" stroke-width="8"/>
+                    <path d="M151.762 60.3705C99.2596 39.3233 80.202 66.8232 8.78467 60.3705V116.2H151.762V60.3705Z" fill="#ffffff"/>
+                    <path d="M51.104 8.08887H108.179V10.7668C108.179 12.6998 106.612 14.2668 104.679 14.2668H54.604C52.671 14.2668 51.104 12.6998 51.104 10.7668V8.08887Z" fill="#ffffff" stroke="#ffffff"/>
+                </svg>
+                <span class="text-stone-400">Admin</span>
+            </a>
+
+            {#
+            {% for parent in parent_view_classes %}
+            <span class="text-stone-400">/</span>
+            <a class="text-stone-500" href="{{ parent.get_view_url() }}">{{ parent.get_nav_title() }}</a>
+            {% endfor %}
+            <span class="text-stone-400">/</span>
+            <a class="text-stone-600" href="{{ request.path }}">{{ title }}</a>
+            #}
+        </div>
+
+        <form method="GET" action="{{ url('admin:search') }}" class="flex flex-1 justify-center">
+            <div class="relative max-w-xs">
+                <label for="query" class="sr-only">Search</label>
+                <input
+                    type="text"
+                    name="query"
+                    id="query"
+                    class="block w-full pr-10 pl-10 placeholder:text-center text-sm border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1"
+                    placeholder="Search everything"
+                    value="{{ global_search_query|default('') }}"
+                    >
+                <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <svg class="h-3.5 w-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </form>
+
+        <div class="">
+            <a href="/" class="">Back to app</a>
+        </div>
+    </nav>
+
+    <div class="fixed top-14 bottom-2 left-2 right-2">
+        <aside id="admin-sidebar" data-toggle-class="hidden" class="flex-col bg-stone-950 z-50 border-r border-white/10 lg:border-none justify-between flex-shrink-0 hidden w-52 pl-3.5 pr-5 pt-2 overflow-auto lg:flex absolute top-0 bottom-0">
+            <div class="flex-grow">
+                <div>
+                    {% for section, views in admin_registry.get_nav_sections().items() %}
+                    <div class="mt-4 text-xs tracking-wide uppercase text-stone-300/90">{{ section }}</div>
+                    {% for view in views %}
+                    {% set url = view.get_view_url() %}
+                    <a
+                        {% if url == request.path %}data-active{% endif %}
+                        class="data-[active]:bg-white/20 data-[active]:text-white flex items-center px-2 py-1 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400/80 hover:bg-white/5"
+                        href="{{ url }}">
+                        {{ view.get_nav_title() }}
+                    </a>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+
+                <!-- <div class="mt-6">
+                    <div class="text-xs tracking-wide text-stone-500">Pinned</div>
+                </div>
+                <div class="mt-6">
+                    <div class="text-xs tracking-wide text-stone-500">Recent</div>
+                </div> -->
+            </div>
+            <div class="flex items-center justify-between mt-8 text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-950">
+                <div class="flex items-center truncate">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-6 h-6 mr-1.5 bi bi-person-circle" viewBox="0 0 16 16">
+                        <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                        <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                    </svg>
+                    <span class="truncate">
+                        {{ request.user }}
+                    </span>
+                </div>
+                <a class="ml-2 hover:text-white hover:underline flex-shrink-0" href="{{ url('logout') }}">Log out</a>
+            </div>
+        </aside>
+
+        <div id="admin-content" data-toggle-class="x" class="absolute top-0 bottom-0 right-0 left-0 lg:left-52 bg-stone-900 border border-white/5 text-white rounded-lg overflow-auto">
+            <div class="flex items-center justify-between px-4 lg:px-8 sticky z-10 top-0 bg-stone-900 border-b border-white/10 py-2 lg:py-3">
+                <div>
+                {% block header %}
+                    <div class="flex items-center">
+                        {% block image %}
+                            {% if image %}
+                            <img src="{{ image.src }}" alt="{{ image.alt }}" class="h-20 rounded mr-3">
+                            {% endif %}
+                        {% endblock %}
+                        <div class="max-w-prose break-all">
+                            <h1 class="text-xl text-white/90">
+                                {% block title %}{{ title }}{% endblock %}
+                            </h1>
+                            {% if description %}<p class="mt-1 text-sm text-gray-500">{{ description }}</p>{% endif %}
+                        </div>
+                    </div>
+                {% endblock %}
+                </div>
+                <div class="flex space-x-2 text-sm actions">
+                    {% block actions %}{% endblock %}
+                    {% for link, url in links.items() %}
+                    <a href="{{ url }}">{{ link }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if cards %}
+            <div class="px-4 mt-5 lg:px-8">
+                <div class="grid grid-cols-1 gap-6 mt-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {% for card in cards %}
+                        {{ render_card(card)|safe }}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <main class="px-4 py-6 lg:px-8 text-white/70">{% block content %}{% endblock %}</main>
+        </div>
+
+    </div>
+
+    {% toolbar %}
+</body>
+</html>

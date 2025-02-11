@@ -40,7 +40,7 @@ from plain.passwords.models import PasswordField
 class User(models.Model):
     email = models.EmailField(unique=True)
     password = PasswordField()
-    is_staff = models.BooleanField(default=False)
+    is_admin = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -93,7 +93,7 @@ else:
 
 ## Restricting views
 
-Use the `AuthViewMixin` to restrict views to logged in users, staff users, or custom logic.
+Use the `AuthViewMixin` to restrict views to logged in users, admin users, or custom logic.
 
 ```python
 from plain.auth.views import AuthViewMixin
@@ -105,9 +105,9 @@ class LoggedInView(AuthViewMixin, View):
     login_required = True
 
 
-class StaffOnlyView(AuthViewMixin, View):
+class AdminOnlyView(AuthViewMixin, View):
     login_required = True
-    staff_required = True
+    admin_required = True
 
 
 class CustomPermissionView(AuthViewMixin, View):

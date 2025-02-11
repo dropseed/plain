@@ -28,6 +28,6 @@ With the official Plain ecosystem packages you can:
 - Add [OAuth login](https://plainframework.com/docs/plain-oauth/) and API access
 - Run tests with [pytest](https://plainframework.com/docs/plain-test/)
 - Run a [background job worker](https://plainframework.com/docs/plain-worker/)
-- Build [staff tooling and admin dashboards](https://plainframework.com/docs/plain-staff/)
+- Build [admin dashboard and tools](https://plainframework.com/docs/plain-admin/)
 
 Learn more at [plainframework.com](https://plainframework.com).

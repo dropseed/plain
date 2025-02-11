@@ -1,0 +1,7 @@
+{% for item in value %}
+<div>
+    {% with value=item %}
+    {% include "admin/values/model.html" %}
+    {% endwith %}
+</div>
+{% endfor %}

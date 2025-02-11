@@ -27,7 +27,7 @@ WelcomeUserJob(user).run_in_worker()
 
 The worker process is run separately using `plain worker run`.
 
-## Staff
+## Admin
 
 ## Job history
 

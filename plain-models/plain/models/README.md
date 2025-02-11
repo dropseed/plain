@@ -11,7 +11,7 @@ from plain.passwords.models import PasswordField
 class User(models.Model):
     email = models.EmailField(unique=True)
     password = PasswordField()
-    is_staff = models.BooleanField(default=False)
+    is_admin = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -38,7 +38,7 @@ user.save()
 user.delete()
 
 # Query for users
-staff_users = User.objects.filter(is_staff=True)
+admin_users = User.objects.filter(is_admin=True)
 ```
 
 ## Installation

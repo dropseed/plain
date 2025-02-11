@@ -1,0 +1,17 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+
+<div class="border border-red-500 rounded">
+    <form method="post">
+        {{ csrf_input }}
+        <div class="p-4">
+            <p>Are you sure you want to delete this?</p>
+            <button class="px-5 py-2 mt-6 text-white bg-red-600 rounded hover:bg-red-700" type="submit">
+                Delete
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
