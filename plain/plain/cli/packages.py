@@ -14,10 +14,11 @@ class InstalledPackagesGroup(click.Group):
     """
 
     PLAIN_APPS_PREFIX = "plain."
+    APP_PREFIX = "app."
     MODULE_NAME = "cli"
 
     def list_commands(self, ctx):
-        packages_with_commands = []
+        command_names = []
 
         # Get installed packages with a cli.py module
         for app in packages.get_package_configs():
@@ -26,21 +27,37 @@ class InstalledPackagesGroup(click.Group):
 
             cli_name = app.name
 
+            # Change plain.{pkg} to just {pkg}
             if cli_name.startswith(self.PLAIN_APPS_PREFIX):
                 cli_name = cli_name[len(self.PLAIN_APPS_PREFIX) :]
 
-            packages_with_commands.append(cli_name)
+            # Change app.{pkg} to just {pkg}
+            if cli_name.startswith(self.APP_PREFIX):
+                cli_name = cli_name[len(self.APP_PREFIX) :]
 
-        return packages_with_commands
+            if cli_name in command_names:
+                raise ValueError(
+                    f"Duplicate command name {cli_name} found in installed packages."
+                )
+
+            command_names.append(cli_name)
+
+        return command_names
 
     def get_command(self, ctx, name):
-        # Try it as plain.x and just x (we don't know ahead of time which it is, but prefer plain.x)
-        for n in [self.PLAIN_APPS_PREFIX + name, name]:
-            if not find_spec(n):
-                # plain.<name> doesn't exist at all
+        # Try it as plain.x, app.x, and just x (we don't know ahead of time which it is)
+        for n in [self.PLAIN_APPS_PREFIX + name, self.APP_PREFIX + name, name]:
+            try:
+                if not find_spec(n):
+                    # plain.<name> doesn't exist at all
+                    continue
+            except ModuleNotFoundError:
                 continue
 
-            if not find_spec(f"{n}.{self.MODULE_NAME}"):
+            try:
+                if not find_spec(f"{n}.{self.MODULE_NAME}"):
+                    continue
+            except ModuleNotFoundError:
                 continue
 
             cli = importlib.import_module(f"{n}.{self.MODULE_NAME}")
