@@ -101,6 +101,15 @@ wheels = [
 ]
 
 [[package]]
+name = "inotify"
+version = "0.2.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nose" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/35/cb/6d564f8a3f25d9516298dce151670d01e43a4b3b769c1c15f40453179cd5/inotify-0.2.10.tar.gz", hash = "sha256:974a623a338482b62e16d4eb705fb863ed33ec178680fc3e96ccdf0df6c02a07", size = 9905 }
+
+[[package]]
 name = "jinja2"
 version = "3.1.5"
 source = { registry = "https://pypi.org/simple" }
@@ -182,6 +191,15 @@ wheels = [
 ]
 
 [[package]]
+name = "nose"
+version = "1.3.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/58/a5/0dc93c3ec33f4e281849523a5a913fa1eea9a3068acfa754d44d88107a44/nose-1.3.7.tar.gz", hash = "sha256:f1bffef9cbc82628f6e7d7b40d7e255aefaa1adb6a1b1d26c69a8b79e6208a98", size = 280488 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/d8/dd071918c040f50fa1cf80da16423af51ff8ce4a0f2399b7bf8de45ac3d9/nose-1.3.7-py3-none-any.whl", hash = "sha256:9ff7c6cc443f8c51994b34a667bbcf45afd6d945be7477b52e97516fd17c53ac", size = 154731 },
+]
+
+[[package]]
 name = "packaging"
 version = "24.2"
 source = { registry = "https://pypi.org/simple" }
@@ -205,11 +223,12 @@ wheels = [
 
 [[package]]
 name = "plain-dev"
-version = "0.19.1"
+version = "0.19.3"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "gunicorn" },
+    { name = "inotify" },
     { name = "plain" },
     { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
@@ -221,6 +240,7 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "gunicorn", specifier = ">20" },
+    { name = "inotify" },
     { name = "plain", specifier = "<1.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = "~=3.2.2" },
     { name = "python-dotenv", specifier = "~=1.0.0" },
