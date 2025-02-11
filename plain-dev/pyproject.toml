@@ -16,6 +16,11 @@ dependencies = [
     "rich",
 ]
 
+# Make this available as a standalone command
+# in case plain can't load or something (this can run anyways)
+[project.scripts]
+plain-contrib = "plain.dev.contribute:cli"
+
 # Make the CLI available without adding to INSTALLED_APPS
 [project.entry-points."plain.cli"]
 "dev" = "plain.dev:cli"
