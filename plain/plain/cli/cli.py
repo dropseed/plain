@@ -346,6 +346,10 @@ def compile(keep_original, fingerprint, compress):
         f"\nCompiled {total_files} assets into {total_compiled} files", fg="green"
     )
 
+    # TODO could do a jinja pre-compile here too?
+    # environment.compile_templates() but it needs a target, ignore_errors=False
+
+
 
 @plain_cli.command()
 @click.argument("package_name")
