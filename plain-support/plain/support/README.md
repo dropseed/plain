@@ -20,3 +20,9 @@ urlpatterns = [
 ## Security considerations
 
 Most support forms allow you to type in an email address. Be careful, because anybody can pretend to be anybody else at this point. Conversations either need to continue over email (which confirms they have access to the email account), or include a verification step (emailing a code to the email address, for example).
+
+## FAQs
+
+### How can I customize the support form?
+
+You can customize the support form by creating a `support_form.html` template in your project's templates directory. This template will override the default one provided by the `plain-support` package.
