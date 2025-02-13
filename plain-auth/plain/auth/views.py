@@ -9,6 +9,7 @@ from plain.http import (
 )
 from plain.runtime import settings
 from plain.urls import reverse
+from plain.utils.cache import patch_cache_control
 from plain.views import View
 
 from .sessions import logout
@@ -83,7 +84,10 @@ class AuthViewMixin:
             else:
                 raise PermissionDenied("Login required")
 
-        return super().get_response()  # type: ignore
+        response = super().get_response()
+        # Make sure it at least has private as a default
+        patch_cache_control(response, private=True)
+        return response
 
 
 class LogoutView(View):
