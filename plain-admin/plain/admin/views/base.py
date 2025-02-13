@@ -42,6 +42,13 @@ class AdminView(AuthViewMixin, TemplateView):
     template_name = "admin/page.html"
     cards: list["Card"] = []
 
+    def get_response(self):
+        response = super().get_response()
+        response.headers["Cache-Control"] = (
+            "no-cache, no-store, must-revalidate, max-age=0"
+        )
+        return response
+
     def get_template_context(self):
         context = super().get_template_context()
         context["title"] = self.get_title()
