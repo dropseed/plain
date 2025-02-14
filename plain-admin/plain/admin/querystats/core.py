@@ -16,7 +16,6 @@ IGNORE_STACK_FILES = [
     "querystats/core",
     "plain/template/base",
     "plain/utils/decorators",
-    "plain/utils/deprecation",
     "plain/db",
     "plain/utils/functional",
     "plain/core/servers",
