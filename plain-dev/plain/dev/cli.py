@@ -17,7 +17,6 @@ from rich.text import Text
 
 from plain.runtime import APP_PATH, settings
 
-from .db import cli as db_cli
 from .mkcert import MkcertManager
 from .pid import Pid
 from .poncho.manager import Manager as PonchoManager
@@ -388,6 +387,3 @@ class Dev:
                 **data.get("env", {}),
             }
             self.poncho.add_process(name, data["cmd"], env=env)
-
-
-cli.add_command(db_cli)
