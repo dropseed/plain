@@ -1,4 +1,3 @@
-import warnings
 from enum import Enum
 from types import NoneType
 
@@ -9,7 +8,6 @@ from plain.models.indexes import IndexExpression
 from plain.models.lookups import Exact
 from plain.models.query_utils import Q
 from plain.models.sql.query import Query
-from plain.utils.deprecation import RemovedInDjango60Warning
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 
@@ -19,19 +17,9 @@ class BaseConstraint:
     violation_error_code = None
     violation_error_message = None
 
-    # RemovedInDjango60Warning: When the deprecation ends, replace with:
-    # def __init__(
-    #     self, *, name, violation_error_code=None, violation_error_message=None
-    # ):
     def __init__(
-        self, *args, name=None, violation_error_code=None, violation_error_message=None
+        self, *, name, violation_error_code=None, violation_error_message=None
     ):
-        # RemovedInDjango60Warning.
-        if name is None and not args:
-            raise TypeError(
-                f"{self.__class__.__name__}.__init__() missing 1 required keyword-only "
-                f"argument: 'name'"
-            )
         self.name = name
         if violation_error_code is not None:
             self.violation_error_code = violation_error_code
@@ -39,17 +27,6 @@ class BaseConstraint:
             self.violation_error_message = violation_error_message
         else:
             self.violation_error_message = self.default_violation_error_message
-        # RemovedInDjango60Warning.
-        if args:
-            warnings.warn(
-                f"Passing positional arguments to {self.__class__.__name__} is "
-                f"deprecated.",
-                RemovedInDjango60Warning,
-                stacklevel=2,
-            )
-            for arg, attr in zip(args, ["name", "violation_error_message"]):
-                if arg:
-                    setattr(self, attr, arg)
 
     @property
     def contains_expressions(self):

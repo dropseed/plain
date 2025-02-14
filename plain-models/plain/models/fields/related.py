@@ -1785,7 +1785,7 @@ class ManyToManyField(RelatedField):
             self.remote_field.related_name = f"{name}_rel_+"
         elif self.remote_field.is_hidden():
             # If the backwards relation is disabled, replace the original
-            # related_name with one generated from the m2m field name. Django
+            # related_name with one generated from the m2m field name. Plain
             # still uses backwards relations internally and we need to avoid
             # clashes between multiple m2m fields with related_name == '+'.
             self.remote_field.related_name = (

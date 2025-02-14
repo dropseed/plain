@@ -1,5 +1,4 @@
 import json
-import warnings
 
 from plain import exceptions, preflight
 from plain.models import expressions, lookups
@@ -11,7 +10,6 @@ from plain.models.lookups import (
     PostgresOperatorLookup,
     Transform,
 )
-from plain.utils.deprecation import RemovedInDjango51Warning
 
 from . import Field
 from .mixins import CheckFieldDefaultMixin
@@ -96,31 +94,10 @@ class JSONField(CheckFieldDefaultMixin, Field):
         return "JSONField"
 
     def get_db_prep_value(self, value, connection, prepared=False):
-        # RemovedInDjango51Warning: When the deprecation ends, replace with:
-        # if (
-        #     isinstance(value, expressions.Value)
-        #     and isinstance(value.output_field, JSONField)
-        # ):
-        #     value = value.value
-        # elif hasattr(value, "as_sql"): ...
-        if isinstance(value, expressions.Value):
-            if isinstance(value.value, str) and not isinstance(
-                value.output_field, JSONField
-            ):
-                try:
-                    value = json.loads(value.value, cls=self.decoder)
-                except json.JSONDecodeError:
-                    value = value.value
-                else:
-                    warnings.warn(
-                        "Providing an encoded JSON string via Value() is deprecated. "
-                        f"Use Value({value!r}, output_field=JSONField()) instead.",
-                        category=RemovedInDjango51Warning,
-                    )
-            elif isinstance(value.output_field, JSONField):
-                value = value.value
-            else:
-                return value
+        if isinstance(value, expressions.Value) and isinstance(
+            value.output_field, JSONField
+        ):
+            value = value.value
         elif hasattr(value, "as_sql"):
             return value
         return connection.ops.adapt_json_value(value, self.encoder)

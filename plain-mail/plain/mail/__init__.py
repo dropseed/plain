@@ -5,10 +5,6 @@ Tools for sending email.
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 
-# Imported for backwards compatibility and for the sake
-# of a cleaner namespace. These symbols used to be in
-# django/core/mail.py before the introduction of email
-# backends and the subsequent reorganization (See #10355)
 from .message import (
     DEFAULT_ATTACHMENT_MIME_TYPE,
     BadHeaderError,
