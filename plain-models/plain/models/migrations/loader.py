@@ -358,7 +358,7 @@ class MigrationLoader:
         """
         statements = []
         state = None
-        for migration, backwards in plan:
+        for migration in plan:
             with self.connection.schema_editor(
                 collect_sql=True, atomic=migration.atomic
             ) as schema_editor:
@@ -366,9 +366,7 @@ class MigrationLoader:
                     state = self.project_state(
                         (migration.package_label, migration.name), at_end=False
                     )
-                if not backwards:
-                    state = migration.apply(state, schema_editor, collect_sql=True)
-                else:
-                    state = migration.unapply(state, schema_editor, collect_sql=True)
+
+                state = migration.apply(state, schema_editor, collect_sql=True)
             statements.extend(schema_editor.collected_sql)
         return statements

@@ -112,13 +112,6 @@ class AddField(FieldOperation):
             if not self.preserve_default:
                 field.default = NOT_PROVIDED
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        from_model = from_state.packages.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, from_model):
-            schema_editor.remove_field(
-                from_model, from_model._meta.get_field(self.name)
-            )
-
     def describe(self):
         return f"Add field {self.name} to {self.model_name}"
 
@@ -170,12 +163,6 @@ class RemoveField(FieldOperation):
             schema_editor.remove_field(
                 from_model, from_model._meta.get_field(self.name)
             )
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        to_model = to_state.packages.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.packages.get_model(package_label, self.model_name)
-            schema_editor.add_field(from_model, to_model._meta.get_field(self.name))
 
     def describe(self):
         return f"Remove field {self.name} from {self.model_name}"
@@ -235,9 +222,6 @@ class AlterField(FieldOperation):
             schema_editor.alter_field(from_model, from_field, to_field)
             if not self.preserve_default:
                 to_field.default = NOT_PROVIDED
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        self.database_forwards(package_label, schema_editor, from_state, to_state)
 
     def describe(self):
         return f"Alter field {self.name} on {self.model_name}"
@@ -304,16 +288,6 @@ class RenameField(FieldOperation):
                 from_model,
                 from_model._meta.get_field(self.old_name),
                 to_model._meta.get_field(self.new_name),
-            )
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        to_model = to_state.packages.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.packages.get_model(package_label, self.model_name)
-            schema_editor.alter_field(
-                from_model,
-                from_model._meta.get_field(self.new_name),
-                to_model._meta.get_field(self.old_name),
             )
 
     def describe(self):

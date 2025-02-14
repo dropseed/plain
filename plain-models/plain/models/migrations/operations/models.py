@@ -94,11 +94,6 @@ class CreateModel(ModelOperation):
         if self.allow_migrate_model(schema_editor.connection.alias, model):
             schema_editor.create_model(model)
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        model = from_state.packages.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
-            schema_editor.delete_model(model)
-
     def describe(self):
         return f"Create model {self.name}"
 
@@ -278,11 +273,6 @@ class DeleteModel(ModelOperation):
         if self.allow_migrate_model(schema_editor.connection.alias, model):
             schema_editor.delete_model(model)
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.packages.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
-            schema_editor.create_model(model)
-
     def references_model(self, name, package_label):
         # The deleted model could be referencing the specified model through
         # related fields.
@@ -370,21 +360,6 @@ class RenameModel(ModelOperation):
                     strict=False,
                 )
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        self.new_name_lower, self.old_name_lower = (
-            self.old_name_lower,
-            self.new_name_lower,
-        )
-        self.new_name, self.old_name = self.old_name, self.new_name
-
-        self.database_forwards(package_label, schema_editor, from_state, to_state)
-
-        self.new_name_lower, self.old_name_lower = (
-            self.old_name_lower,
-            self.new_name_lower,
-        )
-        self.new_name, self.old_name = self.old_name, self.new_name
-
     def references_model(self, name, package_label):
         return (
             name.lower() == self.old_name_lower or name.lower() == self.new_name_lower
@@ -464,11 +439,6 @@ class AlterModelTable(ModelOptionOperation):
                         new_field.remote_field.through._meta.db_table,
                     )
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        return self.database_forwards(
-            package_label, schema_editor, from_state, to_state
-        )
-
     def describe(self):
         return "Rename table for {} to {}".format(
             self.name,
@@ -506,11 +476,6 @@ class AlterModelTableComment(ModelOptionOperation):
                 old_model._meta.db_table_comment,
                 new_model._meta.db_table_comment,
             )
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        return self.database_forwards(
-            package_label, schema_editor, from_state, to_state
-        )
 
     def describe(self):
         return f"Alter {self.name} table comment"
@@ -569,9 +534,6 @@ class AlterOrderWithRespectTo(ModelOptionOperation):
                     field,
                 )
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        self.database_forwards(package_label, schema_editor, from_state, to_state)
-
     def references_field(self, model_name, name, package_label):
         return self.references_model(model_name, package_label) and (
             self.order_with_respect_to is None or name == self.order_with_respect_to
@@ -627,9 +589,6 @@ class AlterModelOptions(ModelOptionOperation):
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         pass
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        pass
-
     def describe(self):
         return f"Change Meta options on {self.name}"
 
@@ -654,9 +613,6 @@ class AlterModelManagers(ModelOptionOperation):
         state.alter_model_managers(package_label, self.name_lower, self.managers)
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        pass
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
         pass
 
     def describe(self):
@@ -694,11 +650,6 @@ class AddIndex(IndexOperation):
         model = to_state.packages.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection.alias, model):
             schema_editor.add_index(model, self.index)
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        model = from_state.packages.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
-            schema_editor.remove_index(model, self.index)
 
     def deconstruct(self):
         kwargs = {
@@ -745,13 +696,6 @@ class RemoveIndex(IndexOperation):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             index = from_model_state.get_index_by_name(self.name)
             schema_editor.remove_index(model, index)
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.packages.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
-            to_model_state = to_state.models[package_label, self.model_name_lower]
-            index = to_model_state.get_index_by_name(self.name)
-            schema_editor.add_index(model, index)
 
     def deconstruct(self):
         kwargs = {
@@ -857,25 +801,6 @@ class RenameIndex(IndexOperation):
         new_index = to_model_state.get_index_by_name(self.new_name)
         schema_editor.rename_index(model, old_index, new_index)
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        if self.old_fields:
-            # Backward operation with unnamed index is a no-op.
-            return
-
-        self.new_name_lower, self.old_name_lower = (
-            self.old_name_lower,
-            self.new_name_lower,
-        )
-        self.new_name, self.old_name = self.old_name, self.new_name
-
-        self.database_forwards(package_label, schema_editor, from_state, to_state)
-
-        self.new_name_lower, self.old_name_lower = (
-            self.old_name_lower,
-            self.new_name_lower,
-        )
-        self.new_name, self.old_name = self.old_name, self.new_name
-
     def describe(self):
         if self.old_name:
             return (
@@ -929,11 +854,6 @@ class AddConstraint(IndexOperation):
         if self.allow_migrate_model(schema_editor.connection.alias, model):
             schema_editor.add_constraint(model, self.constraint)
 
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.packages.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
-            schema_editor.remove_constraint(model, self.constraint)
-
     def deconstruct(self):
         return (
             self.__class__.__name__,
@@ -968,13 +888,6 @@ class RemoveConstraint(IndexOperation):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             constraint = from_model_state.get_constraint_by_name(self.name)
             schema_editor.remove_constraint(model, constraint)
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.packages.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
-            to_model_state = to_state.models[package_label, self.model_name_lower]
-            constraint = to_model_state.get_constraint_by_name(self.name)
-            schema_editor.add_constraint(model, constraint)
 
     def deconstruct(self):
         return (

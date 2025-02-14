@@ -483,16 +483,6 @@ def migrate(
                     click.echo(click.style(f" FAKED{elapsed}", fg="green"))
                 else:
                     click.echo(click.style(f" OK{elapsed}", fg="green"))
-            elif action == "unapply_start":
-                if compute_time:
-                    start = time.monotonic()
-                click.echo(f"  Unapplying {migration}...", nl=False)
-            elif action == "unapply_success":
-                elapsed = f" ({time.monotonic() - start:.3f}s)" if compute_time else ""
-                if fake:
-                    click.echo(click.style(f" FAKED{elapsed}", fg="green"))
-                else:
-                    click.echo(click.style(f" OK{elapsed}", fg="green"))
             elif action == "render_start":
                 if compute_time:
                     start = time.monotonic()
@@ -556,24 +546,19 @@ def migrate(
             if verbosity >= 1:
                 click.echo("    Running deferred SQL...", color="cyan")
 
-    def describe_operation(operation, backwards):
+    def describe_operation(operation):
         """Return a string that describes a migration operation for --plan."""
         prefix = ""
         is_error = False
         if hasattr(operation, "code"):
-            code = operation.reverse_code if backwards else operation.code
+            code = operation.code
             action = (code.__doc__ or "") if code else None
         elif hasattr(operation, "sql"):
-            action = operation.reverse_sql if backwards else operation.sql
+            action = operation.sql
         else:
             action = ""
-            if backwards:
-                prefix = "Undo "
         if action is not None:
             action = str(action).replace("\n", "")
-        elif backwards:
-            action = "IRREVERSIBLE"
-            is_error = True
         if action:
             action = " -> " + action
         truncated = Truncator(action)
@@ -623,30 +608,27 @@ def migrate(
             )
 
     if package_label and migration_name:
-        if migration_name == "zero":
-            targets = [(package_label, None)]
-        else:
-            try:
-                migration = executor.loader.get_migration_by_prefix(
-                    package_label, migration_name
-                )
-            except AmbiguityError:
-                raise click.ClickException(
-                    f"More than one migration matches '{migration_name}' in package '{package_label}'. "
-                    "Please be more specific."
-                )
-            except KeyError:
-                raise click.ClickException(
-                    f"Cannot find a migration matching '{migration_name}' from package '{package_label}'."
-                )
-            target = (package_label, migration.name)
-            if (
-                target not in executor.loader.graph.nodes
-                and target in executor.loader.replacements
-            ):
-                incomplete_migration = executor.loader.replacements[target]
-                target = incomplete_migration.replaces[-1]
-            targets = [target]
+        try:
+            migration = executor.loader.get_migration_by_prefix(
+                package_label, migration_name
+            )
+        except AmbiguityError:
+            raise click.ClickException(
+                f"More than one migration matches '{migration_name}' in package '{package_label}'. "
+                "Please be more specific."
+            )
+        except KeyError:
+            raise click.ClickException(
+                f"Cannot find a migration matching '{migration_name}' from package '{package_label}'."
+            )
+        target = (package_label, migration.name)
+        if (
+            target not in executor.loader.graph.nodes
+            and target in executor.loader.replacements
+        ):
+            incomplete_migration = executor.loader.replacements[target]
+            target = incomplete_migration.replaces[-1]
+        targets = [target]
         target_package_labels_only = False
     elif package_label:
         targets = [
@@ -715,10 +697,10 @@ def migrate(
         if not migration_plan:
             click.echo("  No planned migration operations.")
         else:
-            for migration, backwards in migration_plan:
+            for migration in migration_plan:
                 click.echo(str(migration), color="cyan")
                 for operation in migration.operations:
-                    message, is_error = describe_operation(operation, backwards)
+                    message, is_error = describe_operation(operation)
                     if is_error:
                         click.echo("    " + message, fg="yellow")
                     else:
@@ -758,13 +740,10 @@ def migrate(
                 color="yellow",
             )
         else:
-            if targets[0][1] is None:
-                click.echo(f"  Unapply all migrations: {targets[0][0]}", color="yellow")
-            else:
-                click.echo(
-                    f"  Target specific migration: {targets[0][1]}, from {targets[0][0]}",
-                    color="yellow",
-                )
+            click.echo(
+                f"  Target specific migration: {targets[0][1]}, from {targets[0][0]}",
+                color="yellow",
+            )
 
     pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
 

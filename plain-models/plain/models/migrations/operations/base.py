@@ -17,10 +17,6 @@ class Operation:
     considered immutable.
     """
 
-    # If this migration can be run in reverse.
-    # Some operations are impossible to reverse, like deleting data.
-    reversible = True
-
     # Can this migration be represented as SQL? (things like RunPython cannot)
     reduces_to_sql = True
 
@@ -67,16 +63,6 @@ class Operation:
         """
         raise NotImplementedError(
             "subclasses of Operation must provide a database_forwards() method"
-        )
-
-    def database_backwards(self, package_label, schema_editor, from_state, to_state):
-        """
-        Perform the mutation on the database schema in the reverse
-        direction - e.g. if this were CreateModel, it would in fact
-        drop the model's table.
-        """
-        raise NotImplementedError(
-            "subclasses of Operation must provide a database_backwards() method"
         )
 
     def describe(self):

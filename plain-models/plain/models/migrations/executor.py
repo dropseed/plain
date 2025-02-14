@@ -2,7 +2,6 @@ from plain.models import migrations
 from plain.models.db import router
 from plain.packages.registry import packages as global_packages
 
-from .exceptions import InvalidMigrationPlan
 from .loader import MigrationLoader
 from .recorder import MigrationRecorder
 from .state import ProjectState
@@ -22,7 +21,7 @@ class MigrationExecutor:
 
     def migration_plan(self, targets, clean_start=False):
         """
-        Given a set of targets, return a list of (Migration instance, backwards?).
+        Given a set of targets, return a list of Migration instances.
         """
         plan = []
         if clean_start:
@@ -30,45 +29,10 @@ class MigrationExecutor:
         else:
             applied = dict(self.loader.applied_migrations)
         for target in targets:
-            # If the target is (package_label, None), that means unmigrate everything
-            if target[1] is None:
-                for root in self.loader.graph.root_nodes():
-                    if root[0] == target[0]:
-                        for migration in self.loader.graph.backwards_plan(root):
-                            if migration in applied:
-                                plan.append((self.loader.graph.nodes[migration], True))
-                                applied.pop(migration)
-            # If the migration is already applied, do backwards mode,
-            # otherwise do forwards mode.
-            elif target in applied:
-                # If the target is missing, it's likely a replaced migration.
-                # Reload the graph without replacements.
-                if (
-                    self.loader.replace_migrations
-                    and target not in self.loader.graph.node_map
-                ):
-                    self.loader.replace_migrations = False
-                    self.loader.build_graph()
-                    return self.migration_plan(targets, clean_start=clean_start)
-                # Don't migrate backwards all the way to the target node (that
-                # may roll back dependencies in other packages that don't need to
-                # be rolled back); instead roll back through target's immediate
-                # child(ren) in the same app, and no further.
-                next_in_app = sorted(
-                    n
-                    for n in self.loader.graph.node_map[target].children
-                    if n[0] == target[0]
-                )
-                for node in next_in_app:
-                    for migration in self.loader.graph.backwards_plan(node):
-                        if migration in applied:
-                            plan.append((self.loader.graph.nodes[migration], True))
-                            applied.pop(migration)
-            else:
-                for migration in self.loader.graph.forwards_plan(target):
-                    if migration not in applied:
-                        plan.append((self.loader.graph.nodes[migration], False))
-                        applied[migration] = self.loader.graph.nodes[migration]
+            for migration in self.loader.graph.forwards_plan(target):
+                if migration not in applied:
+                    plan.append(self.loader.graph.nodes[migration])
+                    applied[migration] = self.loader.graph.nodes[migration]
         return plan
 
     def _create_project_state(self, with_applied_migrations=False):
@@ -87,7 +51,7 @@ class MigrationExecutor:
                 for key in self.loader.applied_migrations
                 if key in self.loader.graph.nodes
             }
-            for migration, _ in full_plan:
+            for migration in full_plan:
                 if migration in applied_migrations:
                     migration.mutate_state(state, preserve=False)
         return state
@@ -114,32 +78,17 @@ class MigrationExecutor:
             self.loader.graph.leaf_nodes(), clean_start=True
         )
 
-        all_forwards = all(not backwards for mig, backwards in plan)
-        all_backwards = all(backwards for mig, backwards in plan)
-
         if not plan:
             if state is None:
                 # The resulting state should include applied migrations.
                 state = self._create_project_state(with_applied_migrations=True)
-        elif all_forwards == all_backwards:
-            # This should only happen if there's a mixed plan
-            raise InvalidMigrationPlan(
-                "Migration plans with both forwards and backwards migrations "
-                "are not supported. Please split your migration process into "
-                "separate plans of only forwards OR backwards migrations.",
-                plan,
-            )
-        elif all_forwards:
+        else:
             if state is None:
                 # The resulting state should still include applied migrations.
                 state = self._create_project_state(with_applied_migrations=True)
             state = self._migrate_all_forwards(
                 state, plan, full_plan, fake=fake, fake_initial=fake_initial
             )
-        else:
-            # No need to check for `elif all_backwards` here, as that condition
-            # would always evaluate to true.
-            state = self._migrate_all_backwards(plan, full_plan, fake=fake)
 
         self.check_replacements()
 
@@ -150,8 +99,8 @@ class MigrationExecutor:
         Take a list of 2-tuples of the form (migration instance, False) and
         apply them in the order they occur in the full_plan.
         """
-        migrations_to_run = {m[0] for m in plan}
-        for migration, _ in full_plan:
+        migrations_to_run = set(plan)
+        for migration in full_plan:
             if not migrations_to_run:
                 # We remove every migration that we applied from these sets so
                 # that we can bail out once the last migration has been applied
@@ -169,68 +118,6 @@ class MigrationExecutor:
                     state, migration, fake=fake, fake_initial=fake_initial
                 )
                 migrations_to_run.remove(migration)
-
-        return state
-
-    def _migrate_all_backwards(self, plan, full_plan, fake):
-        """
-        Take a list of 2-tuples of the form (migration instance, True) and
-        unapply them in reverse order they occur in the full_plan.
-
-        Since unapplying a migration requires the project state prior to that
-        migration, Plain will compute the migration states before each of them
-        in a first run over the plan and then unapply them in a second run over
-        the plan.
-        """
-        migrations_to_run = {m[0] for m in plan}
-        # Holds all migration states prior to the migrations being unapplied
-        states = {}
-        state = self._create_project_state()
-        applied_migrations = {
-            self.loader.graph.nodes[key]
-            for key in self.loader.applied_migrations
-            if key in self.loader.graph.nodes
-        }
-        if self.progress_callback:
-            self.progress_callback("render_start")
-        for migration, _ in full_plan:
-            if not migrations_to_run:
-                # We remove every migration that we applied from this set so
-                # that we can bail out once the last migration has been applied
-                # and don't always run until the very end of the migration
-                # process.
-                break
-            if migration in migrations_to_run:
-                if "packages" not in state.__dict__:
-                    state.packages  # Render all -- performance critical
-                # The state before this migration
-                states[migration] = state
-                # The old state keeps as-is, we continue with the new state
-                state = migration.mutate_state(state, preserve=True)
-                migrations_to_run.remove(migration)
-            elif migration in applied_migrations:
-                # Only mutate the state if the migration is actually applied
-                # to make sure the resulting state doesn't include changes
-                # from unrelated migrations.
-                migration.mutate_state(state, preserve=False)
-        if self.progress_callback:
-            self.progress_callback("render_success")
-
-        for migration, _ in plan:
-            self.unapply_migration(states[migration], migration, fake=fake)
-            applied_migrations.remove(migration)
-
-        # Generate the post migration state by starting from the state before
-        # the last migration is unapplied and mutating it to include all the
-        # remaining applied migrations.
-        last_unapplied_migration = plan[-1][0]
-        state = states[last_unapplied_migration]
-        for index, (migration, _) in enumerate(full_plan):
-            if migration == last_unapplied_migration:
-                for migration, _ in full_plan[index:]:
-                    if migration in applied_migrations:
-                        migration.mutate_state(state, preserve=False)
-                break
 
         return state
 
@@ -268,25 +155,6 @@ class MigrationExecutor:
                 self.recorder.record_applied(package_label, name)
         else:
             self.recorder.record_applied(migration.package_label, migration.name)
-
-    def unapply_migration(self, state, migration, fake=False):
-        """Run a migration backwards."""
-        if self.progress_callback:
-            self.progress_callback("unapply_start", migration, fake)
-        if not fake:
-            with self.connection.schema_editor(
-                atomic=migration.atomic
-            ) as schema_editor:
-                state = migration.unapply(state, schema_editor)
-        # For replacement migrations, also record individual statuses.
-        if migration.replaces:
-            for package_label, name in migration.replaces:
-                self.recorder.record_unapplied(package_label, name)
-        self.recorder.record_unapplied(migration.package_label, migration.name)
-        # Report progress
-        if self.progress_callback:
-            self.progress_callback("unapply_success", migration, fake)
-        return state
 
     def check_replacements(self):
         """

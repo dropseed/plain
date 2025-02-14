@@ -31,12 +31,6 @@ class InvalidBasesError(ValueError):
     pass
 
 
-class IrreversibleError(RuntimeError):
-    """An irreversible migration is about to be reversed."""
-
-    pass
-
-
 class NodeNotFoundError(LookupError):
     """An attempt on a node is made that is not available in the graph."""
 

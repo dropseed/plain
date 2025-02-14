@@ -206,16 +206,6 @@ class MigrationGraph:
             raise NodeNotFoundError(f"Node {target!r} not a valid node", target)
         return self.iterative_dfs(self.node_map[target])
 
-    def backwards_plan(self, target):
-        """
-        Given a node, return a list of which dependent nodes (dependencies)
-        must be unapplied, ending with the node itself. This is the list you
-        would follow if removing the migrations from a database.
-        """
-        if target not in self.nodes:
-            raise NodeNotFoundError(f"Node {target!r} not a valid node", target)
-        return self.iterative_dfs(self.node_map[target], forwards=False)
-
     def iterative_dfs(self, start, forwards=True):
         """Iterative depth-first search for finding dependencies."""
         visited = []
