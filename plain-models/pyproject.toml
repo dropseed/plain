@@ -14,6 +14,7 @@ dependencies = [
 [project.entry-points."plain.cli"]
 "makemigrations" = "plain.models.cli:makemigrations"
 "migrate" = "plain.models.cli:migrate"
+"backups" = "plain.models.backups.cli:cli"
 
 # Automatically sets this up with pytest
 [project.entry-points."pytest11"]

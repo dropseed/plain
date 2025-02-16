@@ -6,30 +6,36 @@ from itertools import takewhile
 
 import click
 
-from plain.models import migrations
-from plain.models.db import DEFAULT_DB_ALIAS, OperationalError, connections, router
-from plain.models.migrations.autodetector import MigrationAutodetector
-from plain.models.migrations.executor import MigrationExecutor
-from plain.models.migrations.loader import AmbiguityError, MigrationLoader
-from plain.models.migrations.migration import Migration, SwappableTuple
-from plain.models.migrations.optimizer import MigrationOptimizer
-from plain.models.migrations.questioner import (
+from plain.packages import packages
+from plain.runtime import settings
+from plain.utils.text import Truncator
+
+from . import migrations
+from .backups.cli import cli as backups_cli
+from .backups.cli import create_backup
+from .db import DEFAULT_DB_ALIAS, OperationalError, connections, router
+from .migrations.autodetector import MigrationAutodetector
+from .migrations.executor import MigrationExecutor
+from .migrations.loader import AmbiguityError, MigrationLoader
+from .migrations.migration import Migration, SwappableTuple
+from .migrations.optimizer import MigrationOptimizer
+from .migrations.questioner import (
     InteractiveMigrationQuestioner,
     MigrationQuestioner,
     NonInteractiveMigrationQuestioner,
 )
-from plain.models.migrations.recorder import MigrationRecorder
-from plain.models.migrations.state import ModelState, ProjectState
-from plain.models.migrations.utils import get_migration_name_timestamp
-from plain.models.migrations.writer import MigrationWriter
-from plain.packages import packages
-from plain.runtime import settings
-from plain.utils.text import Truncator
+from .migrations.recorder import MigrationRecorder
+from .migrations.state import ModelState, ProjectState
+from .migrations.utils import get_migration_name_timestamp
+from .migrations.writer import MigrationWriter
 
 
 @click.group()
 def cli():
     pass
+
+
+cli.add_command(backups_cli)
 
 
 @cli.command()
@@ -410,13 +416,6 @@ def makemigrations(
 @click.argument("package_label", required=False)
 @click.argument("migration_name", required=False)
 @click.option(
-    "--noinput",
-    "--no-input",
-    "no_input",
-    is_flag=True,
-    help="Tells Plain to NOT prompt the user for input of any kind.",
-)
-@click.option(
     "--database",
     default=DEFAULT_DB_ALIAS,
     help="Nominates a database to synchronize. Defaults to the 'default' database.",
@@ -444,6 +443,13 @@ def makemigrations(
     "--run-syncdb", is_flag=True, help="Creates tables for packages without migrations."
 )
 @click.option(
+    "--backup/--no-backup",
+    "backup",
+    is_flag=True,
+    default=None,
+    help="Explicitly enable/disable pre-migration backups.",
+)
+@click.option(
     "--prune",
     is_flag=True,
     help="Delete nonexistent migrations from the plainmigrations table.",
@@ -458,13 +464,13 @@ def makemigrations(
 def migrate(
     package_label,
     migration_name,
-    no_input,
     database,
     fake,
     fake_initial,
     plan,
     check_unapplied,
     run_syncdb,
+    backup,
     prune,
     verbosity,
 ):
@@ -747,6 +753,29 @@ def migrate(
 
     pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
 
+    # sql = executor.loader.collect_sql(migration_plan)
+    # pprint(sql)
+
+    # Can move this down once syncdb is gone
+    if migration_plan:
+        if backup or (
+            backup is None
+            and settings.DEBUG
+            and click.confirm(
+                "\nYou are in DEBUG mode. Would you like to make a database backup before running migrations?"
+            )
+        ):
+            backup_name = f"migrate_{time.strftime('%Y%m%d_%H%M%S')}"
+            # Can't use ctx.invoke because this is called by the test db creation currently,
+            # which doesn't have a context.
+            create_backup.callback(
+                backup_name=backup_name,
+                pg_dump=os.environ.get(
+                    "PG_DUMP", "pg_dump"
+                ),  # Have to this again manually
+            )
+            print()
+
     # Run the syncdb phase.
     if run_syncdb:
         if verbosity >= 1:
@@ -759,33 +788,8 @@ def migrate(
     # Migrate!
     if verbosity >= 1:
         click.echo("Running migrations:", color="cyan")
-    if not migration_plan:
-        if verbosity >= 1:
-            click.echo("  No migrations to apply.")
-            # If there's changes that aren't in migrations yet, tell them
-            # how to fix it.
-            autodetector = MigrationAutodetector(
-                executor.loader.project_state(),
-                ProjectState.from_packages(packages),
-            )
-            changes = autodetector.changes(graph=executor.loader.graph)
-            if changes:
-                click.echo(
-                    click.style(
-                        f"  Your models in package(s): {', '.join(repr(package) for package in sorted(changes))} "
-                        "have changes that are not yet reflected in a migration, and so won't be applied.",
-                        fg="yellow",
-                    )
-                )
-                click.echo(
-                    click.style(
-                        "  Run 'manage.py makemigrations' to make new "
-                        "migrations, and then re-run 'manage.py migrate' to "
-                        "apply them.",
-                        fg="yellow",
-                    )
-                )
-    else:
+
+    if migration_plan:
         post_migrate_state = executor.migrate(
             targets,
             plan=migration_plan,
@@ -810,6 +814,32 @@ def migrate(
         post_migrate_packages.render_multiple(
             [ModelState.from_model(packages.get_model(*model)) for model in model_keys]
         )
+
+    elif verbosity >= 1:
+        click.echo("  No migrations to apply.")
+        # If there's changes that aren't in migrations yet, tell them
+        # how to fix it.
+        autodetector = MigrationAutodetector(
+            executor.loader.project_state(),
+            ProjectState.from_packages(packages),
+        )
+        changes = autodetector.changes(graph=executor.loader.graph)
+        if changes:
+            click.echo(
+                click.style(
+                    f"  Your models in package(s): {', '.join(repr(package) for package in sorted(changes))} "
+                    "have changes that are not yet reflected in a migration, and so won't be applied.",
+                    fg="yellow",
+                )
+            )
+            click.echo(
+                click.style(
+                    "  Run 'manage.py makemigrations' to make new "
+                    "migrations, and then re-run 'manage.py migrate' to "
+                    "apply them.",
+                    fg="yellow",
+                )
+            )
 
 
 @cli.command()

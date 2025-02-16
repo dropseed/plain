@@ -341,7 +341,9 @@ class Dev:
         gunicorn = " ".join(gunicorn_cmd)
 
         if plain_db_installed:
-            runserver_cmd = f"plain models db-wait && plain migrate && {gunicorn}"
+            runserver_cmd = (
+                f"plain models db-wait && plain migrate --backup && {gunicorn}"
+            )
         else:
             runserver_cmd = gunicorn
 
