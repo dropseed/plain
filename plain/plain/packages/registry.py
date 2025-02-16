@@ -36,10 +36,6 @@ class Packages:
         # Mapping of labels to PackageConfig instances for installed packages.
         self.package_configs = {}
 
-        # Stack of package_configs. Used to store the current state in
-        # set_available_packages and set_installed_packages.
-        self.stored_package_configs = []
-
         # Whether the registry is populated.
         self.packages_ready = self.models_ready = self.ready = False
 
@@ -238,15 +234,6 @@ class Packages:
         self.do_pending_operations(model)
         self.clear_cache()
 
-    def is_installed(self, package_name):
-        """
-        Check whether an application with this name exists in the registry.
-
-        package_name is the full name of the app e.g. 'plain.admin'.
-        """
-        self.check_packages_ready()
-        return any(ac.name == package_name for ac in self.package_configs.values())
-
     def get_containing_package_config(self, object_name):
         """
         Look for an app config containing a given object.
@@ -301,67 +288,6 @@ class Packages:
             if model._meta.swappable and model._meta.label_lower == to_string:
                 return model._meta.swappable
         return None
-
-    def set_available_packages(self, available):
-        """
-        Restrict the set of installed packages used by get_package_config[s].
-
-        available must be an iterable of application names.
-
-        set_available_packages() must be balanced with unset_available_packages().
-
-        Primarily used for performance optimization in TransactionTestCase.
-
-        This method is safe in the sense that it doesn't trigger any imports.
-        """
-        available = set(available)
-        installed = {
-            package_config.name for package_config in self.get_package_configs()
-        }
-        if not available.issubset(installed):
-            raise ValueError(
-                "Available packages isn't a subset of installed packages, extra packages: {}".format(
-                    ", ".join(available - installed)
-                )
-            )
-
-        self.stored_package_configs.append(self.package_configs)
-        self.package_configs = {
-            label: package_config
-            for label, package_config in self.package_configs.items()
-            if package_config.name in available
-        }
-        self.clear_cache()
-
-    def unset_available_packages(self):
-        """Cancel a previous call to set_available_packages()."""
-        self.package_configs = self.stored_package_configs.pop()
-        self.clear_cache()
-
-    def set_installed_packages(self, installed):
-        """
-        Enable a different set of installed packages for get_package_config[s].
-
-        installed must be an iterable in the same format as INSTALLED_PACKAGES.
-
-        set_installed_packages() must be balanced with unset_installed_packages(),
-        even if it exits with an exception.
-
-        Primarily used as a receiver of the setting_changed signal in tests.
-
-        This method may trigger new imports, which may add new models to the
-        registry of all imported models. They will stay in the registry even
-        after unset_installed_packages(). Since it isn't possible to replay
-        imports safely (e.g. that could lead to registering listeners twice),
-        models are registered when they're imported and never removed.
-        """
-        if not self.ready:
-            raise PackageRegistryNotReady("Package registry isn't ready yet.")
-        self.stored_package_configs.append(self.package_configs)
-        self.package_configs = {}
-        self.packages_ready = self.models_ready = self.loading = self.ready = False
-        self.clear_cache()
-        self.populate(installed)
 
     def clear_cache(self):
         """
