@@ -72,7 +72,6 @@ class BaseDatabaseCreation:
                 fake_initial=False,
                 plan=False,
                 check_unapplied=False,
-                run_syncdb=True,
                 backup=False,
                 prune=False,
                 verbosity=max(verbosity - 1, 0),

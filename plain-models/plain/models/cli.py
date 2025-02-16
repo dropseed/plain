@@ -440,9 +440,6 @@ def makemigrations(
     help="Exits with a non-zero status if unapplied migrations exist and does not actually apply migrations.",
 )
 @click.option(
-    "--run-syncdb", is_flag=True, help="Creates tables for packages without migrations."
-)
-@click.option(
     "--backup/--no-backup",
     "backup",
     is_flag=True,
@@ -469,7 +466,6 @@ def migrate(
     fake_initial,
     plan,
     check_unapplied,
-    run_syncdb,
     backup,
     prune,
     verbosity,
@@ -496,61 +492,6 @@ def migrate(
             elif action == "render_success":
                 elapsed = f" ({time.monotonic() - start:.3f}s)" if compute_time else ""
                 click.echo(click.style(f" DONE{elapsed}", fg="green"))
-
-    def sync_packages(connection, package_labels):
-        """Run the old syncdb-style operation on a list of package_labels."""
-        with connection.cursor() as cursor:
-            tables = connection.introspection.table_names(cursor)
-
-        # Build the manifest of packages and models that are to be synchronized.
-        all_models = [
-            (
-                package_config.label,
-                router.get_migratable_models(
-                    package_config, connection.alias, include_auto_created=False
-                ),
-            )
-            for package_config in packages.get_package_configs()
-            if package_config.models_module is not None
-            and package_config.label in package_labels
-        ]
-
-        def model_installed(model):
-            opts = model._meta
-            converter = connection.introspection.identifier_converter
-            return not (
-                (converter(opts.db_table) in tables)
-                or (
-                    opts.auto_created
-                    and converter(opts.auto_created._meta.db_table) in tables
-                )
-            )
-
-        manifest = {
-            package_name: list(filter(model_installed, model_list))
-            for package_name, model_list in all_models
-        }
-
-        # Create the tables for each model
-        if verbosity >= 1:
-            click.echo("  Creating tables...", color="cyan")
-        with connection.schema_editor() as editor:
-            for package_name, model_list in manifest.items():
-                for model in model_list:
-                    # Never install unmanaged models, etc.
-                    if not model._meta.can_migrate(connection):
-                        continue
-                    if verbosity >= 3:
-                        click.echo(
-                            f"    Processing {package_name}.{model._meta.object_name} model"
-                        )
-                    if verbosity >= 1:
-                        click.echo(f"    Creating table {model._meta.db_table}")
-                    editor.create_model(model)
-
-            # Deferred SQL is executed when exiting the editor's context.
-            if verbosity >= 1:
-                click.echo("    Running deferred SQL...", color="cyan")
 
     def describe_operation(operation):
         """Return a string that describes a migration operation for --plan."""
@@ -603,12 +544,8 @@ def migrate(
             packages.get_package_config(package_label)
         except LookupError as err:
             raise click.ClickException(str(err))
-        if run_syncdb:
-            if package_label in executor.loader.migrated_packages:
-                raise click.ClickException(
-                    f"Can't use run_syncdb with package '{package_label}' as it has migrations."
-                )
-        elif package_label not in executor.loader.migrated_packages:
+
+        if package_label not in executor.loader.migrated_packages:
             raise click.ClickException(
                 f"Package '{package_label}' does not have migrations."
             )
@@ -723,22 +660,10 @@ def migrate(
     if prune:
         return
 
-    # At this point, ignore run_syncdb if there aren't any packages to sync.
-    run_syncdb = run_syncdb and executor.loader.unmigrated_packages
     # Print some useful info
     if verbosity >= 1:
         click.echo("Operations to perform:", color="cyan")
-        if run_syncdb:
-            if package_label:
-                click.echo(
-                    f"  Synchronize unmigrated package: {package_label}", color="yellow"
-                )
-            else:
-                click.echo(
-                    "  Synchronize unmigrated packages: "
-                    + (", ".join(sorted(executor.loader.unmigrated_packages))),
-                    color="yellow",
-                )
+
         if target_package_labels_only:
             click.echo(
                 "  Apply all migrations: "
@@ -756,7 +681,6 @@ def migrate(
     # sql = executor.loader.collect_sql(migration_plan)
     # pprint(sql)
 
-    # Can move this down once syncdb is gone
     if migration_plan:
         if backup or (
             backup is None
@@ -776,20 +700,9 @@ def migrate(
             )
             print()
 
-    # Run the syncdb phase.
-    if run_syncdb:
         if verbosity >= 1:
-            click.echo("Synchronizing packages without migrations:", color="cyan")
-        if package_label:
-            sync_packages(connection, [package_label])
-        else:
-            sync_packages(connection, executor.loader.unmigrated_packages)
+            click.echo("Running migrations:", color="cyan")
 
-    # Migrate!
-    if verbosity >= 1:
-        click.echo("Running migrations:", color="cyan")
-
-    if migration_plan:
         post_migrate_state = executor.migrate(
             targets,
             plan=migration_plan,
@@ -1195,7 +1108,7 @@ def squash_migrations(
         operations.extend(smigration.operations)
         for dependency in smigration.dependencies:
             if isinstance(dependency, SwappableTuple):
-                if settings.AUTH_USER_MODEL == dependency.setting:
+                if getattr(settings, "AUTH_USER_MODEL", None) == dependency.setting:
                     dependencies.add(("__setting__", "AUTH_USER_MODEL"))
                 else:
                     dependencies.add(dependency)
