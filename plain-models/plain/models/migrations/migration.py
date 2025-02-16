@@ -15,7 +15,6 @@ class Migration:
      - operations: A list of Operation instances, probably from
        plain.models.migrations.operations
      - dependencies: A list of tuples of (app_path, migration_name)
-     - run_before: A list of tuples of (app_path, migration_name)
      - replaces: A list of migration_names
 
     Note that all migrations come out of migrations and into the Loader or
@@ -28,11 +27,6 @@ class Migration:
     # Other migrations that should be run before this migration.
     # Should be a list of (app, migration_name).
     dependencies = []
-
-    # Other migrations that should be run after this one (i.e. have
-    # this migration added to their dependencies). Useful to make third-party
-    # packages' migrations run after your AUTH_USER replacement, for example.
-    run_before = []
 
     # Migration names in this app that this migration replaces. If this is
     # non-empty, this migration will only be applied if all these migrations
@@ -56,7 +50,6 @@ class Migration:
         # Copy dependencies & other attrs as we might mutate them at runtime
         self.operations = list(self.__class__.operations)
         self.dependencies = list(self.__class__.dependencies)
-        self.run_before = list(self.__class__.run_before)
         self.replaces = list(self.__class__.replaces)
 
     def __eq__(self, other):

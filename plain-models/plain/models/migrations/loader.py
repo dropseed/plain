@@ -210,10 +210,6 @@ class MigrationLoader:
             parent = self.check_key(parent, key[0])
             if parent is not None:
                 self.graph.add_dependency(migration, key, parent, skip_validation=True)
-        for child in migration.run_before:
-            child = self.check_key(child, key[0])
-            if child is not None:
-                self.graph.add_dependency(migration, child, key, skip_validation=True)
 
     def build_graph(self):
         """
