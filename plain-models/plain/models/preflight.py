@@ -1,5 +1,4 @@
 import inspect
-import types
 from collections import defaultdict
 from itertools import chain
 
@@ -117,14 +116,6 @@ def _check_lazy_references(packages, ignore=None):
     if not pending_models:
         return []
 
-    from plain.models import signals
-
-    model_signals = {
-        signal: name
-        for name, signal in vars(signals).items()
-        if isinstance(signal, signals.ModelSignal)
-    }
-
     def extract_operation(obj):
         """
         Take a callable found in Packages._pending_operations and identify the
@@ -168,29 +159,6 @@ def _check_lazy_references(packages, ignore=None):
         }
         return Error(error_msg % params, obj=keywords["field"], id="fields.E307")
 
-    def signal_connect_error(model_key, func, args, keywords):
-        error_msg = (
-            "%(receiver)s was connected to the '%(signal)s' signal with a "
-            "lazy reference to the sender '%(model)s', but %(model_error)s."
-        )
-        receiver = args[0]
-        # The receiver is either a function or an instance of class
-        # defining a `__call__` method.
-        if isinstance(receiver, types.FunctionType):
-            description = f"The function '{receiver.__name__}'"
-        elif isinstance(receiver, types.MethodType):
-            description = f"Bound method '{receiver.__self__.__class__.__name__}.{receiver.__name__}'"
-        else:
-            description = f"An instance of class '{receiver.__class__.__name__}'"
-        signal_name = model_signals.get(func.__self__, "unknown")
-        params = {
-            "model": ".".join(model_key),
-            "receiver": description,
-            "signal": signal_name,
-            "model_error": app_model_error(model_key),
-        }
-        return Error(error_msg % params, obj=receiver.__module__, id="signals.E001")
-
     def default_error(model_key, func, args, keywords):
         error_msg = (
             "%(op)s contains a lazy reference to %(model)s, but %(model_error)s."
@@ -208,7 +176,6 @@ def _check_lazy_references(packages, ignore=None):
     known_lazy = {
         ("plain.models.fields.related", "resolve_related_class"): field_error,
         ("plain.models.fields.related", "set_managed"): None,
-        ("plain.signals.dispatch.dispatcher", "connect"): signal_connect_error,
     }
 
     def build_error(model_key, func, args, keywords):

@@ -5,7 +5,6 @@ from operator import attrgetter, or_
 
 from plain.models import (
     query_utils,
-    signals,
     sql,
     transaction,
 )
@@ -179,11 +178,6 @@ class Collector:
             )
             self.clear_restricted_objects_from_set(model, objs)
 
-    def _has_signal_listeners(self, model):
-        return signals.pre_delete.has_listeners(
-            model
-        ) or signals.post_delete.has_listeners(model)
-
     def can_fast_delete(self, objs, from_field=None):
         """
         Determine if the objects in the given queryset-like or single object
@@ -203,8 +197,7 @@ class Collector:
             model = objs.model
         else:
             return False
-        if self._has_signal_listeners(model):
-            return False
+
         # The use of from_field comes from the need to avoid cascade back to
         # parent when parent delete is cascading to child.
         opts = model._meta
@@ -325,10 +318,7 @@ class Collector:
                 # relationships are select_related as interactions between both
                 # features are hard to get right. This should only happen in
                 # the rare cases where .related_objects is overridden anyway.
-                if not (
-                    sub_objs.query.select_related
-                    or self._has_signal_listeners(related_model)
-                ):
+                if not sub_objs.query.select_related:
                     referenced_fields = set(
                         chain.from_iterable(
                             (rf.attname for rf in rel.field.foreign_related_fields)
@@ -441,16 +431,6 @@ class Collector:
                 return count, {model._meta.label: count}
 
         with transaction.atomic(using=self.using, savepoint=False):
-            # send pre_delete signals
-            for model, obj in self.instances_with_model():
-                if not model._meta.auto_created:
-                    signals.pre_delete.send(
-                        sender=model,
-                        instance=obj,
-                        using=self.using,
-                        origin=self.origin,
-                    )
-
             # fast deletes
             for qs in self.fast_deletes:
                 count = qs._raw_delete(using=self.using)
@@ -490,15 +470,6 @@ class Collector:
                 count = query.delete_batch(pk_list, self.using)
                 if count:
                     deleted_counter[model._meta.label] += count
-
-                if not model._meta.auto_created:
-                    for obj in instances:
-                        signals.post_delete.send(
-                            sender=model,
-                            instance=obj,
-                            using=self.using,
-                            origin=self.origin,
-                        )
 
         for model, instances in self.data.items():
             for instance in instances:

@@ -659,8 +659,7 @@ class QuerySet(AltersData):
     ):
         """
         Insert each of the instances into the database. Do *not* call
-        save() on each of the instances, do not send any pre/post_save
-        signals, and do not set the primary key attribute if it is an
+        save() on each of the instances, and do not set the primary key attribute if it is an
         autoincrement field (except if features.can_return_rows_from_bulk_insert=True).
         Multi-table models are not supported.
         """

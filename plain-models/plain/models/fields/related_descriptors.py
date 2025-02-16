@@ -64,7 +64,7 @@ and two directions (forward and reverse) for a total of six combinations.
 """
 
 from plain.exceptions import FieldError
-from plain.models import signals, transaction
+from plain.models import transaction
 from plain.models.db import (
     DEFAULT_DB_ALIAS,
     NotSupportedError,
@@ -1093,28 +1093,9 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
         def clear(self):
             db = router.db_for_write(self.through, instance=self.instance)
             with transaction.atomic(using=db, savepoint=False):
-                signals.m2m_changed.send(
-                    sender=self.through,
-                    action="pre_clear",
-                    instance=self.instance,
-                    reverse=self.reverse,
-                    model=self.model,
-                    pk_set=None,
-                    using=db,
-                )
                 self._remove_prefetched_objects()
                 filters = self._build_remove_filters(super().get_queryset().using(db))
                 self.through._default_manager.using(db).filter(filters).delete()
-
-                signals.m2m_changed.send(
-                    sender=self.through,
-                    action="post_clear",
-                    instance=self.instance,
-                    reverse=self.reverse,
-                    model=self.model,
-                    pk_set=None,
-                    using=db,
-                )
 
         clear.alters_data = True
 
@@ -1252,19 +1233,14 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 self.through._meta.auto_created is not False
                 and connections[db].features.supports_ignore_conflicts
             )
-            # Don't send the signal when inserting duplicate data row
-            # for symmetrical reverse entries.
-            must_send_signals = (
-                self.reverse or source_field_name == self.source_field_name
-            ) and (signals.m2m_changed.has_listeners(self.through))
+
             # Fast addition through bulk insertion can only be performed
             # if no m2m_changed listeners are connected for self.through
             # as they require the added set of ids to be provided via
             # pk_set.
             return (
                 can_ignore_conflicts,
-                must_send_signals,
-                (can_ignore_conflicts and not must_send_signals),
+                can_ignore_conflicts,
             )
 
         def _add_items(
@@ -1280,7 +1256,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             through_defaults = dict(resolve_callables(through_defaults or {}))
             target_ids = self._get_target_ids(target_field_name, objs)
             db = router.db_for_write(self.through, instance=self.instance)
-            can_ignore_conflicts, must_send_signals, can_fast_add = self._get_add_plan(
+            can_ignore_conflicts, can_fast_add = self._get_add_plan(
                 db, source_field_name
             )
             if can_fast_add:
@@ -1302,16 +1278,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 source_field_name, target_field_name, db, target_ids
             )
             with transaction.atomic(using=db, savepoint=False):
-                if must_send_signals:
-                    signals.m2m_changed.send(
-                        sender=self.through,
-                        action="pre_add",
-                        instance=self.instance,
-                        reverse=self.reverse,
-                        model=self.model,
-                        pk_set=missing_target_ids,
-                        using=db,
-                    )
                 # Add the ones that aren't there already.
                 self.through._default_manager.using(db).bulk_create(
                     [
@@ -1326,17 +1292,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     ],
                     ignore_conflicts=can_ignore_conflicts,
                 )
-
-                if must_send_signals:
-                    signals.m2m_changed.send(
-                        sender=self.through,
-                        action="post_add",
-                        instance=self.instance,
-                        reverse=self.reverse,
-                        model=self.model,
-                        pk_set=missing_target_ids,
-                        using=db,
-                    )
 
         def _remove_items(self, source_field_name, target_field_name, *objs):
             # source_field_name: the PK colname in join table for the source object
@@ -1357,16 +1312,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
 
             db = router.db_for_write(self.through, instance=self.instance)
             with transaction.atomic(using=db, savepoint=False):
-                # Send a signal to the other end if need be.
-                signals.m2m_changed.send(
-                    sender=self.through,
-                    action="pre_remove",
-                    instance=self.instance,
-                    reverse=self.reverse,
-                    model=self.model,
-                    pk_set=old_ids,
-                    using=db,
-                )
                 target_model_qs = super().get_queryset()
                 if target_model_qs._has_filters():
                     old_vals = target_model_qs.using(db).filter(
@@ -1376,15 +1321,5 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     old_vals = old_ids
                 filters = self._build_remove_filters(old_vals)
                 self.through._default_manager.using(db).filter(filters).delete()
-
-                signals.m2m_changed.send(
-                    sender=self.through,
-                    action="post_remove",
-                    instance=self.instance,
-                    reverse=self.reverse,
-                    model=self.model,
-                    pk_set=old_ids,
-                    using=db,
-                )
 
     return ManyRelatedManager
