@@ -17,12 +17,8 @@ jobs:
       uses: astral-sh/setup-uv@v2
     - name: Set up Python
       run: uv python install ${{ matrix.python-version }}
-
-    - working-directory: ${{ matrix.package }}
-      run: uv sync --isolated
-
     - working-directory: ${{ matrix.package }}/tests
-      run: uv run pytest --isolated
+      run: uv run --isolated pytest
 
   lint:
     runs-on: ubuntu-latest
