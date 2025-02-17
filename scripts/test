@@ -14,6 +14,6 @@ do
     echo
     bold "Testing $package"
     cd "$package/tests"
-    uv run pytest "$@"
+    uv run --package "$package" --isolated pytest "$@"
     cd ../..
 done

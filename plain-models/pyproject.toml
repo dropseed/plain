@@ -25,9 +25,6 @@ dev-dependencies = [
     "plain.pytest<1.0.0",
 ]
 
-[tool.uv.sources]
-"plain.pytest" = {path = "../plain-pytest", editable = true}
-
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]
 

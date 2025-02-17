@@ -1,0 +1,64 @@
+[project]
+name = "plain-workspace"
+version = "0.0.0"
+requires-python = ">=3.11"
+
+[tool.uv.sources]
+"plain" = { workspace = true }
+"plain-admin" = { workspace = true }
+"plain-api" = { workspace = true }
+"plain-auth" = { workspace = true }
+"plain-cache" = { workspace = true }
+"plain-code" = { workspace = true }
+"plain-dev" = { workspace = true }
+"plain-elements" = { workspace = true }
+"plain-esbuild" = { workspace = true }
+"plain-flags" = { workspace = true }
+"plain-htmx" = { workspace = true }
+"plain-importmap" = { workspace = true }
+"plain-loginlink" = { workspace = true }
+"plain-mail" = { workspace = true }
+"plain-models" = { workspace = true }
+"plain-oauth" = { workspace = true }
+"plain-pages" = { workspace = true }
+"plain-pageviews" = { workspace = true }
+"plain-passwords" = { workspace = true }
+"plain-pytest" = { workspace = true }
+"plain-redirection" = { workspace = true }
+"plain-sessions" = { workspace = true }
+"plain-support" = { workspace = true }
+"plain-tailwind" = { workspace = true }
+"plain-tunnel" = { workspace = true }
+"plain-vendor" = { workspace = true }
+"plain-worker" = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "plain",
+    "plain-admin",
+    "plain-api",
+    "plain-auth",
+    "plain-cache",
+    "plain-code",
+    "plain-dev",
+    "plain-elements",
+    "plain-esbuild",
+    "plain-flags",
+    "plain-htmx",
+    "plain-importmap",
+    "plain-loginlink",
+    "plain-mail",
+    "plain-models",
+    "plain-oauth",
+    "plain-pages",
+    "plain-pageviews",
+    "plain-passwords",
+    "plain-pytest",
+    "plain-redirection",
+    "plain-sessions",
+    "plain-support",
+    "plain-tailwind",
+    "plain-tunnel",
+    "plain-vendor",
+    "plain-worker",
+]

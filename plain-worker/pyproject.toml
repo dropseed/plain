@@ -15,9 +15,6 @@ dev-dependencies = [
     "plain.models<1.0.0",
 ]
 
-[tool.uv.sources]
-"plain.models" = {path = "../plain-models", editable = true}
-
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]
 
