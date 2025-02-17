@@ -5,6 +5,7 @@ import uuid
 
 from plain import models
 from plain.models import transaction
+from plain.packages import register_model
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -13,6 +14,7 @@ from .jobs import load_job
 logger = logging.getLogger("plain.worker")
 
 
+@register_model
 class JobRequest(models.Model):
     """
     Keep all pending job requests in a single table.
@@ -106,6 +108,7 @@ class JobQuerySet(models.QuerySet):
             job.convert_to_result(status=JobResultStatuses.LOST)
 
 
+@register_model
 class Job(models.Model):
     """
     All active jobs are stored in this table.
@@ -251,6 +254,7 @@ class JobResultStatuses(models.TextChoices):
     )  # Either process lost, lost in transit, or otherwise never finished
 
 
+@register_model
 class JobResult(models.Model):
     """
     All in-process and completed jobs are stored in this table.

@@ -4,6 +4,7 @@ import uuid
 from plain import models
 from plain.exceptions import ValidationError
 from plain.models import ProgrammingError
+from plain.packages import register_model
 from plain.preflight import Info
 from plain.runtime import settings
 
@@ -16,6 +17,7 @@ def validate_flag_name(value):
         raise ValidationError(f"{value} is not a valid Python identifier name")
 
 
+@register_model
 class FlagResult(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -35,6 +37,7 @@ class FlagResult(models.Model):
         return self.key
 
 
+@register_model
 class Flag(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)

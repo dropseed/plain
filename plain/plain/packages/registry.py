@@ -24,8 +24,8 @@ class Packages:
         if installed_packages is None and hasattr(sys.modules[__name__], "packages"):
             raise RuntimeError("You must supply an installed_packages argument.")
 
-        # Mapping of app labels => model names => model classes. Every time a
-        # model is imported, ModelBase.__new__ calls packages.register_model which
+        # Mapping of app labels => model names => model classes.
+        # Models are registered with @register_model, which
         # creates an entry in all_models. All imported models are registered,
         # regardless of whether they're defined in an installed application
         # and whether the registry has been populated. Since it isn't possible
@@ -99,7 +99,7 @@ class Packages:
             duplicates = [name for name, count in counts.most_common() if count > 1]
             if duplicates:
                 raise ImproperlyConfigured(
-                    "Package names aren't unique, " "duplicates: {}".format(
+                    "Package names aren't unique, duplicates: {}".format(
                         ", ".join(duplicates)
                     )
                 )
@@ -356,3 +356,10 @@ class Packages:
 
 
 packages = Packages(installed_packages=None)
+
+
+def register_model(model_class):
+    model_class._meta.packages.register_model(
+        model_class._meta.package_label, model_class
+    )
+    return model_class

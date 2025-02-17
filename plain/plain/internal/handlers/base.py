@@ -117,7 +117,7 @@ class BaseHandler:
                 name = f"The view {callback.__module__}.{callback.__class__.__name__}.__call__"
         if response is None:
             raise ValueError(
-                f"{name} didn't return a Response object. It returned None " "instead."
+                f"{name} didn't return a Response object. It returned None instead."
             )
 
 

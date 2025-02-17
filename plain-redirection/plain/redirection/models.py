@@ -1,6 +1,7 @@
 import re
 
 from plain import models
+from plain.packages import register_model
 
 
 def _get_client_ip(request):
@@ -10,6 +11,7 @@ def _get_client_ip(request):
         return request.META.get("REMOTE_ADDR")
 
 
+@register_model
 class Redirect(models.Model):
     from_pattern = models.CharField(max_length=255, unique=True)
     to_pattern = models.CharField(max_length=255)
@@ -63,6 +65,7 @@ class Redirect(models.Model):
         return re.sub(self.from_pattern, self.to_pattern, url)
 
 
+@register_model
 class RedirectLog(models.Model):
     redirect = models.ForeignKey(Redirect, on_delete=models.CASCADE)
 
@@ -103,6 +106,7 @@ class RedirectLog(models.Model):
         )
 
 
+@register_model
 class NotFoundLog(models.Model):
     url = models.URLField(max_length=512)
 

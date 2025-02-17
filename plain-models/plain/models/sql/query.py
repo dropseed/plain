@@ -1234,8 +1234,7 @@ class Query(BaseExpression):
             expression, "filterable", True
         ):
             raise NotSupportedError(
-                expression.__class__.__name__ + " is disallowed in the filter "
-                "clause."
+                expression.__class__.__name__ + " is disallowed in the filter clause."
             )
         if hasattr(expression, "get_source_expressions"):
             for expr in expression.get_source_expressions():
@@ -2131,8 +2130,7 @@ class Query(BaseExpression):
                 raise
             elif name in self.annotations:
                 raise FieldError(
-                    f"Cannot select the '{name}' alias. Use annotate() to promote "
-                    "it."
+                    f"Cannot select the '{name}' alias. Use annotate() to promote it."
                 )
             else:
                 names = sorted(

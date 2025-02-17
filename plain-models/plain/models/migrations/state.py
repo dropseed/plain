@@ -10,7 +10,7 @@ from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from plain.models.migrations.utils import field_is_referenced, get_references
 from plain.models.options import DEFAULT_NAMES
 from plain.models.utils import make_model_tuple
-from plain.packages import PackageConfig
+from plain.packages import PackageConfig, register_model
 from plain.packages.registry import Packages
 from plain.packages.registry import packages as global_packages
 from plain.runtime import settings
@@ -897,7 +897,9 @@ class ModelState:
         # Restore managers
         body.update(self.construct_managers())
         # Then, make a Model object (packages.register_model is called in __new__)
-        return type(self.name, bases, body)
+        model_class = type(self.name, bases, body)
+        register_model(model_class)
+        return model_class
 
     def get_index_by_name(self, name):
         for index in self.options["indexes"]:

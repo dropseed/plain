@@ -188,8 +188,7 @@ class Atomic(ContextDecorator):
             and not connection.atomic_blocks[-1]._from_testcase
         ):
             raise RuntimeError(
-                "A durable atomic block cannot be nested within another "
-                "atomic block."
+                "A durable atomic block cannot be nested within another atomic block."
             )
         if not connection.in_atomic_block:
             # Reset state when entering an outermost atomic block.

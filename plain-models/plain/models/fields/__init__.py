@@ -1147,8 +1147,7 @@ class CommaSeparatedIntegerField(CharField):
             "historical migrations."
         ),
         "hint": (
-            "Use CharField(validators=[validate_comma_separated_integer_list]) "
-            "instead."
+            "Use CharField(validators=[validate_comma_separated_integer_list]) instead."
         ),
         "id": "fields.E901",
     }
@@ -1954,8 +1953,7 @@ class NullBooleanField(BooleanField):
     description = "Boolean (Either True, False or None)"
     system_check_removed_details = {
         "msg": (
-            "NullBooleanField is removed except for support in historical "
-            "migrations."
+            "NullBooleanField is removed except for support in historical migrations."
         ),
         "hint": "Use BooleanField(null=True) instead.",
         "id": "fields.E903",

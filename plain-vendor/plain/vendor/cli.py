@@ -69,7 +69,7 @@ def update(name):
         if len(deps) != len(name):
             not_found = set(name) - {dep.name for dep in deps}
             click.secho(
-                f"Some dependencies not found: {", ".join(not_found)}", fg="red"
+                f"Some dependencies not found: {', '.join(not_found)}", fg="red"
             )
             exit(1)
 

@@ -1,9 +1,11 @@
 import uuid
 
 from plain import models
+from plain.packages import register_model
 from plain.runtime import settings
 
 
+@register_model
 class SupportFormEntry(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(

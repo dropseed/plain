@@ -295,8 +295,7 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
     def log_lack_of_migration(self, field_name, model_name, reason):
         if self.verbosity > 0:
             self.log(
-                f"Field '{field_name}' on model '{model_name}' not migrated: "
-                f"{reason}."
+                f"Field '{field_name}' on model '{model_name}' not migrated: {reason}."
             )
 
     def ask_not_null_addition(self, field_name, model_name):
@@ -304,8 +303,7 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
         self.log_lack_of_migration(
             field_name,
             model_name,
-            "it is impossible to add a non-nullable field without specifying "
-            "a default",
+            "it is impossible to add a non-nullable field without specifying a default",
         )
         sys.exit(3)
 

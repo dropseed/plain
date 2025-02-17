@@ -18,8 +18,7 @@ class cached_property:
     @staticmethod
     def func(instance):
         raise TypeError(
-            "Cannot use cached_property instance without calling "
-            "__set_name__() on it."
+            "Cannot use cached_property instance without calling __set_name__() on it."
         )
 
     def __init__(self, func):

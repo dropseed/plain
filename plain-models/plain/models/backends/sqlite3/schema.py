@@ -7,7 +7,7 @@ from plain.models.backends.utils import strip_quotes
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import NotSupportedError
 from plain.models.transaction import atomic
-from plain.packages.registry import Packages
+from plain.packages.registry import Packages, register_model
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -281,7 +281,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         meta = type("Meta", (), meta_contents)
         body_copy["Meta"] = meta
         body_copy["__module__"] = model.__module__
-        type(model._meta.object_name, model.__bases__, body_copy)
+        register_model(type(model._meta.object_name, model.__bases__, body_copy))
 
         # Construct a model with a renamed table name.
         body_copy = copy.deepcopy(body)
@@ -296,6 +296,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         body_copy["Meta"] = meta
         body_copy["__module__"] = model.__module__
         new_model = type(f"New{model._meta.object_name}", model.__bases__, body_copy)
+        register_model(new_model)
 
         # Create a new table with the updated schema.
         self.create_model(new_model)

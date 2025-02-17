@@ -1,4 +1,5 @@
 from plain import models
+from plain.packages import register_model
 from plain.utils import timezone
 
 
@@ -13,6 +14,7 @@ class CachedItemQuerySet(models.QuerySet):
         return self.filter(expires_at=None)
 
 
+@register_model
 class CachedItem(models.Model):
     key = models.CharField(max_length=255, unique=True)
     value = models.JSONField(blank=True, null=True)

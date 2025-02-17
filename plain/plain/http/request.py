@@ -328,8 +328,7 @@ class HttpRequest:
         self.upload_handlers = ImmutableList(
             self.upload_handlers,
             warning=(
-                "You cannot alter upload handlers after the upload has been "
-                "processed."
+                "You cannot alter upload handlers after the upload has been processed."
             ),
         )
         parser = MultiPartParser(META, post_data, self.upload_handlers, self.encoding)

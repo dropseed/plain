@@ -9,7 +9,7 @@ from plain.models.db import connection, router
 from plain.models.deletion import CASCADE, SET_DEFAULT, SET_NULL
 from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
-from plain.packages import packages
+from plain.packages import packages, register_model
 from plain.runtime import settings
 from plain.runtime.user_settings import SettingsReference
 from plain.utils.functional import cached_property
@@ -1201,7 +1201,7 @@ def create_many_to_many_intermediary_model(field, klass):
         },
     )
     # Construct and return the new class.
-    return type(
+    model_class = type(
         name,
         (models.Model,),
         {
@@ -1223,6 +1223,8 @@ def create_many_to_many_intermediary_model(field, klass):
             ),
         },
     )
+    register_model(model_class)
+    return model_class
 
 
 class ManyToManyField(RelatedField):
