@@ -1,10 +1,9 @@
-from plain.urls import include, path
+from plain.urls import RouterBase, register_router
 
 from .registry import registry
 
-default_namespace = "pages"
 
-
-urlpatterns = [
-    path("", include(registry.get_page_urls())),
-]
+@register_router
+class Router(RouterBase):
+    namespace = "pages"
+    urls = registry.get_page_urls()

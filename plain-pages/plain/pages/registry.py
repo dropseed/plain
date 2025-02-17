@@ -24,27 +24,16 @@ class PagesRegistry:
         """
         paths = []
 
-        for url_path in self.registered_pages.keys():
-            if url_path == "":
-                # The root index is a special case and should be
-                # referred to as pages:index
-                url = ""
-                name = "index"
-            else:
-                url = url_path
-                # The named urls shouldn't end with a trailing slash,
-                # so you can just do {% url 'pages:about' %} instead of {% url 'pages:about/' %}
-                name = url_path.rstrip("/")
-
-            page = self.get_page(url_path)
+        for url_name in self.registered_pages.keys():
+            page = self.get_page(url_name)
+            url = page.get_url_path()
             view_class = page.get_view_class()
 
             paths.append(
                 path(
                     url,
                     view_class,
-                    name=name,
-                    kwargs={"url_path": url_path},
+                    name=url_name,
                 )
             )
 
@@ -57,22 +46,22 @@ class PagesRegistry:
                 absolute_path = os.path.join(root, file)
 
                 page_args = (relative_path, absolute_path)
-                url_path = Page(*page_args).get_url_path()
+                url_name = Page(*page_args).get_url_name()
 
                 # Some pages don't get a url (like templates)
-                if url_path is None:
+                if url_name is None:
                     continue
 
-                self.registered_pages[url_path] = page_args
+                self.registered_pages[url_name] = page_args
 
-    def get_page(self, url_path):
+    def get_page(self, url_name):
         try:
-            page_args = self.registered_pages[url_path]
+            page_args = self.registered_pages[url_name]
             # Instantiate the page here, so we don't store a ton of cached data over time
             # as we render all the pages
             return Page(*page_args)
         except KeyError:
-            raise PageNotFoundError(f"Could not find a page for {url_path}")
+            raise PageNotFoundError(f"Could not find a page for {url_name}")
 
 
 registry = PagesRegistry()

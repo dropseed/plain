@@ -65,7 +65,7 @@ class AdminViewRegistry:
         # return root_nav_items
 
     def get_urls(self):
-        urlpatterns = []
+        urls = []
 
         paths_seen = set()
 
@@ -75,12 +75,12 @@ class AdminViewRegistry:
             paths_seen.add(_path)
             if not _path.endswith("/"):
                 _path += "/"
-            urlpatterns.append(path(_path, view, name=view.view_name()))
+            urls.append(path(_path, view, name=view.view_name()))
 
         for view in self.registered_views:
             add_view_path(view, f"p/{view.get_path()}")
 
-        return urlpatterns
+        return urls
 
     def get_searchable_views(self):
         views = [
@@ -107,7 +107,7 @@ class AdminViewRegistry:
             if view.model == instance.__class__:
                 return reverse_lazy(
                     f"{URL_NAMESPACE}:{view.view_name()}",
-                    kwargs={"pk": instance.pk},
+                    pk=instance.pk,
                 )
 
 

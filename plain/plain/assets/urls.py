@@ -1,10 +1,16 @@
 from plain.runtime import settings
-from plain.urls import path, reverse
+from plain.urls import RouterBase, path, register_router, reverse
 
 from .fingerprints import get_fingerprinted_url_path
 from .views import AssetView
 
-default_namespace = "assets"
+
+@register_router
+class Router(RouterBase):
+    namespace = "assets"
+    urls = [
+        path("<path:path>", AssetView, name="asset"),
+    ]
 
 
 def get_asset_url(url_path):
@@ -23,9 +29,4 @@ def get_asset_url(url_path):
     if settings.ASSETS_BASE_URL:
         return settings.ASSETS_BASE_URL + resolved_url_path
 
-    return reverse(default_namespace + ":asset", kwargs={"path": resolved_url_path})
-
-
-urlpatterns = [
-    path("<path:path>", AssetView, name="asset"),
-]
+    return reverse(Router.namespace + ":asset", path=resolved_url_path)

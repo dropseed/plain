@@ -29,7 +29,7 @@ MIDDLEWARE = [
     "plain.auth.middleware.AuthenticationMiddleware",
 ]
 
-ROOT_URLCONF = "app.urls"
+URLS_MODULE = "app.urls"
 
 WSGI_APPLICATION = "wsgi.application"
 

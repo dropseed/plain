@@ -1,13 +1,14 @@
-from plain.urls import include, path
+from plain.urls import RouterBase, include, path, register_router
 
 from . import views
 
-default_namespace = "oauth"
 
-urlpatterns = [
-    path(
-        "<str:provider>/",
+@register_router
+class Router(RouterBase):
+    namespace = "oauth"
+    urls = [
         include(
+            "<str:provider>/",
             [
                 # Login and Signup are both handled here, because the intent is the same
                 path("login/", views.OAuthLoginView, name="login"),
@@ -18,7 +19,6 @@ urlpatterns = [
                     name="disconnect",
                 ),
                 path("callback/", views.OAuthCallbackView, name="callback"),
-            ]
+            ],
         ),
-    ),
-]
+    ]

@@ -29,7 +29,7 @@ class RedirectView(View):
         if self.url:
             url = self.url % self.url_kwargs
         elif self.pattern_name:
-            url = reverse(self.pattern_name, args=self.url_args, kwargs=self.url_kwargs)
+            url = reverse(self.pattern_name, *self.url_args, **self.url_kwargs)
         else:
             return None
 

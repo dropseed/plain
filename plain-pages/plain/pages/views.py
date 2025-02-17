@@ -10,11 +10,10 @@ from .registry import registry
 class PageViewMixin:
     @cached_property
     def page(self):
-        # Passed manually by the kwargs in the path definition
-        url_path = self.url_kwargs.get("url_path", "index")
+        url_name = self.request.resolver_match.url_name
 
         try:
-            return registry.get_page(url_path)
+            return registry.get_page(url_name)
         except PageNotFoundError:
             raise Http404()
 
@@ -38,13 +37,10 @@ class PageView(PageViewMixin, TemplateView):
 
 class PageRedirectView(PageViewMixin, View):
     def get(self):
-        # Passed manually by the kwargs in the path definition
-        url_path = self.url_kwargs.get("url_path", "index")
-
         url = self.page.vars.get("url")
 
         if not url:
-            raise RedirectPageError(f"Redirect page {url_path} is missing a url")
+            raise RedirectPageError("Redirect page is missing a url")
 
         if self.page.vars.get("temporary", True):
             return ResponseRedirect(url)
@@ -54,7 +50,7 @@ class PageRedirectView(PageViewMixin, View):
 
 class PageAssetView(PageViewMixin, AssetView):
     def get_url_path(self):
-        return self.url_kwargs["url_path"]
+        return self.page.get_url_path()
 
     def get_asset_path(self, path):
         return self.page.absolute_path

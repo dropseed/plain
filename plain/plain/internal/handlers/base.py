@@ -4,8 +4,7 @@ import types
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import log_response
 from plain.runtime import settings
-from plain.signals import request_finished
-from plain.urls import get_resolver, set_urlconf
+from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
 
 from .exception import convert_exception_to_response
@@ -61,7 +60,6 @@ class BaseHandler:
     def get_response(self, request):
         """Return a Response object for the given HttpRequest."""
         # Setup default url resolver for this thread
-        set_urlconf(settings.ROOT_URLCONF)
         response = self._middleware_chain(request)
         response._resource_closers.append(request.close)
         if response.status_code >= 400:
@@ -80,27 +78,23 @@ class BaseHandler:
         template_response middleware. This method is everything that happens
         inside the request/response middleware.
         """
-        callback, callback_args, callback_kwargs = self.resolve_request(request)
+        resolver_match = self.resolve_request(request)
 
-        response = callback(request, *callback_args, **callback_kwargs)
+        response = resolver_match.func(
+            request, *resolver_match.args, **resolver_match.kwargs
+        )
 
         # Complain if the view returned None (a common error).
-        self.check_response(response, callback)
+        self.check_response(response, resolver_match.func)
 
         return response
 
     def resolve_request(self, request):
         """
-        Retrieve/set the urlconf for the request. Return the view resolved,
+        Retrieve/set the urlrouter for the request. Return the view resolved,
         with its args and kwargs.
         """
-        # Work out the resolver.
-        if hasattr(request, "urlconf"):
-            urlconf = request.urlconf
-            set_urlconf(urlconf)
-            resolver = get_resolver(urlconf)
-        else:
-            resolver = get_resolver()
+        resolver = get_resolver()
         # Resolve the view, and assign the match object back to the request.
         resolver_match = resolver.resolve(request.path_info)
         request.resolver_match = resolver_match
@@ -119,11 +113,3 @@ class BaseHandler:
             raise ValueError(
                 f"{name} didn't return a Response object. It returned None instead."
             )
-
-
-def reset_urlconf(sender, **kwargs):
-    """Reset the URLconf after each request is finished."""
-    set_urlconf(None)
-
-
-request_finished.connect(reset_urlconf)

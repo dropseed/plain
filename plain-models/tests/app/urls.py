@@ -1,6 +1,6 @@
 import plain.admin.urls
 import plain.assets.urls
-from plain.urls import include, path
+from plain.urls import RouterBase, include, path, register_router
 from plain.views import View
 
 
@@ -14,9 +14,11 @@ class LogoutView(View):
         return "Logout!"
 
 
-urlpatterns = [
-    path("admin/", include(plain.admin.urls)),
-    path("assets/", include(plain.assets.urls)),
-    path("login/", LoginView, name="login"),
-    path("logout/", LogoutView, name="logout"),
-]
+@register_router
+class Router(RouterBase):
+    urls = [
+        include("admin/", plain.admin.urls),
+        include("assets/", plain.assets.urls),
+        path("login/", LoginView, name="login"),
+        path("logout/", LogoutView, name="logout"),
+    ]

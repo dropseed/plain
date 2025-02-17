@@ -206,12 +206,12 @@ class AssetView(View):
             # or we're already looking at it.
             return
 
-        from .urls import default_namespace
+        from .urls import Router
+
+        namespace = Router.namespace
 
         return ResponseRedirect(
-            redirect_to=reverse(
-                f"{default_namespace}:asset", args=[fingerprinted_url_path]
-            ),
+            redirect_to=reverse(f"{namespace}:asset", fingerprinted_url_path),
             headers={
                 "Cache-Control": "max-age=60",  # Can cache this for a short time, but the fingerprinted path can change
             },

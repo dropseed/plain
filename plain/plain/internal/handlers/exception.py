@@ -127,6 +127,8 @@ def handle_uncaught_exception():
     Processing for any otherwise uncaught exceptions (those that will
     generate HTTP 500 responses).
     """
+    if settings.DEBUG:
+        raise
     return ResponseServerError()
 
 

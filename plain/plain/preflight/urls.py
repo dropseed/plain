@@ -7,7 +7,7 @@ from . import Error, Warning, register
 
 @register
 def check_url_config(package_configs, **kwargs):
-    if getattr(settings, "ROOT_URLCONF", None):
+    if getattr(settings, "URLS_MODULE", None):
         from plain.urls import get_resolver
 
         resolver = get_resolver()
@@ -33,7 +33,7 @@ def check_url_namespaces_unique(package_configs, **kwargs):
     """
     Warn if URL namespaces used in applications aren't unique.
     """
-    if not getattr(settings, "ROOT_URLCONF", None):
+    if not getattr(settings, "URLS_MODULE", None):
         return []
 
     from plain.urls import get_resolver

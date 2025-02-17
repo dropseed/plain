@@ -1,6 +1,6 @@
 from plain.http import ResponsePermanentRedirect
 from plain.runtime import settings
-from plain.urls import is_valid_path
+from plain.urls import Resolver404, get_resolver
 from plain.utils.http import escape_leading_slashes
 
 
@@ -26,18 +26,26 @@ class RedirectSlashMiddleware:
 
         return response
 
+    @staticmethod
+    def _is_valid_path(path):
+        """
+        Return the ResolverMatch if the given path resolves against the default URL
+        resolver, False otherwise. This is a convenience method to make working
+        with "is this a match?" cases easier, avoiding try...except blocks.
+        """
+        try:
+            return get_resolver().resolve(path)
+        except Resolver404:
+            return False
+
     def should_redirect_with_slash(self, request):
         """
         Return True if settings.APPEND_SLASH is True and appending a slash to
         the request path turns an invalid path into a valid one.
         """
         if settings.APPEND_SLASH and not request.path_info.endswith("/"):
-            urlconf = getattr(request, "urlconf", None)
-            if not is_valid_path(request.path_info, urlconf):
-                match = is_valid_path(f"{request.path_info}/", urlconf)
-                if match:
-                    view = match.func
-                    return getattr(view, "should_append_slash", True)
+            if not self._is_valid_path(request.path_info):
+                return self._is_valid_path(f"{request.path_info}/")
         return False
 
     def get_full_path_with_slash(self, request):

@@ -30,7 +30,7 @@ def resolve_url(to, *args, **kwargs):
 
     # Next try a reverse URL resolution.
     try:
-        return reverse(to, args=args, kwargs=kwargs)
+        return reverse(to, *args, **kwargs)
     except NoReverseMatch:
         # If this is a callable, re-raise.
         if callable(to):

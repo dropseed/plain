@@ -1,9 +1,11 @@
-from plain.urls import path
+from plain.urls import RouterBase, path, register_router
 
 from . import views
 
-default_namespace = "dev"
 
-urlpatterns = [
-    path("", views.RequestsView, name="requests"),
-]
+@register_router
+class Router(RouterBase):
+    namespace = "dev"
+    urls = [
+        path("", views.RequestsView, name="requests"),
+    ]

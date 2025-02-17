@@ -102,6 +102,16 @@ class Page:
         # Everything else should get a trailing slash
         return url_path + "/"
 
+    def get_url_name(self):
+        url_path = self.get_url_path()
+        if url_path is None:
+            return None
+
+        if not url_path:
+            return "index"
+
+        return url_path.rstrip("/")
+
     def get_template_name(self):
         if template_name := self.vars.get("template_name"):
             return template_name

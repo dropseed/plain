@@ -15,7 +15,7 @@ from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
 from plain.runtime import settings
 from plain.signals import got_request_exception, request_started
-from plain.urls import resolve
+from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
 from plain.utils.functional import SimpleLazyObject
 from plain.utils.http import urlencode
@@ -298,7 +298,7 @@ class RequestFactory:
     post_request = rf.post('/submit/', {'foo': 'bar'})
 
     Once you have a request object you can pass it to any view function,
-    just as if that view had been hooked up using a URLconf.
+    just as if that view had been hooked up using a urlrouter.
     """
 
     def __init__(self, *, json_encoder=PlainJSONEncoder, headers=None, **defaults):
@@ -690,9 +690,9 @@ class Client(ClientMixin, RequestFactory):
             response.user = response.wsgi_request.user
 
         # Attach the ResolverMatch instance to the response.
-        urlconf = getattr(response.wsgi_request, "urlconf", None)
+        resolver = get_resolver()
         response.resolver_match = SimpleLazyObject(
-            lambda: resolve(request["PATH_INFO"], urlconf=urlconf),
+            lambda: resolver.resolve(request["PATH_INFO"]),
         )
 
         # Update persistent cookie data.

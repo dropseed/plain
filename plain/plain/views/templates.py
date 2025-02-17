@@ -22,7 +22,7 @@ csrf_token_lazy = lazy(get_token, str)
 
 class TemplateView(View):
     """
-    Render a template. Pass keyword arguments from the URLconf to the context.
+    Render a template.
     """
 
     template_name: str | None = None

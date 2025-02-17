@@ -1,4 +1,4 @@
-from plain.urls import path
+from plain.urls import RouterBase, path, register_router
 from plain.views import View
 
 
@@ -9,6 +9,8 @@ class IndexView(View):
         return "test"
 
 
-urlpatterns = [
-    path("", IndexView),
-]
+@register_router
+class Router(RouterBase):
+    urls = [
+        path("", IndexView),
+    ]

@@ -136,7 +136,7 @@ class AdminView(AuthViewMixin, TemplateView):
     @classmethod
     def get_view_url(cls, obj=None) -> str:
         if obj:
-            return reverse(f"{URL_NAMESPACE}:" + cls.view_name(), kwargs={"pk": obj.pk})
+            return reverse(f"{URL_NAMESPACE}:" + cls.view_name(), pk=obj.pk)
         else:
             return reverse(f"{URL_NAMESPACE}:" + cls.view_name())
 

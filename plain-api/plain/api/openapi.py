@@ -13,7 +13,7 @@ from .views import APIBaseView
 class OpenAPISchemaView(View):
     openapi_title: str
     openapi_version: str
-    openapi_urlconf: str
+    # openapi_urlrouter: str
 
     def get(self):
         # TODO can heaviliy cache this - browser headers? or cache the schema obj?
@@ -21,15 +21,14 @@ class OpenAPISchemaView(View):
             OpenAPISchema(
                 title=self.openapi_title,
                 version=self.openapi_version,
-                urlconf=self.openapi_urlconf,
+                # urlrouter=self.openapi_urlrouter,
             ),
             json_dumps_params={"sort_keys": True},
         )
 
 
 class OpenAPISchema(dict):
-    def __init__(self, *, title: str, version: str, urlconf="app.api.urls"):
-        self.urlconf = urlconf
+    def __init__(self, *, title: str, version: str):
         self.url_converters = {
             class_instance.__class__: key
             for key, class_instance in get_converters().items()
@@ -59,7 +58,7 @@ class OpenAPISchema(dict):
     #     for path in paths.values():
 
     def get_paths(self) -> dict[str, dict[str, Any]]:
-        resolver = get_resolver(self.urlconf)
+        resolver = get_resolver()  # (self.urlrouter)
         paths = {}
 
         for url_pattern in resolver.url_patterns:
