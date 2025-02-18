@@ -52,7 +52,7 @@ def include(route, module_or_urls, *, Pattern=RoutePattern):
     else:
         # We were given a module, so we need to look up the router for that module
         module = module_or_urls
-        router = routers.get_module_router(module)
+        router = routers_registry.get_module_router(module)
         namespace = router.namespace
 
         return URLResolver(
@@ -86,5 +86,5 @@ def path(route, view, *, name=None, Pattern=RoutePattern):
     raise TypeError("view must be a View class or View.as_view()")
 
 
-routers = RoutersRegistry()
-register_router = routers.register_router
+routers_registry = RoutersRegistry()
+register_router = routers_registry.register_router

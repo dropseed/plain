@@ -97,7 +97,7 @@ def get_resolver(urls_module=None):
 
 @functools.cache
 def _get_cached_resolver(urls_module):
-    from .routers import routers
+    from .routers import routers_registry
 
     if isinstance(urls_module, str):
         # Need to trigger an import in order for the @register_router
@@ -105,7 +105,7 @@ def _get_cached_resolver(urls_module):
         # usually just for the root URLS_MODULE but could be for anything.
         urls_module = import_module(urls_module)
 
-    router = routers.get_module_router(urls_module)
+    router = routers_registry.get_module_router(urls_module)
     return URLResolver(pattern=RegexPattern(r"^/"), router_class=router)
 
 
