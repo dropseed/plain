@@ -3,14 +3,13 @@ import os
 import uuid
 
 from plain import models
-from plain.packages import register_model
 
 
 def generate_token():
     return binascii.hexlify(os.urandom(20)).decode()
 
 
-@register_model
+@models.register_model
 class APIKey(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)

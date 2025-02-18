@@ -5,7 +5,6 @@ from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.models import transaction
 from plain.models.db import IntegrityError, OperationalError, ProgrammingError
-from plain.packages import register_model
 from plain.preflight import Error
 from plain.runtime import settings
 from plain.utils import timezone
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
 # TODO preflight check for deploy that ensures all provider keys in db are also in settings?
 
 
-@register_model
+@models.register_model
 class OAuthConnection(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

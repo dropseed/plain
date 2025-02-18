@@ -66,6 +66,7 @@ from .lookups import Lookup, Transform
 from .manager import Manager
 from .query import Prefetch, QuerySet, prefetch_related_objects
 from .query_utils import FilteredRelation, Q
+from .registry import register_model
 
 # Imports that would create circular imports if sorted
 from .base import DEFERRED, Model  # isort:skip
@@ -150,3 +151,6 @@ __all__ += [
     "DEFAULT_DB_ALIAS",
     "PLAIN_VERSION_PICKLE_KEY",
 ]
+
+# Registry exports
+__all__ += ["register_model"]

@@ -1,5 +1,4 @@
 from plain import models
-from plain.packages import register_model
 
 
 class SessionManager(models.Manager):
@@ -21,7 +20,7 @@ class SessionManager(models.Manager):
         return s
 
 
-@register_model
+@models.register_model
 class Session(models.Model):
     """
     Plain provides full support for anonymous sessions. The session

@@ -25,7 +25,7 @@ class Packages:
             raise RuntimeError("You must supply an installed_packages argument.")
 
         # Mapping of app labels => model names => model classes.
-        # Models are registered with @register_model, which
+        # Models are registered with @models.register_model, which
         # creates an entry in all_models. All imported models are registered,
         # regardless of whether they're defined in an installed application
         # and whether the registry has been populated. Since it isn't possible
@@ -356,10 +356,3 @@ class Packages:
 
 
 packages = Packages(installed_packages=None)
-
-
-def register_model(model_class):
-    model_class._meta.packages.register_model(
-        model_class._meta.package_label, model_class
-    )
-    return model_class

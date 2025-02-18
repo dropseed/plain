@@ -1,10 +1,9 @@
 import uuid
 
 from plain import models
-from plain.packages import register_model
 
 
-@register_model
+@models.register_model
 class Pageview(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 

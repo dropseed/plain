@@ -1,13 +1,14 @@
 import copy
 from decimal import Decimal
 
+from plain.models import register_model
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import Statement
 from plain.models.backends.utils import strip_quotes
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import NotSupportedError
 from plain.models.transaction import atomic
-from plain.packages.registry import Packages, register_model
+from plain.packages.registry import Packages
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
