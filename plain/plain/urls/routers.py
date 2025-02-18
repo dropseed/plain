@@ -1,5 +1,7 @@
 import re
 from abc import ABC
+from types import ModuleType
+from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured
 
@@ -7,6 +9,9 @@ from .patterns import RegexPattern, RoutePattern, URLPattern
 from .resolvers import (
     URLResolver,
 )
+
+if TYPE_CHECKING:
+    from plain.views import View
 
 
 class RouterBase(ABC):
@@ -40,7 +45,12 @@ class RoutersRegistry:
             ) from e
 
 
-def include(route, module_or_urls):
+def include(
+    route: str | re.Pattern, module_or_urls: list | tuple | str | ModuleType
+) -> URLResolver:
+    """
+    Include URLs from another module or a nested list of URL patterns.
+    """
     if isinstance(route, str):
         pattern = RoutePattern(route, is_endpoint=False)
     elif isinstance(route, re.Pattern):
@@ -54,21 +64,22 @@ def include(route, module_or_urls):
         class _IncludeRouter(RouterBase):
             urls = module_or_urls
 
-        return URLResolver(pattern=pattern, router_class=_IncludeRouter, namespace=None)
+        return URLResolver(pattern=pattern, router_class=_IncludeRouter)
     else:
         # We were given a module, so we need to look up the router for that module
         module = module_or_urls
-        router = routers_registry.get_module_router(module)
-        namespace = router.namespace
+        router_class = routers_registry.get_module_router(module)
 
         return URLResolver(
             pattern=pattern,
-            router_class=router,
-            namespace=namespace,
+            router_class=router_class,
         )
 
 
-def path(route, view, *, name=None):
+def path(route: str | re.Pattern, view: "View", *, name: str = "") -> URLPattern:
+    """
+    Standard URL with a view.
+    """
     from plain.views import View
 
     if isinstance(route, str):

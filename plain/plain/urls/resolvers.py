@@ -139,11 +139,9 @@ class URLResolver:
         *,
         pattern,
         router_class,
-        namespace=None,
     ):
         self.pattern = pattern
         self.router_class = router_class
-        self.namespace = namespace
         self._reverse_dict = {}
         self._namespace_dict = {}
         self._app_dict = {}
@@ -319,6 +317,10 @@ class URLResolver:
     def url_patterns(self):
         # Don't need to instantiate the class because they are just class attributes for now.
         return self.router_class.urls
+
+    @cached_property
+    def namespace(self):
+        return self.router_class.namespace
 
     def reverse(self, lookup_view, *args, **kwargs):
         if args and kwargs:
