@@ -38,6 +38,8 @@ jobs:
         echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
 
     - name: Publish packages
-      run: ./scripts/publish
+      run: |
+        uv build --all-packages
+        uv publish
       env:
         UV_PUBLISH_TOKEN: ${{ steps.mint-token.outputs.api-token }}
