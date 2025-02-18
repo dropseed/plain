@@ -6,9 +6,6 @@ __pycache__
 *.DS_Store
 .coverage
 
-# Build files from publish
-plain*/dist/
-
 # Test apps
 plain*/tests/.plain
 

@@ -1,21 +1,4 @@
 #!/bin/sh -e
 
-for package_dir in plain*; do
-    cd "$package_dir"
-    rm -rf dist
-    uv build
-
-    # Run uv publish and handle errors
-    if ! uv publish --no-progress 2>stderr.log; then
-        if ! grep -q "already exists" stderr.log; then
-            echo "Publish failed with an unexpected error."
-            cat stderr.log
-            rm stderr.log
-            exit 1
-        fi
-        echo "Publish failed: package already exists. Continuing..."
-    fi
-    rm -f stderr.log
-
-    cd ..
-done
+uv build --all-packages
+uv publish
