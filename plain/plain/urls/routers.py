@@ -1,8 +1,9 @@
+import re
 from abc import ABC
 
 from plain.exceptions import ImproperlyConfigured
 
-from .patterns import RoutePattern, URLPattern
+from .patterns import RegexPattern, RoutePattern, URLPattern
 from .resolvers import (
     URLResolver,
 )
@@ -39,8 +40,13 @@ class RoutersRegistry:
             ) from e
 
 
-def include(route, module_or_urls, *, Pattern=RoutePattern):
-    pattern = Pattern(route, is_endpoint=False)
+def include(route, module_or_urls):
+    if isinstance(route, str):
+        pattern = RoutePattern(route, is_endpoint=False)
+    elif isinstance(route, re.Pattern):
+        pattern = RegexPattern(route.pattern, is_endpoint=False)
+    else:
+        raise TypeError("include() route must be a string or regex")
 
     if isinstance(module_or_urls, list | tuple):
         # We were given an explicit list of sub-patterns,
@@ -62,10 +68,15 @@ def include(route, module_or_urls, *, Pattern=RoutePattern):
         )
 
 
-def path(route, view, *, name=None, Pattern=RoutePattern):
+def path(route, view, *, name=None):
     from plain.views import View
 
-    pattern = Pattern(route, name=name, is_endpoint=True)
+    if isinstance(route, str):
+        pattern = RoutePattern(route, name=name, is_endpoint=True)
+    elif isinstance(route, re.Pattern):
+        pattern = RegexPattern(route.pattern, name=name, is_endpoint=True)
+    else:
+        raise TypeError("path() route must be a string or regex")
 
     # You can't pass a View() instance to path()
     if isinstance(view, View):
