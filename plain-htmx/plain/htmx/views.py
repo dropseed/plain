@@ -35,10 +35,17 @@ class HTMXViewMixin:
             # You can use an htmx_{method} method on views
             # (or htmx_{method}_{action} for specific actions)
             method = f"htmx_{self.request.method.lower()}"
-            if self.htmx_action_name:
-                method += f"_{self.htmx_action_name}"
 
-            if handler := getattr(self, method):
+            if self.htmx_action_name:
+                # If an action is specified, we throw an error if
+                # the associated method isn't found
+                handler = getattr(self, f"{method}_{self.htmx_action_name}")
+                return handler
+
+            if handler := getattr(self, method, None):
+                # If it's just an htmx post, for example,
+                # we can use a custom method or we can let it fall back
+                # to a regular post method if it's not found
                 return handler
 
         return super().get_request_handler()
