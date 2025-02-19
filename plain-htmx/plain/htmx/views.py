@@ -38,7 +38,7 @@ class HTMXViewMixin:
             if self.htmx_action_name:
                 method += f"_{self.htmx_action_name}"
 
-            if handler := getattr(self, method, None):
+            if handler := getattr(self, method):
                 return handler
 
         return super().get_request_handler()
