@@ -16,7 +16,6 @@ from urllib.parse import quote
 from plain.preflight.urls import check_resolver
 from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
-from plain.utils.functional import cached_property
 from plain.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
 from plain.utils.regex_helper import normalize
 
@@ -106,7 +105,7 @@ def _get_cached_resolver(urls_module):
         urls_module = import_module(urls_module)
 
     router = routers_registry.get_module_router(urls_module)
-    return URLResolver(pattern=RegexPattern(r"^/"), router_class=router)
+    return URLResolver(pattern=RegexPattern(r"^/"), router=router)
 
 
 @functools.cache
@@ -120,16 +119,18 @@ def get_ns_resolver(ns_pattern, resolver, converters):
     pattern.converters = dict(converters)
 
     class _NestedRouter(RouterBase):
+        namespace = ""
         urls = resolver.url_patterns
 
-    ns_resolver = URLResolver(pattern=pattern, router_class=_NestedRouter)
+    ns_resolver = URLResolver(pattern=pattern, router=_NestedRouter())
 
     class _NamespacedRouter(RouterBase):
+        namespace = ""
         urls = [ns_resolver]
 
     return URLResolver(
         pattern=RegexPattern(r"^/"),
-        router_class=_NamespacedRouter,
+        router=_NamespacedRouter(),
     )
 
 
@@ -138,18 +139,23 @@ class URLResolver:
         self,
         *,
         pattern,
-        router_class,
+        router,
     ):
         self.pattern = pattern
-        self.router_class = router_class
+        self.router = router
         self._reverse_dict = {}
         self._namespace_dict = {}
         self._app_dict = {}
         self._populated = False
         self._local = local()
 
+        # Set these immediately, in part so we can find routers
+        # where the attributes weren't set correctly.
+        self.namespace = self.router.namespace
+        self.url_patterns = self.router.urls
+
     def __repr__(self):
-        return f"<{self.__class__.__name__} {repr(self.router_class)} ({self.namespace}) {self.pattern.describe()}>"
+        return f"<{self.__class__.__name__} {repr(self.router)} ({self.namespace}) {self.pattern.describe()}>"
 
     def check(self):
         messages = []
@@ -312,15 +318,6 @@ class URLResolver:
                     tried.append([pattern])
             raise Resolver404({"tried": tried, "path": new_path})
         raise Resolver404({"path": path})
-
-    @cached_property
-    def url_patterns(self):
-        # Don't need to instantiate the class because they are just class attributes for now.
-        return self.router_class.urls
-
-    @cached_property
-    def namespace(self):
-        return self.router_class.namespace
 
     def reverse(self, lookup_view, *args, **kwargs):
         if args and kwargs:

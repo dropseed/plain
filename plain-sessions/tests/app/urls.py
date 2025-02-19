@@ -11,6 +11,7 @@ class IndexView(View):
 
 @register_router
 class Router(RouterBase):
+    namespace = ""
     urls = [
         path("", IndexView),
     ]

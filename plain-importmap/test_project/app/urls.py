@@ -4,6 +4,7 @@ from plain.views import TemplateView
 
 @register_router
 class Router(RouterBase):
+    namespace = ""
     urls = [
         path("", TemplateView.as_view(template_name="index.html"), name="index"),
     ]

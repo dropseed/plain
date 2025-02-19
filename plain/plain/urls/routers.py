@@ -1,5 +1,4 @@
 import re
-from abc import ABC
 from types import ModuleType
 from typing import TYPE_CHECKING
 
@@ -14,9 +13,16 @@ if TYPE_CHECKING:
     from plain.views import View
 
 
-class RouterBase(ABC):
-    namespace: str = ""
-    urls: list  # Required
+class RouterBase:
+    """
+    Base class for defining url patterns.
+
+    A namespace is required, and generally recommended,
+    except for the root router in app.urls where it is typically "".
+    """
+
+    namespace: str
+    urls: list
 
 
 class RoutersRegistry:
@@ -26,9 +32,12 @@ class RoutersRegistry:
         self._routers = {}
 
     def register_router(self, router_class):
+        router = (
+            router_class()
+        )  # Don't necessarily need to instantiate it yet, but will likely add methods.
         router_module_name = router_class.__module__
-        self._routers[router_module_name] = router_class
-        return router_class
+        self._routers[router_module_name] = router
+        return router
 
     def get_module_router(self, module):
         if isinstance(module, str):
@@ -62,17 +71,18 @@ def include(
         # We were given an explicit list of sub-patterns,
         # so we generate a router for it
         class _IncludeRouter(RouterBase):
+            namespace = ""
             urls = module_or_urls
 
-        return URLResolver(pattern=pattern, router_class=_IncludeRouter)
+        return URLResolver(pattern=pattern, router=_IncludeRouter())
     else:
         # We were given a module, so we need to look up the router for that module
         module = module_or_urls
-        router_class = routers_registry.get_module_router(module)
+        router = routers_registry.get_module_router(module)
 
         return URLResolver(
             pattern=pattern,
-            router_class=router_class,
+            router=router,
         )
 
 
@@ -109,4 +119,9 @@ def path(route: str | re.Pattern, view: "View", *, name: str = "") -> URLPattern
 
 
 routers_registry = RoutersRegistry()
-register_router = routers_registry.register_router
+
+
+def register_router(router_class):
+    """Decorator to register a router class"""
+    routers_registry.register_router(router_class)
+    return router_class  # Return the class, not the instance

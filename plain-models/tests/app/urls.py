@@ -16,6 +16,7 @@ class LogoutView(View):
 
 @register_router
 class Router(RouterBase):
+    namespace = ""
     urls = [
         include("admin/", plain.admin.urls),
         include("assets/", plain.assets.urls),

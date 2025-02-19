@@ -9,6 +9,7 @@ class TestView(View):
 
 @register_router
 class Router(RouterBase):
+    namespace = ""
     urls = [
         path("", TestView),
     ]

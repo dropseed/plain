@@ -20,6 +20,7 @@ class LoginView(TemplateView):
 
 @register_router
 class Router(RouterBase):
+    namespace = ""
     urls = [
         include("oauth/", plain.oauth.urls),
         path("login/", LoginView, name="login"),
