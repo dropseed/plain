@@ -57,7 +57,7 @@ def cli(install):
             check_short("Running plain code checks", "plain", "code", "check")
 
         if Path("uv.lock").exists():
-            check_short("Checking uv.lock", "uv", "lock", "--locked")
+            check_short("Checking uv.lock", "uv", "lock", "--check")
 
         if plain_db_connected():
             check_short(
