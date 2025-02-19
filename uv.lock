@@ -310,7 +310,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.15.1"
+version = "0.16.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -481,7 +481,7 @@ dev = [
 
 [[package]]
 name = "plain-htmx"
-version = "0.4.1"
+version = "0.5.0"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
