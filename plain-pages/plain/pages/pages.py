@@ -66,16 +66,12 @@ class Page:
 
     def is_asset(self):
         extension = os.path.splitext(self.absolute_path)[1]
-        return extension.lower() in (
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".gif",
-            ".webp",
-            ".svg",
-            ".js",
-            ".css",
-            ".ico",
+        # Anything that we don't specifically recognize for pages
+        # gets treated as an asset
+        return extension.lower() not in (
+            ".html",
+            ".md",
+            ".redirect",
         )
 
     def is_redirect(self):
