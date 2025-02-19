@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from plain.paginator import Paginator
 from plain.urls import reverse
 from plain.utils import timezone
@@ -16,5 +18,6 @@ default_globals = {
     "url": reverse,
     "Paginator": Paginator,
     "now": timezone.now,
+    "timedelta": timedelta,
     "localtime": timezone.localtime,
 }
