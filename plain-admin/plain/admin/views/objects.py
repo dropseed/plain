@@ -59,7 +59,7 @@ class AdminListView(HTMXViewMixin, AdminView):
         return context
 
     def get(self) -> Response:
-        if self.is_htmx_request:
+        if self.is_htmx_request():
             hx_from_this_page = self.request.path in self.request.headers.get(
                 "HX-Current-Url", ""
             )
@@ -70,7 +70,7 @@ class AdminListView(HTMXViewMixin, AdminView):
 
         response = super().get()
 
-        if self.is_htmx_request and not hx_from_this_page and not self._page:
+        if self.is_htmx_request() and not hx_from_this_page and not self._page:
             # Don't render anything
             return Response(status=204)
 
