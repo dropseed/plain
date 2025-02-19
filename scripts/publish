@@ -1,0 +1,7 @@
+#!/bin/sh -e
+
+for package_dir in plain*; do
+    rm -rf dist  # Clear the previous dist (which uv publish looks at)
+    uv build --package $package_dir  #  Build just this package
+    uv publish  || true  # Continue even if publish fails
+done
