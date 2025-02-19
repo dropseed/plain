@@ -2,6 +2,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 
 import click
@@ -73,13 +74,17 @@ class MkcertManager:
     def generate_certs(self, domain, storage_path):
         cert_path = storage_path / f"{domain}-cert.pem"
         key_path = storage_path / f"{domain}-key.pem"
+        timestamp_path = storage_path / f"{domain}.timestamp"
+        update_interval = 60 * 24 * 3600  # 60 days in seconds
 
-        if cert_path.exists() and key_path.exists():
-            return cert_path, key_path
+        # Check if the certs exist and if the timestamp is recent enough
+        if cert_path.exists() and key_path.exists() and timestamp_path.exists():
+            last_updated = timestamp_path.stat().st_mtime
+            if time.time() - last_updated < update_interval:
+                return cert_path, key_path
 
         storage_path.mkdir(parents=True, exist_ok=True)
 
-        # Generate SSL certificates using mkcert
         click.secho(f"Generating SSL certificates for {domain}...", bold=True)
         subprocess.run(
             [
@@ -92,5 +97,9 @@ class MkcertManager:
             ],
             check=True,
         )
+
+        # Update the timestamp file to the current time
+        with open(timestamp_path, "w") as f:
+            f.write(str(time.time()))
 
         return cert_path, key_path
