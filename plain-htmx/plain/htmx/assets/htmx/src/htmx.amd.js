@@ -1,3 +1,4 @@
+define(() => {
 var htmx = (function() {
   'use strict'
 
@@ -5259,3 +5260,5 @@ var htmx = (function() {
  * @property {(xhr: XMLHttpRequest, parameters: FormData, elt: Node) => *|string|null} encodeParameters
  * @property {() => string[]|null} getSelectors
  */
+return htmx
+})

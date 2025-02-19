@@ -3,7 +3,7 @@
     "copy-assets": "rm -r plain/htmx/assets/htmx/src && cp -r node_modules/htmx.org/dist plain/htmx/assets/htmx/src && rm -r plain/htmx/assets/htmx/idiomorph && cp -r node_modules/idiomorph/dist plain/htmx/assets/htmx/idiomorph"
   },
   "dependencies": {
-    "htmx.org": "^1.8.5",
-    "idiomorph": "^0.3.0"
+    "htmx.org": "^2.0.0",
+    "idiomorph": "^0.4.0"
   }
 }
