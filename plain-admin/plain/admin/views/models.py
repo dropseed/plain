@@ -69,7 +69,17 @@ class AdminModelListView(AdminListView):
 
     @classmethod
     def get_slug(cls) -> str:
+        if slug := super().get_slug():
+            return slug
+
         return cls.model._meta.model_name
+
+    @classmethod
+    def get_path(cls) -> str:
+        if path := super().get_path():
+            return path
+
+        return f"{cls.model._meta.model_name}/"
 
     def get_template_context(self):
         context = super().get_template_context()
@@ -139,10 +149,16 @@ class AdminModelDetailView(AdminDetailView):
 
     @classmethod
     def get_slug(cls) -> str:
+        if slug := super().get_slug():
+            return slug
+
         return f"{cls.model._meta.model_name}_detail"
 
     @classmethod
     def get_path(cls) -> str:
+        if path := super().get_path():
+            return path
+
         return f"{cls.model._meta.model_name}/<int:pk>/"
 
     def get_fields(self):
@@ -184,10 +200,16 @@ class AdminModelCreateView(AdminCreateView):
 
     @classmethod
     def get_slug(cls) -> str:
+        if slug := super().get_slug():
+            return slug
+
         return f"{cls.model._meta.model_name}_create"
 
     @classmethod
     def get_path(cls) -> str:
+        if path := super().get_path():
+            return path
+
         return f"{cls.model._meta.model_name}/create/"
 
     def get_template_names(self):
@@ -215,10 +237,16 @@ class AdminModelUpdateView(AdminUpdateView):
 
     @classmethod
     def get_slug(cls) -> str:
+        if slug := super().get_slug():
+            return slug
+
         return f"{cls.model._meta.model_name}_update"
 
     @classmethod
     def get_path(cls) -> str:
+        if path := super().get_path():
+            return path
+
         return f"{cls.model._meta.model_name}/<int:pk>/update/"
 
     def get_object(self):
@@ -244,10 +272,16 @@ class AdminModelDeleteView(AdminDeleteView):
 
     @classmethod
     def get_slug(cls) -> str:
+        if slug := super().get_slug():
+            return slug
+
         return f"{cls.model._meta.model_name}_delete"
 
     @classmethod
     def get_path(cls) -> str:
+        if path := super().get_path():
+            return path
+
         return f"{cls.model._meta.model_name}/<int:pk>/delete/"
 
     def get_object(self):
