@@ -61,6 +61,12 @@ main a:hover {
     border-radius: 6px;
     transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
     cursor: pointer;
+    flex-shrink: 0;
+
+    @media (max-width: 640px) {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
 
     &:hover {
         background-color: #2a2928;
