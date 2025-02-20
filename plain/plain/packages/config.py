@@ -6,7 +6,6 @@ from plain.exceptions import ImproperlyConfigured
 from plain.utils.module_loading import import_string, module_has_submodule
 
 CONFIG_MODULE_NAME = "config"
-MODELS_MODULE_NAME = "models"
 
 
 class PackageConfig:
@@ -42,15 +41,6 @@ class PackageConfig:
         # '/path/to/admin'.
         if not hasattr(self, "path"):
             self.path = self._path_from_module(package_module)
-
-        # Module containing models e.g. <module 'plain.admin.models'
-        # from 'admin/models.py'>. Set by import_models().
-        # None if the application doesn't have a models module.
-        self.models_module = None
-
-        # Mapping of lowercase model names to model classes. Initially set to
-        # None to prevent accidental access before import_models() runs.
-        self.models = None
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.label}>"
@@ -199,53 +189,6 @@ class PackageConfig:
 
         # Entry is a path to an app config class.
         return package_config_class(package_name, package_module)
-
-    def get_model(self, model_name, require_ready=True):
-        """
-        Return the model with the given case-insensitive model_name.
-
-        Raise LookupError if no model exists with this name.
-        """
-        if require_ready:
-            self.packages_registry.check_models_ready()
-        else:
-            self.packages_registry.check_packages_ready()
-        try:
-            return self.models[model_name.lower()]
-        except KeyError:
-            raise LookupError(
-                f"Package '{self.label}' doesn't have a '{model_name}' model."
-            )
-
-    def get_models(self, include_auto_created=False, include_swapped=False):
-        """
-        Return an iterable of models.
-
-        By default, the following models aren't included:
-
-        - auto-created models for many-to-many relations without
-          an explicit intermediate table,
-        - models that have been swapped out.
-
-        Set the corresponding keyword argument to True to include such models.
-        Keyword arguments aren't documented; they're a private API.
-        """
-        self.packages_registry.check_models_ready()
-        for model in self.models.values():
-            if model._meta.auto_created and not include_auto_created:
-                continue
-            if model._meta.swapped and not include_swapped:
-                continue
-            yield model
-
-    def import_models(self):
-        # Dictionary of models for this app, primarily maintained in the
-        # 'all_models' attribute of the Packages this PackageConfig is attached to.
-        self.models = self.packages_registry.all_models[self.label]
-
-        if module_has_submodule(self.module, MODELS_MODULE_NAME):
-            models_module_name = f"{self.name}.{MODELS_MODULE_NAME}"
-            self.models_module = import_module(models_module_name)
 
     def ready(self):
         """

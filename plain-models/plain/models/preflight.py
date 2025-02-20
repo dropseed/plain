@@ -31,7 +31,8 @@ def check_all_models(package_configs=None, **kwargs):
         models = packages_registry.get_models()
     else:
         models = chain.from_iterable(
-            package_config.get_models() for package_config in package_configs
+            packages_registry.get_models(package_label=package_config.label)
+            for package_config in package_configs
         )
     for model in models:
         if model._meta.managed:

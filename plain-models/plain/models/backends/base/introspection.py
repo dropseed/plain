@@ -85,7 +85,7 @@ class BaseDatabaseIntrospection:
             model
             for package_config in packages_registry.get_package_configs()
             for model in router.get_migratable_models(
-                package_config, self.connection.alias
+                packages_registry, package_config.label, self.connection.alias
             )
             if model._meta.can_migrate(self.connection)
         )

@@ -324,9 +324,7 @@ def makemigrations(
                 connection.alias, package_label, model_name=model._meta.object_name
             )
             for package_label in consistency_check_labels
-            for model in packages_registry.get_package_config(
-                package_label
-            ).get_models()
+            for model in packages_registry.get_models(package_label=package_label)
         ):
             loader.check_consistent_history(connection)
 

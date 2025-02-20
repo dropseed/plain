@@ -552,15 +552,11 @@ class PackageConfigStub(PackageConfig):
 
     def __init__(self, label):
         self.packages_registry = None
-        self.models = {}
         # Package-label and package-name are not the same thing, so technically passing
         # in the label here is wrong. In practice, migrations don't care about
         # the package name, but we need something unique, and the label works fine.
         self.label = label
         self.name = label
-
-    def import_models(self):
-        self.models = self.packages_registry.all_models[self.label]
 
 
 class StatePackagesRegistry(PackagesRegistry):
@@ -577,8 +573,7 @@ class StatePackagesRegistry(PackagesRegistry):
         # mess things up with partial states (due to lack of dependencies)
         self.real_models = []
         for package_label in real_packages:
-            app = global_packages.get_package_config(package_label)
-            for model in app.get_models():
+            for model in global_packages.get_models(package_label=package_label):
                 self.real_models.append(ModelState.from_model(model, exclude_rels=True))
         # Populate the app registry with a stub for each application.
         package_labels = {model_state.package_label for model_state in models.values()}
@@ -650,7 +645,6 @@ class StatePackagesRegistry(PackagesRegistry):
         for package_label in self.package_configs:
             package_config = PackageConfigStub(package_label)
             package_config.packages_registry = clone
-            package_config.import_models()
             clone.package_configs[package_label] = package_config
 
         # No need to actually clone them, they'll never change
@@ -662,14 +656,12 @@ class StatePackagesRegistry(PackagesRegistry):
         if package_label not in self.package_configs:
             self.package_configs[package_label] = PackageConfigStub(package_label)
             self.package_configs[package_label].packages_registry = self
-        self.package_configs[package_label].models[model._meta.model_name] = model
         self.do_pending_operations(model)
         self.clear_cache()
 
     def unregister_model(self, package_label, model_name):
         try:
             del self.all_models[package_label][model_name]
-            del self.package_configs[package_label].models[model_name]
         except KeyError:
             pass
 
@@ -874,19 +866,19 @@ class ModelState:
             managers=list(self.managers),
         )
 
-    def render(self, packages):
+    def render(self, packages_registry):
         """Create a Model object from our current state into the given packages."""
         # First, make a Meta object
         meta_contents = {
             "package_label": self.package_label,
-            "packages_registry": packages,
+            "packages_registry": packages_registry,
             **self.options,
         }
         meta = type("Meta", (), meta_contents)
         # Then, work out our bases
         try:
             bases = tuple(
-                (packages.get_model(base) if isinstance(base, str) else base)
+                (packages_registry.get_model(base) if isinstance(base, str) else base)
                 for base in self.bases
             )
         except LookupError:

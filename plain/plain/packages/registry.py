@@ -108,17 +108,13 @@ class PackagesRegistry:
 
             self.packages_ready = True
 
-            # Phase 2: import models modules.
-            for package_config in self.package_configs.values():
-                package_config.import_models()
+            # Phase 3: run ready() methods of app configs.
+            for package_config in self.get_package_configs():
+                package_config.ready()
 
             self.clear_cache()
 
             self.models_ready = True
-
-            # Phase 3: run ready() methods of app configs.
-            for package_config in self.get_package_configs():
-                package_config.ready()
 
             self.ready = True
 
@@ -162,7 +158,9 @@ class PackagesRegistry:
 
     # This method is performance-critical at least for Plain's test suite.
     @functools.cache
-    def get_models(self, include_auto_created=False, include_swapped=False):
+    def get_models(
+        self, *, package_label="", include_auto_created=False, include_swapped=False
+    ):
         """
         Return a list of all installed models.
 
@@ -177,10 +175,27 @@ class PackagesRegistry:
         self.check_models_ready()
 
         result = []
-        for package_config in self.package_configs.values():
-            result.extend(
-                package_config.get_models(include_auto_created, include_swapped)
-            )
+
+        # Get models for a single package
+        if package_label:
+            package_models = self.all_models[package_label]
+            for model in package_models.values():
+                if model._meta.auto_created and not include_auto_created:
+                    continue
+                if model._meta.swapped and not include_swapped:
+                    continue
+                result.append(model)
+            return result
+
+        # Get models for all packages
+        for package_models in self.all_models.values():
+            for model in package_models.values():
+                if model._meta.auto_created and not include_auto_created:
+                    continue
+                if model._meta.swapped and not include_swapped:
+                    continue
+                result.append(model)
+
         return result
 
     def get_model(self, package_label, model_name=None, require_ready=True):
@@ -203,12 +218,13 @@ class PackagesRegistry:
         if model_name is None:
             package_label, model_name = package_label.split(".")
 
-        package_config = self.get_package_config(package_label)
+        # package_config = self.get_package_config(package_label)
 
-        if not require_ready and package_config.models is None:
-            package_config.import_models()
+        # if not require_ready and package_config.models is None:
+        #     package_config.import_models()
 
-        return package_config.get_model(model_name, require_ready=require_ready)
+        package_models = self.all_models[package_label]
+        return package_models[model_name.lower()]
 
     def register_model(self, package_label, model):
         # Since this method is called when models are imported, it cannot
@@ -303,8 +319,8 @@ class PackagesRegistry:
         if self.ready:
             # Circumvent self.get_models() to prevent that the cache is refilled.
             # This particularly prevents that an empty value is cached while cloning.
-            for package_config in self.package_configs.values():
-                for model in package_config.get_models(include_auto_created=True):
+            for package_models in self.all_models.values():
+                for model in package_models.values():
                     model._meta._expire_cache()
 
     def lazy_model_operation(self, function, *model_keys):
