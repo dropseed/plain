@@ -80,6 +80,20 @@ main a:hover {
     }
 }
 
+main button[type="submit"] {
+    background-color: #2563eb;
+    border-color: #2563eb;
+
+    &:hover {
+        background-color: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+    &:focus {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+    }
+}
+
 /* Cards use these? */
 section {
     border: rgba(255, 255, 255, 0.1) 1px solid;

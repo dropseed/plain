@@ -1,0 +1,7 @@
+<textarea
+    id="{{ field.html_id }}"
+    name="{{ field.html_name }}"
+    class="block w-full text-sm border rounded border-white/10 bg-white/5"
+    rows="{{ rows|default(3) }}"
+    {% if field.field.required %}required{% endif %}
+    >{{ field.value() or "" }}</textarea>
