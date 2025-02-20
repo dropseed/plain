@@ -383,7 +383,7 @@ class URLResolver:
         else:
             lookup_view_s = lookup_view
 
-        patterns = [pattern for (_, pattern, _, _) in possibilities]
+        patterns = [pos[1] for pos in possibilities]
         if patterns:
             if args:
                 arg_msg = f"arguments '{args}'"
