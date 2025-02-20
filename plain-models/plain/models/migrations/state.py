@@ -11,8 +11,8 @@ from plain.models.migrations.utils import field_is_referenced, get_references
 from plain.models.options import DEFAULT_NAMES
 from plain.models.utils import make_model_tuple
 from plain.packages import PackageConfig
-from plain.packages.registry import Packages
-from plain.packages.registry import packages as global_packages
+from plain.packages.registry import PackagesRegistry
+from plain.packages.registry import packages_registry as global_packages
 from plain.runtime import settings
 from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
@@ -114,7 +114,7 @@ class ProjectState:
         self.models[model_key] = model_state
         if self._relations is not None:
             self.resolve_model_relations(model_key)
-        if "packages" in self.__dict__:  # hasattr would cache the property
+        if "packages_registry" in self.__dict__:  # hasattr would cache the property
             self.reload_model(*model_key)
 
     def remove_model(self, package_label, model_name):
@@ -127,11 +127,11 @@ class ProjectState:
                 model_relations.pop(model_key, None)
                 if not model_relations:
                     del self._relations[related_model_key]
-        if "packages" in self.__dict__:  # hasattr would cache the property
-            self.packages.unregister_model(*model_key)
+        if "packages_registry" in self.__dict__:  # hasattr would cache the property
+            self.packages_registry.unregister_model(*model_key)
             # Need to do this explicitly since unregister_model() doesn't clear
             # the cache automatically (#24513)
-            self.packages.clear_cache()
+            self.packages_registry.clear_cache()
 
     def rename_model(self, package_label, old_name, new_name):
         # Add a new model.
@@ -340,12 +340,12 @@ class ProjectState:
         related_models = set()
 
         try:
-            old_model = self.packages.get_model(package_label, model_name)
+            old_model = self.packages_registry.get_model(package_label, model_name)
         except LookupError:
             pass
         else:
             # Get all relations to and from the old model before reloading,
-            # as _meta.packages may change
+            # as _meta.packages_registry may change
             if delay:
                 related_models = get_related_models_tuples(old_model)
             else:
@@ -369,7 +369,9 @@ class ProjectState:
         related_models.update(direct_related_models)
         for rel_package_label, rel_model_name in direct_related_models:
             try:
-                rel_model = self.packages.get_model(rel_package_label, rel_model_name)
+                rel_model = self.packages_registry.get_model(
+                    rel_package_label, rel_model_name
+                )
             except LookupError:
                 pass
             else:
@@ -384,12 +386,12 @@ class ProjectState:
         return related_models
 
     def reload_model(self, package_label, model_name, delay=False):
-        if "packages" in self.__dict__:  # hasattr would cache the property
+        if "packages_registry" in self.__dict__:  # hasattr would cache the property
             related_models = self._find_reload_model(package_label, model_name, delay)
             self._reload(related_models)
 
     def reload_models(self, models, delay=True):
-        if "packages" in self.__dict__:  # hasattr would cache the property
+        if "packages_registry" in self.__dict__:  # hasattr would cache the property
             related_models = set()
             for package_label, model_name in models:
                 related_models.update(
@@ -399,15 +401,17 @@ class ProjectState:
 
     def _reload(self, related_models):
         # Unregister all related models
-        with self.packages.bulk_update():
+        with self.packages_registry.bulk_update():
             for rel_package_label, rel_model_name in related_models:
-                self.packages.unregister_model(rel_package_label, rel_model_name)
+                self.packages_registry.unregister_model(
+                    rel_package_label, rel_model_name
+                )
 
         states_to_be_rendered = []
         # Gather all models states of those models that will be rerendered.
         # This includes:
         # 1. All related models of unmigrated packages
-        for model_state in self.packages.real_models:
+        for model_state in self.packages_registry.real_models:
             if (model_state.package_label, model_state.name_lower) in related_models:
                 states_to_be_rendered.append(model_state)
 
@@ -421,7 +425,7 @@ class ProjectState:
                 states_to_be_rendered.append(model_state)
 
         # Render all models
-        self.packages.render_multiple(states_to_be_rendered)
+        self.packages_registry.render_multiple(states_to_be_rendered)
 
     def update_model_field_relation(
         self,
@@ -515,24 +519,24 @@ class ProjectState:
             models={k: v.clone() for k, v in self.models.items()},
             real_packages=self.real_packages,
         )
-        if "packages" in self.__dict__:
-            new_state.packages = self.packages.clone()
+        if "packages_registry" in self.__dict__:
+            new_state.packages_registry = self.packages_registry.clone()
         new_state.is_delayed = self.is_delayed
         return new_state
 
     def clear_delayed_packages_cache(self):
-        if self.is_delayed and "packages" in self.__dict__:
-            del self.__dict__["packages"]
+        if self.is_delayed and "packages_registry" in self.__dict__:
+            del self.__dict__["packages_registry"]
 
     @cached_property
-    def packages(self):
-        return StatePackages(self.real_packages, self.models)
+    def packages_registry(self):
+        return StatePackagesRegistry(self.real_packages, self.models)
 
     @classmethod
-    def from_packages(cls, packages):
+    def from_packages_registry(cls, packages_registry):
         """Take an Packages and return a ProjectState matching it."""
         app_models = {}
-        for model in packages.get_models(include_swapped=True):
+        for model in packages_registry.get_models(include_swapped=True):
             model_state = ModelState.from_model(model)
             app_models[(model_state.package_label, model_state.name_lower)] = (
                 model_state
@@ -547,7 +551,7 @@ class PackageConfigStub(PackageConfig):
     """Stub of an PackageConfig. Only provides a label and a dict of models."""
 
     def __init__(self, label):
-        self.packages = None
+        self.packages_registry = None
         self.models = {}
         # Package-label and package-name are not the same thing, so technically passing
         # in the label here is wrong. In practice, migrations don't care about
@@ -556,10 +560,10 @@ class PackageConfigStub(PackageConfig):
         self.name = label
 
     def import_models(self):
-        self.models = self.packages.all_models[self.label]
+        self.models = self.packages_registry.all_models[self.label]
 
 
-class StatePackages(Packages):
+class StatePackagesRegistry(PackagesRegistry):
     """
     Subclass of the global Packages registry class to better handle dynamic model
     additions and removals.
@@ -640,12 +644,12 @@ class StatePackages(Packages):
 
     def clone(self):
         """Return a clone of this registry."""
-        clone = StatePackages([], {})
+        clone = StatePackagesRegistry([], {})
         clone.all_models = copy.deepcopy(self.all_models)
 
         for package_label in self.package_configs:
             package_config = PackageConfigStub(package_label)
-            package_config.packages = clone
+            package_config.packages_registry = clone
             package_config.import_models()
             clone.package_configs[package_label] = package_config
 
@@ -657,7 +661,7 @@ class StatePackages(Packages):
         self.all_models[package_label][model._meta.model_name] = model
         if package_label not in self.package_configs:
             self.package_configs[package_label] = PackageConfigStub(package_label)
-            self.package_configs[package_label].packages = self
+            self.package_configs[package_label].packages_registry = self
         self.package_configs[package_label].models[model._meta.model_name] = model
         self.do_pending_operations(model)
         self.clear_cache()
@@ -756,7 +760,7 @@ class ModelState:
         options = {}
         for name in DEFAULT_NAMES:
             # Ignore some special options
-            if name in ["packages", "package_label"]:
+            if name in ["packages_registry", "package_label"]:
                 continue
             elif name in model._meta.original_attrs:
                 if name == "indexes":
@@ -875,7 +879,7 @@ class ModelState:
         # First, make a Meta object
         meta_contents = {
             "package_label": self.package_label,
-            "packages": packages,
+            "packages_registry": packages,
             **self.options,
         }
         meta = type("Meta", (), meta_contents)
@@ -896,7 +900,7 @@ class ModelState:
 
         # Restore managers
         body.update(self.construct_managers())
-        # Then, make a Model object (packages.register_model is called in __new__)
+        # Then, make a Model object (packages_registry.register_model is called in __new__)
         model_class = type(self.name, bases, body)
         from plain.models import register_model
 

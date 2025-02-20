@@ -6,7 +6,7 @@ import sys
 import click
 
 from plain.models.fields import NOT_PROVIDED
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.utils import timezone
 
 from .loader import MigrationLoader
@@ -34,7 +34,7 @@ class MigrationQuestioner:
         # Packages from the new app template will have these; the Python
         # file check will ensure we skip South ones.
         try:
-            package_config = packages.get_package_config(package_label)
+            package_config = packages_registry.get_package_config(package_label)
         except LookupError:  # It's a fake app.
             return self.defaults.get("ask_initial", False)
         migrations_import_path, _ = MigrationLoader.migrations_module(

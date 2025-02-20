@@ -39,7 +39,7 @@ from plain.models.manager import Manager
 from plain.models.options import Options
 from plain.models.query import F, Q
 from plain.models.utils import AltersData, make_model_tuple
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.utils.encoding import force_str
 from plain.utils.hashable import make_hashable
 
@@ -115,7 +115,7 @@ class ModelBase(type):
         package_label = None
 
         # Look for an application configuration to attach the model to.
-        package_config = packages.get_containing_package_config(module)
+        package_config = packages_registry.get_containing_package_config(module)
 
         if getattr(meta, "package_label", None) is None:
             if package_config is None:
@@ -1366,7 +1366,7 @@ class Model(AltersData, metaclass=ModelBase):
         errors = []
         if cls._meta.swapped:
             try:
-                packages.get_model(cls._meta.swapped)
+                packages_registry.get_model(cls._meta.swapped)
             except ValueError:
                 errors.append(
                     preflight.Error(
@@ -2168,7 +2168,7 @@ def make_foreign_order_accessors(model, related_model):
 def model_unpickle(model_id):
     """Used to unpickle Model subclasses with deferred fields."""
     if isinstance(model_id, tuple):
-        model = packages.get_model(*model_id)
+        model = packages_registry.get_model(*model_id)
     else:
         # Backwards compat - the model was cached directly in earlier versions.
         model = model_id

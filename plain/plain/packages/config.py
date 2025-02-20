@@ -24,7 +24,7 @@ class PackageConfig:
 
         # Reference to the Packages registry that holds this PackageConfig. Set by the
         # registry when it registers the PackageConfig instance.
-        self.packages = None
+        self.packages_registry = None
 
         # The following attributes could be defined at the class level in a
         # subclass, hence the test-and-set pattern.
@@ -207,9 +207,9 @@ class PackageConfig:
         Raise LookupError if no model exists with this name.
         """
         if require_ready:
-            self.packages.check_models_ready()
+            self.packages_registry.check_models_ready()
         else:
-            self.packages.check_packages_ready()
+            self.packages_registry.check_packages_ready()
         try:
             return self.models[model_name.lower()]
         except KeyError:
@@ -230,7 +230,7 @@ class PackageConfig:
         Set the corresponding keyword argument to True to include such models.
         Keyword arguments aren't documented; they're a private API.
         """
-        self.packages.check_models_ready()
+        self.packages_registry.check_models_ready()
         for model in self.models.values():
             if model._meta.auto_created and not include_auto_created:
                 continue
@@ -241,7 +241,7 @@ class PackageConfig:
     def import_models(self):
         # Dictionary of models for this app, primarily maintained in the
         # 'all_models' attribute of the Packages this PackageConfig is attached to.
-        self.models = self.packages.all_models[self.label]
+        self.models = self.packages_registry.all_models[self.label]
 
         if module_has_submodule(self.module, MODELS_MODULE_NAME):
             models_module_name = f"{self.name}.{MODELS_MODULE_NAME}"

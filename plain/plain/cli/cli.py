@@ -16,7 +16,7 @@ import plain.runtime
 from plain import preflight
 from plain.assets.compile import compile_assets, get_compiled_path
 from plain.exceptions import ImproperlyConfigured
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.utils.crypto import get_random_string
 
 from .formatting import PlainContext
@@ -161,7 +161,7 @@ def preflight_checks(package_label, deploy, fail_level, databases):
 
     if package_label:
         package_configs = [
-            packages.get_package_config(label) for label in package_label
+            packages_registry.get_package_config(label) for label in package_label
         ]
     else:
         package_configs = None

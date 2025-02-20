@@ -4,7 +4,7 @@ from importlib import import_module, reload
 
 from plain.models.migrations.graph import MigrationGraph
 from plain.models.migrations.recorder import MigrationRecorder
-from plain.packages import packages
+from plain.packages import packages_registry
 
 from .exceptions import (
     AmbiguityError,
@@ -64,7 +64,7 @@ class MigrationLoader:
         settings.MIGRATION_MODULE.
         """
 
-        app = packages.get_package_config(package_label)
+        app = packages_registry.get_package_config(package_label)
         if app.migrations_module is None:
             return None, True
         explicit = app.migrations_module != MIGRATIONS_MODULE_NAME
@@ -75,7 +75,7 @@ class MigrationLoader:
         self.disk_migrations = {}
         self.unmigrated_packages = set()
         self.migrated_packages = set()
-        for package_config in packages.get_package_configs():
+        for package_config in packages_registry.get_package_configs():
             # Get the migrations module directory
             module_name, explicit = self.migrations_module(package_config.label)
             if module_name is None:

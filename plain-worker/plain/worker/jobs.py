@@ -71,9 +71,9 @@ class ModelInstanceParameter:
         if not s.startswith("gid://"):
             raise ValueError("Invalid ModelInstanceParameter string")
         package, model, pk = s[6:].split("/")
-        from plain.packages import packages
+        from plain.packages import packages_registry
 
-        model = packages.get_model(package, model)
+        model = packages_registry.get_model(package, model)
         return model.objects.get(pk=pk)
 
     @staticmethod

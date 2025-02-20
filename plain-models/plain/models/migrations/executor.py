@@ -1,6 +1,6 @@
 from plain.models import migrations
 from plain.models.db import router
-from plain.packages.registry import packages as global_packages
+from plain.packages.registry import packages_registry as global_packages
 
 from .loader import MigrationLoader
 from .recorder import MigrationRecorder
@@ -108,10 +108,10 @@ class MigrationExecutor:
                 # process.
                 break
             if migration in migrations_to_run:
-                if "packages" not in state.__dict__:
+                if "packages_registry" not in state.__dict__:
                     if self.progress_callback:
                         self.progress_callback("render_start")
-                    state.packages  # Render all -- performance critical
+                    state.packages_registry  # Render all -- performance critical
                     if self.progress_callback:
                         self.progress_callback("render_success")
                 state = self.apply_migration(
@@ -207,7 +207,7 @@ class MigrationExecutor:
             )
         else:
             after_state = migration.mutate_state(project_state)
-        packages = after_state.packages
+        packages_registry = after_state.packages_registry
         found_create_model_migration = False
         found_add_field_migration = False
         fold_identifier_case = self.connection.features.ignores_table_name_case
@@ -222,7 +222,9 @@ class MigrationExecutor:
         # Make sure all create model and add field operations are done
         for operation in migration.operations:
             if isinstance(operation, migrations.CreateModel):
-                model = packages.get_model(migration.package_label, operation.name)
+                model = packages_registry.get_model(
+                    migration.package_label, operation.name
+                )
                 if model._meta.swapped:
                     # We have to fetch the model to test with from the
                     # main app cache, as it's not a direct dependency.
@@ -236,7 +238,7 @@ class MigrationExecutor:
                     return False, project_state
                 found_create_model_migration = True
             elif isinstance(operation, migrations.AddField):
-                model = packages.get_model(
+                model = packages_registry.get_model(
                     migration.package_label, operation.model_name
                 )
                 if model._meta.swapped:

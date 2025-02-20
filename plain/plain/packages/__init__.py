@@ -1,4 +1,4 @@
 from .config import PackageConfig
-from .registry import packages
+from .registry import packages_registry
 
-__all__ = ["PackageConfig", "packages"]
+__all__ = ["PackageConfig", "packages_registry"]

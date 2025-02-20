@@ -1,7 +1,7 @@
 import os
 import sys
 
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import settings
 
 # The prefix to put on the default database name when creating
@@ -58,7 +58,7 @@ class BaseDatabaseCreation:
         try:
             if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
                 # Disable migrations for all packages.
-                for app in packages.get_package_configs():
+                for app in packages_registry.get_package_configs():
                     app._old_migrations_module = app.migrations_module
                     app.migrations_module = None
             # We report migrate messages at one level lower than that
@@ -78,7 +78,7 @@ class BaseDatabaseCreation:
             )
         finally:
             if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
-                for app in packages.get_package_configs():
+                for app in packages_registry.get_package_configs():
                     app.migrations_module = app._old_migrations_module
                     del app._old_migrations_module
 

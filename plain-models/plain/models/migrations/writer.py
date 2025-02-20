@@ -5,7 +5,7 @@ from importlib import import_module
 from plain.models import migrations
 from plain.models.migrations.loader import MigrationLoader
 from plain.models.migrations.serializer import Serializer, serializer_factory
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import __version__
 from plain.utils.inspect import get_func_args
 from plain.utils.module_loading import module_dir
@@ -221,7 +221,9 @@ class MigrationWriter:
                 pass
 
         # Alright, see if it's a direct submodule of the app
-        package_config = packages.get_package_config(self.migration.package_label)
+        package_config = packages_registry.get_package_config(
+            self.migration.package_label
+        )
         (
             maybe_package_name,
             _,

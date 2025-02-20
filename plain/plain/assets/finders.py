@@ -1,6 +1,6 @@
 import os
 
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import APP_PATH
 
 APP_ASSETS_DIR = APP_PATH / "assets"
@@ -33,7 +33,7 @@ def iter_assets():
 
 def iter_asset_dirs():
     # Iterate the installed package assets, in order
-    for pkg in packages.get_package_configs():
+    for pkg in packages_registry.get_package_configs():
         asset_dir = os.path.join(pkg.path, "assets")
         if os.path.exists(asset_dir):
             yield asset_dir

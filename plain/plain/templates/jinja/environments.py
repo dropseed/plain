@@ -4,7 +4,7 @@ from pathlib import Path
 from jinja2 import Environment, StrictUndefined
 from jinja2.loaders import FileSystemLoader
 
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import settings
 
 from .filters import default_filters
@@ -40,7 +40,7 @@ def _get_app_template_dirs():
     dirname = "templates"
     template_dirs = [
         Path(package_config.path) / dirname
-        for package_config in packages.get_package_configs()
+        for package_config in packages_registry.get_package_configs()
         if package_config.path and (Path(package_config.path) / dirname).is_dir()
     ]
     # Immutable return value because it will be cached and shared by callers.

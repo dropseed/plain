@@ -33,7 +33,7 @@ def setup():
         entry_point.load()()
 
     from plain.logs import configure_logging
-    from plain.packages import packages
+    from plain.packages import packages_registry
 
     if not APP_PATH.exists():
         raise AppPathNotFound(
@@ -48,7 +48,7 @@ def setup():
 
     configure_logging(settings.LOGGING)
 
-    packages.populate(settings.INSTALLED_PACKAGES)
+    packages_registry.populate(settings.INSTALLED_PACKAGES)
 
 
 __all__ = [

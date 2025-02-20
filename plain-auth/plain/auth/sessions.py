@@ -1,6 +1,6 @@
 from plain.csrf.middleware import rotate_token
 from plain.exceptions import ImproperlyConfigured
-from plain.packages import packages as plain_packages
+from plain.packages import packages_registry as plain_packages
 from plain.runtime import settings
 from plain.utils.crypto import constant_time_compare, salted_hmac
 

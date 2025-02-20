@@ -4,7 +4,7 @@ from importlib.util import find_spec
 
 import click
 
-from plain.packages import packages
+from plain.packages import packages_registry
 
 
 class InstalledPackagesGroup(click.Group):
@@ -21,7 +21,7 @@ class InstalledPackagesGroup(click.Group):
         command_names = []
 
         # Get installed packages with a cli.py module
-        for app in packages.get_package_configs():
+        for app in packages_registry.get_package_configs():
             if not find_spec(f"{app.name}.{self.MODULE_NAME}"):
                 continue
 

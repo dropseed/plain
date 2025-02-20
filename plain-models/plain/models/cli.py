@@ -6,7 +6,7 @@ from itertools import takewhile
 
 import click
 
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils.text import Truncator
 
@@ -301,7 +301,7 @@ def makemigrations(
     has_bad_labels = False
     for package_label in package_labels:
         try:
-            packages.get_package_config(package_label)
+            packages_registry.get_package_config(package_label)
         except LookupError as err:
             click.echo(str(err), err=True)
             has_bad_labels = True
@@ -313,7 +313,7 @@ def makemigrations(
 
     # Raise an error if any migrations are applied before their dependencies.
     consistency_check_labels = {
-        config.label for config in packages.get_package_configs()
+        config.label for config in packages_registry.get_package_configs()
     }
     # Non-default databases are only checked if database routers used.
     aliases_to_check = connections if settings.DATABASE_ROUTERS else [DEFAULT_DB_ALIAS]
@@ -324,7 +324,9 @@ def makemigrations(
                 connection.alias, package_label, model_name=model._meta.object_name
             )
             for package_label in consistency_check_labels
-            for model in packages.get_package_config(package_label).get_models()
+            for model in packages_registry.get_package_config(
+                package_label
+            ).get_models()
         ):
             loader.check_consistent_history(connection)
 
@@ -368,7 +370,7 @@ def makemigrations(
     # Set up autodetector
     autodetector = MigrationAutodetector(
         loader.project_state(),
-        ProjectState.from_packages(packages),
+        ProjectState.from_packages_registry(packages_registry),
         questioner,
     )
 
@@ -541,7 +543,7 @@ def migrate(
     target_package_labels_only = True
     if package_label:
         try:
-            packages.get_package_config(package_label)
+            packages_registry.get_package_config(package_label)
         except LookupError as err:
             raise click.ClickException(str(err))
 
@@ -713,7 +715,7 @@ def migrate(
         # post_migrate signals have access to all models. Ensure that all models
         # are reloaded in case any are delayed.
         post_migrate_state.clear_delayed_packages_cache()
-        post_migrate_packages = post_migrate_state.packages
+        post_migrate_packages = post_migrate_state.packages_registry
 
         # Re-render models of real packages to include relationships now that
         # we've got a final state. This wouldn't be necessary if real packages
@@ -725,7 +727,10 @@ def migrate(
                 model_keys.append(model_key)
                 post_migrate_packages.unregister_model(*model_key)
         post_migrate_packages.render_multiple(
-            [ModelState.from_model(packages.get_model(*model)) for model in model_keys]
+            [
+                ModelState.from_model(packages_registry.get_model(*model))
+                for model in model_keys
+            ]
         )
 
     elif verbosity >= 1:
@@ -734,7 +739,7 @@ def migrate(
         # how to fix it.
         autodetector = MigrationAutodetector(
             executor.loader.project_state(),
-            ProjectState.from_packages(packages),
+            ProjectState.from_packages_registry(packages_registry),
         )
         changes = autodetector.changes(graph=executor.loader.graph)
         if changes:
@@ -773,7 +778,7 @@ def migrate(
 def optimize_migration(package_label, migration_name, check, verbosity):
     """Optimizes the operations for the named migration."""
     try:
-        packages.get_package_config(package_label)
+        packages_registry.get_package_config(package_label)
     except LookupError as err:
         raise click.ClickException(str(err))
 
@@ -885,7 +890,7 @@ def show_migrations(package_labels, database, format, verbosity):
         has_bad_names = False
         for package_name in package_names:
             try:
-                packages.get_package_config(package_name)
+                packages_registry.get_package_config(package_name)
             except LookupError as err:
                 click.echo(str(err), err=True)
                 has_bad_names = True
@@ -1043,7 +1048,7 @@ def squash_migrations(
 
     # Validate package_label
     try:
-        packages.get_package_config(package_label)
+        packages_registry.get_package_config(package_label)
     except LookupError as err:
         raise click.ClickException(str(err))
 

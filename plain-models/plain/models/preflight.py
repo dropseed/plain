@@ -2,7 +2,7 @@ import inspect
 from collections import defaultdict
 from itertools import chain
 
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.preflight import Error, Warning, register
 from plain.runtime import settings
 
@@ -28,7 +28,7 @@ def check_all_models(package_configs=None, **kwargs):
     constraints = defaultdict(list)
     errors = []
     if package_configs is None:
-        models = packages.get_models()
+        models = packages_registry.get_models()
     else:
         models = chain.from_iterable(
             package_config.get_models() for package_config in package_configs
@@ -99,7 +99,7 @@ def check_all_models(package_configs=None, **kwargs):
     return errors
 
 
-def _check_lazy_references(packages, ignore=None):
+def _check_lazy_references(packages_registry, ignore=None):
     """
     Ensure all lazy (i.e. string) model references have been resolved.
 
@@ -110,7 +110,7 @@ def _check_lazy_references(packages, ignore=None):
     The ignore parameter is used by StatePackages to exclude swappable models from
     this check.
     """
-    pending_models = set(packages._pending_operations) - (ignore or set())
+    pending_models = set(packages_registry._pending_operations) - (ignore or set())
 
     # Short circuit if there aren't any errors.
     if not pending_models:
@@ -135,7 +135,7 @@ def _check_lazy_references(packages, ignore=None):
 
     def app_model_error(model_key):
         try:
-            packages.get_package_config(model_key[0])
+            packages_registry.get_package_config(model_key[0])
             model_error = "app '{}' doesn't provide model '{}'".format(*model_key)
         except LookupError:
             model_error = f"app '{model_key[0]}' isn't installed"
@@ -189,7 +189,7 @@ def _check_lazy_references(packages, ignore=None):
             (
                 build_error(model_key, *extract_operation(func))
                 for model_key in pending_models
-                for func in packages._pending_operations[model_key]
+                for func in packages_registry._pending_operations[model_key]
             ),
         ),
         key=lambda error: error.msg,
@@ -198,7 +198,7 @@ def _check_lazy_references(packages, ignore=None):
 
 @register
 def check_lazy_references(package_configs=None, **kwargs):
-    return _check_lazy_references(packages)
+    return _check_lazy_references(packages_registry)
 
 
 @register

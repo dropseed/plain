@@ -10,7 +10,7 @@ from plain.exceptions import ImproperlyConfigured, PackageRegistryNotReady
 from .config import PackageConfig
 
 
-class Packages:
+class PackagesRegistry:
     """
     A registry that stores the configuration of installed applications.
 
@@ -21,7 +21,9 @@ class Packages:
         # installed_packages is set to None when creating the main registry
         # because it cannot be populated at that point. Other registries must
         # provide a list of installed packages and are populated immediately.
-        if installed_packages is None and hasattr(sys.modules[__name__], "packages"):
+        if installed_packages is None and hasattr(
+            sys.modules[__name__], "packages_registry"
+        ):
             raise RuntimeError("You must supply an installed_packages argument.")
 
         # Mapping of app labels => model names => model classes.
@@ -90,7 +92,7 @@ class Packages:
                     )
 
                 self.package_configs[package_config.label] = package_config
-                package_config.packages = self
+                package_config.packages_registry = self
 
             # Check for duplicate app names.
             counts = Counter(
@@ -355,4 +357,4 @@ class Packages:
             function(model)
 
 
-packages = Packages(installed_packages=None)
+packages_registry = PackagesRegistry(installed_packages=None)

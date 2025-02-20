@@ -1,6 +1,6 @@
 from importlib import import_module
 
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils.functional import LazyObject
 from plain.utils.module_loading import import_string, module_has_submodule
@@ -29,7 +29,7 @@ class JinjaEnvironment(LazyObject):
                 import_module(name)
                 self._imported_modules.add(name)
 
-        for package_config in packages.get_package_configs():
+        for package_config in packages_registry.get_package_configs():
             if module_has_submodule(package_config.module, "templates"):
                 # Allow this to fail in case there are import errors inside of their file
                 _maybe_import_module(f"{package_config.name}.templates")

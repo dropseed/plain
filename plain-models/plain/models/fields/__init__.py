@@ -13,7 +13,7 @@ from plain.models.constants import LOOKUP_SEP
 from plain.models.db import connection, connections, router
 from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import DeferredAttribute, RegisterLookupMixin
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.datastructures import DictWrapper
@@ -77,7 +77,9 @@ BLANK_CHOICE_DASH = [("", "---------")]
 
 
 def _load_field(package_label, model_name, field_name):
-    return packages.get_model(package_label, model_name)._meta.get_field(field_name)
+    return packages_registry.get_model(package_label, model_name)._meta.get_field(
+        field_name
+    )
 
 
 # A guide to Field parameters:

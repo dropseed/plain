@@ -2,7 +2,7 @@ import os
 
 import click
 
-from plain.packages import packages
+from plain.packages import packages_registry
 from plain.runtime import APP_PATH
 
 from .core import Tailwind
@@ -79,7 +79,7 @@ def compile(watch, minify):
     ]
 
     # Add paths from installed packages
-    for package_config in packages.get_package_configs():
+    for package_config in packages_registry.get_package_configs():
         paths.append(os.path.relpath(package_config.path) + "/**/*.{html,js}")
 
     content = ",".join(paths)

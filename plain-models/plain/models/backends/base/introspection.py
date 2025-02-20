@@ -79,11 +79,11 @@ class BaseDatabaseIntrospection:
 
     def get_migratable_models(self):
         from plain.models.db import router
-        from plain.packages import packages
+        from plain.packages import packages_registry
 
         return (
             model
-            for package_config in packages.get_package_configs()
+            for package_config in packages_registry.get_package_configs()
             for model in router.get_migratable_models(
                 package_config, self.connection.alias
             )
