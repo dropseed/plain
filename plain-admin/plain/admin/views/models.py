@@ -68,13 +68,6 @@ class AdminModelListView(AdminListView):
         return cls.model._meta.model_name.capitalize() + "s"
 
     @classmethod
-    def get_slug(cls) -> str:
-        if slug := super().get_slug():
-            return slug
-
-        return cls.model._meta.model_name
-
-    @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path
@@ -148,13 +141,6 @@ class AdminModelDetailView(AdminDetailView):
         return str(self.object)
 
     @classmethod
-    def get_slug(cls) -> str:
-        if slug := super().get_slug():
-            return slug
-
-        return f"{cls.model._meta.model_name}_detail"
-
-    @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path
@@ -199,13 +185,6 @@ class AdminModelCreateView(AdminCreateView):
         return f"New {self.model._meta.model_name}"
 
     @classmethod
-    def get_slug(cls) -> str:
-        if slug := super().get_slug():
-            return slug
-
-        return f"{cls.model._meta.model_name}_create"
-
-    @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path
@@ -236,13 +215,6 @@ class AdminModelUpdateView(AdminUpdateView):
         return f"Update {self.object}"
 
     @classmethod
-    def get_slug(cls) -> str:
-        if slug := super().get_slug():
-            return slug
-
-        return f"{cls.model._meta.model_name}_update"
-
-    @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path
@@ -269,13 +241,6 @@ class AdminModelDeleteView(AdminDeleteView):
 
     def get_title(self) -> str:
         return f"Delete {self.object}"
-
-    @classmethod
-    def get_slug(cls) -> str:
-        if slug := super().get_slug():
-            return slug
-
-        return f"{cls.model._meta.model_name}_delete"
 
     @classmethod
     def get_path(cls) -> str:
