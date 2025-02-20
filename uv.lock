@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.23.2"
+version = "0.24.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -310,7 +310,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.17.0"
+version = "0.18.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -458,7 +458,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-flags"
-version = "0.9.1"
+version = "0.10.0"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
@@ -651,7 +651,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.4.1"
+version = "0.5.0"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
