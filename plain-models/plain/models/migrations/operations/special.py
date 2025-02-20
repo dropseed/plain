@@ -51,8 +51,6 @@ class RunSQL(Operation):
     by this SQL change, in case it's custom column/table creation/deletion.
     """
 
-    noop = ""
-
     def __init__(self, sql, *, state_operations=None, hints=None, elidable=False):
         self.sql = sql
         self.state_operations = state_operations or []
@@ -93,7 +91,7 @@ class RunSQL(Operation):
                     else:
                         raise ValueError("Expected a 2-tuple but got %d" % elements)  # noqa: UP031
                 schema_editor.execute(sql, params=params)
-        elif sqls != RunSQL.noop:
+        else:
             statements = schema_editor.connection.ops.prepare_sql_script(sqls)
             for statement in statements:
                 schema_editor.execute(statement, params=None)
@@ -141,11 +139,7 @@ class RunPython(Operation):
             # object, representing the versioned models as an app registry.
             # We could try to override the global cache, but then people will still
             # use direct imports, so we go with a documentation approach instead.
-            self.code(from_state.packages, schema_editor)
+            self.code(from_state.packages_registry, schema_editor)
 
     def describe(self):
         return "Raw Python operation"
-
-    @staticmethod
-    def noop(packages, schema_editor):
-        return None
