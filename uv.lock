@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.24.0"
+version = "0.24.1"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -310,7 +310,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.19.0"
+version = "0.19.1"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
