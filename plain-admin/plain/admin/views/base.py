@@ -67,7 +67,7 @@ class AdminView(AuthViewMixin, TemplateView):
 
     @classmethod
     def get_slug(cls) -> str:
-        return f"{cls.__module__}.{cls.__name__}".lower().replace(".", "_")
+        return f"{cls.__module__}.{cls.__qualname__}".lower().replace(".", "_")
 
     # Can actually use @classmethod, @staticmethod or regular method for these?
     def get_title(self) -> str:
