@@ -443,7 +443,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-esbuild"
-version = "0.2.1"
+version = "0.3.0"
 source = { editable = "plain-esbuild" }
 dependencies = [
     { name = "plain" },
