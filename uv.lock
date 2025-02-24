@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.26.0"
+version = "0.27.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -362,7 +362,7 @@ dev = [
 
 [[package]]
 name = "plain-auth"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "plain-auth" }
 dependencies = [
     { name = "plain" },
@@ -537,7 +537,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-models"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -755,7 +755,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-worker"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "plain-worker" }
 dependencies = [
     { name = "plain" },
