@@ -547,18 +547,6 @@ class ProjectState:
         return self.models == other.models and self.real_packages == other.real_packages
 
 
-class PackageConfigStub(PackageConfig):
-    """Stub of an PackageConfig. Only provides a label and a dict of models."""
-
-    def __init__(self, label):
-        self.packages_registry = None
-        # Package-label and package-name are not the same thing, so technically passing
-        # in the label here is wrong. In practice, migrations don't care about
-        # the package name, but we need something unique, and the label works fine.
-        self.label = label
-        self.name = label
-
-
 class StatePackagesRegistry(PackagesRegistry):
     """
     Subclass of the global Packages registry class to better handle dynamic model
@@ -578,7 +566,7 @@ class StatePackagesRegistry(PackagesRegistry):
         # Populate the app registry with a stub for each application.
         package_labels = {model_state.package_label for model_state in models.values()}
         package_configs = [
-            PackageConfigStub(label)
+            PackageConfig(label, label=label)
             for label in sorted([*real_packages, *package_labels])
         ]
         super().__init__(package_configs)
@@ -643,7 +631,7 @@ class StatePackagesRegistry(PackagesRegistry):
         clone.all_models = copy.deepcopy(self.all_models)
 
         for package_label in self.package_configs:
-            package_config = PackageConfigStub(package_label)
+            package_config = PackageConfig(package_label, label=package_label)
             package_config.packages_registry = clone
             clone.package_configs[package_label] = package_config
 
@@ -654,7 +642,9 @@ class StatePackagesRegistry(PackagesRegistry):
     def register_model(self, package_label, model):
         self.all_models[package_label][model._meta.model_name] = model
         if package_label not in self.package_configs:
-            self.package_configs[package_label] = PackageConfigStub(package_label)
+            self.package_configs[package_label] = PackageConfig(
+                package_label, label=package_label
+            )
             self.package_configs[package_label].packages_registry = self
         self.do_pending_operations(model)
         self.clear_cache()

@@ -4,10 +4,13 @@ import threading
 import warnings
 from collections import Counter, defaultdict
 from functools import partial
+from importlib import import_module
 
 from plain.exceptions import ImproperlyConfigured, PackageRegistryNotReady
 
 from .config import PackageConfig
+
+CONFIG_MODULE_NAME = "config"
 
 
 class PackagesRegistry:
@@ -82,17 +85,35 @@ class PackagesRegistry:
             # Phase 1: initialize app configs and import app modules.
             for entry in installed_packages:
                 if isinstance(entry, PackageConfig):
-                    package_config = entry
+                    # Some instances of the registry pass in the
+                    # PackageConfig directly...
+                    self.register_config(entry)
                 else:
-                    package_config = PackageConfig.create(entry)
-                if package_config.label in self.package_configs:
-                    raise ImproperlyConfigured(
-                        "Package labels aren't unique, "
-                        f"duplicates: {package_config.label}"
-                    )
+                    try:
+                        import_module(f"{entry}.{CONFIG_MODULE_NAME}")
+                    except ModuleNotFoundError:
+                        pass
 
-                self.package_configs[package_config.label] = package_config
-                package_config.packages_registry = self
+                    # The config for the package should now be registered, if it existed.
+                    # And if it didn't, now we can auto generate one.
+                    entry_config = None
+                    for config in self.package_configs.values():
+                        if config.name == entry:
+                            entry_config = config
+                            break
+
+                    if not entry_config:
+                        # Use PackageConfig class as-is, without any customization.
+                        entry_config = self.register_config(
+                            PackageConfig, module_name=entry
+                        )
+
+            # Make sure we have the same number of configs as we have installed packages
+            if len(self.package_configs) != len(installed_packages):
+                raise ImproperlyConfigured(
+                    f"The number of installed packages ({len(installed_packages)}) does not match the number of "
+                    f"registered configs ({len(self.package_configs)})."
+                )
 
             # Check for duplicate app names.
             counts = Counter(
@@ -372,5 +393,38 @@ class PackagesRegistry:
         for function in self._pending_operations.pop(key, []):
             function(model)
 
+    def register_config(self, package_config, module_name=""):
+        """
+        Add a config to the registry.
+
+        Typically used as a decorator on a PackageConfig subclass. Example:
+
+        @register_config
+        class Config(PackageConfig):
+            pass
+        """
+        if not module_name:
+            module_name = package_config.__module__
+
+        # If it is in .config like expected, return the parent module name
+        if module_name.endswith(f".{CONFIG_MODULE_NAME}"):
+            module_name = module_name[: -len(CONFIG_MODULE_NAME) - 1]
+
+        if isinstance(package_config, type) and issubclass(
+            package_config, PackageConfig
+        ):
+            # A class was passed, so init it
+            package_config = package_config(module_name)
+
+        if package_config.label in self.package_configs:
+            raise ImproperlyConfigured(
+                f"Package labels aren't unique, duplicates: {package_config.label}"
+            )
+        self.package_configs[package_config.label] = package_config
+        package_config.packages = self
+
+        return package_config
+
 
 packages_registry = PackagesRegistry(installed_packages=None)
+register_config = packages_registry.register_config
