@@ -4,5 +4,5 @@ MODULE_NAME = "jobs"
 
 
 @register_config
-class PlainJobsConfig(PackageConfig):
+class Config(PackageConfig):
     label = "plainworker"
