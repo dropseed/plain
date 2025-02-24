@@ -207,7 +207,7 @@ class URLResolver:
                     else:
                         for name in url_pattern.reverse_dict:
                             for (
-                                matches,
+                                _,
                                 pat,
                                 converters,
                             ) in url_pattern.reverse_dict.getlist(name):
