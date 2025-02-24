@@ -1,6 +1,5 @@
 import base64
 import datetime
-import re
 import unicodedata
 from binascii import Error as BinasciiError
 from email.utils import formatdate
@@ -9,19 +8,6 @@ from urllib.parse import urlencode as original_urlencode
 
 from plain.utils.datastructures import MultiValueDict
 from plain.utils.regex_helper import _lazy_re_compile
-
-# Based on RFC 9110 Appendix A.
-ETAG_MATCH = _lazy_re_compile(
-    r"""
-    \A(      # start of string and capture group
-    (?:W/)?  # optional weak indicator
-    "        # opening quote
-    [^"]*    # any sequence of non-quote characters
-    "        # end quote
-    )\Z      # end of string and capture group
-""",
-    re.X,
-)
 
 MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split()
 __D = r"(?P<day>[0-9]{2})"
@@ -134,16 +120,6 @@ def parse_http_date(date):
         raise ValueError(f"{date!r} is not a valid date") from exc
 
 
-def parse_http_date_safe(date):
-    """
-    Same as parse_http_date, but return None if the input is invalid.
-    """
-    try:
-        return parse_http_date(date)
-    except Exception:
-        pass
-
-
 # Base 36 functions: useful for generating compact URLs
 
 
@@ -192,31 +168,6 @@ def urlsafe_base64_decode(s):
         return base64.urlsafe_b64decode(s.ljust(len(s) + len(s) % 4, b"="))
     except (LookupError, BinasciiError) as e:
         raise ValueError(e)
-
-
-def parse_etags(etag_str):
-    """
-    Parse a string of ETags given in an If-None-Match or If-Match header as
-    defined by RFC 9110. Return a list of quoted ETags, or ['*'] if all ETags
-    should be matched.
-    """
-    if etag_str.strip() == "*":
-        return ["*"]
-    else:
-        # Parse each ETag individually, and return any that are valid.
-        etag_matches = (ETAG_MATCH.match(etag.strip()) for etag in etag_str.split(","))
-        return [match[1] for match in etag_matches if match]
-
-
-def quote_etag(etag_str):
-    """
-    If the provided string is already a quoted ETag, return it. Otherwise, wrap
-    the string in quotes, making it a strong ETag.
-    """
-    if ETAG_MATCH.match(etag_str):
-        return etag_str
-    else:
-        return f'"{etag_str}"'
 
 
 def is_same_domain(host, pattern):
