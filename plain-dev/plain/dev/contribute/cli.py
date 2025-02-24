@@ -25,7 +25,7 @@ def cli(packages, repo, reset, all_packages):
             sys.exit(result.returncode)
 
         click.secho("Running uv sync", bold=True)
-        result = subprocess.run(["uv", "sync"])
+        result = subprocess.run(["uv", "sync", "--reinstall"])
         if result.returncode:
             click.secho("Failed to sync", fg="red")
             sys.exit(result.returncode)
