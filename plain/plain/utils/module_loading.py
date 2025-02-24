@@ -32,7 +32,6 @@ def import_string(dotted_path):
         ) from err
 
 
-
 def module_dir(module):
     """
     Find the name of the directory that contains a module, if possible.
