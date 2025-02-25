@@ -685,7 +685,7 @@ class MigrationAutodetector:
         Also bring forward removal of any model options that refer to
         collections of fields - the inverse of generate_created_models().
         """
-        deleted_models = self.old_model_keys - self.new_model_key
+        deleted_models = self.old_model_keys - self.new_model_keys
 
         for package_label, model_name in sorted(deleted_models):
             model_state = self.from_state.models[package_label, model_name]
