@@ -6,16 +6,8 @@ import sys
 import requests
 import tomlkit
 
-from plain.runtime import settings
-
-DEFAULT_CSS = """@tailwind base;
-
-
-@tailwind components;
-
-
-@tailwind utilities;
-"""
+from plain.packages import packages_registry
+from plain.runtime import APP_PATH, settings
 
 
 class Tailwind:
@@ -32,18 +24,27 @@ class Tailwind:
         return os.path.join(self.target_directory, "tailwind.version")
 
     @property
-    def config_path(self) -> str:
-        return os.path.join(
-            os.path.dirname(self.target_directory), "tailwind.config.js"
-        )
-
-    @property
     def src_css_path(self) -> str:
         return settings.TAILWIND_SRC_PATH
 
     @property
     def dist_css_path(self) -> str:
         return settings.TAILWIND_DIST_PATH
+
+    def update_plain_sources(self):
+        paths = set()
+
+        # Add paths from installed packages
+        for package_config in packages_registry.get_package_configs():
+            abs_package_path = os.path.abspath(package_config.path)
+            abs_app_path = os.path.abspath(APP_PATH)
+            if os.path.commonpath([abs_app_path, abs_package_path]) != abs_app_path:
+                paths.add(os.path.relpath(abs_package_path, self.target_directory))
+
+        plain_sources_path = os.path.join(self.target_directory, "tailwind.css")
+        with open(plain_sources_path, "w") as f:
+            for path in paths:
+                f.write(f'@source "{path}";\n')
 
     def invoke(self, *args, cwd=None) -> None:
         result = subprocess.run([self.standalone_path] + list(args), cwd=cwd)
@@ -55,19 +56,10 @@ class Tailwind:
             os.mkdir(self.target_directory)
         return os.path.exists(os.path.join(self.target_directory, "tailwind"))
 
-    def config_exists(self) -> bool:
-        return os.path.exists(self.config_path)
-
-    def create_config(self):
-        self.invoke("init", self.config_path)
-
-    def src_css_exists(self) -> bool:
-        return os.path.exists(self.src_css_path)
-
     def create_src_css(self):
         os.makedirs(os.path.dirname(self.src_css_path), exist_ok=True)
         with open(self.src_css_path, "w") as f:
-            f.write(DEFAULT_CSS)
+            f.write("""@import "tailwindcss";\n@import "./.plain/tailwind.css";\n""")
 
     def needs_update(self) -> bool:
         if not os.path.exists(self.version_lockfile_path):

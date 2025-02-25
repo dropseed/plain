@@ -2,7 +2,6 @@ import os
 
 import click
 
-from plain.packages import packages_registry
 from plain.runtime import APP_PATH
 
 from .core import Tailwind
@@ -15,37 +14,24 @@ def cli():
 
 
 @cli.command()
-def init():
+@click.pass_context
+def init(ctx):
     """Install Tailwind, create a tailwind.config.js and app/assets/src/tailwind.css"""
     tailwind = Tailwind()
 
-    tailwind_installed = tailwind.is_installed()
+    if not tailwind.is_installed():
+        ctx.invoke(update)
 
-    if not tailwind_installed:
-        # Need to do an initial download to run init
-        tailwind.download()
-
-    # Config needs to exist first so we can save the version here
-    if not tailwind.config_exists():
-        click.secho("Creating Tailwind config...", bold=True)
-        tailwind.create_config()
-
-    if not tailwind_installed:
-        # Mostly need to save the version to config...
-        click.secho("Installing Tailwind standalone...", bold=True, nl=False)
-        version = tailwind.install()
-        click.secho(f"Tailwind {version} installed", fg="green")
-
-    if not tailwind.src_css_exists():
+    if not tailwind.src_css_path.exists():
         click.secho("Creating Tailwind source CSS...", bold=True)
         tailwind.create_src_css()
 
+    # gitignore
+
 
 @cli.command()
-@click.option("--watch", is_flag=True)
-@click.option("--minify", is_flag=True)
-def build(watch, minify):
-    """Compile a Tailwind CSS file"""
+@click.pass_context
+def install(ctx):
     tailwind = Tailwind()
 
     if not tailwind.is_installed() or tailwind.needs_update():
@@ -57,42 +43,11 @@ def build(watch, minify):
                 nl=False,
             )
             version = tailwind.install(version_to_install)
+            click.secho(f"Tailwind {version} installed", fg="green")
         else:
-            click.secho("Installing Tailwind standalone...", bold=True, nl=False)
-            version = tailwind.install()
-        click.secho(f"Tailwind {version} installed", fg="green")
-
-    args = []
-    args.append("-i")
-    print(f"Input: {tailwind.src_css_path}")
-    args.append(tailwind.src_css_path)
-
-    args.append("-o")
-    print(f"Output: {tailwind.dist_css_path}")
-    args.append(tailwind.dist_css_path)
-
-    # These paths should actually work on Windows too
-    # https://github.com/mrmlnc/fast-glob#how-to-write-patterns-on-windows
-    args.append("--content")
-    paths = [
-        os.path.relpath(APP_PATH) + "/**/*.{html,js}",
-    ]
-
-    # Add paths from installed packages
-    for package_config in packages_registry.get_package_configs():
-        paths.append(os.path.relpath(package_config.path) + "/**/*.{html,js}")
-
-    content = ",".join(paths)
-    print(f"Content: {content}")
-    args.append(content)
-
-    if watch:
-        args.append("--watch")
-
-    if minify:
-        args.append("--minify")
-
-    tailwind.invoke(*args, cwd=os.path.dirname(APP_PATH))
+            ctx.invoke(update)
+    else:
+        click.secho("Tailwind already installed", fg="green")
 
 
 @cli.command()
@@ -102,6 +57,39 @@ def update():
     click.secho("Installing Tailwind standalone...", bold=True, nl=True)
     version = tailwind.install()
     click.secho(f"Tailwind {version} installed", fg="green")
+
+
+@cli.command()
+@click.option("--watch", is_flag=True)
+@click.option("--minify", is_flag=True)
+@click.pass_context
+def build(ctx, watch, minify):
+    """Compile a Tailwind CSS file"""
+    tailwind = Tailwind()
+
+    ctx.invoke(install)
+
+    tailwind.update_plain_sources()
+
+    args = []
+    args.append("-i")
+    args.append(tailwind.src_css_path)
+
+    args.append("-o")
+    args.append(tailwind.dist_css_path)
+
+    click.secho(
+        f"Compiling {os.path.relpath(tailwind.src_css_path)} to {os.path.relpath(tailwind.dist_css_path)}...",
+        bold=True,
+    )
+
+    if watch:
+        args.append("--watch")
+
+    if minify:
+        args.append("--minify")
+
+    tailwind.invoke(*args, cwd=os.path.dirname(APP_PATH))
 
 
 if __name__ == "__main__":

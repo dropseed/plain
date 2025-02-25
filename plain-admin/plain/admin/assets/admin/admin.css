@@ -14,12 +14,19 @@ table {
 
 th {
     text-align: left;
-    padding: 0 0.5rem;
-    color: rgb(55, 65, 81);
+    padding: 0.5rem 0.5rem;
 }
 
 table th a {
-    color: rgb(55, 65, 81);
+    color: rgba(255, 255, 255, 0.60);
+}
+
+table td a {
+    color: white;
+
+    &:hover {
+        text-decoration: none;
+    }
 }
 
 tbody tr:hover {

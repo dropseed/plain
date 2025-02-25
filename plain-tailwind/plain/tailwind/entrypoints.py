@@ -8,4 +8,4 @@ def run_dev_build():
 
 def run_build():
     # Standalone mode prevents it from exit()ing
-    build([], standalone_mode=False)
+    build(["--minify"], standalone_mode=False)

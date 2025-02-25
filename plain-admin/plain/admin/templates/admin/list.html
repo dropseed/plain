@@ -76,20 +76,20 @@
 <div class="w-full overflow-auto mt-2">
     <table class="text-sm table-auto">
         <thead>
-            <tr class="bg-white/5 [&>th]:py-2 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
+            <tr class="bg-white/5 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
                 {% if table_style != "simple" and actions %}<th></th>{% endif %}
 
                 {% for field in fields %}
                     {% if order_by_field is defined %}
                     <th>
                         {% if table_style == "simple" %}
-                        <div class="font-mono text-xs font-normal text-white/60">
+                        <div class="font-mono text-xs font-normal">
                             {{ field }}
                         </div>
                         {% else %}
                         <a
                             data-merge-params
-                            class="font-mono text-xs font-normal text-white/60"
+                            class="font-mono text-xs font-normal"
                             href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
                             {{ field }}
                             {% if field == order_by_field %}
