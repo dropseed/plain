@@ -108,9 +108,6 @@ def _check_lazy_references(models_registry, packages_registry):
     Lazy references are used in various places throughout Plain, primarily in
     related fields and model signals. Identify those common cases and provide
     more helpful error messages for them.
-
-    The ignore parameter is used by StatePackages to exclude swappable models from
-    this check.
     """
     pending_models = set(models_registry._pending_operations)
 

@@ -141,7 +141,7 @@ class MigrationWriter:
             operations.append(operation_string)
         items["operations"] = "\n".join(operations) + "\n" if operations else ""
 
-        # Format dependencies and write out swappable dependencies right
+        # Format dependencies and write out settings dependencies right
         dependencies = []
         for dependency in self.migration.dependencies:
             if isinstance(dependency, SettingsTuple):

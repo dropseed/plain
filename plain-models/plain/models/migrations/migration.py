@@ -154,7 +154,7 @@ class Migration:
 
 class SettingsTuple(tuple):
     """
-    Subclass of tuple so Plain can tell this was originally a swappable
+    Subclass of tuple so Plain can tell this was originally a settings
     dependency when it reads the migration file.
     """
 

@@ -240,7 +240,7 @@ class MigrationAutodetector:
     def _resolve_dependency(dependency):
         """
         Return the resolved dependency and a boolean denoting whether or not
-        it was swappable.
+        it was a settings dependency.
         """
         if not isinstance(dependency, SettingsTuple):
             return dependency, False
@@ -279,12 +279,12 @@ class MigrationAutodetector:
                     deps_satisfied = True
                     operation_dependencies = set()
                     for dep in operation._auto_deps:
-                        # Temporarily resolve the swappable dependency to
+                        # Temporarily resolve the settings dependency to
                         # prevent circular references. While keeping the
                         # dependency checks on the resolved model, add the
-                        # swappable dependencies.
+                        # settings dependencies.
                         original_dep = dep
-                        dep, is_swappable_dep = self._resolve_dependency(dep)
+                        dep, is_settings_dep = self._resolve_dependency(dep)
                         if dep[0] != package_label:
                             # External app dependency. See if it's not yet
                             # satisfied.
@@ -297,7 +297,7 @@ class MigrationAutodetector:
                             if not deps_satisfied:
                                 break
                             else:
-                                if is_swappable_dep:
+                                if is_settings_dep:
                                     operation_dependencies.add(
                                         (original_dep[0], original_dep[1])
                                     )
@@ -376,7 +376,7 @@ class MigrationAutodetector:
                 ts.add(op)
                 for dep in op._auto_deps:
                     # Resolve intra-app dependencies to handle circular
-                    # references involving a swappable model.
+                    # references involving a settings model.
                     dep = self._resolve_dependency(dep)[0]
                     if dep[0] != package_label:
                         continue
