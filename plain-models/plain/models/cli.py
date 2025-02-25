@@ -713,7 +713,7 @@ def migrate(
         )
         # post_migrate signals have access to all models. Ensure that all models
         # are reloaded in case any are delayed.
-        post_migrate_state.clear_delayed_packages_cache()
+        post_migrate_state.clear_delayed_models_cache()
         post_migrate_packages = post_migrate_state.models_registry
 
         # Re-render models of real packages to include relationships now that

@@ -522,7 +522,7 @@ class ProjectState:
         new_state.is_delayed = self.is_delayed
         return new_state
 
-    def clear_delayed_packages_cache(self):
+    def clear_delayed_models_cache(self):
         if self.is_delayed and "models_registry" in self.__dict__:
             del self.__dict__["models_registry"]
 

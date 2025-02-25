@@ -131,7 +131,7 @@ class RunPython(Operation):
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         # RunPython has access to all models. Ensure that all models are
         # reloaded in case any are delayed.
-        from_state.clear_delayed_packages_cache()
+        from_state.clear_delayed_models_cache()
         if router.allow_migrate(
             schema_editor.connection.alias, package_label, **self.hints
         ):
