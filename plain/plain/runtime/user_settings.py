@@ -298,16 +298,3 @@ class SettingDefinition:
 
     def __str__(self):
         return f"SettingDefinition(name={self.name}, value={self.value}, source={self.source})"
-
-
-class SettingsReference(str):
-    """
-    String subclass which references a current settings value. It's treated as
-    the value in memory but serializes to a settings.NAME attribute reference.
-    """
-
-    def __new__(self, value, setting_name):
-        return str.__new__(self, value)
-
-    def __init__(self, value, setting_name):
-        self.setting_name = setting_name

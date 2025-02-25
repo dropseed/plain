@@ -34,7 +34,6 @@ DEFAULT_NAMES = (
     "db_tablespace",
     "abstract",
     "managed",
-    "swappable",
     "auto_created",
     "models_registry",
     "select_on_save",
@@ -100,7 +99,6 @@ class Options:
         # in the end of the proxy_for_model chain. In particular, for
         # concrete models, the concrete_model is always the class itself.
         self.concrete_model = None
-        self.swappable = None
         self.parents = {}
         self.auto_created = False
 
@@ -285,7 +283,7 @@ class Options:
         Return True if the model can/should be migrated on the `connection`.
         `connection` can be either a real connection or a connection alias.
         """
-        if self.swapped or not self.managed:
+        if not self.managed:
             return False
         if isinstance(connection, str):
             connection = connections[connection]
@@ -297,31 +295,6 @@ class Options:
                 for feat in self.required_db_features
             )
         return True
-
-    @property
-    def swapped(self):
-        """
-        Has this model been swapped out for another? If so, return the model
-        name of the replacement; otherwise, return None.
-
-        For historical reasons, model name lookups using get_model() are
-        case insensitive, so we make sure we are case insensitive here.
-        """
-        if self.swappable:
-            swapped_for = getattr(settings, self.swappable, None)
-            if swapped_for:
-                try:
-                    swapped_label, swapped_object = swapped_for.split(".")
-                except ValueError:
-                    # setting not in the format package_label.model_name
-                    # raising ImproperlyConfigured here causes problems with
-                    # test cleanup code - instead it is raised in get_user_model
-                    # or as part of validation.
-                    return swapped_for
-
-                if f"{swapped_label}.{swapped_object.lower()}" != self.label_lower:
-                    return swapped_for
-        return None
 
     @cached_property
     def managers(self):

@@ -1,5 +1,4 @@
 from plain.models import migrations
-from plain.models import models_registry as global_models
 from plain.models.db import router
 
 from .loader import MigrationLoader
@@ -225,10 +224,7 @@ class MigrationExecutor:
                 model = models_registry.get_model(
                     migration.package_label, operation.name
                 )
-                if model._meta.swapped:
-                    # We have to fetch the model to test with from the
-                    # main app cache, as it's not a direct dependency.
-                    model = global_models.get_model(model._meta.swapped)
+
                 if should_skip_detecting_model(migration, model):
                     continue
                 db_table = model._meta.db_table
@@ -241,10 +237,7 @@ class MigrationExecutor:
                 model = models_registry.get_model(
                     migration.package_label, operation.model_name
                 )
-                if model._meta.swapped:
-                    # We have to fetch the model to test with from the
-                    # main app cache, as it's not a direct dependency.
-                    model = global_models.get_model(model._meta.swapped)
+
                 if should_skip_detecting_model(migration, model):
                     continue
 

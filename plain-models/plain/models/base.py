@@ -1306,34 +1306,33 @@ class Model(AltersData, metaclass=ModelBase):
     @classmethod
     def check(cls, **kwargs):
         errors = [
-            *cls._check_swappable(),
             *cls._check_managers(**kwargs),
         ]
-        if not cls._meta.swapped:
-            databases = kwargs.get("databases") or []
-            errors += [
-                *cls._check_fields(**kwargs),
-                *cls._check_m2m_through_same_relationship(),
-                *cls._check_long_column_names(databases),
-            ]
-            clash_errors = (
-                *cls._check_id_field(),
-                *cls._check_field_name_clashes(),
-                *cls._check_model_name_db_lookup_clashes(),
-                *cls._check_property_name_related_field_accessor_clashes(),
-                *cls._check_single_primary_key(),
-            )
-            errors.extend(clash_errors)
-            # If there are field name clashes, hide consequent column name
-            # clashes.
-            if not clash_errors:
-                errors.extend(cls._check_column_name_clashes())
-            errors += [
-                *cls._check_indexes(databases),
-                *cls._check_ordering(),
-                *cls._check_constraints(databases),
-                *cls._check_db_table_comment(databases),
-            ]
+
+        databases = kwargs.get("databases") or []
+        errors += [
+            *cls._check_fields(**kwargs),
+            *cls._check_m2m_through_same_relationship(),
+            *cls._check_long_column_names(databases),
+        ]
+        clash_errors = (
+            *cls._check_id_field(),
+            *cls._check_field_name_clashes(),
+            *cls._check_model_name_db_lookup_clashes(),
+            *cls._check_property_name_related_field_accessor_clashes(),
+            *cls._check_single_primary_key(),
+        )
+        errors.extend(clash_errors)
+        # If there are field name clashes, hide consequent column name
+        # clashes.
+        if not clash_errors:
+            errors.extend(cls._check_column_name_clashes())
+        errors += [
+            *cls._check_indexes(databases),
+            *cls._check_ordering(),
+            *cls._check_constraints(databases),
+            *cls._check_db_table_comment(databases),
+        ]
 
         return errors
 
@@ -1356,31 +1355,6 @@ class Model(AltersData, metaclass=ModelBase):
                         f"tables (db_table_comment).",
                         obj=cls,
                         id="models.W046",
-                    )
-                )
-        return errors
-
-    @classmethod
-    def _check_swappable(cls):
-        """Check if the swapped model exists."""
-        errors = []
-        if cls._meta.swapped:
-            try:
-                models_registry.get_model(cls._meta.swapped)
-            except ValueError:
-                errors.append(
-                    preflight.Error(
-                        f"'{cls._meta.swappable}' is not of the form 'package_label.package_name'.",
-                        id="models.E001",
-                    )
-                )
-            except LookupError:
-                package_label, model_name = cls._meta.swapped.split(".")
-                errors.append(
-                    preflight.Error(
-                        f"'{cls._meta.swappable}' references '{package_label}.{model_name}', which has not been "
-                        "installed, or is abstract.",
-                        id="models.E002",
                     )
                 )
         return errors

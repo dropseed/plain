@@ -101,18 +101,15 @@ def check_all_models(package_configs=None, **kwargs):
     return errors
 
 
-def _check_lazy_references(models_registry, packages_registry, ignore=None):
+def _check_lazy_references(models_registry, packages_registry):
     """
     Ensure all lazy (i.e. string) model references have been resolved.
 
     Lazy references are used in various places throughout Plain, primarily in
     related fields and model signals. Identify those common cases and provide
     more helpful error messages for them.
-
-    The ignore parameter is used by StatePackages to exclude swappable models from
-    this check.
     """
-    pending_models = set(models_registry._pending_operations) - (ignore or set())
+    pending_models = set(models_registry._pending_operations)
 
     # Short circuit if there aren't any errors.
     if not pending_models:

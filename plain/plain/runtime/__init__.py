@@ -51,9 +51,24 @@ def setup():
     packages_registry.populate(settings.INSTALLED_PACKAGES)
 
 
+class SettingsReference(str):
+    """
+    String subclass which references a current settings value. It's treated as
+    the value in memory but serializes to a settings.NAME attribute reference.
+    """
+
+    def __new__(self, setting_name):
+        value = getattr(settings, setting_name)
+        return str.__new__(self, value)
+
+    def __init__(self, setting_name):
+        self.setting_name = setting_name
+
+
 __all__ = [
     "setup",
     "settings",
+    "SettingsReference",
     "APP_PATH",
     "__version__",
 ]

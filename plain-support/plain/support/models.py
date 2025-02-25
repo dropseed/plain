@@ -1,14 +1,14 @@
 import uuid
 
 from plain import models
-from plain.runtime import settings
+from plain.runtime import SettingsReference
 
 
 @models.register_model
 class SupportFormEntry(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.SET_NULL,
         related_name="support_form_entries",
         null=True,

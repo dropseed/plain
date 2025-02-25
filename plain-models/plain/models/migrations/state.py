@@ -13,7 +13,6 @@ from plain.models.registry import ModelsRegistry
 from plain.models.registry import models_registry as global_models
 from plain.models.utils import make_model_tuple
 from plain.packages import packages_registry
-from plain.runtime import settings
 from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
 
@@ -534,7 +533,7 @@ class ProjectState:
     def from_models_registry(cls, models_registry):
         """Take an Packages and return a ProjectState matching it."""
         app_models = {}
-        for model in models_registry.get_models(include_swapped=True):
+        for model in models_registry.get_models():
             model_state = ModelState.from_model(model)
             app_models[(model_state.package_label, model_state.name_lower)] = (
                 model_state
@@ -551,7 +550,7 @@ class StateModelsRegistry(ModelsRegistry):
     additions and removals.
     """
 
-    def __init__(self, real_packages, models, ignore_swappable=False):
+    def __init__(self, real_packages, models):
         # Any packages in self.real_packages should have all their models included
         # in the render. We don't use the original model instances as there
         # are some variables that refer to the Packages object.
@@ -571,11 +570,7 @@ class StateModelsRegistry(ModelsRegistry):
         # There shouldn't be any operations pending at this point.
         from plain.models.preflight import _check_lazy_references
 
-        ignore = (
-            {make_model_tuple(settings.AUTH_USER_MODEL)} if ignore_swappable else set()
-        )
-        errors = _check_lazy_references(self, packages_registry, ignore=ignore)
-        if errors:
+        if errors := _check_lazy_references(self, packages_registry):
             raise ValueError("\n".join(error.msg for error in errors))
 
     @contextmanager

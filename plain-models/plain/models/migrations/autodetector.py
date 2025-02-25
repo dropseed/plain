@@ -5,7 +5,7 @@ from itertools import chain
 
 from plain import models
 from plain.models.migrations import operations
-from plain.models.migrations.migration import Migration
+from plain.models.migrations.migration import Migration, SettingsTuple
 from plain.models.migrations.operations.models import AlterModelOptions
 from plain.models.migrations.optimizer import MigrationOptimizer
 from plain.models.migrations.questioner import MigrationQuestioner
@@ -240,9 +240,9 @@ class MigrationAutodetector:
     def _resolve_dependency(dependency):
         """
         Return the resolved dependency and a boolean denoting whether or not
-        it was swappable.
+        it was a settings dependency.
         """
-        if dependency[0] != "__setting__":
+        if not isinstance(dependency, SettingsTuple):
             return dependency, False
         resolved_package_label, resolved_object_name = getattr(
             settings, dependency[1]
@@ -279,12 +279,12 @@ class MigrationAutodetector:
                     deps_satisfied = True
                     operation_dependencies = set()
                     for dep in operation._auto_deps:
-                        # Temporarily resolve the swappable dependency to
+                        # Temporarily resolve the settings dependency to
                         # prevent circular references. While keeping the
                         # dependency checks on the resolved model, add the
-                        # swappable dependencies.
+                        # settings dependencies.
                         original_dep = dep
-                        dep, is_swappable_dep = self._resolve_dependency(dep)
+                        dep, is_settings_dep = self._resolve_dependency(dep)
                         if dep[0] != package_label:
                             # External app dependency. See if it's not yet
                             # satisfied.
@@ -297,7 +297,7 @@ class MigrationAutodetector:
                             if not deps_satisfied:
                                 break
                             else:
-                                if is_swappable_dep:
+                                if is_settings_dep:
                                     operation_dependencies.add(
                                         (original_dep[0], original_dep[1])
                                     )
@@ -376,7 +376,7 @@ class MigrationAutodetector:
                 ts.add(op)
                 for dep in op._auto_deps:
                     # Resolve intra-app dependencies to handle circular
-                    # references involving a swappable model.
+                    # references involving a settings model.
                     dep = self._resolve_dependency(dep)[0]
                     if dep[0] != package_label:
                         continue
@@ -466,24 +466,6 @@ class MigrationAutodetector:
         else:
             self.generated_operations.setdefault(package_label, []).append(operation)
 
-    def swappable_first_key(self, item):
-        """
-        Place potential swappable models first in lists of created models (only
-        real way to solve #22783).
-        """
-        try:
-            model_state = self.to_state.models[item]
-            string_version = f"{item[0]}.{item[1]}"
-            if (
-                model_state.options.get("swappable")
-                or getattr(settings, "AUTH_USER_MODEL", "").lower()
-                == string_version.lower()
-            ):
-                return ("___" + item[0], "___" + item[1])
-        except LookupError:
-            pass
-        return item
-
     def generate_renamed_models(self):
         """
         Find any renamed models, generate the operations for them, and remove
@@ -562,10 +544,7 @@ class MigrationAutodetector:
         old_keys = self.old_model_keys | self.old_unmanaged_keys
         added_models = self.new_model_keys - old_keys
         added_unmanaged_models = self.new_unmanaged_keys - old_keys
-        all_added_models = chain(
-            sorted(added_models, key=self.swappable_first_key, reverse=True),
-            sorted(added_unmanaged_models, key=self.swappable_first_key, reverse=True),
-        )
+        all_added_models = chain(added_models, added_unmanaged_models)
         for package_label, model_name in all_added_models:
             model_state = self.to_state.models[package_label, model_name]
             # Gather related fields
@@ -1249,17 +1228,11 @@ class MigrationAutodetector:
                 ):
                     remote_field_model = f"{remote_package_label}.{remote_model_name}"
                     break
-        # Account for FKs to swappable models
-        swappable_setting = getattr(field, "swappable_setting", None)
-        if swappable_setting is not None:
-            dep_package_label = "__setting__"
-            dep_object_name = swappable_setting
-        else:
-            dep_package_label, dep_object_name = resolve_relation(
-                remote_field_model,
-                package_label,
-                model_name,
-            )
+        dep_package_label, dep_object_name = resolve_relation(
+            remote_field_model,
+            package_label,
+            model_name,
+        )
         dependencies = [(dep_package_label, dep_object_name, None, True)]
         if getattr(field.remote_field, "through", None):
             through_package_label, through_object_name = resolve_relation(
