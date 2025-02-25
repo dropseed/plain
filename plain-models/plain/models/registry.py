@@ -54,9 +54,19 @@ class ModelsRegistry:
 
         models = []
 
-        for package_label, package_models in self.all_models.items():
-            if package_label and package_label != package_label:
-                continue
+        # Get models for a single package
+        if package_label:
+            package_models = self.all_models[package_label]
+            for model in package_models.values():
+                if model._meta.auto_created and not include_auto_created:
+                    continue
+                if model._meta.swapped and not include_swapped:
+                    continue
+                models.append(model)
+            return models
+
+        # Get models for all packages
+        for package_models in self.all_models.values():
             for model in package_models.values():
                 if model._meta.auto_created and not include_auto_created:
                     continue
