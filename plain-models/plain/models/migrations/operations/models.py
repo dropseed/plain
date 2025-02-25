@@ -566,7 +566,6 @@ class AlterModelOptions(ModelOptionOperation):
         "get_latest_by",
         "managed",
         "ordering",
-        "select_on_save",
     ]
 
     def __init__(self, name, options):

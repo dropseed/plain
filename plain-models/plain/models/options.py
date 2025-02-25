@@ -36,7 +36,6 @@ DEFAULT_NAMES = (
     "managed",
     "auto_created",
     "models_registry",
-    "select_on_save",
     "default_related_name",
     "required_db_features",
     "required_db_vendor",
@@ -82,7 +81,6 @@ class Options:
         self._ordering_clash = False
         self.indexes = []
         self.constraints = []
-        self.select_on_save = False
         self.object_name = None
         self.package_label = package_label
         self.get_latest_by = None
