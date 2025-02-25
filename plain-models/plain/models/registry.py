@@ -114,8 +114,6 @@ class ModelsRegistry:
         self.do_pending_operations(model)
         self.clear_cache()
 
-        return model
-
     def _get_registered_model(self, package_label, model_name):
         """
         Similar to get_model(), but doesn't require that an app exists with
