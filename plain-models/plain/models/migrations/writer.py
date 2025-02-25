@@ -4,6 +4,7 @@ from importlib import import_module
 
 from plain.models import migrations
 from plain.models.migrations.loader import MigrationLoader
+from plain.models.migrations.migration import SettingsTuple
 from plain.models.migrations.serializer import serializer_factory
 from plain.packages import packages_registry
 from plain.runtime import __version__
@@ -143,7 +144,7 @@ class MigrationWriter:
         # Format dependencies and write out swappable dependencies right
         dependencies = []
         for dependency in self.migration.dependencies:
-            if isinstance(dependency, migrations.SettingsTuple):
+            if isinstance(dependency, SettingsTuple):
                 dependencies.append(
                     f"        migrations.settings_dependency(settings.{dependency[1]}),"
                 )

@@ -14,7 +14,7 @@ import uuid
 from plain import models
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
-from plain.runtime.user_settings import SettingsReference
+from plain.runtime import SettingsReference
 from plain.utils.functional import LazyObject, Promise
 
 

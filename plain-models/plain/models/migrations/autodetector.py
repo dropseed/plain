@@ -4,8 +4,8 @@ from graphlib import TopologicalSorter
 from itertools import chain
 
 from plain import models
-from plain.models.migrations import SettingsTuple, operations
-from plain.models.migrations.migration import Migration
+from plain.models.migrations import operations
+from plain.models.migrations.migration import Migration, SettingsTuple
 from plain.models.migrations.operations.models import AlterModelOptions
 from plain.models.migrations.optimizer import MigrationOptimizer
 from plain.models.migrations.questioner import MigrationQuestioner

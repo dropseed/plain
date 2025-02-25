@@ -9,8 +9,7 @@ from plain.models.db import connection, router
 from plain.models.deletion import CASCADE, SET_DEFAULT, SET_NULL
 from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
-from plain.runtime import settings
-from plain.runtime.user_settings import SettingsReference
+from plain.runtime import SettingsReference, settings
 from plain.utils.functional import cached_property
 
 from ..registry import models_registry, register_model
