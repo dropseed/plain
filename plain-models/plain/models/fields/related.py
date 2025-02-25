@@ -590,12 +590,6 @@ class ForeignObject(RelatedField):
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        print(
-            args,
-            kwargs,
-            type(self.remote_field.model),
-            hasattr(self.remote_field.model, "setting_name"),
-        )
         kwargs["on_delete"] = self.remote_field.on_delete
         kwargs["from_fields"] = self.from_fields
         kwargs["to_fields"] = self.to_fields
@@ -612,7 +606,6 @@ class ForeignObject(RelatedField):
                 kwargs["to"] = self.remote_field.model.lower()
         else:
             kwargs["to"] = self.remote_field.model._meta.label_lower
-        print(kwargs)
         return name, path, args, kwargs
 
     def resolve_related_fields(self):

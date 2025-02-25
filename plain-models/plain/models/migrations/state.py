@@ -570,8 +570,7 @@ class StateModelsRegistry(ModelsRegistry):
         # There shouldn't be any operations pending at this point.
         from plain.models.preflight import _check_lazy_references
 
-        errors = _check_lazy_references(self, packages_registry)
-        if errors:
+        if errors := _check_lazy_references(self, packages_registry):
             raise ValueError("\n".join(error.msg for error in errors))
 
     @contextmanager
