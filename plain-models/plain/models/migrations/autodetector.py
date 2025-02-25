@@ -1,7 +1,6 @@
 import functools
 import re
 from graphlib import TopologicalSorter
-from itertools import chain
 
 from plain import models
 from plain.models.migrations import operations
@@ -128,19 +127,13 @@ class MigrationAutodetector:
 
         # Prepare some old/new state and model lists, ignoring unmigrated packages.
         self.old_model_keys = set()
-        self.old_unmanaged_keys = set()
         self.new_model_keys = set()
-        self.new_unmanaged_keys = set()
         for (package_label, model_name), model_state in self.from_state.models.items():
-            if not model_state.options.get("managed", True):
-                self.old_unmanaged_keys.add((package_label, model_name))
-            elif package_label not in self.from_state.real_packages:
+            if package_label not in self.from_state.real_packages:
                 self.old_model_keys.add((package_label, model_name))
 
         for (package_label, model_name), model_state in self.to_state.models.items():
-            if not model_state.options.get("managed", True):
-                self.new_unmanaged_keys.add((package_label, model_name))
-            elif package_label not in self.from_state.real_packages or (
+            if package_label not in self.from_state.real_packages or (
                 convert_packages and package_label in convert_packages
             ):
                 self.new_model_keys.add((package_label, model_name))
@@ -200,7 +193,6 @@ class MigrationAutodetector:
         deletion to the field that uses it.
         """
         self.kept_model_keys = self.old_model_keys & self.new_model_keys
-        self.kept_unmanaged_keys = self.old_unmanaged_keys & self.new_unmanaged_keys
         self.through_users = {}
         self.old_field_keys = {
             (package_label, model_name, field_name)
@@ -533,7 +525,7 @@ class MigrationAutodetector:
 
     def generate_created_models(self):
         """
-        Find all new models (both managed and unmanaged) and make create
+        Find all new models and make create
         operations for them as well as separate operations to create any
         foreign key or M2M relationships (these are optimized later, if
         possible).
@@ -541,11 +533,9 @@ class MigrationAutodetector:
         Defer any model options that refer to collections of fields that might
         be deferred.
         """
-        old_keys = self.old_model_keys | self.old_unmanaged_keys
-        added_models = self.new_model_keys - old_keys
-        added_unmanaged_models = self.new_unmanaged_keys - old_keys
-        all_added_models = chain(added_models, added_unmanaged_models)
-        for package_label, model_name in all_added_models:
+        added_models = self.new_model_keys - self.old_model_keys
+
+        for package_label, model_name in added_models:
             model_state = self.to_state.models[package_label, model_name]
             # Gather related fields
             related_fields = {}
@@ -628,10 +618,6 @@ class MigrationAutodetector:
                 beginning=True,
             )
 
-            # Don't add operations which modify the database for unmanaged models
-            if not model_state.options.get("managed", True):
-                continue
-
             # Generate operations for each related field
             for name, field in sorted(related_fields.items()):
                 dependencies = self._get_dependencies_for_foreign_key(
@@ -691,7 +677,7 @@ class MigrationAutodetector:
 
     def generate_deleted_models(self):
         """
-        Find all deleted models (managed and unmanaged) and make delete
+        Find all deleted models and make delete
         operations for them as well as separate operations to delete any
         foreign key or M2M relationships (these are optimized later, if
         possible).
@@ -699,13 +685,9 @@ class MigrationAutodetector:
         Also bring forward removal of any model options that refer to
         collections of fields - the inverse of generate_created_models().
         """
-        new_keys = self.new_model_keys | self.new_unmanaged_keys
-        deleted_models = self.old_model_keys - new_keys
-        deleted_unmanaged_models = self.old_unmanaged_keys - new_keys
-        all_deleted_models = chain(
-            sorted(deleted_models), sorted(deleted_unmanaged_models)
-        )
-        for package_label, model_name in all_deleted_models:
+        deleted_models = self.old_model_keys - self.new_model_key
+
+        for package_label, model_name in sorted(deleted_models):
             model_state = self.from_state.models[package_label, model_name]
             # Gather related fields
             related_fields = {}
@@ -1327,8 +1309,7 @@ class MigrationAutodetector:
                 )
 
     def generate_altered_db_table(self):
-        models_to_check = self.kept_model_keys.union(self.kept_unmanaged_keys)
-        for package_label, model_name in sorted(models_to_check):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
                 (package_label, model_name), model_name
             )
@@ -1346,8 +1327,7 @@ class MigrationAutodetector:
                 )
 
     def generate_altered_db_table_comment(self):
-        models_to_check = self.kept_model_keys.union(self.kept_unmanaged_keys)
-        for package_label, model_name in sorted(models_to_check):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
                 (package_label, model_name), model_name
             )
@@ -1371,15 +1351,7 @@ class MigrationAutodetector:
         operation to represent them in state changes (in case Python code in
         migrations needs them).
         """
-        models_to_check = self.kept_model_keys.union(
-            self.kept_unmanaged_keys,
-            # unmanaged converted to managed
-            self.old_unmanaged_keys & self.new_model_keys,
-            # managed converted to unmanaged
-            self.old_model_keys & self.new_unmanaged_keys,
-        )
-
-        for package_label, model_name in sorted(models_to_check):
+        for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
                 (package_label, model_name), model_name
             )

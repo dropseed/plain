@@ -1116,12 +1116,8 @@ class OneToOneField(ForeignKey):
 def create_many_to_many_intermediary_model(field, klass):
     from plain import models
 
-    def set_managed(model, related, through):
-        through._meta.managed = model._meta.managed or related._meta.managed
-
     to_model = resolve_relation(klass, field.remote_field.model)
     name = f"{klass._meta.object_name}_{field.name}"
-    lazy_related_operation(set_managed, klass, to_model, name)
 
     to = make_model_tuple(to_model)[1]
     from_ = klass._meta.model_name
@@ -1515,15 +1511,12 @@ class ManyToManyField(RelatedField):
         return errors
 
     def _check_table_uniqueness(self, **kwargs):
-        if (
-            isinstance(self.remote_field.through, str)
-            or not self.remote_field.through._meta.managed
-        ):
+        if isinstance(self.remote_field.through, str):
             return []
         registered_tables = {
             model._meta.db_table: model
             for model in self.opts.models_registry.get_models(include_auto_created=True)
-            if model != self.remote_field.through and model._meta.managed
+            if model != self.remote_field.through
         }
         m2m_db_table = self.m2m_db_table()
         model = registered_tables.get(m2m_db_table)

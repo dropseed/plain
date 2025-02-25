@@ -1385,8 +1385,6 @@ class BaseDatabaseSchemaEditor:
         """
         Return a list of all index SQL statements (field indexes, Meta.indexes) for the specified model.
         """
-        if not model._meta.managed:
-            return []
         output = []
         for field in model._meta.local_fields:
             output.extend(self._field_indexes_sql(model, field))

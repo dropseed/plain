@@ -104,8 +104,7 @@ class Operation:
         """
         Return whether or not a model may be migrated.
 
-        This is a thin wrapper around router.allow_migrate_model() that
-        preemptively rejects any unmanaged model.
+        This is a thin wrapper around router.allow_migrate_model().
         """
         if not model._meta.can_migrate(connection_alias):
             return False

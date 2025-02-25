@@ -33,7 +33,6 @@ DEFAULT_NAMES = (
     "package_label",
     "db_tablespace",
     "abstract",
-    "managed",
     "auto_created",
     "models_registry",
     "default_related_name",
@@ -92,7 +91,7 @@ class Options:
         self.pk = None
         self.auto_field = None
         self.abstract = False
-        self.managed = True
+
         # For any non-abstract class, the concrete class is the model
         # in the end of the proxy_for_model chain. In particular, for
         # concrete models, the concrete_model is always the class itself.
@@ -281,8 +280,6 @@ class Options:
         Return True if the model can/should be migrated on the `connection`.
         `connection` can be either a real connection or a connection alias.
         """
-        if not self.managed:
-            return False
         if isinstance(connection, str):
             connection = connections[connection]
         if self.required_db_vendor:

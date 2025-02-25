@@ -203,8 +203,6 @@ class SQLCompiler:
             # present in the grouped columns. This is done by identifying all
             # tables that have their primary key included in the grouped
             # columns and removing non-primary key columns referring to them.
-            # Unmanaged models are excluded because they could be representing
-            # database views on which the optimization might not be allowed.
             pks = {
                 expr
                 for expr in expressions

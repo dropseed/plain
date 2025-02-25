@@ -181,10 +181,9 @@ class MigrationExecutor:
 
         def should_skip_detecting_model(migration, model):
             """
-            No need to detect tables for unmanaged models, or
-            models that can't be migrated on the current database.
+            No need to detect tables for models that can't be migrated on the current database.
             """
-            return not model._meta.managed or not router.allow_migrate(
+            return not router.allow_migrate(
                 self.connection.alias,
                 migration.package_label,
                 model_name=model._meta.model_name,

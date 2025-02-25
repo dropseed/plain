@@ -36,8 +36,7 @@ def check_all_models(package_configs=None, **kwargs):
             for package_config in package_configs
         )
     for model in models:
-        if model._meta.managed:
-            db_table_models[model._meta.db_table].append(model._meta.label)
+        db_table_models[model._meta.db_table].append(model._meta.label)
         if not inspect.ismethod(model.check):
             errors.append(
                 Error(
@@ -174,7 +173,6 @@ def _check_lazy_references(models_registry, packages_registry):
     # default_error() will be used for usages that don't appear in this dict.
     known_lazy = {
         ("plain.models.fields.related", "resolve_related_class"): field_error,
-        ("plain.models.fields.related", "set_managed"): None,
     }
 
     def build_error(model_key, func, args, keywords):
