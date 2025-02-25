@@ -7,8 +7,8 @@ import click
 from plain.runtime import settings
 from plain.utils import timezone
 
-from .jobs import load_job
 from .models import Job, JobRequest, JobResult
+from .registry import jobs_registry
 from .scheduling import load_schedule
 from .workers import Worker
 
@@ -127,10 +127,17 @@ def purge_processing():
 
 
 @cli.command()
-@click.argument("job_class", type=str)
-def run_job(job_class):
+@click.argument("job_class_name", type=str)
+def run_job(job_class_name):
     """Run a job class directly (and not using a worker)."""
-    job = load_job(job_class, {"args": [], "kwargs": {}})
+    job = jobs_registry.load_job(job_class_name, {"args": [], "kwargs": {}})
     click.secho("Loaded job: ", bold=True, nl=False)
     print(job)
     job.run()
+
+
+@cli.command()
+def registered_jobs():
+    """List all registered jobs."""
+    for name, job_class in jobs_registry.jobs.items():
+        click.echo(f"{click.style(name, fg='blue')}: {job_class}")

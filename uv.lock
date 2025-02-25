@@ -759,22 +759,22 @@ version = "0.12.0"
 source = { editable = "plain-worker" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-models" },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-models" },
     { name = "pytest" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-models", editable = "plain-models" },
+]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "plain-models", editable = "plain-models" },
-    { name = "pytest", specifier = ">=8.0.0" },
-]
+dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-workspace"

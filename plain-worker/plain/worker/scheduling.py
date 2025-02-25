@@ -3,7 +3,8 @@ import subprocess
 
 from plain.utils import timezone
 
-from .jobs import Job, load_job
+from .jobs import Job
+from .registry import jobs_registry
 
 _MONTH_NAMES = {
     "JAN": 1,
@@ -228,7 +229,7 @@ def load_schedule(schedules):
             if job.startswith("cmd:"):
                 job = ScheduledCommand(job[4:])
             else:
-                job = load_job(job, {"args": [], "kwargs": {}})
+                job = jobs_registry.load_job(job, {"args": [], "kwargs": {}})
 
         if isinstance(schedule, str):
             schedule = Schedule.from_cron(schedule)

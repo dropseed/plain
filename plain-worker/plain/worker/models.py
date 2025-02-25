@@ -8,7 +8,7 @@ from plain.models import transaction
 from plain.runtime import settings
 from plain.utils import timezone
 
-from .jobs import load_job
+from .registry import jobs_registry
 
 logger = logging.getLogger("plain.worker")
 
@@ -145,7 +145,7 @@ class Job(models.Model):
         self.save(update_fields=["started_at"])
 
         try:
-            job = load_job(self.job_class, self.parameters)
+            job = jobs_registry.load_job(self.job_class, self.parameters)
             job.run()
             status = JobResultStatuses.SUCCESSFUL
             error = ""
@@ -296,7 +296,7 @@ class JobResult(models.Model):
         retry_attempt = self.retry_attempt + 1
 
         try:
-            job = load_job(self.job_class, self.parameters)
+            job = jobs_registry.load_job(self.job_class, self.parameters)
             class_delay = job.get_retry_delay(retry_attempt)
         except Exception as e:
             # If this fails at all (loading model instance from str, class not existing, user code error)

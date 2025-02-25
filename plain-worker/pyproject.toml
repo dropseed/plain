@@ -7,12 +7,12 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "plain<1.0.0",
+    "plain.models<1.0.0",
 ]
 
 [tool.uv]
 dev-dependencies = [
     "pytest>=8.0.0",
-    "plain.models<1.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]

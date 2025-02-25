@@ -14,6 +14,7 @@ from plain.utils import timezone
 from plain.utils.module_loading import import_string
 
 from .models import Job, JobRequest, JobResult, JobResultStatuses
+from .registry import jobs_registry
 
 logger = logging.getLogger("plain.worker")
 
@@ -53,7 +54,10 @@ class Worker:
 
     def run(self):
         logger.info(
-            "⬣ Starting Plain worker\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
+            "⬣ Starting Plain worker\n    Registered jobs: %s\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
+            "\n                     ".join(
+                f"{name}: {cls}" for name, cls in jobs_registry.jobs.items()
+            ),
             ", ".join(self.queues),
             "\n                   ".join(str(x) for x in self.jobs_schedule),
             self.stats_every,

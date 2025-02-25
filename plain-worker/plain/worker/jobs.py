@@ -1,86 +1,13 @@
 import datetime
 import inspect
 import logging
-from importlib import import_module
 
-from plain.models import IntegrityError, Model
+from plain.models import IntegrityError
 from plain.utils import timezone
 
+from .registry import JobParameters, jobs_registry
+
 logger = logging.getLogger(__name__)
-
-
-def load_job(job_class_path, parameters):
-    module_path, class_name = job_class_path.rsplit(".", 1)
-    module = import_module(module_path)
-    job_class = getattr(module, class_name)
-    args, kwargs = JobParameters.from_json(parameters)
-    return job_class(*args, **kwargs)
-
-
-class JobParameters:
-    @staticmethod
-    def to_json(args, kwargs):
-        serialized_args = []
-        for arg in args:
-            if isinstance(arg, Model):
-                serialized_args.append(ModelInstanceParameter.from_instance(arg))
-            else:
-                serialized_args.append(arg)
-
-        serialized_kwargs = {}
-        for key, value in kwargs.items():
-            if isinstance(value, Model):
-                serialized_kwargs[key] = ModelInstanceParameter.from_instance(value)
-            else:
-                serialized_kwargs[key] = value
-
-        return {"args": serialized_args, "kwargs": serialized_kwargs}
-
-    @staticmethod
-    def from_json(data):
-        args = []
-        for arg in data["args"]:
-            if ModelInstanceParameter.is_gid(arg):
-                args.append(ModelInstanceParameter.to_instance(arg))
-            else:
-                args.append(arg)
-
-        kwargs = {}
-        for key, value in data["kwargs"].items():
-            if ModelInstanceParameter.is_gid(value):
-                kwargs[key] = ModelInstanceParameter.to_instance(value)
-            else:
-                kwargs[key] = value
-
-        return args, kwargs
-
-
-class ModelInstanceParameter:
-    """
-    A string representation of a model instance,
-    so we can convert a single parameter (model instance itself)
-    into a string that can be serialized and stored in the database.
-    """
-
-    @staticmethod
-    def from_instance(instance):
-        return f"gid://{instance._meta.package_label}/{instance._meta.model_name}/{instance.pk}"
-
-    @staticmethod
-    def to_instance(s):
-        if not s.startswith("gid://"):
-            raise ValueError("Invalid ModelInstanceParameter string")
-        package, model, pk = s[6:].split("/")
-        from plain.models import models_registry
-
-        model = models_registry.get_model(package, model)
-        return model.objects.get(pk=pk)
-
-    @staticmethod
-    def is_gid(x):
-        if not isinstance(x, str):
-            return False
-        return x.startswith("gid://")
 
 
 class JobType(type):
@@ -154,7 +81,7 @@ class Job(metaclass=JobType):
 
         try:
             job_request = JobRequest(
-                job_class=self._job_class_str(),
+                job_class=jobs_registry.get_job_class_name(self.__class__),
                 parameters=parameters,
                 start_at=start_at,
                 source=source,
@@ -173,22 +100,19 @@ class Job(metaclass=JobType):
             # Try to return the _in_progress list again
             return self._in_progress(unique_key)
 
-    def _job_class_str(self):
-        return f"{self.__module__}.{self.__class__.__name__}"
-
     def _in_progress(self, unique_key):
         """Get all JobRequests and Jobs that are currently in progress, regardless of queue."""
         from .models import Job, JobRequest
 
-        job_class = self._job_class_str()
+        job_class_name = jobs_registry.get_job_class_name(self.__class__)
 
         job_requests = JobRequest.objects.filter(
-            job_class=job_class,
+            job_class=job_class_name,
             unique_key=unique_key,
         )
 
         jobs = Job.objects.filter(
-            job_class=job_class,
+            job_class=job_class_name,
             unique_key=unique_key,
         )
 
