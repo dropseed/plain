@@ -310,7 +310,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.20.0"
+version = "0.21.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -706,7 +706,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tailwind"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "plain-tailwind" }
 dependencies = [
     { name = "plain" },
