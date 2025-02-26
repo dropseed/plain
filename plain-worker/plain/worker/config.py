@@ -20,5 +20,6 @@ class Config(PackageConfig):
                 import_module(module_name)
 
         # Also need to make sure out internal jobs are registered
+        import_module("plain.worker.scheduling")
 
         jobs_registry.ready = True
