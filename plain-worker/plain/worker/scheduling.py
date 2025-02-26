@@ -4,7 +4,7 @@ import subprocess
 from plain.utils import timezone
 
 from .jobs import Job
-from .registry import jobs_registry
+from .registry import jobs_registry, register_job
 
 _MONTH_NAMES = {
     "JAN": 1,
@@ -205,6 +205,7 @@ class Schedule:
                 raise ValueError("No valid schedule match found in the next 500 days")
 
 
+@register_job
 class ScheduledCommand(Job):
     def __init__(self, command):
         self.command = command

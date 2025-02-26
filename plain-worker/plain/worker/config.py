@@ -19,4 +19,6 @@ class Config(PackageConfig):
             if find_spec(module_name):
                 import_module(module_name)
 
+        # Also need to make sure out internal jobs are registered
+
         jobs_registry.ready = True
