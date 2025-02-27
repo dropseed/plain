@@ -64,9 +64,9 @@ class RedirectLogAdmin(AdminViewset):
             "http_status",
             "user_agent",
             "ip_address",
-            "referer",
+            "referrer",
         ]
-        search_fields = ["from_url", "to_url", "user_agent", "ip_address", "referer"]
+        search_fields = ["from_url", "to_url", "user_agent", "ip_address", "referrer"]
         allow_global_search = False
 
     class DetailView(AdminModelDetailView):
@@ -79,8 +79,8 @@ class NotFoundLogAdmin(AdminViewset):
         model = NotFoundLog
         nav_section = "Redirection"
         title = "404 logs"
-        fields = ["created_at", "url", "user_agent", "ip_address", "referer"]
-        search_fields = ["url", "user_agent", "ip_address", "referer"]
+        fields = ["created_at", "url", "user_agent", "ip_address", "referrer"]
+        search_fields = ["url", "user_agent", "ip_address", "referrer"]
         allow_global_search = False
 
     class DetailView(AdminModelDetailView):

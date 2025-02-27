@@ -76,7 +76,7 @@ class RedirectLog(models.Model):
     # Request metadata
     ip_address = models.GenericIPAddressField()
     user_agent = models.CharField(blank=True, max_length=512)
-    referer = models.CharField(blank=True, max_length=512)
+    referrer = models.CharField(blank=True, max_length=512)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -101,7 +101,7 @@ class RedirectLog(models.Model):
             http_status=redirect.http_status,
             ip_address=_get_client_ip(request),
             user_agent=request.headers.get("User-Agent", ""),
-            referer=request.headers.get("Referer", ""),
+            referrer=request.headers.get("Referer", ""),
         )
 
 
@@ -112,7 +112,7 @@ class NotFoundLog(models.Model):
     # Request metadata
     ip_address = models.GenericIPAddressField()
     user_agent = models.CharField(blank=True, max_length=512)
-    referer = models.CharField(blank=True, max_length=512)
+    referrer = models.CharField(blank=True, max_length=512)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -125,5 +125,5 @@ class NotFoundLog(models.Model):
             url=request.build_absolute_uri(),
             ip_address=_get_client_ip(request),
             user_agent=request.headers.get("User-Agent", ""),
-            referer=request.headers.get("Referer", ""),
+            referrer=request.headers.get("Referer", ""),
         )
