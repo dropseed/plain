@@ -14,10 +14,6 @@ MODELS_MODULE_NAME = "models"
 
 @register_config
 class Config(PackageConfig):
-    # We want to use the "migrations" module
-    # in this package but not for the standard purpose
-    migrations_module = None
-
     def ready(self):
         # Trigger register calls to fire by importing the modules
         for package_config in packages_registry.get_package_configs():

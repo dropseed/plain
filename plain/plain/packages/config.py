@@ -10,8 +10,6 @@ CONFIG_MODULE_NAME = "config"
 class PackageConfig:
     """Class representing a Plain application and its configuration."""
 
-    migrations_module = "migrations"
-
     def __init__(self, name, *, label=""):
         # Full Python path to the application e.g. 'plain.admin.admin'.
         self.name = name

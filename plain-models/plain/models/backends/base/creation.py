@@ -1,7 +1,6 @@
 import os
 import sys
 
-from plain.packages import packages_registry
 from plain.runtime import settings
 
 # The prefix to put on the default database name when creating
@@ -55,32 +54,21 @@ class BaseDatabaseCreation:
         settings.DATABASES[self.connection.alias]["NAME"] = test_database_name
         self.connection.settings_dict["NAME"] = test_database_name
 
-        try:
-            if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
-                # Disable migrations for all packages.
-                for app in packages_registry.get_package_configs():
-                    app._old_migrations_module = app.migrations_module
-                    app.migrations_module = None
-            # We report migrate messages at one level lower than that
-            # requested. This ensures we don't get flooded with messages during
-            # testing (unless you really ask to be flooded).
-            migrate.callback(
-                package_label=None,
-                migration_name=None,
-                database=self.connection.alias,
-                fake=False,
-                fake_initial=False,
-                plan=False,
-                check_unapplied=False,
-                backup=False,
-                prune=False,
-                verbosity=max(verbosity - 1, 0),
-            )
-        finally:
-            if self.connection.settings_dict["TEST"]["MIGRATE"] is False:
-                for app in packages_registry.get_package_configs():
-                    app.migrations_module = app._old_migrations_module
-                    del app._old_migrations_module
+        # We report migrate messages at one level lower than that
+        # requested. This ensures we don't get flooded with messages during
+        # testing (unless you really ask to be flooded).
+        migrate.callback(
+            package_label=None,
+            migration_name=None,
+            database=self.connection.alias,
+            fake=False,
+            fake_initial=False,
+            plan=False,
+            check_unapplied=False,
+            backup=False,
+            prune=False,
+            verbosity=max(verbosity - 1, 0),
+        )
 
         # We then serialize the current state of the database into a string
         # and store it on the connection. This slightly horrific process is so people

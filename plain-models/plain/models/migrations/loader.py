@@ -64,11 +64,12 @@ class MigrationLoader:
         settings.MIGRATION_MODULE.
         """
 
-        app = packages_registry.get_package_config(package_label)
-        if app.migrations_module is None:
+        # This package (plain-models) has different code under migrations/
+        if package_label == "models":
             return None, True
-        explicit = app.migrations_module != MIGRATIONS_MODULE_NAME
-        return f"{app.name}.{app.migrations_module}", explicit
+
+        app = packages_registry.get_package_config(package_label)
+        return f"{app.name}.{MIGRATIONS_MODULE_NAME}", False
 
     def load_disk(self):
         """Load the migrations from all INSTALLED_PACKAGES from disk."""

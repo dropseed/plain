@@ -160,7 +160,6 @@ class ConnectionHandler(BaseConnectionHandler):
             default_test_settings = [
                 ("CHARSET", None),
                 ("COLLATION", None),
-                ("MIGRATE", True),
                 ("MIRROR", None),
                 ("NAME", None),
             ]
