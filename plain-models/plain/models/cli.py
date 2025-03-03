@@ -6,6 +6,7 @@ from itertools import takewhile
 
 import click
 
+from plain.cli import register_cli
 from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils.text import Truncator
@@ -31,6 +32,7 @@ from .migrations.writer import MigrationWriter
 from .registry import models_registry
 
 
+@register_cli("models")
 @click.group()
 def cli():
     pass
@@ -102,6 +104,7 @@ def db_wait():
             break
 
 
+@register_cli("makemigrations")
 @cli.command()
 @click.argument("package_labels", nargs=-1)
 @click.option(
@@ -413,6 +416,7 @@ def makemigrations(
         write_migration_files(changes)
 
 
+@register_cli("migrate")
 @cli.command()
 @click.argument("package_label", required=False)
 @click.argument("migration_name", required=False)

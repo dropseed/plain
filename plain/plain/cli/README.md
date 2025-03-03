@@ -99,19 +99,3 @@ then any commands you defined.
 $ plain <pkg> hello
 Hello, world!
 ```
-
-### Add CLI commands to published packages
-
-Some packages, like [plain-dev](https://plainframework.com/docs/plain-dev/),
-never show up in `INSTALLED_PACKAGES` but still have CLI commands.
-These are detected via Python entry points.
-
-An example with `pyproject.toml` and UV:
-
-```toml
-# pyproject.toml
-[project.entry-points."plain.cli"]
-"dev" = "plain.dev:cli"
-"pre-commit" = "plain.dev.precommit:cli"
-"contrib" = "plain.dev.contribute:cli"
-```

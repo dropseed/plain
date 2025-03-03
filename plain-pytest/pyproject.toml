@@ -13,9 +13,8 @@ dependencies = [
     "python-dotenv~=1.0.0",
 ]
 
-# Make the CLI available without adding to INSTALLED_APPS
-[project.entry-points."plain.cli"]
-"test" = "plain.pytest:cli"
+[project.entry-points."plain.setup"]
+"test-setup" = "plain.pytest.entrypoints:setup"
 
 # Automatically sets this up with pytest
 [project.entry-points."pytest11"]

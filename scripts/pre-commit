@@ -4,7 +4,7 @@ NORMAL=$(tput sgr0)
 
 echo "${BOLD}Checking with plain-code${NORMAL}"
 cd plain-code
-uv run plain code check ..
+uv run plain-code check ..
 cd ..
 
 echo ""

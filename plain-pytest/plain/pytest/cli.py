@@ -5,8 +5,10 @@ import click
 from dotenv import load_dotenv
 
 import pytest
+from plain.cli import register_cli
 
 
+@register_cli("test")
 @click.command(
     context_settings={
         "ignore_unknown_options": True,

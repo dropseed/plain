@@ -1,8 +1,11 @@
 import click
 
+from plain.cli import register_cli
+
 from .models import CachedItem
 
 
+@register_cli("cache")
 @click.group()
 def cli():
     pass

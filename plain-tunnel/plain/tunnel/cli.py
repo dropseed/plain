@@ -4,9 +4,12 @@ import string
 
 import click
 
+from plain.cli import register_cli
+
 from .client import TunnelClient
 
 
+@register_cli("tunnel")
 @click.command()
 @click.argument("destination")
 @click.option(

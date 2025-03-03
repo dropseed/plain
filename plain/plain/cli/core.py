@@ -1,4 +1,3 @@
-import importlib
 import os
 import shutil
 import subprocess
@@ -6,7 +5,6 @@ import sys
 import tomllib
 import traceback
 from importlib.metadata import entry_points
-from importlib.util import find_spec
 from pathlib import Path
 
 import click
@@ -20,7 +18,7 @@ from plain.packages import packages_registry
 from plain.utils.crypto import get_random_string
 
 from .formatting import PlainContext
-from .packages import EntryPointGroup, InstalledPackagesGroup
+from .registry import cli_registry
 
 
 @click.group()
@@ -500,25 +498,21 @@ def urls(flat):
         print_tree(resolver.url_patterns)
 
 
-class AppCLIGroup(click.Group):
+class CLIRegistryGroup(click.Group):
     """
-    Loads app.cli if it exists as `plain app`
+    Click Group that exposes commands from the CLI registry.
     """
 
-    MODULE_NAME = "app.cli"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        cli_registry.import_modules()
 
     def list_commands(self, ctx):
-        if find_spec(self.MODULE_NAME):
-            return ["app"]
-        else:
-            return []
+        return sorted(cli_registry.get_commands().keys())
 
     def get_command(self, ctx, name):
-        if name != "app":
-            return
-
-        cli = importlib.import_module(self.MODULE_NAME)
-        return cli.cli
+        commands = cli_registry.get_commands()
+        return commands.get(name)
 
 
 class PlainCommandCollection(click.CommandCollection):
@@ -531,9 +525,7 @@ class PlainCommandCollection(click.CommandCollection):
             plain.runtime.setup()
 
             sources = [
-                InstalledPackagesGroup(),
-                EntryPointGroup(),
-                AppCLIGroup(),
+                CLIRegistryGroup(),
                 plain_cli,
             ]
         except plain.runtime.AppPathNotFound:
@@ -545,7 +537,6 @@ class PlainCommandCollection(click.CommandCollection):
             )
 
             sources = [
-                EntryPointGroup(),
                 plain_cli,
             ]
         except ImproperlyConfigured as e:

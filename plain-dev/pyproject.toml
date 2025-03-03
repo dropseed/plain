@@ -22,12 +22,6 @@ dependencies = [
 [project.scripts]
 plain-contrib = "plain.dev.contribute:cli"
 
-# Make the CLI available without adding to INSTALLED_APPS
-[project.entry-points."plain.cli"]
-"dev" = "plain.dev:cli"
-"pre-commit" = "plain.dev.precommit:cli"
-"contrib" = "plain.dev.contribute:cli"
-
 [project.entry-points."plain.setup"]
 "dev-setup" = "plain.dev.entrypoints:setup"
 

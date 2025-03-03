@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 
+from plain.cli import register_cli
 from plain.cli.print import print_event
 
 from ..services import Services
@@ -26,6 +27,7 @@ plain pre-commit"""
         print("pre-commit hook installed")
 
 
+@register_cli("pre-commit")
 @click.command()
 @click.option("--install", is_flag=True)
 def cli(install):

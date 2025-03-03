@@ -4,7 +4,10 @@ from pathlib import Path
 
 import click
 
+from plain.cli import register_cli
 
+
+@register_cli("contribute")
 @click.command("contribute")
 @click.option("--repo", default="../plain", help="Path to the plain repo")
 @click.option(

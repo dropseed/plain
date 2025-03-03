@@ -4,6 +4,7 @@ import signal
 
 import click
 
+from plain.cli import register_cli
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -15,6 +16,7 @@ from .workers import Worker
 logger = logging.getLogger("plain.worker")
 
 
+@register_cli("worker")
 @click.group()
 def cli():
     pass

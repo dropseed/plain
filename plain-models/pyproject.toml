@@ -10,11 +10,8 @@ dependencies = [
     "sqlparse>=0.3.1",
 ]
 
-# Make these available at the root level
-[project.entry-points."plain.cli"]
-"makemigrations" = "plain.models.cli:makemigrations"
-"migrate" = "plain.models.cli:migrate"
-"backups" = "plain.models.backups.cli:cli"
+[project.entry-points."plain.setup"]
+"models-setup" = "plain.models.entrypoints:setup"
 
 # Automatically sets this up with pytest
 [project.entry-points."pytest11"]

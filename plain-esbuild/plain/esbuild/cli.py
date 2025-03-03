@@ -4,10 +4,12 @@ import click
 from watchfiles import Change, DefaultFilter, watch
 
 from plain.assets.finders import iter_asset_dirs, iter_assets
+from plain.cli import register_cli
 
 from .core import esbuild, get_esbuilt_path
 
 
+@register_cli("esbuild")
 @click.group("esbuild")
 def cli():
     pass
@@ -54,7 +56,3 @@ def dev(ctx):
                 if os.path.exists(dist_path):
                     print(f"Deleting {os.path.relpath(dist_path)}")
                     os.remove(dist_path)
-
-
-if __name__ == "__main__":
-    cli()

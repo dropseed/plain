@@ -5,11 +5,13 @@ from pathlib import Path
 
 import click
 
+from plain.cli import register_cli
 from plain.cli.print import print_event
 
 DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
 
 
+@register_cli("code")
 @click.group()
 def cli():
     """Standard code formatting and linting."""
@@ -38,6 +40,7 @@ def check(path):
         sys.exit(result.returncode)
 
 
+@register_cli("fix")
 @cli.command()
 @click.argument("path", default=".")
 @click.option("--unsafe-fixes", is_flag=True, help="Apply ruff unsafe fixes")

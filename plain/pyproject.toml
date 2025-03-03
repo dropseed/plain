@@ -11,7 +11,7 @@ dependencies = [
 requires-python = ">=3.11"
 
 [project.scripts]
-plain = "plain.cli:cli"
+plain = "plain.cli.core:cli"
 
 [tool.uv]
 dev-dependencies = [

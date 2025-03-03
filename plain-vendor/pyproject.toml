@@ -13,8 +13,8 @@ dependencies = [
 ]
 
 # Make the CLI available without adding to INSTALLED_APPS
-[project.entry-points."plain.cli"]
-"vendor" = "plain.vendor:cli"
+[project.entry-points."plain.setup"]
+"vendor-setup" = "plain.vendor.entrypoints:setup"
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

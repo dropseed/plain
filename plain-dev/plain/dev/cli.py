@@ -15,6 +15,7 @@ from rich.columns import Columns
 from rich.console import Console
 from rich.text import Text
 
+from plain.cli import register_cli
 from plain.runtime import APP_PATH, settings
 
 from .mkcert import MkcertManager
@@ -27,6 +28,7 @@ from .utils import has_pyproject_toml
 ENTRYPOINT_GROUP = "plain.dev"
 
 
+@register_cli("dev")
 @click.group(invoke_without_command=True)
 @click.pass_context
 @click.option(

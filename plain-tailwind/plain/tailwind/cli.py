@@ -2,11 +2,13 @@ import os
 
 import click
 
+from plain.cli import register_cli
 from plain.runtime import APP_PATH
 
 from .core import Tailwind
 
 
+@register_cli("tailwind")
 @click.group("tailwind")
 def cli():
     """Tailwind CSS"""

@@ -1,3 +1,3 @@
-from .cli import cli
+from .registry import register_cli
 
-__all__ = ["cli"]
+__all__ = ["register_cli"]

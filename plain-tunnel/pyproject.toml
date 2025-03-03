@@ -16,9 +16,8 @@ dependencies = [
 [project.scripts]
 "plain-tunnel" = "plain.tunnel.cli:cli"
 
-# Make the CLI available without adding to INSTALLED_APPS
-[project.entry-points."plain.cli"]
-"tunnel" = "plain.tunnel:cli"
+[project.entry-points."plain.setup"]
+"tunnel-setup" = "plain.tunnel.entrypoints:setup"
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

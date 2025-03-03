@@ -10,10 +10,13 @@ dependencies = [
     "ruff>=0.1.0",
 ]
 
-# Make the CLI available without adding to INSTALLED_APPS
-[project.entry-points."plain.cli"]
-"code" = "plain.code:cli"
-"fix" = "plain.code.cli:fix"
+# Make this available as a standalone command
+# in case plain can't load or something (this can run anyways)
+[project.scripts]
+plain-code = "plain.code:cli"
+
+[project.entry-points."plain.setup"]
+"code-setup" = "plain.code.entrypoints:setup"
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]
