@@ -96,7 +96,7 @@
             </div>
             <div class="mt-8 flex flex-col text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-950">
                 <a class="sm:hidden py-1" href="{{ url('admin:search') }}">Global search</a>
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between space-x-1.5">
                     <div class="flex items-center truncate">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-6 h-6 mr-1.5 bi bi-person-circle" viewBox="0 0 16 16">
                             <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
@@ -106,7 +106,9 @@
                             {{ request.user }}
                         </span>
                     </div>
-                    <a class="ml-2 hover:text-white hover:underline flex-shrink-0" href="{{ url('logout') }}">Log out</a>
+                    <form method="POST" action="{{ url('logout') }}" class="flex-shrink-0">
+                        <button type="submit" class="hover:text-white hover:underline">Log out</button>
+                    </form>
                 </div>
             </div>
         </aside>
