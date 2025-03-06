@@ -1,10 +1,9 @@
-from plain.urls import RouterBase, path, register_router
+from plain.urls import Router, path
 
 from . import views
 
 
-@register_router
-class Router(RouterBase):
+class PasswordsRouter(Router):
     namespace = "passwords"
     urls = [
         path("password_change/", views.PasswordChangeView, name="password_change"),

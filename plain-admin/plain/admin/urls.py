@@ -1,8 +1,8 @@
 from plain.http import ResponseRedirect
-from plain.urls import RouterBase, include, path, register_router
+from plain.urls import Router, include, path
 
-from .impersonate import urls as impersonate_urls
-from .querystats import urls as querystats_urls
+from .impersonate.urls import ImpersonateRouter
+from .querystats.urls import QuerystatsRouter
 from .views.base import AdminView
 from .views.registry import registry
 
@@ -31,13 +31,12 @@ class AdminSearchView(AdminView):
         return context
 
 
-@register_router
-class Router(RouterBase):
+class AdminRouter(Router):
     namespace = "admin"
     urls = [
         path("search/", AdminSearchView, name="search"),
-        include("impersonate/", impersonate_urls),
-        include("querystats/", querystats_urls),
+        include("impersonate/", ImpersonateRouter),
+        include("querystats/", QuerystatsRouter),
         include("", registry.get_urls()),
         path("", AdminIndexView, name="index"),
     ]

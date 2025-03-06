@@ -1,6 +1,7 @@
 from os import environ
 
 SECRET_KEY = "test"
+URLS_ROUTER = "app.urls.AppRouter"
 INSTALLED_PACKAGES = [
     "plain.auth",
     "plain.sessions",

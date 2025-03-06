@@ -1,7 +1,7 @@
-import plain.oauth.urls
 from plain.auth.views import AuthViewMixin, LogoutView
 from plain.oauth.providers import get_provider_keys
-from plain.urls import RouterBase, include, path, register_router
+from plain.oauth.urls import OAuthRouter
+from plain.urls import Router, include, path
 from plain.views import TemplateView
 
 
@@ -18,11 +18,10 @@ class LoginView(TemplateView):
     template_name = "login.html"
 
 
-@register_router
-class Router(RouterBase):
+class AppRouter(Router):
     namespace = ""
     urls = [
-        include("oauth/", plain.oauth.urls),
+        include("oauth/", OAuthRouter),
         path("login/", LoginView, name="login"),
         path("logout/", LogoutView, name="logout"),
         path("", LoggedInView),

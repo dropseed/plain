@@ -1,7 +1,6 @@
-from plain.urls import RouterBase, register_router
+from plain.urls import Router
 
 
-@register_router
-class Router(RouterBase):
+class AppRouter(Router):
     namespace = ""
     urls = []

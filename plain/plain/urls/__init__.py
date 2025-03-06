@@ -6,7 +6,7 @@ from .resolvers import (
     URLResolver,
     get_resolver,
 )
-from .routers import RouterBase, include, path, register_router
+from .routers import Router, include, path
 from .utils import (
     reverse,
     reverse_lazy,
@@ -24,6 +24,5 @@ __all__ = [
     "register_converter",
     "reverse",
     "reverse_lazy",
-    "RouterBase",
-    "register_router",
+    "Router",
 ]

@@ -1,10 +1,9 @@
-from plain.urls import RouterBase, path, register_router
+from plain.urls import Router, path
 
 from . import views
 
 
-@register_router
-class Router(RouterBase):
+class DevRequestsRouter(Router):
     namespace = "dev"
     urls = [
         path("", views.RequestsView, name="requests"),

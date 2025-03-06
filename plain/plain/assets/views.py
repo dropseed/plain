@@ -206,9 +206,9 @@ class AssetView(View):
             # or we're already looking at it.
             return
 
-        from .urls import Router
+        from .urls import AssetsRouter
 
-        namespace = Router.namespace
+        namespace = AssetsRouter.namespace
 
         return ResponseRedirect(
             redirect_to=reverse(f"{namespace}:asset", fingerprinted_url_path),

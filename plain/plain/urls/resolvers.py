@@ -8,7 +8,6 @@ attributes of the resolved URL match.
 
 import functools
 import re
-from importlib import import_module
 from pickle import PicklingError
 from threading import local
 from urllib.parse import quote
@@ -17,6 +16,7 @@ from plain.preflight.urls import check_resolver
 from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
 from plain.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
+from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import normalize
 
 from .exceptions import NoReverseMatch, Resolver404
@@ -87,30 +87,26 @@ class ResolverMatch:
         raise PicklingError(f"Cannot pickle {self.__class__.__qualname__}.")
 
 
-def get_resolver(urls_module=None):
-    if urls_module is None:
-        urls_module = settings.URLS_MODULE
+def get_resolver(router=None):
+    if router is None:
+        router = settings.URLS_ROUTER
 
-    return _get_cached_resolver(urls_module)
+    return _get_cached_resolver(router)
 
 
 @functools.cache
-def _get_cached_resolver(urls_module):
-    from .routers import routers_registry
+def _get_cached_resolver(router):
+    if isinstance(router, str):
+        # Do this inside the cached call, primarily for the URLS_ROUTER
+        router_class = import_string(router)
+        router = router_class()
 
-    if isinstance(urls_module, str):
-        # Need to trigger an import in order for the @register_router
-        # decorators to run. So this is a sensible entrypoint to do that,
-        # usually just for the root URLS_MODULE but could be for anything.
-        urls_module = import_module(urls_module)
-
-    router = routers_registry.get_module_router(urls_module)
     return URLResolver(pattern=RegexPattern(r"^/"), router=router)
 
 
 @functools.cache
 def get_ns_resolver(ns_pattern, resolver, converters):
-    from .routers import RouterBase
+    from .routers import Router
 
     # Build a namespaced resolver for the given parent urls_module pattern.
     # This makes it possible to have captured parameters in the parent
@@ -118,13 +114,13 @@ def get_ns_resolver(ns_pattern, resolver, converters):
     pattern = RegexPattern(ns_pattern)
     pattern.converters = dict(converters)
 
-    class _NestedRouter(RouterBase):
+    class _NestedRouter(Router):
         namespace = ""
         urls = resolver.url_patterns
 
     ns_resolver = URLResolver(pattern=pattern, router=_NestedRouter())
 
-    class _NamespacedRouter(RouterBase):
+    class _NamespacedRouter(Router):
         namespace = ""
         urls = [ns_resolver]
 

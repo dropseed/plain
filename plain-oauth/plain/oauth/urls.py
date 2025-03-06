@@ -1,10 +1,9 @@
-from plain.urls import RouterBase, include, path, register_router
+from plain.urls import Router, include, path
 
 from . import views
 
 
-@register_router
-class Router(RouterBase):
+class OAuthRouter(Router):
     namespace = "oauth"
     urls = [
         include(

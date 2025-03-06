@@ -379,10 +379,10 @@ def create(package_name):
     # Create a urls.py file with a default namespace
     if not (package_dir / "urls.py").exists():
         (package_dir / "urls.py").write_text(
-            f"""from plain.urls import path, RouterBase, register_router
+            f"""from plain.urls import path, Router
 
-@register_router
-class Router(RouterBase):
+
+class {package_name.capitalize()}Router(Router):
     namespace = f"{package_name}"
     urls = [
         # path("", views.IndexView, name="index"),
@@ -422,10 +422,15 @@ def generate_secret_key():
 @plain_cli.command()
 @click.option("--flat", is_flag=True, help="List all URLs in a flat list")
 def urls(flat):
-    """Print all URL patterns under settings.URLS_MODULE"""
+    """Print all URL patterns under settings.URLS_ROUTER"""
+    from plain.runtime import settings
     from plain.urls import URLResolver, get_resolver
 
-    resolver = get_resolver()
+    if not settings.URLS_ROUTER:
+        click.secho("URLS_ROUTER is not set", fg="red")
+        sys.exit(1)
+
+    resolver = get_resolver(settings.URLS_ROUTER)
     if flat:
 
         def flat_list(patterns, prefix="", curr_ns=""):

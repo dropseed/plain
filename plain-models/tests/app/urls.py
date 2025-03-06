@@ -1,6 +1,6 @@
-import plain.admin.urls
-import plain.assets.urls
-from plain.urls import RouterBase, include, path, register_router
+from plain.admin.urls import AdminRouter
+from plain.assets.urls import AssetsRouter
+from plain.urls import Router, include, path
 from plain.views import View
 
 
@@ -14,12 +14,11 @@ class LogoutView(View):
         return "Logout!"
 
 
-@register_router
-class Router(RouterBase):
+class AppRouter(Router):
     namespace = ""
     urls = [
-        include("admin/", plain.admin.urls),
-        include("assets/", plain.assets.urls),
+        include("admin/", AdminRouter),
+        include("assets/", AssetsRouter),
         path("login/", LoginView, name="login"),
         path("logout/", LogoutView, name="logout"),
     ]

@@ -1,10 +1,9 @@
-from plain.urls import RouterBase, path, register_router
+from plain.urls import Router, path
 
 from .views import ImpersonateStartView, ImpersonateStopView
 
 
-@register_router
-class Router(RouterBase):
+class ImpersonateRouter(Router):
     namespace = "impersonate"
     urls = [
         path("stop/", ImpersonateStopView, name="stop"),

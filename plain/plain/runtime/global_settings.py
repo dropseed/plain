@@ -74,7 +74,7 @@ SECRET_KEY: str
 # secret key rotation.
 SECRET_KEY_FALLBACKS: list[str] = []
 
-URLS_MODULE = "app.urls"
+URLS_ROUTER: str
 
 # List of upload handler classes to be applied in order.
 FILE_UPLOAD_HANDLERS = [

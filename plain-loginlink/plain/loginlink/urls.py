@@ -1,10 +1,9 @@
-from plain.urls import RouterBase, path, register_router
+from plain.urls import Router, path
 
 from . import views
 
 
-@register_router
-class Router(RouterBase):
+class LoginlinkRouter(Router):
     namespace = "loginlink"
     urls = [
         path("sent/", views.LoginLinkSentView.as_view(), name="sent"),

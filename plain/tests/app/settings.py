@@ -1,6 +1,8 @@
 SECRET_KEY = "secret"
 DEBUG = True
 
+URLS_ROUTER = "app.urls.AppRouter"
+
 INSTALLED_PACKAGES = [
     "app.test",
 ]
