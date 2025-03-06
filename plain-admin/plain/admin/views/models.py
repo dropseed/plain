@@ -151,7 +151,7 @@ class AdminModelDetailView(AdminDetailView):
         if fields := super().get_fields():
             return fields
 
-        return ["pk"] + [f.name for f in self.object._meta.get_fields() if f.concrete]
+        return [f.name for f in self.object._meta.get_fields() if f.concrete]
 
     def get_field_value(self, obj, field: str):
         try:
