@@ -171,6 +171,15 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         )
 
     @cached_property
+    def supports_select_intersection(self):
+        is_mariadb = self.connection.mysql_is_mariadb
+        return is_mariadb or self.connection.mysql_version >= (8, 0, 31)
+
+    supports_select_difference = property(
+        operator.attrgetter("supports_select_intersection")
+    )
+
+    @cached_property
     def can_rename_index(self):
         if self.connection.mysql_is_mariadb:
             return self.connection.mysql_version >= (10, 5, 2)
