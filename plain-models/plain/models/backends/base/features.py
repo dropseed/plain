@@ -68,10 +68,6 @@ class BaseDatabaseFeatures:
     # deferred
     can_defer_constraint_checks = False
 
-    # Does the backend support tablespaces? Default to False because it isn't
-    # in the SQL standard.
-    supports_tablespaces = False
-
     # Can the backend introspect the column order (ASC/DESC) for indexes?
     supports_index_column_ordering = True
 

@@ -1133,7 +1133,6 @@ def create_many_to_many_intermediary_model(field, klass):
             "db_table": field._get_m2m_db_table(klass._meta),
             "auto_created": klass,
             "package_label": klass._meta.package_label,
-            "db_tablespace": klass._meta.db_tablespace,
             "constraints": [
                 models.UniqueConstraint(
                     fields=[from_, to],
@@ -1153,14 +1152,12 @@ def create_many_to_many_intermediary_model(field, klass):
             from_: models.ForeignKey(
                 klass,
                 related_name=f"{name}+",
-                db_tablespace=field.db_tablespace,
                 db_constraint=field.remote_field.db_constraint,
                 on_delete=CASCADE,
             ),
             to: models.ForeignKey(
                 to_model,
                 related_name=f"{name}+",
-                db_tablespace=field.db_tablespace,
                 db_constraint=field.remote_field.db_constraint,
                 on_delete=CASCADE,
             ),

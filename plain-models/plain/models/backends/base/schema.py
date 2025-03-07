@@ -15,7 +15,6 @@ from plain.models.constraints import Deferrable
 from plain.models.indexes import Index
 from plain.models.sql import Query
 from plain.models.transaction import TransactionManagementError, atomic
-from plain.runtime import settings
 from plain.utils import timezone
 
 logger = logging.getLogger("plain.models.backends.schema")
@@ -263,12 +262,6 @@ class BaseDatabaseSchemaEditor:
                 if constraint
             ),
         }
-        if model._meta.db_tablespace:
-            tablespace_sql = self.connection.ops.tablespace_sql(
-                model._meta.db_tablespace
-            )
-            if tablespace_sql:
-                sql += " " + tablespace_sql
         return sql, params
 
     # Field <-> database mapping functions
@@ -321,14 +314,6 @@ class BaseDatabaseSchemaEditor:
             yield "PRIMARY KEY"
         elif field.unique:
             yield "UNIQUE"
-        # Optionally add the tablespace if it's an implicitly indexed column.
-        tablespace = field.db_tablespace or model._meta.db_tablespace
-        if (
-            tablespace
-            and self.connection.features.supports_tablespaces
-            and field.unique
-        ):
-            yield self.connection.ops.tablespace_sql(tablespace, inline=True)
 
     def column_sql(self, model, field, include_default=False):
         """
@@ -1272,18 +1257,6 @@ class BaseDatabaseSchemaEditor:
             index_name = f"D{index_name[:-1]}"
         return index_name
 
-    def _get_index_tablespace_sql(self, model, fields, db_tablespace=None):
-        if db_tablespace is None:
-            if len(fields) == 1 and fields[0].db_tablespace:
-                db_tablespace = fields[0].db_tablespace
-            elif settings.DEFAULT_INDEX_TABLESPACE:
-                db_tablespace = settings.DEFAULT_INDEX_TABLESPACE
-            elif model._meta.db_tablespace:
-                db_tablespace = model._meta.db_tablespace
-        if db_tablespace is not None:
-            return " " + self.connection.ops.tablespace_sql(db_tablespace)
-        return ""
-
     def _index_condition_sql(self, condition):
         if condition:
             return " WHERE " + condition
@@ -1305,7 +1278,6 @@ class BaseDatabaseSchemaEditor:
         name=None,
         suffix="",
         using="",
-        db_tablespace=None,
         col_suffixes=(),
         sql=None,
         opclasses=(),
@@ -1322,9 +1294,6 @@ class BaseDatabaseSchemaEditor:
         expressions = expressions or []
         compiler = Query(model, alias_cols=False).get_compiler(
             connection=self.connection,
-        )
-        tablespace_sql = self._get_index_tablespace_sql(
-            model, fields, db_tablespace=db_tablespace
         )
         columns = [field.column for field in fields]
         sql_create_index = sql or self.sql_create_index
@@ -1346,7 +1315,7 @@ class BaseDatabaseSchemaEditor:
                 if columns
                 else Expressions(table, expressions, compiler, self.quote_value)
             ),
-            extra=tablespace_sql,
+            extra="",
             condition=self._index_condition_sql(condition),
             include=self._index_include_sql(model, include),
         )

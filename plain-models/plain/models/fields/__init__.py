@@ -13,7 +13,6 @@ from plain.models.constants import LOOKUP_SEP
 from plain.models.db import connection, connections, router
 from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import DeferredAttribute, RegisterLookupMixin
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.datastructures import DictWrapper
 from plain.utils.dateparse import (
@@ -177,7 +176,6 @@ class Field(RegisterLookupMixin):
         default=NOT_PROVIDED,
         choices=None,
         db_column=None,
-        db_tablespace=None,
         auto_created=False,
         validators=(),
         error_messages=None,
@@ -198,7 +196,6 @@ class Field(RegisterLookupMixin):
         self.db_index = db_index
         self.db_column = db_column
         self.db_comment = db_comment
-        self._db_tablespace = db_tablespace
         self.auto_created = auto_created
 
         # Adjust the appropriate creation counter, and save our local copy.
@@ -529,7 +526,6 @@ class Field(RegisterLookupMixin):
             "choices": None,
             "db_column": None,
             "db_comment": None,
-            "db_tablespace": None,
             "auto_created": False,
             "validators": [],
             "error_messages": None,
@@ -538,7 +534,6 @@ class Field(RegisterLookupMixin):
             "unique": "_unique",
             "error_messages": "_error_messages",
             "validators": "_validators",
-            "db_tablespace": "_db_tablespace",
         }
         equals_comparison = {"choices", "validators"}
         for name, default in possibles.items():
@@ -828,10 +823,6 @@ class Field(RegisterLookupMixin):
     @property
     def unique(self):
         return self._unique or self.primary_key
-
-    @property
-    def db_tablespace(self):
-        return self._db_tablespace or settings.DEFAULT_INDEX_TABLESPACE
 
     @property
     def db_returning(self):

@@ -10,7 +10,6 @@ from plain.models.db import connections
 from plain.models.fields import BigAutoField
 from plain.models.manager import Manager
 from plain.models.query_utils import PathInfo
-from plain.runtime import settings
 from plain.utils.datastructures import ImmutableList, OrderedSet
 from plain.utils.functional import cached_property
 
@@ -29,7 +28,6 @@ DEFAULT_NAMES = (
     "ordering",
     "get_latest_by",
     "package_label",
-    "db_tablespace",
     "abstract",
     "auto_created",
     "models_registry",
@@ -80,7 +78,6 @@ class Options:
         self.object_name = None
         self.package_label = package_label
         self.get_latest_by = None
-        self.db_tablespace = settings.DEFAULT_TABLESPACE
         self.required_db_features = []
         self.required_db_vendor = None
         self.meta = meta

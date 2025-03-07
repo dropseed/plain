@@ -24,7 +24,3 @@ if "DATABASE_URL" in environ:
 
 # Classes used to implement DB routing behavior.
 DATABASE_ROUTERS = []
-
-# The tablespaces to use for each model when not specified otherwise.
-DEFAULT_TABLESPACE = ""
-DEFAULT_INDEX_TABLESPACE = ""

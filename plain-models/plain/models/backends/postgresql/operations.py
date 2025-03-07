@@ -200,12 +200,6 @@ class DatabaseOperations(BaseDatabaseOperations):
     def set_time_zone_sql(self):
         return "SELECT set_config('TimeZone', %s, false)"
 
-    def tablespace_sql(self, tablespace, inline=False):
-        if inline:
-            return f"USING INDEX TABLESPACE {self.quote_name(tablespace)}"
-        else:
-            return f"TABLESPACE {self.quote_name(tablespace)}"
-
     def prep_for_iexact_query(self, x):
         return x
 

@@ -21,7 +21,6 @@ class Index:
         *expressions,
         fields=(),
         name=None,
-        db_tablespace=None,
         opclasses=(),
         condition=None,
         include=None,
@@ -69,7 +68,6 @@ class Index:
             for field_name in self.fields
         ]
         self.name = name or ""
-        self.db_tablespace = db_tablespace
         self.opclasses = opclasses
         self.condition = condition
         self.include = tuple(include) if include else ()
@@ -122,7 +120,6 @@ class Index:
             fields=fields,
             name=self.name,
             using=using,
-            db_tablespace=self.db_tablespace,
             col_suffixes=col_suffixes,
             opclasses=self.opclasses,
             condition=condition,
@@ -140,8 +137,6 @@ class Index:
         kwargs = {"name": self.name}
         if self.fields:
             kwargs["fields"] = self.fields
-        if self.db_tablespace is not None:
-            kwargs["db_tablespace"] = self.db_tablespace
         if self.opclasses:
             kwargs["opclasses"] = self.opclasses
         if self.condition:
@@ -191,14 +186,11 @@ class Index:
             self.name = f"D{self.name[1:]}"
 
     def __repr__(self):
-        return "<{}:{}{}{}{}{}{}{}>".format(
+        return "<{}:{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
             "" if not self.fields else f" fields={repr(self.fields)}",
             "" if not self.expressions else f" expressions={repr(self.expressions)}",
             "" if not self.name else f" name={repr(self.name)}",
-            ""
-            if self.db_tablespace is None
-            else f" db_tablespace={repr(self.db_tablespace)}",
             "" if self.condition is None else f" condition={self.condition}",
             "" if not self.include else f" include={repr(self.include)}",
             "" if not self.opclasses else f" opclasses={repr(self.opclasses)}",
