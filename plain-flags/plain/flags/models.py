@@ -18,7 +18,7 @@ def validate_flag_name(value):
 
 @models.register_model
 class FlagResult(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     flag = models.ForeignKey("Flag", on_delete=models.CASCADE)
@@ -38,7 +38,7 @@ class FlagResult(models.Model):
 
 @models.register_model
 class Flag(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     name = models.CharField(

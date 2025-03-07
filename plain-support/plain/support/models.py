@@ -6,7 +6,7 @@ from plain.runtime import SettingsReference
 
 @models.register_model
 class SupportFormEntry(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     user = models.ForeignKey(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.SET_NULL,

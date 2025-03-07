@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "uuid",
-                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                    models.UUIDField(default=uuid.uuid4, unique=True),
                 ),
                 ("job_class", models.CharField(db_index=True, max_length=255)),
                 ("parameters", models.JSONField(blank=True, null=True)),

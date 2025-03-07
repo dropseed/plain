@@ -38,11 +38,7 @@ def construct_instance(form, instance, fields=None):
     cleaned_data = form.cleaned_data
     file_field_list = []
     for f in opts.fields:
-        if (
-            not f.editable
-            or isinstance(f, models.AutoField)
-            or f.name not in cleaned_data
-        ):
+        if isinstance(f, models.AutoField) or f.name not in cleaned_data:
             continue
         if fields is not None and f.name not in fields:
             continue
@@ -81,8 +77,6 @@ def model_to_dict(instance, fields=None):
     opts = instance._meta
     data = {}
     for f in chain(opts.concrete_fields, opts.many_to_many):
-        if not getattr(f, "editable", False):
-            continue
         if fields is not None and f.name not in fields:
             continue
         data[f.name] = f.value_from_object(instance)
@@ -116,13 +110,6 @@ def fields_for_model(
     opts = model._meta
 
     for f in sorted(chain(opts.concrete_fields, opts.many_to_many)):
-        if not getattr(f, "editable", False):
-            if fields is not None and f.name in fields:
-                raise FieldError(
-                    f"'{f.name}' cannot be specified for {model.__name__} model form as it is a "
-                    "non-editable field"
-                )
-            continue
         if fields is not None and f.name not in fields:
             continue
 

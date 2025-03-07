@@ -28,7 +28,6 @@ class ForeignObjectRel(FieldCacheMixin):
     # Field flags
     auto_created = True
     concrete = False
-    editable = False
     is_relation = True
 
     # Reverse relations are always nullable (Plain can't enforce that a

@@ -139,7 +139,6 @@ class Field(RegisterLookupMixin):
         "blank",
         "choices",
         "db_column",
-        "editable",
         "error_messages",
         "limit_choices_to",
         # Database-level options are not supported, see #21961.
@@ -177,7 +176,6 @@ class Field(RegisterLookupMixin):
         db_index=False,
         rel=None,
         default=NOT_PROVIDED,
-        editable=True,
         choices=None,
         db_column=None,
         db_tablespace=None,
@@ -193,7 +191,6 @@ class Field(RegisterLookupMixin):
         self.remote_field = rel
         self.is_relation = self.remote_field is not None
         self.default = default
-        self.editable = editable
         if isinstance(choices, ChoicesMeta):
             choices = choices.choices
         if isinstance(choices, collections.abc.Iterator):
@@ -530,7 +527,6 @@ class Field(RegisterLookupMixin):
             "null": False,
             "db_index": False,
             "default": NOT_PROVIDED,
-            "editable": True,
             "choices": None,
             "db_column": None,
             "db_comment": None,
@@ -708,9 +704,6 @@ class Field(RegisterLookupMixin):
         Validate value and raise ValidationError if necessary. Subclasses
         should override this to provide validation logic.
         """
-        if not self.editable:
-            # Skip validation for non-editable fields.
-            return
 
         if self.choices is not None and value not in self.empty_values:
             for option_key, option_value in self.choices:
@@ -1250,7 +1243,6 @@ class DateField(DateTimeCheckMixin, Field):
     def __init__(self, name=None, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
-            kwargs["editable"] = False
             kwargs["blank"] = True
         super().__init__(name, **kwargs)
 
@@ -1280,7 +1272,6 @@ class DateField(DateTimeCheckMixin, Field):
         if self.auto_now_add:
             kwargs["auto_now_add"] = True
         if self.auto_now or self.auto_now_add:
-            del kwargs["editable"]
             del kwargs["blank"]
         return name, path, args, kwargs
 
@@ -2122,7 +2113,6 @@ class TimeField(DateTimeCheckMixin, Field):
     def __init__(self, name=None, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
-            kwargs["editable"] = False
             kwargs["blank"] = True
         super().__init__(name, **kwargs)
 
@@ -2156,7 +2146,6 @@ class TimeField(DateTimeCheckMixin, Field):
             kwargs["auto_now_add"] = self.auto_now_add
         if self.auto_now or self.auto_now_add:
             del kwargs["blank"]
-            del kwargs["editable"]
         return name, path, args, kwargs
 
     def get_internal_type(self):
@@ -2233,7 +2222,6 @@ class BinaryField(Field):
     empty_values = [None, b""]
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault("editable", False)
         super().__init__(*args, **kwargs)
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
@@ -2252,14 +2240,6 @@ class BinaryField(Field):
                 )
             ]
         return []
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        if self.editable:
-            kwargs["editable"] = True
-        else:
-            del kwargs["editable"]
-        return name, path, args, kwargs
 
     def get_internal_type(self):
         return "BinaryField"

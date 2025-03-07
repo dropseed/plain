@@ -20,7 +20,7 @@ class JobRequest(models.Model):
     """
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
 
     job_class = models.CharField(max_length=255, db_index=True)
     parameters = models.JSONField(blank=True, null=True)
@@ -113,7 +113,7 @@ class Job(models.Model):
     All active jobs are stored in this table.
     """
 
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     started_at = models.DateTimeField(blank=True, null=True, db_index=True)
 
@@ -259,7 +259,7 @@ class JobResult(models.Model):
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     # From the Job

@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             name="Pageview",
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True)),
-                ("uuid", models.UUIDField(default=uuid.uuid4, editable=False)),
+                ("uuid", models.UUIDField(default=uuid.uuid4)),
                 ("title", models.CharField(blank=True, max_length=255)),
                 ("url", models.URLField(db_index=True, max_length=255)),
                 ("referrer", models.URLField(blank=True, max_length=255)),

@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ("id", models.BigAutoField(auto_created=True, primary_key=True)),
                 (
                     "uuid",
-                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                    models.UUIDField(default=uuid.uuid4, unique=True),
                 ),
                 ("name", models.CharField(max_length=255)),
                 ("email", models.EmailField(max_length=254)),
