@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 ("url", models.URLField()),
                 ("ip_address", models.GenericIPAddressField()),
                 ("user_agent", models.CharField(max_length=255)),
-                ("referer", models.URLField(required=False, null=True)),
+                ("referer", models.URLField(required=False, allow_null=True)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
                 ("id", models.BigAutoField(auto_created=True, primary_key=True)),
                 ("ip_address", models.GenericIPAddressField()),
                 ("user_agent", models.CharField(max_length=255)),
-                ("referer", models.URLField(required=False, null=True)),
+                ("referer", models.URLField(required=False, allow_null=True)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("from_url", models.URLField()),
                 ("to_url", models.URLField()),

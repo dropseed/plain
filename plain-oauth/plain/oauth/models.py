@@ -38,8 +38,8 @@ class OAuthConnection(models.Model):
     # Token data
     access_token = models.CharField(max_length=2000)
     refresh_token = models.CharField(max_length=2000, required=False)
-    access_token_expires_at = models.DateTimeField(required=False, null=True)
-    refresh_token_expires_at = models.DateTimeField(required=False, null=True)
+    access_token_expires_at = models.DateTimeField(required=False, allow_null=True)
+    refresh_token_expires_at = models.DateTimeField(required=False, allow_null=True)
 
     class Meta:
         constraints = [

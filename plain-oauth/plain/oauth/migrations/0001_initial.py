@@ -32,11 +32,11 @@ class Migration(migrations.Migration):
                 ("refresh_token", models.CharField(required=False, max_length=100)),
                 (
                     "access_token_expires_at",
-                    models.DateTimeField(required=False, null=True),
+                    models.DateTimeField(required=False, allow_null=True),
                 ),
                 (
                     "refresh_token_expires_at",
-                    models.DateTimeField(required=False, null=True),
+                    models.DateTimeField(required=False, allow_null=True),
                 ),
                 (
                     "user",

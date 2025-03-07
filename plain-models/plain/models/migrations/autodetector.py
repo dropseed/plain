@@ -852,7 +852,7 @@ class MigrationAutodetector:
         # which don't allow empty strings as default.
         time_fields = (models.DateField, models.DateTimeField, models.TimeField)
         preserve_default = (
-            field.null
+            field.allow_null
             or field.has_default()
             or field.many_to_many
             or (not field.required and field.empty_strings_allowed)
@@ -991,8 +991,8 @@ class MigrationAutodetector:
                     # Either both fields are m2m or neither is
                     preserve_default = True
                     if (
-                        old_field.null
-                        and not new_field.null
+                        old_field.allow_null
+                        and not new_field.allow_null
                         and not new_field.has_default()
                         and not new_field.many_to_many
                     ):

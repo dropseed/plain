@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="jobrequest",
             name="start_at",
-            field=models.DateTimeField(required=False, db_index=True, null=True),
+            field=models.DateTimeField(required=False, db_index=True, allow_null=True),
         ),
         migrations.AddField(
             model_name="jobresult",
@@ -38,6 +38,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="jobresult",
             name="retry_job_request_uuid",
-            field=models.UUIDField(required=False, null=True),
+            field=models.UUIDField(required=False, allow_null=True),
         ),
     ]

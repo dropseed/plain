@@ -29,11 +29,13 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (
                     "started_at",
-                    models.DateTimeField(required=False, db_index=True, null=True),
+                    models.DateTimeField(
+                        required=False, db_index=True, allow_null=True
+                    ),
                 ),
                 ("job_request_uuid", models.UUIDField(db_index=True)),
                 ("job_class", models.CharField(db_index=True, max_length=255)),
-                ("parameters", models.JSONField(required=False, null=True)),
+                ("parameters", models.JSONField(required=False, allow_null=True)),
                 ("priority", models.IntegerField(db_index=True, default=0)),
                 ("source", models.TextField(required=False)),
                 ("retries", models.IntegerField(default=0)),

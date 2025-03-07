@@ -2525,7 +2525,7 @@ class Query(BaseExpression):
         Check if the given field should be treated as nullable.
 
         Some backends treat '' as null and Plain treats such fields as
-        nullable for those backends. In such situations field.null can be
+        nullable for those backends. In such situations field.allow_null can be
         False even if we should treat the field as nullable.
         """
         # We need to use DEFAULT_DB_ALIAS here, as QuerySet does not have
@@ -2533,7 +2533,7 @@ class Query(BaseExpression):
         # used. The proper fix would be to defer all decisions where
         # is_nullable() is needed to the compiler stage, but that is not easy
         # to do currently.
-        return field.null or (
+        return field.allow_null or (
             field.empty_strings_allowed
             and connections[DEFAULT_DB_ALIAS].features.interprets_empty_strings_as_nulls
         )

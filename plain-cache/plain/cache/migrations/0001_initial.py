@@ -21,10 +21,12 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("key", models.CharField(max_length=255, unique=True)),
-                ("value", models.JSONField(required=False, null=True)),
+                ("value", models.JSONField(required=False, allow_null=True)),
                 (
                     "expires_at",
-                    models.DateTimeField(required=False, db_index=True, null=True),
+                    models.DateTimeField(
+                        required=False, db_index=True, allow_null=True
+                    ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),

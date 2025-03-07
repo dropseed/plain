@@ -11,7 +11,7 @@ class SupportFormEntry(models.Model):
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.SET_NULL,
         related_name="support_form_entries",
-        null=True,
+        allow_null=True,
         required=False,
     )
     name = models.CharField(max_length=255)

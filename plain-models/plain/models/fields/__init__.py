@@ -126,7 +126,7 @@ class Field(RegisterLookupMixin):
     default_validators = []  # Default set of validators
     default_error_messages = {
         "invalid_choice": "Value %(value)r is not a valid choice.",
-        "null": "This field cannot be null.",
+        "allow_null": "This field cannot be null.",
         "required": "This field is be required.",
         "unique": "A %(model_name)s with this %(field_label)s already exists.",
     }
@@ -172,7 +172,7 @@ class Field(RegisterLookupMixin):
         max_length=None,
         unique=False,
         required=True,
-        null=False,
+        allow_null=False,
         db_index=False,
         rel=None,
         default=NOT_PROVIDED,
@@ -187,7 +187,7 @@ class Field(RegisterLookupMixin):
         self.name = None  # Set by set_attributes_from_name
         self.primary_key = primary_key
         self.max_length, self._unique = max_length, unique
-        self.required, self.null = required, null
+        self.required, self.allow_null = required, allow_null
         self.remote_field = rel
         self.is_relation = self.remote_field is not None
         self.default = default
@@ -389,7 +389,7 @@ class Field(RegisterLookupMixin):
     def _check_null_allowed_for_primary_keys(self):
         if (
             self.primary_key
-            and self.null
+            and self.allow_null
             and not connection.features.interprets_empty_strings_as_nulls
         ):
             # We cannot reliably check this for backends like Oracle which
@@ -397,9 +397,9 @@ class Field(RegisterLookupMixin):
             # character-based fields a little differently).
             return [
                 preflight.Error(
-                    "Primary keys must not have null=True.",
+                    "Primary keys must not have allow_null=True.",
                     hint=(
-                        "Set null=False on the field, or "
+                        "Set allow_null=False on the field, or "
                         "remove primary_key=True argument."
                     ),
                     obj=self,
@@ -524,7 +524,7 @@ class Field(RegisterLookupMixin):
             "max_length": None,
             "unique": False,
             "required": True,
-            "null": False,
+            "allow_null": False,
             "db_index": False,
             "default": NOT_PROVIDED,
             "choices": None,
@@ -721,8 +721,10 @@ class Field(RegisterLookupMixin):
                 params={"value": value},
             )
 
-        if value is None and not self.null:
-            raise exceptions.ValidationError(self.error_messages["null"], code="null")
+        if value is None and not self.allow_null:
+            raise exceptions.ValidationError(
+                self.error_messages["allow_null"], code="allow_null"
+            )
 
         if self.required and value in self.empty_values:
             raise exceptions.ValidationError(
@@ -930,7 +932,7 @@ class Field(RegisterLookupMixin):
 
         if (
             not self.empty_strings_allowed
-            or self.null
+            or self.allow_null
             and not connection.features.interprets_empty_strings_as_nulls
         ):
             return return_None
@@ -1011,7 +1013,7 @@ class BooleanField(Field):
         return "BooleanField"
 
     def to_python(self, value):
-        if self.null and value in self.empty_values:
+        if self.allow_null and value in self.empty_values:
             return None
         if value in (True, False):
             # 1/0 are equal to True/False. bool() converts former to latter.
@@ -1021,7 +1023,7 @@ class BooleanField(Field):
         if value in ("f", "False", "0"):
             return False
         raise exceptions.ValidationError(
-            self.error_messages["invalid_nullable" if self.null else "invalid"],
+            self.error_messages["invalid_nullable" if self.allow_null else "invalid"],
             code="invalid",
             params={"value": value},
         )
@@ -1320,7 +1322,7 @@ class DateField(DateTimeCheckMixin, Field):
 
     def contribute_to_class(self, cls, name, **kwargs):
         super().contribute_to_class(cls, name, **kwargs)
-        if not self.null:
+        if not self.allow_null:
             setattr(
                 cls,
                 f"get_next_by_{self.name}",
@@ -1887,10 +1889,10 @@ class GenericIPAddressField(Field):
         ]
 
     def _check_required_and_null_values(self, **kwargs):
-        if not getattr(self, "null", False) and getattr(self, "required", True):
+        if not getattr(self, "allow_null", False) and getattr(self, "required", True):
             return [
                 preflight.Error(
-                    "GenericIPAddressFields cannot have required=False if null=False, "
+                    "GenericIPAddressFields cannot have required=False if allow_null=False, "
                     "as blank values are stored as nulls.",
                     obj=self,
                     id="fields.E150",
@@ -1950,18 +1952,18 @@ class NullBooleanField(BooleanField):
         "msg": (
             "NullBooleanField is removed except for support in historical migrations."
         ),
-        "hint": "Use BooleanField(null=True) instead.",
+        "hint": "Use BooleanField(allow_null=True) instead.",
         "id": "fields.E903",
     }
 
     def __init__(self, **kwargs):
-        kwargs["null"] = True
+        kwargs["allow_null"] = True
         kwargs["required"] = False
         super().__init__(**kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        del kwargs["null"]
+        del kwargs["allow_null"]
         del kwargs["required"]
         return name, path, args, kwargs
 

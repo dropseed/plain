@@ -14,8 +14,8 @@ class APIKey(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    expires_at = models.DateTimeField(required=False, null=True)
-    last_used_at = models.DateTimeField(required=False, null=True)
+    expires_at = models.DateTimeField(required=False, allow_null=True)
+    last_used_at = models.DateTimeField(required=False, allow_null=True)
 
     name = models.CharField(max_length=255, required=False)
 
@@ -26,8 +26,8 @@ class APIKey(models.Model):
     #     APIKey,
     #     on_delete=models.CASCADE,
     #     related_name="user",
-    #     null=True,
-    #     blank=True,
+    #     allow_null=True,
+    #     required=False,
     # )
 
     def __str__(self):

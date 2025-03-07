@@ -285,7 +285,7 @@ class BaseDatabaseSchemaEditor:
         if self.connection.features.supports_comments_inline and field.db_comment:
             yield self._comment_sql(field.db_comment)
         # Work out nullability.
-        null = field.null
+        null = field.allow_null
         # Include a default value, if requested.
         include_default = (
             include_default
@@ -395,7 +395,9 @@ class BaseDatabaseSchemaEditor:
         # This method allows testing its logic without a connection.
         if field.has_default():
             default = field.get_default()
-        elif not field.null and not field.required and field.empty_strings_allowed:
+        elif (
+            not field.allow_null and not field.required and field.empty_strings_allowed
+        ):
             if field.get_internal_type() == "BinaryField":
                 default = b""
             else:
@@ -928,7 +930,7 @@ class BaseDatabaseSchemaEditor:
         #  4. Drop the default again.
         # Default change?
         needs_database_default = False
-        if old_field.null and not new_field.null:
+        if old_field.allow_null and not new_field.allow_null:
             old_default = self.effective_default(old_field)
             new_default = self.effective_default(new_field)
             if (
@@ -941,13 +943,13 @@ class BaseDatabaseSchemaEditor:
                     self._alter_column_default_sql(model, old_field, new_field)
                 )
         # Nullability change?
-        if old_field.null != new_field.null:
+        if old_field.allow_null != new_field.allow_null:
             fragment = self._alter_column_null_sql(model, old_field, new_field)
             if fragment:
                 null_actions.append(fragment)
         # Only if we have a default and there is a change from NULL to NOT NULL
         four_way_default_alteration = new_field.has_default() and (
-            old_field.null and not new_field.null
+            old_field.allow_null and not new_field.allow_null
         )
         if actions or null_actions:
             if not four_way_default_alteration:
@@ -1109,7 +1111,7 @@ class BaseDatabaseSchemaEditor:
             new_db_params = new_field.db_parameters(connection=self.connection)
             sql = (
                 self.sql_alter_column_null
-                if new_field.null
+                if new_field.allow_null
                 else self.sql_alter_column_not_null
             )
             return (
@@ -1143,7 +1145,7 @@ class BaseDatabaseSchemaEditor:
 
         new_db_params = new_field.db_parameters(connection=self.connection)
         if drop:
-            if new_field.null:
+            if new_field.allow_null:
                 sql = self.sql_alter_column_no_default_null
             else:
                 sql = self.sql_alter_column_no_default

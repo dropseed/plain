@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                     "user",
                     models.ForeignKey(
                         required=False,
-                        null=True,
+                        allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
                         related_name="support_form_entries",
                         to="users.user",

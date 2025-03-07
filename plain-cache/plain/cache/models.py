@@ -16,8 +16,8 @@ class CachedItemQuerySet(models.QuerySet):
 @models.register_model
 class CachedItem(models.Model):
     key = models.CharField(max_length=255, unique=True)
-    value = models.JSONField(required=False, null=True)
-    expires_at = models.DateTimeField(required=False, null=True, db_index=True)
+    value = models.JSONField(required=False, allow_null=True)
+    expires_at = models.DateTimeField(required=False, allow_null=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

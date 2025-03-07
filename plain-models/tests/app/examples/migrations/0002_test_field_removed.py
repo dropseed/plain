@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="car",
             name="uuid",
-            field=models.UUIDField(null=True),
+            field=models.UUIDField(allow_null=True),
         ),
         migrations.RunPython(set_uuids),
         migrations.RemoveField(

@@ -338,7 +338,7 @@ def select_related_descend(field, restricted, requested, select_mask, reverse=Fa
             return False
         if not reverse and field.name not in requested:
             return False
-    if not restricted and field.null:
+    if not restricted and field.allow_null:
         return False
     if (
         restricted

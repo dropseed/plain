@@ -53,7 +53,7 @@ class Flag(models.Model):
     enabled = models.BooleanField(default=True)
 
     # To provide an easier way to see if a flag is still being used
-    used_at = models.DateTimeField(required=False, null=True)
+    used_at = models.DateTimeField(required=False, allow_null=True)
 
     def __str__(self):
         return self.name

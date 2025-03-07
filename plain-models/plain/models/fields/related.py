@@ -887,12 +887,12 @@ class ForeignKey(ForeignObject):
 
     def _check_on_delete(self):
         on_delete = getattr(self.remote_field, "on_delete", None)
-        if on_delete == SET_NULL and not self.null:
+        if on_delete == SET_NULL and not self.allow_null:
             return [
                 preflight.Error(
                     "Field specifies on_delete=SET_NULL, but cannot be null.",
                     hint=(
-                        "Set null=True argument on the field, or change the on_delete "
+                        "Set allow_null=True argument on the field, or change the on_delete "
                         "rule."
                     ),
                     obj=self,
@@ -1231,7 +1231,7 @@ class ManyToManyField(RelatedField):
             through_fields=through_fields,
             db_constraint=db_constraint,
         )
-        self.has_null_arg = "null" in kwargs
+        self.has_null_arg = "allow_null" in kwargs
 
         super().__init__(
             related_name=related_name,

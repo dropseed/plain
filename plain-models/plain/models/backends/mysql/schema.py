@@ -208,7 +208,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         Keep the null property of the old field. If it has changed, it will be
         handled separately.
         """
-        if field.null:
+        if field.allow_null:
             new_type += " NULL"
         else:
             new_type += " NOT NULL"

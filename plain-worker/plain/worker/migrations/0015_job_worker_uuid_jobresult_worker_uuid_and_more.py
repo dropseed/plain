@@ -13,12 +13,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="job",
             name="worker_uuid",
-            field=models.UUIDField(required=False, db_index=True, null=True),
+            field=models.UUIDField(required=False, db_index=True, allow_null=True),
         ),
         migrations.AddField(
             model_name="jobresult",
             name="worker_uuid",
-            field=models.UUIDField(required=False, db_index=True, null=True),
+            field=models.UUIDField(required=False, db_index=True, allow_null=True),
         ),
         migrations.AlterField(
             model_name="jobresult",

@@ -717,7 +717,7 @@ def modelfield_to_formfield(
         )
         defaults["choices"] = modelfield.get_choices(include_blank=include_blank)
         defaults["coerce"] = modelfield.to_python
-        if modelfield.null:
+        if modelfield.allow_null:
             defaults["empty_value"] = None
         if choices_form_class is not None:
             form_class = choices_form_class
@@ -753,7 +753,9 @@ def modelfield_to_formfield(
         return None
 
     if isinstance(modelfield, models.BooleanField):
-        form_class = fields.NullBooleanField if modelfield.null else fields.BooleanField
+        form_class = (
+            fields.NullBooleanField if modelfield.allow_null else fields.BooleanField
+        )
         # In HTML checkboxes, 'required' means "must be checked" which is
         # different from the choices case ("must select some value").
         # required=False allows unchecked checkboxes.
@@ -787,7 +789,7 @@ def modelfield_to_formfield(
         from plain.models.db import connection
 
         if (
-            modelfield.null
+            modelfield.allow_null
             and not connection.features.interprets_empty_strings_as_nulls
         ):
             defaults["empty_value"] = None

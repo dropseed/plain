@@ -236,7 +236,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             body.pop(old_field.name, None)
             mapping.pop(old_field.column, None)
             body[new_field.name] = new_field
-            if old_field.null and not new_field.null:
+            if old_field.allow_null and not new_field.allow_null:
                 case_sql = f"coalesce({self.quote_name(old_field.column)}, {self.prepare_default(self.effective_default(new_field))})"
                 mapping[new_field.column] = case_sql
             else:
@@ -363,7 +363,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # Fields with default values cannot by handled by ALTER TABLE ADD
             # COLUMN statement because DROP DEFAULT is not supported in
             # ALTER TABLE.
-            not field.null
+            not field.allow_null
             or self.effective_default(field) is not None
         ):
             self._remake_table(model, create_field=field)

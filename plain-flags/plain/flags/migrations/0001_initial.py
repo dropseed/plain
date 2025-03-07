@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ),
                 ("description", models.TextField(required=False)),
                 ("enabled", models.BooleanField(default=True)),
-                ("used_at", models.DateTimeField(required=False, null=True)),
+                ("used_at", models.DateTimeField(required=False, allow_null=True)),
             ],
         ),
         migrations.CreateModel(

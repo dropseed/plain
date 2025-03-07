@@ -237,7 +237,7 @@ class ForwardManyToOneDescriptor:
                     remote_field.set_cached_value(rel_obj, instance)
             self.field.set_cached_value(instance, rel_obj)
 
-        if rel_obj is None and not self.field.null:
+        if rel_obj is None and not self.field.allow_null:
             raise self.RelatedObjectDoesNotExist(
                 f"{self.field.model.__name__} has no {self.field.name}."
             )
@@ -788,7 +788,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
 
         # remove() and clear() are only provided if the ForeignKey can have a
         # value of null.
-        if rel.field.null:
+        if rel.field.allow_null:
 
             def remove(self, *objs, bulk=True):
                 if not objs:
@@ -839,7 +839,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
             # could be affected by `manager.clear()`. Refs #19816.
             objs = tuple(objs)
 
-            if self.field.null:
+            if self.field.allow_null:
                 db = router.db_for_write(self.model, instance=self.instance)
                 with transaction.atomic(using=db, savepoint=False):
                     if clear:

@@ -32,7 +32,7 @@ class ForeignObjectRel(FieldCacheMixin):
 
     # Reverse relations are always nullable (Plain can't enforce that a
     # foreign key on the related model points to this model).
-    null = True
+    allow_null = True
     empty_strings_allowed = False
 
     def __init__(
