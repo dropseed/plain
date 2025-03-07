@@ -1888,7 +1888,9 @@ class GenericIPAddressField(Field):
         ]
 
     def _check_required_and_null_values(self, **kwargs):
-        if not getattr(self, "allow_null", False) and getattr(self, "required", True):
+        if not getattr(self, "allow_null", False) and not getattr(
+            self, "required", True
+        ):
             return [
                 preflight.Error(
                     "GenericIPAddressFields cannot have required=False if allow_null=False, "
