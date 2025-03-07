@@ -696,10 +696,6 @@ class ModelMultipleChoiceField(ModelChoiceField):
         return data.getlist(html_name)
 
 
-def modelform_defines_fields(form_class):
-    return hasattr(form_class, "_meta") and (form_class._meta.fields is not None)
-
-
 def modelfield_to_formfield(
     modelfield, form_class=None, choices_form_class=None, **kwargs
 ):

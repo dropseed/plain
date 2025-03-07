@@ -81,17 +81,6 @@ class BaseDatabaseOperations:
             "format_for_duration_arithmetic() method."
         )
 
-    def cache_key_culling_sql(self):
-        """
-        Return an SQL query that retrieves the first cache key greater than the
-        n smallest.
-
-        This is used by the 'db' cache backend to determine where to start
-        culling.
-        """
-        cache_key = self.quote_name("cache_key")
-        return f"SELECT {cache_key} FROM %s ORDER BY {cache_key} LIMIT 1 OFFSET %%s"
-
     def unification_cast_sql(self, output_field):
         """
         Given a field instance, return the SQL that casts the result of a union

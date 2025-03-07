@@ -227,10 +227,6 @@ class IndexExpression(Func):
                 ]
             )
 
-    @classmethod
-    def register_wrappers(cls, *wrapper_classes):
-        cls.wrapper_classes = wrapper_classes
-
     def resolve_expression(
         self,
         query=None,

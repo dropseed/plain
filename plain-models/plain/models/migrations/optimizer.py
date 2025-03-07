@@ -29,10 +29,8 @@ class MigrationOptimizer:
         # Internal tracking variable for test assertions about # of loops
         if package_label is None:
             raise TypeError("package_label must be a str.")
-        self._iterations = 0
         while True:
             result = self.optimize_inner(operations, package_label)
-            self._iterations += 1
             if result == operations:
                 return result
             operations = result

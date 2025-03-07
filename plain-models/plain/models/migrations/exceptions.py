@@ -48,7 +48,3 @@ class NodeNotFoundError(LookupError):
 
 class MigrationSchemaMissing(DatabaseError):
     pass
-
-
-class InvalidMigrationPlan(ValueError):
-    pass

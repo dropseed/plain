@@ -1,7 +1,5 @@
 import multiprocessing
 import os
-import shutil
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -70,40 +68,6 @@ class DatabaseCreation(BaseDatabaseCreation):
             f"Cloning with start method {start_method!r} is not supported."
         )
 
-    def _clone_test_db(self, suffix, verbosity, keepdb=False):
-        source_database_name = self.connection.settings_dict["NAME"]
-        target_database_name = self.get_test_db_clone_settings(suffix)["NAME"]
-        if not self.is_in_memory_db(source_database_name):
-            # Erase the old test database
-            if os.access(target_database_name, os.F_OK):
-                if keepdb:
-                    return
-                if verbosity >= 1:
-                    self.log(
-                        "Destroying old test database for alias {}...".format(
-                            self._get_database_display_str(
-                                verbosity, target_database_name
-                            ),
-                        )
-                    )
-                try:
-                    os.remove(target_database_name)
-                except Exception as e:
-                    self.log(f"Got an error deleting the old test database: {e}")
-                    sys.exit(2)
-            try:
-                shutil.copy(source_database_name, target_database_name)
-            except Exception as e:
-                self.log(f"Got an error cloning the test database: {e}")
-                sys.exit(2)
-        # Forking automatically makes a copy of an in-memory database.
-        # Spawn requires migrating to disk which will be re-opened in
-        # setup_worker_connection.
-        elif multiprocessing.get_start_method() == "spawn":
-            ondisk_db = sqlite3.connect(target_database_name, uri=True)
-            self.connection.connection.backup(ondisk_db)
-            ondisk_db.close()
-
     def _destroy_test_db(self, test_database_name, verbosity):
         if test_database_name and not self.is_in_memory_db(test_database_name):
             # Remove the SQLite database file
@@ -124,32 +88,3 @@ class DatabaseCreation(BaseDatabaseCreation):
         else:
             sig.append(test_database_name)
         return tuple(sig)
-
-    def setup_worker_connection(self, _worker_id):
-        settings_dict = self.get_test_db_clone_settings(_worker_id)
-        # connection.settings_dict must be updated in place for changes to be
-        # reflected in plain.models.connections. Otherwise new threads would
-        # connect to the default database instead of the appropriate clone.
-        start_method = multiprocessing.get_start_method()
-        if start_method == "fork":
-            # Update settings_dict in place.
-            self.connection.settings_dict.update(settings_dict)
-            self.connection.close()
-        elif start_method == "spawn":
-            alias = self.connection.alias
-            connection_str = (
-                f"file:memorydb_{alias}_{_worker_id}?mode=memory&cache=shared"
-            )
-            source_db = self.connection.Database.connect(
-                f"file:{alias}_{_worker_id}.sqlite3", uri=True
-            )
-            target_db = sqlite3.connect(connection_str, uri=True)
-            source_db.backup(target_db)
-            source_db.close()
-            # Update settings_dict in place.
-            self.connection.settings_dict.update(settings_dict)
-            self.connection.settings_dict["NAME"] = connection_str
-            # Re-open connection to in-memory database before closing copy
-            # connection.
-            self.connection.connect()
-            target_db.close()

@@ -8,43 +8,13 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     empty_fetchmany_value = ()
     allows_group_by_selected_pks = True
     related_fields_match_type = True
-    # MySQL doesn't support sliced subqueries with IN/ALL/ANY/SOME.
-    allow_sliced_subqueries_with_in = False
     has_select_for_update = True
-    supports_forward_references = False
-    supports_regex_backreferencing = False
-    supports_date_lookup_using_string = False
-    supports_timezones = False
-    requires_explicit_null_ordering_when_grouping = True
-    atomic_transactions = False
-    can_clone_databases = True
     supports_comments = True
     supports_comments_inline = True
     supports_temporal_subtraction = True
     supports_slicing_ordering_in_compound = True
-    supports_index_on_text_field = False
     supports_update_conflicts = True
-    create_test_procedure_without_params_sql = """
-        CREATE PROCEDURE test_procedure ()
-        BEGIN
-            DECLARE V_I INTEGER;
-            SET V_I = 1;
-        END;
-    """
-    create_test_procedure_with_int_param_sql = """
-        CREATE PROCEDURE test_procedure (P_I INTEGER)
-        BEGIN
-            DECLARE V_I INTEGER;
-            SET V_I = P_I;
-        END;
-    """
-    create_test_table_with_composite_primary_key = """
-        CREATE TABLE test_table_composite_pk (
-            column_1 INTEGER NOT NULL,
-            column_2 INTEGER NOT NULL,
-            PRIMARY KEY(column_1, column_2)
-        )
-    """
+
     # Neither MySQL nor MariaDB support partial indexes.
     supports_partial_indexes = False
     # COLLATE must be wrapped in parentheses because MySQL treats COLLATE as an
@@ -61,26 +31,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             return (10, 4)
         else:
             return (8,)
-
-    @cached_property
-    def test_collations(self):
-        charset = "utf8"
-        if (
-            self.connection.mysql_is_mariadb
-            and self.connection.mysql_version >= (10, 6)
-        ) or (
-            not self.connection.mysql_is_mariadb
-            and self.connection.mysql_version >= (8, 0, 30)
-        ):
-            # utf8 is an alias for utf8mb3 in MariaDB 10.6+ and MySQL 8.0.30+.
-            charset = "utf8mb3"
-        return {
-            "ci": f"{charset}_general_ci",
-            "non_default": f"{charset}_esperanto_ci",
-            "swedish_ci": f"{charset}_swedish_ci",
-        }
-
-    test_now_utc_template = "UTC_TIMESTAMP(6)"
 
     @cached_property
     def _mysql_storage_engine(self):
@@ -102,21 +52,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             3,
             2,
         )
-
-    @cached_property
-    def can_introspect_foreign_keys(self):
-        "Confirm support for introspected foreign keys"
-        return self._mysql_storage_engine != "MyISAM"
-
-    @cached_property
-    def introspected_field_types(self):
-        return {
-            **super().introspected_field_types,
-            "BinaryField": "TextField",
-            "BooleanField": "IntegerField",
-            "DurationField": "BigIntegerField",
-            "GenericIPAddressField": "CharField",
-        }
 
     @cached_property
     def can_return_columns_from_insert(self):
@@ -143,10 +78,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         if self.connection.mysql_is_mariadb:
             return True
         return self.connection.mysql_version >= (8, 0, 2)
-
-    supports_frame_range_fixed_distance = property(
-        operator.attrgetter("supports_over_clause")
-    )
 
     @cached_property
     def supports_column_check_constraints(self):
@@ -212,16 +143,10 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         return self._mysql_storage_engine != "MyISAM"
 
     uses_savepoints = property(operator.attrgetter("supports_transactions"))
-    can_release_savepoints = property(operator.attrgetter("supports_transactions"))
 
     @cached_property
     def ignores_table_name_case(self):
         return self.connection.mysql_server_data["lower_case_table_names"]
-
-    @cached_property
-    def supports_default_in_lead_lag(self):
-        # To be added in https://jira.mariadb.org/browse/MDEV-12981.
-        return not self.connection.mysql_is_mariadb
 
     @cached_property
     def can_introspect_json_field(self):
@@ -244,15 +169,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             and self._mysql_storage_engine != "MyISAM"
             and self.connection.mysql_version >= (8, 0, 13)
         )
-
-    @cached_property
-    def supports_select_intersection(self):
-        is_mariadb = self.connection.mysql_is_mariadb
-        return is_mariadb or self.connection.mysql_version >= (8, 0, 31)
-
-    supports_select_difference = property(
-        operator.attrgetter("supports_select_intersection")
-    )
 
     @cached_property
     def can_rename_index(self):

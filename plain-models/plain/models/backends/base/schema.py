@@ -83,7 +83,6 @@ class BaseDatabaseSchemaEditor:
     # Overrideable SQL templates
     sql_create_table = "CREATE TABLE %(table)s (%(definition)s)"
     sql_rename_table = "ALTER TABLE %(old_table)s RENAME TO %(new_table)s"
-    sql_retablespace_table = "ALTER TABLE %(table)s SET TABLESPACE %(new_tablespace)s"
     sql_delete_table = "DROP TABLE %(table)s CASCADE"
 
     sql_create_column = "ALTER TABLE %(table)s ADD COLUMN %(column)s %(definition)s"
@@ -139,8 +138,6 @@ class BaseDatabaseSchemaEditor:
         "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s PRIMARY KEY (%(columns)s)"
     )
     sql_delete_pk = sql_delete_constraint
-
-    sql_delete_procedure = "DROP PROCEDURE %(procedure)s"
 
     sql_alter_table_comment = "COMMENT ON TABLE %(table)s IS %(comment)s"
     sql_alter_column_comment = "COMMENT ON COLUMN %(table)s.%(column)s IS %(comment)s"
@@ -557,17 +554,6 @@ class BaseDatabaseSchemaEditor:
             % {
                 "table": self.quote_name(model._meta.db_table),
                 "comment": self.quote_value(new_db_table_comment or ""),
-            }
-        )
-
-    def alter_db_tablespace(self, model, old_db_tablespace, new_db_tablespace):
-        """Move a model's table between tablespaces."""
-        self.execute(
-            self.sql_retablespace_table
-            % {
-                "table": self.quote_name(model._meta.db_table),
-                "old_tablespace": self.quote_name(old_db_tablespace),
-                "new_tablespace": self.quote_name(new_db_tablespace),
             }
         )
 
@@ -1722,10 +1708,3 @@ class BaseDatabaseSchemaEditor:
 
     def _collate_sql(self, collation, old_collation=None, table_name=None):
         return "COLLATE " + self.quote_name(collation) if collation else ""
-
-    def remove_procedure(self, procedure_name, param_types=()):
-        sql = self.sql_delete_procedure % {
-            "procedure": self.quote_name(procedure_name),
-            "param_types": ",".join(param_types),
-        }
-        self.execute(sql)

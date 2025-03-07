@@ -63,10 +63,6 @@ class Choices(enum.Enum, metaclass=ChoicesMeta):
     def label(self):
         return self._label_
 
-    @property
-    def do_not_call_in_templates(self):
-        return True
-
     def __str__(self):
         """
         Use value when cast to str, so that Choices set as model instance

@@ -48,7 +48,6 @@ class CheckURLMixin:
 class RegexPattern(CheckURLMixin):
     def __init__(self, regex, name=None, is_endpoint=False):
         self._regex = regex
-        self._regex_dict = {}
         self._is_endpoint = is_endpoint
         self.name = name
         self.converters = {}
@@ -157,7 +156,6 @@ def _route_to_regex(route, is_endpoint=False):
 class RoutePattern(CheckURLMixin):
     def __init__(self, route, name=None, is_endpoint=False):
         self._route = route
-        self._regex_dict = {}
         self._is_endpoint = is_endpoint
         self.name = name
         self.converters = _route_to_regex(str(route), is_endpoint)[1]

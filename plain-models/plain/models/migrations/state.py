@@ -11,7 +11,6 @@ from plain.models.migrations.utils import field_is_referenced, get_references
 from plain.models.options import DEFAULT_NAMES
 from plain.models.registry import ModelsRegistry
 from plain.models.registry import models_registry as global_models
-from plain.models.utils import make_model_tuple
 from plain.packages import packages_registry
 from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
@@ -178,16 +177,6 @@ class ProjectState:
             for key in option_keys:
                 if key not in options:
                     model_state.options.pop(key, False)
-        self.reload_model(package_label, model_name, delay=True)
-
-    def remove_model_options(
-        self, package_label, model_name, option_name, value_to_remove
-    ):
-        model_state = self.models[package_label, model_name]
-        if objs := model_state.options.get(option_name):
-            model_state.options[option_name] = [
-                obj for obj in objs if tuple(obj) != tuple(value_to_remove)
-            ]
         self.reload_model(package_label, model_name, delay=True)
 
     def alter_model_managers(self, package_label, model_name, managers):
@@ -498,11 +487,6 @@ class ProjectState:
 
         for model_key in concretes:
             self.resolve_model_relations(model_key, concretes)
-
-    def get_concrete_model_key(self, model):
-        (concrete_models_mapping,) = self._get_concrete_models_mapping()
-        model_key = make_model_tuple(model)
-        return concrete_models_mapping[model_key]
 
     def _get_concrete_models_mapping(self):
         concrete_models_mapping = {}

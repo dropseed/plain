@@ -28,7 +28,6 @@ def CASCADE(collector, field, sub_objs, using):
     collector.collect(
         sub_objs,
         source=field.remote_field.model,
-        source_attr=field.name,
         nullable=field.allow_null,
         fail_on_restricted=False,
     )
@@ -236,7 +235,6 @@ class Collector:
         source=None,
         nullable=False,
         collect_related=True,
-        source_attr=None,
         reverse_dependency=False,
         keep_parents=False,
         fail_on_restricted=True,
@@ -285,7 +283,6 @@ class Collector:
                     self.collect(
                         parent_objs,
                         source=model,
-                        source_attr=ptr.remote_field.related_name,
                         collect_related=False,
                         reverse_dependency=True,
                         fail_on_restricted=False,
@@ -383,11 +380,6 @@ class Collector:
             connector=query_utils.Q.OR,
         )
         return related_model._base_manager.using(self.using).filter(predicate)
-
-    def instances_with_model(self):
-        for model, instances in self.data.items():
-            for obj in instances:
-                yield model, obj
 
     def sort(self):
         sorted_models = []

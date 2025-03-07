@@ -631,8 +631,6 @@ def create_reverse_many_to_one_manager(superclass, rel):
             manager_class = create_reverse_many_to_one_manager(manager.__class__, rel)
             return manager_class(self.instance)
 
-        do_not_call_in_templates = True
-
         def _check_fk_val(self):
             for field in self.field.foreign_related_fields:
                 if getattr(self.instance, field.attname) is None:
@@ -974,8 +972,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 manager.__class__, rel, reverse
             )
             return manager_class(instance=self.instance)
-
-        do_not_call_in_templates = True
 
         def _build_remove_filters(self, removed_vals):
             filters = Q.create([(self.source_field_name, self.related_val)])

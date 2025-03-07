@@ -192,12 +192,3 @@ class ManagerDescriptor:
             )
 
         return cls._meta.managers_map[self.manager.name]
-
-
-class EmptyManager(Manager):
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-
-    def get_queryset(self):
-        return super().get_queryset().none()

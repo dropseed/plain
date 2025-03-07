@@ -500,18 +500,6 @@ class BaseDatabaseWrapper:
 
     # ##### Foreign key constraints checks handling #####
 
-    @contextmanager
-    def constraint_checks_disabled(self):
-        """
-        Disable foreign key constraint checking.
-        """
-        disabled = self.disable_constraint_checking()
-        try:
-            yield
-        finally:
-            if disabled:
-                self.enable_constraint_checking()
-
     def disable_constraint_checking(self):
         """
         Backends can implement as needed to temporarily disable foreign key
@@ -596,18 +584,6 @@ class BaseDatabaseWrapper:
     def allow_thread_sharing(self):
         with self._thread_sharing_lock:
             return self._thread_sharing_count > 0
-
-    def inc_thread_sharing(self):
-        with self._thread_sharing_lock:
-            self._thread_sharing_count += 1
-
-    def dec_thread_sharing(self):
-        with self._thread_sharing_lock:
-            if self._thread_sharing_count <= 0:
-                raise RuntimeError(
-                    "Cannot decrement the thread sharing count below zero."
-                )
-            self._thread_sharing_count -= 1
 
     def validate_thread_sharing(self):
         """

@@ -212,24 +212,6 @@ class BaseDatabaseCreation:
 
         return test_database_name
 
-    def clone_test_db(self, suffix, verbosity=1, autoclobber=False, keepdb=False):
-        """
-        Clone a test database.
-        """
-        source_database_name = self.connection.settings_dict["NAME"]
-
-        if verbosity >= 1:
-            action = "Cloning test database"
-            if keepdb:
-                action = "Using existing clone"
-            self.log(
-                f"{action} for alias {self._get_database_display_str(verbosity, source_database_name)}..."
-            )
-
-        # We could skip this call if keepdb is True, but we instead
-        # give it the keepdb param. See create_test_db for details.
-        self._clone_test_db(suffix, verbosity, keepdb)
-
     def get_test_db_clone_settings(self, suffix):
         """
         Return a modified connection settings dict for the n-th clone of a DB.
@@ -242,15 +224,6 @@ class BaseDatabaseCreation:
             **orig_settings_dict,
             "NAME": "{}_{}".format(orig_settings_dict["NAME"], suffix),
         }
-
-    def _clone_test_db(self, suffix, verbosity, keepdb=False):
-        """
-        Internal implementation - duplicate the test db tables.
-        """
-        raise NotImplementedError(
-            "The database backend doesn't support cloning databases. "
-            "Disable the option to run tests in parallel processes."
-        )
 
     def destroy_test_db(
         self, old_database_name=None, verbosity=1, keepdb=False, suffix=None
@@ -315,12 +288,3 @@ class BaseDatabaseCreation:
             settings_dict["ENGINE"],
             self._get_test_db_name(),
         )
-
-    def setup_worker_connection(self, _worker_id):
-        settings_dict = self.get_test_db_clone_settings(str(_worker_id))
-        # connection.settings_dict must be updated in place for changes to be
-        # reflected in plain.models.connections. If the following line assigned
-        # connection.settings_dict = settings_dict, new threads would connect
-        # to the default database instead of the appropriate clone.
-        self.connection.settings_dict.update(settings_dict)
-        self.connection.close()

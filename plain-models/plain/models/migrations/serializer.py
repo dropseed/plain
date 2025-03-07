@@ -348,10 +348,6 @@ class Serializer:
             )
         cls._registry[type_] = serializer
 
-    @classmethod
-    def unregister(cls, type_):
-        cls._registry.pop(type_)
-
 
 def serializer_factory(value):
     if isinstance(value, Promise):
