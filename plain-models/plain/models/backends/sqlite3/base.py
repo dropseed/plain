@@ -76,7 +76,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "PositiveBigIntegerField": "bigint unsigned",
         "PositiveIntegerField": "integer unsigned",
         "PositiveSmallIntegerField": "smallint unsigned",
-        "SlugField": "varchar(%(max_length)s)",
         "SmallAutoField": "integer",
         "SmallIntegerField": "smallint",
         "TextField": "text",

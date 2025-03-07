@@ -341,9 +341,6 @@ class OpenAPISchema(dict):
             fields.CharField: {
                 "type": "string",
             },
-            fields.SlugField: {
-                "type": "string",
-            },
             fields.EmailField: {
                 "type": "string",
                 "format": "email",

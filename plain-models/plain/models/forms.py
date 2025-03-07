@@ -772,9 +772,6 @@ def modelfield_to_formfield(
     if issubclass(modelfield.__class__, models.fields.PositiveIntegerRelDbTypeMixin):
         return fields.IntegerField(min_value=0, **defaults)
 
-    if isinstance(modelfield, models.SlugField):
-        return fields.SlugField(allow_unicode=modelfield.allow_unicode, **defaults)
-
     if isinstance(modelfield, models.TextField):
         # Passing max_length to fields.CharField means that the value's length
         # will be validated twice. This is considered acceptable since we want

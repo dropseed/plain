@@ -237,21 +237,6 @@ class EmailValidator:
 
 validate_email = EmailValidator()
 
-slug_re = _lazy_re_compile(r"^[-a-zA-Z0-9_]+\Z")
-validate_slug = RegexValidator(
-    slug_re,
-    # Translators: "letters" means latin letters: a-z and A-Z.
-    "Enter a valid “slug” consisting of letters, numbers, underscores or hyphens.",
-    "invalid",
-)
-
-slug_unicode_re = _lazy_re_compile(r"^[-\w]+\Z")
-validate_unicode_slug = RegexValidator(
-    slug_unicode_re,
-    "Enter a valid “slug” consisting of Unicode letters, numbers, underscores, or hyphens."
-    "invalid",
-)
-
 
 def validate_ipv4_address(value):
     try:

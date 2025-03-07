@@ -43,7 +43,6 @@ __all__ = (
     "FloatField",
     "DecimalField",
     "JSONField",
-    "SlugField",
     "TypedChoiceField",
     "UUIDField",
 )
@@ -898,16 +897,6 @@ class MultipleChoiceField(ChoiceField):
 
     def value_from_form_data(self, data, files, html_name):
         return data.getlist(html_name)
-
-
-class SlugField(CharField):
-    default_validators = [validators.validate_slug]
-
-    def __init__(self, *, allow_unicode=False, **kwargs):
-        self.allow_unicode = allow_unicode
-        if self.allow_unicode:
-            self.default_validators = [validators.validate_unicode_slug]
-        super().__init__(**kwargs)
 
 
 class UUIDField(CharField):

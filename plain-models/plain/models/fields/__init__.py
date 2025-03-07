@@ -54,7 +54,6 @@ __all__ = [
     "PositiveBigIntegerField",
     "PositiveIntegerField",
     "PositiveSmallIntegerField",
-    "SlugField",
     "SmallAutoField",
     "SmallIntegerField",
     "TextField",
@@ -2015,32 +2014,6 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
 
     def get_internal_type(self):
         return "PositiveSmallIntegerField"
-
-
-class SlugField(CharField):
-    default_validators = [validators.validate_slug]
-    description = "Slug (up to %(max_length)s)"
-
-    def __init__(self, *, max_length=50, db_index=True, allow_unicode=False, **kwargs):
-        self.allow_unicode = allow_unicode
-        if self.allow_unicode:
-            self.default_validators = [validators.validate_unicode_slug]
-        super().__init__(max_length=max_length, db_index=db_index, **kwargs)
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        if kwargs.get("max_length") == 50:
-            del kwargs["max_length"]
-        if self.db_index is False:
-            kwargs["db_index"] = False
-        else:
-            del kwargs["db_index"]
-        if self.allow_unicode is not False:
-            kwargs["allow_unicode"] = self.allow_unicode
-        return name, path, args, kwargs
-
-    def get_internal_type(self):
-        return "SlugField"
 
 
 class TextField(Field):
