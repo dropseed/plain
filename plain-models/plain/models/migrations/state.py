@@ -683,8 +683,6 @@ class ModelState:
         return self.name.lower()
 
     def get_field(self, field_name):
-        if field_name == "_order":
-            field_name = self.options.get("order_with_respect_to", field_name)
         return self.fields[field_name]
 
     @classmethod
@@ -694,8 +692,6 @@ class ModelState:
         fields = []
         for field in model._meta.local_fields:
             if getattr(field, "remote_field", None) and exclude_rels:
-                continue
-            if isinstance(field, models.OrderWrt):
                 continue
             name = field.name
             try:
@@ -732,11 +728,6 @@ class ModelState:
                     ]
                 else:
                     options[name] = model._meta.original_attrs[name]
-        # If we're ignoring relationships, remove all field-listing model
-        # options (that option basically just means "make a stub model")
-        if exclude_rels:
-            if "order_with_respect_to" in options:
-                del options["order_with_respect_to"]
 
         def flatten_bases(model):
             bases = []

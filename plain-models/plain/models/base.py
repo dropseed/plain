@@ -1,7 +1,6 @@
 import copy
 import inspect
 import warnings
-from functools import partialmethod
 from itertools import chain
 
 import plain.runtime
@@ -15,7 +14,6 @@ from plain.exceptions import (
     ValidationError,
 )
 from plain.models import models_registry, transaction
-from plain.models.aggregates import Max
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import CheckConstraint, UniqueConstraint
 from plain.models.db import (
@@ -26,15 +24,13 @@ from plain.models.db import (
     router,
 )
 from plain.models.deletion import CASCADE, Collector
-from plain.models.expressions import ExpressionWrapper, RawSQL, Value
-from plain.models.fields import NOT_PROVIDED, IntegerField
+from plain.models.expressions import RawSQL, Value
+from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import (
     ForeignObjectRel,
     OneToOneField,
-    lazy_related_operation,
     resolve_relation,
 )
-from plain.models.functions import Coalesce
 from plain.models.manager import Manager
 from plain.models.options import Options
 from plain.models.query import F, Q
@@ -297,24 +293,6 @@ class ModelBase(type):
         """Create some methods once self._meta has been populated."""
         opts = cls._meta
         opts._prepare(cls)
-
-        if opts.order_with_respect_to:
-            cls.get_next_in_order = partialmethod(
-                cls._get_next_or_previous_in_order, is_next=True
-            )
-            cls.get_previous_in_order = partialmethod(
-                cls._get_next_or_previous_in_order, is_next=False
-            )
-
-            # Defer creating accessors on the foreign class until it has been
-            # created and registered. If remote_field is None, we're ordering
-            # with respect to a GenericForeignKey and don't know what the
-            # foreign class is - we'll add those accessors later in
-            # contribute_to_class().
-            if opts.order_with_respect_to.remote_field:
-                wrt = opts.order_with_respect_to
-                remote = wrt.remote_field.model
-                lazy_related_operation(make_foreign_order_accessors, cls, remote)
 
         # Give the class a docstring -- its definition.
         if cls.__doc__ is None:
@@ -874,23 +852,6 @@ class Model(AltersData, metaclass=ModelBase):
             if update_fields and not updated:
                 raise DatabaseError("Save with update_fields did not affect any rows.")
         if not updated:
-            if meta.order_with_respect_to:
-                # If this is a model with an order_with_respect_to
-                # autopopulate the _order field
-                field = meta.order_with_respect_to
-                filter_args = field.get_filter_kwargs_for_object(self)
-                self._order = (
-                    cls._base_manager.using(using)
-                    .filter(**filter_args)
-                    .aggregate(
-                        _order__max=Coalesce(
-                            ExpressionWrapper(
-                                Max("_order") + Value(1), output_field=IntegerField()
-                            ),
-                            Value(0),
-                        ),
-                    )["_order__max"]
-                )
             fields = meta.local_concrete_fields
             if not pk_set:
                 fields = [f for f in fields if f is not meta.auto_field]
@@ -1012,28 +973,6 @@ class Model(AltersData, metaclass=ModelBase):
             raise self.DoesNotExist(
                 f"{self.__class__._meta.object_name} matching query does not exist."
             )
-
-    def _get_next_or_previous_in_order(self, is_next):
-        cachename = f"__{is_next}_order_cache"
-        if not hasattr(self, cachename):
-            op = "gt" if is_next else "lt"
-            order = "_order" if is_next else "-_order"
-            order_field = self._meta.order_with_respect_to
-            filter_args = order_field.get_filter_kwargs_for_object(self)
-            obj = (
-                self.__class__._default_manager.filter(**filter_args)
-                .filter(
-                    **{
-                        f"_order__{op}": self.__class__._default_manager.values(
-                            "_order"
-                        ).filter(**{self._meta.pk.name: self.pk})
-                    }
-                )
-                .order_by(order)[:1]
-                .get()
-            )
-            setattr(self, cachename, obj)
-        return getattr(self, cachename)
 
     def _get_field_value_map(self, meta, exclude=None):
         if exclude is None:
@@ -1696,16 +1635,8 @@ class Model(AltersData, metaclass=ModelBase):
         Check "ordering" option -- is it a list of strings and do all fields
         exist?
         """
-        if cls._meta._ordering_clash:
-            return [
-                preflight.Error(
-                    "'ordering' and 'order_with_respect_to' cannot be used together.",
-                    obj=cls,
-                    id="models.E021",
-                ),
-            ]
 
-        if cls._meta.order_with_respect_to or not cls._meta.ordering:
+        if not cls._meta.ordering:
             return []
 
         if not isinstance(cls._meta.ordering, list | tuple):
@@ -2083,42 +2014,6 @@ class Model(AltersData, metaclass=ModelBase):
                     )
             errors.extend(cls._check_local_fields(fields, "constraints"))
         return errors
-
-
-############################################
-# HELPER FUNCTIONS (CURRIED MODEL METHODS) #
-############################################
-
-# ORDERING METHODS #########################
-
-
-def method_set_order(self, ordered_obj, id_list, using=None):
-    order_wrt = ordered_obj._meta.order_with_respect_to
-    filter_args = order_wrt.get_forward_related_filter(self)
-    ordered_obj.objects.db_manager(using).filter(**filter_args).bulk_update(
-        [ordered_obj(pk=pk, _order=order) for order, pk in enumerate(id_list)],
-        ["_order"],
-    )
-
-
-def method_get_order(self, ordered_obj):
-    order_wrt = ordered_obj._meta.order_with_respect_to
-    filter_args = order_wrt.get_forward_related_filter(self)
-    pk_name = ordered_obj._meta.pk.name
-    return ordered_obj.objects.filter(**filter_args).values_list(pk_name, flat=True)
-
-
-def make_foreign_order_accessors(model, related_model):
-    setattr(
-        related_model,
-        f"get_{model.__name__.lower()}_order",
-        partialmethod(method_get_order, model),
-    )
-    setattr(
-        related_model,
-        f"set_{model.__name__.lower()}_order",
-        partialmethod(method_set_order, model),
-    )
 
 
 ########

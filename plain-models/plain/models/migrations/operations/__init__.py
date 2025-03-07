@@ -6,7 +6,6 @@ from .models import (
     AlterModelOptions,
     AlterModelTable,
     AlterModelTableComment,
-    AlterOrderWithRespectTo,
     CreateModel,
     DeleteModel,
     RemoveConstraint,
@@ -35,6 +34,5 @@ __all__ = [
     "SeparateDatabaseAndState",
     "RunSQL",
     "RunPython",
-    "AlterOrderWithRespectTo",
     "AlterModelManagers",
 ]

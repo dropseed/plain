@@ -175,7 +175,6 @@ class MigrationAutodetector:
         self.generate_removed_fields()
         self.generate_added_fields()
         self.generate_altered_fields()
-        self.generate_altered_order_with_respect_to()
         self.generate_added_indexes()
         self.generate_added_constraints()
         self.generate_altered_db_table()
@@ -435,14 +434,6 @@ class MigrationAutodetector:
                 and operation.model_name_lower == dependency[1].lower()
                 and operation.name_lower == dependency[2].lower()
             )
-        # order_with_respect_to being unset for a field
-        elif dependency[2] is not None and dependency[3] == "order_wrt_unset":
-            return (
-                isinstance(operation, operations.AlterOrderWithRespectTo)
-                and operation.name_lower == dependency[1].lower()
-                and (operation.order_with_respect_to or "").lower()
-                != dependency[2].lower()
-            )
         # Unknown dependency. Raise an error.
         else:
             raise ValueError(f"Can't handle dependency {dependency!r}")
@@ -553,9 +544,6 @@ class MigrationAutodetector:
             # Are there indexes to defer?
             indexes = model_state.options.pop("indexes")
             constraints = model_state.options.pop("constraints")
-            order_with_respect_to = model_state.options.pop(
-                "order_with_respect_to", None
-            )
             # Depend on the deletion of any possible proxy version of us
             dependencies = [
                 (package_label, model_name, None, False),
@@ -638,19 +626,7 @@ class MigrationAutodetector:
                     ),
                     dependencies=list(set(dependencies)),
                 )
-            # Generate other opns
-            if order_with_respect_to:
-                self.add_operation(
-                    package_label,
-                    operations.AlterOrderWithRespectTo(
-                        name=model_name,
-                        order_with_respect_to=order_with_respect_to,
-                    ),
-                    dependencies=[
-                        (package_label, model_name, order_with_respect_to, True),
-                        (package_label, model_name, None, True),
-                    ],
-                )
+
             related_dependencies = [
                 (package_label, model_name, name, True)
                 for name in sorted(related_fields)
@@ -923,12 +899,6 @@ class MigrationAutodetector:
                 model_name=model_name,
                 name=field_name,
             ),
-            # We might need to depend on the removal of an
-            # order_with_respect_to or index operation;
-            # this is safely ignored if there isn't one
-            dependencies=[
-                (package_label, model_name, field_name, "order_wrt_unset"),
-            ],
         )
 
     def generate_altered_fields(self):
@@ -1374,40 +1344,6 @@ class MigrationAutodetector:
                         name=model_name,
                         options=new_options,
                     ),
-                )
-
-    def generate_altered_order_with_respect_to(self):
-        for package_label, model_name in sorted(self.kept_model_keys):
-            old_model_name = self.renamed_models.get(
-                (package_label, model_name), model_name
-            )
-            old_model_state = self.from_state.models[package_label, old_model_name]
-            new_model_state = self.to_state.models[package_label, model_name]
-            if old_model_state.options.get(
-                "order_with_respect_to"
-            ) != new_model_state.options.get("order_with_respect_to"):
-                # Make sure it comes second if we're adding
-                # (removal dependency is part of RemoveField)
-                dependencies = []
-                if new_model_state.options.get("order_with_respect_to"):
-                    dependencies.append(
-                        (
-                            package_label,
-                            model_name,
-                            new_model_state.options["order_with_respect_to"],
-                            True,
-                        )
-                    )
-                # Actually generate the operation
-                self.add_operation(
-                    package_label,
-                    operations.AlterOrderWithRespectTo(
-                        name=model_name,
-                        order_with_respect_to=new_model_state.options.get(
-                            "order_with_respect_to"
-                        ),
-                    ),
-                    dependencies=dependencies,
                 )
 
     def generate_altered_managers(self):

@@ -8,7 +8,6 @@ from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import connections
 from plain.models.fields import BigAutoField
-from plain.models.fields.proxy import OrderWrt
 from plain.models.manager import Manager
 from plain.models.query_utils import PathInfo
 from plain.runtime import settings
@@ -29,7 +28,6 @@ DEFAULT_NAMES = (
     "db_table_comment",
     "ordering",
     "get_latest_by",
-    "order_with_respect_to",
     "package_label",
     "db_tablespace",
     "abstract",
@@ -77,13 +75,11 @@ class Options:
         self.db_table = ""
         self.db_table_comment = ""
         self.ordering = []
-        self._ordering_clash = False
         self.indexes = []
         self.constraints = []
         self.object_name = None
         self.package_label = package_label
         self.get_latest_by = None
-        self.order_with_respect_to = None
         self.db_tablespace = settings.DEFAULT_TABLESPACE
         self.required_db_features = []
         self.required_db_vendor = None
@@ -154,9 +150,6 @@ class Options:
                     objs = getattr(self, attr_name, [])
                     setattr(self, attr_name, self._format_names_with_class(cls, objs))
 
-            # order_with_respect_and ordering are mutually exclusive.
-            self._ordering_clash = bool(self.ordering and self.order_with_respect_to)
-
             # Any leftover attributes must be invalid.
             if meta_attrs != {}:
                 raise TypeError(
@@ -187,29 +180,6 @@ class Options:
         return new_objs
 
     def _prepare(self, model):
-        if self.order_with_respect_to:
-            # The app registry will not be ready at this point, so we cannot
-            # use get_field().
-            query = self.order_with_respect_to
-            try:
-                self.order_with_respect_to = next(
-                    f
-                    for f in self._get_fields(reverse=False)
-                    if f.name == query or f.attname == query
-                )
-            except StopIteration:
-                raise FieldDoesNotExist(
-                    f"{self.object_name} has no field named '{query}'"
-                )
-
-            self.ordering = ("_order",)
-            if not any(
-                isinstance(field, OrderWrt) for field in model._meta.local_fields
-            ):
-                model.add_to_class("_order", OrderWrt())
-        else:
-            self.order_with_respect_to = None
-
         if self.pk is None:
             if self.parents:
                 # Promote the first parent link in lieu of adding yet another

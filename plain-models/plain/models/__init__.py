@@ -59,7 +59,6 @@ from .expressions import (
 from .fields import *  # NOQA
 from .fields import __all__ as fields_all
 from .fields.json import JSONField
-from .fields.proxy import OrderWrt
 from .indexes import *  # NOQA
 from .indexes import __all__ as indexes_all
 from .lookups import Lookup, Transform
@@ -111,7 +110,6 @@ __all__ += [
     "Window",
     "WindowFrame",
     "JSONField",
-    "OrderWrt",
     "Lookup",
     "Transform",
     "Manager",

@@ -174,22 +174,6 @@ class CreateModel(ModelOperation):
                 ),
             ]
         elif (
-            isinstance(operation, AlterOrderWithRespectTo)
-            and self.name_lower == operation.name_lower
-        ):
-            return [
-                CreateModel(
-                    self.name,
-                    fields=self.fields,
-                    options={
-                        **self.options,
-                        "order_with_respect_to": operation.order_with_respect_to,
-                    },
-                    bases=self.bases,
-                    managers=self.managers,
-                ),
-            ]
-        elif (
             isinstance(operation, FieldOperation)
             and self.name_lower == operation.model_name_lower
         ):
@@ -219,9 +203,6 @@ class CreateModel(ModelOperation):
             elif isinstance(operation, RemoveField):
                 options = self.options.copy()
 
-                order_with_respect_to = options.get("order_with_respect_to")
-                if order_with_respect_to == operation.name_lower:
-                    del options["order_with_respect_to"]
                 return [
                     CreateModel(
                         self.name,
@@ -238,9 +219,6 @@ class CreateModel(ModelOperation):
             elif isinstance(operation, RenameField):
                 options = self.options.copy()
 
-                order_with_respect_to = options.get("order_with_respect_to")
-                if order_with_respect_to == operation.old_name:
-                    options["order_with_respect_to"] = operation.new_name
                 return [
                     CreateModel(
                         self.name,
@@ -485,70 +463,6 @@ class AlterModelTableComment(ModelOptionOperation):
     @property
     def migration_name_fragment(self):
         return f"alter_{self.name_lower}_table_comment"
-
-
-class AlterOrderWithRespectTo(ModelOptionOperation):
-    """Represent a change with the order_with_respect_to option."""
-
-    option_name = "order_with_respect_to"
-
-    def __init__(self, name, order_with_respect_to):
-        self.order_with_respect_to = order_with_respect_to
-        super().__init__(name)
-
-    def deconstruct(self):
-        kwargs = {
-            "name": self.name,
-            "order_with_respect_to": self.order_with_respect_to,
-        }
-        return (self.__class__.__qualname__, [], kwargs)
-
-    def state_forwards(self, package_label, state):
-        state.alter_model_options(
-            package_label,
-            self.name_lower,
-            {self.option_name: self.order_with_respect_to},
-        )
-
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        to_model = to_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, to_model):
-            from_model = from_state.models_registry.get_model(package_label, self.name)
-            # Remove a field if we need to
-            if (
-                from_model._meta.order_with_respect_to
-                and not to_model._meta.order_with_respect_to
-            ):
-                schema_editor.remove_field(
-                    from_model, from_model._meta.get_field("_order")
-                )
-            # Add a field if we need to (altering the column is untouched as
-            # it's likely a rename)
-            elif (
-                to_model._meta.order_with_respect_to
-                and not from_model._meta.order_with_respect_to
-            ):
-                field = to_model._meta.get_field("_order")
-                if not field.has_default():
-                    field.default = 0
-                schema_editor.add_field(
-                    from_model,
-                    field,
-                )
-
-    def references_field(self, model_name, name, package_label):
-        return self.references_model(model_name, package_label) and (
-            self.order_with_respect_to is None or name == self.order_with_respect_to
-        )
-
-    def describe(self):
-        return (
-            f"Set order_with_respect_to on {self.name} to {self.order_with_respect_to}"
-        )
-
-    @property
-    def migration_name_fragment(self):
-        return f"alter_{self.name_lower}_order_with_respect_to"
 
 
 class AlterModelOptions(ModelOptionOperation):
