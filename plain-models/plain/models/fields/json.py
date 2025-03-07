@@ -27,7 +27,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
 
     def __init__(
         self,
-        name=None,
+        *,
         encoder=None,
         decoder=None,
         **kwargs,
@@ -38,7 +38,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
             raise ValueError("The decoder parameter must be a callable object.")
         self.encoder = encoder
         self.decoder = decoder
-        super().__init__(name, **kwargs)
+        super().__init__(**kwargs)
 
     def check(self, **kwargs):
         errors = super().check(**kwargs)

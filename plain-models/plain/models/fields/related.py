@@ -96,6 +96,7 @@ class RelatedField(FieldCacheMixin, Field):
 
     def __init__(
         self,
+        *,
         related_name=None,
         related_query_name=None,
         limit_choices_to=None,

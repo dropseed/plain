@@ -167,7 +167,7 @@ class Field(RegisterLookupMixin):
 
     def __init__(
         self,
-        name=None,
+        *,
         primary_key=False,
         max_length=None,
         unique=False,
@@ -184,7 +184,7 @@ class Field(RegisterLookupMixin):
         error_messages=None,
         db_comment=None,
     ):
-        self.name = name
+        self.name = None  # Set by set_attributes_from_name
         self.primary_key = primary_key
         self.max_length, self._unique = max_length, unique
         self.blank, self.null = blank, null
@@ -1032,8 +1032,8 @@ class BooleanField(Field):
 
 
 class CharField(Field):
-    def __init__(self, *args, db_collation=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, db_collation=None, **kwargs):
+        super().__init__(**kwargs)
         self.db_collation = db_collation
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
@@ -1240,11 +1240,11 @@ class DateField(DateTimeCheckMixin, Field):
     }
     description = "Date (without time)"
 
-    def __init__(self, name=None, auto_now=False, auto_now_add=False, **kwargs):
+    def __init__(self, *, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
             kwargs["blank"] = True
-        super().__init__(name, **kwargs)
+        super().__init__(**kwargs)
 
     def _check_fix_default_value(self):
         """
@@ -1478,13 +1478,13 @@ class DecimalField(Field):
 
     def __init__(
         self,
-        name=None,
+        *,
         max_digits=None,
         decimal_places=None,
         **kwargs,
     ):
         self.max_digits, self.decimal_places = max_digits, decimal_places
-        super().__init__(name, **kwargs)
+        super().__init__(**kwargs)
 
     def check(self, **kwargs):
         errors = super().check(**kwargs)
@@ -1673,10 +1673,10 @@ class EmailField(CharField):
     default_validators = [validators.validate_email]
     description = "Email address"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         # max_length=254 to be compliant with RFCs 3696 and 5321
         kwargs.setdefault("max_length", 254)
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -1837,9 +1837,9 @@ class IPAddressField(Field):
         "id": "fields.E900",
     }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         kwargs["max_length"] = 15
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -1863,10 +1863,9 @@ class GenericIPAddressField(Field):
 
     def __init__(
         self,
-        name=None,
+        *,
         protocol="both",
         unpack_ipv4=False,
-        *args,
         **kwargs,
     ):
         self.unpack_ipv4 = unpack_ipv4
@@ -1877,7 +1876,7 @@ class GenericIPAddressField(Field):
         ) = validators.ip_address_validators(protocol, unpack_ipv4)
         self.default_error_messages["invalid"] = invalid_error_message
         kwargs["max_length"] = 39
-        super().__init__(name, *args, **kwargs)
+        super().__init__(**kwargs)
 
     def check(self, **kwargs):
         return [
@@ -1953,10 +1952,10 @@ class NullBooleanField(BooleanField):
         "id": "fields.E903",
     }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         kwargs["null"] = True
         kwargs["blank"] = True
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -2018,13 +2017,11 @@ class SlugField(CharField):
     default_validators = [validators.validate_slug]
     description = "Slug (up to %(max_length)s)"
 
-    def __init__(
-        self, *args, max_length=50, db_index=True, allow_unicode=False, **kwargs
-    ):
+    def __init__(self, *, max_length=50, db_index=True, allow_unicode=False, **kwargs):
         self.allow_unicode = allow_unicode
         if self.allow_unicode:
             self.default_validators = [validators.validate_unicode_slug]
-        super().__init__(*args, max_length=max_length, db_index=db_index, **kwargs)
+        super().__init__(max_length=max_length, db_index=db_index, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -2045,8 +2042,8 @@ class SlugField(CharField):
 class TextField(Field):
     description = "Text"
 
-    def __init__(self, *args, db_collation=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, db_collation=None, **kwargs):
+        super().__init__(**kwargs)
         self.db_collation = db_collation
 
     def check(self, **kwargs):
@@ -2110,11 +2107,11 @@ class TimeField(DateTimeCheckMixin, Field):
     }
     description = "Time"
 
-    def __init__(self, name=None, auto_now=False, auto_now_add=False, **kwargs):
+    def __init__(self, *, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
             kwargs["blank"] = True
-        super().__init__(name, **kwargs)
+        super().__init__(**kwargs)
 
     def _check_fix_default_value(self):
         """
@@ -2206,9 +2203,9 @@ class URLField(CharField):
     default_validators = [validators.URLValidator()]
     description = "URL"
 
-    def __init__(self, name=None, **kwargs):
+    def __init__(self, **kwargs):
         kwargs.setdefault("max_length", 200)
-        super().__init__(name, **kwargs)
+        super().__init__(**kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -2221,8 +2218,8 @@ class BinaryField(Field):
     description = "Raw binary data"
     empty_values = [None, b""]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
 
