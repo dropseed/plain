@@ -12,7 +12,7 @@ class SupportFormEntry(models.Model):
         on_delete=models.SET_NULL,
         related_name="support_form_entries",
         null=True,
-        blank=True,
+        required=False,
     )
     name = models.CharField(max_length=255)
     email = models.EmailField()

@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             model_name="jobresult",
             name="status",
             field=models.CharField(
-                blank=True,
+                required=False,
                 choices=[
                     ("", "Unknown"),
                     ("PROCESSING", "Processing"),

@@ -1216,10 +1216,10 @@ class Model(AltersData, metaclass=ModelBase):
         for f in self._meta.fields:
             if f.name in exclude:
                 continue
-            # Skip validation for empty fields with blank=True. The developer
+            # Skip validation for empty fields with required=False. The developer
             # is responsible for making sure they have a valid value.
             raw_value = getattr(self, f.attname)
-            if f.blank and raw_value in f.empty_values:
+            if not f.required and raw_value in f.empty_values:
                 continue
             try:
                 setattr(self, f.attname, f.clean(raw_value, self))

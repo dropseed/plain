@@ -46,14 +46,14 @@ class Flag(models.Model):
     )
 
     # Optional description that can be filled in after the flag is used/created
-    description = models.TextField(blank=True)
+    description = models.TextField(required=False)
 
     # To manually disable a flag before completing deleting
     # (good to disable first to make sure the code doesn't use the flag anymore)
     enabled = models.BooleanField(default=True)
 
     # To provide an easier way to see if a flag is still being used
-    used_at = models.DateTimeField(blank=True, null=True)
+    used_at = models.DateTimeField(required=False, null=True)
 
     def __str__(self):
         return self.name

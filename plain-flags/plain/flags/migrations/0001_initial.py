@@ -38,9 +38,9 @@ class Migration(migrations.Migration):
                         validators=[plain.flags.models.validate_flag_name],
                     ),
                 ),
-                ("description", models.TextField(blank=True)),
+                ("description", models.TextField(required=False)),
                 ("enabled", models.BooleanField(default=True)),
-                ("used_at", models.DateTimeField(blank=True, null=True)),
+                ("used_at", models.DateTimeField(required=False, null=True)),
             ],
         ),
         migrations.CreateModel(

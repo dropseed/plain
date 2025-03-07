@@ -23,8 +23,8 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
-                ("last_used_at", models.DateTimeField(blank=True, null=True)),
-                ("name", models.CharField(blank=True, max_length=255)),
+                ("last_used_at", models.DateTimeField(required=False, null=True)),
+                ("name", models.CharField(required=False, max_length=255)),
                 (
                     "token",
                     models.CharField(

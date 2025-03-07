@@ -855,7 +855,7 @@ class MigrationAutodetector:
             field.null
             or field.has_default()
             or field.many_to_many
-            or (field.blank and field.empty_strings_allowed)
+            or (not field.required and field.empty_strings_allowed)
             or (isinstance(field, time_fields) and field.auto_now)
         )
         if not preserve_default:

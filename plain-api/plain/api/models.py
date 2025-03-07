@@ -14,10 +14,10 @@ class APIKey(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    expires_at = models.DateTimeField(blank=True, null=True)
-    last_used_at = models.DateTimeField(blank=True, null=True)
+    expires_at = models.DateTimeField(required=False, null=True)
+    last_used_at = models.DateTimeField(required=False, null=True)
 
-    name = models.CharField(max_length=255, blank=True)
+    name = models.CharField(max_length=255, required=False)
 
     token = models.CharField(max_length=40, default=generate_token, unique=True)
 

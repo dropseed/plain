@@ -23,20 +23,20 @@ class JobRequest(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
 
     job_class = models.CharField(max_length=255, db_index=True)
-    parameters = models.JSONField(blank=True, null=True)
+    parameters = models.JSONField(required=False, null=True)
     priority = models.IntegerField(default=0, db_index=True)
-    source = models.TextField(blank=True)
+    source = models.TextField(required=False)
     queue = models.CharField(default="default", max_length=255, db_index=True)
 
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
 
-    unique_key = models.CharField(max_length=255, blank=True, db_index=True)
+    unique_key = models.CharField(max_length=255, required=False, db_index=True)
 
-    start_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    start_at = models.DateTimeField(required=False, null=True, db_index=True)
 
     # context
-    # expires_at = models.DateTimeField(blank=True, null=True)
+    # expires_at = models.DateTimeField(required=False, null=True)
 
     class Meta:
         ordering = ["priority", "-created_at"]
@@ -115,18 +115,18 @@ class Job(models.Model):
 
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    started_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    started_at = models.DateTimeField(required=False, null=True, db_index=True)
 
     # From the JobRequest
     job_request_uuid = models.UUIDField(db_index=True)
     job_class = models.CharField(max_length=255, db_index=True)
-    parameters = models.JSONField(blank=True, null=True)
+    parameters = models.JSONField(required=False, null=True)
     priority = models.IntegerField(default=0, db_index=True)
-    source = models.TextField(blank=True)
+    source = models.TextField(required=False)
     queue = models.CharField(default="default", max_length=255, db_index=True)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
-    unique_key = models.CharField(max_length=255, blank=True, db_index=True)
+    unique_key = models.CharField(max_length=255, required=False, db_index=True)
 
     objects = JobQuerySet.as_manager()
 
@@ -264,9 +264,9 @@ class JobResult(models.Model):
 
     # From the Job
     job_uuid = models.UUIDField(db_index=True)
-    started_at = models.DateTimeField(blank=True, null=True, db_index=True)
-    ended_at = models.DateTimeField(blank=True, null=True, db_index=True)
-    error = models.TextField(blank=True)
+    started_at = models.DateTimeField(required=False, null=True, db_index=True)
+    ended_at = models.DateTimeField(required=False, null=True, db_index=True)
+    error = models.TextField(required=False)
     status = models.CharField(
         max_length=20,
         choices=JobResultStatuses.choices,
@@ -276,16 +276,16 @@ class JobResult(models.Model):
     # From the JobRequest
     job_request_uuid = models.UUIDField(db_index=True)
     job_class = models.CharField(max_length=255, db_index=True)
-    parameters = models.JSONField(blank=True, null=True)
+    parameters = models.JSONField(required=False, null=True)
     priority = models.IntegerField(default=0, db_index=True)
-    source = models.TextField(blank=True)
+    source = models.TextField(required=False)
     queue = models.CharField(default="default", max_length=255, db_index=True)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
-    unique_key = models.CharField(max_length=255, blank=True, db_index=True)
+    unique_key = models.CharField(max_length=255, required=False, db_index=True)
 
     # Retries
-    retry_job_request_uuid = models.UUIDField(blank=True, null=True)
+    retry_job_request_uuid = models.UUIDField(required=False, null=True)
 
     objects = JobResultQuerySet.as_manager()
 

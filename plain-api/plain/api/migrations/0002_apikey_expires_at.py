@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="apikey",
             name="expires_at",
-            field=models.DateTimeField(blank=True, null=True),
+            field=models.DateTimeField(required=False, null=True),
         ),
     ]

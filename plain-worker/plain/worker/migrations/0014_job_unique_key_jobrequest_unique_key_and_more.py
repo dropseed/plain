@@ -13,17 +13,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="job",
             name="unique_key",
-            field=models.CharField(blank=True, db_index=True, max_length=255),
+            field=models.CharField(required=False, db_index=True, max_length=255),
         ),
         migrations.AddField(
             model_name="jobrequest",
             name="unique_key",
-            field=models.CharField(blank=True, db_index=True, max_length=255),
+            field=models.CharField(required=False, db_index=True, max_length=255),
         ),
         migrations.AddField(
             model_name="jobresult",
             name="unique_key",
-            field=models.CharField(blank=True, db_index=True, max_length=255),
+            field=models.CharField(required=False, db_index=True, max_length=255),
         ),
         migrations.AddIndex(
             model_name="job",

@@ -13,11 +13,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="jobrequest",
             name="source",
-            field=models.TextField(blank=True),
+            field=models.TextField(required=False),
         ),
         migrations.AddField(
             model_name="jobresult",
             name="source",
-            field=models.TextField(blank=True),
+            field=models.TextField(required=False),
         ),
     ]

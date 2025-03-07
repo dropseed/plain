@@ -13,11 +13,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="notfoundlog",
             name="user_agent",
-            field=models.CharField(blank=True, max_length=512),
+            field=models.CharField(required=False, max_length=512),
         ),
         migrations.AlterField(
             model_name="redirectlog",
             name="user_agent",
-            field=models.CharField(blank=True, max_length=512),
+            field=models.CharField(required=False, max_length=512),
         ),
     ]

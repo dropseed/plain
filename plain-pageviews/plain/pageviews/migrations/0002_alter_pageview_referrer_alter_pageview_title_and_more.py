@@ -13,12 +13,12 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="pageview",
             name="referrer",
-            field=models.URLField(blank=True, max_length=1024),
+            field=models.URLField(required=False, max_length=1024),
         ),
         migrations.AlterField(
             model_name="pageview",
             name="title",
-            field=models.CharField(blank=True, max_length=512),
+            field=models.CharField(required=False, max_length=512),
         ),
         migrations.AlterField(
             model_name="pageview",

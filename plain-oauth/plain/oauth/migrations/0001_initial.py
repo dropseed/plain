@@ -28,15 +28,15 @@ class Migration(migrations.Migration):
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("provider_key", models.CharField(db_index=True, max_length=100)),
                 ("provider_user_id", models.CharField(db_index=True, max_length=100)),
-                ("access_token", models.CharField(blank=True, max_length=100)),
-                ("refresh_token", models.CharField(blank=True, max_length=100)),
+                ("access_token", models.CharField(required=False, max_length=100)),
+                ("refresh_token", models.CharField(required=False, max_length=100)),
                 (
                     "access_token_expires_at",
-                    models.DateTimeField(blank=True, null=True),
+                    models.DateTimeField(required=False, null=True),
                 ),
                 (
                     "refresh_token_expires_at",
-                    models.DateTimeField(blank=True, null=True),
+                    models.DateTimeField(required=False, null=True),
                 ),
                 (
                     "user",

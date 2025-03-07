@@ -27,19 +27,19 @@ class Migration(migrations.Migration):
                     models.UUIDField(default=uuid.uuid4, unique=True),
                 ),
                 ("job_class", models.CharField(db_index=True, max_length=255)),
-                ("parameters", models.JSONField(blank=True, null=True)),
+                ("parameters", models.JSONField(required=False, null=True)),
                 ("priority", models.IntegerField(db_index=True, default=0)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
                     "started_at",
-                    models.DateTimeField(blank=True, db_index=True, null=True),
+                    models.DateTimeField(required=False, db_index=True, null=True),
                 ),
                 (
                     "completed_at",
-                    models.DateTimeField(blank=True, db_index=True, null=True),
+                    models.DateTimeField(required=False, db_index=True, null=True),
                 ),
-                ("error", models.TextField(blank=True)),
+                ("error", models.TextField(required=False)),
             ],
             options={
                 "ordering": ["priority", "-created_at"],

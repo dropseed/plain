@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="oauthconnection",
             name="refresh_token",
-            field=models.CharField(blank=True, max_length=2000),
+            field=models.CharField(required=False, max_length=2000),
         ),
     ]

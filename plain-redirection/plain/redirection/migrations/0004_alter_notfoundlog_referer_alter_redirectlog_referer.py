@@ -13,13 +13,13 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="notfoundlog",
             name="referer",
-            field=models.CharField(blank=True, default=""),
+            field=models.CharField(required=False, default=""),
             preserve_default=False,
         ),
         migrations.AlterField(
             model_name="redirectlog",
             name="referer",
-            field=models.CharField(blank=True, default=""),
+            field=models.CharField(required=False, default=""),
             preserve_default=False,
         ),
     ]

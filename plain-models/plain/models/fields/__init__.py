@@ -127,7 +127,7 @@ class Field(RegisterLookupMixin):
     default_error_messages = {
         "invalid_choice": "Value %(value)r is not a valid choice.",
         "null": "This field cannot be null.",
-        "blank": "This field cannot be blank.",
+        "required": "This field is be required.",
         "unique": "A %(model_name)s with this %(field_label)s already exists.",
     }
     system_check_deprecated_details = None
@@ -136,7 +136,7 @@ class Field(RegisterLookupMixin):
     # Attributes that don't affect a column definition.
     # These attributes are ignored when altering the field.
     non_db_attrs = (
-        "blank",
+        "required",
         "choices",
         "db_column",
         "error_messages",
@@ -171,7 +171,7 @@ class Field(RegisterLookupMixin):
         primary_key=False,
         max_length=None,
         unique=False,
-        blank=False,
+        required=True,
         null=False,
         db_index=False,
         rel=None,
@@ -187,7 +187,7 @@ class Field(RegisterLookupMixin):
         self.name = None  # Set by set_attributes_from_name
         self.primary_key = primary_key
         self.max_length, self._unique = max_length, unique
-        self.blank, self.null = blank, null
+        self.required, self.null = required, null
         self.remote_field = rel
         self.is_relation = self.remote_field is not None
         self.default = default
@@ -523,7 +523,7 @@ class Field(RegisterLookupMixin):
             "primary_key": False,
             "max_length": None,
             "unique": False,
-            "blank": False,
+            "required": True,
             "null": False,
             "db_index": False,
             "default": NOT_PROVIDED,
@@ -724,8 +724,10 @@ class Field(RegisterLookupMixin):
         if value is None and not self.null:
             raise exceptions.ValidationError(self.error_messages["null"], code="null")
 
-        if not self.blank and value in self.empty_values:
-            raise exceptions.ValidationError(self.error_messages["blank"], code="blank")
+        if self.required and value in self.empty_values:
+            raise exceptions.ValidationError(
+                self.error_messages["required"], code="required"
+            )
 
     def clean(self, value, model_instance):
         """
@@ -1243,7 +1245,7 @@ class DateField(DateTimeCheckMixin, Field):
     def __init__(self, *, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
-            kwargs["blank"] = True
+            kwargs["required"] = False
         super().__init__(**kwargs)
 
     def _check_fix_default_value(self):
@@ -1272,7 +1274,7 @@ class DateField(DateTimeCheckMixin, Field):
         if self.auto_now_add:
             kwargs["auto_now_add"] = True
         if self.auto_now or self.auto_now_add:
-            del kwargs["blank"]
+            del kwargs["required"]
         return name, path, args, kwargs
 
     def get_internal_type(self):
@@ -1881,14 +1883,14 @@ class GenericIPAddressField(Field):
     def check(self, **kwargs):
         return [
             *super().check(**kwargs),
-            *self._check_blank_and_null_values(**kwargs),
+            *self._check_required_and_null_values(**kwargs),
         ]
 
-    def _check_blank_and_null_values(self, **kwargs):
-        if not getattr(self, "null", False) and getattr(self, "blank", False):
+    def _check_required_and_null_values(self, **kwargs):
+        if not getattr(self, "null", False) and getattr(self, "required", True):
             return [
                 preflight.Error(
-                    "GenericIPAddressFields cannot have blank=True if null=False, "
+                    "GenericIPAddressFields cannot have required=False if null=False, "
                     "as blank values are stored as nulls.",
                     obj=self,
                     id="fields.E150",
@@ -1954,13 +1956,13 @@ class NullBooleanField(BooleanField):
 
     def __init__(self, **kwargs):
         kwargs["null"] = True
-        kwargs["blank"] = True
+        kwargs["required"] = False
         super().__init__(**kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         del kwargs["null"]
-        del kwargs["blank"]
+        del kwargs["required"]
         return name, path, args, kwargs
 
 
@@ -2110,7 +2112,7 @@ class TimeField(DateTimeCheckMixin, Field):
     def __init__(self, *, auto_now=False, auto_now_add=False, **kwargs):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
-            kwargs["blank"] = True
+            kwargs["required"] = False
         super().__init__(**kwargs)
 
     def _check_fix_default_value(self):
@@ -2142,7 +2144,7 @@ class TimeField(DateTimeCheckMixin, Field):
         if self.auto_now_add is not False:
             kwargs["auto_now_add"] = self.auto_now_add
         if self.auto_now or self.auto_now_add:
-            del kwargs["blank"]
+            del kwargs["required"]
         return name, path, args, kwargs
 
     def get_internal_type(self):
@@ -2320,7 +2322,7 @@ class AutoFieldMixin:
     db_returning = True
 
     def __init__(self, *args, **kwargs):
-        kwargs["blank"] = True
+        kwargs["required"] = False
         super().__init__(*args, **kwargs)
 
     def check(self, **kwargs):
@@ -2343,7 +2345,7 @@ class AutoFieldMixin:
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        del kwargs["blank"]
+        del kwargs["required"]
         kwargs["primary_key"] = True
         return name, path, args, kwargs
 

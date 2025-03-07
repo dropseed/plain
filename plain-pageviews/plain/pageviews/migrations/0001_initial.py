@@ -17,17 +17,17 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True)),
                 ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("title", models.CharField(blank=True, max_length=255)),
+                ("title", models.CharField(required=False, max_length=255)),
                 ("url", models.URLField(db_index=True, max_length=255)),
-                ("referrer", models.URLField(blank=True, max_length=255)),
+                ("referrer", models.URLField(required=False, max_length=255)),
                 ("timestamp", models.DateTimeField(auto_now_add=True, db_index=True)),
                 (
                     "user_id",
-                    models.CharField(blank=True, db_index=True, max_length=255),
+                    models.CharField(required=False, db_index=True, max_length=255),
                 ),
                 (
                     "session_key",
-                    models.CharField(blank=True, db_index=True, max_length=255),
+                    models.CharField(required=False, db_index=True, max_length=255),
                 ),
             ],
             options={

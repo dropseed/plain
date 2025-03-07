@@ -271,7 +271,7 @@ class BaseModelForm(BaseForm, AltersData):
                 form_field = self.fields[field]
                 field_value = self.cleaned_data.get(field)
                 if (
-                    not f.blank
+                    f.required
                     and not form_field.required
                     and field_value in form_field.empty_values
                 ):
@@ -514,7 +514,6 @@ class ModelChoiceField(ChoiceField):
         required=True,
         initial=None,
         to_field_name=None,
-        blank=False,
         **kwargs,
     ):
         # Call Field instead of ChoiceField __init__() because we don't need
@@ -705,7 +704,7 @@ def modelfield_to_formfield(
     modelfield, form_class=None, choices_form_class=None, **kwargs
 ):
     defaults = {
-        "required": not modelfield.blank,
+        "required": modelfield.required,
     }
 
     if modelfield.has_default():
@@ -713,7 +712,7 @@ def modelfield_to_formfield(
 
     if modelfield.choices is not None:
         # Fields with choices get special treatment.
-        include_blank = modelfield.blank or not (
+        include_blank = not modelfield.required or not (
             modelfield.has_default() or "initial" in kwargs
         )
         defaults["choices"] = modelfield.get_choices(include_blank=include_blank)
@@ -806,7 +805,6 @@ def modelfield_to_formfield(
         return ModelChoiceField(
             queryset=modelfield.remote_field.model._default_manager,
             to_field_name=modelfield.remote_field.field_name,
-            blank=modelfield.blank,
             **defaults,
         )
 

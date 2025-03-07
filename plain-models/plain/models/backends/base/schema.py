@@ -395,7 +395,7 @@ class BaseDatabaseSchemaEditor:
         # This method allows testing its logic without a connection.
         if field.has_default():
             default = field.get_default()
-        elif not field.null and field.blank and field.empty_strings_allowed:
+        elif not field.null and not field.required and field.empty_strings_allowed:
             if field.get_internal_type() == "BinaryField":
                 default = b""
             else:
