@@ -186,4 +186,9 @@ class ManagerDescriptor:
                 f"Manager isn't accessible via {cls.__name__} instances"
             )
 
+        if cls._meta.abstract:
+            raise AttributeError(
+                f"Manager isn't available; {cls._meta.object_name} is abstract"
+            )
+
         return cls._meta.managers_map[self.manager.name]
