@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.31.0"
+version = "0.32.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -339,7 +339,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -379,7 +379,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-cache"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
@@ -458,7 +458,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-flags"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
@@ -537,7 +537,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-models"
-version = "0.20.1"
+version = "0.21.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -560,7 +560,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.13.0"
+version = "0.14.0"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
@@ -606,7 +606,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -651,7 +651,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
@@ -689,7 +689,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
@@ -755,7 +755,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-worker"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "plain-worker" }
 dependencies = [
     { name = "plain" },
