@@ -18,7 +18,7 @@ def validate_flag_name(value):
 
 @models.register_model
 class FlagResult(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     flag = models.ForeignKey("Flag", on_delete=models.CASCADE)
@@ -28,8 +28,11 @@ class FlagResult(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["flag", "key"], name="unique_flag_result_key"
-            )
+                fields=["flag", "key"], name="plainflags_flagresult_unique_key"
+            ),
+            models.UniqueConstraint(
+                fields=["uuid"], name="plainflags_flagresult_unique_uuid"
+            ),
         ]
 
     def __str__(self):
@@ -38,12 +41,10 @@ class FlagResult(models.Model):
 
 @models.register_model
 class Flag(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    name = models.CharField(
-        max_length=255, unique=True, validators=[validate_flag_name]
-    )
+    name = models.CharField(max_length=255, validators=[validate_flag_name])
 
     # Optional description that can be filled in after the flag is used/created
     description = models.TextField(required=False)
@@ -54,6 +55,16 @@ class Flag(models.Model):
 
     # To provide an easier way to see if a flag is still being used
     used_at = models.DateTimeField(required=False, allow_null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name"], name="plainflags_flag_unique_name"
+            ),
+            models.UniqueConstraint(
+                fields=["uuid"], name="plainflags_flag_unique_uuid"
+            ),
+        ]
 
     def __str__(self):
         return self.name

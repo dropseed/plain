@@ -5,7 +5,7 @@ from plain import models
 
 @models.register_model
 class Pageview(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4)
 
     url = models.URLField(max_length=1024, db_index=True)
     timestamp = models.DateTimeField(db_index=True, auto_now_add=True)
@@ -18,6 +18,11 @@ class Pageview(models.Model):
 
     class Meta:
         ordering = ["-timestamp"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["uuid"], name="plainpageviews_pageview_unique_uuid"
+            ),
+        ]
 
     def __str__(self):
         return self.url

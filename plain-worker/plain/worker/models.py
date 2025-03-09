@@ -20,7 +20,7 @@ class JobRequest(models.Model):
     """
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4)
 
     job_class = models.CharField(max_length=255, db_index=True)
     parameters = models.JSONField(required=False, allow_null=True)
@@ -52,8 +52,11 @@ class JobRequest(models.Model):
             models.UniqueConstraint(
                 fields=["job_class", "unique_key"],
                 condition=models.Q(unique_key__gt="", retry_attempt=0),
-                name="unique_job_class_unique_key",
-            )
+                name="plainworker_jobrequest_unique_job_class_key",
+            ),
+            models.UniqueConstraint(
+                fields=["uuid"], name="plainworker_jobrequest_unique_uuid"
+            ),
         ]
 
     def __str__(self):
@@ -113,7 +116,7 @@ class Job(models.Model):
     All active jobs are stored in this table.
     """
 
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     started_at = models.DateTimeField(required=False, allow_null=True, db_index=True)
 
@@ -136,6 +139,11 @@ class Job(models.Model):
             # Used to dedupe unique in-process jobs
             models.Index(
                 name="job_class_unique_key", fields=["job_class", "unique_key"]
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["uuid"], name="plainworker_job_unique_uuid"
             ),
         ]
 
@@ -259,7 +267,7 @@ class JobResult(models.Model):
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     # From the Job
@@ -291,6 +299,11 @@ class JobResult(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["uuid"], name="plainworker_jobresult_unique_uuid"
+            ),
+        ]
 
     def retry_job(self, delay: int | None = None):
         retry_attempt = self.retry_attempt + 1

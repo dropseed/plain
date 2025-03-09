@@ -11,7 +11,7 @@ def generate_token():
 
 @models.register_model
 class APIKey(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     expires_at = models.DateTimeField(required=False, allow_null=True)
@@ -19,7 +19,7 @@ class APIKey(models.Model):
 
     name = models.CharField(max_length=255, required=False)
 
-    token = models.CharField(max_length=40, default=generate_token, unique=True)
+    token = models.CharField(max_length=40, default=generate_token)
 
     # Connect to a user, for example, from your own model:
     # api_key = models.OneToOneField(
@@ -29,6 +29,16 @@ class APIKey(models.Model):
     #     allow_null=True,
     #     required=False,
     # )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["uuid"], name="plainapi_apikey_unique_uuid"
+            ),
+            models.UniqueConstraint(
+                fields=["token"], name="plainapi_apikey_unique_token"
+            ),
+        ]
 
     def __str__(self):
         return self.name or str(self.uuid)

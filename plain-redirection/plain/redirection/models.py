@@ -12,7 +12,7 @@ def _get_client_ip(request):
 
 @models.register_model
 class Redirect(models.Model):
-    from_pattern = models.CharField(max_length=255, unique=True)
+    from_pattern = models.CharField(max_length=255)
     to_pattern = models.CharField(max_length=255)
     http_status = models.PositiveSmallIntegerField(
         default=301
@@ -29,6 +29,12 @@ class Redirect(models.Model):
 
     class Meta:
         ordering = ["order", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["from_pattern"],
+                name="plainredirects_redirect_unique_from_pattern",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.from_pattern}"

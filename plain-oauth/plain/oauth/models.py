@@ -45,7 +45,7 @@ class OAuthConnection(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["provider_key", "provider_user_id"],
-                name="unique_oauth_provider_user_id",
+                name="plainoauth_oauthconnection_unique_provider_key_user_id",
             )
         ]
         ordering = ("provider_key",)
