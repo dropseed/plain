@@ -316,33 +316,32 @@ class RelatedField(FieldCacheMixin, Field):
 
         self.opts = cls._meta
 
-        if not cls._meta.abstract:
-            if self.remote_field.related_name:
-                related_name = self.remote_field.related_name
-            else:
-                related_name = self.opts.default_related_name
-            if related_name:
-                related_name %= {
-                    "class": cls.__name__.lower(),
-                    "model_name": cls._meta.model_name.lower(),
-                    "package_label": cls._meta.package_label.lower(),
-                }
-                self.remote_field.related_name = related_name
+        if self.remote_field.related_name:
+            related_name = self.remote_field.related_name
+        else:
+            related_name = self.opts.default_related_name
+        if related_name:
+            related_name %= {
+                "class": cls.__name__.lower(),
+                "model_name": cls._meta.model_name.lower(),
+                "package_label": cls._meta.package_label.lower(),
+            }
+            self.remote_field.related_name = related_name
 
-            if self.remote_field.related_query_name:
-                related_query_name = self.remote_field.related_query_name % {
-                    "class": cls.__name__.lower(),
-                    "package_label": cls._meta.package_label.lower(),
-                }
-                self.remote_field.related_query_name = related_query_name
+        if self.remote_field.related_query_name:
+            related_query_name = self.remote_field.related_query_name % {
+                "class": cls.__name__.lower(),
+                "package_label": cls._meta.package_label.lower(),
+            }
+            self.remote_field.related_query_name = related_query_name
 
-            def resolve_related_class(model, related, field):
-                field.remote_field.model = related
-                field.do_related_class(related, model)
+        def resolve_related_class(model, related, field):
+            field.remote_field.model = related
+            field.do_related_class(related, model)
 
-            lazy_related_operation(
-                resolve_related_class, cls, self.remote_field.model, field=self
-            )
+        lazy_related_operation(
+            resolve_related_class, cls, self.remote_field.model, field=self
+        )
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -662,20 +661,13 @@ class ForeignObject(RelatedField):
     @staticmethod
     def get_instance_value_for_fields(instance, fields):
         ret = []
-        opts = instance._meta
         for field in fields:
             # Gotcha: in some cases (like fixture loading) a model can have
             # different values in parent_ptr_id and parent's id. So, use
             # instance.pk (that is, parent_ptr_id) when asked for instance.id.
             if field.primary_key:
-                possible_parent_link = opts.get_ancestor_link(field.model)
-                if (
-                    not possible_parent_link
-                    or possible_parent_link.primary_key
-                    or possible_parent_link.model._meta.abstract
-                ):
-                    ret.append(instance.pk)
-                    continue
+                ret.append(instance.pk)
+                continue
             ret.append(getattr(instance, field.attname))
         return tuple(ret)
 
@@ -1597,19 +1589,8 @@ class ManyToManyField(RelatedField):
                 join2infos = linkfield1.get_path_info(filtered_relation)
             else:
                 join2infos = linkfield1.path_infos
-        # Get join infos between the last model of join 1 and the first model
-        # of join 2. Assume the only reason these may differ is due to model
-        # inheritance.
-        join1_final = join1infos[-1].to_opts
-        join2_initial = join2infos[0].from_opts
-        if join1_final is join2_initial:
-            intermediate_infos = []
-        elif issubclass(join1_final.model, join2_initial.model):
-            intermediate_infos = join1_final.get_path_to_parent(join2_initial.model)
-        else:
-            intermediate_infos = join2_initial.get_path_from_parent(join1_final.model)
 
-        return [*join1infos, *intermediate_infos, *join2infos]
+        return [*join1infos, *join2infos]
 
     def get_path_info(self, filtered_relation=None):
         return self._get_path_info(direct=True, filtered_relation=filtered_relation)
@@ -1713,21 +1694,19 @@ class ManyToManyField(RelatedField):
         super().contribute_to_class(cls, name, **kwargs)
 
         # The intermediate m2m model is not auto created if:
-        #  1) There is a manually specified intermediate, or
-        #  2) The class owning the m2m field is abstract.
-        if not cls._meta.abstract:
-            if self.remote_field.through:
+        #  1) There is a manually specified intermediate
+        if self.remote_field.through:
 
-                def resolve_through_model(_, model, field):
-                    field.remote_field.through = model
+            def resolve_through_model(_, model, field):
+                field.remote_field.through = model
 
-                lazy_related_operation(
-                    resolve_through_model, cls, self.remote_field.through, field=self
-                )
-            else:
-                self.remote_field.through = create_many_to_many_intermediary_model(
-                    self, cls
-                )
+            lazy_related_operation(
+                resolve_through_model, cls, self.remote_field.through, field=self
+            )
+        else:
+            self.remote_field.through = create_many_to_many_intermediary_model(
+                self, cls
+            )
 
         # Add the descriptor for the m2m relation.
         setattr(cls, self.name, ManyToManyDescriptor(self.remote_field, reverse=False))

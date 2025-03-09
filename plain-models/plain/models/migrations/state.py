@@ -35,7 +35,7 @@ def _get_related_models(m):
         if issubclass(subclass, models.Model)
     ]
     related_fields_models = set()
-    for f in m._meta.get_fields(include_parents=True, include_hidden=True):
+    for f in m._meta.get_fields(include_hidden=True):
         if (
             f.is_relation
             and f.related_model is not None
@@ -716,10 +716,7 @@ class ModelState:
         def flatten_bases(model):
             bases = []
             for base in model.__bases__:
-                if hasattr(base, "_meta") and base._meta.abstract:
-                    bases.extend(flatten_bases(base))
-                else:
-                    bases.append(base)
+                bases.append(base)
             return bases
 
         # We can't rely on __mro__ directly because we only want to flatten

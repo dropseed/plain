@@ -201,11 +201,6 @@ class Collector:
         # parent when parent delete is cascading to child.
         opts = model._meta
         return (
-            all(
-                link == from_field
-                for link in opts.concrete_model._meta.parents.values()
-            )
-            and
             # Foreign keys pointing to this model.
             all(
                 related.field.remote_field.on_delete is DO_NOTHING
@@ -236,7 +231,6 @@ class Collector:
         nullable=False,
         collect_related=True,
         reverse_dependency=False,
-        keep_parents=False,
         fail_on_restricted=True,
     ):
         """
@@ -253,8 +247,6 @@ class Collector:
         current model, rather than after. (Needed for cascading to parent
         models, the one case in which the cascade follows the forwards
         direction of an FK rather than the reverse direction.)
-
-        If 'keep_parents' is True, data of parent model's will be not deleted.
 
         If 'fail_on_restricted' is False, error won't be raised even if it's
         prohibited to delete such objects due to RESTRICT, that defers
@@ -273,31 +265,12 @@ class Collector:
 
         model = new_objs[0].__class__
 
-        if not keep_parents:
-            # Recursively collect concrete model's parent models, but not their
-            # related objects. These will be found by meta.get_fields()
-            concrete_model = model._meta.concrete_model
-            for ptr in concrete_model._meta.parents.values():
-                if ptr:
-                    parent_objs = [getattr(obj, ptr.name) for obj in new_objs]
-                    self.collect(
-                        parent_objs,
-                        source=model,
-                        collect_related=False,
-                        reverse_dependency=True,
-                        fail_on_restricted=False,
-                    )
         if not collect_related:
             return
 
-        if keep_parents:
-            parents = set(model._meta.get_parent_list())
         model_fast_deletes = defaultdict(list)
         protected_objects = defaultdict(list)
         for related in get_candidate_relations_to_delete(model._meta):
-            # Preserve parent reverse relationships if keep_parents=True.
-            if keep_parents and related.model in parents:
-                continue
             field = related.field
             on_delete = field.remote_field.on_delete
             if on_delete == DO_NOTHING:

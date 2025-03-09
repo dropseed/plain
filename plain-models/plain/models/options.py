@@ -9,8 +9,7 @@ from plain.models.constraints import UniqueConstraint
 from plain.models.db import connections
 from plain.models.fields import BigAutoField
 from plain.models.manager import Manager
-from plain.models.query_utils import PathInfo
-from plain.utils.datastructures import ImmutableList, OrderedSet
+from plain.utils.datastructures import ImmutableList
 from plain.utils.functional import cached_property
 
 PROXY_PARENTS = object()
@@ -28,7 +27,6 @@ DEFAULT_NAMES = (
     "ordering",
     "get_latest_by",
     "package_label",
-    "abstract",
     "auto_created",
     "models_registry",
     "default_related_name",
@@ -83,13 +81,11 @@ class Options:
         self.meta = meta
         self.pk = None
         self.auto_field = None
-        self.abstract = False
 
         # For any non-abstract class, the concrete class is the model
         # in the end of the proxy_for_model chain. In particular, for
         # concrete models, the concrete_model is always the class itself.
         self.concrete_model = None
-        self.parents = {}
         self.auto_created = False
 
         # List of all lookups defined in ForeignKey 'limit_choices_to' options
@@ -142,10 +138,9 @@ class Options:
 
             # Package label/class name interpolation for names of constraints and
             # indexes.
-            if not getattr(cls._meta, "abstract", False):
-                for attr_name in {"constraints", "indexes"}:
-                    objs = getattr(self, attr_name, [])
-                    setattr(self, attr_name, self._format_names_with_class(cls, objs))
+            for attr_name in {"constraints", "indexes"}:
+                objs = getattr(self, attr_name, [])
+                setattr(self, attr_name, self._format_names_with_class(cls, objs))
 
             # Any leftover attributes must be invalid.
             if meta_attrs != {}:
@@ -178,23 +173,8 @@ class Options:
 
     def _prepare(self, model):
         if self.pk is None:
-            if self.parents:
-                # Promote the first parent link in lieu of adding yet another
-                # field.
-                field = next(iter(self.parents.values()))
-                # Look for a local field with the same name as the
-                # first parent link. If a local field has already been
-                # created, use it instead of promoting the parent
-                already_created = [
-                    fld for fld in self.local_fields if fld.name == field.name
-                ]
-                if already_created:
-                    field = already_created[0]
-                field.primary_key = True
-                self.setup_pk(field)
-            else:
-                auto = BigAutoField(primary_key=True, auto_created=True)
-                model.add_to_class("id", auto)
+            auto = BigAutoField(primary_key=True, auto_created=True)
+            model.add_to_class("id", auto)
 
     def add_manager(self, manager):
         self.local_managers.append(manager)
@@ -494,108 +474,6 @@ class Options:
                 f"{self.object_name} has no field named '{field_name}'"
             )
 
-    def get_base_chain(self, model):
-        """
-        Return a list of parent classes leading to `model` (ordered from
-        closest to most distant ancestor). This has to handle the case where
-        `model` is a grandparent or even more distant relation.
-        """
-        if not self.parents:
-            return []
-        if model in self.parents:
-            return [model]
-        for parent in self.parents:
-            res = parent._meta.get_base_chain(model)
-            if res:
-                res.insert(0, parent)
-                return res
-        return []
-
-    def get_parent_list(self):
-        """
-        Return all the ancestors of this model as a list ordered by MRO.
-        Useful for determining if something is an ancestor, regardless of lineage.
-        """
-        result = OrderedSet(self.parents)
-        for parent in self.parents:
-            for ancestor in parent._meta.get_parent_list():
-                result.add(ancestor)
-        return list(result)
-
-    def get_ancestor_link(self, ancestor):
-        """
-        Return the field on the current model which points to the given
-        "ancestor". This is possible an indirect link (a pointer to a parent
-        model, which points, eventually, to the ancestor). Used when
-        constructing table joins for model inheritance.
-
-        Return None if the model isn't an ancestor of this one.
-        """
-        if ancestor in self.parents:
-            return self.parents[ancestor]
-        for parent in self.parents:
-            # Tries to get a link field from the immediate parent
-            parent_link = parent._meta.get_ancestor_link(ancestor)
-            if parent_link:
-                # In case of a proxied model, the first link
-                # of the chain to the ancestor is that parent
-                # links
-                return self.parents[parent] or parent_link
-
-    def get_path_to_parent(self, parent):
-        """
-        Return a list of PathInfos containing the path from the current
-        model to the parent model, or an empty list if parent is not a
-        parent of the current model.
-        """
-        if self.model is parent:
-            return []
-        # Skip the chain of proxy to the concrete proxied model.
-        proxied_model = self.concrete_model
-        path = []
-        opts = self
-        for int_model in self.get_base_chain(parent):
-            if int_model is proxied_model:
-                opts = int_model._meta
-            else:
-                final_field = opts.parents[int_model]
-                targets = (final_field.remote_field.get_related_field(),)
-                opts = int_model._meta
-                path.append(
-                    PathInfo(
-                        from_opts=final_field.model._meta,
-                        to_opts=opts,
-                        target_fields=targets,
-                        join_field=final_field,
-                        m2m=False,
-                        direct=True,
-                        filtered_relation=None,
-                    )
-                )
-        return path
-
-    def get_path_from_parent(self, parent):
-        """
-        Return a list of PathInfos containing the path from the parent
-        model to the current model, or an empty list if parent is not a
-        parent of the current model.
-        """
-        if self.model is parent:
-            return []
-        model = self.concrete_model
-        # Get a reversed base chain including both the current and parent
-        # models.
-        chain = model._meta.get_base_chain(parent)
-        chain.reverse()
-        chain.append(model)
-        # Construct a list of the PathInfos between models in chain.
-        path = []
-        for i, ancestor in enumerate(chain[:-1]):
-            child = chain[i + 1]
-            link = child._meta.get_ancestor_link(ancestor)
-            path.extend(link.reverse_path_infos)
-        return path
-
     def _populate_directed_relation_graph(self):
         """
         This method is used by each model to find its reverse objects. As this
@@ -608,13 +486,10 @@ class Options:
         all_models = self.models_registry.get_models(include_auto_created=True)
         for model in all_models:
             opts = model._meta
-            # Abstract model's fields are copied to child models, hence we will
-            # see the fields from the child models.
-            if opts.abstract:
-                continue
+
             fields_with_relations = (
                 f
-                for f in opts._get_fields(reverse=False, include_parents=False)
+                for f in opts._get_fields(reverse=False)
                 if f.is_relation and f.related_model is not None
             )
             for f in fields_with_relations:
@@ -647,33 +522,27 @@ class Options:
             for cache_key in self.FORWARD_PROPERTIES:
                 if cache_key in self.__dict__:
                     delattr(self, cache_key)
-        if reverse and not self.abstract:
+        if reverse:
             for cache_key in self.REVERSE_PROPERTIES:
                 if cache_key in self.__dict__:
                     delattr(self, cache_key)
         self._get_fields_cache = {}
 
-    def get_fields(self, include_parents=True, include_hidden=False):
+    def get_fields(self, include_hidden=False):
         """
         Return a list of fields associated to the model. By default, include
         forward and reverse fields, fields derived from inheritance, but not
         hidden fields. The returned fields can be changed using the parameters:
 
-        - include_parents: include fields derived from inheritance
         - include_hidden:  include fields that have a related_name that
                            starts with a "+"
         """
-        if include_parents is False:
-            include_parents = PROXY_PARENTS
-        return self._get_fields(
-            include_parents=include_parents, include_hidden=include_hidden
-        )
+        return self._get_fields(include_hidden=include_hidden)
 
     def _get_fields(
         self,
         forward=True,
         reverse=True,
-        include_parents=True,
         include_hidden=False,
         seen_models=None,
     ):
@@ -682,14 +551,8 @@ class Options:
         * If forward=True, then fields defined on this model are returned.
         * If reverse=True, then relations pointing to this model are returned.
         * If include_hidden=True, then fields with is_hidden=True are returned.
-        * The include_parents argument toggles if fields from parent models
-          should be included. It has three values: True, False, and
-          PROXY_PARENTS. When set to PROXY_PARENTS, the call will return all
-          fields defined for the current model or any of its parents in the
-          parent chain to the model's concrete model.
         """
-        if include_parents not in (True, False, PROXY_PARENTS):
-            raise TypeError(f"Invalid argument for include_parents: {include_parents}")
+
         # This helper function is used to allow recursion in ``get_fields()``
         # implementation and to provide a fast way for Plain's internals to
         # access specific subsets of fields.
@@ -702,7 +565,7 @@ class Options:
         seen_models.add(self.model)
 
         # Creates a cache key composed of all arguments
-        cache_key = (forward, reverse, include_parents, include_hidden, topmost_call)
+        cache_key = (forward, reverse, include_hidden, topmost_call)
 
         try:
             # In order to avoid list manipulation. Always return a shallow copy
@@ -712,32 +575,7 @@ class Options:
             pass
 
         fields = []
-        # Recursively call _get_fields() on each parent, with the same
-        # options provided in this call.
-        if include_parents is not False:
-            for parent in self.parents:
-                # In diamond inheritance it is possible that we see the same
-                # model from two different routes. In that case, avoid adding
-                # fields from the same parent again.
-                if parent in seen_models:
-                    continue
-                if (
-                    parent._meta.concrete_model != self.concrete_model
-                    and include_parents == PROXY_PARENTS
-                ):
-                    continue
-                for obj in parent._meta._get_fields(
-                    forward=forward,
-                    reverse=reverse,
-                    include_parents=include_parents,
-                    include_hidden=include_hidden,
-                    seen_models=seen_models,
-                ):
-                    if (
-                        not getattr(obj, "parent_link", False)
-                        or obj.model == self.concrete_model
-                    ):
-                        fields.append(obj)
+
         if reverse:
             # Tree is computed once and cached until the app cache is expired.
             # It is composed of a list of fields pointing to the current model
@@ -808,8 +646,6 @@ class Options:
         """
         return [
             field
-            for field in self._get_fields(
-                forward=True, reverse=False, include_parents=PROXY_PARENTS
-            )
+            for field in self._get_fields(forward=True, reverse=False)
             if getattr(field, "db_returning", False)
         ]

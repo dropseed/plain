@@ -173,26 +173,8 @@ class DeferredAttribute:
         data = instance.__dict__
         field_name = self.field.attname
         if field_name not in data:
-            # Let's see if the field is part of the parent chain. If so we
-            # might be able to reuse the already loaded value. Refs #18343.
-            val = self._check_parent_chain(instance)
-            if val is None:
-                instance.refresh_from_db(fields=[field_name])
-            else:
-                data[field_name] = val
+            instance.refresh_from_db(fields=[field_name])
         return data[field_name]
-
-    def _check_parent_chain(self, instance):
-        """
-        Check if the field value can be fetched from a parent field already
-        loaded in the instance. This can be done if the to-be fetched
-        field is a primary key field.
-        """
-        opts = instance._meta
-        link_field = opts.get_ancestor_link(self.field.model)
-        if self.field.primary_key and self.field != link_field:
-            return getattr(instance, link_field.attname)
-        return None
 
 
 class class_or_instance_method:
@@ -375,11 +357,7 @@ def check_rel_lookup_compatibility(model, target_opts, field):
     """
 
     def check(opts):
-        return (
-            model._meta.concrete_model == opts.concrete_model
-            or opts.concrete_model in model._meta.get_parent_list()
-            or model in opts.get_parent_list()
-        )
+        return model._meta.concrete_model == opts.concrete_model
 
     # If the field is a primary key, then doing a query against the field's
     # model is ok, too. Consider the case:

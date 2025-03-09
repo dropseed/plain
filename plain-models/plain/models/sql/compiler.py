@@ -277,16 +277,6 @@ class SQLCompiler:
             related_klass_infos = self.get_related_selections(select, select_mask)
             klass_info["related_klass_infos"] = related_klass_infos
 
-            def get_select_from_parent(klass_info):
-                for ki in klass_info["related_klass_infos"]:
-                    if ki["from_parent"]:
-                        ki["select_fields"] = (
-                            klass_info["select_fields"] + ki["select_fields"]
-                        )
-                    get_select_from_parent(ki)
-
-            get_select_from_parent(klass_info)
-
         ret = []
         col_idx = 1
         for col, alias in select:
@@ -935,9 +925,7 @@ class SQLCompiler:
             # Finally do cleanup - get rid of the joins we created above.
             self.query.reset_refcounts(refcounts_before)
 
-    def get_default_columns(
-        self, select_mask, start_alias=None, opts=None, from_parent=None
-    ):
+    def get_default_columns(self, select_mask, start_alias=None, opts=None):
         """
         Compute the default columns for selecting every field in the base
         model. Will sometimes be called to pull in related models (e.g. via
@@ -954,10 +942,6 @@ class SQLCompiler:
             if (opts := self.query.get_meta()) is None:
                 return result
         start_alias = start_alias or self.query.get_initial_alias()
-        # The 'seen_models' is used to optimize checking the needed parent
-        # alias for a given field. This also includes None -> start_alias to
-        # be used by local fields.
-        seen_models = {None: start_alias}
 
         for field in opts.concrete_fields:
             model = field.model._meta.concrete_model
@@ -965,23 +949,10 @@ class SQLCompiler:
             # will assign None if the field belongs to this model.
             if model == opts.model:
                 model = None
-            if (
-                from_parent
-                and model is not None
-                and issubclass(
-                    from_parent._meta.concrete_model, model._meta.concrete_model
-                )
-            ):
-                # Avoid loading data for already loaded parents.
-                # We end up here in the case select_related() resolution
-                # proceeds from parent model to child model. In that case the
-                # parent model data is already present in the SELECT clause,
-                # and we want to avoid reloading the same data again.
-                continue
             if select_mask and field not in select_mask:
                 continue
-            alias = self.query.join_parent_model(opts, model, start_alias, seen_models)
-            column = field.get_col(alias)
+
+            column = field.get_col(start_alias)
             result.append(column)
         return result
 
@@ -1206,7 +1177,6 @@ class SQLCompiler:
                 "remote_setter": f.remote_field.set_cached_value
                 if f.unique
                 else lambda x, y: None,
-                "from_parent": False,
             }
             related_klass_infos.append(klass_info)
             select_fields = []
@@ -1254,14 +1224,12 @@ class SQLCompiler:
                     [related_field_name], opts, root_alias
                 )
                 alias = join_info.joins[-1]
-                from_parent = issubclass(model, opts.model) and model is not opts.model
                 klass_info = {
                     "model": model,
                     "field": related_field,
                     "reverse": True,
                     "local_setter": related_field.remote_field.set_cached_value,
                     "remote_setter": related_field.set_cached_value,
-                    "from_parent": from_parent,
                 }
                 related_klass_infos.append(klass_info)
                 select_fields = []
@@ -1269,7 +1237,6 @@ class SQLCompiler:
                     related_select_mask,
                     start_alias=alias,
                     opts=model._meta,
-                    from_parent=opts.model,
                 )
                 for col in columns:
                     select_fields.append(len(select))
@@ -1309,9 +1276,6 @@ class SQLCompiler:
                     )
                     model = join_opts.model
                     alias = joins[-1]
-                    from_parent = (
-                        issubclass(model, opts.model) and model is not opts.model
-                    )
                     klass_info = {
                         "model": model,
                         "field": final_field,
@@ -1322,7 +1286,6 @@ class SQLCompiler:
                             else local_setter_noop
                         ),
                         "remote_setter": partial(remote_setter, name),
-                        "from_parent": from_parent,
                     }
                     related_klass_infos.append(klass_info)
                     select_fields = []
@@ -1331,7 +1294,6 @@ class SQLCompiler:
                         field_select_mask,
                         start_alias=alias,
                         opts=model._meta,
-                        from_parent=opts.model,
                     )
                     for col in columns:
                         select_fields.append(len(select))
@@ -1366,25 +1328,6 @@ class SQLCompiler:
         the query.
         """
 
-        def _get_parent_klass_info(klass_info):
-            concrete_model = klass_info["model"]._meta.concrete_model
-            for parent_model, parent_link in concrete_model._meta.parents.items():
-                parent_list = parent_model._meta.get_parent_list()
-                yield {
-                    "model": parent_model,
-                    "field": parent_link,
-                    "reverse": False,
-                    "select_fields": [
-                        select_index
-                        for select_index in klass_info["select_fields"]
-                        # Selected columns from a model or its parents.
-                        if (
-                            self.select[select_index][0].target.model == parent_model
-                            or self.select[select_index][0].target.model in parent_list
-                        )
-                    ],
-                }
-
         def _get_first_selected_col_from_model(klass_info):
             """
             Find the first selected column from a model. If it doesn't exist,
@@ -1414,10 +1357,6 @@ class SQLCompiler:
                     yield LOOKUP_SEP.join(path)
                 queue.extend(
                     (path, klass_info)
-                    for klass_info in _get_parent_klass_info(klass_info)
-                )
-                queue.extend(
-                    (path, klass_info)
                     for klass_info in klass_info.get("related_klass_infos", [])
                 )
 
@@ -1431,10 +1370,7 @@ class SQLCompiler:
                 col = _get_first_selected_col_from_model(klass_info)
             else:
                 for part in name.split(LOOKUP_SEP):
-                    klass_infos = (
-                        *klass_info.get("related_klass_infos", []),
-                        *_get_parent_klass_info(klass_info),
-                    )
+                    klass_infos = (*klass_info.get("related_klass_infos", []),)
                     for related_klass_info in klass_infos:
                         field = related_klass_info["field"]
                         if related_klass_info["reverse"]:
@@ -2002,18 +1938,10 @@ class SQLUpdateCompiler(SQLCompiler):
         fields = [meta.pk.name]
         related_ids_index = []
         for related in self.query.related_updates:
-            if all(
-                path.join_field.primary_key for path in meta.get_path_to_parent(related)
-            ):
-                # If a primary key chain exists to the targeted related update,
-                # then the meta.pk value can be used for it.
-                related_ids_index.append((related, 0))
-            else:
-                # This branch will only be reached when updating a field of an
-                # ancestor that is not part of the primary key chain of a MTI
-                # tree.
-                related_ids_index.append((related, len(fields)))
-                fields.append(related._meta.pk.name)
+            # If a primary key chain exists to the targeted related update,
+            # then the meta.pk value can be used for it.
+            related_ids_index.append((related, 0))
+
         query.add_fields(fields)
         super().pre_sql_setup()
 

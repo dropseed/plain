@@ -43,7 +43,6 @@ def _all_related_fields(model):
             forward=False,
             reverse=True,
             include_hidden=True,
-            include_parents=False,
         ),
         key=operator.attrgetter("name"),
     )

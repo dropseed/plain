@@ -23,9 +23,6 @@ class Migration(migrations.Migration):
                     models.DateTimeField(db_index=True),
                 ),
             ],
-            options={
-                "abstract": False,
-            },
             managers=[
                 ("objects", plain.sessions.models.SessionManager()),
             ],

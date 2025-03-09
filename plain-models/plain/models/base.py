@@ -8,7 +8,6 @@ from plain import preflight
 from plain.exceptions import (
     NON_FIELD_ERRORS,
     FieldDoesNotExist,
-    FieldError,
     MultipleObjectsReturned,
     ObjectDoesNotExist,
     ValidationError,
@@ -23,18 +22,15 @@ from plain.models.db import (
     connections,
     router,
 )
-from plain.models.deletion import CASCADE, Collector
+from plain.models.deletion import Collector
 from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import (
     ForeignObjectRel,
-    OneToOneField,
-    resolve_relation,
 )
 from plain.models.manager import Manager
 from plain.models.options import Options
 from plain.models.query import F, Q
-from plain.models.utils import make_model_tuple
 from plain.packages import packages_registry
 from plain.utils.encoding import force_str
 from plain.utils.hashable import make_hashable
@@ -51,24 +47,6 @@ class Deferred:
 DEFERRED = Deferred()
 
 
-def subclass_exception(name, bases, module, attached_to):
-    """
-    Create exception subclass. Used by ModelBase below.
-
-    The exception is created in a way that allows it to be pickled, assuming
-    that the returned exception class will be added as an attribute to the
-    'attached_to' class.
-    """
-    return type(
-        name,
-        bases,
-        {
-            "__module__": module,
-            "__qualname__": f"{attached_to.__qualname__}.{name}",
-        },
-    )
-
-
 def _has_contribute_to_class(value):
     # Only call contribute_to_class() if it's bound.
     return not inspect.isclass(value) and hasattr(value, "contribute_to_class")
@@ -78,206 +56,50 @@ class ModelBase(type):
     """Metaclass for all models."""
 
     def __new__(cls, name, bases, attrs, **kwargs):
-        super_new = super().__new__
+        # Don't do any of this for the root models.Model class.
+        if not bases:
+            return super().__new__(cls, name, bases, attrs)
 
-        # Also ensure initialization is only performed for subclasses of Model
-        # (excluding Model class itself).
-        parents = [b for b in bases if isinstance(b, ModelBase)]
-        if not parents:
-            return super_new(cls, name, bases, attrs)
+        for base in bases:
+            # Models are required to directly inherit from model.Model, not a subclass of it.
+            if issubclass(base, Model) and base is not Model:
+                raise TypeError(
+                    f"A model can't extend another model: {name} extends {base}"
+                )
+            # Meta has to be defined on the model itself.
+            if hasattr(base, "Meta"):
+                raise TypeError(
+                    "Meta can only be defined on a model itself, not a parent class: "
+                    f"{name} extends {base}"
+                )
 
-        # Create the class.
-        module = attrs.pop("__module__")
-        new_attrs = {"__module__": module}
-        classcell = attrs.pop("__classcell__", None)
-        if classcell is not None:
-            new_attrs["__classcell__"] = classcell
-        attr_meta = attrs.pop("Meta", None)
-        # Pass all attrs without a (Plain-specific) contribute_to_class()
-        # method to type.__new__() so that they're properly initialized
-        # (i.e. __set_name__()).
-        contributable_attrs = {}
-        for obj_name, obj in attrs.items():
-            if _has_contribute_to_class(obj):
-                contributable_attrs[obj_name] = obj
-            else:
-                new_attrs[obj_name] = obj
-        new_class = super_new(cls, name, bases, new_attrs, **kwargs)
+        new_class = super().__new__(cls, name, bases, attrs, **kwargs)
 
-        abstract = getattr(attr_meta, "abstract", False)
-        meta = attr_meta or getattr(new_class, "Meta", None)
-        base_meta = getattr(new_class, "_meta", None)
+        new_class._setup_meta()
+        new_class._add_exceptions()
 
-        package_label = None
+        # Now go back over all the attrs on this class see if they have a contribute_to_class() method.
+        # Attributes with contribute_to_class are fields, meta options, and managers.
+        for attr_name, attr_value in inspect.getmembers(new_class):
+            if attr_name.startswith("_"):
+                continue
 
-        # Look for an application configuration to attach the model to.
-        package_config = packages_registry.get_containing_package_config(module)
-
-        if getattr(meta, "package_label", None) is None:
-            if package_config is None:
-                if not abstract:
-                    raise RuntimeError(
-                        f"Model class {module}.{name} doesn't declare an explicit "
-                        "package_label and isn't in an application in "
-                        "INSTALLED_PACKAGES."
-                    )
-
-            else:
-                package_label = package_config.label
-
-        new_class.add_to_class("_meta", Options(meta, package_label))
-        if not abstract:
-            new_class.add_to_class(
-                "DoesNotExist",
-                subclass_exception(
-                    "DoesNotExist",
-                    tuple(
-                        x.DoesNotExist
-                        for x in parents
-                        if hasattr(x, "_meta") and not x._meta.abstract
-                    )
-                    or (ObjectDoesNotExist,),
-                    module,
-                    attached_to=new_class,
-                ),
-            )
-            new_class.add_to_class(
-                "MultipleObjectsReturned",
-                subclass_exception(
-                    "MultipleObjectsReturned",
-                    tuple(
-                        x.MultipleObjectsReturned
-                        for x in parents
-                        if hasattr(x, "_meta") and not x._meta.abstract
-                    )
-                    or (MultipleObjectsReturned,),
-                    module,
-                    attached_to=new_class,
-                ),
-            )
-            if base_meta and not base_meta.abstract:
-                # Non-abstract child classes inherit some attributes from their
-                # non-abstract parent (unless an ABC comes before it in the
-                # method resolution order).
-                if not hasattr(meta, "ordering"):
-                    new_class._meta.ordering = base_meta.ordering
-                if not hasattr(meta, "get_latest_by"):
-                    new_class._meta.get_latest_by = base_meta.get_latest_by
-
-        # Add remaining attributes (those with a contribute_to_class() method)
-        # to the class.
-        for obj_name, obj in contributable_attrs.items():
-            new_class.add_to_class(obj_name, obj)
-
-        # All the fields of any type declared on this model
-        new_fields = chain(
-            new_class._meta.local_fields,
-            new_class._meta.local_many_to_many,
-        )
-        field_names = {f.name for f in new_fields}
+            if _has_contribute_to_class(attr_value):
+                if attr_name not in attrs:
+                    # If the field came from an inherited class/mixin,
+                    # we need to make a copy of it to avoid altering the
+                    # original class and other classes that inherit from it.
+                    field = copy.deepcopy(attr_value)
+                else:
+                    field = attr_value
+                new_class.add_to_class(attr_name, field)
 
         new_class._meta.concrete_model = new_class
 
-        # Collect the parent links for multi-table inheritance.
-        parent_links = {}
-        for base in reversed([new_class] + parents):
-            # Conceptually equivalent to `if base is Model`.
-            if not hasattr(base, "_meta"):
-                continue
-            # Skip concrete parent classes.
-            if base != new_class and not base._meta.abstract:
-                continue
-            # Locate OneToOneField instances.
-            for field in base._meta.local_fields:
-                if isinstance(field, OneToOneField) and field.remote_field.parent_link:
-                    related = resolve_relation(new_class, field.remote_field.model)
-                    parent_links[make_model_tuple(related)] = field
-
-        # Track fields inherited from base models.
-        inherited_attributes = set()
-        # Do the appropriate setup for any model parents.
-        for base in new_class.mro():
-            if base not in parents or not hasattr(base, "_meta"):
-                # Things without _meta aren't functional models, so they're
-                # uninteresting parents.
-                inherited_attributes.update(base.__dict__)
-                continue
-
-            parent_fields = base._meta.local_fields + base._meta.local_many_to_many
-            if not base._meta.abstract:
-                # Check for clashes between locally declared fields and those
-                # on the base classes.
-                for field in parent_fields:
-                    if field.name in field_names:
-                        raise FieldError(
-                            f"Local field {field.name!r} in class {name!r} clashes with field of "
-                            f"the same name from base class {base.__name__!r}."
-                        )
-                    else:
-                        inherited_attributes.add(field.name)
-
-                # Concrete classes...
-                base = base._meta.concrete_model
-                base_key = make_model_tuple(base)
-                if base_key in parent_links:
-                    field = parent_links[base_key]
-                else:
-                    attr_name = f"{base._meta.model_name}_ptr"
-                    field = OneToOneField(
-                        base,
-                        on_delete=CASCADE,
-                        name=attr_name,
-                        auto_created=True,
-                        parent_link=True,
-                    )
-
-                    if attr_name in field_names:
-                        raise FieldError(
-                            f"Auto-generated field '{attr_name}' in class {name!r} for "
-                            f"parent_link to base class {base.__name__!r} clashes with "
-                            "declared field of the same name."
-                        )
-
-                    # Only add the ptr field if it's not already present;
-                    # e.g. migrations will already have it specified
-                    if not hasattr(new_class, attr_name):
-                        new_class.add_to_class(attr_name, field)
-                new_class._meta.parents[base] = field
-            else:
-                base_parents = base._meta.parents.copy()
-
-                # Add fields from abstract base class if it wasn't overridden.
-                for field in parent_fields:
-                    if (
-                        field.name not in field_names
-                        and field.name not in new_class.__dict__
-                        and field.name not in inherited_attributes
-                    ):
-                        new_field = copy.deepcopy(field)
-                        new_class.add_to_class(field.name, new_field)
-                        # Replace parent links defined on this base by the new
-                        # field. It will be appropriately resolved if required.
-                        if field.one_to_one:
-                            for parent, parent_link in base_parents.items():
-                                if field == parent_link:
-                                    base_parents[parent] = new_field
-
-                # Pass any non-abstract parent classes onto child.
-                new_class._meta.parents.update(base_parents)
-
-        # Copy indexes so that index names are unique when models extend an
-        # abstract model.
+        # Copy indexes so that index names are unique when models extend another class.
         new_class._meta.indexes = [
             copy.deepcopy(idx) for idx in new_class._meta.indexes
         ]
-
-        if abstract:
-            # Abstract base models can't be instantiated and don't appear in
-            # the list of models for an app. We do the final setup for them a
-            # little differently from normal models.
-            attr_meta.abstract = False
-            new_class.Meta = attr_meta
-            return new_class
 
         new_class._prepare()
 
@@ -288,6 +110,48 @@ class ModelBase(type):
             value.contribute_to_class(cls, name)
         else:
             setattr(cls, name, value)
+
+    def _setup_meta(cls):
+        name = cls.__name__
+        module = cls.__module__
+
+        # The model's Meta class, if it has one.
+        meta = getattr(cls, "Meta", None)
+
+        # Look for an application configuration to attach the model to.
+        package_config = packages_registry.get_containing_package_config(module)
+
+        package_label = getattr(meta, "package_label", None)
+        if package_label is None:
+            if package_config is None:
+                raise RuntimeError(
+                    f"Model class {module}.{name} doesn't declare an explicit "
+                    "package_label and isn't in an application in "
+                    "INSTALLED_PACKAGES."
+                )
+            else:
+                package_label = package_config.label
+
+        cls.add_to_class("_meta", Options(meta, package_label))
+
+    def _add_exceptions(cls):
+        cls.DoesNotExist = type(
+            "DoesNotExist",
+            (ObjectDoesNotExist,),
+            {
+                "__module__": cls.__module__,
+                "__qualname__": f"{cls.__qualname__}.DoesNotExist",
+            },
+        )
+
+        cls.MultipleObjectsReturned = type(
+            "MultipleObjectsReturned",
+            (MultipleObjectsReturned,),
+            {
+                "__module__": cls.__module__,
+                "__qualname__": f"{cls.__qualname__}.MultipleObjectsReturned",
+            },
+        )
 
     def _prepare(cls):
         """Create some methods once self._meta has been populated."""
@@ -354,8 +218,6 @@ class Model(metaclass=ModelBase):
         opts = self._meta
         _setattr = setattr
         _DEFERRED = DEFERRED
-        if opts.abstract:
-            raise TypeError("Abstract models cannot be instantiated.")
 
         # Set up the storage for instance state
         self._state = ModelState()
@@ -542,9 +404,6 @@ class Model(metaclass=ModelBase):
         return getattr(self, meta.pk.attname)
 
     def _set_pk_val(self, value):
-        for parent_link in self._meta.parents.values():
-            if parent_link and parent_link != self._meta.pk:
-                setattr(self, parent_link.target_field.attname, value)
         return setattr(self, self._meta.pk.attname, value)
 
     pk = property(_get_pk_val, _set_pk_val)
@@ -729,21 +588,12 @@ class Model(metaclass=ModelBase):
         assert not (force_insert and (force_update or update_fields))
         assert update_fields is None or update_fields
         cls = self.__class__
-        meta = cls._meta
 
-        # A transaction isn't needed if one query is issued.
-        if meta.parents:
-            context_manager = transaction.atomic(using=using, savepoint=False)
-        else:
-            context_manager = transaction.mark_for_rollback_on_error(using=using)
-        with context_manager:
-            parent_inserted = False
-            if not raw:
-                parent_inserted = self._save_parents(cls, using, update_fields)
+        with transaction.mark_for_rollback_on_error(using=using):
             self._save_table(
                 raw,
                 cls,
-                force_insert or parent_inserted,
+                force_insert,
                 force_update,
                 using,
                 update_fields,
@@ -752,41 +602,6 @@ class Model(metaclass=ModelBase):
         self._state.db = using
         # Once saved, this is no longer a to-be-added instance.
         self._state.adding = False
-
-    def _save_parents(self, cls, using, update_fields):
-        """Save all the parents of cls using values from self."""
-        meta = cls._meta
-        inserted = False
-        for parent, field in meta.parents.items():
-            # Make sure the link fields are synced between parent and self.
-            if (
-                field
-                and getattr(self, parent._meta.pk.attname) is None
-                and getattr(self, field.attname) is not None
-            ):
-                setattr(self, parent._meta.pk.attname, getattr(self, field.attname))
-            parent_inserted = self._save_parents(
-                cls=parent, using=using, update_fields=update_fields
-            )
-            updated = self._save_table(
-                cls=parent,
-                using=using,
-                update_fields=update_fields,
-                force_insert=parent_inserted,
-            )
-            if not updated:
-                inserted = True
-            # Set the parent's PK value to self.
-            if field:
-                setattr(self, field.attname, self._get_pk_val(parent._meta))
-                # Since we didn't have an instance of the parent handy set
-                # attname directly, bypassing the descriptor. Invalidate
-                # the related object cache, in case it's been accidentally
-                # populated. A fresh instance will be re-built from the
-                # database if necessary.
-                if field.is_cached(self):
-                    field.delete_cached_value(self)
-        return inserted
 
     def _save_table(
         self,
@@ -928,7 +743,7 @@ class Model(metaclass=ModelBase):
                 ):
                     field.delete_cached_value(self)
 
-    def delete(self, using=None, keep_parents=False):
+    def delete(self, using=None):
         if self.pk is None:
             raise ValueError(
                 f"{self._meta.object_name} object can't be deleted because its {self._meta.pk.attname} attribute is set "
@@ -936,7 +751,7 @@ class Model(metaclass=ModelBase):
             )
         using = using or router.db_for_write(self.__class__, instance=self)
         collector = Collector(using=using, origin=self)
-        collector.collect([self], keep_parents=keep_parents)
+        collector.collect([self])
         return collector.delete()
 
     def _get_FIELD_display(self, field):
@@ -1020,8 +835,6 @@ class Model(metaclass=ModelBase):
         # the list of checks.
 
         fields_with_class = [(self.__class__, self._meta.local_fields)]
-        for parent_class in self._meta.get_parent_list():
-            fields_with_class.append((parent_class, parent_class._meta.local_fields))
 
         for model_class, fields in fields_with_class:
             for f in fields:
@@ -1124,9 +937,6 @@ class Model(metaclass=ModelBase):
 
     def get_constraints(self):
         constraints = [(self.__class__, self._meta.constraints)]
-        for parent_class in self._meta.get_parent_list():
-            if parent_class._meta.constraints:
-                constraints.append((parent_class, parent_class._meta.constraints))
         return constraints
 
     def validate_constraints(self, exclude=None):
@@ -1356,31 +1166,6 @@ class Model(metaclass=ModelBase):
         """Forbid field shadowing in multi-table inheritance."""
         errors = []
         used_fields = {}  # name or attname -> field
-
-        # Check that multi-inheritance doesn't cause field name shadowing.
-        for parent in cls._meta.get_parent_list():
-            for f in parent._meta.local_fields:
-                clash = used_fields.get(f.name) or used_fields.get(f.attname) or None
-                if clash:
-                    errors.append(
-                        preflight.Error(
-                            f"The field '{clash.name}' from parent model "
-                            f"'{clash.model._meta}' clashes with the field '{f.name}' "
-                            f"from parent model '{f.model._meta}'.",
-                            obj=cls,
-                            id="models.E005",
-                        )
-                    )
-                used_fields[f.name] = f
-                used_fields[f.attname] = f
-
-        # Check that fields defined in the model don't clash with fields from
-        # parents, including auto-generated fields like multi-table inheritance
-        # child accessors.
-        for parent in cls._meta.get_parent_list():
-            for f in parent._meta.get_fields():
-                if f not in used_fields:
-                    used_fields[f.name] = f
 
         for f in cls._meta.local_fields:
             clash = used_fields.get(f.name) or used_fields.get(f.attname) or None
