@@ -5,19 +5,21 @@ from plain.models import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('plainredirection', '0009_rename_referer_notfoundlog_referrer_and_more'),
+        ("plainredirection", "0009_rename_referer_notfoundlog_referrer_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='redirect',
-            name='from_pattern',
+            model_name="redirect",
+            name="from_pattern",
             field=models.CharField(max_length=255),
         ),
         migrations.AddConstraint(
-            model_name='redirect',
-            constraint=models.UniqueConstraint(fields=('from_pattern',), name='plainredirects_redirect_unique_from_pattern'),
+            model_name="redirect",
+            constraint=models.UniqueConstraint(
+                fields=("from_pattern",),
+                name="plainredirects_redirect_unique_from_pattern",
+            ),
         ),
     ]
