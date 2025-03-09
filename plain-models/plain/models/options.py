@@ -83,7 +83,6 @@ class Options:
         self.meta = meta
         self.pk = None
         self.auto_field = None
-        self.abstract = False
 
         # For any non-abstract class, the concrete class is the model
         # in the end of the proxy_for_model chain. In particular, for
@@ -608,10 +607,7 @@ class Options:
         all_models = self.models_registry.get_models(include_auto_created=True)
         for model in all_models:
             opts = model._meta
-            # Abstract model's fields are copied to child models, hence we will
-            # see the fields from the child models.
-            if opts.abstract:
-                continue
+
             fields_with_relations = (
                 f
                 for f in opts._get_fields(reverse=False, include_parents=False)
@@ -647,7 +643,7 @@ class Options:
             for cache_key in self.FORWARD_PROPERTIES:
                 if cache_key in self.__dict__:
                     delattr(self, cache_key)
-        if reverse and not self.abstract:
+        if reverse:
             for cache_key in self.REVERSE_PROPERTIES:
                 if cache_key in self.__dict__:
                     delattr(self, cache_key)

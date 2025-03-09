@@ -316,33 +316,32 @@ class RelatedField(FieldCacheMixin, Field):
 
         self.opts = cls._meta
 
-        if not cls._meta.abstract:
-            if self.remote_field.related_name:
-                related_name = self.remote_field.related_name
-            else:
-                related_name = self.opts.default_related_name
-            if related_name:
-                related_name %= {
-                    "class": cls.__name__.lower(),
-                    "model_name": cls._meta.model_name.lower(),
-                    "package_label": cls._meta.package_label.lower(),
-                }
-                self.remote_field.related_name = related_name
+        if self.remote_field.related_name:
+            related_name = self.remote_field.related_name
+        else:
+            related_name = self.opts.default_related_name
+        if related_name:
+            related_name %= {
+                "class": cls.__name__.lower(),
+                "model_name": cls._meta.model_name.lower(),
+                "package_label": cls._meta.package_label.lower(),
+            }
+            self.remote_field.related_name = related_name
 
-            if self.remote_field.related_query_name:
-                related_query_name = self.remote_field.related_query_name % {
-                    "class": cls.__name__.lower(),
-                    "package_label": cls._meta.package_label.lower(),
-                }
-                self.remote_field.related_query_name = related_query_name
+        if self.remote_field.related_query_name:
+            related_query_name = self.remote_field.related_query_name % {
+                "class": cls.__name__.lower(),
+                "package_label": cls._meta.package_label.lower(),
+            }
+            self.remote_field.related_query_name = related_query_name
 
-            def resolve_related_class(model, related, field):
-                field.remote_field.model = related
-                field.do_related_class(related, model)
+        def resolve_related_class(model, related, field):
+            field.remote_field.model = related
+            field.do_related_class(related, model)
 
-            lazy_related_operation(
-                resolve_related_class, cls, self.remote_field.model, field=self
-            )
+        lazy_related_operation(
+            resolve_related_class, cls, self.remote_field.model, field=self
+        )
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -669,11 +668,7 @@ class ForeignObject(RelatedField):
             # instance.pk (that is, parent_ptr_id) when asked for instance.id.
             if field.primary_key:
                 possible_parent_link = opts.get_ancestor_link(field.model)
-                if (
-                    not possible_parent_link
-                    or possible_parent_link.primary_key
-                    or possible_parent_link.model._meta.abstract
-                ):
+                if not possible_parent_link or possible_parent_link.primary_key:
                     ret.append(instance.pk)
                     continue
             ret.append(getattr(instance, field.attname))
@@ -1713,21 +1708,19 @@ class ManyToManyField(RelatedField):
         super().contribute_to_class(cls, name, **kwargs)
 
         # The intermediate m2m model is not auto created if:
-        #  1) There is a manually specified intermediate, or
-        #  2) The class owning the m2m field is abstract.
-        if not cls._meta.abstract:
-            if self.remote_field.through:
+        #  1) There is a manually specified intermediate
+        if self.remote_field.through:
 
-                def resolve_through_model(_, model, field):
-                    field.remote_field.through = model
+            def resolve_through_model(_, model, field):
+                field.remote_field.through = model
 
-                lazy_related_operation(
-                    resolve_through_model, cls, self.remote_field.through, field=self
-                )
-            else:
-                self.remote_field.through = create_many_to_many_intermediary_model(
-                    self, cls
-                )
+            lazy_related_operation(
+                resolve_through_model, cls, self.remote_field.through, field=self
+            )
+        else:
+            self.remote_field.through = create_many_to_many_intermediary_model(
+                self, cls
+            )
 
         # Add the descriptor for the m2m relation.
         setattr(cls, self.name, ManyToManyDescriptor(self.remote_field, reverse=False))
