@@ -33,7 +33,6 @@ from plain.models.functions import Cast, Trunc
 from plain.models.query_utils import FilteredRelation, Q
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
 from plain.models.utils import (
-    AltersData,
     create_namedtuple_class,
     resolve_callables,
 )
@@ -265,7 +264,7 @@ class FlatValuesListIterable(BaseIterable):
             yield row[0]
 
 
-class QuerySet(AltersData):
+class QuerySet:
     """Represent a lazy database lookup for a set of objects."""
 
     def __init__(self, model=None, query=None, using=None, hints=None):
@@ -798,8 +797,6 @@ class QuerySet(AltersData):
                 rows_updated += queryset.filter(pk__in=pks).update(**update_kwargs)
         return rows_updated
 
-    bulk_update.alters_data = True
-
     def get_or_create(self, defaults=None, **kwargs):
         """
         Look up an object with the given kwargs, creating one if necessary.
@@ -1032,7 +1029,6 @@ class QuerySet(AltersData):
         self._result_cache = None
         return deleted, _rows_count
 
-    delete.alters_data = True
     delete.queryset_only = True
 
     def _raw_delete(self, using):
@@ -1047,8 +1043,6 @@ class QuerySet(AltersData):
             with cursor:
                 return cursor.rowcount
         return 0
-
-    _raw_delete.alters_data = True
 
     def update(self, **kwargs):
         """
@@ -1089,8 +1083,6 @@ class QuerySet(AltersData):
         self._result_cache = None
         return rows
 
-    update.alters_data = True
-
     def _update(self, values):
         """
         A version of update() that accepts field objects instead of field names.
@@ -1107,7 +1099,6 @@ class QuerySet(AltersData):
         self._result_cache = None
         return query.get_compiler(self.db).execute_sql(CURSOR)
 
-    _update.alters_data = True
     _update.queryset_only = False
 
     def exists(self):
@@ -1665,7 +1656,6 @@ class QuerySet(AltersData):
         query.insert_values(fields, objs, raw=raw)
         return query.get_compiler(using=using).execute_sql(returning_fields)
 
-    _insert.alters_data = True
     _insert.queryset_only = False
 
     def _batched_insert(

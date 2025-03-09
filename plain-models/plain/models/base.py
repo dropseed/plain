@@ -34,7 +34,7 @@ from plain.models.fields.related import (
 from plain.models.manager import Manager
 from plain.models.options import Options
 from plain.models.query import F, Q
-from plain.models.utils import AltersData, make_model_tuple
+from plain.models.utils import make_model_tuple
 from plain.packages import packages_registry
 from plain.utils.encoding import force_str
 from plain.utils.hashable import make_hashable
@@ -347,7 +347,7 @@ class ModelState:
     fields_cache = ModelStateFieldsCacheDescriptor()
 
 
-class Model(AltersData, metaclass=ModelBase):
+class Model(metaclass=ModelBase):
     def __init__(self, *args, **kwargs):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
@@ -707,8 +707,6 @@ class Model(AltersData, metaclass=ModelBase):
             update_fields=update_fields,
         )
 
-    save.alters_data = True
-
     def save_base(
         self,
         *,
@@ -754,8 +752,6 @@ class Model(AltersData, metaclass=ModelBase):
         self._state.db = using
         # Once saved, this is no longer a to-be-added instance.
         self._state.adding = False
-
-    save_base.alters_data = True
 
     def _save_parents(self, cls, using, update_fields):
         """Save all the parents of cls using values from self."""
@@ -942,8 +938,6 @@ class Model(AltersData, metaclass=ModelBase):
         collector = Collector(using=using, origin=self)
         collector.collect([self], keep_parents=keep_parents)
         return collector.delete()
-
-    delete.alters_data = True
 
     def _get_FIELD_display(self, field):
         value = getattr(self, field.attname)

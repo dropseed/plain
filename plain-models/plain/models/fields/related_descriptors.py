@@ -76,7 +76,7 @@ from plain.models.functions import RowNumber
 from plain.models.lookups import GreaterThan, LessThanOrEqual
 from plain.models.query import QuerySet
 from plain.models.query_utils import DeferredAttribute, Q
-from plain.models.utils import AltersData, resolve_callables
+from plain.models.utils import resolve_callables
 from plain.utils.functional import cached_property
 
 
@@ -616,7 +616,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
     the related model, and adds behaviors specific to many-to-one relations.
     """
 
-    class RelatedManager(superclass, AltersData):
+    class RelatedManager(superclass):
         def __init__(self, instance):
             super().__init__()
 
@@ -758,15 +758,11 @@ def create_reverse_many_to_one_manager(superclass, rel):
                         check_and_update_obj(obj)
                         obj.save()
 
-        add.alters_data = True
-
         def create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
             db = router.db_for_write(self.model, instance=self.instance)
             return super(RelatedManager, self.db_manager(db)).create(**kwargs)
-
-        create.alters_data = True
 
         def get_or_create(self, **kwargs):
             self._check_fk_val()
@@ -774,15 +770,11 @@ def create_reverse_many_to_one_manager(superclass, rel):
             db = router.db_for_write(self.model, instance=self.instance)
             return super(RelatedManager, self.db_manager(db)).get_or_create(**kwargs)
 
-        get_or_create.alters_data = True
-
         def update_or_create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
             db = router.db_for_write(self.model, instance=self.instance)
             return super(RelatedManager, self.db_manager(db)).update_or_create(**kwargs)
-
-        update_or_create.alters_data = True
 
         # remove() and clear() are only provided if the ForeignKey can have a
         # value of null.
@@ -808,13 +800,9 @@ def create_reverse_many_to_one_manager(superclass, rel):
                         )
                 self._clear(self.filter(pk__in=old_ids), bulk)
 
-            remove.alters_data = True
-
             def clear(self, *, bulk=True):
                 self._check_fk_val()
                 self._clear(self, bulk)
-
-            clear.alters_data = True
 
             def _clear(self, queryset, bulk):
                 self._remove_prefetched_objects()
@@ -828,8 +816,6 @@ def create_reverse_many_to_one_manager(superclass, rel):
                         for obj in queryset:
                             setattr(obj, self.field.name, None)
                             obj.save(update_fields=[self.field.name])
-
-            _clear.alters_data = True
 
         def set(self, objs, *, bulk=True, clear=False):
             self._check_fk_val()
@@ -856,8 +842,6 @@ def create_reverse_many_to_one_manager(superclass, rel):
                         self.add(*new_objs, bulk=bulk)
             else:
                 self.add(*objs, bulk=bulk)
-
-        set.alters_data = True
 
     return RelatedManager
 
@@ -917,7 +901,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
     the related model, and adds behaviors specific to many-to-many relations.
     """
 
-    class ManyRelatedManager(superclass, AltersData):
+    class ManyRelatedManager(superclass):
         def __init__(self, instance=None):
             super().__init__()
 
@@ -1078,13 +1062,9 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                         through_defaults=through_defaults,
                     )
 
-        add.alters_data = True
-
         def remove(self, *objs):
             self._remove_prefetched_objects()
             self._remove_items(self.source_field_name, self.target_field_name, *objs)
-
-        remove.alters_data = True
 
         def clear(self):
             db = router.db_for_write(self.through, instance=self.instance)
@@ -1092,8 +1072,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 self._remove_prefetched_objects()
                 filters = self._build_remove_filters(super().get_queryset().using(db))
                 self.through._default_manager.using(db).filter(filters).delete()
-
-        clear.alters_data = True
 
         def set(self, objs, *, clear=False, through_defaults=None):
             # Force evaluation of `objs` in case it's a queryset whose value
@@ -1127,15 +1105,11 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     self.remove(*old_ids)
                     self.add(*new_objs, through_defaults=through_defaults)
 
-        set.alters_data = True
-
         def create(self, *, through_defaults=None, **kwargs):
             db = router.db_for_write(self.instance.__class__, instance=self.instance)
             new_obj = super(ManyRelatedManager, self.db_manager(db)).create(**kwargs)
             self.add(new_obj, through_defaults=through_defaults)
             return new_obj
-
-        create.alters_data = True
 
         def get_or_create(self, *, through_defaults=None, **kwargs):
             db = router.db_for_write(self.instance.__class__, instance=self.instance)
@@ -1148,8 +1122,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 self.add(obj, through_defaults=through_defaults)
             return obj, created
 
-        get_or_create.alters_data = True
-
         def update_or_create(self, *, through_defaults=None, **kwargs):
             db = router.db_for_write(self.instance.__class__, instance=self.instance)
             obj, created = super(
@@ -1160,8 +1132,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             if created:
                 self.add(obj, through_defaults=through_defaults)
             return obj, created
-
-        update_or_create.alters_data = True
 
         def _get_target_ids(self, target_field_name, objs):
             """

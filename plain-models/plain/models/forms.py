@@ -14,7 +14,6 @@ from plain.exceptions import (
 from plain.forms import fields
 from plain.forms.fields import ChoiceField, Field
 from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
-from plain.models.utils import AltersData
 
 __all__ = (
     "ModelForm",
@@ -200,7 +199,7 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
         return new_class
 
 
-class BaseModelForm(BaseForm, AltersData):
+class BaseModelForm(BaseForm):
     def __init__(
         self,
         data=None,
@@ -394,8 +393,6 @@ class BaseModelForm(BaseForm, AltersData):
             # saving of m2m data.
             self.save_m2m = self._save_m2m
         return self.instance
-
-    save.alters_data = True
 
 
 class ModelForm(BaseModelForm, metaclass=ModelFormMetaclass):
