@@ -21,7 +21,6 @@ class Migration(migrations.Migration):
                     ("SUCCESSFUL", "Successful"),
                     ("ERRORED", "Errored"),
                 ],
-                db_index=True,
                 default="",
                 max_length=20,
             ),

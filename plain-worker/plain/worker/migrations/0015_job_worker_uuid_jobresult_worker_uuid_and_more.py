@@ -13,12 +13,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="job",
             name="worker_uuid",
-            field=models.UUIDField(required=False, db_index=True, allow_null=True),
+            field=models.UUIDField(required=False, allow_null=True),
         ),
         migrations.AddField(
             model_name="jobresult",
             name="worker_uuid",
-            field=models.UUIDField(required=False, db_index=True, allow_null=True),
+            field=models.UUIDField(required=False, allow_null=True),
         ),
         migrations.AlterField(
             model_name="jobresult",
@@ -30,7 +30,6 @@ class Migration(migrations.Migration):
                     ("CANCELLED", "Cancelled"),
                     ("LOST", "Lost"),
                 ],
-                db_index=True,
                 max_length=20,
             ),
         ),

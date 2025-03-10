@@ -824,6 +824,7 @@ class ForeignKey(ForeignObject):
         limit_choices_to=None,
         parent_link=False,
         to_field=None,
+        db_index=True,
         db_constraint=True,
         **kwargs,
     ):
@@ -853,7 +854,6 @@ class ForeignKey(ForeignObject):
             parent_link=parent_link,
             on_delete=on_delete,
         )
-        kwargs.setdefault("db_index", True)
 
         super().__init__(
             to,
@@ -865,6 +865,7 @@ class ForeignKey(ForeignObject):
             to_fields=[to_field],
             **kwargs,
         )
+        self.db_index = db_index
         self.db_constraint = db_constraint
 
     def __class_getitem__(cls, *args, **kwargs):
@@ -925,13 +926,13 @@ class ForeignKey(ForeignObject):
         name, path, args, kwargs = super().deconstruct()
         del kwargs["to_fields"]
         del kwargs["from_fields"]
-        # Handle the simpler arguments
-        if self.db_index:
-            del kwargs["db_index"]
-        else:
-            kwargs["db_index"] = False
+
+        if self.db_index is not True:
+            kwargs["db_index"] = self.db_index
+
         if self.db_constraint is not True:
             kwargs["db_constraint"] = self.db_constraint
+
         # Rel needs more work.
         to_meta = getattr(self.remote_field.model, "_meta", None)
         if self.remote_field.field_name and (

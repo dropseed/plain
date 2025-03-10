@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="session",
             name="expire_date",
-            field=models.DateTimeField(db_index=True),
+            field=models.DateTimeField(),
         ),
         migrations.AlterField(
             model_name="session",

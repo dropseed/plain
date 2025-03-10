@@ -30,21 +30,17 @@ class Migration(migrations.Migration):
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
                     "started_at",
-                    models.DateTimeField(
-                        required=False, db_index=True, allow_null=True
-                    ),
+                    models.DateTimeField(required=False, allow_null=True),
                 ),
                 (
                     "completed_at",
-                    models.DateTimeField(
-                        required=False, db_index=True, allow_null=True
-                    ),
+                    models.DateTimeField(required=False, allow_null=True),
                 ),
                 ("error", models.TextField(required=False)),
-                ("job_request_uuid", models.UUIDField(db_index=True)),
-                ("job_class", models.CharField(db_index=True, max_length=255)),
+                ("job_request_uuid", models.UUIDField()),
+                ("job_class", models.CharField(max_length=255)),
                 ("parameters", models.JSONField(required=False, allow_null=True)),
-                ("priority", models.IntegerField(db_index=True, default=0)),
+                ("priority", models.IntegerField(default=0)),
             ],
             options={
                 "ordering": ["created_at"],

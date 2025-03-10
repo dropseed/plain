@@ -22,7 +22,6 @@ class Migration(migrations.Migration):
                     ("ERRORED", "Errored"),
                     ("TIMED_OUT", "Timed out"),
                 ],
-                db_index=True,
                 default="",
                 max_length=20,
             ),

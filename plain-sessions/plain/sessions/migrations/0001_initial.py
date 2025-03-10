@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 ("session_data", models.TextField()),
                 (
                     "expire_date",
-                    models.DateTimeField(db_index=True),
+                    models.DateTimeField(),
                 ),
             ],
             managers=[

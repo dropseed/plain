@@ -21,16 +21,16 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="job",
             name="created_at",
-            field=models.DateTimeField(auto_now_add=True, db_index=True),
+            field=models.DateTimeField(auto_now_add=True),
         ),
         migrations.AlterField(
             model_name="jobrequest",
             name="created_at",
-            field=models.DateTimeField(auto_now_add=True, db_index=True),
+            field=models.DateTimeField(auto_now_add=True),
         ),
         migrations.AlterField(
             model_name="jobresult",
             name="created_at",
-            field=models.DateTimeField(auto_now_add=True, db_index=True),
+            field=models.DateTimeField(auto_now_add=True),
         ),
     ]

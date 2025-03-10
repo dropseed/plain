@@ -13,16 +13,16 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="job",
             name="queue",
-            field=models.CharField(db_index=True, default="default", max_length=255),
+            field=models.CharField(default="default", max_length=255),
         ),
         migrations.AddField(
             model_name="jobrequest",
             name="queue",
-            field=models.CharField(db_index=True, default="default", max_length=255),
+            field=models.CharField(default="default", max_length=255),
         ),
         migrations.AddField(
             model_name="jobresult",
             name="queue",
-            field=models.CharField(db_index=True, default="default", max_length=255),
+            field=models.CharField(default="default", max_length=255),
         ),
     ]

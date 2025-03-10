@@ -171,7 +171,6 @@ class Field(RegisterLookupMixin):
         unique=False,
         required=True,
         allow_null=False,
-        db_index=False,
         rel=None,
         default=NOT_PROVIDED,
         choices=None,
@@ -193,7 +192,6 @@ class Field(RegisterLookupMixin):
         if isinstance(choices, collections.abc.Iterator):
             choices = list(choices)
         self.choices = choices
-        self.db_index = db_index
         self.db_column = db_column
         self.db_comment = db_comment
         self.auto_created = auto_created
@@ -232,7 +230,6 @@ class Field(RegisterLookupMixin):
         return [
             *self._check_field_name(),
             *self._check_choices(),
-            *self._check_db_index(),
             *self._check_db_comment(**kwargs),
             *self._check_null_allowed_for_primary_keys(),
             *self._check_backend_specific_checks(**kwargs),
@@ -347,18 +344,6 @@ class Field(RegisterLookupMixin):
                 id="fields.E005",
             )
         ]
-
-    def _check_db_index(self):
-        if self.db_index not in (None, True, False):
-            return [
-                preflight.Error(
-                    "'db_index' must be None, True or False.",
-                    obj=self,
-                    id="fields.E006",
-                )
-            ]
-        else:
-            return []
 
     def _check_db_comment(self, databases=None, **kwargs):
         if not self.db_comment or not databases:
@@ -521,7 +506,6 @@ class Field(RegisterLookupMixin):
             "unique": False,
             "required": True,
             "allow_null": False,
-            "db_index": False,
             "default": NOT_PROVIDED,
             "choices": None,
             "db_column": None,

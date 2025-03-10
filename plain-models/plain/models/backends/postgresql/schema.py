@@ -87,7 +87,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         when the column type is 'varchar' or 'text', otherwise return None.
         """
         db_type = field.db_type(connection=self.connection)
-        if db_type is not None and (field.db_index or field.unique):
+        if db_type is not None and field.unique:
             # Fields with database column types of `varchar` and `text` need
             # a second index that specifies their operator class, which is
             # needed when performing correct LIKE queries outside the
@@ -145,7 +145,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # different type.
         old_db_params = old_field.db_parameters(connection=self.connection)
         old_type = old_db_params["type"]
-        if (old_field.db_index or old_field.unique) and (
+        if old_field.unique and (
             (old_type.startswith("varchar") and not new_type.startswith("varchar"))
             or (old_type.startswith("text") and not new_type.startswith("text"))
             or (old_type.startswith("citext") and not new_type.startswith("citext"))
@@ -275,15 +275,18 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             strict,
         )
         # Added an index? Create any PostgreSQL-specific indexes.
-        if (not (old_field.db_index or old_field.unique) and new_field.db_index) or (
-            not old_field.unique and new_field.unique
-        ):
+        if (
+            not ((old_field.remote_field and old_field.db_index) or old_field.unique)
+            and (new_field.remote_field and new_field.db_index)
+        ) or (not old_field.unique and new_field.unique):
             like_index_statement = self._create_like_index_sql(model, new_field)
             if like_index_statement is not None:
                 self.execute(like_index_statement)
 
         # Removed an index? Drop any PostgreSQL-specific indexes.
-        if old_field.unique and not (new_field.db_index or new_field.unique):
+        if old_field.unique and not (
+            (new_field.remote_field and new_field.db_index) or new_field.unique
+        ):
             index_to_remove = self._create_index_name(
                 model._meta.db_table, [old_field.column], suffix="_like"
             )

@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="redirect",
             name="order",
-            field=models.PositiveSmallIntegerField(db_index=True, default=0),
+            field=models.PositiveSmallIntegerField(default=0),
         ),
         migrations.AlterField(
             model_name="redirectlog",

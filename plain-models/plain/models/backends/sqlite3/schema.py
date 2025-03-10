@@ -387,7 +387,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # not supported in ALTER TABLE DROP COLUMN.
             and not field.primary_key
             and not field.unique
-            and not field.db_index
+            and not (field.remote_field and field.db_index)
             and not (field.remote_field and field.db_constraint)
         ):
             super().remove_field(model, field)

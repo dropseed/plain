@@ -29,14 +29,12 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (
                     "started_at",
-                    models.DateTimeField(
-                        required=False, db_index=True, allow_null=True
-                    ),
+                    models.DateTimeField(required=False, allow_null=True),
                 ),
-                ("job_request_uuid", models.UUIDField(db_index=True)),
-                ("job_class", models.CharField(db_index=True, max_length=255)),
+                ("job_request_uuid", models.UUIDField()),
+                ("job_class", models.CharField(max_length=255)),
                 ("parameters", models.JSONField(required=False, allow_null=True)),
-                ("priority", models.IntegerField(db_index=True, default=0)),
+                ("priority", models.IntegerField(default=0)),
                 ("source", models.TextField(required=False)),
                 ("retries", models.IntegerField(default=0)),
                 ("retry_attempt", models.IntegerField(default=0)),
@@ -45,7 +43,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="jobresult",
             name="job_uuid",
-            field=models.UUIDField(db_index=True, default=uuid.uuid4),
+            field=models.UUIDField(default=uuid.uuid4),
             preserve_default=False,
         ),
         migrations.AlterField(
@@ -57,7 +55,6 @@ class Migration(migrations.Migration):
                     ("ERRORED", "Errored"),
                     ("LOST", "Lost"),
                 ],
-                db_index=True,
                 max_length=20,
             ),
         ),

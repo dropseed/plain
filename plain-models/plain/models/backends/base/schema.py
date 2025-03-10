@@ -818,7 +818,8 @@ class BaseDatabaseSchemaEditor:
         # True               | False            | False              | True
         # True               | False            | True               | True
         if (
-            old_field.db_index
+            old_field.remote_field
+            and old_field.db_index
             and not old_field.unique
             and (not new_field.db_index or new_field.unique)
         ):
@@ -982,7 +983,7 @@ class BaseDatabaseSchemaEditor:
         # True               | True             | True               | False
         if (
             (not old_field.db_index or old_field.unique)
-            and new_field.db_index
+            and (new_field.remote_field and new_field.db_index)
             and not new_field.unique
         ):
             self.execute(self._create_index_sql(model, fields=[new_field]))
@@ -1380,7 +1381,7 @@ class BaseDatabaseSchemaEditor:
         ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
 
     def _field_should_be_indexed(self, model, field):
-        return field.db_index and not field.unique
+        return (field.remote_field and field.db_index) and not field.unique
 
     def _field_became_primary_key(self, old_field, new_field):
         return not old_field.primary_key and new_field.primary_key

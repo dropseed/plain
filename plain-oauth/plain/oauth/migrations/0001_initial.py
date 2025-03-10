@@ -26,8 +26,8 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
-                ("provider_key", models.CharField(db_index=True, max_length=100)),
-                ("provider_user_id", models.CharField(db_index=True, max_length=100)),
+                ("provider_key", models.CharField(max_length=100)),
+                ("provider_user_id", models.CharField(max_length=100)),
                 ("access_token", models.CharField(required=False, max_length=100)),
                 ("refresh_token", models.CharField(required=False, max_length=100)),
                 (
