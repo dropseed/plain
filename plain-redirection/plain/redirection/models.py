@@ -19,7 +19,7 @@ class Redirect(models.Model):
     )  # Default to permanent - could be choices?
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    order = models.PositiveSmallIntegerField(default=0, db_index=True)
+    order = models.PositiveSmallIntegerField(default=0)
     enabled = models.BooleanField(default=True)
     is_regex = models.BooleanField(default=False)
 
@@ -29,6 +29,9 @@ class Redirect(models.Model):
 
     class Meta:
         ordering = ["order", "-created_at"]
+        indexes = [
+            models.Index(fields=["order"]),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["from_pattern"],

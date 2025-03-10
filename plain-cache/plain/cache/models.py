@@ -17,13 +17,16 @@ class CachedItemQuerySet(models.QuerySet):
 class CachedItem(models.Model):
     key = models.CharField(max_length=255)
     value = models.JSONField(required=False, allow_null=True)
-    expires_at = models.DateTimeField(required=False, allow_null=True, db_index=True)
+    expires_at = models.DateTimeField(required=False, allow_null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = CachedItemQuerySet.as_manager()
 
     class Meta:
+        indexes = [
+            models.Index(fields=["expires_at"]),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["key"], name="plaincache_cacheditem_unique_key"

@@ -41,9 +41,14 @@ class Session(models.Model):
 
     session_key = models.CharField(max_length=40, primary_key=True)
     session_data = models.TextField()
-    expire_date = models.DateTimeField(db_index=True)
+    expire_date = models.DateTimeField()
 
     objects = SessionManager()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["expire_date"]),
+        ]
 
     def __str__(self):
         return self.session_key

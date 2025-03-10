@@ -19,21 +19,21 @@ class JobRequest(models.Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     uuid = models.UUIDField(default=uuid.uuid4)
 
-    job_class = models.CharField(max_length=255, db_index=True)
+    job_class = models.CharField(max_length=255)
     parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.IntegerField(default=0, db_index=True)
+    priority = models.IntegerField(default=0)
     source = models.TextField(required=False)
-    queue = models.CharField(default="default", max_length=255, db_index=True)
+    queue = models.CharField(default="default", max_length=255)
 
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
 
-    unique_key = models.CharField(max_length=255, required=False, db_index=True)
+    unique_key = models.CharField(max_length=255, required=False)
 
-    start_at = models.DateTimeField(required=False, allow_null=True, db_index=True)
+    start_at = models.DateTimeField(required=False, allow_null=True)
 
     # context
     # expires_at = models.DateTimeField(required=False, allow_null=True)
@@ -41,6 +41,12 @@ class JobRequest(models.Model):
     class Meta:
         ordering = ["priority", "-created_at"]
         indexes = [
+            models.Index(fields=["priority"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["queue"]),
+            models.Index(fields=["start_at"]),
+            models.Index(fields=["unique_key"]),
+            models.Index(fields=["job_class"]),
             # Used to dedupe unique in-process jobs
             models.Index(
                 name="job_request_class_unique_key", fields=["job_class", "unique_key"]
@@ -117,25 +123,31 @@ class Job(models.Model):
     """
 
     uuid = models.UUIDField(default=uuid.uuid4)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    started_at = models.DateTimeField(required=False, allow_null=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(required=False, allow_null=True)
 
     # From the JobRequest
-    job_request_uuid = models.UUIDField(db_index=True)
-    job_class = models.CharField(max_length=255, db_index=True)
+    job_request_uuid = models.UUIDField()
+    job_class = models.CharField(max_length=255)
     parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.IntegerField(default=0, db_index=True)
+    priority = models.IntegerField(default=0)
     source = models.TextField(required=False)
-    queue = models.CharField(default="default", max_length=255, db_index=True)
+    queue = models.CharField(default="default", max_length=255)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
-    unique_key = models.CharField(max_length=255, required=False, db_index=True)
+    unique_key = models.CharField(max_length=255, required=False)
 
     objects = JobQuerySet.as_manager()
 
     class Meta:
         ordering = ["-created_at"]
         indexes = [
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["queue"]),
+            models.Index(fields=["unique_key"]),
+            models.Index(fields=["started_at"]),
+            models.Index(fields=["job_class"]),
+            models.Index(fields=["job_request_uuid"]),
             # Used to dedupe unique in-process jobs
             models.Index(
                 name="job_class_unique_key", fields=["job_class", "unique_key"]
@@ -268,29 +280,28 @@ class JobResult(models.Model):
     """
 
     uuid = models.UUIDField(default=uuid.uuid4)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     # From the Job
-    job_uuid = models.UUIDField(db_index=True)
-    started_at = models.DateTimeField(required=False, allow_null=True, db_index=True)
-    ended_at = models.DateTimeField(required=False, allow_null=True, db_index=True)
+    job_uuid = models.UUIDField()
+    started_at = models.DateTimeField(required=False, allow_null=True)
+    ended_at = models.DateTimeField(required=False, allow_null=True)
     error = models.TextField(required=False)
     status = models.CharField(
         max_length=20,
         choices=JobResultStatuses.choices,
-        db_index=True,
     )
 
     # From the JobRequest
-    job_request_uuid = models.UUIDField(db_index=True)
-    job_class = models.CharField(max_length=255, db_index=True)
+    job_request_uuid = models.UUIDField()
+    job_class = models.CharField(max_length=255)
     parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.IntegerField(default=0, db_index=True)
+    priority = models.IntegerField(default=0)
     source = models.TextField(required=False)
-    queue = models.CharField(default="default", max_length=255, db_index=True)
+    queue = models.CharField(default="default", max_length=255)
     retries = models.IntegerField(default=0)
     retry_attempt = models.IntegerField(default=0)
-    unique_key = models.CharField(max_length=255, required=False, db_index=True)
+    unique_key = models.CharField(max_length=255, required=False)
 
     # Retries
     retry_job_request_uuid = models.UUIDField(required=False, allow_null=True)
@@ -299,6 +310,16 @@ class JobResult(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["job_uuid"]),
+            models.Index(fields=["started_at"]),
+            models.Index(fields=["ended_at"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["job_request_uuid"]),
+            models.Index(fields=["job_class"]),
+            models.Index(fields=["queue"]),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["uuid"], name="plainworker_jobresult_unique_uuid"

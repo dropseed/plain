@@ -30,10 +30,10 @@ class OAuthConnection(models.Model):
     )
 
     # The key used to refer to this provider type (in settings)
-    provider_key = models.CharField(max_length=100, db_index=True)
+    provider_key = models.CharField(max_length=100)
 
     # The unique ID of the user on the provider's system
-    provider_user_id = models.CharField(max_length=100, db_index=True)
+    provider_user_id = models.CharField(max_length=100)
 
     # Token data
     access_token = models.CharField(max_length=2000)
