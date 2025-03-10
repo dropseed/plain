@@ -88,7 +88,6 @@ class RelatedField(FieldCacheMixin, Field):
 
     # Field flags
     one_to_many = False
-    one_to_one = False
     many_to_many = False
     many_to_one = False
 
@@ -445,7 +444,6 @@ class ForeignObject(RelatedField):
     many_to_many = False
     many_to_one = True
     one_to_many = False
-    one_to_one = False
 
     requires_unique_target = True
     related_accessor_class = ReverseManyToOneDescriptor
@@ -802,7 +800,6 @@ class ForeignKey(ForeignObject):
     many_to_many = False
     many_to_one = True
     one_to_many = False
-    one_to_one = False
 
     rel_class = ManyToOneRel
 
@@ -1107,7 +1104,6 @@ class ManyToManyField(RelatedField):
     many_to_many = True
     many_to_one = False
     one_to_many = False
-    one_to_one = False
 
     rel_class = ManyToManyRel
 

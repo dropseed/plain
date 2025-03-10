@@ -152,7 +152,6 @@ class Field(RegisterLookupMixin):
     many_to_many = None
     many_to_one = None
     one_to_many = None
-    one_to_one = None
     related_model = None
 
     descriptor_class = DeferredAttribute
