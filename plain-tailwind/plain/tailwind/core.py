@@ -41,6 +41,9 @@ class Tailwind:
             if os.path.commonpath([abs_app_path, abs_package_path]) != abs_app_path:
                 paths.add(os.path.relpath(abs_package_path, self.target_directory))
 
+        # Sort the paths so that the order is consistent
+        paths = sorted(paths)
+
         plain_sources_path = os.path.join(self.target_directory, "tailwind.css")
         with open(plain_sources_path, "w") as f:
             for path in paths:
