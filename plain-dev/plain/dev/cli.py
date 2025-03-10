@@ -19,7 +19,6 @@ from plain.cli import register_cli
 from plain.runtime import APP_PATH, settings
 
 from .mkcert import MkcertManager
-from .pid import Pid
 from .poncho.manager import Manager as PonchoManager
 from .poncho.printer import Printer
 from .services import Services
@@ -104,7 +103,11 @@ def debug():
 @cli.command()
 def services():
     """Start additional services defined in pyproject.toml"""
-    Services().run()
+    _services = Services()
+    if _services.are_running():
+        click.secho("Services already running", fg="yellow")
+        return
+    _services.run()
 
 
 @cli.command()
@@ -154,65 +157,59 @@ class Dev:
         self.poncho = PonchoManager(printer=Printer(lambda s: self.console.out(s)))
 
     def run(self):
-        pid = Pid()
-        pid.write()
+        mkcert_manager = MkcertManager()
+        mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
+        self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
+            domain=self.hostname,
+            storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
+        )
 
-        try:
-            mkcert_manager = MkcertManager()
-            mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
-            self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
-                domain=self.hostname,
-                storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
+        self.symlink_plain_src()
+        self.modify_hosts_file()
+        self.set_csrf_and_allowed_hosts()
+        self.run_preflight()
+
+        # Processes for poncho to run simultaneously
+        self.add_gunicorn()
+        self.add_entrypoints()
+        self.add_pyproject_run()
+        self.add_services()
+
+        click.secho("\nStarting dev...", italic=True, dim=True)
+
+        if self.tunnel_url:
+            status_bar = Columns(
+                [
+                    Text.from_markup(
+                        f"[bold]Tunnel[/bold] [underline][link={self.tunnel_url}]{self.tunnel_url}[/link][/underline]"
+                    ),
+                    Text.from_markup(
+                        f"[dim][bold]Server[/bold] [link={self.url}]{self.url}[/link][/dim]"
+                    ),
+                    Text.from_markup(
+                        "[dim][bold]Ctrl+C[/bold] to stop[/dim]",
+                        justify="right",
+                    ),
+                ],
+                expand=True,
+            )
+        else:
+            status_bar = Columns(
+                [
+                    Text.from_markup(
+                        f"[bold]Server[/bold] [underline][link={self.url}]{self.url}[/link][/underline]"
+                    ),
+                    Text.from_markup(
+                        "[dim][bold]Ctrl+C[/bold] to stop[/dim]", justify="right"
+                    ),
+                ],
+                expand=True,
             )
 
-            self.symlink_plain_src()
-            self.modify_hosts_file()
-            self.set_csrf_and_allowed_hosts()
-            self.run_preflight()
+        with self.console.status(status_bar):
+            self.poncho.loop()
 
-            # Processes for poncho to run simultaneously
-            self.add_gunicorn()
-            self.add_entrypoints()
-            self.add_pyproject_run()
-            self.add_services()
-
-            click.secho("\nStarting dev...", italic=True, dim=True)
-
-            if self.tunnel_url:
-                status_bar = Columns(
-                    [
-                        Text.from_markup(
-                            f"[bold]Tunnel[/bold] [underline][link={self.tunnel_url}]{self.tunnel_url}[/link][/underline]"
-                        ),
-                        Text.from_markup(
-                            f"[dim][bold]Server[/bold] [link={self.url}]{self.url}[/link][/dim]"
-                        ),
-                        Text.from_markup(
-                            "[dim][bold]Ctrl+C[/bold] to stop[/dim]",
-                            justify="right",
-                        ),
-                    ],
-                    expand=True,
-                )
-            else:
-                status_bar = Columns(
-                    [
-                        Text.from_markup(
-                            f"[bold]Server[/bold] [underline][link={self.url}]{self.url}[/link][/underline]"
-                        ),
-                        Text.from_markup(
-                            "[dim][bold]Ctrl+C[/bold] to stop[/dim]", justify="right"
-                        ),
-                    ],
-                    expand=True,
-                )
-
-            with self.console.status(status_bar):
-                self.poncho.loop()
-
-            return self.poncho.returncode
-        finally:
-            pid.rm()
+        return self.poncho.returncode
 
     def symlink_plain_src(self):
         """Symlink the plain package into .plain so we can look at it easily"""
@@ -388,6 +385,12 @@ class Dev:
 
     def add_services(self):
         """Services are things that also run during tests (like a database), and are critical for the app to function."""
+
+        if Services.are_running():
+            click.secho("Services already running", fg="yellow")
+            return
+
+        # Split each service into a separate process
         services = Services.get_services(APP_PATH.parent)
         for name, data in services.items():
             env = {
