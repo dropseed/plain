@@ -218,10 +218,19 @@ class Dev:
         ).parent.parent
         if not settings.PLAIN_TEMP_PATH.exists():
             settings.PLAIN_TEMP_PATH.mkdir()
+
         symlink_path = settings.PLAIN_TEMP_PATH / "src"
 
-        # Remove a broken symlink if it changed
+        # The symlink is broken
         if symlink_path.is_symlink() and not symlink_path.exists():
+            symlink_path.unlink()
+
+        # The symlink exists but points to the wrong place
+        if (
+            symlink_path.is_symlink()
+            and symlink_path.exists()
+            and symlink_path.resolve() != plain_path
+        ):
             symlink_path.unlink()
 
         if plain_path.exists() and not symlink_path.exists():
@@ -389,6 +398,8 @@ class Dev:
         if Services.are_running():
             click.secho("Services already running", fg="yellow")
             return
+
+        # TODO need to set services pid here somehow...
 
         # Split each service into a separate process
         services = Services.get_services(APP_PATH.parent)
