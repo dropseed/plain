@@ -821,7 +821,9 @@ class BaseDatabaseSchemaEditor:
             old_field.remote_field
             and old_field.db_index
             and not old_field.unique
-            and (not new_field.db_index or new_field.unique)
+            and (
+                not (new_field.remote_field and new_field.db_index) or new_field.unique
+            )
         ):
             # Find the index for this field
             meta_index_names = {index.name for index in model._meta.indexes}
@@ -982,8 +984,11 @@ class BaseDatabaseSchemaEditor:
         # False              | True             | True               | False
         # True               | True             | True               | False
         if (
-            (not old_field.db_index or old_field.unique)
-            and (new_field.remote_field and new_field.db_index)
+            (not (old_field.remote_field and old_field.db_index) or old_field.unique)
+            and (
+                new_field.remote_field
+                and (new_field.remote_field and new_field.db_index)
+            )
             and not new_field.unique
         ):
             self.execute(self._create_index_sql(model, fields=[new_field]))
