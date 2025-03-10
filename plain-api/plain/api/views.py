@@ -63,7 +63,9 @@ class APIAuthViewMixin(AuthViewMixin):
             # Put the api_key on the request so we can access it
             self.request.api_key = api_key
 
-            # Set the user if api_key has that attribute (typically from a OneToOneField)
+            # Set the user if api_key has that attribute (typically from a ForeignKey)
+            # TODO OneToOneField is gone, so now this should get the users and error if there are multiple?
+            # or we need to move this to user space instead
             if user := getattr(api_key, "user", None):
                 self.request.user = user
 
