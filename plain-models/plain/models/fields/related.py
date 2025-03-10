@@ -18,10 +18,8 @@ from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForeignKeyDeferredAttribute,
     ForwardManyToOneDescriptor,
-    ForwardOneToOneDescriptor,
     ManyToManyDescriptor,
     ReverseManyToOneDescriptor,
-    ReverseOneToOneDescriptor,
 )
 from .related_lookups import (
     RelatedExact,
@@ -32,7 +30,7 @@ from .related_lookups import (
     RelatedLessThan,
     RelatedLessThanOrEqual,
 )
-from .reverse_related import ForeignObjectRel, ManyToManyRel, ManyToOneRel, OneToOneRel
+from .reverse_related import ForeignObjectRel, ManyToManyRel, ManyToOneRel
 
 RECURSIVE_RELATIONSHIP_CONSTANT = "self"
 
@@ -875,7 +873,6 @@ class ForeignKey(ForeignObject):
         return [
             *super().check(**kwargs),
             *self._check_on_delete(),
-            *self._check_unique(),
         ]
 
     def _check_on_delete(self):
@@ -903,24 +900,6 @@ class ForeignKey(ForeignObject):
             ]
         else:
             return []
-
-    def _check_unique(self, **kwargs):
-        return (
-            [
-                preflight.Warning(
-                    "Setting unique=True on a ForeignKey has the same effect as using "
-                    "a OneToOneField.",
-                    hint=(
-                        "ForeignKey(unique=True) is usually better served by a "
-                        "OneToOneField."
-                    ),
-                    obj=self,
-                    id="fields.W342",
-                )
-            ]
-            if self.unique
-            else []
-        )
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -1060,51 +1039,6 @@ class ForeignKey(ForeignObject):
                 if output_field is self:
                     raise ValueError("Cannot resolve output_field.")
         return super().get_col(alias, output_field)
-
-
-class OneToOneField(ForeignKey):
-    """
-    A OneToOneField is essentially the same as a ForeignKey, with the exception
-    that it always carries a "unique" constraint with it and the reverse
-    relation always returns the object pointed to (since there will only ever
-    be one), rather than returning a list.
-    """
-
-    # Field flags
-    many_to_many = False
-    many_to_one = False
-    one_to_many = False
-    one_to_one = True
-
-    related_accessor_class = ReverseOneToOneDescriptor
-    forward_related_accessor_class = ForwardOneToOneDescriptor
-    rel_class = OneToOneRel
-
-    description = "One-to-one relationship"
-
-    def __init__(self, to, on_delete, to_field=None, **kwargs):
-        kwargs["unique"] = True
-        super().__init__(to, on_delete, to_field=to_field, **kwargs)
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        if "unique" in kwargs:
-            del kwargs["unique"]
-        return name, path, args, kwargs
-
-    def save_form_data(self, instance, data):
-        if isinstance(data, self.remote_field.model):
-            setattr(instance, self.name, data)
-        else:
-            setattr(instance, self.attname, data)
-            # Remote field object must be cleared otherwise Model.save()
-            # will reassign attname using the related object pk.
-            if data is None:
-                setattr(instance, self.name, data)
-
-    def _check_unique(self, **kwargs):
-        # Override ForeignKey since check isn't applicable here.
-        return []
 
 
 def create_many_to_many_intermediary_model(field, klass):

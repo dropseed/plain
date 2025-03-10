@@ -63,10 +63,8 @@ def get_related_models_recursive(model):
     to the given model.
 
     Relationships are either defined by explicit relational fields, like
-    ForeignKey, ManyToManyField or OneToOneField, or by inheriting from another
-    model (a superclass is related to its subclasses, but not vice versa). Note,
-    however, that a model inheriting from a concrete model is also related to
-    its superclass through the implicit *_ptr OneToOneField on the subclass.
+    ForeignKey or ManyToManyField, or by inheriting from another
+    model (a superclass is related to its subclasses, but not vice versa).
     """
     seen = set()
     queue = _get_related_models(model)
@@ -341,8 +339,7 @@ class ProjectState:
 
         # Get all outgoing references from the model to be rendered
         model_state = self.models[(package_label, model_name)]
-        # Directly related models are the models pointed to by ForeignKeys,
-        # OneToOneFields, and ManyToManyFields.
+        # Directly related models are the models pointed to by ForeignKeys and ManyToManyFields.
         direct_related_models = set()
         for field in model_state.fields.values():
             if field.is_relation:

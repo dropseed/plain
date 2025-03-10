@@ -706,9 +706,7 @@ class Model(metaclass=ModelBase):
 
     def _prepare_related_fields_for_save(self, operation_name, fields=None):
         # Ensure that a model instance without a PK hasn't been assigned to
-        # a ForeignKey, GenericForeignKey or OneToOneField on this model. If
-        # the field is nullable, allowing the save would result in silent data
-        # loss.
+        # a ForeignKey on this model. If the field is nullable, allowing the save would result in silent data loss.
         for field in self._meta.concrete_fields:
             if fields and field not in fields:
                 continue

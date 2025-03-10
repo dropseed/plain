@@ -72,12 +72,10 @@ from .base import DEFERRED, Model  # isort:skip
 from .fields.related import (  # isort:skip
     ForeignKey,
     ForeignObject,
-    OneToOneField,
     ManyToManyField,
     ForeignObjectRel,
     ManyToOneRel,
     ManyToManyRel,
-    OneToOneRel,
 )
 
 
@@ -122,12 +120,10 @@ __all__ += [
     "FilteredRelation",
     "ForeignKey",
     "ForeignObject",
-    "OneToOneField",
     "ManyToManyField",
     "ForeignObjectRel",
     "ManyToOneRel",
     "ManyToManyRel",
-    "OneToOneRel",
 ]
 
 # DB-related exports
