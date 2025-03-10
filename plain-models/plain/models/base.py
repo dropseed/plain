@@ -839,7 +839,7 @@ class Model(metaclass=ModelBase):
                 name = f.name
                 if name in exclude:
                     continue
-                if f.unique:
+                if f.primary_key:
                     unique_checks.append((model_class, (name,)))
 
         return unique_checks

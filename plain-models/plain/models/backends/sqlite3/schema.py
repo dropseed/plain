@@ -355,10 +355,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if field.many_to_many and field.remote_field.through._meta.auto_created:
             self.create_model(field.remote_field.through)
         elif (
-            # Primary keys and unique fields are not supported in ALTER TABLE
+            # Primary keys are not supported in ALTER TABLE
             # ADD COLUMN.
             field.primary_key
-            or field.unique
             or
             # Fields with default values cannot by handled by ALTER TABLE ADD
             # COLUMN statement because DROP DEFAULT is not supported in
@@ -386,7 +385,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # Primary keys, unique fields, indexed fields, and foreign keys are
             # not supported in ALTER TABLE DROP COLUMN.
             and not field.primary_key
-            and not field.unique
             and not (field.remote_field and field.db_index)
             and not (field.remote_field and field.db_constraint)
         ):
@@ -433,7 +431,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Rebuild tables with FKs pointing to this field.
         old_collation = old_db_params.get("collation")
         new_collation = new_db_params.get("collation")
-        if new_field.unique and (
+        if new_field.primary_key and (
             old_type != new_type or old_collation != new_collation
         ):
             related_models = set()

@@ -1121,7 +1121,7 @@ class SQLCompiler:
             reverse_choices = (
                 f.field.related_query_name()
                 for f in opts.related_objects
-                if f.field.unique
+                if f.field.primary_key
             )
             return chain(
                 direct_choices, reverse_choices, self.query._filtered_relations
@@ -1175,7 +1175,7 @@ class SQLCompiler:
                 "reverse": False,
                 "local_setter": f.set_cached_value,
                 "remote_setter": f.remote_field.set_cached_value
-                if f.unique
+                if f.primary_key
                 else lambda x, y: None,
             }
             related_klass_infos.append(klass_info)
@@ -1204,7 +1204,7 @@ class SQLCompiler:
             related_fields = [
                 (o.field, o.related_model)
                 for o in opts.related_objects
-                if o.field.unique and not o.many_to_many
+                if o.field.primary_key and not o.many_to_many
             ]
             for related_field, model in related_fields:
                 related_select_mask = select_mask.get(related_field) or {}

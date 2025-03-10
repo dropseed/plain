@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                         primary_key=True,
                     ),
                 ),
-                ("key", models.CharField(max_length=255, unique=True)),
+                ("key", models.CharField(max_length=255)),
                 ("value", models.JSONField(required=False, allow_null=True)),
                 (
                     "expires_at",

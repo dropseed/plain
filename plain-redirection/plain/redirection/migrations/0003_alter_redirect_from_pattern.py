@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="redirect",
             name="from_pattern",
-            field=models.CharField(max_length=255, unique=True),
+            field=models.CharField(max_length=255),
         ),
     ]

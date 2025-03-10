@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "uuid",
-                    models.UUIDField(default=uuid.uuid4, unique=True),
+                    models.UUIDField(default=uuid.uuid4),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
@@ -34,7 +34,6 @@ class Migration(migrations.Migration):
                     "name",
                     models.CharField(
                         max_length=255,
-                        unique=True,
                         validators=[plain.flags.models.validate_flag_name],
                     ),
                 ),
@@ -55,7 +54,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "uuid",
-                    models.UUIDField(default=uuid.uuid4, unique=True),
+                    models.UUIDField(default=uuid.uuid4),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),

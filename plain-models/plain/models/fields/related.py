@@ -538,7 +538,7 @@ class ForeignObject(RelatedField):
         unique_foreign_fields = {
             frozenset([f.name])
             for f in self.remote_field.model._meta.get_fields()
-            if getattr(f, "unique", False)
+            if getattr(f, "primary_key", False)
         }
         unique_foreign_fields.update(
             {
@@ -558,7 +558,7 @@ class ForeignObject(RelatedField):
                 preflight.Error(
                     f"No subset of the fields {field_combination} on model '{model_name}' is unique.",
                     hint=(
-                        "Mark a single field as unique=True or add a set of "
+                        "Add a set of "
                         "fields to a unique constraint (via "
                         "a UniqueConstraint (without condition) in the "
                         "model Meta.constraints)."
@@ -575,8 +575,7 @@ class ForeignObject(RelatedField):
                     f"'{model_name}.{field_name}' must be unique because it is referenced by "
                     "a foreign key.",
                     hint=(
-                        "Add unique=True to this field or add a "
-                        "UniqueConstraint (without condition) in the model "
+                        "Add a UniqueConstraint (without condition) in the model "
                         "Meta.constraints."
                     ),
                     obj=self,
@@ -741,7 +740,7 @@ class ForeignObject(RelatedField):
                 to_opts=opts,
                 target_fields=(opts.pk,),
                 join_field=self.remote_field,
-                m2m=not self.unique,
+                m2m=not self.primary_key,
                 direct=False,
                 filtered_relation=filtered_relation,
             )
@@ -1169,22 +1168,10 @@ class ManyToManyField(RelatedField):
     def check(self, **kwargs):
         return [
             *super().check(**kwargs),
-            *self._check_unique(**kwargs),
             *self._check_relationship_model(**kwargs),
             *self._check_ignored_options(**kwargs),
             *self._check_table_uniqueness(**kwargs),
         ]
-
-    def _check_unique(self, **kwargs):
-        if self.unique:
-            return [
-                preflight.Error(
-                    "ManyToManyFields cannot be unique.",
-                    obj=self,
-                    id="fields.E330",
-                )
-            ]
-        return []
 
     def _check_ignored_options(self, **kwargs):
         warnings = []

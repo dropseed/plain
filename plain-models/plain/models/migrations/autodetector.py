@@ -869,7 +869,7 @@ class MigrationAutodetector:
                     field_name, model_name
                 )
         if (
-            field.unique
+            field.primary_key
             and field.default is not models.NOT_PROVIDED
             and callable(field.default)
         ):

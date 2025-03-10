@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "uuid",
-                    models.UUIDField(default=uuid.uuid4, unique=True),
+                    models.UUIDField(default=uuid.uuid4),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (

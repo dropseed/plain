@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
                 ("id", models.BigAutoField(auto_created=True, primary_key=True)),
                 (
                     "uuid",
-                    models.UUIDField(default=uuid.uuid4, unique=True),
+                    models.UUIDField(default=uuid.uuid4),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
@@ -30,7 +30,6 @@ class Migration(migrations.Migration):
                     models.CharField(
                         default=plain.api.models.generate_token,
                         max_length=40,
-                        unique=True,
                     ),
                 ),
             ],

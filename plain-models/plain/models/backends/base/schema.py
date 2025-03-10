@@ -305,14 +305,14 @@ class BaseDatabaseSchemaEditor:
             and self.connection.features.interprets_empty_strings_as_nulls
         ):
             null = True
+
         if not null:
             yield "NOT NULL"
         elif not self.connection.features.implied_column_null:
             yield "NULL"
+
         if field.primary_key:
             yield "PRIMARY KEY"
-        elif field.unique:
-            yield "UNIQUE"
 
     def column_sql(self, model, field, include_default=False):
         """
@@ -766,8 +766,9 @@ class BaseDatabaseSchemaEditor:
                 fks_dropped.add((old_field.column,))
                 self.execute(self._delete_fk_sql(model, fk_name))
         # Has unique been removed?
-        if old_field.unique and (
-            not new_field.unique or self._field_became_primary_key(old_field, new_field)
+        if old_field.primary_key and (
+            not new_field.primary_key
+            or self._field_became_primary_key(old_field, new_field)
         ):
             # Find the unique constraint for this field
             meta_constraint_names = {
@@ -792,10 +793,7 @@ class BaseDatabaseSchemaEditor:
         new_collation = new_db_params.get("collation")
         drop_foreign_keys = (
             self.connection.features.supports_foreign_keys
-            and (
-                (old_field.primary_key and new_field.primary_key)
-                or (old_field.unique and new_field.unique)
-            )
+            and (old_field.primary_key and new_field.primary_key)
             and ((old_type != new_type) or (old_collation != new_collation))
         )
         if drop_foreign_keys:
@@ -812,17 +810,17 @@ class BaseDatabaseSchemaEditor:
         # will now be used in lieu of an index. The following lines from the
         # truth table show all True cases; the rest are False:
         #
-        # old_field.db_index | old_field.unique | new_field.db_index | new_field.unique
+        # old_field.db_index | old_field.primary_key | new_field.db_index | new_field.primary_key
         # ------------------------------------------------------------------------------
         # True               | False            | False              | False
         # True               | False            | False              | True
         # True               | False            | True               | True
         if (
-            old_field.remote_field
-            and old_field.db_index
-            and not old_field.unique
+            (old_field.remote_field and old_field.db_index)
+            and not old_field.primary_key
             and (
-                not (new_field.remote_field and new_field.db_index) or new_field.unique
+                not (new_field.remote_field and new_field.db_index)
+                or new_field.primary_key
             )
         ):
             # Find the index for this field
@@ -971,25 +969,23 @@ class BaseDatabaseSchemaEditor:
         # If primary_key changed to False, delete the primary key constraint.
         if old_field.primary_key and not new_field.primary_key:
             self._delete_primary_key(model, strict)
-        # Added a unique?
-        if self._unique_should_be_added(old_field, new_field):
-            self.execute(self._create_unique_sql(model, [new_field]))
+
         # Added an index? Add an index if db_index switched to True or a unique
         # constraint will no longer be used in lieu of an index. The following
         # lines from the truth table show all True cases; the rest are False:
         #
-        # old_field.db_index | old_field.unique | new_field.db_index | new_field.unique
+        # old_field.db_index | old_field.primary_key | new_field.db_index | new_field.primary_key
         # ------------------------------------------------------------------------------
         # False              | False            | True               | False
         # False              | True             | True               | False
         # True               | True             | True               | False
         if (
-            (not (old_field.remote_field and old_field.db_index) or old_field.unique)
-            and (
-                new_field.remote_field
-                and (new_field.remote_field and new_field.db_index)
+            (
+                not (old_field.remote_field and old_field.db_index)
+                or old_field.primary_key
             )
-            and not new_field.unique
+            and (new_field.remote_field and new_field.db_index)
+            and not new_field.primary_key
         ):
             self.execute(self._create_index_sql(model, fields=[new_field]))
         # Type alteration on primary key? Then we need to alter the column
@@ -1386,17 +1382,10 @@ class BaseDatabaseSchemaEditor:
         ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
 
     def _field_should_be_indexed(self, model, field):
-        return (field.remote_field and field.db_index) and not field.unique
+        return (field.remote_field and field.db_index) and not field.primary_key
 
     def _field_became_primary_key(self, old_field, new_field):
         return not old_field.primary_key and new_field.primary_key
-
-    def _unique_should_be_added(self, old_field, new_field):
-        return (
-            not new_field.primary_key
-            and new_field.unique
-            and (not old_field.unique or old_field.primary_key)
-        )
 
     def _rename_field_sql(self, table, old_field, new_field, new_type):
         return self.sql_rename_column % {

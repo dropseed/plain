@@ -168,7 +168,6 @@ class Field(RegisterLookupMixin):
         *,
         primary_key=False,
         max_length=None,
-        unique=False,
         required=True,
         allow_null=False,
         rel=None,
@@ -182,7 +181,7 @@ class Field(RegisterLookupMixin):
     ):
         self.name = None  # Set by set_attributes_from_name
         self.primary_key = primary_key
-        self.max_length, self._unique = max_length, unique
+        self.max_length = max_length
         self.required, self.allow_null = required, allow_null
         self.remote_field = rel
         self.is_relation = self.remote_field is not None
@@ -503,7 +502,6 @@ class Field(RegisterLookupMixin):
         possibles = {
             "primary_key": False,
             "max_length": None,
-            "unique": False,
             "required": True,
             "allow_null": False,
             "default": NOT_PROVIDED,
@@ -515,7 +513,6 @@ class Field(RegisterLookupMixin):
             "error_messages": None,
         }
         attr_overrides = {
-            "unique": "_unique",
             "error_messages": "_error_messages",
             "validators": "_validators",
         }
@@ -802,10 +799,6 @@ class Field(RegisterLookupMixin):
         if hasattr(self, "from_db_value"):
             return [self.from_db_value]
         return []
-
-    @property
-    def unique(self):
-        return self._unique or self.primary_key
 
     @property
     def db_returning(self):

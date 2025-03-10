@@ -36,7 +36,7 @@ class DatabaseValidation(BaseDatabaseValidation):
         errors = []
         if (
             field_type.startswith("varchar")
-            and field.unique
+            and field.primary_key
             and (field.max_length is None or int(field.max_length) > 255)
         ):
             errors.append(

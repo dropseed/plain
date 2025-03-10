@@ -965,7 +965,7 @@ class QuerySet:
         ]
         if (
             field_name != "pk"
-            and not opts.get_field(field_name).unique
+            and not opts.get_field(field_name).primary_key
             and field_name not in unique_fields
             and self.query.distinct_fields != (field_name,)
         ):
