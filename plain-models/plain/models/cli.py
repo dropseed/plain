@@ -691,7 +691,8 @@ def migrate(
             backup is None
             and settings.DEBUG
             and click.confirm(
-                "\nYou are in DEBUG mode. Would you like to make a database backup before running migrations?"
+                "\nYou are in DEBUG mode. Would you like to make a database backup before running migrations?",
+                default=True,
             )
         ):
             backup_name = f"migrate_{time.strftime('%Y%m%d_%H%M%S')}"
