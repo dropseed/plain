@@ -29,6 +29,8 @@ class MigrationRecorder:
         MigrationRecorder.
         """
         if cls._migration_class is None:
+            _models_registry = ModelsRegistry()
+            _models_registry.ready = True
 
             class Migration(models.Model):
                 app = models.CharField(max_length=255)
@@ -36,7 +38,7 @@ class MigrationRecorder:
                 applied = models.DateTimeField(default=now)
 
                 class Meta:
-                    models_registry = ModelsRegistry()
+                    models_registry = _models_registry
                     package_label = "migrations"
                     db_table = "plainmigrations"
 
