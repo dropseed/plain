@@ -27,7 +27,6 @@ DEFAULT_NAMES = (
     "ordering",
     "get_latest_by",
     "package_label",
-    "auto_created",
     "models_registry",
     "default_related_name",
     "required_db_features",
@@ -86,7 +85,6 @@ class Options:
         # in the end of the proxy_for_model chain. In particular, for
         # concrete models, the concrete_model is always the class itself.
         self.concrete_model = None
-        self.auto_created = False
 
         # List of all lookups defined in ForeignKey 'limit_choices_to' options
         # from *other* models. Needed for some admin checks. Internal use only.
@@ -483,7 +481,7 @@ class Options:
         """
         related_objects_graph = defaultdict(list)
 
-        all_models = self.models_registry.get_models(include_auto_created=True)
+        all_models = self.models_registry.get_models()
         for model in all_models:
             opts = model._meta
 

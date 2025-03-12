@@ -258,13 +258,9 @@ class ConnectionRouter:
             model=model,
         )
 
-    def get_migratable_models(
-        self, models_registry, package_label, db, include_auto_created=False
-    ):
+    def get_migratable_models(self, models_registry, package_label, db):
         """Return app models allowed to be migrated on provided db."""
-        models = models_registry.get_models(
-            package_label=package_label, include_auto_created=include_auto_created
-        )
+        models = models_registry.get_models(package_label=package_label)
         return [model for model in models if self.allow_migrate_model(db, model)]
 
 

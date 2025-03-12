@@ -924,34 +924,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             )
             return target_ids.difference(vals)
 
-        def _get_add_plan(self, db, source_field_name):
-            """
-            Return a boolean triple of the way the add should be performed.
-
-            The first element is whether or not bulk_create(ignore_conflicts)
-            can be used, the second whether or not signals must be sent, and
-            the third element is whether or not the immediate bulk insertion
-            with conflicts ignored can be performed.
-            """
-            # Conflicts can be ignored when the intermediary model is
-            # auto-created as the only possible collision is on the
-            # (source_id, target_id) tuple. The same assertion doesn't hold for
-            # user-defined intermediary models as they could have other fields
-            # causing conflicts which must be surfaced.
-            can_ignore_conflicts = (
-                self.through._meta.auto_created is not False
-                and connections[db].features.supports_ignore_conflicts
-            )
-
-            # Fast addition through bulk insertion can only be performed
-            # if no m2m_changed listeners are connected for self.through
-            # as they require the added set of ids to be provided via
-            # pk_set.
-            return (
-                can_ignore_conflicts,
-                can_ignore_conflicts,
-            )
-
         def _add_items(
             self, source_field_name, target_field_name, *objs, through_defaults=None
         ):
@@ -965,23 +937,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             through_defaults = dict(resolve_callables(through_defaults or {}))
             target_ids = self._get_target_ids(target_field_name, objs)
             db = router.db_for_write(self.through, instance=self.instance)
-            can_ignore_conflicts, can_fast_add = self._get_add_plan(
-                db, source_field_name
-            )
-            if can_fast_add:
-                self.through._default_manager.using(db).bulk_create(
-                    [
-                        self.through(
-                            **{
-                                f"{source_field_name}_id": self.related_val[0],
-                                f"{target_field_name}_id": target_id,
-                            }
-                        )
-                        for target_id in target_ids
-                    ],
-                    ignore_conflicts=True,
-                )
-                return
 
             missing_target_ids = self._get_missing_target_ids(
                 source_field_name, target_field_name, db, target_ids
@@ -999,7 +954,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                         )
                         for target_id in missing_target_ids
                     ],
-                    ignore_conflicts=can_ignore_conflicts,
                 )
 
         def _remove_items(self, source_field_name, target_field_name, *objs):

@@ -303,13 +303,13 @@ class ManyToManyRel(ForeignObjectRel):
         self,
         field,
         to,
+        *,
+        through,
+        through_fields=None,
         related_name=None,
         related_query_name=None,
         limit_choices_to=None,
         symmetrical=True,
-        through=None,
-        through_fields=None,
-        db_constraint=True,
     ):
         super().__init__(
             field,
@@ -319,16 +319,11 @@ class ManyToManyRel(ForeignObjectRel):
             limit_choices_to=limit_choices_to,
         )
 
-        if through and not db_constraint:
-            raise ValueError("Can't supply a through model and db_constraint=False")
         self.through = through
-
-        if through_fields and not through:
-            raise ValueError("Cannot specify through_fields without a through model")
         self.through_fields = through_fields
 
         self.symmetrical = symmetrical
-        self.db_constraint = db_constraint
+        self.db_constraint = True
 
     @property
     def identity(self):

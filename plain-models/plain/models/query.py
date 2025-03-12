@@ -594,20 +594,10 @@ class QuerySet:
             obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
     def _check_bulk_create_options(
-        self, ignore_conflicts, update_conflicts, update_fields, unique_fields
+        self, update_conflicts, update_fields, unique_fields
     ):
-        if ignore_conflicts and update_conflicts:
-            raise ValueError(
-                "ignore_conflicts and update_conflicts are mutually exclusive."
-            )
         db_features = connections[self.db].features
-        if ignore_conflicts:
-            if not db_features.supports_ignore_conflicts:
-                raise NotSupportedError(
-                    "This database backend does not support ignoring conflicts."
-                )
-            return OnConflict.IGNORE
-        elif update_conflicts:
+        if update_conflicts:
             if not db_features.supports_update_conflicts:
                 raise NotSupportedError(
                     "This database backend does not support updating conflicts."
@@ -650,7 +640,6 @@ class QuerySet:
         self,
         objs,
         batch_size=None,
-        ignore_conflicts=False,
         update_conflicts=False,
         update_fields=None,
         unique_fields=None,
@@ -688,7 +677,6 @@ class QuerySet:
         if update_fields:
             update_fields = [self.model._meta.get_field(name) for name in update_fields]
         on_conflict = self._check_bulk_create_options(
-            ignore_conflicts,
             update_conflicts,
             update_fields,
             unique_fields,

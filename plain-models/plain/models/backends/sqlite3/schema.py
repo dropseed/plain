@@ -245,12 +245,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if delete_field:
             del body[delete_field.name]
             del mapping[delete_field.column]
-            # Remove any implicit M2M tables
-            if (
-                delete_field.many_to_many
-                and delete_field.remote_field.through._meta.auto_created
-            ):
-                return self.delete_model(delete_field.remote_field.through)
         # Work inside a new app registry
         models_registry = ModelsRegistry()
 
@@ -351,10 +345,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def add_field(self, model, field):
         """Create a field on a model."""
-        # Special-case implicit M2M tables.
-        if field.many_to_many and field.remote_field.through._meta.auto_created:
-            self.create_model(field.remote_field.through)
-        elif (
+        if (
             # Primary keys are not supported in ALTER TABLE
             # ADD COLUMN.
             field.primary_key
@@ -376,10 +367,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         """
         # M2M fields are a special case
         if field.many_to_many:
-            # For implicit M2M tables, delete the auto-created table
-            if field.remote_field.through._meta.auto_created:
-                self.delete_model(field.remote_field.through)
             # For explicit "through" M2M fields, do nothing
+            pass
         elif (
             self.connection.features.can_alter_table_drop_column
             # Primary keys, unique fields, indexed fields, and foreign keys are
@@ -443,15 +432,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 if not remote_field.many_to_many:
                     if remote_field.field_name == new_field.name:
                         related_models.add(remote_field.related_model)
-                elif new_field.primary_key and remote_field.through._meta.auto_created:
-                    related_models.add(remote_field.through)
             if new_field.primary_key:
                 for many_to_many in opts.many_to_many:
                     # Ignore self-relationship since the table was already rebuilt.
                     if many_to_many.related_model == model:
                         continue
-                    if many_to_many.remote_field.through._meta.auto_created:
-                        related_models.add(many_to_many.remote_field.through)
             for related_model in related_models:
                 self._remake_table(related_model)
 

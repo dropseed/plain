@@ -123,14 +123,6 @@ class BaseDatabaseIntrospection:
                         cursor, model._meta.db_table, model._meta.local_fields
                     )
                 )
-                for f in model._meta.local_many_to_many:
-                    # If this is an m2m using an intermediate table,
-                    # we don't need to reset the sequence.
-                    if f.remote_field.through._meta.auto_created:
-                        sequence = self.get_sequences(cursor, f.m2m_db_table())
-                        sequence_list.extend(
-                            sequence or [{"table": f.m2m_db_table(), "column": None}]
-                        )
         return sequence_list
 
     def get_sequences(self, cursor, table_name, table_fields=()):

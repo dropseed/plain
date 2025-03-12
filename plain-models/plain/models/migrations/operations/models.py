@@ -321,24 +321,6 @@ class RenameModel(ModelOperation):
                     related_object.field,
                     to_field,
                 )
-            # Rename M2M fields whose name is based on this model's name.
-            fields = zip(
-                old_model._meta.local_many_to_many, new_model._meta.local_many_to_many
-            )
-            for old_field, new_field in fields:
-                # Skip self-referential fields as these are renamed above.
-                if (
-                    new_field.model == new_field.related_model
-                    or not new_field.remote_field.through._meta.auto_created
-                ):
-                    continue
-                # Rename columns and the M2M table.
-                schema_editor._alter_many_to_many(
-                    new_model,
-                    old_field,
-                    new_field,
-                    strict=False,
-                )
 
     def references_model(self, name, package_label):
         return (
@@ -408,16 +390,6 @@ class AlterModelTable(ModelOptionOperation):
                 old_model._meta.db_table,
                 new_model._meta.db_table,
             )
-            # Rename M2M fields whose name is based on this model's db_table
-            for old_field, new_field in zip(
-                old_model._meta.local_many_to_many, new_model._meta.local_many_to_many
-            ):
-                if new_field.remote_field.through._meta.auto_created:
-                    schema_editor.alter_db_table(
-                        new_field.remote_field.through,
-                        old_field.remote_field.through._meta.db_table,
-                        new_field.remote_field.through._meta.db_table,
-                    )
 
     def describe(self):
         return "Rename table for {} to {}".format(

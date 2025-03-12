@@ -35,7 +35,7 @@ class ModelsRegistry:
 
     # This method is performance-critical at least for Plain's test suite.
     @functools.cache
-    def get_models(self, *, package_label="", include_auto_created=False):
+    def get_models(self, *, package_label=""):
         """
         Return a list of all installed models.
 
@@ -55,16 +55,12 @@ class ModelsRegistry:
         if package_label:
             package_models = self.all_models[package_label]
             for model in package_models.values():
-                if model._meta.auto_created and not include_auto_created:
-                    continue
                 models.append(model)
             return models
 
         # Get models for all packages
         for package_models in self.all_models.values():
             for model in package_models.values():
-                if model._meta.auto_created and not include_auto_created:
-                    continue
                 models.append(model)
 
         return models

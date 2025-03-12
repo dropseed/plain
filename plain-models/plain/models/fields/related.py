@@ -3,16 +3,15 @@ import inspect
 from functools import partial
 
 from plain import exceptions, preflight
-from plain.models.backends import utils
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import connection, router
-from plain.models.deletion import CASCADE, SET_DEFAULT, SET_NULL
+from plain.models.db import router
+from plain.models.deletion import SET_DEFAULT, SET_NULL
 from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
 from plain.runtime import SettingsReference, settings
 from plain.utils.functional import cached_property
 
-from ..registry import models_registry, register_model
+from ..registry import models_registry
 from . import Field
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
@@ -1037,59 +1036,6 @@ class ForeignKey(ForeignObject):
         return super().get_col(alias, output_field)
 
 
-def create_many_to_many_intermediary_model(field, klass):
-    from plain import models
-
-    to_model = resolve_relation(klass, field.remote_field.model)
-    name = f"{klass._meta.object_name}_{field.name}"
-
-    to = make_model_tuple(to_model)[1]
-    from_ = klass._meta.model_name
-    if to == from_:
-        to = f"to_{to}"
-        from_ = f"from_{from_}"
-
-    meta = type(
-        "Meta",
-        (),
-        {
-            "db_table": field._get_m2m_db_table(klass._meta),
-            "auto_created": klass,
-            "package_label": klass._meta.package_label,
-            "constraints": [
-                models.UniqueConstraint(
-                    fields=[from_, to],
-                    name=f"{klass._meta.package_label}_{name.lower()}_unique",
-                )
-            ],
-            "models_registry": field.model._meta.models_registry,
-        },
-    )
-    # Construct and return the new class.
-    model_class = type(
-        name,
-        (models.Model,),
-        {
-            "Meta": meta,
-            "__module__": klass.__module__,
-            from_: models.ForeignKey(
-                klass,
-                related_name=f"{name}+",
-                db_constraint=field.remote_field.db_constraint,
-                on_delete=CASCADE,
-            ),
-            to: models.ForeignKey(
-                to_model,
-                related_name=f"{name}+",
-                db_constraint=field.remote_field.db_constraint,
-                on_delete=CASCADE,
-            ),
-        },
-    )
-    register_model(model_class)
-    return model_class
-
-
 class ManyToManyField(RelatedField):
     """
     Provide a many-to-many relation by using an intermediary model that
@@ -1112,14 +1058,13 @@ class ManyToManyField(RelatedField):
     def __init__(
         self,
         to,
+        *,
+        through,
+        through_fields=None,
         related_name=None,
         related_query_name=None,
         limit_choices_to=None,
         symmetrical=None,
-        through=None,
-        through_fields=None,
-        db_constraint=True,
-        db_table=None,
         **kwargs,
     ):
         try:
@@ -1134,10 +1079,8 @@ class ManyToManyField(RelatedField):
         if symmetrical is None:
             symmetrical = to == RECURSIVE_RELATIONSHIP_CONSTANT
 
-        if through is not None and db_table is not None:
-            raise ValueError(
-                "Cannot specify a db_table if an intermediary model is used."
-            )
+        if not through:
+            raise ValueError("ManyToManyField must have a 'through' argument.")
 
         kwargs["rel"] = self.rel_class(
             self,
@@ -1148,7 +1091,6 @@ class ManyToManyField(RelatedField):
             symmetrical=symmetrical,
             through=through,
             through_fields=through_fields,
-            db_constraint=db_constraint,
         )
         self.has_null_arg = "allow_null" in kwargs
 
@@ -1158,8 +1100,6 @@ class ManyToManyField(RelatedField):
             limit_choices_to=limit_choices_to,
             **kwargs,
         )
-
-        self.db_table = db_table
 
     def check(self, **kwargs):
         return [
@@ -1217,9 +1157,7 @@ class ManyToManyField(RelatedField):
 
         errors = []
 
-        if self.remote_field.through not in self.opts.models_registry.get_models(
-            include_auto_created=True
-        ):
+        if self.remote_field.through not in self.opts.models_registry.get_models():
             # The relationship model is not installed.
             errors.append(
                 preflight.Error(
@@ -1423,7 +1361,7 @@ class ManyToManyField(RelatedField):
             return []
         registered_tables = {
             model._meta.db_table: model
-            for model in self.opts.models_registry.get_models(include_auto_created=True)
+            for model in self.opts.models_registry.get_models()
             if model != self.remote_field.through
         }
         m2m_db_table = self.m2m_db_table()
@@ -1435,17 +1373,7 @@ class ManyToManyField(RelatedField):
             and model._meta.concrete_model
             != self.remote_field.through._meta.concrete_model
         ):
-            if model._meta.auto_created:
-
-                def _get_field_name(model):
-                    for field in model._meta.auto_created._meta.many_to_many:
-                        if field.remote_field.through is model:
-                            return field.name
-
-                opts = model._meta.auto_created._meta
-                clashing_obj = f"{opts.label}.{_get_field_name(model)}"
-            else:
-                clashing_obj = model._meta.label
+            clashing_obj = model._meta.label
             if settings.DATABASE_ROUTERS:
                 error_class, error_id = preflight.Warning, "fields.W344"
                 error_hint = (
@@ -1469,11 +1397,10 @@ class ManyToManyField(RelatedField):
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        # Handle the simpler arguments.
-        if self.db_table is not None:
-            kwargs["db_table"] = self.db_table
+
         if self.remote_field.db_constraint is not True:
             kwargs["db_constraint"] = self.remote_field.db_constraint
+
         # Lowercase model names as they should be treated as case-insensitive.
         if isinstance(self.remote_field.model, str):
             if "." in self.remote_field.model:
@@ -1483,11 +1410,12 @@ class ManyToManyField(RelatedField):
                 kwargs["to"] = self.remote_field.model.lower()
         else:
             kwargs["to"] = self.remote_field.model._meta.label_lower
-        if getattr(self.remote_field, "through", None) is not None:
-            if isinstance(self.remote_field.through, str):
-                kwargs["through"] = self.remote_field.through
-            elif not self.remote_field.through._meta.auto_created:
-                kwargs["through"] = self.remote_field.through._meta.label
+
+        if isinstance(self.remote_field.through, str):
+            kwargs["through"] = self.remote_field.through
+        else:
+            kwargs["through"] = self.remote_field.through._meta.label
+
         return name, path, args, kwargs
 
     def _get_path_info(self, direct=False, filtered_relation=None):
@@ -1524,18 +1452,12 @@ class ManyToManyField(RelatedField):
     def reverse_path_infos(self):
         return self.get_reverse_path_info()
 
-    def _get_m2m_db_table(self, opts):
+    def _get_m2m_db_table(self):
         """
         Function that can be curried to provide the m2m table name for this
         relation.
         """
-        if self.remote_field.through is not None:
-            return self.remote_field.through._meta.db_table
-        elif self.db_table:
-            return self.db_table
-        else:
-            m2m_table_name = f"{utils.strip_quotes(opts.db_table)}_{self.name}"
-            return utils.truncate_name(m2m_table_name, connection.ops.max_name_length())
+        return self.remote_field.through._meta.db_table
 
     def _get_m2m_attr(self, related, attr):
         """
@@ -1611,26 +1533,18 @@ class ManyToManyField(RelatedField):
 
         super().contribute_to_class(cls, name, **kwargs)
 
-        # The intermediate m2m model is not auto created if:
-        #  1) There is a manually specified intermediate
-        if self.remote_field.through:
+        def resolve_through_model(_, model, field):
+            field.remote_field.through = model
 
-            def resolve_through_model(_, model, field):
-                field.remote_field.through = model
-
-            lazy_related_operation(
-                resolve_through_model, cls, self.remote_field.through, field=self
-            )
-        else:
-            self.remote_field.through = create_many_to_many_intermediary_model(
-                self, cls
-            )
+        lazy_related_operation(
+            resolve_through_model, cls, self.remote_field.through, field=self
+        )
 
         # Add the descriptor for the m2m relation.
         setattr(cls, self.name, ManyToManyDescriptor(self.remote_field, reverse=False))
 
         # Set up the accessor for the m2m table name for the relation.
-        self.m2m_db_table = partial(self._get_m2m_db_table, cls._meta)
+        self.m2m_db_table = self._get_m2m_db_table
 
     def contribute_to_related_class(self, cls, related):
         # Internal M2Ms (i.e., those with a related name ending with '+')

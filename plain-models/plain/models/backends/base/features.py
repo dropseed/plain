@@ -136,9 +136,6 @@ class BaseDatabaseFeatures:
     # What formats does the backend EXPLAIN syntax support?
     supported_explain_formats = set()
 
-    # Does the backend support ignoring constraint or uniqueness errors during
-    # INSERT?
-    supports_ignore_conflicts = True
     # Does the backend support updating rows on constraint or uniqueness errors
     # during INSERT?
     supports_update_conflicts = False

@@ -443,17 +443,8 @@ class BaseDatabaseSchemaEditor:
         # Add any field index (deferred as SQLite _remake_table needs it).
         self.deferred_sql.extend(self._model_indexes_sql(model))
 
-        # Make M2M tables
-        for field in model._meta.local_many_to_many:
-            if field.remote_field.through._meta.auto_created:
-                self.create_model(field.remote_field.through)
-
     def delete_model(self, model):
         """Delete a model from the database."""
-        # Handle auto-created intermediary models
-        for field in model._meta.local_many_to_many:
-            if field.remote_field.through._meta.auto_created:
-                self.delete_model(field.remote_field.through)
 
         # Delete the table
         self.execute(
@@ -546,9 +537,6 @@ class BaseDatabaseSchemaEditor:
         Create a field on a model. Usually involves adding a column, but may
         involve adding a table instead (for M2M fields).
         """
-        # Special-case implicit M2M tables
-        if field.many_to_many and field.remote_field.through._meta.auto_created:
-            return self.create_model(field.remote_field.through)
         # Get the column's definition
         definition, params = self.column_sql(model, field, include_default=True)
         # It might not actually have a column behind it
@@ -630,9 +618,6 @@ class BaseDatabaseSchemaEditor:
         Remove a field from a model. Usually involves deleting a column,
         but for M2Ms may involve deleting a table.
         """
-        # Special-case implicit M2M tables
-        if field.many_to_many and field.remote_field.through._meta.auto_created:
-            return self.delete_model(field.remote_field.through)
         # It might not actually have a column behind it
         if field.db_parameters(connection=self.connection)["type"] is None:
             return
@@ -682,23 +667,7 @@ class BaseDatabaseSchemaEditor:
         elif (
             old_type is None
             and new_type is None
-            and (
-                old_field.remote_field.through
-                and new_field.remote_field.through
-                and old_field.remote_field.through._meta.auto_created
-                and new_field.remote_field.through._meta.auto_created
-            )
-        ):
-            return self._alter_many_to_many(model, old_field, new_field, strict)
-        elif (
-            old_type is None
-            and new_type is None
-            and (
-                old_field.remote_field.through
-                and new_field.remote_field.through
-                and not old_field.remote_field.through._meta.auto_created
-                and not new_field.remote_field.through._meta.auto_created
-            )
+            and (old_field.remote_field.through and new_field.remote_field.through)
         ):
             # Both sides have through models; this is a no-op.
             return
