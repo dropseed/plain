@@ -537,7 +537,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-models"
-version = "0.24.0"
+version = "0.25.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
