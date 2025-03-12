@@ -2,6 +2,27 @@
 
 Track pageviews from the client-side.
 
+## Installation
+
+Install `plain.pageviews` and add it to `INSTALLED_PACKAGES`.
+
+Add `PageviewsRouter` to your urls.
+
+Add `{% pageviews_js %}` to your `base.html` template to include the tracking code on the client side.
+
+## Admin integration
+
+```python
+from plain.pageviews.admin import UserPageviewsCard
+
+
+@register_viewset
+class UserAdmin(AdminViewset):
+    class DetailView(AdminModelDetailView):
+        model = User
+        cards = [UserPageviewsCard]
+```
+
 ## FAQs
 
 ### Why not use server-side middleware?
