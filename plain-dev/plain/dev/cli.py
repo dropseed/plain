@@ -335,6 +335,8 @@ class Dev:
             str(self.ssl_cert_path),
             "--keyfile",
             str(self.ssl_key_path),
+            "--threads",
+            "4",
             "--reload",
             "plain.wsgi:app",
             "--timeout",
@@ -359,10 +361,6 @@ class Dev:
             )
         else:
             runserver_cmd = gunicorn
-
-        if "WEB_CONCURRENCY" not in self.plain_env:
-            # Default to two workers to prevent lockups
-            self.plain_env["WEB_CONCURRENCY"] = "2"
 
         self.poncho.add_process("plain", runserver_cmd, env=self.plain_env)
 
