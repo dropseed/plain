@@ -910,6 +910,7 @@ def show_migrations(package_labels, database, format, verbosity):
         loader = MigrationLoader(connection, ignore_no_migrations=True)
         recorder = MigrationRecorder(connection)
         recorded_migrations = recorder.applied_migrations()
+
         graph = loader.graph
         # If we were passed a list of packages, validate it
         if package_names:
@@ -946,6 +947,35 @@ def show_migrations(package_labels, database, format, verbosity):
             # If we didn't print anything, then a small message
             if not shown:
                 click.secho(" (no migrations)", fg="red")
+
+        # Find recorded migrations that aren't in the graph (prunable)
+        prunable_migrations = [
+            migration
+            for migration in recorded_migrations
+            if (
+                migration not in loader.disk_migrations
+                and (not package_names or migration[0] in package_names)
+            )
+        ]
+
+        if prunable_migrations:
+            click.echo()
+            click.secho(
+                "Recorded migrations not in migration files (candidates for pruning):",
+                fg="yellow",
+                bold=True,
+            )
+            prunable_by_package = {}
+            for migration in prunable_migrations:
+                package, name = migration
+                if package not in prunable_by_package:
+                    prunable_by_package[package] = []
+                prunable_by_package[package].append(name)
+
+            for package in sorted(prunable_by_package.keys()):
+                click.secho(f"  {package}:", fg="yellow")
+                for name in sorted(prunable_by_package[package]):
+                    click.echo(f"    - {name}")
 
     def show_plan(connection, package_names):
         """
