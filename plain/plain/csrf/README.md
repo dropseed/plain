@@ -1,15 +1,18 @@
 # CSRF
 
-Cross-Site Request Forgery (CSRF) protection.
+**Cross-Site Request Forgery (CSRF) protection.**
 
-## What is CSRF protection?
+Plain protects against [CSRF attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery) through a [middleware](middleware.py) that compares the generated `csrftoken` cookie with the CSRF token from the request (either `csrfmiddlewaretoken` in form data or the `X-CSRFToken` header).
 
-TODO
+## Usage
 
-## Using CSRF in forms
+The `CsrfViewMiddleware` is [automatically installed](../internal/handlers/base.py#BUILTIN_BEFORE_MIDDLEWARE), so you don't need to add it to your `settings.MIDDLEWARE`.
 
-TODO
+When you use HTML forms, you should include the CSRF token in the form data:
 
-## Using CSRF in JavaScript requests
-
-TODO
+```html
+<form method="post">
+    {{ csrf_input }}
+    <!-- other form fields here -->
+</form>
+```

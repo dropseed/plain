@@ -1,12 +1,34 @@
 # CLI
 
-The `plain` CLI loads commands from Plain itself, and any `INSTALLED_PACKAGES`.
+**The `plain` CLI and how to add your own commands to it.**
 
-Commands are written using [Click]((https://click.palletsprojects.com/en/8.1.x/))
+Commands are written using [Click](<(https://click.palletsprojects.com/en/8.1.x/)>)
 (one of Plain's few dependencies),
-which has been one of those most popular CLI frameworks in Python for a long time now.
+which has been one of those most popular CLI frameworks in Python for a long time.
 
 ## Built-in commands
+
+### `plain build`
+
+Compile static assets (used in the deploy/production process).
+
+Automatically runs `plain tailwind build` if [plain.tailwind](/plain-tailwind/) is installed.
+
+### `plain create`
+
+Create a new local package.
+
+### `plain preflight`
+
+Run preflight checks to ensure your app is ready to run.
+
+### `plain run`
+
+Run a Python script in the context of your app.
+
+### `plain setting`
+
+View the runtime value of a named setting.
 
 ### `plain shell`
 
@@ -17,85 +39,46 @@ create an `app/shell.py` and it will be imported automatically.
 
 ```python
 # app/shell.py
-from organizations.models import Organization
+from app.organizations.models import Organization
 
 __all__ = [
     "Organization",
 ]
 ```
 
-### `plain build`
+### `plain urls`
 
-Compile static assets (used in the deploy/production process).
+List all the URL patterns in your app.
 
-Automatically runs `plain tailwind build` if [plain-tailwind](https://plainframework.com/docs/plain-tailwind/) is installed.
+### `plain utils generate-secret-key`
 
-### `plain run`
-
-Run a Python script in the context of your app.
-
-### `plain preflight`
-
-Run preflight checks to ensure your app is ready to run.
-
-### `plain create`
-
-Create a new local package.
-
-### `plain setting`
-
-View the runtime value of a named setting.
+Generate a new secret key for your app, to be used in `settings.SECRET_KEY`.
 
 ## Adding commands
 
-### Add an `app/cli.py`
-
-You can add "root" commands to your app by defining a `cli` function in `app/cli.py`.
+The `register_cli` decorator can be used to add your own commands to the `plain` CLI.
 
 ```python
 import click
+from plain.cli import register_cli
 
 
+@register_cli("example-subgroup-name")
 @click.group()
 def cli():
+    """Custom example commands"""
     pass
 
-
 @cli.command()
-def custom_command():
-    click.echo("An app command!")
+def example_command():
+    click.echo("An example command!")
 ```
 
 Then you can run the command with `plain`.
 
 ```bash
-$ plain custom-command
-An app command!
+$ plain example-subgroup-name example-command
+An example command!
 ```
 
-### Add CLI commands to your local packages
-
-Any package in `INSTALLED_PACKAGES` can define CLI commands by creating a `cli.py` in the root of the package.
-In `cli.py`, create a command or group of commands named `cli`.
-
-```python
-import click
-
-
-@click.group()
-def cli():
-    pass
-
-
-@cli.command()
-def hello():
-    click.echo("Hello, world!")
-```
-
-Plain will use the name of the package in the CLI,
-then any commands you defined.
-
-```bash
-$ plain <pkg> hello
-Hello, world!
-```
+Technically you can register a CLI from anywhere, but typically you will do it in either `app/cli.py` or a package's `<pkg>/cli.py`, as those modules will be autoloaded by Plain.

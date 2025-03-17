@@ -82,7 +82,7 @@ class ExampleView(TemplateView):
         return context
 ```
 
-The `TemplateView` is also the base class for *most* of the other built-in view classes.
+The `TemplateView` is also the base class for _most_ of the other built-in view classes.
 
 ## Form views
 

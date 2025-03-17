@@ -1,6 +1,10 @@
 # Plain
 
-Plain is a web framework for building products with Python.
+**A web framework for building products with Python.**
+
+The Plain framework consists of a core `plain` package, and a collection of additional first-party packages that can be installed by choice.
+
+The quickest way to get started is to clone one of the [starter kits](https://plainframework.com/start/), but you can always install `plain` directly from [PyPI](https://pypi.org/project/plain/) and start from scratch.
 
 With the core `plain` package you can build an app that:
 
@@ -26,7 +30,7 @@ With the official Plain ecosystem packages you can:
 - Integrate [HTMX](https://plainframework.com/docs/plain-htmx/)
 - Style with [Tailwind CSS](https://plainframework.com/docs/plain-tailwind/)
 - Add [OAuth login](https://plainframework.com/docs/plain-oauth/) and API access
-- Run tests with [pytest](https://plainframework.com/docs/plain-test/)
+- Run tests with [pytest](https://plainframework.com/docs/plain-pytest/)
 - Run a [background job worker](https://plainframework.com/docs/plain-worker/)
 - Build [admin dashboard and tools](https://plainframework.com/docs/plain-admin/)
 

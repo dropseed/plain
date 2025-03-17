@@ -9,6 +9,10 @@ SKIP_ASSETS = (".DS_Store", ".gitignore")
 
 
 def iter_assets():
+    """
+    Iterate all valid asset files found in the installed
+    packages and the app itself.
+    """
     class Asset:
         def __init__(self, *, url_path, absolute_path):
             self.url_path = url_path
@@ -32,6 +36,10 @@ def iter_assets():
 
 
 def iter_asset_dirs():
+    """
+    Iterate all directories containing assets, from installed
+    packages and from app/assets.
+    """
     # Iterate the installed package assets, in order
     for pkg in packages_registry.get_package_configs():
         asset_dir = os.path.join(pkg.path, "assets")

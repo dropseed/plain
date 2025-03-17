@@ -1,10 +1,16 @@
+import hashlib
 import json
 from functools import cache
 
 from plain.runtime import settings
 
 
+FINGERPRINT_LENGTH = 7
+
 class AssetsFingerprintsManifest(dict):
+    """
+    A manifest of original filenames to fingerprinted filenames.
+    """
     def __init__(self):
         self.path = settings.PLAIN_TEMP_PATH / "assets" / "fingerprints.json"
 
@@ -36,3 +42,16 @@ def get_fingerprinted_url_path(url_path):
     manifest = _get_manifest()
     if url_path in manifest:
         return manifest[url_path]
+
+
+def get_file_fingerprint(file_path):
+    """
+    Get the fingerprint hash for a file.
+    """
+    with open(file_path, "rb") as f:
+        content = f.read()
+        fingerprint_hash = hashlib.md5(content, usedforsecurity=False).hexdigest()[
+            :FINGERPRINT_LENGTH
+        ]
+
+    return fingerprint_hash

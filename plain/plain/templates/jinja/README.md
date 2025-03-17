@@ -59,6 +59,7 @@ where you can define `filters`, `globals`, and `extensions`.
 Any of your `INSTALLED_PACKAGES` can customize Jinja by adding a `jinja.py` module.
 
 To put it simply, the three things you can "export" from this module are:
+
 - `filters` - functions that can be used in templates
 - `globals` - variables that can be used in templates
 - `extensions` - a list of custom Jinja extensions to install

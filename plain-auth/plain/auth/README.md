@@ -66,7 +66,6 @@ urlpatterns = [
 ]
 ```
 
-
 ## Checking if a user is logged in
 
 A `request.user` will either be `None` or point to an instance of a your `AUTH_USER_MODEL`.
@@ -89,7 +88,6 @@ if request.user:
 else:
     print("You are not logged in.")
 ```
-
 
 ## Restricting views
 

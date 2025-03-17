@@ -127,7 +127,7 @@ COOKIE_SIGNING_BACKEND = "plain.signing.TimestampSigner"
 
 # Settings for CSRF cookie.
 CSRF_COOKIE_NAME = "csrftoken"
-CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52
+CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
 CSRF_COOKIE_DOMAIN = None
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = True

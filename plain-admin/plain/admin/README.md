@@ -113,7 +113,9 @@ INSTALLED_PACKAGES += [
 
 ```html
 <!-- base.template.html -->
+
 {% load toolbar %}
+
 <!doctype html>
 <html lang="en">
   <head>
@@ -147,7 +149,6 @@ module.exports = {
 ```
 
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
-
 
 # plain.requestlog
 
@@ -213,7 +214,6 @@ module.exports = {
 
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
 
-
 # plain.impersonate
 
 See what your users see.
@@ -254,7 +254,8 @@ urlpatterns = [
 
 By default, all admin users can impersonate other users.
 
-```python
+````python
 # settings.py
 IMPERSONATE_ALLOWED = lambda user: user.is_admin
 ``` -->
+````

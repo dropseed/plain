@@ -28,7 +28,7 @@ class FormView(TemplateView):
     def get_form_kwargs(self) -> dict:
         """Return the keyword arguments for instantiating the form."""
         kwargs: dict = {
-            "initial": {},  # Make it easier to set keys in subclasses
+            "initial": {},  # Makes it easier to set keys in subclasses
         }
 
         if hasattr(self, "request") and self.request.method in ("POST", "PUT"):

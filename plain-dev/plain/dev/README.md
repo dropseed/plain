@@ -4,7 +4,7 @@ A single command that runs everything you need for local development.
 
 ![Plain dev command example](https://github.com/dropseed/plain/assets/649496/3643bb64-a99b-4a8e-adab-8c6b81791ea9)
 
-The `plain.dev` package can be [installed from PyPI](https://pypi.org/project/plain.dev/), and does *not* need to be added to `INSTALLED_PACKAGES`.
+The `plain.dev` package can be [installed from PyPI](https://pypi.org/project/plain.dev/), and does _not_ need to be added to `INSTALLED_PACKAGES`.
 
 - [`plain dev`](#plain-dev)
 - [`plain dev services`](#plain-dev-services)
@@ -26,7 +26,7 @@ The `plain dev` command does several things:
 
 ### Services
 
-Use services to define databases or other processes that your app *needs* to be functional. The services will be started automatically in `plain dev`, but also in `plain pre-commit` (so preflight and tests have a database).
+Use services to define databases or other processes that your app _needs_ to be functional. The services will be started automatically in `plain dev`, but also in `plain pre-commit` (so preflight and tests have a database).
 
 Ultimately, how you run your development database is up to you. But a recommended starting point is to use Docker:
 
@@ -38,7 +38,7 @@ postgres = {cmd = "docker run --name app-postgres --rm -p 54321:5432 -v $(pwd)/.
 
 ### Custom processes
 
-Unlike [services](#services), custom processes are *only* run during `plain dev`. This is a good place to run something like [ngrok](https://ngrok.com/) or a [Plain worker](../../../plain-worker), which you might need to use your local site, but don't need running for executing tests, for example.
+Unlike [services](#services), custom processes are _only_ run during `plain dev`. This is a good place to run something like [ngrok](https://ngrok.com/) or a [Plain worker](../../../plain-worker), which you might need to use your local site, but don't need running for executing tests, for example.
 
 ```toml
 # pyproject.toml

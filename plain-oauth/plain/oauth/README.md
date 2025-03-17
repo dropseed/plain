@@ -15,7 +15,6 @@ There are three OAuth flows that it makes possible:
 2. Login via OAuth (existing user, existing OAuth connection)
 3. Connect/disconnect OAuth accounts to a user (existing user, new OAuth connection)
 
-
 ## Usage
 
 Install the package from PyPi:
@@ -142,7 +141,7 @@ That's pretty much it!
 The most common error you'll run into is if an existing user clicks a login button,
 but they haven't yet connected that provider to their account.
 For security reasons,
-the required flow here is that the user actually logs in with another method (however they signed up) and then *connects* the OAuth provider from a settings page.
+the required flow here is that the user actually logs in with another method (however they signed up) and then _connects_ the OAuth provider from a settings page.
 
 For this error (and a couple others),
 there is an error template that is rendered.
@@ -236,7 +235,7 @@ response = requests.get(...)
 
 ### Using the Django system check
 
-This library comes with a Django system check to ensure you don't *remove* a provider from `settings.py` that is still in use in your database.
+This library comes with a Django system check to ensure you don't _remove_ a provider from `settings.py` that is still in use in your database.
 You do need to specify the `--database` for this to run when using the check command by itself:
 
 ```sh
@@ -247,7 +246,7 @@ python manage.py check --database default
 
 ### How is this different from [Django OAuth libraries](https://djangopackages.org/grids/g/oauth/)?
 
-The short answer is that *it does less*.
+The short answer is that _it does less_.
 
 In [django-allauth](https://github.com/pennersr/django-allauth)
 (maybe the most popular alternative)
@@ -262,7 +261,7 @@ Personally, I don't like the way that your OAuth settings are stored in the data
 and the implications for doing it one way or another.
 
 The other popular OAuth libraries have similar issues,
-and I think their *weight* outweighs their usefulness for 80% of the use cases.
+and I think their _weight_ outweighs their usefulness for 80% of the use cases.
 
 ### Why aren't providers included in the library itself?
 
@@ -281,7 +280,7 @@ Just copy that code and paste it in your project.
 Tweak as necessary!
 
 This might sound strange at first.
-But in the long run we think it's actually *much* more maintainable for both us (as library authors) and you (as app author).
+But in the long run we think it's actually _much_ more maintainable for both us (as library authors) and you (as app author).
 If something breaks with a provider, you can fix it immediately!
 You don't need to try to run changes through us or wait for an upstream update.
 You're welcome to contribute an example to this repo,

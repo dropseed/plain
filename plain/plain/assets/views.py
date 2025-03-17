@@ -16,9 +16,9 @@ from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import View
 
-from .compile import FINGERPRINT_LENGTH, get_compiled_path
+from .compile import get_compiled_path
 from .finders import iter_assets
-from .fingerprints import get_fingerprinted_url_path
+from .fingerprints import get_fingerprinted_url_path, FINGERPRINT_LENGTH
 
 
 class AssetView(View):

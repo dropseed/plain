@@ -6,9 +6,8 @@ import shutil
 from plain.runtime import settings
 
 from .finders import iter_assets
-from .fingerprints import AssetsFingerprintsManifest
+from .fingerprints import AssetsFingerprintsManifest, get_file_fingerprint
 
-FINGERPRINT_LENGTH = 7
 
 SKIP_COMPRESS_EXTENSIONS = (
     # Images
@@ -46,12 +45,17 @@ SKIP_COMPRESS_EXTENSIONS = (
 def get_compiled_path():
     """
     Get the path at runtime to the compiled assets directory.
+
     There's no reason currently for this to be a user-facing setting.
     """
     return settings.PLAIN_TEMP_PATH / "assets" / "compiled"
 
 
 def compile_assets(*, target_dir, keep_original, fingerprint, compress):
+    """
+    Compile all assets to the target directory and save a JSON manifest
+    mapping the original filenames to the compiled filenames.
+    """
     manifest = AssetsFingerprintsManifest()
 
     for asset in iter_assets():
@@ -68,8 +72,7 @@ def compile_assets(*, target_dir, keep_original, fingerprint, compress):
 
         yield url_path, resolved_path, compiled_paths
 
-    if manifest:
-        manifest.save()
+    manifest.save()
 
 
 def compile_asset(*, asset, target_dir, keep_original, fingerprint, compress):
@@ -98,11 +101,7 @@ def compile_asset(*, asset, target_dir, keep_original, fingerprint, compress):
         # Fingerprint it with an md5 hash
         # (maybe need a setting with fnmatch patterns for files to NOT fingerprint?
         # that would allow pre-fingerprinted files to be used as-is, and keep source maps etc in tact)
-        with open(asset.absolute_path, "rb") as f:
-            content = f.read()
-            fingerprint_hash = hashlib.md5(content, usedforsecurity=False).hexdigest()[
-                :FINGERPRINT_LENGTH
-            ]
+        fingerprint_hash = get_file_fingerprint(asset.absolute_path)
 
         fingerprinted_basename = f"{base}.{fingerprint_hash}{extension}"
         fingerprinted_path = os.path.join(target_dir, fingerprinted_basename)

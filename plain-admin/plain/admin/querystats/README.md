@@ -43,7 +43,7 @@ you can add the querystats to your frontend templates with this include:
 {% include "querystats/button.html" %}
 ```
 
-*Note that you will likely want to surround this with an if `DEBUG` or `is_admin` check.*
+_Note that you will likely want to surround this with an if `DEBUG` or `is_admin` check._
 
 To view querystats you need to send a POST request to `?querystats=store` (i.e. via a `<form>`),
 and the template include is the easiest way to do that.
@@ -68,7 +68,6 @@ module.exports = {
 ```
 
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
-
 
 # plain.toolbar
 
@@ -124,7 +123,6 @@ module.exports = {
 ```
 
 If you aren't using Tailwind, and don't intend to, open an issue to discuss other options.
-
 
 # plain.requestlog
 

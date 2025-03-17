@@ -6,6 +6,11 @@ from .views import AssetView
 
 
 class AssetsRouter(Router):
+    """
+    The router for serving static assets.
+
+    Include this router in your app router if you are serving assets yourself.
+    """
     namespace = "assets"
     urls = [
         path("<path:path>", AssetView, name="asset"),
@@ -13,6 +18,9 @@ class AssetsRouter(Router):
 
 
 def get_asset_url(url_path):
+    """
+    Get the full URL to a given asset path.
+    """
     if settings.DEBUG:
         # In debug, we only ever use the original URL path.
         resolved_url_path = url_path

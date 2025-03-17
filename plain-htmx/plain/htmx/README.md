@@ -52,7 +52,7 @@ INSTALLED_PACKAGES = [
 
 An `{% htmxfragment %}` can be used to render a specific part of your template in HTMX responses.
 When you use a fragment, all `hx-get`, `hx-post`, etc. elements inside that fragment will automatically send a request to the current URL,
-render *only* the updated content for the fragment,
+render _only_ the updated content for the fragment,
 and swap out the fragment.
 
 Here's an example:
@@ -306,7 +306,7 @@ And then subsequent HTMX requests/actions on individual items can be handled by 
 </div>
 ```
 
-*If* you need a URL to render an individual item, you can simply include the same template fragment in most cases:
+_If_ you need a URL to render an individual item, you can simply include the same template fragment in most cases:
 
 ```html
 <!-- pullrequests/pullrequest_detail.html -->
