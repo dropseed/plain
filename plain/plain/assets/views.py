@@ -18,7 +18,7 @@ from plain.views import View
 
 from .compile import get_compiled_path
 from .finders import iter_assets
-from .fingerprints import get_fingerprinted_url_path, FINGERPRINT_LENGTH
+from .fingerprints import FINGERPRINT_LENGTH, get_fingerprinted_url_path
 
 
 class AssetView(View):

@@ -4,11 +4,11 @@ from itertools import chain
 
 from plain.models.registry import models_registry
 from plain.packages import packages_registry
-from plain.preflight import Error, Warning, register
+from plain.preflight import Error, Warning, register_check
 from plain.runtime import settings
 
 
-@register
+@register_check
 def check_database_backends(databases=None, **kwargs):
     if databases is None:
         return []
@@ -22,7 +22,7 @@ def check_database_backends(databases=None, **kwargs):
     return issues
 
 
-@register
+@register_check
 def check_all_models(package_configs=None, **kwargs):
     db_table_models = defaultdict(list)
     indexes = defaultdict(list)
@@ -193,12 +193,12 @@ def _check_lazy_references(models_registry, packages_registry):
     )
 
 
-@register
+@register_check
 def check_lazy_references(package_configs=None, **kwargs):
     return _check_lazy_references(models_registry, packages_registry)
 
 
-@register
+@register_check
 def check_database_tables(package_configs, **kwargs):
     from plain.models.db import connection
 

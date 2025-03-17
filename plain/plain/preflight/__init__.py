@@ -11,7 +11,7 @@ from .messages import (
     Info,
     Warning,
 )
-from .registry import register, run_checks
+from .registry import register_check, run_checks
 
 # Import these to force registration of checks
 import plain.preflight.files  # NOQA isort:skip
@@ -31,6 +31,6 @@ __all__ = [
     "WARNING",
     "ERROR",
     "CRITICAL",
-    "register",
+    "register_check",
     "run_checks",
 ]

@@ -11,6 +11,7 @@ class AssetsRouter(Router):
 
     Include this router in your app router if you are serving assets yourself.
     """
+
     namespace = "assets"
     urls = [
         path("<path:path>", AssetView, name="asset"),

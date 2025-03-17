@@ -2,10 +2,10 @@ from pathlib import Path
 
 from plain.runtime import settings
 
-from . import Error, register
+from . import Error, register_check
 
 
-@register
+@register_check
 def check_setting_file_upload_temp_dir(package_configs, **kwargs):
     setting = getattr(settings, "FILE_UPLOAD_TEMP_DIR", None)
     if setting and not Path(setting).is_dir():

@@ -1,4 +1,4 @@
-from plain.preflight import Warning, register
+from plain.preflight import Warning, register_check
 from plain.runtime import settings
 
 
@@ -62,7 +62,7 @@ W015 = Warning(
 )
 
 
-@register(deploy=True)
+@register_check(deploy=True)
 def check_session_cookie_secure(package_configs, **kwargs):
     if settings.SESSION_COOKIE_SECURE is True:
         return []
@@ -76,7 +76,7 @@ def check_session_cookie_secure(package_configs, **kwargs):
     return errors
 
 
-@register(deploy=True)
+@register_check(deploy=True)
 def check_session_cookie_httponly(package_configs, **kwargs):
     if settings.SESSION_COOKIE_HTTPONLY is True:
         return []

@@ -1,5 +1,4 @@
 import gzip
-import hashlib
 import os
 import shutil
 
@@ -7,7 +6,6 @@ from plain.runtime import settings
 
 from .finders import iter_assets
 from .fingerprints import AssetsFingerprintsManifest, get_file_fingerprint
-
 
 SKIP_COMPRESS_EXTENSIONS = (
     # Images

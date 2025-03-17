@@ -1,9 +1,9 @@
 from plain.runtime import settings
 
-from . import Error, register
+from . import Error, register_check
 
 
-@register
+@register_check
 def check_url_config(package_configs, **kwargs):
     if getattr(settings, "URLS_ROUTER", None):
         from plain.urls import get_resolver

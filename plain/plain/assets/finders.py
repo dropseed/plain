@@ -13,6 +13,7 @@ def iter_assets():
     Iterate all valid asset files found in the installed
     packages and the app itself.
     """
+
     class Asset:
         def __init__(self, *, url_path, absolute_path):
             self.url_path = url_path

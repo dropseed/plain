@@ -67,6 +67,6 @@ class CheckRegistry:
         return checks
 
 
-registry = CheckRegistry()
-register = registry.register
-run_checks = registry.run_checks
+checks_registry = CheckRegistry()
+register_check = checks_registry.register
+run_checks = checks_registry.run_checks

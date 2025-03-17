@@ -4,13 +4,14 @@ from functools import cache
 
 from plain.runtime import settings
 
-
 FINGERPRINT_LENGTH = 7
+
 
 class AssetsFingerprintsManifest(dict):
     """
     A manifest of original filenames to fingerprinted filenames.
     """
+
     def __init__(self):
         self.path = settings.PLAIN_TEMP_PATH / "assets" / "fingerprints.json"
 

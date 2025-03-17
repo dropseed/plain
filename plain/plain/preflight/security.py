@@ -2,7 +2,7 @@ from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 
 from .messages import Warning
-from .registry import register
+from .registry import register_check
 
 SECRET_KEY_INSECURE_PREFIX = "plain-insecure-"
 SECRET_KEY_MIN_LENGTH = 50
@@ -28,7 +28,7 @@ def _check_secret_key(secret_key):
     )
 
 
-@register(deploy=True)
+@register_check(deploy=True)
 def check_secret_key(package_configs, **kwargs):
     try:
         secret_key = settings.SECRET_KEY
@@ -48,7 +48,7 @@ def check_secret_key(package_configs, **kwargs):
     )
 
 
-@register(deploy=True)
+@register_check(deploy=True)
 def check_secret_key_fallbacks(package_configs, **kwargs):
     warnings = []
     try:
@@ -64,7 +64,7 @@ def check_secret_key_fallbacks(package_configs, **kwargs):
     return warnings
 
 
-@register(deploy=True)
+@register_check(deploy=True)
 def check_debug(package_configs, **kwargs):
     passed_check = not settings.DEBUG
     return (
@@ -79,7 +79,7 @@ def check_debug(package_configs, **kwargs):
     )
 
 
-@register(deploy=True)
+@register_check(deploy=True)
 def check_allowed_hosts(package_configs, **kwargs):
     return (
         []
