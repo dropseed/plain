@@ -1,3 +1,5 @@
 #!/bin/sh -e
 cd plain-code
 uv run plain-code fix .. "$@"
+
+npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --write
