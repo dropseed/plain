@@ -4,17 +4,14 @@ from plain.runtime import settings
 from .messages import Warning
 from .registry import register_check
 
-SECRET_KEY_INSECURE_PREFIX = "plain-insecure-"
 SECRET_KEY_MIN_LENGTH = 50
 SECRET_KEY_MIN_UNIQUE_CHARACTERS = 5
 
 SECRET_KEY_WARNING_MSG = (
-    f"Your %s has less than {SECRET_KEY_MIN_LENGTH} characters, less than "
-    f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS} unique characters, or it's prefixed "
-    f"with '{SECRET_KEY_INSECURE_PREFIX}' indicating that it was generated "
-    f"automatically by Plain. Please generate a long and random value, "
-    f"otherwise many of Plain's security-critical features will be "
-    f"vulnerable to attack."
+    f"Your %s has less than {SECRET_KEY_MIN_LENGTH} characters or less than "
+    f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS} unique characters. Please generate "
+    f"a long and random value, otherwise many of Plain's security-critical "
+    f"features will be vulnerable to attack."
 )
 
 W025 = Warning(SECRET_KEY_WARNING_MSG, id="security.W025")
@@ -24,7 +21,6 @@ def _check_secret_key(secret_key):
     return (
         len(set(secret_key)) >= SECRET_KEY_MIN_UNIQUE_CHARACTERS
         and len(secret_key) >= SECRET_KEY_MIN_LENGTH
-        and not secret_key.startswith(SECRET_KEY_INSECURE_PREFIX)
     )
 
 

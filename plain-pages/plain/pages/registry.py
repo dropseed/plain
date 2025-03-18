@@ -1,11 +1,13 @@
 import os
 
+from plain.internal import internalcode
 from plain.urls import path
 
 from .exceptions import PageNotFoundError
 from .pages import Page
 
 
+@internalcode
 class PagesRegistry:
     """
     The registry loads up all the pages at once, so we only have to do a
@@ -64,4 +66,4 @@ class PagesRegistry:
             raise PageNotFoundError(f"Could not find a page for {url_name}")
 
 
-registry = PagesRegistry()
+pages_registry = PagesRegistry()

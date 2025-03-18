@@ -1,7 +1,6 @@
 import pytest
 from plain.runtime import settings as plain_settings
 from plain.runtime import setup
-from plain.test.client import Client, RequestFactory
 
 
 def pytest_configure(config):
@@ -13,18 +12,6 @@ def pytest_configure(config):
 def _allowed_hosts_testserver():
     # Add testserver to ALLOWED_HOSTS so the test client can make requests
     plain_settings.ALLOWED_HOSTS = [*plain_settings.ALLOWED_HOSTS, "testserver"]
-
-
-@pytest.fixture
-def client() -> Client:
-    """A Plain test client instance."""
-    return Client()
-
-
-@pytest.fixture
-def request_factory() -> RequestFactory:
-    """A Plain RequestFactory instance."""
-    return RequestFactory()
 
 
 @pytest.fixture

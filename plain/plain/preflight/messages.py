@@ -53,7 +53,7 @@ class CheckMessage:
     def is_silenced(self):
         from plain.runtime import settings
 
-        return self.id in settings.SILENCED_PREFLIGHT_CHECKS
+        return self.id in settings.PREFLIGHT_SILENCED_CHECKS
 
 
 class Debug(CheckMessage):

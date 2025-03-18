@@ -1,10 +1,11 @@
 from plain.sessions.models import Session
+from plain.test import Client
 
 
-def test_session_created(db, client):
+def test_session_created(db):
     assert Session.objects.count() == 0
 
-    response = client.get("/")
+    response = Client().get("/")
 
     assert response.status_code == 200
 

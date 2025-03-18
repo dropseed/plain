@@ -162,7 +162,7 @@ ASSETS_BASE_URL: str = ""
 # issues like warnings, infos or debugs will not generate a message. Silencing
 # serious issues like errors and criticals does not result in hiding the
 # message, but Plain will not stop you from e.g. running server.
-SILENCED_PREFLIGHT_CHECKS = []
+PREFLIGHT_SILENCED_CHECKS = []
 
 #############
 # Templates #

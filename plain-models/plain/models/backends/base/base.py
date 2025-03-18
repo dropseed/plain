@@ -11,7 +11,6 @@ from contextlib import contextmanager
 
 from plain.models.backends import utils
 from plain.models.backends.base.validation import BaseDatabaseValidation
-from plain.models.backends.signals import connection_created
 from plain.models.backends.utils import debug_transaction
 from plain.models.db import (
     DEFAULT_DB_ALIAS,
@@ -251,7 +250,6 @@ class BaseDatabaseWrapper:
         self.connection = self.get_new_connection(conn_params)
         self.set_autocommit(self.settings_dict["AUTOCOMMIT"])
         self.init_connection_state()
-        connection_created.send(sender=self.__class__, connection=self)
 
         self.run_on_commit = []
 

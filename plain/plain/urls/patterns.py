@@ -4,6 +4,7 @@ import re
 import string
 
 from plain.exceptions import ImproperlyConfigured
+from plain.internal import internalcode
 from plain.preflight import Error, Warning
 from plain.runtime import settings
 from plain.utils.functional import cached_property
@@ -12,6 +13,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 from .converters import get_converter
 
 
+@internalcode
 class CheckURLMixin:
     def describe(self):
         """

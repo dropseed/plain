@@ -2,4 +2,5 @@
 cd plain-code
 uv run plain-code fix .. "$@"
 
+cd ..
 npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --write

@@ -1,15 +1,13 @@
 import json
-import mimetypes
-import os
 import sys
 from functools import partial
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from io import BytesIO, IOBase
-from itertools import chain
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
 from plain.http import HttpHeaders, HttpRequest, QueryDict
+from plain.internal import internalcode
 from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
@@ -19,70 +17,26 @@ from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
 from plain.utils.functional import SimpleLazyObject
 from plain.utils.http import urlencode
-from plain.utils.itercompat import is_iterable
 from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
 
+from .encoding import encode_multipart
+from .exceptions import RedirectCycleError
+
 __all__ = (
     "Client",
-    "RedirectCycleError",
     "RequestFactory",
-    "encode_file",
-    "encode_multipart",
 )
 
 
-BOUNDARY = "BoUnDaRyStRiNg"
-MULTIPART_CONTENT = f"multipart/form-data; boundary={BOUNDARY}"
-CONTENT_TYPE_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
+_BOUNDARY = "BoUnDaRyStRiNg"
+_MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
+_CONTENT_TYPE_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
-JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
+_JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
 
 
-class ContextList(list):
-    """
-    A wrapper that provides direct key access to context items contained
-    in a list of context objects.
-    """
-
-    def __getitem__(self, key):
-        if isinstance(key, str):
-            for subcontext in self:
-                if key in subcontext:
-                    return subcontext[key]
-            raise KeyError(key)
-        else:
-            return super().__getitem__(key)
-
-    def get(self, key, default=None):
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
-    def __contains__(self, key):
-        try:
-            self[key]
-        except KeyError:
-            return False
-        return True
-
-    def keys(self):
-        """
-        Flattened keys of subcontexts.
-        """
-        return set(chain.from_iterable(d for subcontext in self for d in subcontext))
-
-
-class RedirectCycleError(Exception):
-    """The test client has been asked to follow a redirect loop."""
-
-    def __init__(self, message, last_response):
-        super().__init__(message)
-        self.last_response = last_response
-        self.redirect_chain = last_response.redirect_chain
-
-
+@internalcode
 class FakePayload(IOBase):
     """
     A wrapper around BytesIO that restricts what can be read since data from
@@ -135,7 +89,7 @@ class FakePayload(IOBase):
         self.__len += len(content)
 
 
-def conditional_content_removal(request, response):
+def _conditional_content_removal(request, response):
     """
     Simulate the behavior of most web servers by removing the content of
     responses for HEAD requests, 1xx, 204, and 304 responses. Ensure
@@ -177,13 +131,14 @@ class ClientHandler(BaseHandler):
         # CsrfViewMiddleware.  This makes life easier, and is probably
         # required for backwards compatibility with external tests against
         # admin views.
-        request.csrf_exempt = not self.enforce_csrf_checks
+        if not self.enforce_csrf_checks:
+            request.csrf_exempt = True
 
         # Request goes through middleware.
         response = self.get_response(request)
 
         # Simulate behaviors of most web servers.
-        conditional_content_removal(request, response)
+        _conditional_content_removal(request, response)
 
         # Attach the originating request to the response so that it could be
         # later retrieved.
@@ -193,98 +148,6 @@ class ClientHandler(BaseHandler):
         response.close()
 
         return response
-
-
-def encode_multipart(boundary, data):
-    """
-    Encode multipart POST data from a dictionary of form values.
-
-    The key will be used as the form data name; the value will be transmitted
-    as content. If the value is a file, the contents of the file will be sent
-    as an application/octet-stream; otherwise, str(value) will be sent.
-    """
-    lines = []
-
-    def to_bytes(s):
-        return force_bytes(s, settings.DEFAULT_CHARSET)
-
-    # Not by any means perfect, but good enough for our purposes.
-    def is_file(thing):
-        return hasattr(thing, "read") and callable(thing.read)
-
-    # Each bit of the multipart form data could be either a form value or a
-    # file, or a *list* of form values and/or files. Remember that HTTP field
-    # names can be duplicated!
-    for key, value in data.items():
-        if value is None:
-            raise TypeError(
-                f"Cannot encode None for key '{key}' as POST data. Did you mean "
-                "to pass an empty string or omit the value?"
-            )
-        elif is_file(value):
-            lines.extend(encode_file(boundary, key, value))
-        elif not isinstance(value, str) and is_iterable(value):
-            for item in value:
-                if is_file(item):
-                    lines.extend(encode_file(boundary, key, item))
-                else:
-                    lines.extend(
-                        to_bytes(val)
-                        for val in [
-                            f"--{boundary}",
-                            f'Content-Disposition: form-data; name="{key}"',
-                            "",
-                            item,
-                        ]
-                    )
-        else:
-            lines.extend(
-                to_bytes(val)
-                for val in [
-                    f"--{boundary}",
-                    f'Content-Disposition: form-data; name="{key}"',
-                    "",
-                    value,
-                ]
-            )
-
-    lines.extend(
-        [
-            to_bytes(f"--{boundary}--"),
-            b"",
-        ]
-    )
-    return b"\r\n".join(lines)
-
-
-def encode_file(boundary, key, file):
-    def to_bytes(s):
-        return force_bytes(s, settings.DEFAULT_CHARSET)
-
-    # file.name might not be a string. For example, it's an int for
-    # tempfile.TemporaryFile().
-    file_has_string_name = hasattr(file, "name") and isinstance(file.name, str)
-    filename = os.path.basename(file.name) if file_has_string_name else ""
-
-    if hasattr(file, "content_type"):
-        content_type = file.content_type
-    elif filename:
-        content_type = mimetypes.guess_type(filename)[0]
-    else:
-        content_type = None
-
-    if content_type is None:
-        content_type = "application/octet-stream"
-    filename = filename or key
-    return [
-        to_bytes(f"--{boundary}"),
-        to_bytes(
-            f'Content-Disposition: form-data; name="{key}"; filename="{filename}"'
-        ),
-        to_bytes(f"Content-Type: {content_type}"),
-        b"",
-        to_bytes(file.read()),
-    ]
 
 
 class RequestFactory:
@@ -347,11 +210,11 @@ class RequestFactory:
         return WSGIRequest(self._base_environ(**request))
 
     def _encode_data(self, data, content_type):
-        if content_type is MULTIPART_CONTENT:
-            return encode_multipart(BOUNDARY, data)
+        if content_type is _MULTIPART_CONTENT:
+            return encode_multipart(_BOUNDARY, data)
         else:
             # Encode the content so that the byte representation is correct.
-            match = CONTENT_TYPE_RE.match(content_type)
+            match = _CONTENT_TYPE_RE.match(content_type)
             if match:
                 charset = match[1]
             else:
@@ -363,7 +226,7 @@ class RequestFactory:
         Return encoded JSON if data is a dict, list, or tuple and content_type
         is application/json.
         """
-        should_encode = JSON_CONTENT_TYPE_RE.match(content_type) and isinstance(
+        should_encode = _JSON_CONTENT_TYPE_RE.match(content_type) and isinstance(
             data, dict | list | tuple
         )
         return json.dumps(data, cls=self.json_encoder) if should_encode else data
@@ -397,7 +260,7 @@ class RequestFactory:
         self,
         path,
         data=None,
-        content_type=MULTIPART_CONTENT,
+        content_type=_MULTIPART_CONTENT,
         secure=True,
         *,
         headers=None,
@@ -537,97 +400,7 @@ class RequestFactory:
         return self.request(**r)
 
 
-class ClientMixin:
-    """
-    Mixin with common methods between Client and AsyncClient.
-    """
-
-    def store_exc_info(self, **kwargs):
-        """Store exceptions when they are generated by a view."""
-        self.exc_info = sys.exc_info()
-
-    def check_exception(self, response):
-        """
-        Look for a signaled exception, clear the current context exception
-        data, re-raise the signaled exception, and clear the signaled exception
-        from the local cache.
-        """
-        response.exc_info = self.exc_info
-        if self.exc_info:
-            _, exc_value, _ = self.exc_info
-            self.exc_info = None
-            if self.raise_request_exception:
-                raise exc_value
-
-    @property
-    def session(self):
-        """Return the current session variables."""
-        Session = import_string(settings.SESSION_CLASS)
-        cookie = self.cookies.get(settings.SESSION_COOKIE_NAME)
-        if cookie:
-            return Session(cookie.value)
-        session = Session()
-        session.save()
-        self.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
-        return session
-
-    def force_login(self, user):
-        self._login(user)
-
-    def _login(self, user):
-        from plain.auth import login
-
-        # Create a fake request to store login details.
-        request = HttpRequest()
-        if self.session:
-            request.session = self.session
-        else:
-            Session = import_string(settings.SESSION_CLASS)
-            request.session = Session()
-        login(request, user)
-        # Save the session values.
-        request.session.save()
-        # Set the cookie to represent the session.
-        session_cookie = settings.SESSION_COOKIE_NAME
-        self.cookies[session_cookie] = request.session.session_key
-        cookie_data = {
-            "max-age": None,
-            "path": "/",
-            "domain": settings.SESSION_COOKIE_DOMAIN,
-            "secure": settings.SESSION_COOKIE_SECURE or None,
-            "expires": None,
-        }
-        self.cookies[session_cookie].update(cookie_data)
-
-    def logout(self):
-        """Log out the user by removing the cookies and session object."""
-        from plain.auth import get_user, logout
-
-        request = HttpRequest()
-        if self.session:
-            request.session = self.session
-            request.user = get_user(request)
-        else:
-            Session = import_string(settings.SESSION_CLASS)
-            request.session = Session()
-        logout(request)
-        self.cookies = SimpleCookie()
-
-    def _parse_json(self, response, **extra):
-        if not hasattr(response, "_json"):
-            if not JSON_CONTENT_TYPE_RE.match(response.headers.get("Content-Type")):
-                raise ValueError(
-                    'Content-Type header is "{}", not "application/json"'.format(
-                        response.headers.get("Content-Type")
-                    )
-                )
-            response._json = json.loads(
-                response.content.decode(response.charset), **extra
-            )
-        return response._json
-
-
-class Client(ClientMixin, RequestFactory):
+class Client(RequestFactory):
     """
     A class that can act as a client for testing purposes.
 
@@ -724,7 +497,7 @@ class Client(ClientMixin, RequestFactory):
         self,
         path,
         data=None,
-        content_type=MULTIPART_CONTENT,
+        content_type=_MULTIPART_CONTENT,
         follow=False,
         secure=True,
         *,
@@ -982,3 +755,87 @@ class Client(ClientMixin, RequestFactory):
                 raise RedirectCycleError("Too many redirects.", last_response=response)
 
         return response
+
+    def store_exc_info(self, **kwargs):
+        """Store exceptions when they are generated by a view."""
+        self.exc_info = sys.exc_info()
+
+    def check_exception(self, response):
+        """
+        Look for a signaled exception, clear the current context exception
+        data, re-raise the signaled exception, and clear the signaled exception
+        from the local cache.
+        """
+        response.exc_info = self.exc_info
+        if self.exc_info:
+            _, exc_value, _ = self.exc_info
+            self.exc_info = None
+            if self.raise_request_exception:
+                raise exc_value
+
+    @property
+    def session(self):
+        """Return the current session variables."""
+        Session = import_string(settings.SESSION_CLASS)
+        cookie = self.cookies.get(settings.SESSION_COOKIE_NAME)
+        if cookie:
+            return Session(cookie.value)
+        session = Session()
+        session.save()
+        self.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+        return session
+
+    def force_login(self, user):
+        self._login(user)
+
+    def _login(self, user):
+        from plain.auth import login
+
+        # Create a fake request to store login details.
+        request = HttpRequest()
+        if self.session:
+            request.session = self.session
+        else:
+            Session = import_string(settings.SESSION_CLASS)
+            request.session = Session()
+        login(request, user)
+        # Save the session values.
+        request.session.save()
+        # Set the cookie to represent the session.
+        session_cookie = settings.SESSION_COOKIE_NAME
+        self.cookies[session_cookie] = request.session.session_key
+        cookie_data = {
+            "max-age": None,
+            "path": "/",
+            "domain": settings.SESSION_COOKIE_DOMAIN,
+            "secure": settings.SESSION_COOKIE_SECURE or None,
+            "expires": None,
+        }
+        self.cookies[session_cookie].update(cookie_data)
+
+    def logout(self):
+        """Log out the user by removing the cookies and session object."""
+        from plain.auth import get_user, logout
+
+        request = HttpRequest()
+        if self.session:
+            request.session = self.session
+            request.user = get_user(request)
+        else:
+            Session = import_string(settings.SESSION_CLASS)
+            request.session = Session()
+        logout(request)
+        self.cookies = SimpleCookie()
+
+    def _parse_json(self, response, **extra):
+        if not hasattr(response, "_json"):
+            if not _JSON_CONTENT_TYPE_RE.match(response.headers.get("Content-Type")):
+                raise ValueError(
+                    'Content-Type header is "{}", not "application/json"'.format(
+                        response.headers.get("Content-Type")
+                    )
+                )
+            response._json = json.loads(
+                response.content.decode(response.charset), **extra
+            )
+        return response._json

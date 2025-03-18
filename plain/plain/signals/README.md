@@ -1,6 +1,6 @@
 # Signals
 
-Run code when certain events happen.
+**Run code when certain events happen.**
 
 ```python
 from plain.signals import request_finished

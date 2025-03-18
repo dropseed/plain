@@ -1,4 +1,5 @@
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from plain.test import Client
 
 
 class DummyProvider(OAuthProvider):
@@ -19,7 +20,7 @@ class DummyProvider(OAuthProvider):
         return
 
 
-def test_single_backend(db, client, settings):
+def test_single_backend(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_backends.DummyProvider",
@@ -30,6 +31,8 @@ def test_single_backend(db, client, settings):
             },
         }
     }
+
+    client = Client()
 
     response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
     assert response.status_code == 302
@@ -40,7 +43,7 @@ def test_single_backend(db, client, settings):
     assert response.user
 
 
-def test_multiple_backends(db, client, settings):
+def test_multiple_backends(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_backends.DummyProvider",
@@ -51,6 +54,8 @@ def test_multiple_backends(db, client, settings):
             },
         }
     }
+
+    client = Client()
 
     response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
     assert response.status_code == 302

@@ -1,8 +1,8 @@
 from plain.urls import Router
 
-from .registry import registry
+from .registry import pages_registry
 
 
 class PagesRouter(Router):
     namespace = "pages"
-    urls = registry.get_page_urls()
+    urls = pages_registry.get_page_urls()

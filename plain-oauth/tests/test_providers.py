@@ -3,6 +3,7 @@ import datetime
 from plain.auth import get_user_model
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from plain.test import Client
 
 
 class DummyProvider(OAuthProvider):
@@ -43,7 +44,7 @@ class DummyProvider(OAuthProvider):
         )
 
 
-def test_dummy_signup(db, client, settings):
+def test_dummy_signup(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_providers.DummyProvider",
@@ -54,6 +55,8 @@ def test_dummy_signup(db, client, settings):
             },
         }
     }
+
+    client = Client()
 
     assert get_user_model().objects.count() == 0
     assert OAuthConnection.objects.count() == 0
@@ -102,7 +105,7 @@ def test_dummy_signup(db, client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-def test_dummy_login_connection(db, client, settings):
+def test_dummy_login_connection(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_providers.DummyProvider",
@@ -113,6 +116,8 @@ def test_dummy_login_connection(db, client, settings):
             },
         }
     }
+
+    client = Client()
 
     assert get_user_model().objects.count() == 0
     assert OAuthConnection.objects.count() == 0
@@ -182,7 +187,7 @@ def test_dummy_login_connection(db, client, settings):
     assert OAuthConnection.objects.count() == 1
 
 
-def test_dummy_login_without_connection(db, client, settings):
+def test_dummy_login_without_connection(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_providers.DummyProvider",
@@ -193,6 +198,8 @@ def test_dummy_login_without_connection(db, client, settings):
             },
         }
     }
+
+    client = Client()
 
     assert get_user_model().objects.count() == 0
     assert OAuthConnection.objects.count() == 0
@@ -224,7 +231,7 @@ def test_dummy_login_without_connection(db, client, settings):
     assert b"OAuth Error" in response.content
 
 
-def test_dummy_connect(db, client, settings):
+def test_dummy_connect(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "dummy": {
             "class": "test_providers.DummyProvider",
@@ -235,6 +242,8 @@ def test_dummy_connect(db, client, settings):
             },
         }
     }
+
+    client = Client()
 
     assert get_user_model().objects.count() == 0
     assert OAuthConnection.objects.count() == 0

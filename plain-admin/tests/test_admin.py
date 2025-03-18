@@ -1,7 +1,11 @@
 from app.users.models import User
 
+from plain.test import Client
 
-def test_admin_login_required(db, client):
+
+def test_admin_login_required(db):
+    client = Client()
+
     # Login required
     assert client.get("/admin/").status_code == 302
 

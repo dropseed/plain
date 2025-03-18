@@ -1,6 +1,12 @@
 # Plain
 
-- pep 420 https://peps.python.org/pep-0420/
+**Plain is a web framework for building products with Python.**
+
+The core `plain` package provides the backbone of a Python web application (similar to [Flask](https://flask.palletsprojects.com/en/stable/)), while the additional first-party packages can power a more fully-featured database-backed app (similar to [Django](https://www.djangoproject.com/)).
+
+All Plain packages are designed to work together and use [PEP 420](https://peps.python.org/pep-0420/) to share the `plain` namespace.
+
+To quickly get started with Plain, visit [plainframework.com/start/](https://plainframework.com/start/).
 
 ## Core Modules
 

@@ -4,7 +4,7 @@ from plain.utils.functional import cached_property
 from plain.views import TemplateView, View
 
 from .exceptions import PageNotFoundError, RedirectPageError
-from .registry import registry
+from .registry import pages_registry
 
 
 class PageViewMixin:
@@ -13,7 +13,7 @@ class PageViewMixin:
         url_name = self.request.resolver_match.url_name
 
         try:
-            return registry.get_page(url_name)
+            return pages_registry.get_page(url_name)
         except PageNotFoundError:
             raise Http404()
 

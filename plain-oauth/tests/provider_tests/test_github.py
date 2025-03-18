@@ -1,6 +1,7 @@
 from tests.providers.github import GitHubOAuthProvider
 
 from plain.oauth.providers import OAuthToken, OAuthUser
+from plain.test import Client
 
 
 class DummyGitHubOAuthProvider(GitHubOAuthProvider):
@@ -18,7 +19,7 @@ class DummyGitHubOAuthProvider(GitHubOAuthProvider):
         )
 
 
-def test_github_provider(db, client, settings):
+def test_github_provider(db, settings):
     settings.OAUTH_LOGIN_PROVIDERS = {
         "github": {
             "class": "provider_tests.test_github.DummyGitHubOAuthProvider",
@@ -29,6 +30,8 @@ def test_github_provider(db, client, settings):
             },
         }
     }
+
+    client = Client()
 
     # Login required for this view
     response = client.get("/")

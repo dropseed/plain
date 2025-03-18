@@ -6,10 +6,12 @@ import sys
 import requests
 import tomlkit
 
+from plain.internal import internalcode
 from plain.packages import packages_registry
 from plain.runtime import APP_PATH, settings
 
 
+@internalcode
 class Tailwind:
     @property
     def target_directory(self) -> str:

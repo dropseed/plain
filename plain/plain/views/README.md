@@ -1,6 +1,6 @@
 # Views
 
-Take a request, return a response.
+**Take a request, return a response.**
 
 Plain views are written as classes,
 with a straightforward API that keeps simple views simple,

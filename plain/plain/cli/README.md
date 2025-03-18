@@ -2,7 +2,7 @@
 
 **The `plain` CLI and how to add your own commands to it.**
 
-Commands are written using [Click](<(https://click.palletsprojects.com/en/8.1.x/)>)
+Commands are written using [Click](https://click.palletsprojects.com/en/8.1.x/)
 (one of Plain's few dependencies),
 which has been one of those most popular CLI frameworks in Python for a long time.
 
