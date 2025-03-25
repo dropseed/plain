@@ -28,8 +28,12 @@ class AssetView(View):
     This class could be subclassed to further tweak the responses or behavior.
     """
 
+    def __init__(self, asset_path=None):
+        # Allow a path to be passed in AssetView.as_view(path="...")
+        self.asset_path = asset_path
+
     def get_url_path(self):
-        return self.url_kwargs["path"]
+        return self.asset_path or self.url_kwargs["path"]
 
     def get(self):
         url_path = self.get_url_path()
