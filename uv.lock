@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.32.1"
+version = "0.33.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -310,7 +310,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.22.0"
+version = "0.22.1"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -362,7 +362,7 @@ dev = [
 
 [[package]]
 name = "plain-auth"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "plain-auth" }
 dependencies = [
     { name = "plain" },
@@ -405,7 +405,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-dev"
-version = "0.26.0"
+version = "0.26.1"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -481,7 +481,7 @@ dev = [
 
 [[package]]
 name = "plain-htmx"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
@@ -537,7 +537,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-models"
-version = "0.25.1"
+version = "0.26.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -560,7 +560,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.16.0"
+version = "0.16.1"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
@@ -587,7 +587,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pages"
-version = "0.10.0"
+version = "0.10.1"
 source = { editable = "plain-pages" }
 dependencies = [
     { name = "mistune" },
@@ -606,7 +606,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.12.0"
+version = "0.12.1"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -632,7 +632,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-pytest"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
@@ -666,7 +666,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-sessions"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
@@ -706,7 +706,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tailwind"
-version = "0.11.0"
+version = "0.11.1"
 source = { editable = "plain-tailwind" }
 dependencies = [
     { name = "plain" },
