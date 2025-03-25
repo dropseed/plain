@@ -31,24 +31,22 @@ class View:
         "trace",
     ]
 
-    def __init__(self, *args, **kwargs) -> None:
-        # Views can customize their init, which receives
-        # the args and kwargs from as_view()
-        pass
+    # View.as_view(example="foo") usage can be customized by defining your own __init__ method.
+    # def __init__(self, *args, **kwargs):
 
-    def setup(self, request: HttpRequest, *args, **kwargs) -> None:
+    def setup(self, request: HttpRequest, *url_args, **url_kwargs) -> None:
         if hasattr(self, "get") and not hasattr(self, "head"):
             self.head = self.get
 
         self.request = request
-        self.url_args = args
-        self.url_kwargs = kwargs
+        self.url_args = url_args
+        self.url_kwargs = url_kwargs
 
     @classonlymethod
     def as_view(cls, *init_args, **init_kwargs):
-        def view(request, *args, **kwargs):
+        def view(request, *url_args, **url_kwargs):
             v = cls(*init_args, **init_kwargs)
-            v.setup(request, *args, **kwargs)
+            v.setup(request, *url_args, **url_kwargs)
             try:
                 return v.get_response()
             except ResponseException as e:
