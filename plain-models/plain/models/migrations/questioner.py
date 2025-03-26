@@ -38,7 +38,7 @@ class MigrationQuestioner:
         except LookupError:  # It's a fake app.
             return self.defaults.get("ask_initial", False)
         migrations_import_path, _ = MigrationLoader.migrations_module(
-            package_config.label
+            package_config.package_label
         )
         if migrations_import_path is None:
             # It's an application with migrations disabled.

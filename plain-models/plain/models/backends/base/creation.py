@@ -104,7 +104,7 @@ class BaseDatabaseCreation:
     #         for package_config in packages.get_package_configs():
     #             if (
     #                 package_config.models_module is not None
-    #                 and package_config.label in loader.migrated_packages
+    #                 and package_config.package_label in loader.migrated_packages
     #             ):
     #                 for model in package_config.get_models():
     #                     if model._meta.can_migrate(

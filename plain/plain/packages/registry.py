@@ -146,7 +146,7 @@ class PackagesRegistry:
             message = f"No installed app with label '{package_label}'."
             for package_config in self.get_package_configs():
                 if package_config.name == package_label:
-                    message += f" Did you mean '{package_config.label}'?"
+                    message += f" Did you mean '{package_config.package_label}'?"
                     break
             raise LookupError(message)
 
@@ -179,11 +179,11 @@ class PackagesRegistry:
         class Config(PackageConfig):
             pass
         """
-        if package_config.label in self.package_configs:
+        if package_config.package_label in self.package_configs:
             raise ImproperlyConfigured(
-                f"Package labels aren't unique, duplicates: {package_config.label}"
+                f"Package labels aren't unique, duplicates: {package_config.package_label}"
             )
-        self.package_configs[package_config.label] = package_config
+        self.package_configs[package_config.package_label] = package_config
         package_config.packages = self
 
         return package_config

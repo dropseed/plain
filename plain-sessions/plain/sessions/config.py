@@ -3,4 +3,4 @@ from plain.packages import PackageConfig, register_config
 
 @register_config
 class Config(PackageConfig):
-    label = "plainsessions"
+    package_label = "plainsessions"

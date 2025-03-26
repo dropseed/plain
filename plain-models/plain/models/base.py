@@ -130,7 +130,7 @@ class ModelBase(type):
                     "INSTALLED_PACKAGES."
                 )
             else:
-                package_label = package_config.label
+                package_label = package_config.package_label
 
         cls.add_to_class("_meta", Options(meta, package_label))
 

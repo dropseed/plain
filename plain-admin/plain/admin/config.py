@@ -6,7 +6,7 @@ from plain.packages import PackageConfig, packages_registry, register_config
 
 @register_config
 class Config(PackageConfig):
-    label = "plainadmin"
+    package_label = "plainadmin"
 
     def ready(self):
         def _import_if_exists(module_name):

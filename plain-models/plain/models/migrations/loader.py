@@ -78,9 +78,9 @@ class MigrationLoader:
         self.migrated_packages = set()
         for package_config in packages_registry.get_package_configs():
             # Get the migrations module directory
-            module_name, explicit = self.migrations_module(package_config.label)
+            module_name, explicit = self.migrations_module(package_config.package_label)
             if module_name is None:
-                self.unmigrated_packages.add(package_config.label)
+                self.unmigrated_packages.add(package_config.package_label)
                 continue
             was_loaded = module_name in sys.modules
             try:
@@ -89,13 +89,13 @@ class MigrationLoader:
                 if (explicit and self.ignore_no_migrations) or (
                     not explicit and MIGRATIONS_MODULE_NAME in e.name.split(".")
                 ):
-                    self.unmigrated_packages.add(package_config.label)
+                    self.unmigrated_packages.add(package_config.package_label)
                     continue
                 raise
             else:
                 # Module is not a package (e.g. migrations.py).
                 if not hasattr(module, "__path__"):
-                    self.unmigrated_packages.add(package_config.label)
+                    self.unmigrated_packages.add(package_config.package_label)
                     continue
                 # Empty directories are namespaces. Namespace packages have no
                 # __file__ and don't use a list for __path__. See
@@ -103,12 +103,12 @@ class MigrationLoader:
                 if getattr(module, "__file__", None) is None and not isinstance(
                     module.__path__, list
                 ):
-                    self.unmigrated_packages.add(package_config.label)
+                    self.unmigrated_packages.add(package_config.package_label)
                     continue
                 # Force a reload if it's already loaded (tests need this)
                 if was_loaded:
                     reload(module)
-            self.migrated_packages.add(package_config.label)
+            self.migrated_packages.add(package_config.package_label)
             migration_names = {
                 name
                 for _, name, is_pkg in pkgutil.iter_modules(module.__path__)
@@ -129,12 +129,12 @@ class MigrationLoader:
                         raise
                 if not hasattr(migration_module, "Migration"):
                     raise BadMigrationError(
-                        f"Migration {migration_name} in app {package_config.label} has no Migration class"
+                        f"Migration {migration_name} in app {package_config.package_label} has no Migration class"
                     )
-                self.disk_migrations[package_config.label, migration_name] = (
+                self.disk_migrations[package_config.package_label, migration_name] = (
                     migration_module.Migration(
                         migration_name,
-                        package_config.label,
+                        package_config.package_label,
                     )
                 )
 

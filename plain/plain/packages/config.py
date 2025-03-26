@@ -10,7 +10,9 @@ CONFIG_MODULE_NAME = "config"
 class PackageConfig:
     """Class representing a Plain application and its configuration."""
 
-    def __init__(self, name, *, label=""):
+    package_label: str
+
+    def __init__(self, name):
         # Full Python path to the application e.g. 'plain.admin.admin'.
         self.name = name
 
@@ -18,28 +20,18 @@ class PackageConfig:
         # registry when it registers the PackageConfig instance.
         self.packages_registry = None
 
-        # The following attributes could be defined at the class level in a
-        # subclass, hence the test-and-set pattern.
-        if label and hasattr(self, "label"):
-            raise ImproperlyConfigured(
-                "PackageConfig class should not define a class label attribute and an init label"
-            )
-
-        if label:
-            # Set the label explicitly from the init
-            self.label = label
-        elif not hasattr(self, "label"):
+        if not hasattr(self, "package_label"):
             # Last component of the Python path to the application e.g. 'admin'.
             # This value must be unique across a Plain project.
-            self.label = self.name.rpartition(".")[2]
+            self.package_label = self.name.rpartition(".")[2]
 
-        if not self.label.isidentifier():
+        if not self.package_label.isidentifier():
             raise ImproperlyConfigured(
-                f"The app label '{self.label}' is not a valid Python identifier."
+                f"The app label '{self.package_label}' is not a valid Python identifier."
             )
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}: {self.label}>"
+        return f"<{self.__class__.__name__}: {self.package_label}>"
 
     @cached_property
     def path(self):

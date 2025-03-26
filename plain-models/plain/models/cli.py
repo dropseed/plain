@@ -317,7 +317,7 @@ def makemigrations(
 
     # Raise an error if any migrations are applied before their dependencies.
     consistency_check_labels = {
-        config.label for config in packages_registry.get_package_configs()
+        config.package_label for config in packages_registry.get_package_configs()
     }
     # Non-default databases are only checked if database routers used.
     aliases_to_check = connections if settings.DATABASE_ROUTERS else [DEFAULT_DB_ALIAS]

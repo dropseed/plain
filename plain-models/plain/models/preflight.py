@@ -32,7 +32,7 @@ def check_all_models(package_configs=None, **kwargs):
         models = models_registry.get_models()
     else:
         models = chain.from_iterable(
-            models_registry.get_models(package_label=package_config.label)
+            models_registry.get_models(package_label=package_config.package_label)
             for package_config in package_configs
         )
     for model in models:

@@ -10,7 +10,7 @@ JOBS_MODULE_NAME = "jobs"
 
 @register_config
 class Config(PackageConfig):
-    label = "plainworker"
+    package_label = "plainworker"
 
     def ready(self):
         # Trigger register calls to fire by importing the modules
