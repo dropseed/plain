@@ -21,7 +21,7 @@ class PasswordResetForm(forms.Form):
         from_email,
         to_email,
     ):
-        from plain.mail import TemplateEmail
+        from plain.email import TemplateEmail
 
         email = TemplateEmail(
             template=template_name,

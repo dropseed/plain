@@ -17,7 +17,7 @@ members = [
     "plain-htmx",
     "plain-importmap",
     "plain-loginlink",
-    "plain-mail",
+    "plain-email",
     "plain-models",
     "plain-oauth",
     "plain-pages",
@@ -515,19 +515,19 @@ version = "0.8.0"
 source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-mail" },
+    { name = "plain-email" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-mail", editable = "plain-mail" },
+    { name = "plain-email", editable = "plain-email" },
 ]
 
 [[package]]
-name = "plain-mail"
+name = "plain-email"
 version = "0.7.0"
-source = { editable = "plain-mail" }
+source = { editable = "plain-email" }
 dependencies = [
     { name = "plain" },
 ]

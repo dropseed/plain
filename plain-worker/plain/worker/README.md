@@ -4,7 +4,7 @@ Process background jobs with a database-driven worker.
 
 ```python
 from plain.worker import Job
-from plain.mail import send_mail
+from plain.email import send_mail
 
 # Create a new job class
 class WelcomeUserJob(Job):

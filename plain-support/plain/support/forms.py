@@ -1,5 +1,5 @@
 from plain.auth import get_user_model
-from plain.mail import TemplateEmail
+from plain.email import TemplateEmail
 from plain.models.forms import ModelForm
 from plain.runtime import settings
 

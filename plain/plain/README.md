@@ -29,7 +29,7 @@ The `plain` package includes everything you need to start handling web requests 
 
 - [plain.models](/plain-models/README.md) - Define and interact with your database models.
 - [plain.cache](/plain-cache/README.md) - A database-driven general purpose cache.
-- [plain.mail](/plain-mail/README.md) - Send emails with SMTP or custom backends.
+- [plain.email](/plain-email/README.md) - Send emails with SMTP or custom backends.
 - [plain.sessions](/plain-sessions/README.md) - User sessions and cookies.
 - [plain.worker](/plain-worker/README.md) - Backgrounb jobs stored in the database.
 - [plain.api](/plain-api/README.md) - Build APIs with Plain views.

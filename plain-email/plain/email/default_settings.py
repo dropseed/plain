@@ -1,4 +1,4 @@
-# The email backend to use. For possible shortcuts see plain.mail.
+# The email backend to use. For possible shortcuts see plain.email.
 # The default is to use the SMTP backend.
 # Third-party backends can be specified by providing a Python path
 # to a module that defines an EmailBackend class.

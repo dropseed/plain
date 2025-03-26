@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "plain<1.0.0",
-    "plain-mail<1.0.0",
+    "plain-email<1.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]

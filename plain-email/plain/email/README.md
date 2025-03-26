@@ -1,15 +1,15 @@
-# plain.mail
+# plain.email
 
 Everything you need to send email.
 
 ## Installation
 
-Add `plain.mail` to your `INSTALLED_APPS`:
+Add `plain.email` to your `INSTALLED_APPS`:
 
 ```python
 # settings.py
 INSTALLED_APPS = [
     # ...
-    'plain.mail',
+    'plain.email',
 ]
 ```

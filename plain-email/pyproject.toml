@@ -1,5 +1,5 @@
 [project]
-name = "plain.mail"
+name = "plain.email"
 version = "0.7.0"
 description = "Email sending for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]

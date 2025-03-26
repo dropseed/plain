@@ -24,7 +24,7 @@ With the official Plain ecosystem packages you can:
 - Use a built-in [user authentication](https://plainframework.com/docs/plain-auth/) system
 - [Lint and format code](https://plainframework.com/docs/plain-code/)
 - Run a [database-backed cache](https://plainframework.com/docs/plain-cache/)
-- [Send emails](https://plainframework.com/docs/plain-mail/)
+- [Send emails](https://plainframework.com/docs/plain-email/)
 - Streamline [local development](https://plainframework.com/docs/plain-dev/)
 - Manage [feature flags](https://plainframework.com/docs/plain-flags/)
 - Integrate [HTMX](https://plainframework.com/docs/plain-htmx/)

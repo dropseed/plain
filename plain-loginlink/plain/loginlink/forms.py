@@ -1,6 +1,6 @@
 from plain import forms
 from plain.auth import get_user_model
-from plain.mail import TemplateEmail
+from plain.email import TemplateEmail
 
 from .links import generate_link_url
 

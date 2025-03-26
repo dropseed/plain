@@ -17,7 +17,7 @@ requires-python = ">=3.11"
 "plain-htmx" = { workspace = true }
 "plain-importmap" = { workspace = true }
 "plain-loginlink" = { workspace = true }
-"plain-mail" = { workspace = true }
+"plain-email" = { workspace = true }
 "plain-models" = { workspace = true }
 "plain-oauth" = { workspace = true }
 "plain-pages" = { workspace = true }
@@ -47,7 +47,7 @@ members = [
     "plain-htmx",
     "plain-importmap",
     "plain-loginlink",
-    "plain-mail",
+    "plain-email",
     "plain-models",
     "plain-oauth",
     "plain-pages",
