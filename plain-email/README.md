@@ -1,1 +1,1 @@
-./plain/mail/README.md
+plain/email/README.md
