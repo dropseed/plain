@@ -12,12 +12,12 @@ members = [
     "plain-code",
     "plain-dev",
     "plain-elements",
+    "plain-email",
     "plain-esbuild",
     "plain-flags",
     "plain-htmx",
     "plain-importmap",
     "plain-loginlink",
-    "plain-email",
     "plain-models",
     "plain-oauth",
     "plain-pages",
@@ -442,6 +442,17 @@ dependencies = [
 requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
+name = "plain-email"
+version = "0.8.0"
+source = { editable = "plain-email" }
+dependencies = [
+    { name = "plain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "plain", editable = "plain" }]
+
+[[package]]
 name = "plain-esbuild"
 version = "0.5.0"
 source = { editable = "plain-esbuild" }
@@ -523,17 +534,6 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-email", editable = "plain-email" },
 ]
-
-[[package]]
-name = "plain-email"
-version = "0.7.0"
-source = { editable = "plain-email" }
-dependencies = [
-    { name = "plain" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-models"
