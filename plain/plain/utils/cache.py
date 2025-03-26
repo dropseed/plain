@@ -15,11 +15,37 @@ An example: i18n middleware would need to distinguish caches by the
 "Accept-language" header.
 """
 
+import time
 from collections import defaultdict
 
-from plain.utils.regex_helper import _lazy_re_compile
+from .http import http_date
+from .regex_helper import _lazy_re_compile
 
 cc_delim_re = _lazy_re_compile(r"\s*,\s*")
+
+
+def patch_response_headers(response, cache_timeout):
+    """
+    Add HTTP caching headers to the given HttpResponse: Expires and
+    Cache-Control.
+
+    Each header is only added if it isn't already set.
+    """
+    if cache_timeout < 0:
+        cache_timeout = 0  # Can't have max-age negative
+    if not response.has_header("Expires"):
+        response.headers["Expires"] = http_date(time.time() + cache_timeout)
+    patch_cache_control(response, max_age=cache_timeout)
+
+
+def add_never_cache_headers(response):
+    """
+    Add headers to a response to indicate that a page should never be cached.
+    """
+    patch_response_headers(response, cache_timeout=-1)
+    patch_cache_control(
+        response, no_cache=True, no_store=True, must_revalidate=True, private=True
+    )
 
 
 def patch_cache_control(response, **kwargs):

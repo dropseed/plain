@@ -15,7 +15,47 @@ in addition to models.
 ## Installation
 
 - install plain.admin and plain.htmx, add plain.admin.admin and plain.htmx to installed packages
-- add url
+
+Add the `AdminRouter` to your `urls.py`.
+
+```python
+# app/urls.py
+from plain.admin.urls import AdminRouter
+from plain.urls import Router, include, path
+
+from . import views
+
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        include("admin/", AdminRouter),
+        path("login/", views.LoginView, name="login"),
+        path("logout/", LogoutView, name="logout"),
+        # Your other urls here...
+    ]
+
+```
+
+Optionally, add the admin toolbar to your base template.
+
+```html
+<!-- app/templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ html_title|default("My App") }}</title>
+    {% tailwind_css %}
+</head>
+<body>
+    {% block content required %}{% endblock %}
+
+    {% toolbar %}
+</body>
+</html>
+```
 
 ## Models in the admin
 

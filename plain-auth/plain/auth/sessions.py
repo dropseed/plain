@@ -21,6 +21,20 @@ def get_session_auth_hash(user):
     return _get_session_auth_hash(user)
 
 
+def update_session_auth_hash(request, user):
+    """
+    Updating a user's password (for example) logs out all sessions for the user.
+
+    Take the current request and the updated user object from which the new
+    session hash will be derived and update the session hash appropriately to
+    prevent a password change from logging out the session from which the
+    password was changed.
+    """
+    request.session.cycle_key()
+    if request.user == user:
+        request.session[USER_HASH_SESSION_KEY] = get_session_auth_hash(user)
+
+
 def get_session_auth_fallback_hash(user):
     for fallback_secret in settings.SECRET_KEY_FALLBACKS:
         yield _get_session_auth_hash(user, secret=fallback_secret)

@@ -20,6 +20,7 @@ class View:
     url_kwargs: dict
 
     # By default, any of these are allowed if a method is defined for it.
+    # To disallow a defined method, remove it from this list.
     allowed_http_methods = [
         "get",
         "post",

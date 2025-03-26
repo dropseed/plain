@@ -19,6 +19,8 @@ urlpatterns = [
 
 This sets up a basic login view where users can authenticate using their username and password.
 
+For password resets to work, you also need to install [plain.mail](/plain-mail/README.md).
+
 ## FAQs
 
 ### How do I customize the login form?

@@ -2,165 +2,137 @@ from plain import forms
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.models.forms import ModelForm
+from plain.urls import reverse
+from plain.utils.encoding import force_bytes
 
 from .core import check_user_password
 from .hashers import check_password
-
-# class PasswordResetForm(forms.Form):
-#     email = forms.EmailField(
-#         # label="Email",
-#         max_length=254,
-#         # widget=forms.EmailInput(attrs={"autocomplete": "email"}),
-#     )
-
-#     def send_mail(
-#         self,
-#         subject_template_name,
-#         email_template_name,
-#         context,
-#         from_email,
-#         to_email,
-#         html_email_template_name=None,
-#     ):
-#         from plain.mail import EmailMultiAlternatives
-
-#         """
-#         Send a plain.mail.EmailMultiAlternatives to `to_email`.
-#         """
-#         template = Template(subject_template_name)
-#         subject = template.render(context)
-#         # Email subject *must not* contain newlines
-#         subject = "".join(subject.splitlines())
-#         template = Template(email_template_name)
-#         body = template.render(context)
-
-#         email_message = EmailMultiAlternatives(subject, body, from_email, [to_email])
-#         if html_email_template_name is not None:
-#             template = Template(html_email_template_name)
-#             html_email = template.render(context)
-#             email_message.attach_alternative(html_email, "text/html")
-
-#         email_message.send()
-
-#     def get_users(self, email):
-#         """Given an email, return matching user(s) who should receive a reset.
-
-#         This allows subclasses to more easily customize the default policies
-#         that prevent inactive users and users with unusable passwords from
-#         resetting their password.
-#         """
-#         active_users = get_user_model()._default_manager.filter(email__iexact=email)
-#         return (u for u in active_users if _unicode_ci_compare(email, u.email))
-
-#     def save(
-#         self,
-#         subject_template_name="auth/password_reset_subject.txt",
-#         email_template_name="auth/password_reset_email.html",
-#         use_https=False,
-#         token_generator=default_token_generator,
-#         from_email=None,
-#         html_email_template_name=None,
-#         extra_email_context=None,
-#     ):
-#         """
-#         Generate a one-use only link for resetting password and send it to the
-#         user.
-#         """
-#         email = self.cleaned_data["email"]
-#         for user in self.get_users(email):
-#             context = {
-#                 "email": user.email,
-#                 "uid": urlsafe_base64_encode(force_bytes(user.pk)),
-#                 "user": user,
-#                 "token": token_generator.make_token(user),
-#                 "protocol": "https" if use_https else "http",
-#                 **(extra_email_context or {}),
-#             }
-#             self.send_mail(
-#                 subject_template_name,
-#                 email_template_name,
-#                 context,
-#                 from_email,
-#                 user.email,
-#                 html_email_template_name=html_email_template_name,
-#             )
+from .utils import unicode_ci_compare, urlsafe_base64_encode
 
 
-# class SetPasswordForm(forms.Form):
-#     """
-#     A form that lets a user set their password without entering the old
-#     password
-#     """
+class PasswordResetForm(forms.Form):
+    email = forms.EmailField(max_length=254)
 
-#     error_messages = {
-#         "password_mismatch": "The two password fields didn’t match.",
-#     }
-#     new_password1 = forms.CharField(
-#         # label="New password",
-#         # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
-#         strip=False,
-#         # help_text=validators.password_validators_help_text_html(),
-#     )
-#     new_password2 = forms.CharField(
-#         # label="New password confirmation",
-#         strip=False,
-#         # widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
-#     )
+    def send_mail(
+        self,
+        *,
+        template_name,
+        context,
+        from_email,
+        to_email,
+    ):
+        from plain.mail import TemplateEmail
 
-#     def __init__(self, user, *args, **kwargs):
-#         self.user = user
-#         super().__init__(*args, **kwargs)
+        email = TemplateEmail(
+            template=template_name,
+            context=context,
+            from_email=from_email,
+            to=[to_email],
+        )
 
-#     def clean_new_password2(self):
-#         password1 = self.cleaned_data.get("new_password1")
-#         password2 = self.cleaned_data.get("new_password2")
-#         if password1 and password2 and password1 != password2:
-#             raise ValidationError(
-#                 self.error_messages["password_mismatch"],
-#                 code="password_mismatch",
-#             )
-#         validators.validate_password(password2, self.user)
-#         return password2
+        email.send()
 
-#     def save(self, commit=True):
-#         password = self.cleaned_data["new_password1"]
-#         self.user.set_password(password)
-#         if commit:
-#             self.user.save()
-#         return self.user
+    def get_users(self, email):
+        """Given an email, return matching user(s) who should receive a reset.
+
+        This allows subclasses to more easily customize the default policies
+        that prevent inactive users and users with unusable passwords from
+        resetting their password.
+        """
+        active_users = get_user_model()._default_manager.filter(email__iexact=email)
+        return (u for u in active_users if unicode_ci_compare(email, u.email))
+
+    def save(
+        self,
+        *,
+        request,
+        reset_confirm_url_name,
+        token_generator,
+        email_template_name="password_reset",
+        from_email=None,
+        extra_email_context=None,
+    ):
+        """
+        Generate a one-use only link for resetting password and send it to the
+        user.
+        """
+        email = self.cleaned_data["email"]
+        for user in self.get_users(email):
+            password_reset_url = request.build_absolute_uri(
+                reverse(
+                    reset_confirm_url_name,
+                    uidb64=urlsafe_base64_encode(force_bytes(user.pk)),
+                    token=token_generator.make_token(user),
+                )
+            )
+            context = {
+                "email": user.email,
+                "user": user,
+                "password_reset_url": password_reset_url,
+                **(extra_email_context or {}),
+            }
+            self.send_mail(
+                template_name=email_template_name,
+                context=context,
+                from_email=from_email,
+                to_email=user.email,
+            )
 
 
-# class PasswordChangeForm(SetPasswordForm):
-#     """
-#     A form that lets a user change their password by entering their old
-#     password.
-#     """
+class PasswordSetForm(forms.Form):
+    """
+    A form that lets a user set their password without entering the old
+    password
+    """
 
-#     error_messages = {
-#         **SetPasswordForm.error_messages,
-#         "password_incorrect": "Your old password was entered incorrectly. Please enter it again.",
-#     }
-#     old_password = forms.CharField(
-#         # label="Old password",
-#         strip=False,
-#         # widget=forms.PasswordInput(
-#         #     attrs={"autocomplete": "current-password", "autofocus": True}
-#         # ),
-#     )
+    new_password1 = forms.CharField(strip=False)
+    new_password2 = forms.CharField(strip=False)
 
-#     field_order = ["old_password", "new_password1", "new_password2"]
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
 
-#     def clean_old_password(self):
-#         """
-#         Validate that the old_password field is correct.
-#         """
-#         old_password = self.cleaned_data["old_password"]
-#         if not self.user.check_password(old_password):
-#             raise ValidationError(
-#                 self.error_messages["password_incorrect"],
-#                 code="password_incorrect",
-#             )
-#         return old_password
+    def clean_new_password2(self):
+        password1 = self.cleaned_data.get("new_password1")
+        password2 = self.cleaned_data.get("new_password2")
+        if password1 and password2 and password1 != password2:
+            raise ValidationError(
+                "The two password fields didn't match.",
+                code="password_mismatch",
+            )
+
+        # Clean it as if it were being put into the model directly
+        self.user._meta.get_field("password").clean(password2, self.user)
+
+        return password2
+
+    def save(self, commit=True):
+        password = self.cleaned_data["new_password1"]
+        self.user.password = password
+        if commit:
+            self.user.save()
+        return self.user
+
+
+class PasswordChangeForm(PasswordSetForm):
+    """
+    A form that lets a user change their password by entering their old
+    password.
+    """
+
+    current_password = forms.CharField(strip=False)
+
+    def clean_current_password(self):
+        """
+        Validate that the current_password field is correct.
+        """
+        current_password = self.cleaned_data["current_password"]
+        if not check_user_password(self.user, current_password):
+            raise ValidationError(
+                "Your old password was entered incorrectly. Please enter it again.",
+                code="password_incorrect",
+            )
+        return current_password
 
 
 class PasswordLoginForm(forms.Form):
