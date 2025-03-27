@@ -7,11 +7,19 @@ from .templates import TemplateView
 class ErrorView(TemplateView):
     status_code: int
 
-    def __init__(self, status_code=None) -> None:
+    def __init__(self, *, status_code=None, exception=None) -> None:
         # Allow creating an ErrorView with a status code
         # e.g. ErrorView.as_view(status_code=404)
-        if status_code is not None:
-            self.status_code = status_code
+        self.status_code = status_code or self.status_code
+
+        # Allow creating an ErrorView with an exception
+        self.exception = exception
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["status_code"] = self.status_code
+        context["exception"] = self.exception
+        return context
 
     def get_template_names(self) -> list[str]:
         return [f"{self.status_code}.html", "error.html"]

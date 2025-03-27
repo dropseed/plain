@@ -45,10 +45,14 @@ def convert_exception_to_response(get_response):
 
 def response_for_exception(request, exc):
     if isinstance(exc, Http404):
-        response = get_exception_response(request, 404)
+        response = get_exception_response(
+            request=request, status_code=404, exception=None
+        )
 
     elif isinstance(exc, PermissionDenied):
-        response = get_exception_response(request, 403)
+        response = get_exception_response(
+            request=request, status_code=403, exception=exc
+        )
         log_response(
             "Forbidden (Permission denied): %s",
             request.path,
@@ -58,7 +62,9 @@ def response_for_exception(request, exc):
         )
 
     elif isinstance(exc, MultiPartParserError):
-        response = get_exception_response(request, 400)
+        response = get_exception_response(
+            request=request, status_code=400, exception=None
+        )
         log_response(
             "Bad request (Unable to parse request body): %s",
             request.path,
@@ -68,7 +74,9 @@ def response_for_exception(request, exc):
         )
 
     elif isinstance(exc, BadRequest):
-        response = get_exception_response(request, 400)
+        response = get_exception_response(
+            request=request, status_code=400, exception=exc
+        )
         log_response(
             "%s: %s",
             str(exc),
@@ -91,11 +99,15 @@ def response_for_exception(request, exc):
             exc_info=exc,
             extra={"status_code": 400, "request": request},
         )
-        response = get_exception_response(request, 400)
+        response = get_exception_response(
+            request=request, status_code=400, exception=None
+        )
 
     else:
         signals.got_request_exception.send(sender=None, request=request)
-        response = get_exception_response(request, 500)
+        response = get_exception_response(
+            request=request, status_code=500, exception=None
+        )
         log_response(
             "%s: %s",
             response.reason_phrase,
@@ -105,34 +117,25 @@ def response_for_exception(request, exc):
             exception=exc,
         )
 
-    # Force a TemplateResponse to be rendered.
-    if not getattr(response, "is_rendered", True) and callable(
-        getattr(response, "render", None)
-    ):
-        response = response.render()
-
     return response
 
 
-def get_exception_response(request, status_code):
+def get_exception_response(*, request, status_code, exception):
     try:
-        return get_error_view(status_code)(request)
+        view_class = get_error_view(status_code=status_code, exception=exception)
+        return view_class(request)
     except Exception:
         signals.got_request_exception.send(sender=None, request=request)
-        return handle_uncaught_exception()
+
+        # In development mode, re-raise the exception to get a full stack trace
+        if settings.DEBUG:
+            raise
+
+        # If we can't load the view, return a 500 response
+        return ResponseServerError()
 
 
-def handle_uncaught_exception():
-    """
-    Processing for any otherwise uncaught exceptions (those that will
-    generate HTTP 500 responses).
-    """
-    if settings.DEBUG:
-        raise
-    return ResponseServerError()
-
-
-def get_error_view(status_code):
+def get_error_view(*, status_code, exception):
     views_by_status = settings.HTTP_ERROR_VIEWS
     if status_code in views_by_status:
         view = views_by_status[status_code]
@@ -142,4 +145,4 @@ def get_error_view(status_code):
         return view.as_view()
 
     # Create a standard view for any other status code
-    return ErrorView.as_view(status_code=status_code)
+    return ErrorView.as_view(status_code=status_code, exception=exception)
