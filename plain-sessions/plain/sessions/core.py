@@ -188,7 +188,7 @@ class SessionStore:
     def _load(self):
         try:
             session = self._model.objects.get(
-                session_key=self.session_key, expire_date__gt=timezone.now()
+                session_key=self.session_key, expires_at__gt=timezone.now()
             )
         except (self._model.DoesNotExist, SuspiciousOperation) as e:
             if isinstance(e, SuspiciousOperation):
@@ -225,7 +225,7 @@ class SessionStore:
         obj = self._model(
             session_key=self._get_or_create_session_key(),
             session_data=self._encode(data),
-            expire_date=timezone.now() + timedelta(seconds=settings.SESSION_COOKIE_AGE),
+            expires_at=timezone.now() + timedelta(seconds=settings.SESSION_COOKIE_AGE),
         )
 
         using = router.db_for_write(self._model, instance=obj)

@@ -7,7 +7,7 @@ class SessionManager(models.Manager):
         """
         Clear expired sessions from the database.
         """
-        self.filter(expire_date__lt=timezone.now()).delete()
+        self.filter(expires_at__lt=timezone.now()).delete()
 
 
 @models.register_model
@@ -31,13 +31,13 @@ class Session(models.Model):
 
     session_key = models.CharField(max_length=40, primary_key=True)
     session_data = models.TextField()
-    expire_date = models.DateTimeField()
+    expires_at = models.DateTimeField()
 
     objects = SessionManager()
 
     class Meta:
         indexes = [
-            models.Index(fields=["expire_date"]),
+            models.Index(fields=["expires_at"]),
         ]
 
     def __str__(self):
