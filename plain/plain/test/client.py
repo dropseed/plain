@@ -17,7 +17,6 @@ from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
 from plain.utils.functional import SimpleLazyObject
 from plain.utils.http import urlencode
-from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
 
 from .encoding import encode_multipart
@@ -776,11 +775,12 @@ class Client(RequestFactory):
     @property
     def session(self):
         """Return the current session variables."""
-        Session = import_string(settings.SESSION_CLASS)
+        from plain.sessions import SessionStore
+
         cookie = self.cookies.get(settings.SESSION_COOKIE_NAME)
         if cookie:
-            return Session(cookie.value)
-        session = Session()
+            return SessionStore(cookie.value)
+        session = SessionStore()
         session.save()
         self.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
         return session
@@ -790,14 +790,14 @@ class Client(RequestFactory):
 
     def _login(self, user):
         from plain.auth import login
+        from plain.sessions import SessionStore
 
         # Create a fake request to store login details.
         request = HttpRequest()
         if self.session:
             request.session = self.session
         else:
-            Session = import_string(settings.SESSION_CLASS)
-            request.session = Session()
+            request.session = SessionStore()
         login(request, user)
         # Save the session values.
         request.session.save()
@@ -816,14 +816,14 @@ class Client(RequestFactory):
     def logout(self):
         """Log out the user by removing the cookies and session object."""
         from plain.auth import get_user, logout
+        from plain.sessions import SessionStore
 
         request = HttpRequest()
         if self.session:
             request.session = self.session
             request.user = get_user(request)
         else:
-            Session = import_string(settings.SESSION_CLASS)
-            request.session = Session()
+            request.session = SessionStore()
         logout(request)
         self.cookies = SimpleCookie()
 

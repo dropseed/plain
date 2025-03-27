@@ -1,23 +1,13 @@
 from plain import models
+from plain.utils import timezone
 
 
 class SessionManager(models.Manager):
-    use_in_migrations = True
-
-    def encode(self, session_dict):
+    def clear_expired(self):
         """
-        Return the given session dictionary serialized and encoded as a string.
+        Clear expired sessions from the database.
         """
-        session_store_class = self.model.get_session_store_class()
-        return session_store_class().encode(session_dict)
-
-    def save(self, session_key, session_dict, expire_date):
-        s = self.model(session_key, self.encode(session_dict), expire_date)
-        if session_dict:
-            s.save()
-        else:
-            s.delete()  # Clear sessions with no data.
-        return s
+        self.filter(expire_date__lt=timezone.now()).delete()
 
 
 @models.register_model
@@ -52,13 +42,3 @@ class Session(models.Model):
 
     def __str__(self):
         return self.session_key
-
-    @classmethod
-    def get_session_store_class(cls):
-        from plain.sessions.backends.db import SessionStore
-
-        return SessionStore
-
-    def get_decoded(self):
-        session_store_class = self.get_session_store_class()
-        return session_store_class().decode(self.session_data)

@@ -1,8 +1,8 @@
 import click
 
 from plain.cli import register_cli
-from plain.runtime import settings
-from plain.utils.module_loading import import_string
+
+from .models import Session
 
 
 @register_cli("sessions")
@@ -14,11 +14,4 @@ def cli():
 
 @cli.command()
 def clear_expired():
-    Session = import_string(settings.SESSION_CLASS)
-    try:
-        Session.clear_expired()
-    except NotImplementedError:
-        raise NotImplementedError(
-            f"Session '{settings.SESSION_CLASS}' doesn't support clearing expired "
-            "sessions."
-        )
+    Session.objects.clear_expired()

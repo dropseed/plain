@@ -8,6 +8,8 @@ requires-python = ">=3.11"
 dependencies = [
     "plain<1.0.0",
     "plain.models<1.0.0",
+    # Technically you can swap out sessions entirely with your own,
+    # so long as the request.session exists and has a similar API.
     "plain.sessions<1.0.0",
 ]
 

@@ -1,21 +1,20 @@
 import time
 
 from plain.runtime import settings
-from plain.sessions.backends.base import UpdateError
 from plain.sessions.exceptions import SessionInterrupted
 from plain.utils.cache import patch_vary_headers
 from plain.utils.http import http_date
-from plain.utils.module_loading import import_string
+
+from .core import SessionStore, UpdateError
 
 
 class SessionMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.Session = import_string(settings.SESSION_CLASS)
 
     def __call__(self, request):
         session_key = request.COOKIES.get(settings.SESSION_COOKIE_NAME)
-        request.session = self.Session(session_key)
+        request.session = SessionStore(session_key)
 
         response = self.get_response(request)
 
@@ -44,11 +43,11 @@ class SessionMiddleware:
             if accessed:
                 patch_vary_headers(response, ("Cookie",))
             if (modified or settings.SESSION_SAVE_EVERY_REQUEST) and not empty:
-                if request.session.get_expire_at_browser_close():
+                if settings.SESSION_EXPIRE_AT_BROWSER_CLOSE:
                     max_age = None
                     expires = None
                 else:
-                    max_age = request.session.get_expiry_age()
+                    max_age = settings.SESSION_COOKIE_AGE
                     expires_time = time.time() + max_age
                     expires = http_date(expires_time)
                 # Save the session data and refresh the client cookie.
