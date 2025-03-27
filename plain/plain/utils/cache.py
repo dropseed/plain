@@ -33,7 +33,7 @@ def patch_response_headers(response, cache_timeout):
     """
     if cache_timeout < 0:
         cache_timeout = 0  # Can't have max-age negative
-    if not response.has_header("Expires"):
+    if "Expires" not in response.headers:
         response.headers["Expires"] = http_date(time.time() + cache_timeout)
     patch_cache_control(response, max_age=cache_timeout)
 
