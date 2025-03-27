@@ -54,7 +54,7 @@ def get_commits_since_version_change(repo_path, package_path):
         return []
 
 def discover_packages(repo_path):
-    return [d for d in os.listdir(repo_path) if os.path.isdir(d) and d.startswith('plain')]
+    return [d for d in os.listdir(repo_path) if os.path.isdir(d) and d.startswith('plain') and not d.endswith(".egg-info")]
 
 def main():
     repo_path = os.getcwd()
