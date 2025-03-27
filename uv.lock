@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.34.1"
+version = "0.35.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -537,7 +537,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.27.0"
+version = "0.27.1"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -666,7 +666,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-sessions"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
