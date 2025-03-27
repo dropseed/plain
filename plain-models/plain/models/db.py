@@ -134,21 +134,14 @@ class ConnectionHandler(BaseConnectionHandler):
 
     def configure_settings(self, databases):
         databases = super().configure_settings(databases)
-        if databases == {}:
-            databases[DEFAULT_DB_ALIAS] = {"ENGINE": "plain.models.backends.dummy"}
-        elif DEFAULT_DB_ALIAS not in databases:
+        if DEFAULT_DB_ALIAS not in databases:
             raise ImproperlyConfigured(
                 f"You must define a '{DEFAULT_DB_ALIAS}' database."
             )
-        elif databases[DEFAULT_DB_ALIAS] == {}:
-            databases[DEFAULT_DB_ALIAS]["ENGINE"] = "plain.models.backends.dummy"
 
         # Configure default settings.
         for conn in databases.values():
             conn.setdefault("AUTOCOMMIT", True)
-            conn.setdefault("ENGINE", "plain.models.backends.dummy")
-            if conn["ENGINE"] == "plain.models.backends." or not conn["ENGINE"]:
-                conn["ENGINE"] = "plain.models.backends.dummy"
             conn.setdefault("CONN_MAX_AGE", 0)
             conn.setdefault("CONN_HEALTH_CHECKS", False)
             conn.setdefault("OPTIONS", {})

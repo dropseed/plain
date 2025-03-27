@@ -323,7 +323,7 @@ def makemigrations(
     aliases_to_check = connections if settings.DATABASE_ROUTERS else [DEFAULT_DB_ALIAS]
     for alias in sorted(aliases_to_check):
         connection = connections[alias]
-        if connection.settings_dict["ENGINE"] != "plain.models.backends.dummy" and any(
+        if any(
             router.allow_migrate(
                 connection.alias, package_label, model_name=model._meta.object_name
             )
