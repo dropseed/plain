@@ -20,6 +20,11 @@ class RedirectView(View):
     pattern_name: str | None = None
     query_string = False
 
+    def __init__(self, url=None, permanent=None):
+        # Allow url and permanent to be set in RedirectView.as_view(url="...", permanent=True)
+        self.url = url or self.url
+        self.permanent = permanent if permanent is not None else self.permanent
+
     def get_redirect_url(self):
         """
         Return the URL redirect to. Keyword arguments from the URL pattern
