@@ -42,3 +42,9 @@ class Session(models.Model):
 
     def __str__(self):
         return self.session_key
+
+    def decoded_data(self):
+        from .core import SessionStore
+
+        # A little weird to init an empty one just to use the decode
+        return SessionStore()._decode(self.session_data)
