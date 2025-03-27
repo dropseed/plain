@@ -33,12 +33,19 @@ class Session(models.Model):
     session_data = models.TextField()
     expires_at = models.DateTimeField()
 
+    user_id = models.CharField(max_length=255, required=False)
+
     objects = SessionManager()
 
     class Meta:
         indexes = [
             models.Index(fields=["expires_at"]),
+            models.Index(fields=["user_id"]),
         ]
 
     def __str__(self):
         return self.session_key
+
+    def decoded_data(self):
+        from .core import SessionStore
+        return SessionStore()._decode(self.session_data)

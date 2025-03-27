@@ -4,14 +4,16 @@ from plain.models import models_registry
 from plain.runtime import settings
 from plain.utils.crypto import constant_time_compare, salted_hmac
 
-USER_ID_SESSION_KEY = "_auth_user_id"
+# TODO
+# - make sure setting _user_id on sessions is happening and being unset correctly...
+# - and can we remove the user_hash now? if sessions are user-aware, we could ask for all
+# other user sessions and delete them... (also useful tool to expose to user - log out others)
 USER_HASH_SESSION_KEY = "_auth_user_hash"
-
 
 def _get_user_id_from_session(request):
     # This value in the session is always serialized to a string, so we need
     # to convert it back to Python whenever we access it.
-    return get_user_model()._meta.pk.to_python(request.session[USER_ID_SESSION_KEY])
+    return get_user_model()._meta.pk.to_python(request.session.get_user_id())
 
 
 def get_session_auth_hash(user):
@@ -61,7 +63,8 @@ def login(request, user):
     else:
         session_auth_hash = ""
 
-    if USER_ID_SESSION_KEY in request.session:
+    # A user is already logged in to this session
+    if request.session.get_user_id():
         if _get_user_id_from_session(request) != user.pk:
             # To avoid reusing another user's session, create a new, empty
             # session if the existing session corresponds to a different
@@ -78,10 +81,15 @@ def login(request, user):
         # typically done after user login to prevent session fixation attacks.
         request.session.cycle_key()
 
-    request.session[USER_ID_SESSION_KEY] = user._meta.pk.value_to_string(user)
+    # Effectively log the user in by attaching them to the session
+    user_id = user._meta.pk.value_to_string(user)
+    request.session.set_user_id(user_id)
     request.session[USER_HASH_SESSION_KEY] = session_auth_hash
+
+    # Immediately add them to the current request
     if hasattr(request, "user"):
         request.user = user
+
     rotate_token(request)
 
 
@@ -90,9 +98,9 @@ def logout(request):
     Remove the authenticated user's ID from the request and flush their session
     data.
     """
-    # Dispatch the signal before the user is logged out so the receivers have a
-    # chance to find out *who* logged out.
     request.session.flush()
+
+    # Immediately remove them from the current request
     if hasattr(request, "user"):
         request.user = None
 
@@ -118,7 +126,7 @@ def get_user(request):
     Return the user model instance associated with the given request session.
     If no user is retrieved, return None.
     """
-    if USER_ID_SESSION_KEY not in request.session:
+    if not request.session.get_user_id():
         return None
 
     user_id = _get_user_id_from_session(request)

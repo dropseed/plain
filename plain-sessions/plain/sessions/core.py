@@ -40,6 +40,8 @@ class SessionStore:
         self.accessed = False
         self.modified = False
 
+        self._user_id = None
+
         # Lazy import
         from .models import Session
 
@@ -170,6 +172,7 @@ class SessionStore:
         except self._model.DoesNotExist:
             pass
         self.session_key = None
+        self._user_id = None
 
     def cycle_key(self):
         """
@@ -190,14 +193,15 @@ class SessionStore:
             session = self._model.objects.get(
                 session_key=self.session_key, expires_at__gt=timezone.now()
             )
+            self._user_id = session.user_id
+            return self._decode(session.session_data)
         except (self._model.DoesNotExist, SuspiciousOperation) as e:
             if isinstance(e, SuspiciousOperation):
                 logger = logging.getLogger(f"plain.security.{e.__class__.__name__}")
                 logger.warning(str(e))
             self.session_key = None
-            session = None
-
-        return self._decode(session.session_data) if session else {}
+            self._user_id = None
+            return {}
 
     def create(self):
         while True:
@@ -226,6 +230,7 @@ class SessionStore:
             session_key=self._get_or_create_session_key(),
             session_data=self._encode(data),
             expires_at=timezone.now() + timedelta(seconds=settings.SESSION_COOKIE_AGE),
+            user_id=self.get_user_id() or "",  # Needs to be a string, not null
         )
 
         using = router.db_for_write(self._model, instance=obj)
@@ -238,6 +243,8 @@ class SessionStore:
                     using=using,
                 )
         except IntegrityError:
+            # In theory this is just to catch primary keys that already exist,
+            # but be careful of other IntegrityErrors that may be raised...
             if must_create:
                 raise CreateError
             raise
@@ -245,3 +252,15 @@ class SessionStore:
             if not must_create:
                 raise UpdateError
             raise
+
+    def get_user_id(self):
+        if self._user_id:
+            return self._user_id
+
+        # Backwards compatible with old auth module...
+        return self.get("_auth_user_id", None)
+
+    def set_user_id(self, user_id):
+        """Associate a specific user with this session."""
+        self._user_id = user_id
+        self.modified = True
