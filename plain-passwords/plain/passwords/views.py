@@ -1,11 +1,16 @@
+from datetime import datetime
+
+from plain import signing
 from plain.auth import get_user_model
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
-from plain.exceptions import ValidationError
+from plain.exceptions import BadRequest
 from plain.http import (
     ResponseRedirect,
 )
+from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
+from plain.utils.crypto import constant_time_compare
 from plain.views import CreateView, FormView
 
 from .forms import (
@@ -15,102 +20,113 @@ from .forms import (
     PasswordSetForm,
     PasswordSignupForm,
 )
-from .tokens import default_token_generator
-from .utils import urlsafe_base64_decode
 
 
-class PasswordResetView(FormView):
+class PasswordForgotView(FormView):
     form_class = PasswordResetForm
-    reset_token_generator = default_token_generator
     reset_confirm_url_name: str
+
+    def generate_password_reset_token(self, user):
+        return signing.dumps(
+            {
+                "pk": user.pk,
+                "email": user.email,
+                "password": user.password,  # Hashed password
+                "timestamp": datetime.now().timestamp(),  # Makes each token unique
+            },
+            salt="password-reset",
+            compress=True,
+        )
+
+    def generate_password_reset_url(self, user):
+        token = self.generate_password_reset_token(user)
+        url = reverse(self.reset_confirm_url_name) + f"?token={token}"
+        return self.request.build_absolute_uri(url)
 
     def form_valid(self, form):
         form.save(
-            request=self.request,
-            reset_confirm_url_name=self.reset_confirm_url_name,
-            token_generator=self.reset_token_generator,
+            generate_reset_url=self.generate_password_reset_url,
         )
         return super().form_valid(form)
 
 
-class PasswordResetConfirmView(FormView):
+class PasswordResetView(FormView):
     form_class = PasswordSetForm
-    reset_url_token = "set-password"
-    reset_token_generator = default_token_generator
+    reset_token_max_age = 60 * 60  # 1 hour
     _reset_token_session_key = "_password_reset_token"
 
-    def get_response(self):
-        self.validlink = False
-        self.user = self.get_user(self.url_kwargs["uidb64"])
+    def check_password_reset_token(self, token):
+        max_age = self.reset_token_max_age
 
-        if not self.user:
-            # Display the "Password reset unsuccessful" page.
-            response = self.render_to_response(self.get_template_context())
+        try:
+            data = signing.loads(token, salt="password-reset", max_age=max_age)
+        except signing.SignatureExpired:
+            return
+        except signing.BadSignature:
+            return
+
+        UserModel = get_user_model()
+        try:
+            user = UserModel._default_manager.get(pk=data["pk"])
+        except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            return
+
+        # If the password has changed since the token was generated, the token is invalid.
+        # (These are the hashed passwords, not the raw passwords.)
+        if not constant_time_compare(user.password, data["password"]):
+            return
+
+        # If the email has changed since the token was generated, the token is invalid.
+        if not constant_time_compare(user.email, data["email"]):
+            return
+
+        return user
+
+    def get(self):
+        if self.request.user:
+            # Redirect if the user is already logged in
+            return ResponseRedirect(self.success_url)
+
+        # Tokens are initially passed as GET parameters and we
+        # immediately store them in the session and remove it from the URL.
+        if token := self.request.GET.get("token", ""):
+            # Store the token in the session and redirect to the
+            # password reset form at a URL without the token. That
+            # avoids the possibility of leaking the token in the
+            # HTTP Referer header.
+            self.request.session[self._reset_token_session_key] = token
+            # Redirect to the path itself, without the GET parameters
+            response = ResponseRedirect(self.request.path)
             add_never_cache_headers(response)
             return response
 
-        token = self.url_kwargs["token"]
-        if token == self.reset_url_token:
-            session_token = self.request.session.get(self._reset_token_session_key)
-            if self.reset_token_generator.check_token(self.user, session_token):
-                # If the token is valid, display the password reset form.
-                self.validlink = True
-                response = super().get_response()
-                add_never_cache_headers(response)
-                return response
-        else:
-            if self.reset_token_generator.check_token(self.user, token):
-                # Store the token in the session and redirect to the
-                # password reset form at a URL without the token. That
-                # avoids the possibility of leaking the token in the
-                # HTTP Referer header.
-                self.request.session[self._reset_token_session_key] = token
-                redirect_url = self.request.path.replace(token, self.reset_url_token)
-                response = ResponseRedirect(redirect_url)
-                add_never_cache_headers(response)
-                return response
+        return super().get()
 
-    def get_user(self, uidb64):
-        UserModel = get_user_model()
-        try:
-            # urlsafe_base64_decode() decodes to bytestring
-            uid = urlsafe_base64_decode(uidb64).decode()
-            user = UserModel._default_manager.get(pk=uid)
-        except (
-            TypeError,
-            ValueError,
-            OverflowError,
-            UserModel.DoesNotExist,
-            ValidationError,
-        ):
-            user = None
+    def get_user(self):
+        session_token = self.request.session.get(self._reset_token_session_key, "")
+        if not session_token:
+            # No token in the session, so we can't check the password reset token.
+            raise BadRequest("No password reset token found.")
+
+        user = self.check_password_reset_token(session_token)
+        if not user:
+            # Remove it from the session if it is invalid.
+            del self.request.session[self._reset_token_session_key]
+            raise BadRequest("Password reset token is no longer valid.")
+
         return user
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.user
+        kwargs["user"] = self.get_user()
         return kwargs
 
     def form_valid(self, form):
         form.save()
         del self.request.session[self._reset_token_session_key]
-        # if self.post_reset_login:
-        #     auth_login(self.request, user, self.post_reset_login_backend)
+        # If you wanted, you could log in the user here so they don't have to
+        # go through the log in form again.
         return super().form_valid(form)
-
-    def get_template_context(self):
-        context = super().get_template_context()
-        if self.validlink:
-            context["validlink"] = True
-        else:
-            context.update(
-                {
-                    "form": None,
-                    "title": "Password reset unsuccessful",
-                    "validlink": False,
-                }
-            )
-        return context
 
 
 class PasswordChangeView(FormView):

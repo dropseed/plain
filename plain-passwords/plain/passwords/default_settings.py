@@ -1,9 +1,6 @@
-# The number of seconds a password reset link is valid for (default: 3 days).
-PASSWORD_RESET_TIMEOUT: int = 60 * 60 * 24 * 3
-
-# the first hasher in this list is the preferred algorithm.  any
+# The first hasher in this list is the preferred algorithm. Any
 # password using different algorithms will be converted automatically
-# upon login
+# upon login.
 PASSWORD_HASHERS: list = [
     "plain.passwords.hashers.PBKDF2PasswordHasher",
     "plain.passwords.hashers.PBKDF2SHA1PasswordHasher",

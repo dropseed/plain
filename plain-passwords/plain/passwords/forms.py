@@ -2,12 +2,10 @@ from plain import forms
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.models.forms import ModelForm
-from plain.urls import reverse
-from plain.utils.encoding import force_bytes
 
 from .core import check_user_password
 from .hashers import check_password
-from .utils import unicode_ci_compare, urlsafe_base64_encode
+from .utils import unicode_ci_compare
 
 
 class PasswordResetForm(forms.Form):
@@ -16,10 +14,10 @@ class PasswordResetForm(forms.Form):
     def send_mail(
         self,
         *,
-        template_name,
-        context,
-        from_email,
-        to_email,
+        template_name: str,
+        context: dict,
+        from_email: str,
+        to_email: str,
     ):
         from plain.email import TemplateEmail
 
@@ -45,12 +43,10 @@ class PasswordResetForm(forms.Form):
     def save(
         self,
         *,
-        request,
-        reset_confirm_url_name,
-        token_generator,
-        email_template_name="password_reset",
-        from_email=None,
-        extra_email_context=None,
+        generate_reset_url: callable,
+        email_template_name: str = "password_reset",
+        from_email: str = "",
+        extra_email_context: dict | None = None,
     ):
         """
         Generate a one-use only link for resetting password and send it to the
@@ -58,17 +54,10 @@ class PasswordResetForm(forms.Form):
         """
         email = self.cleaned_data["email"]
         for user in self.get_users(email):
-            password_reset_url = request.build_absolute_uri(
-                reverse(
-                    reset_confirm_url_name,
-                    uidb64=urlsafe_base64_encode(force_bytes(user.pk)),
-                    token=token_generator.make_token(user),
-                )
-            )
             context = {
-                "email": user.email,
+                "email": email,
                 "user": user,
-                "password_reset_url": password_reset_url,
+                "url": generate_reset_url(user),
                 **(extra_email_context or {}),
             }
             self.send_mail(
@@ -107,8 +96,7 @@ class PasswordSetForm(forms.Form):
         return password2
 
     def save(self, commit=True):
-        password = self.cleaned_data["new_password1"]
-        self.user.password = password
+        self.user.password = self.cleaned_data["new_password1"]
         if commit:
             self.user.save()
         return self.user
