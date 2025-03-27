@@ -85,7 +85,7 @@ class View:
             return result
 
         if isinstance(result, str):
-            return Response(result)
+            return Response(result, content_type="text/plain")
 
         if isinstance(result, list):
             return JsonResponse(result, safe=False)
