@@ -26,6 +26,9 @@ class PasswordResetForm(forms.Form):
             context=context,
             from_email=from_email,
             to=[to_email],
+            headers={
+                "X-Auto-Response-Suppress": "All",
+            },
         )
 
         email.send()
