@@ -58,8 +58,13 @@ jQuery(function($) {
                 // Column already has a link, so don't add another
                 return;
             }
+            var autolinkUrl = $this.data("column-autolink");
+            if (!autolinkUrl) {
+                // No URL, so don't add a link
+                return;
+            }
             var $link = $(document.createElement("a"));
-            $link.attr("href", $this.data("column-autolink"));
+            $link.attr("href", autolinkUrl);
             $link.addClass("flex p-2 -m-2 text-white/80 hover:no-underline");
             $(this).wrapInner($link);
         })
