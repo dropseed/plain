@@ -7,7 +7,7 @@ from .templates import TemplateView
 
 
 class ObjectTemplateViewMixin:
-    context_object_name = "object"
+    context_object_name = ""
 
     def get(self) -> Response:
         self.load_object()
@@ -31,7 +31,9 @@ class ObjectTemplateViewMixin:
     def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
         context = super().get_template_context()  # type: ignore
-        context[self.context_object_name] = self.object
+        context["object"] = self.object  # Some templates can benefit by always knowing a primary "object" can be present
+        if self.context_object_name:
+            context[self.context_object_name] = self.object
         return context
 
 
@@ -163,7 +165,7 @@ class ListView(TemplateView):
     rendered by a template.
     """
 
-    context_object_name = "objects"
+    context_object_name = ""
 
     def get(self) -> Response:
         self.objects = self.get_objects()
@@ -177,5 +179,7 @@ class ListView(TemplateView):
     def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
         context = super().get_template_context()  # type: ignore
-        context[self.context_object_name] = self.objects
+        context["objects"] = self.objects
+        if self.context_object_name:
+            context[self.context_object_name] = self.objects
         return context
