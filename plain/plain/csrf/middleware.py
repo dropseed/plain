@@ -156,7 +156,7 @@ class RejectRequest(Exception):
 
 class CsrfViewMiddleware:
     """
-    Require a present and correct csrfmiddlewaretoken for POST requests that
+    Require a present and correct _csrftoken for POST requests that
     have a CSRF cookie, and set an outgoing CSRF cookie.
 
     This middleware should be used in conjunction with the {% csrf_token %}
@@ -364,7 +364,7 @@ class CsrfViewMiddleware:
         request_csrf_token = ""
         if request.method == "POST":
             try:
-                request_csrf_token = request.POST.get("csrfmiddlewaretoken", "")
+                request_csrf_token = request.POST.get(settings.CSRF_POST_NAME, "")
             except UnreadablePostError:
                 # Handle a broken connection before we've completed reading the
                 # POST data. process_view shouldn't raise any exceptions, so

@@ -11,7 +11,8 @@ from .base import View
 
 def csrf_input(request):
     return format_html(
-        '<input type="hidden" name="csrfmiddlewaretoken" value="{}">',
+        '<input type="hidden" name="{}" value="{}">',
+        settings.CSRF_POST_NAME,
         get_token(request),
     )
 
