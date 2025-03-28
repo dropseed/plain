@@ -108,7 +108,13 @@ class ResponseBase:
     status_code = 200
 
     def __init__(
-        self, content_type=None, status=None, reason=None, charset=None, headers=None
+        self,
+        *,
+        content_type=None,
+        status_code=None,
+        reason=None,
+        charset=None,
+        headers=None,
     ):
         self.headers = ResponseHeaders(headers)
         self._charset = charset
@@ -127,9 +133,9 @@ class ResponseBase:
         self._handler_class = None
         self.cookies = SimpleCookie()
         self.closed = False
-        if status is not None:
+        if status_code is not None:
             try:
-                self.status_code = int(status)
+                self.status_code = int(status_code)
             except (ValueError, TypeError):
                 raise TypeError("HTTP status code must be an integer.")
 
@@ -353,8 +359,8 @@ class Response(ResponseBase):
         ]
     )
 
-    def __init__(self, content=b"", *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, content=b"", **kwargs):
+        super().__init__(**kwargs)
         # Content is a bytestring. See the `content` property methods.
         self.content = content
 
@@ -434,8 +440,8 @@ class StreamingResponse(ResponseBase):
 
     streaming = True
 
-    def __init__(self, streaming_content=(), *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, streaming_content=(), **kwargs):
+        super().__init__(**kwargs)
         # `streaming_content` should be an iterable of bytestrings.
         # See the `streaming_content` property methods.
         self.streaming_content = streaming_content
@@ -560,8 +566,8 @@ class FileResponse(StreamingResponse):
 class ResponseRedirectBase(Response):
     allowed_schemes = ["http", "https", "ftp"]
 
-    def __init__(self, redirect_to, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, redirect_to, **kwargs):
+        super().__init__(**kwargs)
         self.headers["Location"] = iri_to_uri(redirect_to)
         parsed = urlparse(str(redirect_to))
         if parsed.scheme and parsed.scheme not in self.allowed_schemes:

@@ -214,7 +214,7 @@ class ExampleView(DetailView):
     def get_object(self):
         if self.request.user.exceeds_rate_limit:
             raise ResponseException(
-                Response("Rate limit exceeded", status=429)
+                Response("Rate limit exceeded", status_code=429)
             )
 
         return AnExpensiveObject()

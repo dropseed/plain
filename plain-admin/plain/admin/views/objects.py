@@ -72,7 +72,7 @@ class AdminListView(HTMXViewMixin, AdminView):
 
         if self.is_htmx_request() and not hx_from_this_page and not self._page:
             # Don't render anything
-            return Response(status=204)
+            return Response(status_code=204)
 
         return response
 

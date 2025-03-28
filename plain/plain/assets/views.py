@@ -254,7 +254,7 @@ class AssetView(View):
 
         if not range_header.startswith("bytes="):
             return Response(
-                status=416, headers=[("Content-Range", f"bytes */{file_size}")]
+                status_code=416, headers=[("Content-Range", f"bytes */{file_size}")]
             )
 
         range_values = range_header.split("=")[1].split("-")
@@ -263,7 +263,7 @@ class AssetView(View):
 
         if start >= file_size:
             return Response(
-                status=416, headers=[("Content-Range", f"bytes */{file_size}")]
+                status_code=416, headers=[("Content-Range", f"bytes */{file_size}")]
             )
 
         end = min(end, file_size - 1)
@@ -272,7 +272,7 @@ class AssetView(View):
             f.seek(start)
             content = f.read(end - start + 1)
 
-        response = StreamingResponse(BytesIO(content), status=206)
+        response = StreamingResponse(BytesIO(content), status_code=206)
         response.headers = self.update_headers(response.headers, path)
         response.headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
         response.headers["Content-Length"] = str(end - start + 1)

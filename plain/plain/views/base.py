@@ -95,7 +95,7 @@ class View:
             return JsonResponse(result)
 
         if isinstance(result, int):
-            return Response(status=result)
+            return Response(status_code=result)
 
         # Allow tuple for (status_code, content)?
 

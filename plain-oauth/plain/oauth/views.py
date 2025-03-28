@@ -83,5 +83,5 @@ class OAuthDisconnectView(AuthViewMixin, View):
         #         {
         #             "oauth_error": "This connection can't be removed. You must have a usable password or at least one active connection."
         #         },
-        #         status=400,
+        #         status_code=400,
         #     )

@@ -17,7 +17,7 @@ class ExampleView(View):
         print(self.request.GET.get("example"))
 
         # Creating a response
-        response = Response("Hello, world!", status=200)
+        response = Response("Hello, world!", status_code=200)
 
         # Setting a response header
         response.headers["Example-Header"] = "Example Value"
