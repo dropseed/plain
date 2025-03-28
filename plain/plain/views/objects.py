@@ -7,7 +7,7 @@ from .templates import TemplateView
 
 
 class ObjectTemplateViewMixin:
-    context_object_name = ""
+    context_object_name = "object"
 
     def get(self) -> Response:
         self.load_object()
@@ -31,11 +31,7 @@ class ObjectTemplateViewMixin:
     def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
         context = super().get_template_context()  # type: ignore
-        context["object"] = self.object
-        if self.context_object_name:
-            context[self.context_object_name] = self.object
-        elif hasattr(self.object, "_meta"):
-            context[self.object._meta.model_name] = self.object
+        context[self.context_object_name] = self.object
         return context
 
 
