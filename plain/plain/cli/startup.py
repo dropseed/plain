@@ -3,31 +3,43 @@ import plain.runtime
 plain.runtime.setup()
 
 
-def _print_bold(s):
+def print_bold(s):
     print("\033[1m", end="")
     print(s)
     print("\033[0m", end="")
 
 
-def _print_italic(s):
+def print_italic(s):
     print("\x1b[3m", end="")
     print(s)
     print("\x1b[0m", end="")
 
 
-_print_bold("\n⬣ Welcome to the Plain shell! ⬣")
+def print_dim(s):
+    print("\x1b[2m", end="")
+    print(s)
+    print("\x1b[0m", end="")
 
-_app_shell = plain.runtime.APP_PATH / "shell.py"
 
-if _app_shell.exists():
-    _print_bold("\nImporting custom app/shell.py")
-    contents = _app_shell.read_text()
+print_bold("\n⬣ Welcome to the Plain shell! ⬣\n")
 
-    for line in contents.splitlines():
-        _print_italic(f">>> {line}")
+if shell_import := plain.runtime.settings.SHELL_IMPORT:
+    from importlib import import_module
+
+    print_bold(f"Importing {shell_import}")
+    module = import_module(shell_import)
+
+    with open(module.__file__) as f:
+        contents = f.read()
+        for line in contents.splitlines():
+            print_dim(f"{line}")
 
     print()
 
-    # Import * so we get everything that file imported
-    # (which is mostly the point of having it)
-    from app.shell import *  # noqa
+    # Emulate `from module import *`
+    names = getattr(
+        module, "__all__", [name for name in dir(module) if not name.startswith("_")]
+    )
+    globals().update({name: getattr(module, name) for name in names})
+else:
+    print_italic("Use settings.SHELL_IMPORT to customize the shell startup.\n")

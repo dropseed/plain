@@ -169,3 +169,9 @@ PREFLIGHT_SILENCED_CHECKS = []
 #############
 
 TEMPLATES_JINJA_ENVIRONMENT = "plain.templates.jinja.DefaultEnvironment"
+
+#########
+# Shell #
+#########
+
+SHELL_IMPORT: str = ""
