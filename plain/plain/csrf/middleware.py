@@ -380,7 +380,7 @@ class CsrfViewMiddleware:
                 # depending on whether the client obtained the token from
                 # the DOM or the cookie (and if the cookie, whether the cookie
                 # was masked or unmasked).
-                request_csrf_token = request.META[settings.CSRF_HEADER_NAME]
+                request_csrf_token = request.headers[settings.CSRF_HEADER_NAME]
             except KeyError:
                 raise RejectRequest(REASON_CSRF_TOKEN_MISSING)
             token_source = settings.CSRF_HEADER_NAME

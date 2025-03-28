@@ -1,5 +1,6 @@
 // Expect a data-csrftoken attribute on our own script tag
 var csrfToken = document.currentScript.dataset.csrftoken;
+var csrfHeader = document.currentScript.dataset.csrfheader;
 
 htmx.on("htmx:configRequest", function (event) {
   // Custom header for Plain-HX-Action
@@ -17,7 +18,7 @@ htmx.on("htmx:configRequest", function (event) {
 
   // Add the CSRF token to all non-GET requests automatically
   if (event.detail.method !== "GET" && event.detail.verb !== "get") {
-    event.detail.headers["X-CSRFToken"] = csrfToken;
+    event.detail.headers[csrfHeader] = csrfToken;
   }
 });
 
