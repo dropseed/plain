@@ -48,6 +48,6 @@ class {package_name.capitalize()}Router(Router):
         )
 
     click.secho(
-        f'Created {package_dir.relative_to(Path.cwd())}. Make sure to add "{package_name}" to INSTALLED_PACKAGES!',
+        f'Created {package_dir.relative_to(Path.cwd())}. Make sure to add "app.{package_name}" to INSTALLED_PACKAGES!',
         fg="green",
     )
