@@ -23,12 +23,10 @@ class SessionMiddleware:
         session every time, save the changes and set a session cookie or delete
         the session cookie if the session has been emptied.
         """
-        try:
-            accessed = request.session.accessed
-            modified = request.session.modified
-            empty = request.session.is_empty()
-        except AttributeError:
-            return response
+        accessed = request.session.accessed
+        modified = request.session.modified
+        empty = request.session.is_empty()
+
         # First check if we need to delete this cookie.
         # The session should be deleted only if the session is entirely empty.
         if settings.SESSION_COOKIE_NAME in request.COOKIES and empty:
