@@ -1,13 +1,9 @@
-import re
-
 from plain.utils.cache import patch_vary_headers
 
 from .templates import render_template_fragment
 
 
 class HTMXViewMixin:
-    htmx_template_name = ""
-
     def render_template(self):
         template = self.get_template()
         context = self.get_template_context()
@@ -48,23 +44,6 @@ class HTMXViewMixin:
                 return handler
 
         return super().get_request_handler()
-
-    def get_template_names(self):
-        # TODO is this part necessary anymore?? can I replace those with fragments now?
-        if self.is_htmx_request():
-            if self.htmx_template_name:
-                return [self.htmx_template_name]
-
-            default_template_names = super().get_template_names()
-            return (
-                [
-                    re.sub(r"\.html$", "_htmx.html", template_name)
-                    for template_name in default_template_names
-                ]
-                + default_template_names
-            )  # Fallback to the defaults so you don't need _htmx.html
-
-        return super().get_template_names()
 
     def is_htmx_request(self):
         return self.request.headers.get("HX-Request") == "true"

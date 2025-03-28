@@ -38,32 +38,6 @@ class ObjectTemplateViewMixin:
             context[self.object._meta.model_name] = self.object
         return context
 
-    def get_template_names(self) -> list[str]:
-        """
-        Return a list of template names to be used for the request. May not be
-        called if render_to_response() is overridden. Return the following list:
-
-        * the value of ``template_name`` on the view (if provided)
-          object instance that the view is operating upon (if available)
-        * ``<package_label>/<model_name><template_name_suffix>.html``
-        """
-        if self.template_name:  # type: ignore
-            return [self.template_name]  # type: ignore
-
-        # If template_name isn't specified, it's not a problem --
-        # we just start with an empty list.
-        names = []
-
-        # The least-specific option is the default <app>/<model>_detail.html;
-        # only use this if the object in question is a model.
-        if hasattr(self.object, "_meta"):
-            object_meta = self.object._meta
-            names.append(
-                f"{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
-            )
-
-        return names
-
 
 class DetailView(ObjectTemplateViewMixin, TemplateView):
     """
@@ -73,15 +47,13 @@ class DetailView(ObjectTemplateViewMixin, TemplateView):
     view will support display of *any* object by overriding `self.get_object()`.
     """
 
-    template_name_suffix = "_detail"
+    pass
 
 
 class CreateView(ObjectTemplateViewMixin, FormView):
     """
     View for creating a new object, with a response rendered by a template.
     """
-
-    template_name_suffix = "_form"
 
     def post(self) -> Response:
         """
@@ -118,8 +90,6 @@ class CreateView(ObjectTemplateViewMixin, FormView):
 
 class UpdateView(ObjectTemplateViewMixin, FormView):
     """View for updating an object, with a response rendered by a template."""
-
-    template_name_suffix = "_form"
 
     def post(self) -> Response:
         """
@@ -170,7 +140,6 @@ class DeleteView(ObjectTemplateViewMixin, FormView):
             self.instance.delete()
 
     form_class = EmptyDeleteForm
-    template_name_suffix = "_confirm_delete"
 
     def post(self) -> Response:
         """
@@ -198,7 +167,6 @@ class ListView(TemplateView):
     rendered by a template.
     """
 
-    template_name_suffix = "_list"
     context_object_name = "objects"
 
     def get(self) -> Response:
@@ -215,29 +183,3 @@ class ListView(TemplateView):
         context = super().get_template_context()  # type: ignore
         context[self.context_object_name] = self.objects
         return context
-
-    def get_template_names(self) -> list[str]:
-        """
-        Return a list of template names to be used for the request. May not be
-        called if render_to_response() is overridden. Return the following list:
-
-        * the value of ``template_name`` on the view (if provided)
-          object instance that the view is operating upon (if available)
-        * ``<package_label>/<model_name><template_name_suffix>.html``
-        """
-        if self.template_name:  # type: ignore
-            return [self.template_name]  # type: ignore
-
-        # If template_name isn't specified, it's not a problem --
-        # we just start with an empty list.
-        names = []
-
-        # The least-specific option is the default <app>/<model>_detail.html;
-        # only use this if the object in question is a model.
-        if hasattr(self.objects, "model") and hasattr(self.objects.model, "_meta"):
-            object_meta = self.objects.model._meta
-            names.append(
-                f"{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
-            )
-
-        return names

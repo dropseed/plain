@@ -162,17 +162,6 @@ class AdminModelDetailView(AdminDetailView):
     def get_object(self):
         return self.model.objects.get(pk=self.url_kwargs["pk"])
 
-    def get_template_names(self) -> list[str]:
-        template_names = super().get_template_names()
-
-        if not self.template_name and isinstance(self.object, models.Model):
-            object_meta = self.object._meta
-            template_names = [
-                f"admin/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
-            ] + template_names
-
-        return template_names
-
 
 class AdminModelCreateView(AdminCreateView):
     model: "models.Model"
@@ -190,17 +179,6 @@ class AdminModelCreateView(AdminCreateView):
             return path
 
         return f"{cls.model._meta.model_name}/create/"
-
-    def get_template_names(self):
-        template_names = super().get_template_names()
-
-        if not self.template_name and issubclass(self.model, models.Model):
-            model_meta = self.model._meta
-            template_names = [
-                f"admin/{model_meta.package_label}/{model_meta.model_name}{self.template_name_suffix}.html"
-            ] + template_names
-
-        return template_names
 
 
 class AdminModelUpdateView(AdminUpdateView):
@@ -223,17 +201,6 @@ class AdminModelUpdateView(AdminUpdateView):
 
     def get_object(self):
         return self.model.objects.get(pk=self.url_kwargs["pk"])
-
-    def get_template_names(self):
-        template_names = super().get_template_names()
-
-        if not self.template_name and isinstance(self.object, models.Model):
-            object_meta = self.object._meta
-            template_names = [
-                f"admin/{object_meta.package_label}/{object_meta.model_name}{self.template_name_suffix}.html"
-            ] + template_names
-
-        return template_names
 
 
 class AdminModelDeleteView(AdminDeleteView):

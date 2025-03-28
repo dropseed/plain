@@ -42,19 +42,20 @@ class TemplateView(View):
 
     def get_template_names(self) -> list[str]:
         """
-        Return a list of template names to be used for the request. Must return
-        a list. May not be called if render_to_response() is overridden.
+        Return a list of template names to be used for the request.
         """
-        if self.template_name is None:
-            raise ImproperlyConfigured(
-                "TemplateView requires either a definition of "
-                "'template_name' or an implementation of 'get_template_names()'"
-            )
-        else:
+        if self.template_name:
             return [self.template_name]
+
+        return []
 
     def get_template(self) -> Template:
         template_names = self.get_template_names()
+
+        if not template_names:
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} requires a template_name or get_template_names()."
+            )
 
         for template_name in template_names:
             try:

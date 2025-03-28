@@ -227,7 +227,7 @@ class AdminDetailView(AdminView, DetailView):
 
     def get_template_names(self) -> list[str]:
         return super().get_template_names() + [
-            "admin/detail.html",
+            "admin/detail.html",  # A generic detail view for rendering any object
         ]
 
     def get_description(self):
