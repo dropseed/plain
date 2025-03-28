@@ -31,7 +31,9 @@ class ObjectTemplateViewMixin:
     def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
         context = super().get_template_context()  # type: ignore
-        context["object"] = self.object  # Some templates can benefit by always knowing a primary "object" can be present
+        context["object"] = (
+            self.object
+        )  # Some templates can benefit by always knowing a primary "object" can be present
         if self.context_object_name:
             context[self.context_object_name] = self.object
         return context

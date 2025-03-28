@@ -9,7 +9,7 @@ in addition to models.
 
 - cards
 - dashboards
-- diy forms
+- diy forms - have to install elements if you want to use them (or an app uses them, or maybe plain pkgs should use them just for admin...)
 - detached from login (do your own login (oauth, passkeys, etc))
 
 ## Installation
