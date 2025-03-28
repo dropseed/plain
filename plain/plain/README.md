@@ -12,18 +12,18 @@ To quickly get started with Plain, visit [plainframework.com/start/](https://pla
 
 The `plain` package includes everything you need to start handling web requests with Python:
 
-- [assets](assets/README.md) - Serve static files and assets.
-- [cli](cli/README.md) - The `plain` CLI, powered by Click.
-- [csrf](csrf/README.md) - Cross-Site Request Forgery protection.
-- [forms](forms/README.md) - HTML forms and form validation.
-- [http](http/README.md) - HTTP request and response handling.
-- [logs](logs/README.md) - Logging configuration and utilities.
-- [preflight](preflight/README.md) - Preflight checks for your app.
-- [runtime](runtime/README.md) - Runtime settings and configuration.
-- [templates](templates/README.md) - Jinja2 templates and rendering.
-- [test](test/README.md) - Test utilities and fixtures.
-- [urls](urls/README.md) - URL routing and request dispatching.
-- [views](views/README.md) - Class-based views and request handlers.
+- [assets](./assets/README.md) - Serve static files and assets.
+- [cli](./cli/README.md) - The `plain` CLI, powered by Click.
+- [csrf](./csrf/README.md) - Cross-Site Request Forgery protection.
+- [forms](./forms/README.md) - HTML forms and form validation.
+- [http](./http/README.md) - HTTP request and response handling.
+- [logs](./logs/README.md) - Logging configuration and utilities.
+- [preflight](./preflight/README.md) - Preflight checks for your app.
+- [runtime](./runtime/README.md) - Runtime settings and configuration.
+- [templates](./templates/README.md) - Jinja2 templates and rendering.
+- [test](./test/README.md) - Test utilities and fixtures.
+- [urls](./urls/README.md) - URL routing and request dispatching.
+- [views](./views/README.md) - Class-based views and request handlers.
 
 ## Foundational Packages
 
