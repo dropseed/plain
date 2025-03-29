@@ -35,3 +35,7 @@ With the official Plain ecosystem packages you can:
 - Build [admin dashboard and tools](https://plainframework.com/docs/plain-admin/plain/admin/README.md)
 
 Learn more at [plainframework.com](https://plainframework.com).
+
+---
+
+*Plain is a fork of [Django](https://www.djangoproject.com/). It has no affiliation with the Django project or the Django Software Foundation.*
