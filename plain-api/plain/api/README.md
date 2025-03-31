@@ -4,7 +4,7 @@
 
 The `plain.api` package provides lightweight view classes for building APIs using the same patterns as regular views. It also provides an `APIKey` model and support for generating [OpenAPI](https://www.openapis.org/) documents.
 
-Here's a basic example of using [`APIObjectView`](./views#APIObjectView):
+Here's a basic example of using [`APIObjectView`](./views.py#APIObjectView):
 
 ```python
 # app/api/views.py
