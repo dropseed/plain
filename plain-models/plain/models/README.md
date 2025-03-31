@@ -1,6 +1,6 @@
 # plain.models
 
-Model your data and store it in a database.
+**Model your data and store it in a database.**
 
 ```python
 # app/users/models.py
@@ -8,6 +8,7 @@ from plain import models
 from plain.passwords.models import PasswordField
 
 
+@models.register_model
 class User(models.Model):
     email = models.EmailField()
     password = PasswordField()
@@ -43,6 +44,8 @@ admin_users = User.objects.filter(is_admin=True)
 
 ## Installation
 
+Install `plain.models` from PyPI, then add it to your `INSTALLED_PACKAGES`.
+
 ```python
 # app/settings.py
 INSTALLED_PACKAGES = [
@@ -73,22 +76,32 @@ DATABASES = {
 }
 ```
 
-[Multiple backends are supported, including Postgres, MySQL, and SQLite.](./backends/README.md)
+Multiple backends are supported, including Postgres, MySQL, and SQLite.
 
 ## Querying
 
+TODO
+
 ## Migrations
 
-[Migration docs](./migrations/README.md)
+TODO
 
 ## Fields
 
-[Field docs](./fields/README.md)
+TODO
 
 ## Validation
 
+TODO
+
 ## Indexes and constraints
+
+TODO
 
 ## Managers
 
+TODO
+
 ## Forms
+
+TODO
