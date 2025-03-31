@@ -48,6 +48,18 @@ class APIAuthViewMixin(AuthViewMixin):
 
             return api_key
 
+    def associate_api_key(self, api_key: APIKey) -> None:
+        # Automatically look for related "users" associated with the API key
+        # (though we only expect one or zero)
+        if users := getattr(api_key, "users", None):
+            num_users = users._default_manager.count()
+            if num_users == 1:
+                self.request.user = users._default_manager.first()
+            elif num_users > 1:
+                raise ResponseException(
+                    ResponseBadRequest("API key is associated with multiple users")
+                )
+
     def check_auth(self) -> None:
         if not hasattr(self, "request"):
             raise AttributeError(
@@ -63,11 +75,9 @@ class APIAuthViewMixin(AuthViewMixin):
             # Put the api_key on the request so we can access it
             self.request.api_key = api_key
 
-            # Set the user if api_key has that attribute (typically from a ForeignKey)
-            # TODO OneToOneField is gone, so now this should get the users and error if there are multiple?
-            # or we need to move this to user space instead
-            if user := getattr(api_key, "user", None):
-                self.request.user = user
+            # Associate the API key with the user,
+            # or whatever else it goes with
+            self.associate_api_key(api_key)
 
         # Run the regular auth checks which will look for self.request.user
         super().check_auth()

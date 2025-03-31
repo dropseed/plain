@@ -22,13 +22,14 @@ class APIKey(models.Model):
     token = models.CharField(max_length=40, default=generate_token)
 
     # Connect to a user, for example, from your own model:
-    # api_key = models.OneToOneField(
-    #     APIKey,
-    #     on_delete=models.CASCADE,
-    #     related_name="user",
-    #     allow_null=True,
-    #     required=False,
-    # )
+    # class User(models.Model):
+    #     api_key = models.ForeignKey(
+    #         APIKey,
+    #         on_delete=models.CASCADE,
+    #         related_name="user",
+    #         allow_null=True,
+    #         required=False,
+    #     )
 
     class Meta:
         constraints = [

@@ -1,4 +1,4 @@
-# Admin
+# plain.admin
 
 **Manage your app with a backend interface.**
 
