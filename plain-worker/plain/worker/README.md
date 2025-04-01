@@ -53,8 +53,8 @@ In development, you will typically want to run the worker alongside your app. Wi
 ```toml
 # pyproject.toml
 [tool.plain.dev.run]
-worker = {cmd = "plain models db-wait && watchfiles --filter python \"plain worker run --stats-every 0 --max-processes 2\" ."}
-worker-slow = {cmd = "plain models db-wait && watchfiles --filter python \"plain worker run --queue slow --stats-every 0 --max-processes 2\" ."}
+worker = {cmd = "watchfiles --filter python \"plain worker run --stats-every 0 --max-processes 2\" ."}
+worker-slow = {cmd = "watchfiles --filter python \"plain worker run --queue slow --stats-every 0 --max-processes 2\" ."}
 ```
 
 ## Job parameters
