@@ -76,6 +76,10 @@ class Manager:
         # Update printer width to accommodate this process name
         self._printer.width = max(self._printer.width, len(name))
 
+        # If the loop is already running, we need to start the process now.
+        if self._is_running():
+            self._start_process(name)
+
         return proc
 
     def loop(self):
@@ -97,7 +101,8 @@ class Manager:
         signal.signal(signal.SIGTERM, _terminate)
         signal.signal(signal.SIGINT, _terminate)
 
-        self._start()
+        for name in self._processes.keys():
+            self._start_process(name)
 
         exit = False
         exit_start = None
@@ -172,12 +177,15 @@ class Manager:
             else:
                 self._procmgr.terminate(p["pid"])
 
-    def _start(self):
-        for name, p in self._processes.items():
-            p["process"] = multiprocessing.Process(
-                name=name, target=p["obj"].run, args=(self.events, True)
-            )
-            p["process"].start()
+    def _start_process(self, name):
+        p = self._processes[name]
+        p["process"] = multiprocessing.Process(
+            name=name, target=p["obj"].run, args=(self.events, True)
+        )
+        p["process"].start()
+
+    def _is_running(self):
+        return any(p.get("pid") is not None for _, p in self._processes.items())
 
     def _all_started(self):
         return all(p.get("pid") is not None for _, p in self._processes.items())

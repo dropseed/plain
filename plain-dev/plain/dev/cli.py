@@ -2,8 +2,10 @@ import importlib
 import json
 import os
 import platform
+import signal
 import subprocess
 import sys
+import threading
 import time
 import tomllib
 from importlib.metadata import entry_points
@@ -21,7 +23,7 @@ from plain.runtime import APP_PATH, settings
 from .mkcert import MkcertManager
 from .poncho.manager import Manager as PonchoManager
 from .poncho.printer import Printer
-from .services import Services
+from .services import Services, ServicesPid
 from .utils import has_pyproject_toml
 
 ENTRYPOINT_GROUP = "plain.dev"
@@ -153,30 +155,6 @@ class Dev:
             "PLAIN_DEV_URL": self.url,
         }
 
-        self.console = Console(markup=False, highlight=False)
-        self.poncho = PonchoManager(printer=Printer(lambda s: self.console.out(s)))
-
-    def run(self):
-        mkcert_manager = MkcertManager()
-        mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
-        self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
-            domain=self.hostname,
-            storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
-        )
-
-        self.symlink_plain_src()
-        self.modify_hosts_file()
-        self.set_csrf_and_allowed_hosts()
-        self.run_preflight()
-
-        # Processes for poncho to run simultaneously
-        self.add_gunicorn()
-        self.add_entrypoints()
-        self.add_pyproject_run()
-        self.add_services()
-
-        click.secho("\nStarting dev...", italic=True, dim=True)
-
         if self.tunnel_url:
             status_bar = Columns(
                 [
@@ -205,11 +183,90 @@ class Dev:
                 ],
                 expand=True,
             )
+        self.console = Console(markup=False, highlight=False)
+        self.console_status = self.console.status(status_bar)
 
-        with self.console.status(status_bar):
+        self.poncho = PonchoManager(printer=Printer(lambda s: self.console.out(s)))
+
+    def run(self):
+        mkcert_manager = MkcertManager()
+        mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
+        self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
+            domain=self.hostname,
+            storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
+        )
+
+        self.symlink_plain_src()
+        self.modify_hosts_file()
+        self.set_csrf_and_allowed_hosts()
+        self.run_preflight()
+
+        # If we start services ourselves, we should manage the pidfile
+        services_pid = None
+
+        # Services start first (or are already running from a separate command)
+        if Services.are_running():
+            click.secho("Services already running", fg="yellow")
+        elif services := Services.get_services(APP_PATH.parent):
+            click.secho("\nStarting services...", italic=True, dim=True)
+            services_pid = ServicesPid()
+            services_pid.write()
+
+            for name, data in services.items():
+                env = {
+                    **os.environ,
+                    "PYTHONUNBUFFERED": "true",
+                    **data.get("env", {}),
+                }
+                self.poncho.add_process(name, data["cmd"], env=env)
+
+        # If plain.models is installed (common) then we
+        # will do a couple extra things before starting all of the app-related
+        # processes (this way they don't all have to db-wait or anything)
+        if find_spec("plain.models") is not None:
+            # Use a custom signal to tell the main thread to add
+            # the app processes once the db is ready
+            signal.signal(signal.SIGUSR1, self.start_app)
+
+            def _thread(env):
+                subprocess.run(["plain", "models", "db-wait"], env=env, check=True)
+                subprocess.run(["plain", "migrate", "--backup"], env=env, check=True)
+                # preflight with db?
+                os.kill(os.getpid(), signal.SIGUSR1)
+
+            thread = threading.Thread(
+                target=_thread, daemon=True, args=(self.plain_env,)
+            )
+            thread.start()
+        else:
+            # Start the app processes immediately
+            self.start_app(None, None)
+
+        try:
+            # Start processes we know about and block the main thread
             self.poncho.loop()
 
+            # Remove the status bar
+            self.console_status.stop()
+        finally:
+            # Make sure the services pid gets removed if we set it
+            if services_pid:
+                services_pid.rm()
+
         return self.poncho.returncode
+
+    def start_app(self, signum, frame):
+        # This runs in the main thread when SIGUSR1 is received
+        # (or called directly if no thread).
+        click.secho("\nStarting app...", italic=True, dim=True)
+
+        # Manually start the status bar now so it isn't bungled by
+        # another thread checking db stuff...
+        self.console_status.start()
+
+        self.add_gunicorn()
+        self.add_entrypoints()
+        self.add_pyproject_run()
 
     def symlink_plain_src(self):
         """Symlink the plain package into .plain so we can look at it easily"""
@@ -318,8 +375,6 @@ class Dev:
             sys.exit(1)
 
     def add_gunicorn(self):
-        plain_db_installed = find_spec("plain.models") is not None
-
         # Watch .env files for reload
         extra_watch_files = []
         for f in os.listdir(APP_PATH.parent):
@@ -355,14 +410,7 @@ class Dev:
         ]
         gunicorn = " ".join(gunicorn_cmd)
 
-        if plain_db_installed:
-            runserver_cmd = (
-                f"plain models db-wait && plain migrate --backup && {gunicorn}"
-            )
-        else:
-            runserver_cmd = gunicorn
-
-        self.poncho.add_process("plain", runserver_cmd, env=self.plain_env)
+        self.poncho.add_process("plain", gunicorn, env=self.plain_env)
 
     def add_entrypoints(self):
         for entry_point in entry_points().select(group=ENTRYPOINT_GROUP):
@@ -386,25 +434,6 @@ class Dev:
         for name, data in run_commands.items():
             env = {
                 **self.custom_process_env,
-                **data.get("env", {}),
-            }
-            self.poncho.add_process(name, data["cmd"], env=env)
-
-    def add_services(self):
-        """Services are things that also run during tests (like a database), and are critical for the app to function."""
-
-        if Services.are_running():
-            click.secho("Services already running", fg="yellow")
-            return
-
-        # TODO need to set services pid here somehow...
-
-        # Split each service into a separate process
-        services = Services.get_services(APP_PATH.parent)
-        for name, data in services.items():
-            env = {
-                **os.environ,
-                "PYTHONUNBUFFERED": "true",
                 **data.get("env", {}),
             }
             self.poncho.add_process(name, data["cmd"], env=env)
