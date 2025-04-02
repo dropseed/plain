@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+repo_path = Path(__file__).resolve().parent.parent
+plain_path = Path(__file__).resolve().parent.parent / "plain"
+sys.path.insert(0, str(plain_path))
+
+from plain.cli.docs import LLMDocs
+
+package_dirs = [repo_path / x / "plain" for x in os.listdir(".") if os.path.isdir(x) and x.startswith("plain")]
+
+docs = LLMDocs(package_dirs)
+docs.load()
+docs.print(relative_to=repo_path)

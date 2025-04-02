@@ -8,80 +8,6 @@ import click
 from plain.packages import packages_registry
 
 
-def symbolicate(file_path: Path):
-    if "internal" in str(file_path).split("/"):
-        return ""
-
-    source = file_path.read_text()
-
-    parsed = ast.parse(source)
-
-    def should_skip(node):
-        if isinstance(node, ast.ClassDef | ast.FunctionDef):
-            if any(
-                isinstance(d, ast.Name) and d.id == "internalcode"
-                for d in node.decorator_list
-            ):
-                return True
-            if node.name.startswith("_"):  # and not node.name.endswith("__"):
-                return True
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if (
-                    isinstance(target, ast.Name) and target.id.startswith("_")
-                    # and not target.id.endswith("__")
-                ):
-                    return True
-        return False
-
-    def process_node(node, indent=0):
-        lines = []
-        prefix = "    " * indent
-
-        if should_skip(node):
-            return []
-
-        if isinstance(node, ast.ClassDef):
-            decorators = [
-                f"{prefix}@{ast.unparse(d)}"
-                for d in node.decorator_list
-                if not (isinstance(d, ast.Name) and d.id == "internal")
-            ]
-            lines.extend(decorators)
-            bases = [ast.unparse(base) for base in node.bases]
-            lines.append(f"{prefix}class {node.name}({', '.join(bases)})")
-            # if ast.get_docstring(node):
-            #     lines.append(f'{prefix}    """{ast.get_docstring(node)}"""')
-            for child in node.body:
-                child_lines = process_node(child, indent + 1)
-                if child_lines:
-                    lines.extend(child_lines)
-            # if not has_body:
-            #     lines.append(f"{prefix}    pass")
-
-        elif isinstance(node, ast.FunctionDef):
-            decorators = [f"{prefix}@{ast.unparse(d)}" for d in node.decorator_list]
-            lines.extend(decorators)
-            args = ast.unparse(node.args)
-            lines.append(f"{prefix}def {node.name}({args})")
-            # if ast.get_docstring(node):
-            #     lines.append(f'{prefix}    """{ast.get_docstring(node)}"""')
-            # lines.append(f"{prefix}    pass")
-
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    lines.append(f"{prefix}{target.id} = {ast.unparse(node.value)}")
-
-        return lines
-
-    symbolicated_lines = []
-    for node in parsed.body:
-        symbolicated_lines.extend(process_node(node))
-
-    return "\n".join(symbolicated_lines)
-
-
 @click.command()
 @click.option("--llm", "llm", is_flag=True)
 @click.option("--open")
@@ -92,57 +18,18 @@ def docs(module, llm, open):
         sys.exit(1)
 
     if llm:
-        click.echo(
-            "Below is all of the documentation and abbreviated source code for the Plain web framework. "
-            "Your job is to read and understand it, and then act as the Plain Framework Assistant and "
-            "help the developer accomplish whatever they want to do next."
-            "\n\n---\n\n"
-        )
+        paths = [Path(__file__).parent.parent]
 
-        docs = set()
-        sources = set()
-
-        # Get everything for Plain core
-        for path in Path(__file__).parent.parent.glob("**/*.md"):
-            docs.add(path)
-        for source in Path(__file__).parent.parent.glob("**/*.py"):
-            sources.add(source)
-
-        # Find every *.md file in the other plain packages and installed apps
         for package_config in packages_registry.get_package_configs():
             if package_config.name.startswith("app."):
                 # Ignore app packages for now
                 continue
 
-            for path in Path(package_config.path).glob("**/*.md"):
-                docs.add(path)
+            paths.append(Path(package_config.path))
 
-            for source in Path(package_config.path).glob("**/*.py"):
-                sources.add(source)
-
-        docs = sorted(docs)
-        sources = sorted(sources)
-
-        for doc in docs:
-            try:
-                display_path = doc.relative_to(Path.cwd())
-            except ValueError:
-                display_path = doc.absolute()
-            click.secho(f"<Docs: {display_path}>", fg="yellow")
-            click.echo(doc.read_text())
-            click.secho(f"</Docs: {display_path}>", fg="yellow")
-            click.echo()
-
-        for source in sources:
-            if symbolicated := symbolicate(source):
-                try:
-                    display_path = source.relative_to(Path.cwd())
-                except ValueError:
-                    display_path = source.absolute()
-                click.secho(f"<Source: {display_path}>", fg="yellow")
-                click.echo(symbolicated)
-                click.secho(f"</Source: {display_path}>", fg="yellow")
-                click.echo()
+        source_docs = LLMDocs(paths)
+        source_docs.load()
+        source_docs.print()
 
         click.secho(
             "That's everything! Copy this into your AI tool of choice.",
@@ -209,3 +96,158 @@ def docs(module, llm, open):
                     yield "\n"
 
             click.echo_via_pager(_iterate_markdown(readme_path.read_text()))
+
+
+class LLMDocs:
+    preamble = (
+        "Below is all of the documentation and abbreviated source code for the Plain web framework. "
+        "Your job is to read and understand it, and then act as the Plain Framework Assistant and "
+        "help the developer accomplish whatever they want to do next."
+        "\n\n---\n\n"
+    )
+
+    def __init__(self, paths):
+        self.paths = paths
+
+    def load(self):
+        self.docs = set()
+        self.sources = set()
+
+        for path in self.paths:
+            if path.is_dir():
+                self.docs.update(path.glob("**/*.md"))
+                self.sources.update(path.glob("**/*.py"))
+            elif path.suffix == ".py":
+                self.sources.add(path)
+            elif path.suffix == ".md":
+                self.docs.add(path)
+
+        # Exclude "migrations" code from plain apps, except for plain/models/migrations
+        self.docs = {
+            doc
+            for doc in self.docs
+            if not (
+                "/migrations/" in str(doc)
+                and "/plain/models/migrations/" not in str(doc)
+            )
+        }
+        self.sources = {
+            source
+            for source in self.sources
+            if not (
+                "/migrations/" in str(source)
+                and "/plain/models/migrations/" not in str(source)
+            )
+        }
+
+        self.docs = sorted(self.docs)
+        self.sources = sorted(self.sources)
+
+    def display_path(self, path):
+        if "plain" in path.parts:
+            root_index = path.parts.index("plain")
+        elif "plainx" in path.parts:
+            root_index = path.parts.index("plainx")
+        else:
+            raise ValueError("Path does not contain 'plain' or 'plainx'")
+
+        plain_root = Path(*path.parts[: root_index + 1])
+        return path.relative_to(plain_root.parent)
+
+    def print(self, relative_to=None):
+        click.secho(self.preamble, fg="yellow")
+
+        for doc in self.docs:
+            if relative_to:
+                display_path = doc.relative_to(relative_to)
+            else:
+                display_path = self.display_path(doc)
+            click.secho(f"<Docs: {display_path}>", fg="yellow")
+            click.echo(doc.read_text())
+            click.secho(f"</Docs: {display_path}>", fg="yellow")
+            click.echo()
+
+        for source in self.sources:
+            if symbolicated := self.symbolicate(source):
+                if relative_to:
+                    display_path = source.relative_to(relative_to)
+                else:
+                    display_path = self.display_path(source)
+                click.secho(f"<Source: {display_path}>", fg="yellow")
+                click.echo(symbolicated)
+                click.secho(f"</Source: {display_path}>", fg="yellow")
+                click.echo()
+
+    @staticmethod
+    def symbolicate(file_path: Path):
+        if "internal" in str(file_path).split("/"):
+            return ""
+
+        source = file_path.read_text()
+
+        parsed = ast.parse(source)
+
+        def should_skip(node):
+            if isinstance(node, ast.ClassDef | ast.FunctionDef):
+                if any(
+                    isinstance(d, ast.Name) and d.id == "internalcode"
+                    for d in node.decorator_list
+                ):
+                    return True
+                if node.name.startswith("_"):  # and not node.name.endswith("__"):
+                    return True
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Name) and target.id.startswith("_")
+                        # and not target.id.endswith("__")
+                    ):
+                        return True
+            return False
+
+        def process_node(node, indent=0):
+            lines = []
+            prefix = "    " * indent
+
+            if should_skip(node):
+                return []
+
+            if isinstance(node, ast.ClassDef):
+                decorators = [
+                    f"{prefix}@{ast.unparse(d)}"
+                    for d in node.decorator_list
+                    if not (isinstance(d, ast.Name) and d.id == "internal")
+                ]
+                lines.extend(decorators)
+                bases = [ast.unparse(base) for base in node.bases]
+                lines.append(f"{prefix}class {node.name}({', '.join(bases)})")
+                # if ast.get_docstring(node):
+                #     lines.append(f'{prefix}    """{ast.get_docstring(node)}"""')
+                for child in node.body:
+                    child_lines = process_node(child, indent + 1)
+                    if child_lines:
+                        lines.extend(child_lines)
+                # if not has_body:
+                #     lines.append(f"{prefix}    pass")
+
+            elif isinstance(node, ast.FunctionDef):
+                decorators = [f"{prefix}@{ast.unparse(d)}" for d in node.decorator_list]
+                lines.extend(decorators)
+                args = ast.unparse(node.args)
+                lines.append(f"{prefix}def {node.name}({args})")
+                # if ast.get_docstring(node):
+                #     lines.append(f'{prefix}    """{ast.get_docstring(node)}"""')
+                # lines.append(f"{prefix}    pass")
+
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        lines.append(f"{prefix}{target.id} = {ast.unparse(node.value)}")
+
+            return lines
+
+        symbolicated_lines = []
+        for node in parsed.body:
+            symbolicated_lines.extend(process_node(node))
+
+        return "\n".join(symbolicated_lines)
