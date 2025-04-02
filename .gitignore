@@ -11,3 +11,5 @@ plain*/tests/.plain
 
 # Ottobot
 .aider*
+
+/llms-full.txt
