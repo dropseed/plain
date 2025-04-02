@@ -7,9 +7,9 @@ repo_path = Path(__file__).resolve().parent.parent
 plain_path = Path(__file__).resolve().parent.parent / "plain"
 sys.path.insert(0, str(plain_path))
 
-from plain.cli.docs import LLMDocs
+package_dirs = [repo_path / x / "plain" for x in os.listdir(repo_path) if os.path.isdir(repo_path / x) and x.startswith("plain")]
 
-package_dirs = [repo_path / x / "plain" for x in os.listdir(".") if os.path.isdir(x) and x.startswith("plain")]
+from plain.cli.docs import LLMDocs
 
 docs = LLMDocs(package_dirs)
 docs.load()
