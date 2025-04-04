@@ -216,7 +216,7 @@ class LLMDocs:
                 decorators = [
                     f"{prefix}@{ast.unparse(d)}"
                     for d in node.decorator_list
-                    if not (isinstance(d, ast.Name) and d.id == "internal")
+                    if not (isinstance(d, ast.Name) and d.id == "internalcode")
                 ]
                 lines.extend(decorators)
                 bases = [ast.unparse(base) for base in node.bases]
