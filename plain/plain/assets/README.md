@@ -44,6 +44,22 @@ By default, this [generates "fingerprinted" and compressed versions of the asset
 
 The purpose of fingerprinting the assets is to allow the browser to cache them indefinitely. When the content of the file changes, the fingerprint will change, and the browser will use the newer file. This cuts down on the number of requests that your app has to handle related to assets.
 
+## Using `AssetView` directly
+
+In some situations you may want to use the `AssetView` at a custom URL, for example to serve a `favicon.ico`. You can do this quickly by using the `AssetView.as_view()` class method.
+
+```python
+from plain.assets.views import AssetView
+from plain.urls import path, Router
+
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        path("favicon.ico", AssetView.as_view(asset_path="favicon.ico")),
+    ]
+```
+
 ## FAQs
 
 ### How do you reference assets in Python code?

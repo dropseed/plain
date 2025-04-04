@@ -12,7 +12,7 @@ from plain.views import View
 
 class ExampleView(View):
     def get(self):
-        return "Hello, world!"
+        return "<html><body>Hello, world!</body></html>"
 ```
 
 ## HTTP methods -> class methods
@@ -51,18 +51,23 @@ but you can override these too.
 
 ## Return types
 
-For simple plain text and JSON responses,
+For simple JSON responses, HTML, or status code responses,
 you don't need to instantiate a `Response` object.
 
 ```python
-class TextView(View):
-    def get(self):
-        return "Hello, world!"
-
-
 class JsonView(View):
     def get(self):
         return {"message": "Hello, world!"}
+
+
+class HtmlView(View):
+    def get(self):
+        return "<html><body>Hello, world!</body></html>"
+
+
+class StatusCodeView(View):
+    def get(self):
+        return 204  # No content
 ```
 
 ## Template views
@@ -83,6 +88,19 @@ class ExampleView(TemplateView):
 ```
 
 The `TemplateView` is also the base class for _most_ of the other built-in view classes.
+
+Template views that don't need any custom context can use `TemplateView.as_view()` direcly in the URL route.
+
+```python
+from plain.views import TemplateView
+from plain.urls import path, Router
+
+
+class AppRouter(Router):
+    routes = [
+        path("/example/", TemplateView.as_view(template_name="example.html")),
+    ]
+```
 
 ## Form views
 
@@ -255,7 +273,20 @@ class ExampleRedirectView(RedirectView):
     permanent = True
 ```
 
-## CSRF exemption
+Redirect views can also be used in the URL router.
+
+```python
+from plain.views import RedirectView
+from plain.urls import path, Router
+
+
+class AppRouter(Router):
+    routes = [
+        path("/old-location/", RedirectView.as_view(url="/new-location/", permanent=True)),
+    ]
+```
+
+## CSRF exempt views
 
 ```python
 from plain.views import View
