@@ -379,7 +379,9 @@ class Dev:
         extra_watch_files = []
         for f in os.listdir(APP_PATH.parent):
             if f.startswith(".env"):
-                extra_watch_files.append(f)
+                # Needs to be absolute or "./" for inotify to work on Linux...
+                # https://github.com/dropseed/plain/issues/26
+                extra_watch_files.append(str(Path(APP_PATH.parent) / f))
 
         reload_extra = " ".join(f"--reload-extra-file {f}" for f in extra_watch_files)
         gunicorn_cmd = [
