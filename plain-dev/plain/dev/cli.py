@@ -1,11 +1,11 @@
 import importlib
 import json
+import multiprocessing
 import os
 import platform
 import signal
 import subprocess
 import sys
-import threading
 import time
 import tomllib
 from importlib.metadata import entry_points
@@ -223,21 +223,16 @@ class Dev:
         # If plain.models is installed (common) then we
         # will do a couple extra things before starting all of the app-related
         # processes (this way they don't all have to db-wait or anything)
+        process = None
         if find_spec("plain.models") is not None:
             # Use a custom signal to tell the main thread to add
             # the app processes once the db is ready
             signal.signal(signal.SIGUSR1, self.start_app)
 
-            def _thread(env):
-                subprocess.run(["plain", "models", "db-wait"], env=env, check=True)
-                subprocess.run(["plain", "migrate", "--backup"], env=env, check=True)
-                # preflight with db?
-                os.kill(os.getpid(), signal.SIGUSR1)
-
-            thread = threading.Thread(
-                target=_thread, daemon=True, args=(self.plain_env,)
+            process = multiprocessing.Process(
+                target=_process_task, args=(self.plain_env,)
             )
-            thread.start()
+            process.start()
         else:
             # Start the app processes immediately
             self.start_app(None, None)
@@ -252,6 +247,14 @@ class Dev:
             # Make sure the services pid gets removed if we set it
             if services_pid:
                 services_pid.rm()
+
+            # Make sure the process is terminated if it is still running
+            if process and process.is_alive():
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                process.join(timeout=3)
+                if process.is_alive():
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    process.join()
 
         return self.poncho.returncode
 
@@ -439,3 +442,16 @@ class Dev:
                 **data.get("env", {}),
             }
             self.poncho.add_process(name, data["cmd"], env=env)
+
+
+def _process_task(env):
+    # Make this process the leader of a new group which can be killed together if it doesn't finish
+    os.setsid()
+
+    subprocess.run(["plain", "models", "db-wait"], env=env, check=True)
+    subprocess.run(["plain", "migrate", "--backup"], env=env, check=True)
+
+    # preflight with db?
+
+    # Send SIGUSR1 to the parent process so the parent's handler is invoked
+    os.kill(os.getppid(), signal.SIGUSR1)
