@@ -94,10 +94,12 @@ def db_wait():
                 waiting_for.append(conn.alias)
 
         if waiting_for:
-            click.secho(
-                f"Waiting for database (attempt {attempts}): {', '.join(waiting_for)}",
-                fg="yellow",
-            )
+            if attempts > 1:
+                # After the first attempt, start printing them
+                click.secho(
+                    f"Waiting for database (attempt {attempts}): {', '.join(waiting_for)}",
+                    fg="yellow",
+                )
             time.sleep(1.5)
         else:
             click.secho(f"Database ready: {', '.join(connections)}", fg="green")
