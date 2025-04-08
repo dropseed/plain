@@ -352,24 +352,26 @@ class Dev:
                 sys.exit(1)
 
     def set_csrf_and_allowed_hosts(self):
-        csrf_trusted_origins = json.dumps(
-            [
-                self.url,
-            ]
-        )
-        allowed_hosts = json.dumps([self.hostname])
+        if "PLAIN_CSRF_TRUSTED_ORIGINS" not in os.environ:
+            csrf_trusted_origins = json.dumps(
+                [
+                    self.url,
+                ]
+            )
+            self.plain_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
+            self.custom_process_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
+            click.secho(
+                f"Automatically set PLAIN_CSRF_TRUSTED_ORIGINS={csrf_trusted_origins}",
+                dim=True,
+            )
 
-        # Set environment variables
-        self.plain_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
-        self.custom_process_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
-
-        self.plain_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
-        self.custom_process_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
-
-        click.secho(
-            f"Automatically set PLAIN_ALLOWED_HOSTS={allowed_hosts} PLAIN_CSRF_TRUSTED_ORIGINS={csrf_trusted_origins}",
-            dim=True,
-        )
+        if "PLAIN_ALLOWED_HOSTS" not in os.environ:
+            allowed_hosts = json.dumps([self.hostname])
+            self.plain_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
+            self.custom_process_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
+            click.secho(
+                f"Automatically set PLAIN_ALLOWED_HOSTS={allowed_hosts}", dim=True
+            )
 
     def run_preflight(self):
         click.echo()
