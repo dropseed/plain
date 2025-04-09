@@ -67,26 +67,30 @@ class View:
         except ResponseException as e:
             return e.response
 
-        if isinstance(result, ResponseBase):
-            return result
+        return self.convert_value_to_response(result)
 
-        if isinstance(result, str):
-            # Assume the str is rendered HTML
-            return Response(result)
+    def convert_value_to_response(self, value) -> ResponseBase:
+        """Convert a value to a Response."""
+        if isinstance(value, ResponseBase):
+            return value
 
-        if isinstance(result, list):
-            return JsonResponse(result, safe=False)
+        if isinstance(value, str):
+            # Assume a str is rendered HTML
+            return Response(value)
 
-        if isinstance(result, dict):
-            return JsonResponse(result)
+        if isinstance(value, list):
+            return JsonResponse(value, safe=False)
 
-        if isinstance(result, int):
-            return Response(status_code=result)
+        if isinstance(value, dict):
+            return JsonResponse(value)
 
-        if result is None:
+        if isinstance(value, int):
+            return Response(status_code=value)
+
+        if value is None:
             return ResponseNotFound()
 
-        raise ValueError(f"Unexpected view return type: {type(result)}")
+        raise ValueError(f"Unexpected view return type: {type(value)}")
 
     def options(self) -> Response:
         """Handle responding to requests for the OPTIONS HTTP verb."""
