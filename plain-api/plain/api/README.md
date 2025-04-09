@@ -15,8 +15,9 @@ from app.pullrequests.models import PullRequest
 
 
 class BaseAPIView(APIView, APIKeyView):
-    def use_api_key(self, api_key):
+    def use_api_key(self):
         super().use_api_key()
+
         if user := self.api_key.users.first():
             self.request.user = user
         else:
@@ -29,7 +30,7 @@ class BaseAPIView(APIView, APIKeyView):
 
 
 class UserView(BaseAPIView):
-    def get(self) -> User:
+    def get(self):
         return {
             "uuid": self.request.user.uuid,
             "username": self.request.user.username,
