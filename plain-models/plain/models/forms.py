@@ -202,8 +202,8 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
 class BaseModelForm(BaseForm):
     def __init__(
         self,
-        data=None,
-        files=None,
+        *,
+        request,
         auto_id="id_%s",
         prefix=None,
         initial=None,
@@ -227,11 +227,10 @@ class BaseModelForm(BaseForm):
         # super will stop validate_unique from being called.
         self._validate_unique = False
         super().__init__(
-            data,
-            files,
-            auto_id,
-            prefix,
-            object_data,
+            request=request,
+            auto_id=auto_id,
+            prefix=prefix,
+            initial=object_data,
         )
 
     def _get_validation_exclusions(self):
@@ -588,8 +587,6 @@ class ModelChoiceField(ChoiceField):
         return Field.validate(self, value)
 
     def has_changed(self, initial, data):
-        if self.disabled:
-            return False
         initial_value = initial if initial is not None else ""
         data_value = data if data is not None else ""
         return str(self.prepare_value(initial_value)) != str(data_value)
@@ -677,8 +674,6 @@ class ModelMultipleChoiceField(ModelChoiceField):
         return super().prepare_value(value)
 
     def has_changed(self, initial, data):
-        if self.disabled:
-            return False
         if initial is None:
             initial = []
         if data is None:
@@ -727,7 +722,6 @@ def modelfield_to_formfield(
                 "required",
                 "initial",
                 "error_messages",
-                "disabled",
             ):
                 del kwargs[k]
 
