@@ -4,52 +4,61 @@
 
 The `plain.api` package provides lightweight view classes for building APIs using the same patterns as regular views. It also provides an `APIKey` model and support for generating [OpenAPI](https://www.openapis.org/) documents.
 
-Here's a basic example of using [`APIObjectView`](./views.py#APIObjectView):
-
 ```python
 # app/api/views.py
-from plain.api.views import APIAuthViewMixin, APIObjectView
+from plain.api.views import APIKeyView, APIView
+from plain.http import JsonResponse
+from plain.views.exeptions import ResponseException
 
 from app.users.models import User
 from app.pullrequests.models import PullRequest
 
 
-class UserView(APIAuthViewMixin, APIObjectView):
-    allowed_http_methods = ["get"]
+class BaseAPIView(APIView, APIKeyView):
+    def use_api_key(self, api_key):
+        super().use_api_key()
+        if user := self.api_key.users.first():
+            self.request.user = user
+        else:
+            raise ResponseException(
+                JsonResponse(
+                    {"error": "API key not associated with a user."},
+                    status_code=403,
+                )
+            )
 
-    def get_object(self) -> User:
-        return self.request.user
 
-    def object_to_dict(self, obj: User):
+class UserView(BaseAPIView):
+    def get(self) -> User:
         return {
-            "uuid": obj.uuid,
-            "username": obj.username,
-            "time_zone": str(obj.time_zone),
+            "uuid": self.request.user.uuid,
+            "username": self.request.user.username,
+            "time_zone": str(self.request.user.time_zone),
         }
 
 
-class PullRequestView(APIAuthViewMixin, APIObjectView):
-    allowed_http_methods = ["get"]
+class PullRequestView(BaseAPIView):
+    def get(self):
+        try:
+            pull = (
+                PullRequest.objects.all()
+                .visible_to_user(self.request.user)
+                .get(uuid=self.url_kwargs["uuid"])
+            )
+        except PullRequest.DoesNotExist:
+            return None
 
-    def get_object(self) -> PullRequest:
-        return (
-            PullRequest.objects.all()
-            .visible_to_user(self.request.user)
-            .get(uuid=self.url_kwargs["uuid"])
-        )
-
-    def object_to_dict(self, obj: PullRequest):
         return {
-            "uuid": obj.uuid,
-            "state": obj.state,
-            "number": obj.number,
-            "host_url": obj.host_url,
-            "host_created_at": obj.host_created_at,
-            "host_updated_at": obj.host_updated_at,
-            "host_merged_at": obj.host_merged_at,
+            "uuid": pull.uuid,
+            "state": pull.state,
+            "number": pull.number,
+            "host_url": pull.host_url,
+            "host_created_at": pull.host_created_at,
+            "host_updated_at": pull.host_updated_at,
+            "host_merged_at": pull.host_merged_at,
             "author": {
-                "uuid": obj.author.uuid,
-                "display_name": obj.author.display_name,
+                "uuid": pull.author.uuid,
+                "display_name": pull.author.display_name,
             },
         }
 ```
@@ -70,37 +79,6 @@ class APIRouter(Router):
 ```
 
 ## Authentication and authorization
-
-The [`APIAuthViewMixin`](./views.py#APIAuthViewMixin) is an extension of [`plain.auth.views.AuthViewMixin`](/plain-auth/plain/auth/views.py#AuthViewMixin) that uses the `Authorization: Bearer {apikey}` header to authenticate requests.
-
-To check whether a user can access an endpoint, typically you will use the `request.user` when performing `get_object` (or `get_objects`) to only return objects they have access to. If an object is not returned, a 404 response will be returned instead.
-
-```python
-class PullRequestView(APIAuthViewMixin, APIObjectView):
-    allowed_http_methods = ["get"]
-
-    def get_object(self) -> PullRequest:
-        return (
-            PullRequest.objects.all()
-            .visible_to_user(self.request.user)  # Filter the queryset
-            .get(uuid=self.url_kwargs["uuid"])
-        )
-```
-
-Other permission checks can be done through the `check_auth()` method provided by `AuthViewMixin`, or the specific `get`, `post`, `put`, `patch`, or `delete` method on the view.
-
-```python
-class SuperAdminView(APIAuthViewMixin, APIObjectView):
-    allowed_http_methods = ["get"]
-
-    def check_auth(self):
-        super().check_auth()
-
-        if not self.request.user.is_super_admin:
-            raise PermissionDenied("You are not allowed to access this resource.")
-```
-
-## Object lists
 
 TODO
 
@@ -131,8 +109,14 @@ class User(models.Model):
         required=False,
     )
 
-    def __str__(self):
-        return self.username
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["api_key"],
+                condition=models.Q(api_key__isnull=False),
+                name="unique_user_api_key",
+            ),
+        ]
 ```
 
 Generating API keys is something you will need to do in your own code, wherever it makes sense to do so.
