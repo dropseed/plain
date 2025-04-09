@@ -6,6 +6,7 @@ from plain.http import (
     Response,
     ResponseBase,
     ResponseNotAllowed,
+    ResponseNotFound,
 )
 from plain.utils.decorators import classonlymethod
 
@@ -18,19 +19,6 @@ class View:
     request: HttpRequest
     url_args: tuple
     url_kwargs: dict
-
-    # By default, any of these are allowed if a method is defined for it.
-    # To disallow a defined method, remove it from this list.
-    allowed_http_methods = [
-        "get",
-        "post",
-        "put",
-        "patch",
-        "delete",
-        "head",
-        "options",
-        "trace",
-    ]
 
     # View.as_view(example="foo") usage can be customized by defining your own __init__ method.
     # def __init__(self, *args, **kwargs):
@@ -48,10 +36,7 @@ class View:
         def view(request, *url_args, **url_kwargs):
             v = cls(*init_args, **init_kwargs)
             v.setup(request, *url_args, **url_kwargs)
-            try:
-                return v.get_response()
-            except ResponseException as e:
-                return e.response
+            return v.get_response()
 
         view.view_class = cls
 
@@ -63,23 +48,24 @@ class View:
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
 
-        handler = getattr(self, self.request.method.lower(), None)
+        return getattr(self, self.request.method.lower(), None)
 
-        if not handler or self.request.method.lower() not in self.allowed_http_methods:
+    def get_response(self) -> ResponseBase:
+        handler = self.get_request_handler()
+
+        if not handler:
             logger.warning(
                 "Method Not Allowed (%s): %s",
                 self.request.method,
                 self.request.path,
                 extra={"status_code": 405, "request": self.request},
             )
-            raise ResponseException(ResponseNotAllowed(self._allowed_methods()))
+            return ResponseNotAllowed(self._allowed_methods())
 
-        return handler
-
-    def get_response(self) -> ResponseBase:
-        handler = self.get_request_handler()
-
-        result = handler()
+        try:
+            result = handler()
+        except ResponseException as e:
+            return e.response
 
         if isinstance(result, ResponseBase):
             return result
@@ -97,7 +83,8 @@ class View:
         if isinstance(result, int):
             return Response(status_code=result)
 
-        # Allow tuple for (status_code, content)?
+        if result is None:
+            return ResponseNotFound()
 
         raise ValueError(f"Unexpected view return type: {type(result)}")
 
@@ -109,4 +96,14 @@ class View:
         return response
 
     def _allowed_methods(self) -> list[str]:
-        return [m.upper() for m in self.allowed_http_methods if hasattr(self, m)]
+        known_http_methods = [
+            "get",
+            "post",
+            "put",
+            "patch",
+            "delete",
+            "head",
+            "options",
+            "trace",
+        ]
+        return [m.upper() for m in known_http_methods if hasattr(self, m)]
