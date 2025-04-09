@@ -27,18 +27,10 @@ class FormView(TemplateView):
 
     def get_form_kwargs(self) -> dict:
         """Return the keyword arguments for instantiating the form."""
-        kwargs: dict = {
-            "initial": {},  # Makes it easier to set keys in subclasses
+        return {
+            "initial": {},
+            "request": self.request,
         }
-
-        if hasattr(self, "request") and self.request.method in ("POST", "PUT"):
-            kwargs.update(
-                {
-                    "data": self.request.POST,
-                    "files": self.request.FILES,
-                }
-            )
-        return kwargs
 
     def get_success_url(self, form: "BaseForm") -> str:
         """Return the URL to redirect to after processing a valid form."""

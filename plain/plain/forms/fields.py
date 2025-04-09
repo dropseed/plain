@@ -161,10 +161,17 @@ class Field:
         return result
 
     def value_from_form_data(self, data, files, html_name):
+        # By default, all fields are expected to be present in HTML form data.
         try:
             return data[html_name]
         except KeyError as e:
             raise FormFieldMissingError(html_name) from e
+
+    def value_from_json_data(self, data, files, html_name):
+        if self.required and html_name not in data:
+            raise FormFieldMissingError(html_name)
+
+        return data.get(html_name, None)
 
 
 class CharField(Field):
@@ -582,6 +589,9 @@ class FileField(Field):
     def value_from_form_data(self, data, files, html_name):
         return files.get(html_name)
 
+    def value_from_json_data(self, data, files, html_name):
+        return files.get(html_name)
+
 
 class ImageField(FileField):
     default_validators = [validators.validate_image_file_extension]
@@ -711,6 +721,13 @@ class BooleanField(Field):
             "false": False,
             "on": True,
         }.get(value)
+
+    def value_from_json_data(self, data, files, html_name):
+        # Boolean fields must be present in the JSON data
+        try:
+            return data[html_name]
+        except KeyError as e:
+            raise FormFieldMissingError(html_name) from e
 
 
 class NullBooleanField(BooleanField):

@@ -3,6 +3,7 @@ Form classes
 """
 
 import copy
+import json
 
 from plain.exceptions import NON_FIELD_ERRORS
 from plain.utils.datastructures import MultiValueDict
@@ -57,15 +58,36 @@ class BaseForm:
 
     def __init__(
         self,
-        data=None,
-        files=None,
+        *,
+        request,
         auto_id="id_%s",
         prefix=None,
         initial=None,
     ):
-        self.is_bound = data is not None or files is not None
-        self.data = MultiValueDict() if data is None else data
-        self.files = MultiValueDict() if files is None else files
+        if request.method in ("POST", "PUT", "PATCH"):
+            if request.headers.get("Content-Type") == "application/json":
+                self.data = json.loads(request.body)
+                self.is_json_request = True
+            elif request.headers.get("Content-Type") in [
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ]:
+                self.data = request.POST
+                self.is_json_request = False
+            else:
+                raise ValueError(
+                    "Unsupported Content-Type. Supported types are "
+                    "'application/json', 'application/x-www-form-urlencoded', "
+                    "and 'multipart/form-data'."
+                )
+        else:
+            self.data = MultiValueDict()
+            self.is_json_request = False
+
+        self.files = request.FILES
+
+        self.is_bound = bool(self.data or self.files)
+
         self._auto_id = auto_id
         if prefix is not None:
             self.prefix = prefix
@@ -224,7 +246,10 @@ class BaseForm:
             # Allow custom parsing from form data/files at the form level
             return getattr(self, f"parse_{html_name}")()
 
-        return field.value_from_form_data(self.data, self.files, html_name)
+        if self.is_json_request:
+            return field.value_from_json_data(self.data, self.files, html_name)
+        else:
+            return field.value_from_form_data(self.data, self.files, html_name)
 
     def _clean_fields(self):
         for name, bf in self._bound_items():
