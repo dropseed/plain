@@ -178,7 +178,8 @@ class Field:
             return data[html_name]
         except KeyError as e:
             raise FormFieldMissingError(
-                f'The "{html_name}" field is missing from the form data.'
+                field_name=html_name,
+                message=f'The "{html_name}" field is missing from the form data.',
             ) from e
 
 
