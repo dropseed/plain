@@ -67,23 +67,16 @@ class Field:
         initial=None,
         error_messages=None,
         validators=(),
-        disabled=False,
     ):
         # required -- Boolean that specifies whether the field is required.
         #             True by default.
-        # widget -- A Widget class, or instance of a Widget class, that should
-        #           be used for this Field when displaying it. Each Field has a
-        #           default Widget that it'll use if you don't specify this. In
-        #           most cases, the default widget is TextInput.
         # initial -- A value to use in this Field's initial display. This value
         #            is *not* used as a fallback if data isn't given.
         # error_messages -- An optional dictionary to override the default
         #                   messages that the field will raise.
         # validators -- List of additional validators to use
-        # disabled -- Boolean that specifies whether the field is disabled, that
-        #             is its widget is shown in the form but not editable.
-        self.required, self.initial = required, initial
-        self.disabled = disabled
+        self.required = required
+        self.initial = initial
 
         messages = {}
         for c in reversed(self.__class__.__mro__):
@@ -136,16 +129,10 @@ class Field:
         For most fields, this will simply be data; FileFields need to handle it
         a bit differently.
         """
-        if self.disabled:
-            return initial
         return data
 
     def has_changed(self, initial, data):
         """Return True if data differs from initial."""
-        # Always return False if the field is disabled since self.bound_data
-        # always uses the initial value in this case.
-        if self.disabled:
-            return False
         try:
             data = self.to_python(data)
             if hasattr(self, "_coerce"):
@@ -593,7 +580,7 @@ class FileField(Field):
         return initial
 
     def has_changed(self, initial, data):
-        return not self.disabled and data is not None
+        return data is not None
 
     def value_from_form_data(self, data, files, html_name):
         return files.get(html_name)
@@ -707,8 +694,6 @@ class BooleanField(Field):
             raise ValidationError(self.error_messages["required"], code="required")
 
     def has_changed(self, initial, data):
-        if self.disabled:
-            return False
         # Sometimes data or initial may be a string equivalent of a boolean
         # so we should run it through to_python first to get a boolean value
         return self.to_python(initial) != self.to_python(data)
@@ -884,8 +869,6 @@ class MultipleChoiceField(ChoiceField):
                 )
 
     def has_changed(self, initial, data):
-        if self.disabled:
-            return False
         if initial is None:
             initial = []
         if data is None:
@@ -945,8 +928,6 @@ class JSONField(CharField):
         super().__init__(**kwargs)
 
     def to_python(self, value):
-        if self.disabled:
-            return value
         if value in self.empty_values:
             return None
         elif isinstance(value, list | dict | int | float | JSONString):
@@ -965,8 +946,6 @@ class JSONField(CharField):
             return converted
 
     def bound_data(self, data, initial):
-        if self.disabled:
-            return initial
         if data is None:
             return None
         try:

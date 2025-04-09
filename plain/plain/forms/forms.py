@@ -230,10 +230,7 @@ class BaseForm:
         for name, bf in self._bound_items():
             field = bf.field
 
-            if field.disabled:
-                value = bf.initial
-            else:
-                value = self._field_data_value(bf.field, bf.html_name)
+            value = self._field_data_value(bf.field, bf.html_name)
 
             try:
                 if isinstance(field, FileField):
