@@ -164,10 +164,7 @@ class Field:
         try:
             return data[html_name]
         except KeyError as e:
-            raise FormFieldMissingError(
-                field_name=html_name,
-                message=f'The "{html_name}" field is missing from the form data.',
-            ) from e
+            raise FormFieldMissingError(html_name) from e
 
 
 class CharField(Field):

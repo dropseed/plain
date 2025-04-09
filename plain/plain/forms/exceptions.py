@@ -2,9 +2,9 @@ from plain.exceptions import ValidationError
 
 
 class FormFieldMissingError(Exception):
-    def __init__(self, *, field_name, message):
+    def __init__(self, field_name):
         self.field_name = field_name
-        self.message = message
+        self.message = f'The "{self.field_name}" field is missing from the form data.'
 
 
 __all__ = [
