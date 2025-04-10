@@ -2,7 +2,9 @@
 
 **Build APIs using class-based views.**
 
-The `plain.api` package provides lightweight view classes for building APIs using the same patterns as regular views. It also provides an `APIKey` model and support for generating [OpenAPI](https://www.openapis.org/) documents.
+This package includes lightweight view classes for building APIs using the same patterns as regular HTML views. It also provides an [`APIKey` model](#api-keys) and support for generating [OpenAPI](#openapi) documents.
+
+Because [Views](/plain/plain/views/README.md) can convert built-in types to responses, an API view can simply return a dict or list to send a JSON response back to the client. More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class.
 
 ```python
 # app/api/views.py
@@ -14,6 +16,7 @@ from app.users.models import User
 from app.pullrequests.models import PullRequest
 
 
+# An example base class that will be used across your custom API
 class BaseAPIView(APIView, APIKeyView):
     def use_api_key(self):
         super().use_api_key()
@@ -29,6 +32,7 @@ class BaseAPIView(APIView, APIKeyView):
             )
 
 
+# An endpoint that returns the current user
 class UserView(BaseAPIView):
     def get(self):
         return {
@@ -38,6 +42,7 @@ class UserView(BaseAPIView):
         }
 
 
+# An endpoint that filters querysets based on the user
 class PullRequestView(BaseAPIView):
     def get(self):
         try:
@@ -64,6 +69,8 @@ class PullRequestView(BaseAPIView):
         }
 ```
 
+URLs work like they do everywhere else, though it's generally recommended to put everything together into an `app.api` package and `api` namespace.
+
 ```python
 # app/api/urls.py
 from plain.urls import Router, path
@@ -81,15 +88,98 @@ class APIRouter(Router):
 
 ## Authentication and authorization
 
-TODO
+Handling authentication in the API is pretty straightforward. If you use [API keys](#api-keys), then the `APIKeyView` will parse the `Authorization` header and set `self.api_key`. You will then customize the `use_api_key` method to associate the request with a user (or team, for example), depending on how your app works. To perform custom authentication, you can create your own base view class and hook into [`View.get_response`](/plain/plain/views/base.py#get_response).
 
-## Forms
+```python
+class BaseAPIView(APIView, APIKeyView):
+    def use_api_key(self):
+        super().use_api_key()
 
-TODO
+        if user := self.api_key.users.first():
+            self.request.user = user
+        else:
+            raise ResponseException(
+                JsonResponse(
+                    {"error": "API key not associated with a user."},
+                    status_code=403,
+                )
+            )
+```
+
+When it comes to authorizing actions, typically you will factor this in to the queryset to only return objects that the user is allowed to see. If a response method (`get`, `post`, etc.) returns `None`, then the view will return a 404 response. Other status codes can be returned with an int (ex. `403`) or a `JsonResponse` object.
+
+```python
+class PullRequestView(BaseAPIView):
+    def get(self):
+        try:
+            pull = (
+                PullRequest.objects.all()
+                .visible_to_user(self.request.user)
+                .get(uuid=self.url_kwargs["uuid"])
+            )
+        except PullRequest.DoesNotExist:
+            return None
+
+        # ...return the authorized data here
+```
+
+## `PUT`, `POST`, and `PATCH`
+
+One way to handle PUT, POST, and PATCH endpoints is to use standard [forms](/plain/plain/forms/README.md). This will use the same validation and error handling as an HTML form, but will parse the input from the JSON request instead of HTML form data.
+
+```python
+class UserForm(ModelForm):
+    class Meta:
+        model = User
+        fields = [
+            "username",
+            "time_zone",
+        ]
+
+class UserView(BaseAPIView):
+    def patch(self):
+        form = UserForm(
+            request=self.request,
+            instance=self.request.user,
+        )
+
+        if form.is_valid():
+            user = form.save()
+            return {
+                "uuid": user.uuid,
+                "username": user.username,
+                "time_zone": str(user.time_zone),
+            }
+        else:
+            return {"errors": form.errors}
+```
+
+If you don't want to use Plain's forms, you could also use a third-party schema/validation library like [Pydantic](https://docs.pydantic.dev/latest/) or [Marshmallow](https://marshmallow.readthedocs.io/en/3.x-line/). But depending on your use case, you may not need to use forms or fancy validation at all!
+
+## `DELETE`
+
+Deletes can be handled in the `delete` method of the view. Most of the time this just means getting the object, deleting it, and returning a 204.
+
+```python
+class PullRequestView(BaseAPIView):
+    def delete(self):
+        try:
+            pull = (
+                PullRequest.objects.all()
+                .visible_to_user(self.request.user)
+                .get(uuid=self.url_kwargs["uuid"])
+            )
+        except PullRequest.DoesNotExist:
+            return None
+
+        pull.delete()
+
+        return 204
+```
 
 ## API keys
 
-The provided [`APIKey` model](./models.py) includes randomly generated, unique API tokens that are automatically parsed by `APIAuthViewMixin`. The tokens can optionally be named and include an `expires_at` date.
+The provided [`APIKey` model](./models.py) includes randomly generated, unique API tokens that are automatically parsed by `APIKeyView`. The tokens can optionally be named and include an `expires_at` date.
 
 Associating an `APIKey` with a user (or team, for example) is up to you. Most likely you will want to use a `ForeignKey` or a `ManyToManyField`.
 
@@ -128,8 +218,28 @@ user.api_key = APIKey.objects.create(name="Example")
 user.save()
 ```
 
-If your API key is associated with something other than a user, or does not use the related name `"users"`, you can define your own [`associate_api_key`](./views.py#associate_api_key) method.
+To use API keys in your views, you can inherit from `APIKeyView` and customize the [`use_api_key` method](./views.py#use_api_key) to set the `request.user` attribute (or any other attribute) to the object associated with the API key.
+
+```python
+# app/api/views.py
+from plain.api.views import APIKeyView, APIView
+
+
+class BaseAPIView(APIView, APIKeyView):
+    def use_api_key(self):
+        super().use_api_key()
+
+        if user := self.api_key.users.first():
+            self.request.user = user
+        else:
+            raise ResponseException(
+                JsonResponse(
+                    {"error": "API key not associated with a user."},
+                    status_code=403,
+                )
+            )
+```
 
 ## OpenAPI
 
-TODO
+https://www.openapis.org/
