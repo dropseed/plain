@@ -19,7 +19,7 @@ tunnel = {cmd = "plain tunnel $PLAIN_DEV_URL --subdomain myappname --quiet"}
 
 To show a tunnel URL (whether you are using `plain.tunnel` or not), you can add `PLAIN_DEV_TUNNEL_URL` to your local `.env` file.
 
-```env
+```bash
 PLAIN_DEV_TUNNEL_URL=https://myappname.plaintunnel.com
 ```
 
@@ -27,7 +27,7 @@ PLAIN_DEV_TUNNEL_URL=https://myappname.plaintunnel.com
 
 Depending on your setup, you may need to add your tunnel to the `settings.ALLOWED_HOSTS`, which can be done in `settings.py` or in your dev `.env`.
 
-```env
+```bash
 PLAIN_ALLOWED_HOSTS='["*"]'
 ```
 
