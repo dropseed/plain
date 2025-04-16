@@ -35,7 +35,11 @@ def list_chores(group, name):
         chores = chores_registry.get_chores()
 
     for chore in chores:
-        click.echo(str(chore))
+        click.secho(f"{chore}", bold=True, nl=False)
+        if chore.description:
+            click.echo(f": {chore.description}")
+        else:
+            click.echo("")
 
 
 @chores.command("run")

@@ -12,10 +12,7 @@ class Chore:
         self.description = func.__doc__.strip() if func.__doc__ else ""
 
     def __str__(self):
-        if self.description:
-            return f"{self.name}: {self.description}"
-        else:
-            return self.name
+        return self.name
 
     def run(self):
         """
