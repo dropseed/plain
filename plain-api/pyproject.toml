@@ -11,7 +11,6 @@ dependencies = [
 
 [tool.uv]
 dev-dependencies = [
-    "plain.auth<1.0.0",
     "plain.pytest<1.0.0",
 ]
 

@@ -88,7 +88,7 @@ class APIRouter(Router):
 
 ## Authentication and authorization
 
-Handling authentication in the API is pretty straightforward. If you use [API keys](#api-keys), then the `APIKeyView` will parse the `Authorization` header and set `self.api_key`. You will then customize the `use_api_key` method to associate the request with a user (or team, for example), depending on how your app works. To perform custom authentication, you can create your own base view class and hook into [`View.get_response`](/plain/plain/views/base.py#get_response).
+Handling authentication in the API is pretty straightforward. If you use [API keys](#api-keys), then the `APIKeyView` will parse the `Authorization: Bearer <token>` header and set `self.api_key`. You will then customize the `use_api_key` method to associate the request with a user (or team, for example), depending on how your app works.
 
 ```python
 class BaseAPIView(APIView, APIKeyView):
@@ -214,7 +214,7 @@ Generating API keys is something you will need to do in your own code, wherever 
 
 ```python
 user = User.objects.first()
-user.api_key = APIKey.objects.create(name="Example")
+user.api_key = APIKey.objects.create()
 user.save()
 ```
 
@@ -242,4 +242,141 @@ class BaseAPIView(APIView, APIKeyView):
 
 ## OpenAPI
 
-https://www.openapis.org/
+You can use a combination of decorators to help generate an [OpenAPI](https://www.openapis.org/) document for your API.
+
+To define root level schema, use the `@openapi.schema` decorator on your `Router` class.
+
+```python
+from plain.urls import Router, path
+from plain.api import openapi
+from plain.assets.views import AssetView
+from . import views
+
+
+@openapi.schema({
+    "openapi": "3.0.0",
+    "info": {
+        "title": "PullApprove API",
+        "version": "4.0.0",
+    },
+    "servers": [
+        {
+            "url": "https://4.pullapprove.com/api/",
+            "description": "PullApprove API",
+        }
+    ],
+})
+class APIRouter(Router):
+    namespace = "api"
+    urls = [
+        # ...your API routes
+    ]
+```
+
+You can then define additional schema on a view class, or a specific view method.
+
+```python
+class CurrentUserAPIView(BaseAPIView):
+    @openapi.schema({
+        "summary": "Get current user",
+    })
+    def get(self):
+        if self.request.user:
+            user = self.request.user
+        else:
+            raise Http404
+
+        return schemas.UserSchema.from_user(user, self.request)
+```
+
+While you can attach any raw schema you like, there are a couple helpers to generate schema for API input (`@openapi.request_form`) and output (`@openapi.response_typed_dict`). These are intentionally specific, leaving room for custom decorators to be written for the input/output types of your choice.
+
+```python
+class TeamAccountAPIView(BaseAPIView):
+    @openapi.request_form(TeamAccountForm)
+    @openapi.response_typed_dict(200, TeamAccountSchema)
+    def patch(self):
+        form = TeamAccountForm(request=self.request, instance=self.team_account)
+
+        if form.is_valid():
+            team_account = form.save()
+            return TeamAccountSchema.from_team_account(
+                team_account, self.request
+            )
+        else:
+            return {"errors": form.errors}
+
+    @cached_property
+    def team_account(self):
+        try:
+            if self.organization:
+                return TeamAccount.objects.get(
+                    team__organization=self.organization, uuid=self.url_kwargs["uuid"]
+                )
+
+            if self.request.user:
+                return TeamAccount.objects.get(
+                    team__organization__in=self.request.user.organizations.all(),
+                    uuid=self.url_kwargs["uuid"],
+                )
+        except TeamAccount.DoesNotExist:
+            raise Http404
+
+
+class TeamAccountForm(ModelForm):
+    class Meta:
+        model = TeamAccount
+        fields = ["is_reviewer", "is_admin"]
+
+
+class TeamAccountSchema(TypedDict):
+    uuid: UUID
+    account: AccountSchema
+    is_admin: bool
+    is_reviewer: bool
+    api_url: str
+
+    @classmethod
+    def from_team_account(cls, team_account, request) -> "TeamAccountSchema":
+        return cls(
+            uuid=team_account.uuid,
+            is_admin=team_account.is_admin,
+            is_reviewer=team_account.is_reviewer,
+            api_url=request.build_absolute_uri(
+                reverse("api:team_account", uuid=team_account.uuid)
+            ),
+            account=AccountSchema.from_account(team_account.account, request),
+        )
+```
+
+To generate the OpenAPI JSON, run the following command (including swagger.io validation):
+
+```bash
+plain api generate-openapi --validate
+```
+
+### Deploying
+
+To build the JSON when you deploy, add a `build.run` command to your `pyproject.toml` file:
+
+```toml
+[tool.plain.build.run]
+openapi = {cmd = "plain api generate-openapi --validate > app/assets/openapi.json"}
+```
+
+You will typically want `app/assets/openapi.json` to be included in your `.gitignore` file.
+
+Then you can use an [`AssetView`](/plain/plain/assets/views.py#AssetView) to serve the `openapi.json` file.
+
+```python
+from plain.urls import Router, path
+from plain.assets.views import AssetView
+from . import views
+
+class APIRouter(Router):
+    namespace = "api"
+    urls = [
+        # ...your API routes
+        path("openapi.json", AssetView.as_view(asset_path="openapi.json")),
+    ]
+```

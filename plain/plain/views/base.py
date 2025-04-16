@@ -1,4 +1,5 @@
 import logging
+from http import HTTPMethod
 
 from plain.http import (
     HttpRequest,
@@ -100,14 +101,4 @@ class View:
         return response
 
     def _allowed_methods(self) -> list[str]:
-        known_http_methods = [
-            "get",
-            "post",
-            "put",
-            "patch",
-            "delete",
-            "head",
-            "options",
-            "trace",
-        ]
-        return [m.upper() for m in known_http_methods if hasattr(self, m)]
+        return [m.upper() for m in HTTPMethod if hasattr(self, m.lower())]

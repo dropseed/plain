@@ -1,7 +1,6 @@
 import datetime
 import logging
 from functools import cached_property
-from typing import TYPE_CHECKING
 
 from plain.exceptions import PermissionDenied, ValidationError
 from plain.forms.exceptions import FormFieldMissingError
@@ -12,20 +11,25 @@ from plain.views.base import View
 from plain.views.csrf import CsrfExemptViewMixin
 from plain.views.exceptions import ResponseException
 
-from .models import APIKey
+from . import openapi
+from .schemas import ErrorSchema
 
-if TYPE_CHECKING:
-    pass
-
+# Allow plain.api to be used without plain.models
+try:
+    from .models import APIKey
+except ImportError:
+    APIKey = None
 
 logger = logging.getLogger("plain.api")
 
 
+# @openapi.response_typed_dict(400, ErrorSchema)
+# @openapi.response_typed_dict(401, ErrorSchema)
 class APIKeyView(View):
     api_key_required = True
 
     @cached_property
-    def api_key(self) -> APIKey | None:
+    def api_key(self):
         return self.get_api_key()
 
     def get_response(self) -> Response:
@@ -33,10 +37,10 @@ class APIKeyView(View):
             self.use_api_key()
         elif self.api_key_required:
             return JsonResponse(
-                {
-                    "message": "API key required",
-                    "errors": {},
-                },
+                ErrorSchema(
+                    id="api_key_required",
+                    message="API key required",
+                ),
                 status_code=401,
             )
 
@@ -45,7 +49,7 @@ class APIKeyView(View):
         patch_cache_control(response, private=True)
         return response
 
-    def use_api_key(self) -> None:
+    def use_api_key(self):
         """
         Use the API key for this request.
 
@@ -54,7 +58,7 @@ class APIKeyView(View):
         self.api_key.last_used_at = timezone.now()
         self.api_key.save(update_fields=["last_used_at"])
 
-    def get_api_key(self) -> APIKey | None:
+    def get_api_key(self):
         """
         Get the API key from the request.
 
@@ -67,10 +71,10 @@ class APIKeyView(View):
             except IndexError:
                 raise ResponseException(
                     JsonResponse(
-                        {
-                            "message": "Invalid Authorization header",
-                            "errors": {},
-                        },
+                        ErrorSchema(
+                            id="invalid_authorization_header",
+                            message="Invalid Authorization header",
+                        ),
                         status_code=400,
                     )
                 )
@@ -80,10 +84,10 @@ class APIKeyView(View):
             except APIKey.DoesNotExist:
                 raise ResponseException(
                     JsonResponse(
-                        {
-                            "message": "Invalid API token",
-                            "errors": {},
-                        },
+                        ErrorSchema(
+                            id="invalid_api_token",
+                            message="Invalid API token",
+                        ),
                         status_code=400,
                     )
                 )
@@ -91,10 +95,10 @@ class APIKeyView(View):
             if api_key.expires_at and api_key.expires_at < datetime.datetime.now():
                 raise ResponseException(
                     JsonResponse(
-                        {
-                            "message": "API token has expired",
-                            "errors": {},
-                        },
+                        ErrorSchema(
+                            id="api_token_expired",
+                            message="API token has expired",
+                        ),
                         status_code=400,
                     )
                 )
@@ -102,6 +106,13 @@ class APIKeyView(View):
             return api_key
 
 
+@openapi.response_typed_dict(400, ErrorSchema, component_name="BadRequest")
+@openapi.response_typed_dict(401, ErrorSchema, component_name="Unauthorized")
+@openapi.response_typed_dict(403, ErrorSchema, component_name="Forbidden")
+@openapi.response_typed_dict(404, ErrorSchema, component_name="NotFound")
+@openapi.response_typed_dict(
+    "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
+)
 class APIView(CsrfExemptViewMixin, View):
     def get_response(self):
         try:
@@ -111,42 +122,43 @@ class APIView(CsrfExemptViewMixin, View):
             return e.response
         except ValidationError as e:
             return JsonResponse(
-                {
-                    "message": "Invalid input",
-                    "errors": {field: e.errors[field] for field in e.errors},
-                },
+                ErrorSchema(
+                    id="validation_error",
+                    message=f"Validation error: {e.message}",
+                    # "errors": {field: e.errors[field] for field in e.errors},
+                ),
                 status_code=400,
             )
         except FormFieldMissingError as e:
             return JsonResponse(
-                {
-                    "message": "Invalid input",
-                    "errors": {e.field_name: ["Missing field"]},
-                },
+                ErrorSchema(
+                    id="missing_field",
+                    message=f"Missing field: {e.field_name}",
+                ),
                 status_code=400,
             )
         except PermissionDenied:
             return JsonResponse(
-                {
-                    "message": "Permission denied",
-                    "errors": {},
-                },
+                ErrorSchema(
+                    id="permission_denied",
+                    message="Permission denied",
+                ),
                 status_code=403,
             )
         except Http404:
             return JsonResponse(
-                {
-                    "message": "Not found",
-                    "errors": {},
-                },
+                ErrorSchema(
+                    id="not_found",
+                    message="Not found",
+                ),
                 status_code=404,
             )
         except Exception:
             logger.exception("Internal server error", extra={"request": self.request})
             return JsonResponse(
-                {
-                    "message": "Internal server error",
-                    "errors": {},
-                },
+                ErrorSchema(
+                    id="server_error",
+                    message="Internal server error",
+                ),
                 status_code=500,
             )

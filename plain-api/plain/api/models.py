@@ -21,7 +21,7 @@ class APIKey(models.Model):
 
     token = models.CharField(max_length=40, default=generate_token)
 
-    api_version_name = models.CharField(max_length=255, required=False)
+    api_version = models.CharField(max_length=255, required=False)
 
     class Meta:
         constraints = [

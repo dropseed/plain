@@ -1,0 +1,1 @@
+API_OPENAPI_ROUTER: str = ""
