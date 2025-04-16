@@ -14,7 +14,7 @@ DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
 @register_cli("code")
 @click.group()
 def cli():
-    """Standard code formatting and linting."""
+    """Code formatting and linting"""
     pass
 
 

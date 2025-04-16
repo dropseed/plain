@@ -8,7 +8,7 @@ from plain.cli import register_cli
 
 
 @register_cli("contrib")
-@click.command("contribute")
+@click.command("contribute", hidden=True)
 @click.option("--repo", default="../plain", help="Path to the plain repo")
 @click.option(
     "--reset", is_flag=True, help="Undo any changes to pyproject.toml and uv.lock"
