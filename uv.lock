@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.38.0"
+version = "0.39.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -386,7 +386,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-code"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "plain-code" }
 dependencies = [
     { name = "plain" },
@@ -401,7 +401,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-dev"
-version = "0.27.1"
+version = "0.28.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -647,7 +647,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.13.0"
+version = "0.14.0"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
@@ -662,7 +662,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-sessions"
-version = "0.18.0"
+version = "0.19.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
@@ -719,7 +719,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tunnel"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "plain-tunnel" }
 dependencies = [
     { name = "plain" },
