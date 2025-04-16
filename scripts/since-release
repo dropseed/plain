@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+from pathlib import Path
+import os
+
+BOLD = '\033[1m'
+YELLOW = '\033[33m'
+END = '\033[0m'
+
+def run_git_command(cmd, cwd):
+    return subprocess.check_output(cmd, cwd=cwd, text=True, shell=True).strip()
+
+def extract_version(content):
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith("version"):
+            parts = line.split("=")
+            if len(parts) >= 2:
+                return parts[1].strip().strip('"').strip("'")
+    return None
+
+def get_release_commit(repo_path, package_path, target_version):
+    pyproject = package_path / "pyproject.toml"
+    rel_pyproject = pyproject.relative_to(repo_path)
+    log_cmd = f'git log --reverse --format="%H" -- {rel_pyproject}'
+    for commit in run_git_command(log_cmd, repo_path).splitlines():
+        try:
+            content = run_git_command(f'git show {commit}:{rel_pyproject}', repo_path)
+        except subprocess.CalledProcessError:
+            continue
+        if extract_version(content) == target_version:
+            return commit
+    return None
+
+def get_new_version_in_commit(repo_path, commit, rel_pyproject):
+    try:
+        diff = run_git_command(f'git diff {commit}^ {commit} -- {rel_pyproject}', repo_path)
+    except subprocess.CalledProcessError:
+        return None
+    for line in diff.splitlines():
+        if line.startswith('+') and 'version' in line:
+            text = line[1:].strip()
+            if text.startswith("version"):
+                parts = text.split('=')
+                if len(parts) > 1:
+                    return parts[1].strip().strip('"').strip("'")
+    return None
+
+def get_commits_since_release(repo_path, package_path, release_commit):
+    rel_pkg = package_path.relative_to(repo_path)
+    # Exclude changes in the tests directory
+    log_cmd = (
+        f'git log --format="%H %s" {release_commit}..HEAD '
+        f'-- {rel_pkg} ":(exclude){rel_pkg}/tests"'
+    )
+    commits = []
+    rel_pyproject = (package_path / "pyproject.toml").relative_to(repo_path)
+    for line in run_git_command(log_cmd, repo_path).splitlines():
+        if not line.strip():
+            continue
+        parts = line.split(" ", 1)
+        commit_hash = parts[0]
+        summary = parts[1] if len(parts) > 1 else ""
+        # Check if this commit updated the version
+        version_update = get_new_version_in_commit(repo_path, commit_hash, rel_pyproject)
+        commits.append((commit_hash, summary, version_update))
+    return commits
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Show commits for a package since a specific version, with version bumps flagged."
+    )
+    parser.add_argument('package', help="Path to the package directory")
+    parser.add_argument('version', help="Version to start from (i.e. release version)")
+    args = parser.parse_args()
+
+    repo_path = Path(os.getcwd())
+    package_path = repo_path / args.package
+
+    release_commit = get_release_commit(repo_path, package_path, args.version)
+    if not release_commit:
+        print(f"Could not find a commit setting version {args.version} in {args.package}.")
+        return
+
+    commits = get_commits_since_release(repo_path, package_path, release_commit)
+    if commits:
+        print(f"{BOLD}Commits for {args.package} since version {args.version}:{END}")
+        for commit_hash, summary, ver in commits:
+            line = f"{commit_hash[:7]} - {summary}"
+            if ver:
+                line += f" {YELLOW}({ver}){END}"
+            print(line)
+    else:
+        print(f"No commits for {args.package} since version {args.version}.")
+
+if __name__ == "__main__":
+    main()
