@@ -1,1 +1,5 @@
+from datetime import timedelta
+
 PAGEVIEWS_ASSOCIATE_ANONYMOUS_SESSIONS: bool = True
+PAGEVIEWS_ANONYMOUS_RETENTION_TIMEDELTA: timedelta = timedelta(days=90)
+PAGEVIEWS_AUTHENTICATED_RETENTION_TIMEDELTA: timedelta = timedelta(days=365)

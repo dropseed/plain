@@ -24,8 +24,7 @@ else:
 cached.delete()
 ```
 
-Expired cache items can be cleared with `plain cache clear-expired`.
-You can run this on a schedule through various cron-like tools or [plain-worker](../../../plain-worker/plain/worker/).
+Expired cache items can be cleared by [running chores](/plain/plain/chores/README.md).
 
 ## Installation
 

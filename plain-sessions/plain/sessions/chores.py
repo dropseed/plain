@@ -7,7 +7,7 @@ from .models import Session
 @register_chore("sessions")
 def clear_expired():
     """
-    Clear sessions that have expired.
+    Delete sessions that have expired.
     """
     result = Session.objects.filter(expires_at__lt=timezone.now()).delete()
     return f"{result[0]} expired sessions deleted"
