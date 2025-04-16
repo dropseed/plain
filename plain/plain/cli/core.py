@@ -7,6 +7,7 @@ import plain.runtime
 from plain.exceptions import ImproperlyConfigured
 
 from .build import build
+from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
 from .preflight import preflight_checks
@@ -26,6 +27,7 @@ def plain_cli():
 plain_cli.add_command(docs)
 plain_cli.add_command(preflight_checks)
 plain_cli.add_command(create)
+plain_cli.add_command(chores)
 plain_cli.add_command(build)
 plain_cli.add_command(utils)
 plain_cli.add_command(urls)
