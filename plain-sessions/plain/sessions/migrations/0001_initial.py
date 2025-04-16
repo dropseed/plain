@@ -1,4 +1,3 @@
-import plain.sessions.models
 from plain import models
 from plain.models import migrations
 
@@ -22,9 +21,6 @@ class Migration(migrations.Migration):
                     "expire_date",
                     models.DateTimeField(),
                 ),
-            ],
-            managers=[
-                ("objects", plain.sessions.models.SessionManager()),
             ],
         ),
     ]

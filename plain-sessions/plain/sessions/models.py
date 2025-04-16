@@ -1,13 +1,4 @@
 from plain import models
-from plain.utils import timezone
-
-
-class SessionManager(models.Manager):
-    def clear_expired(self):
-        """
-        Clear expired sessions from the database.
-        """
-        self.filter(expires_at__lt=timezone.now()).delete()
 
 
 @models.register_model
@@ -32,8 +23,6 @@ class Session(models.Model):
     session_key = models.CharField(max_length=40, primary_key=True)
     session_data = models.TextField()
     expires_at = models.DateTimeField()
-
-    objects = SessionManager()
 
     class Meta:
         indexes = [
