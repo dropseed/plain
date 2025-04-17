@@ -134,7 +134,7 @@ CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_HEADER_NAME = "CSRF-Token"
-CSRF_POST_NAME = "_csrftoken"
+CSRF_FIELD_NAME = "_csrftoken"
 CSRF_TRUSTED_ORIGINS: list[str] = []
 
 ###########

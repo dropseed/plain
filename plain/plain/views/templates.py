@@ -12,7 +12,7 @@ from .base import View
 def csrf_input(request):
     return format_html(
         '<input type="hidden" name="{}" value="{}">',
-        settings.CSRF_POST_NAME,
+        settings.CSRF_FIELD_NAME,
         get_token(request),
     )
 
