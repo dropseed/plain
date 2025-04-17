@@ -68,7 +68,7 @@ class HttpRequest:
         self.POST = QueryDict(mutable=True)
         self.COOKIES = {}
         self.META = {}
-        self.FILES = MultiValueDict()
+        self.files = MultiValueDict()
 
         self.path = ""
         self.path_info = ""

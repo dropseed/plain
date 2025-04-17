@@ -116,7 +116,7 @@ class WSGIRequest(HttpRequest):
         return parse_cookie(raw_cookie)
 
     @property
-    def FILES(self):
+    def files(self):
         if not hasattr(self, "_files"):
             self._load_post_and_files()
         return self._files

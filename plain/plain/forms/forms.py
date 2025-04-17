@@ -84,7 +84,7 @@ class BaseForm:
             self.data = MultiValueDict()
             self.is_json_request = False
 
-        self.files = request.FILES
+        self.files = request.files
 
         self.is_bound = bool(self.data or self.files)
 
