@@ -85,7 +85,7 @@ class FileUploadHandler:
         self.request = request
 
     def handle_raw_input(
-        self, input_data, META, content_length, boundary, encoding=None
+        self, input_data, meta, content_length, boundary, encoding=None
     ):
         """
         Handle the raw input from the client.
@@ -94,8 +94,8 @@ class FileUploadHandler:
 
             :input_data:
                 An object that supports reading via .read().
-            :META:
-                ``request.META``.
+            :meta:
+                ``request.meta``.
             :content_length:
                 The (integer) value of the Content-Length header from the
                 client.
@@ -199,7 +199,7 @@ class MemoryFileUploadHandler(FileUploadHandler):
     """
 
     def handle_raw_input(
-        self, input_data, META, content_length, boundary, encoding=None
+        self, input_data, meta, content_length, boundary, encoding=None
     ):
         """
         Use the content_length to signal whether or not this handler should be

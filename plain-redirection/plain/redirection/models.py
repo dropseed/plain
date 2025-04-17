@@ -7,7 +7,7 @@ def _get_client_ip(request):
     if x_forwarded_for := request.headers.get("X-Forwarded-For"):
         return x_forwarded_for.split(",")[0].strip()
     else:
-        return request.META.get("REMOTE_ADDR")
+        return request.meta.get("REMOTE_ADDR")
 
 
 @models.register_model

@@ -67,7 +67,7 @@ class HttpRequest:
         self.GET = QueryDict(mutable=True)
         self.POST = QueryDict(mutable=True)
         self.COOKIES = {}
-        self.META = {}
+        self.meta = {}
         self.files = MultiValueDict()
 
         self.path = ""
@@ -99,7 +99,7 @@ class HttpRequest:
 
     @cached_property
     def headers(self):
-        return HttpHeaders(self.META)
+        return HttpHeaders(self.meta)
 
     @cached_property
     def accepted_types(self):
@@ -130,13 +130,13 @@ class HttpRequest:
         allowed hosts protection, so may return an insecure host.
         """
         # We try three options, in order of decreasing preference.
-        if settings.USE_X_FORWARDED_HOST and ("HTTP_X_FORWARDED_HOST" in self.META):
-            host = self.META["HTTP_X_FORWARDED_HOST"]
-        elif "HTTP_HOST" in self.META:
-            host = self.META["HTTP_HOST"]
+        if settings.USE_X_FORWARDED_HOST and ("HTTP_X_FORWARDED_HOST" in self.meta):
+            host = self.meta["HTTP_X_FORWARDED_HOST"]
+        elif "HTTP_HOST" in self.meta:
+            host = self.meta["HTTP_HOST"]
         else:
             # Reconstruct the host using the algorithm from PEP 333.
-            host = self.META["SERVER_NAME"]
+            host = self.meta["SERVER_NAME"]
             server_port = self.get_port()
             if server_port != ("443" if self.is_https() else "80"):
                 host = f"{host}:{server_port}"
@@ -166,10 +166,10 @@ class HttpRequest:
 
     def get_port(self):
         """Return the port number for the request as a string."""
-        if settings.USE_X_FORWARDED_PORT and "HTTP_X_FORWARDED_PORT" in self.META:
-            port = self.META["HTTP_X_FORWARDED_PORT"]
+        if settings.USE_X_FORWARDED_PORT and "HTTP_X_FORWARDED_PORT" in self.meta:
+            port = self.meta["HTTP_X_FORWARDED_PORT"]
         else:
-            port = self.META["SERVER_PORT"]
+            port = self.meta["SERVER_PORT"]
         return str(port)
 
     def get_full_path(self, force_append_slash=False):
@@ -198,8 +198,8 @@ class HttpRequest:
         return "{}{}{}".format(
             escape_uri_path(path),
             "/" if force_append_slash and not path.endswith("/") else "",
-            ("?" + iri_to_uri(self.META.get("QUERY_STRING", "")))
-            if self.META.get("QUERY_STRING", "")
+            ("?" + iri_to_uri(self.meta.get("QUERY_STRING", "")))
+            if self.meta.get("QUERY_STRING", "")
             else "",
         )
 
@@ -263,7 +263,7 @@ class HttpRequest:
                     "The HTTPS_PROXY_HEADER setting must be a tuple containing "
                     "two values."
                 )
-            header_value = self.META.get(header)
+            header_value = self.meta.get(header)
             if header_value is not None:
                 header_value, *_ = header_value.split(",", 1)
                 return "https" if header_value.strip() == secure_value else "http"
@@ -311,7 +311,7 @@ class HttpRequest:
             )
         self._upload_handlers = upload_handlers
 
-    def parse_file_upload(self, META, post_data):
+    def parse_file_upload(self, meta, post_data):
         """Return a tuple of (POST QueryDict, FILES MultiValueDict)."""
         self.upload_handlers = ImmutableList(
             self.upload_handlers,
@@ -319,7 +319,7 @@ class HttpRequest:
                 "You cannot alter upload handlers after the upload has been processed."
             ),
         )
-        parser = MultiPartParser(META, post_data, self.upload_handlers, self.encoding)
+        parser = MultiPartParser(meta, post_data, self.upload_handlers, self.encoding)
         return parser.parse()
 
     @property
@@ -333,7 +333,7 @@ class HttpRequest:
             # Limit the maximum request data size that will be handled in-memory.
             if (
                 settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
-                and int(self.META.get("CONTENT_LENGTH") or 0)
+                and int(self.meta.get("CONTENT_LENGTH") or 0)
                 > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
             ):
                 raise RequestDataTooBig(
@@ -372,7 +372,7 @@ class HttpRequest:
             else:
                 data = self
             try:
-                self._post, self._files = self.parse_file_upload(self.META, data)
+                self._post, self._files = self.parse_file_upload(self.meta, data)
             except (MultiPartParserError, TooManyFilesSent):
                 # An error occurred while parsing POST data. Since when
                 # formatting the error the request handler might access

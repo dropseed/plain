@@ -72,9 +72,9 @@ class WSGIRequest(HttpRequest):
         self.path = "{}/{}".format(
             script_name.rstrip("/"), path_info.replace("/", "", 1)
         )
-        self.META = environ
-        self.META["PATH_INFO"] = path_info
-        self.META["SCRIPT_NAME"] = script_name
+        self.meta = environ
+        self.meta["PATH_INFO"] = path_info
+        self.meta["SCRIPT_NAME"] = script_name
         self.method = environ["REQUEST_METHOD"].upper()
         # Set content_type, content_params, and encoding.
         self._set_content_type_params(environ)
@@ -89,8 +89,8 @@ class WSGIRequest(HttpRequest):
     def __getstate__(self):
         state = super().__getstate__()
         for attr in self.meta_non_picklable_attrs:
-            if attr in state["META"]:
-                del state["META"][attr]
+            if attr in state["meta"]:
+                del state["meta"][attr]
         return state
 
     def _get_scheme(self):
