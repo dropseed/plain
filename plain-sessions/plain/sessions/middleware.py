@@ -13,7 +13,7 @@ class SessionMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        session_key = request.COOKIES.get(settings.SESSION_COOKIE_NAME)
+        session_key = request.cookies.get(settings.SESSION_COOKIE_NAME)
         request.session = SessionStore(session_key)
 
         response = self.get_response(request)
@@ -29,7 +29,7 @@ class SessionMiddleware:
 
         # First check if we need to delete this cookie.
         # The session should be deleted only if the session is entirely empty.
-        if settings.SESSION_COOKIE_NAME in request.COOKIES and empty:
+        if settings.SESSION_COOKIE_NAME in request.cookies and empty:
             response.delete_cookie(
                 settings.SESSION_COOKIE_NAME,
                 path=settings.SESSION_COOKIE_PATH,

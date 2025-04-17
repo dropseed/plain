@@ -246,7 +246,7 @@ class CsrfViewMiddleware:
         the request's secret has invalid characters or an invalid length.
         """
         try:
-            csrf_secret = request.COOKIES[settings.CSRF_COOKIE_NAME]
+            csrf_secret = request.cookies[settings.CSRF_COOKIE_NAME]
         except KeyError:
             csrf_secret = None
         else:

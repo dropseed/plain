@@ -140,7 +140,7 @@ class RequestLog:
             "querydict": request.POST.dict()
             if request.method == "POST"
             else request.GET.dict(),
-            "cookies": request.COOKIES,
+            "cookies": request.cookies,
             # files?
             "absolute_uri": request.build_absolute_uri(),
             "body": request.body.decode("utf-8"),
