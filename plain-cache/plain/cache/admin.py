@@ -22,11 +22,12 @@ class CachedItemViewset(AdminViewset):
         queryset_order = ["-pk"]
         allow_global_search = False
 
-        # TODO put back
-        # def get_list_queryset(self):
-        #     return CachedItem.objects.all().only(
-        #         "key", "created_at", "expires_at", "updated_at"
-        #     )
+        def get_objects(self):
+            return (
+                super()
+                .get_objects()
+                .only("key", "created_at", "expires_at", "updated_at")
+            )
 
     class DetailView(AdminModelDetailView):
         model = CachedItem
