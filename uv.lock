@@ -310,7 +310,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.25.1"
+version = "0.26.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -375,7 +375,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-cache"
-version = "0.14.1"
+version = "0.14.2"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
@@ -533,7 +533,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.28.0"
+version = "0.29.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
