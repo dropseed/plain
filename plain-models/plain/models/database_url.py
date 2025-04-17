@@ -173,10 +173,7 @@ def parse(
         options["sslmode"] = "require"
 
     # Support for Postgres Schema URLs
-    if "currentSchema" in options and engine in (
-        "plain.models.backends.postgresql_psycopg2",
-        "plain.models.backends.postgresql",
-    ):
+    if "currentSchema" in options and engine == "plain.models.backends.postgresql":
         options["options"] = "-c search_path={}".format(options.pop("currentSchema"))
 
     if options:

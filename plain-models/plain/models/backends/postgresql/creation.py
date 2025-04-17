@@ -1,8 +1,9 @@
 import sys
 
+from psycopg import errors
+
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends.base.creation import BaseDatabaseCreation
-from plain.models.backends.postgresql.psycopg_any import errors
 from plain.models.backends.utils import strip_quotes
 
 

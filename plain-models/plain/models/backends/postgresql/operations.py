@@ -1,14 +1,12 @@
+import ipaddress
 import json
 from functools import lru_cache, partial
 
+from psycopg import ClientCursor, errors
+from psycopg.types import numeric
+from psycopg.types.json import Jsonb
+
 from plain.models.backends.base.operations import BaseDatabaseOperations
-from plain.models.backends.postgresql.psycopg_any import (
-    Inet,
-    Jsonb,
-    errors,
-    is_psycopg3,
-    mogrify,
-)
 from plain.models.backends.utils import split_tzname_delta
 from plain.models.constants import OnConflict
 from plain.utils.regex_helper import _lazy_re_compile
@@ -42,17 +40,14 @@ class DatabaseOperations(BaseDatabaseOperations):
         "SmallAutoField": "smallint",
     }
 
-    if is_psycopg3:
-        from psycopg.types import numeric
-
-        integerfield_type_map = {
-            "SmallIntegerField": numeric.Int2,
-            "IntegerField": numeric.Int4,
-            "BigIntegerField": numeric.Int8,
-            "PositiveSmallIntegerField": numeric.Int2,
-            "PositiveIntegerField": numeric.Int4,
-            "PositiveBigIntegerField": numeric.Int8,
-        }
+    integerfield_type_map = {
+        "SmallIntegerField": numeric.Int2,
+        "IntegerField": numeric.Int4,
+        "BigIntegerField": numeric.Int8,
+        "PositiveSmallIntegerField": numeric.Int2,
+        "PositiveIntegerField": numeric.Int4,
+        "PositiveBigIntegerField": numeric.Int8,
+    }
 
     def unification_cast_sql(self, output_field):
         internal_type = output_field.get_internal_type()
@@ -195,7 +190,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return f'"{name}"'
 
     def compose_sql(self, sql, params):
-        return mogrify(sql, params, self.connection)
+        return ClientCursor(self.connection.connection).mogrify(sql, params)
 
     def set_time_zone_sql(self):
         return "SELECT set_config('TimeZone', %s, false)"
@@ -223,21 +218,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return ["DISTINCT"], []
 
-    if is_psycopg3:
-
-        def last_executed_query(self, cursor, sql, params):
-            try:
-                return self.compose_sql(sql, params)
-            except errors.DataError:
-                return None
-
-    else:
-
-        def last_executed_query(self, cursor, sql, params):
-            # https://www.psycopg.org/docs/cursor.html#cursor.query
-            # The query attribute is a Psycopg extension to the DB API 2.0.
-            if cursor.query is not None:
-                return cursor.query.decode()
+    def last_executed_query(self, cursor, sql, params):
+        try:
+            return self.compose_sql(sql, params)
+        except errors.DataError:
             return None
 
     def return_insert_columns(self, fields):
@@ -254,12 +238,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         values_sql = ", ".join(f"({sql})" for sql in placeholder_rows_sql)
         return "VALUES " + values_sql
 
-    if is_psycopg3:
-
-        def adapt_integerfield_value(self, value, internal_type):
-            if value is None or hasattr(value, "resolve_expression"):
-                return value
-            return self.integerfield_type_map[internal_type](value)
+    def adapt_integerfield_value(self, value, internal_type):
+        if value is None or hasattr(value, "resolve_expression"):
+            return value
+        return self.integerfield_type_map[internal_type](value)
 
     def adapt_datefield_value(self, value):
         return value
@@ -275,7 +257,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def adapt_ipaddressfield_value(self, value):
         if value:
-            return Inet(value)
+            return ipaddress.ip_address(value)
         return None
 
     def adapt_json_value(self, value, encoder):

@@ -1,6 +1,7 @@
+from psycopg import sql
+
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import IndexColumns
-from plain.models.backends.postgresql.psycopg_any import sql
 from plain.models.backends.utils import strip_quotes
 
 

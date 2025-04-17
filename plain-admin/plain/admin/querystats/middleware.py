@@ -12,10 +12,7 @@ from plain.urls import reverse
 from .core import QueryStats
 
 try:
-    try:
-        import psycopg
-    except ImportError:
-        import psycopg2 as psycopg
+    import psycopg
 except ImportError:
     psycopg = None
 
