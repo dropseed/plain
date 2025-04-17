@@ -31,9 +31,9 @@ class RequestsView(TemplateView):
         return ctx
 
     def post(self):
-        if self.request.POST.get("action") == "clear":
+        if self.request.data.get("action") == "clear":
             RequestLog.clear()
             return ResponseRedirect(self.request.path)
         else:
-            RequestLog.replay_request(self.request.POST["log"])
+            RequestLog.replay_request(self.request.data["log"])
             return ResponseRedirect(".")

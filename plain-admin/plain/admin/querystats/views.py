@@ -35,7 +35,7 @@ class QuerystatsView(AuthViewMixin, TemplateView):
         return context
 
     def post(self):
-        querystats_action = self.request.POST["querystats_action"]
+        querystats_action = self.request.data["querystats_action"]
 
         if querystats_action == "enable":
             self.request.session.setdefault("querystats", {})
@@ -45,4 +45,4 @@ class QuerystatsView(AuthViewMixin, TemplateView):
             del self.request.session["querystats"]
 
         # Redirect back to the page that submitted the form
-        return ResponseRedirect(self.request.POST.get("redirect_url", "."))
+        return ResponseRedirect(self.request.data.get("redirect_url", "."))

@@ -1,5 +1,3 @@
-import json
-
 from plain.api.versioning import APIVersionChange, VersionedAPIView
 from plain.api.views import APIView
 from plain.urls import Router, path
@@ -33,8 +31,7 @@ class TestVersionedAPIView(VersionedAPIView):
     }
 
     def post(self):
-        data = json.loads(self.request.body)
-        name = data["name"]
+        name = self.request.data["name"]
         return {"message": f"Hello, {name}!"}
 
 

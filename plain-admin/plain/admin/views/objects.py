@@ -78,10 +78,10 @@ class AdminListView(HTMXViewMixin, AdminView):
 
     def post(self) -> Response:
         # won't be "key" anymore, just list
-        action_name = self.request.POST.get("action_name")
+        action_name = self.request.data.get("action_name")
         actions = self.get_actions()
         if action_name and action_name in actions:
-            target_pks = self.request.POST["action_pks"].split(",")
+            target_pks = self.request.data["action_pks"].split(",")
             response = self.perform_action(action_name, target_pks)
             if response:
                 return response

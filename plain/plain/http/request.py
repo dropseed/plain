@@ -1,5 +1,6 @@
 import codecs
 import copy
+import json
 import uuid
 from io import BytesIO
 from itertools import chain
@@ -65,7 +66,7 @@ class HttpRequest:
         self.unique_id = str(uuid.uuid4())
 
         self.query_params = QueryDict(mutable=True)
-        self.POST = QueryDict(mutable=True)
+        self.data = QueryDict(mutable=True)
         self.cookies = {}
         self.meta = {}
         self.files = MultiValueDict()
@@ -279,15 +280,15 @@ class HttpRequest:
     @encoding.setter
     def encoding(self, val):
         """
-        Set the encoding used for GET/POST accesses. If the GET or POST
+        Set the encoding used for query_params/data accesses. If the query_params or data
         dictionary has already been created, remove and recreate it on the
         next access (so that it is decoded correctly).
         """
         self._encoding = val
         if hasattr(self, "query_params"):
             del self.query_params
-        if hasattr(self, "_post"):
-            del self._post
+        if hasattr(self, "_data"):
+            del self._data
 
     def _initialize_handlers(self):
         self._upload_handlers = [
@@ -312,7 +313,7 @@ class HttpRequest:
         self._upload_handlers = upload_handlers
 
     def parse_file_upload(self, meta, post_data):
-        """Return a tuple of (POST QueryDict, FILES MultiValueDict)."""
+        """Return a tuple of (data QueryDict, files MultiValueDict)."""
         self.upload_handlers = ImmutableList(
             self.upload_handlers,
             warning=(
@@ -350,29 +351,31 @@ class HttpRequest:
         return self._body
 
     def _mark_post_parse_error(self):
-        self._post = QueryDict()
+        self._data = QueryDict()
         self._files = MultiValueDict()
 
-    def _load_post_and_files(self):
-        """Populate self._post and self._files if the content-type is a form type"""
-        if self.method != "POST":
-            self._post, self._files = (
-                QueryDict(encoding=self._encoding),
-                MultiValueDict(),
-            )
-            return
+    def _load_data_and_files(self):
+        """Populate self._data and self._files"""
+
         if self._read_started and not hasattr(self, "_body"):
             self._mark_post_parse_error()
             return
 
-        if self.content_type == "multipart/form-data":
+        if self.content_type.startswith("application/json"):
+            try:
+                self._data = json.loads(self.body)
+                self._files = MultiValueDict()
+            except json.JSONDecodeError:
+                self._mark_post_parse_error()
+                raise
+        elif self.content_type == "multipart/form-data":
             if hasattr(self, "_body"):
                 # Use already read data
                 data = BytesIO(self._body)
             else:
                 data = self
             try:
-                self._post, self._files = self.parse_file_upload(self.meta, data)
+                self._data, self._files = self.parse_file_upload(self.meta, data)
             except (MultiPartParserError, TooManyFilesSent):
                 # An error occurred while parsing POST data. Since when
                 # formatting the error the request handler might access
@@ -381,12 +384,12 @@ class HttpRequest:
                 self._mark_post_parse_error()
                 raise
         elif self.content_type == "application/x-www-form-urlencoded":
-            self._post, self._files = (
+            self._data, self._files = (
                 QueryDict(self.body, encoding=self._encoding),
                 MultiValueDict(),
             )
         else:
-            self._post, self._files = (
+            self._data, self._files = (
                 QueryDict(encoding=self._encoding),
                 MultiValueDict(),
             )
@@ -400,7 +403,7 @@ class HttpRequest:
     #
     # Expects self._stream to be set to an appropriate source of bytes by
     # a corresponding request subclass (e.g. WSGIRequest).
-    # Also when request data has already been read by request.POST or
+    # Also when request data has already been read by request.data or
     # request.body, self._stream points to a BytesIO instance
     # containing that data.
 

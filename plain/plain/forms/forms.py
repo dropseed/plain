@@ -3,10 +3,8 @@ Form classes
 """
 
 import copy
-import json
 
 from plain.exceptions import NON_FIELD_ERRORS
-from plain.utils.datastructures import MultiValueDict
 from plain.utils.functional import cached_property
 
 from .exceptions import ValidationError
@@ -64,27 +62,12 @@ class BaseForm:
         prefix=None,
         initial=None,
     ):
-        if request.method in ("POST", "PUT", "PATCH"):
-            if request.headers.get("Content-Type") == "application/json":
-                self.data = json.loads(request.body)
-                self.is_json_request = True
-            elif request.headers.get("Content-Type") in [
-                "application/x-www-form-urlencoded",
-                "multipart/form-data",
-            ]:
-                self.data = request.POST
-                self.is_json_request = False
-            else:
-                raise ValueError(
-                    "Unsupported Content-Type. Supported types are "
-                    "'application/json', 'application/x-www-form-urlencoded', "
-                    "and 'multipart/form-data'."
-                )
-        else:
-            self.data = MultiValueDict()
-            self.is_json_request = False
-
+        self.data = request.data
         self.files = request.files
+
+        self.is_json_request = request.headers.get("Content-Type", "").startswith(
+            "application/json"
+        )
 
         self.is_bound = bool(self.data or self.files)
 

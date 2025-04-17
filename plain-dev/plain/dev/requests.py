@@ -137,7 +137,7 @@ class RequestLog:
             "method": request.method,
             "path": request.path,
             "full_path": request.get_full_path(),
-            "querydict": request.POST.dict()
+            "querydict": request.data.dict()
             if request.method == "POST"
             else request.query_params.dict(),
             "cookies": request.cookies,

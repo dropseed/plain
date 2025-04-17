@@ -364,7 +364,7 @@ class CsrfViewMiddleware:
         request_csrf_token = ""
         if request.method == "POST":
             try:
-                request_csrf_token = request.POST.get(settings.CSRF_POST_NAME, "")
+                request_csrf_token = request.data.get(settings.CSRF_POST_NAME, "")
             except UnreadablePostError:
                 # Handle a broken connection before we've completed reading the
                 # POST data. process_view shouldn't raise any exceptions, so
