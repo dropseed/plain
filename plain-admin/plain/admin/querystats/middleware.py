@@ -1,13 +1,10 @@
 import json
 import logging
 import re
-import threading
 
-from plain.http import ResponseRedirect
 from plain.json import PlainJSONEncoder
 from plain.models import connection
 from plain.runtime import settings
-from plain.urls import reverse
 
 from .core import QueryStats
 
@@ -17,7 +14,6 @@ except ImportError:
     psycopg = None
 
 logger = logging.getLogger(__name__)
-_local = threading.local()
 
 
 class QueryStatsJSONEncoder(PlainJSONEncoder):
@@ -25,8 +21,11 @@ class QueryStatsJSONEncoder(PlainJSONEncoder):
         try:
             return super().default(obj)
         except TypeError:
-            if psycopg and isinstance(obj, psycopg._json.Json):
-                return obj.adapted
+            print(type(obj))
+            if psycopg and isinstance(obj, psycopg.types.json.Json):
+                return obj.obj
+            elif psycopg and isinstance(obj, psycopg.types.json.Jsonb):
+                return obj.obj
             else:
                 raise
 
@@ -35,7 +34,7 @@ class QueryStatsMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.ignore_url_patterns = [
-            re.compile(url) for url in settings.QUERYSTATS_IGNORE_URLS
+            re.compile(url) for url in settings.ADMIN_QUERYSTATS_IGNORE_URLS
         ]
 
     def should_ignore_request(self, request):
@@ -46,41 +45,49 @@ class QueryStatsMiddleware:
         return False
 
     def __call__(self, request):
-        if request.GET.get("querystats") == "disable":
+        """
+        Enables querystats for the current request.
+
+        If DEBUG or an admin, then Server-Timing headers are always added to the response.
+        Full querystats are only stored in the session if they are manually enabled.
+        """
+
+        if self.should_ignore_request(request):
             return self.get_response(request)
 
-        querystats = QueryStats(
-            # Only want these if we're getting ready to show it
-            include_tracebacks=request.GET.get("querystats") == "store"
-        )
+        session_querystats_enabled = "querystats" in request.session
 
+        querystats = QueryStats(include_tracebacks=session_querystats_enabled)
         with connection.execute_wrapper(querystats):
             # Have to wrap this first call so it is included in the querystats,
             # but we don't have to wrap everything else unless we are admin or debug
             is_admin = self.is_admin_request(request)
 
-        if (settings.DEBUG or is_admin) and not self.should_ignore_request(request):
-            # Persist it on the thread
-            _local.querystats = querystats
-
-            with connection.execute_wrapper(_local.querystats):
+        if settings.DEBUG or is_admin:
+            with connection.execute_wrapper(querystats):
                 response = self.get_response(request)
 
             if settings.DEBUG:
                 # TODO logging settings
-                logger.debug("Querystats: %s", _local.querystats)
+                logger.debug("Querystats: %s", querystats)
 
             # Make current querystats available on the current page
             # by using the server timing API which can be parsed client-side
-            response.headers["Server-Timing"] = _local.querystats.as_server_timing()
+            response.headers["Server-Timing"] = querystats.as_server_timing()
 
-            if request.GET.get("querystats") == "store":
-                request.session["querystats"] = json.dumps(
-                    _local.querystats.as_context_dict(), cls=QueryStatsJSONEncoder
+            if session_querystats_enabled and querystats.num_queries > 0:
+                request.session["querystats"][request.unique_id] = json.dumps(
+                    querystats.as_context_dict(request), cls=QueryStatsJSONEncoder
                 )
-                return ResponseRedirect(reverse("querystats:querystats"))
 
-            del _local.querystats
+                # Keep 30 requests max, in case it is left on by accident
+                if len(request.session["querystats"]) > 30:
+                    del request.session["querystats"][
+                        list(request.session["querystats"])[0]
+                    ]
+
+                # Did a deeper modification to the session dict...
+                request.session.modified = True
 
             return response
 

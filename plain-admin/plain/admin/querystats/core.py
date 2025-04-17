@@ -8,6 +8,8 @@ from plain.utils.functional import cached_property
 
 IGNORE_STACK_FILES = [
     "threading",
+    "concurrent/futures",
+    "functools.py",
     "socketserver",
     "wsgiref",
     "gunicorn",
@@ -15,11 +17,8 @@ IGNORE_STACK_FILES = [
     "sentry_sdk",
     "querystats/core",
     "plain/template/base",
-    "plain/utils/decorators",
-    "plain/db",
-    "plain/utils/functional",
-    "plain/core/servers",
-    "plain/core/handlers",
+    "plain/models",
+    "plain/internal",
 ]
 
 
@@ -74,7 +73,7 @@ class QueryStats:
 
         # if many, then X times is len(params)
 
-        current_query["result"] = result
+        # current_query["result"] = result
 
         current_query["duration"] = time.monotonic() - start
 
@@ -126,7 +125,7 @@ class QueryStats:
             "num_duplicate_queries": self.num_duplicate_queries,
         }
 
-    def as_context_dict(self):
+    def as_context_dict(self, request):
         # If we don't create a dict, the instance of this class
         # is lost before we can use it in the template
         for query in self.queries:
@@ -137,10 +136,15 @@ class QueryStats:
             if duplicates:
                 query["duplicate_count"] = duplicates
 
-        summary = self.as_summary_dict()
-
         return {
-            **summary,
+            **self.as_summary_dict(),
+            "request": {
+                "path": request.path,
+                "method": request.method,
+                "headers": dict(request.headers),
+                "unique_id": request.unique_id,
+            },
+            "timestamp": time.time(),
             "total_time_display": self.total_time_display,
             "queries": self.queries,
         }

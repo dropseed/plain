@@ -8,7 +8,7 @@ from plain.urls.exceptions import Resolver404
 class Toolbar:
     def __init__(self, request):
         self.request = request
-        self.version = settings.TOOLBAR_VERSION
+        self.version = settings.ADMIN_TOOLBAR_VERSION
         self.metadata = {
             "Request ID": request.unique_id,
         }

@@ -1,13 +1,25 @@
-<form
-    data-querystats
-    action="."
-    method="get"
-    target="querystats"
-    class="relative group/querystats"
-    style="display: none;">
-    <input type="hidden" name="querystats" value="store">
-    <button type="submit" class="px-2 py-px text-xs rounded-full bg-stone-700 text-stone-300 whitespace-nowrap" data-querystats-summary></button>
-    <div data-querystats-list style="display: none;" class="absolute right-0 z-50 hidden translate-y-full -bottom-1 group/querystats-hover:block">
+<div data-querystats class="relative group/querystats" style="display: none;">
+    {% if "querystats" in request.session %}
+    <a href="{{ url('admin:querystats:querystats') }}" target="_blank" class="inline-flex items-center cursor-pointer text-xs rounded-full px-2 py-px bg-stone-700 text-stone-300 whitespace-nowrap">
+        <span class="relative inline-flex size-2 mr-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+            <span class="relative inline-flex size-2 rounded-full bg-green-500"></span>
+        </span>
+        <span data-querystats-summary></span>
+    </a>
+    {% else %}
+    <form action="{{ url('admin:querystats:querystats') }}" method="post">
+        {{ csrf_input }}
+        <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
+        <input type="hidden" name="querystats_action" value="enable">
+        <button type="submit" class="cursor-pointer text-xs rounded-full px-2 py-px bg-stone-700 text-stone-300 whitespace-nowrap">
+            <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-1"></span>
+            <span data-querystats-summary></span>
+        </button>
+    </form>
+    {% endif %}
+
+    <div data-querystats-list style="display: none;" class="absolute z-50 -translate-x-1/2 hidden -translate-y-full left-1/2 -top-1 group-hover/querystats:block">
         <div class="p-2 text-xs border rounded shadow-md bg-zinc-900 border-zinc-700"><table><tbody></tbody></table></div>
     </div>
     <script async defer>
@@ -15,9 +27,8 @@
     // https://bugs.webkit.org/show_bug.cgi?id=209216
     var querystatsTimings = [];
     function renderQuerystats() {
-        // Render the most recent timing call
-        const latestTiming = querystatsTimings[querystatsTimings.length - 1];
-        let summary = latestTiming.description;
+        // Render the original timing call
+        let summary = querystatsTimings[0].description;
         if (querystatsTimings.length > 1) {
             summary += ` *`;
         }
@@ -47,7 +58,6 @@
         }
     }
     try {
-        // Create the performance observer.
         const po = new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
                 if (!entry.serverTiming) {
@@ -55,15 +65,15 @@
                     return;
                 }
                 for (const timing of entry.serverTiming) {
-                    if (querystatsTimings.length > 0) {
-                        if (querystatsTimings[querystatsTimings.length - 1] === timing) {
-                            // Skip duplicate timings (happens on initial load...)
-                            continue;
-                        }
-                    }
                     if (timing.name === "querystats") {
                         console.log("Querystats timing", entry)
                         timing.url = entry.name;  // Store this for reference later
+                        for (const existingTiming of querystatsTimings) {
+                            if (existingTiming == timing) {
+                                // Skip duplicate timings (happens on initial load...)
+                                return;
+                            }
+                        }
                         querystatsTimings.push(timing);
                         renderQuerystats();
                     }
@@ -76,4 +86,4 @@
         // Do nothing if the browser doesn't support this API.
     }
     </script>
-</form>
+</div>

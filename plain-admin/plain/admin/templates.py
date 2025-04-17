@@ -12,10 +12,10 @@ class ToolbarExtension(InclusionTagExtension):
     template_name = "toolbar/toolbar.html"
 
     def get_context(self, context, *args, **kwargs):
-        if isinstance(settings.TOOLBAR_CLASS, str):
-            cls = import_string(settings.TOOLBAR_CLASS)
+        if isinstance(settings.ADMIN_TOOLBAR_CLASS, str):
+            cls = import_string(settings.ADMIN_TOOLBAR_CLASS)
         else:
-            cls = settings.TOOLBAR_CLASS
+            cls = settings.ADMIN_TOOLBAR_CLASS
         context.vars["toolbar"] = cls(request=context["request"])
         return context
 
