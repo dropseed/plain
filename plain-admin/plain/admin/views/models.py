@@ -77,7 +77,7 @@ class AdminModelListView(AdminListView):
     def get_template_context(self):
         context = super().get_template_context()
 
-        order_by = self.request.GET.get("order_by", "")
+        order_by = self.request.query_params.get("order_by", "")
         if order_by.startswith("-"):
             order_by_field = order_by[1:]
             order_by_direction = "-"
@@ -102,7 +102,7 @@ class AdminModelListView(AdminListView):
         return self.model.objects.all()
 
     def order_queryset(self, queryset):
-        if order_by := self.request.GET.get("order_by"):
+        if order_by := self.request.query_params.get("order_by"):
             queryset = queryset.order_by(order_by)
         elif self.queryset_order:
             queryset = queryset.order_by(*self.queryset_order)
@@ -110,7 +110,7 @@ class AdminModelListView(AdminListView):
         return queryset
 
     def search_queryset(self, queryset):
-        if search := self.request.GET.get("search"):
+        if search := self.request.query_params.get("search"):
             filters = Q()
             for field in self.search_fields:
                 filters |= Q(**{f"{field}__icontains": search})

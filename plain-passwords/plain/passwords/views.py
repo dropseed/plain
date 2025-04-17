@@ -89,7 +89,7 @@ class PasswordResetView(FormView):
 
         # Tokens are initially passed as GET parameters and we
         # immediately store them in the session and remove it from the URL.
-        if token := self.request.GET.get("token", ""):
+        if token := self.request.query_params.get("token", ""):
             # Store the token in the session and redirect to the
             # password reset form at a URL without the token. That
             # avoids the possibility of leaking the token in the

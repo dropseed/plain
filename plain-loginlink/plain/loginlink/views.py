@@ -44,7 +44,7 @@ class LoginLinkSentView(TemplateView):
     def get(self):
         # Redirect if the user is already logged in
         if self.request.user:
-            next_url = self.request.GET.get("next", "/")
+            next_url = self.request.query_params.get("next", "/")
             return ResponseRedirect(next_url)
 
         return super().get()
@@ -55,7 +55,7 @@ class LoginLinkFailedView(TemplateView):
 
     def get_template_context(self):
         context = super().get_template_context()
-        context["error"] = self.request.GET.get("error")
+        context["error"] = self.request.query_params.get("error")
         context["login_url"] = reverse(settings.AUTH_LOGIN_URL)
         return context
 
@@ -81,7 +81,7 @@ class LoginLinkLoginView(View):
 
         login(self.request, user)
 
-        if next_url := self.request.GET.get("next"):
+        if next_url := self.request.query_params.get("next"):
             return ResponseRedirect(next_url)
 
         return ResponseRedirect(self.success_url)

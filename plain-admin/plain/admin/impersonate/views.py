@@ -12,7 +12,7 @@ class ImpersonateStartView(View):
         impersonator = getattr(self.request, "impersonator", self.request.user)
         if impersonator and can_be_impersonator(impersonator):
             self.request.session[IMPERSONATE_KEY] = self.url_kwargs["pk"]
-            return ResponseRedirect(self.request.GET.get("next", "/"))
+            return ResponseRedirect(self.request.query_params.get("next", "/"))
 
         return ResponseForbidden()
 
@@ -20,4 +20,4 @@ class ImpersonateStartView(View):
 class ImpersonateStopView(View):
     def get(self):
         self.request.session.pop(IMPERSONATE_KEY)
-        return ResponseRedirect(self.request.GET.get("next", "/"))
+        return ResponseRedirect(self.request.query_params.get("next", "/"))

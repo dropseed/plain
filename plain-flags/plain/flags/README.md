@@ -71,7 +71,7 @@ class OrganizationFeature(Flag):
         if (
             self.url_param_name
             and self.request
-            and self.url_param_name in self.request.GET
+            and self.url_param_name in self.request.query_params
         ):
             return None
 
@@ -83,10 +83,10 @@ class OrganizationFeature(Flag):
 
     def get_value(self):
         if self.url_param_name and self.request:
-            if self.request.GET.get(self.url_param_name) == "1":
+            if self.request.query_params.get(self.url_param_name) == "1":
                 return True
 
-            if self.request.GET.get(self.url_param_name) == "0":
+            if self.request.query_params.get(self.url_param_name) == "0":
                 return False
 
         if not self.organization:

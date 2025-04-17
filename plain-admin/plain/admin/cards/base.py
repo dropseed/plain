@@ -75,7 +75,7 @@ class Card:
         return self.link
 
     def get_current_display(self) -> str:
-        return self.request.GET.get(f"{self.get_slug()}.display", "")
+        return self.request.query_params.get(f"{self.get_slug()}.display", "")
 
     def get_displays(self) -> list[str] | Enum | None:
         if hasattr(self.displays, "copy"):

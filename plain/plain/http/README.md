@@ -14,7 +14,7 @@ class ExampleView(View):
         print(self.request.headers.get("Example-Header"))
 
         # Accessing a query parameter
-        print(self.request.GET.get("example"))
+        print(self.request.query_params.get("example"))
 
         # Creating a response
         response = Response("Hello, world!", status_code=200)

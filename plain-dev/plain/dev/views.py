@@ -11,10 +11,12 @@ class RequestsView(TemplateView):
         ctx = super().get_template_context()
         requestlogs = RequestLog.load_json_logs()
 
-        if self.request.GET.get("log"):
+        if self.request.query_params.get("log"):
             try:
                 requestlog = [
-                    x for x in requestlogs if x.get("name") == self.request.GET["log"]
+                    x
+                    for x in requestlogs
+                    if x.get("name") == self.request.query_params["log"]
                 ][0]
             except IndexError:
                 requestlog = None

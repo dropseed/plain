@@ -27,7 +27,7 @@ class AdminSearchView(AdminView):
     def get_template_context(self):
         context = super().get_template_context()
         context["searchable_views"] = registry.get_searchable_views()
-        context["global_search_query"] = self.request.GET.get("query", "")
+        context["global_search_query"] = self.request.query_params.get("query", "")
         return context
 
 

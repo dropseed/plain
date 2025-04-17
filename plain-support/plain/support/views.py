@@ -20,7 +20,7 @@ class SupportFormView(FormView):
         context["form_action"] = self.request.build_absolute_uri()
         context["form_template_name"] = f"support/forms/{form_slug}.html"
         context["success_template_name"] = f"support/success/{form_slug}.html"
-        context["success"] = self.request.GET.get("success") == "true"
+        context["success"] = self.request.query_params.get("success") == "true"
         return context
 
     def get_form_kwargs(self):

@@ -64,7 +64,7 @@ class HttpRequest:
         # A unique ID we can use to trace this request
         self.unique_id = str(uuid.uuid4())
 
-        self.GET = QueryDict(mutable=True)
+        self.query_params = QueryDict(mutable=True)
         self.POST = QueryDict(mutable=True)
         self.cookies = {}
         self.meta = {}
@@ -284,8 +284,8 @@ class HttpRequest:
         next access (so that it is decoded correctly).
         """
         self._encoding = val
-        if hasattr(self, "GET"):
-            del self.GET
+        if hasattr(self, "query_params"):
+            del self.query_params
         if hasattr(self, "_post"):
             del self._post
 

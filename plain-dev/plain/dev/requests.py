@@ -139,7 +139,7 @@ class RequestLog:
             "full_path": request.get_full_path(),
             "querydict": request.POST.dict()
             if request.method == "POST"
-            else request.GET.dict(),
+            else request.query_params.dict(),
             "cookies": request.cookies,
             # files?
             "absolute_uri": request.build_absolute_uri(),
@@ -192,7 +192,7 @@ def should_capture_request(request):
 
     # This could be an attribute set on request or response
     # or something more dynamic
-    if "querystats" in request.GET:
+    if "querystats" in request.query_params:
         return False
 
     return True

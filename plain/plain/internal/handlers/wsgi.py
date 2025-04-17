@@ -97,7 +97,7 @@ class WSGIRequest(HttpRequest):
         return self.environ.get("wsgi.url_scheme")
 
     @cached_property
-    def GET(self):
+    def query_params(self):
         # The WSGI spec says 'QUERY_STRING' may be absent.
         raw_query_string = get_bytes_from_wsgi(self.environ, "QUERY_STRING", "")
         return QueryDict(raw_query_string, encoding=self._encoding)

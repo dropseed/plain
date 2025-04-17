@@ -102,10 +102,10 @@ class OAuthProvider:
         return get_random_string(length=32)
 
     def check_request_state(self, *, request: HttpRequest) -> None:
-        if error := request.GET.get("error"):
+        if error := request.query_params.get("error"):
             raise OAuthError(error)
 
-        state = request.GET["state"]
+        state = request.query_params["state"]
         expected_state = request.session.pop(SESSION_STATE_KEY)
         request.session.save()  # Make sure the pop is saved (won't save on an exception)
         if not secrets.compare_digest(state, expected_state):
@@ -149,7 +149,9 @@ class OAuthProvider:
     def handle_callback_request(self, *, request: HttpRequest) -> Response:
         self.check_request_state(request=request)
 
-        oauth_token = self.get_oauth_token(code=request.GET["code"], request=request)
+        oauth_token = self.get_oauth_token(
+            code=request.query_params["code"], request=request
+        )
         oauth_user = self.get_oauth_user(oauth_token=oauth_token)
 
         if request.user:

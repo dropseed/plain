@@ -25,14 +25,14 @@ class AdminListView(HTMXViewMixin, AdminView):
         context = super().get_template_context()
 
         # Make this available on self for usage in get_objects and other methods
-        self.display = self.request.GET.get("display", "")
+        self.display = self.request.query_params.get("display", "")
 
         # Make this available to get_displays and stuff
         self.objects = self.get_objects()
 
-        page_size = self.request.GET.get("page_size", self.page_size)
+        page_size = self.request.query_params.get("page_size", self.page_size)
         paginator = Paginator(self.objects, page_size)
-        self._page = paginator.get_page(self.request.GET.get("page", 1))
+        self._page = paginator.get_page(self.request.query_params.get("page", 1))
 
         context["paginator"] = paginator
         context["page"] = self._page
@@ -44,7 +44,7 @@ class AdminListView(HTMXViewMixin, AdminView):
         context["current_display"] = self.display
 
         # Implement search yourself in get_objects
-        context["search_query"] = self.request.GET.get("search", "")
+        context["search_query"] = self.request.query_params.get("search", "")
         context["show_search"] = self.show_search
 
         context["table_style"] = getattr(self, "_table_style", "default")
