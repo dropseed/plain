@@ -99,10 +99,17 @@ window.addEventListener("load", function() {
 
   toolbar.querySelectorAll('[data-plaintoolbar-hide]').forEach(function(btn) {
     btn.addEventListener('click', function() {
+      plainToolbar.hide();
+    });
+  });
+
+  toolbar.querySelectorAll('[data-plaintoolbar-hideuntil]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
       console.log("Hiding admin toolbar for 1 hour");
       plainToolbar.hideUntil(Date.now() + 3600000);
     });
   });
+
   toolbar.querySelectorAll('[data-plaintoolbar-expand]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       plainToolbar.toggleExpand();
