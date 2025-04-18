@@ -2,12 +2,20 @@ import json
 
 from plain.auth.views import AuthViewMixin
 from plain.http import ResponseRedirect
+from plain.runtime import settings
 from plain.views import TemplateView
 
 
 class QuerystatsView(AuthViewMixin, TemplateView):
     template_name = "querystats/querystats.html"
     admin_required = True
+
+    def check_auth(self):
+        # Allow the view if we're in DEBUG
+        if settings.DEBUG:
+            return
+
+        super().check_auth()
 
     def get_template_context(self):
         context = super().get_template_context()
