@@ -141,7 +141,6 @@ class QueryStats:
             "request": {
                 "path": request.path,
                 "method": request.method,
-                "headers": dict(request.headers),
                 "unique_id": request.unique_id,
             },
             "timestamp": time.time(),
