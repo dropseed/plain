@@ -35,8 +35,7 @@ jQuery(function($) {
                     instance.popper.classList.add("*:rounded-md")
                     instance.popper.classList.add("*:shadow-lg")
                     instance.popper.classList.add("*:ring-1")
-                    instance.popper.classList.add("*:ring-white")
-                    instance.popper.classList.add("*:ring-opacity-5")
+                    instance.popper.classList.add("*:ring-white/20")
                 },
             });
         });
