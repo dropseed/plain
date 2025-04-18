@@ -27,7 +27,7 @@
         {% if actions %}
         <form method="POST" data-actions-form>
             {{ csrf_input }}
-            <select name="action_name" class="text-sm border-gray-200 rounded-md">
+            <select name="action_name" class="text-sm">
                 <option value="">Actions</option>
                 {% for action in actions %}
                 <option>{{ action }}</option>
@@ -40,7 +40,7 @@
 
         <form method="GET" class="inline-flex space-x-5">
             {% if displays %}
-            <select data-autosubmit name="display" class="text-sm border-gray-200 rounded-md">
+            <select data-autosubmit name="display" class="text-sm">
                 <option value="">Displays</option>
                 {% for display in displays %}
                 <option {% if display == current_display %}selected{% endif %}>{{ display }}</option>
@@ -119,7 +119,7 @@
 
                 {% if table_style != "simple" and actions %}
                 <td class="p-0 pl-1">
-                    <input data-action-checkbox class="rounded-sm" type="checkbox" name="{{ get_object_pk(object) }}" />
+                    <input data-action-checkbox class="rounded-sm bg-white/10" type="checkbox" name="{{ get_object_pk(object) }}" />
                 </td>
                 {% endif %}
 
@@ -136,7 +136,7 @@
                 {% set object_links = get_object_links(object) %}
                 {% if object_links %}
                 <td class="py-0">
-                    <button data-dropdown class="inline-flex rounded-md border border-transparent hover:border-white/10 hover:shadow-sm px-3 py-1.5 hover:bg-white/20 text-sm font-medium text-white/80 focus:outline-none">
+                    <button data-dropdown class="!bg-transparent inline-flex rounded-md border !border-transparent hover:!bg-white/10 hover:!border-white/10 px-3 py-1.5 text-sm font-medium text-white/80 focus:outline-none">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
                             <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
                         </svg>
@@ -161,7 +161,7 @@
 {% if table_style != "simple" %}
 <footer class="mt-4">
     <div class="flex items-center justify-between">
-        <div class="py-2 text-sm text-gray-500">
+        <div class="py-2 text-sm text-white/50">
             {% if page.has_other_pages() %}
             Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results)
             {% endif %}
@@ -174,7 +174,7 @@
             <form data-autosubmit method="GET">
                 {% if show_search and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
                 {% if displays and current_display %}<input type="hidden" name="display" value="{{ current_display }}" />{% endif %}
-                <select name="page" class="text-xs border-white/10 bg-white/5 rounded-md">
+                <select name="page" class="text-xs">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}

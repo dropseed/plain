@@ -8,14 +8,14 @@
     <header class="flex justify-between items-center">
         <div>
             <h2 class="text-sm font-semibold">{{ title }}</h2>
-            {% if description %}<p class="mt-1 text-xs text-gray-500">{{ description }}</p>{% endif %}
+            {% if description %}<p class="mt-1 text-xs text-white/50">{{ description }}</p>{% endif %}
         </div>
 
         {% if displays %}
         <select
             hx-get
             name="{{ slug }}.display"
-            class="text-sm border-gray-200 rounded-md">
+            class="text-xs py-1.5">
             <option value="">(Reset to default)</option>
             {% for display in displays %}
             <option {% if display == current_display %}selected{% endif %}>{{ display }}</option>

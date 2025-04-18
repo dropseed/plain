@@ -22,7 +22,7 @@
 </head>
 <body class="flex min-h-screen bg-stone-950">
 
-    <nav class="fixed top-0 left-0 right-0 h-14 px-4 py-2 flex items-center justify-between sm:justify-evenly text-sm text-white/70 space-x-3">
+    <nav class="fixed top-0 left-0 right-0 h-14 px-5 py-2 flex items-center justify-between sm:justify-evenly text-sm text-white/70 space-x-3">
         <div class="flex items-center space-x-2">
             <button type="button" data-toggle="#admin-sidebar,#admin-content" class="lg:hidden">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-5 h-5 bi bi-list" viewBox="0 0 16 16">
@@ -70,8 +70,8 @@
     </nav>
 
     <div class="fixed top-14 bottom-2 left-2 right-2">
-        <aside id="admin-sidebar" data-toggle-class="hidden" class="flex-col bg-stone-950 z-50 border-r border-white/10 lg:border-none justify-between flex-shrink-0 hidden w-52 pl-3.5 pr-5 pt-2 overflow-auto lg:flex absolute top-0 bottom-0">
-            <div class="flex-grow">
+        <aside id="admin-sidebar" data-toggle-class="hidden" class="flex-col bg-stone-950 z-50 border-r border-white/10 lg:border-none justify-between flex-shrink-0 hidden w-52 overflow-auto lg:flex absolute top-0 bottom-0">
+            <div class="flex-grow pl-3.5 pr-5 pt-2">
                 <div>
                     {% for section, views in admin_registry.get_nav_sections().items() %}
                     <div class="mt-4 text-xs tracking-wide uppercase text-stone-300/90">{{ section }}</div>
@@ -94,7 +94,7 @@
                     <div class="text-xs tracking-wide text-stone-500">Recent</div>
                 </div> -->
             </div>
-            <div class="mt-8 flex flex-col text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-950">
+            <div class="mt-8 flex flex-col text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-950/95 pl-3.5 pr-5">
                 <a class="sm:hidden py-1" href="{{ url('admin:search') }}">Global search</a>
                 <div class="flex items-center justify-between space-x-1.5">
                     <div class="flex items-center truncate">
@@ -127,7 +127,7 @@
                             <h1 class="sm:text-xl text-white/90">
                                 {% block title %}{{ title }}{% endblock %}
                             </h1>
-                            {% if description %}<p class="mt-1 text-sm text-gray-500">{{ description }}</p>{% endif %}
+                            {% if description %}<p class="mt-1 text-sm text-white/50">{{ description }}</p>{% endif %}
                         </div>
                     </div>
                 {% endblock %}

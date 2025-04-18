@@ -125,15 +125,13 @@ class TrendCard(ChartCard):
                     {
                         "data": calculate_trend_line(trend_data),
                         "type": "line",
-                        "borderColor": "rgba(0, 0, 0, 0.3)",
+                        "borderColor": "rgba(255, 255, 255, 0.3)",
                         "borderWidth": 2,
                         "fill": False,
                         "pointRadius": 0,  # Optional: Hide points
                     },
                 ],
             },
-            # Hide the label
-            # "options": {"legend": {"display": False}},
             # Hide the scales
             "options": {
                 "plugins": {"legend": {"display": False}},
@@ -147,7 +145,7 @@ class TrendCard(ChartCard):
                 },
                 "maintainAspectRatio": False,
                 "elements": {
-                    "bar": {"borderRadius": "3", "backgroundColor": "rgb(28, 25, 23)"}
+                    "bar": {"borderRadius": "3", "backgroundColor": "#d6d6d6"}
                 },
             },
         }

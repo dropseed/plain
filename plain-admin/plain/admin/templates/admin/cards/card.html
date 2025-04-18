@@ -9,7 +9,7 @@
 {% endif %}
 
 {% if link %}
-<a href="{{ link }}">{{ text }}</a>
+<a class="text-xs hover:underline mt-2" href="{{ link }}">{{ text }}</a>
 {% elif text %}
 {{ text }}
 {% endif %}
