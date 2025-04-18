@@ -17,15 +17,32 @@ class QuerystatsView(AuthViewMixin, TemplateView):
 
         super().check_auth()
 
+    def get_response(self):
+        response = super().get_response()
+        # So we can load it in the toolbar
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        return response
+
+    def get(self):
+        # Give an easy out if things get messed up
+        if (
+            "clear" in self.request.query_params
+            and "querystats" in self.request.session
+        ):
+            del self.request.session["querystats"]
+            self.request.session.modified = True
+
+        return super().get()
+
     def get_template_context(self):
         context = super().get_template_context()
 
         querystats = self.request.session.get("querystats", {})
 
-        for request_id, json_data in querystats.items():
+        for request_id in list(querystats.keys()):
             try:
-                querystats[request_id] = json.loads(json_data)
-            except json.JSONDecodeError:
+                querystats[request_id] = json.loads(querystats[request_id])
+            except (json.JSONDecodeError, TypeError):
                 # If decoding fails, remove the entry from the dictionary
                 del querystats[request_id]
 

@@ -6,11 +6,16 @@
     <title>Querystats</title>
     {% tailwind_css %}
 </head>
-<body class="bg-stone-950 text-stone-300">
+<body class="text-stone-300">
 
-    <div class="flex items-center justify-between px-6 py-4">
-        <h1 class="text-lg font-semibold">Querystats</h1>
+    <div class="flex items-center justify-between border-b border-white/5 py-2 px-6">
+        <!-- <h1 class="text-lg font-semibold">Querystats</h1> -->
+        <div></div>
         <div class="flex items-center space-x-2">
+            <form method="get" action=".">
+                {{ csrf_input }}
+                <button type="submit" class="px-2 py-px text-sm rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer whitespace-nowrap">Reload</button>
+            </form>
             <form method="post" action=".">
                 {{ csrf_input }}
                 <input type="hidden" name="querystats_action" value="clear">
@@ -24,7 +29,7 @@
         </div>
     </div>
 
-    <div class="space-y-6 px-6 py-4">
+    <div class="space-y-6 mt-2 px-6">
         {% for request_id, qs in querystats.items() %}
         <div class="p-3 bg-white/5 rounded">
             <div class="flex justify-between items-center">
@@ -42,10 +47,10 @@
                 </div>
             </div>
 
-            <div class="flex w-full mt-5 overflow-auto rounded-sm">
+            <div class="flex w-full mt-3 overflow-auto rounded-sm">
                 {% for query in qs.queries %}
                 <a href="#query-{{ loop.index }}"
-                    {{ loop.cycle('class=\"h-4 bg-amber-300\"', 'class=\"h-4 bg-amber-400\"', 'class="h-4 bg-amber-500"', 'class="h-4 bg-amber-600"')|safe }}
+                    {{ loop.cycle('class=\"h-2 bg-amber-400\"', 'class=\"h-2 bg-orange-400\"', 'class="h-2 bg-yellow-400"', 'class="h-2 bg-amber-600"')|safe }}
                     title="[{{ query.duration_display }}] {{ query.sql_display }}"
                     style="width: {{ query.duration / qs.total_time * 100 }}%">
                 </a>
@@ -106,5 +111,5 @@
         {% endfor %}
     </div>
 
-</body>
+    </body>
 </html>

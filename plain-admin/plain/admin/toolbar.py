@@ -9,9 +9,7 @@ class Toolbar:
     def __init__(self, request):
         self.request = request
         self.version = settings.ADMIN_TOOLBAR_VERSION
-        self.metadata = {
-            "Request ID": request.unique_id,
-        }
+        self.metadata = {}
 
     def should_render(self):
         if settings.DEBUG:

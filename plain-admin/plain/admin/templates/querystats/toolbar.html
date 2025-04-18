@@ -1,25 +1,25 @@
 <div data-querystats class="relative group/querystats" style="display: none;">
     {% if "querystats" in request.session %}
-    <a href="{{ url('admin:querystats:querystats') }}" target="querystats" class="inline-flex items-center cursor-pointer text-xs rounded-full px-2 py-px bg-stone-700 text-stone-300 whitespace-nowrap">
+    <button data-toolbar-tab="querystats" class="inline-flex items-center cursor-pointer text-xs rounded-full px-2 py-px bg-white/20 text-white/80 whitespace-nowrap">
         <span class="relative inline-flex size-2 mr-2">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
             <span class="relative inline-flex size-2 rounded-full bg-green-500"></span>
         </span>
         <span data-querystats-summary></span>
-    </a>
+    </button>
     {% else %}
     <form action="{{ url('admin:querystats:querystats') }}" method="post">
         {{ csrf_input }}
         <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
         <input type="hidden" name="querystats_action" value="enable">
-        <button type="submit" class="cursor-pointer text-xs rounded-full px-2 py-px bg-stone-700 text-stone-300 whitespace-nowrap">
+        <button type="submit" class="cursor-pointer text-xs rounded-full px-2 py-px bg-white/20 text-white/80 whitespace-nowrap">
             <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-1"></span>
             <span data-querystats-summary></span>
         </button>
     </form>
     {% endif %}
 
-    <div data-querystats-list style="display: none;" class="absolute z-50 -translate-x-1/2 hidden -translate-y-full left-1/2 -top-1 group-hover/querystats:block">
+    <div data-querystats-list style="display: none;" class="absolute z-50 hidden -translate-y-full right-0 -top-1 group-hover/querystats:block">
         <div class="p-2 text-xs border rounded shadow-md bg-zinc-900 border-zinc-700"><table><tbody></tbody></table></div>
     </div>
     <script async defer>

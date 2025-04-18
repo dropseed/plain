@@ -1,10 +1,184 @@
 {% if toolbar.should_render() %}
 {% set exception=toolbar.request_exception() %}
-<script src="{{ asset('toolbar/toolbar.js') }}"></script>
-<div id="plaintoolbar" class="print:hidden text-sm py-1.5 text-stone-300 fixed bottom-3 mx-3 max-w-full drop-shadow-sm z-30 ring-1 ring-stone-200/5 rounded-2xl lg:flex lg:flex-col -translate-x-1/2 left-1/2 max-h-[90vh] bg-gradient-to-b from-stone-950/90 to-stone-950/95 backdrop-blur-sm">
-    <div class="flex justify-between px-3 mx-auto space-x-4">
+<script defer src="{{ asset('toolbar/toolbar.js') }}"></script>
+<div id="plaintoolbar" class="print:hidden text-stone-300 fixed bottom-0 w-full z-30 hidden sm:flex sm:flex-col">
+
+    <div id="plaintoolbar-details" class="{% if not exception %}hidden{% endif %} relative text-sm border-white/5 shadow-xl border-t inset-shadow-xs inset-shadow-stone-800 rounded-t-xl bg-stone-950/95 backdrop-blur-sm">
+
+        <div class="flex items-center border-b border-white/5 px-2 justify-between">
+            <div class="flex items-center">
+                <button data-active data-toolbar-tab="request" class="data-active:border-yellow-500 px-4 py-2.5 -mb-px cursor-pointer border-b border-transparent hover:border-yellow-600" type="button">Request</button>
+                {% if request.session is defined %}
+                <button data-toolbar-tab="session" class="data-active:border-yellow-500 px-4 py-2.5 -mb-px cursor-pointer border-b border-transparent hover:border-yellow-600" type="button">Session</button>
+                {% endif %}
+                <button data-toolbar-tab="querystats" class="data-active:border-yellow-500 px-4 py-2.5 -mb-px cursor-pointer border-b border-transparent hover:border-yellow-600" type="button">Querystats</button>
+                {% if toolbar.metadata %}
+                <button data-toolbar-tab="metadata" class="data-active:border-yellow-500 px-4 py-2.5 -mb-px cursor-pointer border-b border-transparent hover:border-yellow-600" type="button">Metadata</button>
+                {% endif %}
+            </div>
+            <div class="px-4 flex items-center">
+                <button class="cursor-pointer hover:text-white text-white/50" type="button" data-plaintoolbar-expand>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div data-resizer class="cursor-grab w-20 h-1.5 top-1 bg-white/15 rounded-full absolute top-0 left-1/2 -translate-x-1/2"></div>
+
+        <div class="overflow-auto h-[30vh]">
+            <div data-toolbar-tab="request" class="px-6 py-4">
+
+                {% if exception %}
+                <div class="p-2 mb-5 border-amber-500 border rounded">
+                    <div class="text-amber-500 text-lg flex justify-between items-center">
+                        <div>
+                            <span class="font-bold">Exception</span>
+                            {{ exception }}
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-5 h-5 bi bi-exclamation-triangle-fill" viewBox="0 0 16 16">
+                            <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+                        </svg>
+                    </div>
+                    <div class="text-amber-400 text-xs mt-3 bg-white/5 p-2 rounded overflow-auto">
+                        <pre><code>{{ exception._traceback_string }}</code></pre>
+                    </div>
+                </div>
+                {% endif %}
+
+                <dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8">
+                    <dt>Request ID</dt>
+                    <dd class="text-sm text-stone-400">{{ request.unique_id }}</dd>
+
+                    <dt>Query params</dt>
+                    <dd class="text-sm text-stone-400">{{ request.query_params }}</dd>
+
+                    <dt>Method</dt>
+                    <dd class="text-sm text-stone-400">{{ request.method }}</dd>
+
+                    {% if request.resolver_match %}
+                    <dt>View</dt>
+                    <dd class="text-sm text-stone-400">{{ request.resolver_match.view_name }}</dd>
+
+                    <dt>URL pattern</dt>
+                    <dd class="text-sm text-stone-400">
+                        <pre><code>{{ request.resolver_match.route }}</code></pre>
+                    </dd>
+
+                    <dt>URL args</dt>
+                    <dd class="text-sm text-stone-400">
+                        <pre><code>{{ request.resolver_match.args }}</code></pre>
+                    </dd>
+
+                    <dt>URL kwargs</dt>
+                    <dd class="text-sm text-stone-400">
+                        <pre><code>{{ request.resolver_match.kwargs }}</code></pre>
+                    </dd>
+                    {% endif %}
+
+                    {% if object|default(false) %}
+                    <dt>Primary object</dt>
+                    <dd class="text-sm text-stone-400" title="PK: {{ object.pk|default('unknown') }}">
+                        <pre><code>{{ object.__repr__() }}</code></pre>
+                    </dd>
+                    {% endif %}
+
+                </dl>
+            </div>
+
+            {% if request.session is defined %}
+            <div data-toolbar-tab="session" style="display: none;">
+                <div class="px-6 py-4">
+                    <dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8">
+                        <dt>Session ID</dt>
+                        <dd class="text-sm text-stone-400">{{ request.session.session_key }}</dd>
+
+                        {% for k, v in request.session.items() %}
+                        <dt>session["{{ k }}"]</dt>
+                        <dd class="text-sm text-stone-400 max-h-32 overflow-auto">
+                            {% if v is iterable and not v|string %}
+                            <pre><code>{{ v }}</code></pre>
+                            {% else %}
+                            {{ v }}
+                            {% endif %}
+                        </dd>
+                        {% endfor %}
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+
+            <div data-toolbar-tab="querystats" style="display: none;">
+                <div id="querystats-container">
+                    <div class="px-6 py-4 text-center">
+                        <p>Loading querystats...</p>
+                    </div>
+                </div>
+                <script>
+                (function() {
+                    var container = document.getElementById('querystats-container');
+                    var loaded = false;
+                    var parent = container.parentNode;
+                    var observer = new IntersectionObserver(function(entries) {
+                        entries.forEach(function(entry) {
+                            if (entry.isIntersecting && !loaded) {
+                                loaded = true;
+                                var iframe = document.createElement('iframe');
+                                iframe.src = "{{ url('admin:querystats:querystats') }}";
+                                iframe.frameBorder = "0";
+                                iframe.style.width = "100%";
+                                iframe.style.height = "auto";
+                                // Auto-resize iframe height to its content
+                                iframe.onload = function() {
+                                    try {
+                                        var doc = iframe.contentDocument || iframe.contentWindow.document;
+                                        var body = doc.body, html = doc.documentElement;
+                                        var height = Math.max(
+                                            body.scrollHeight, body.offsetHeight,
+                                            html.clientHeight, html.scrollHeight, html.offsetHeight
+                                        );
+                                        iframe.style.height = height + 'px';
+                                    } catch (e) {
+                                        console.warn('iframe auto-resize failed', e);
+                                    }
+                                };
+                                container.innerHTML = '';
+                                container.appendChild(iframe);
+                                observer.disconnect();
+                            }
+                        });
+                    }, { root: parent, threshold: 0 });
+                    observer.observe(container);
+                })();
+                </script>
+            </div>
+
+            {% if toolbar.metadata %}
+            <div data-toolbar-tab="metadata" style="display: none;">
+                <div class="px-6 py-4">
+                    <dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8">
+                        {% for k, v in toolbar.metadata.items() %}
+                        <dt>{{ k }}</dt>
+                        <dd class="text-sm text-stone-400 max-h-32 overflow-auto">
+                            {% if v is iterable and not v|string %}
+                            <pre><code>{{ v }}</code></pre>
+                            {% else %}
+                            {{ v }}
+                            {% endif %}
+                        </dd>
+                        {% endfor %}
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <div class="flex px-3 text-xs border-t border-white/5 space-x-4 py-2 bg-stone-950">
         <div class="flex items-center">
-            <code class="ml-1.5 text-xs whitespace-nowrap text-mono">{{ toolbar.version }}</code>
+            <code class="ml-1.5 bg-white/10 px-1.5 rounded-sm whitespace-nowrap text-mono">{{ toolbar.version }}</code>
 
             {% if request.impersonator is defined %}
             <div class="flex items-center ml-1 font-light">
@@ -18,10 +192,20 @@
             </div>
             {% endif %}
         </div>
+        <button type="button" data-plaintoolbar-expand class="flex-grow cursor-pointer"></button>
         <div class="flex items-center space-x-4">
             {% include "querystats/toolbar.html" %}
 
             <div class="flex items-center space-x-3 transition-all">
+
+                {% if exception %}
+                <button class="cursor-pointer text-amber-500 hover:text-amber-400" type="button" data-toolbar-tab="request">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 bi bi-exclamation-triangle-fill" viewBox="0 0 16 16">
+                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+                    </svg>
+                </button>
+                {% endif %}
+
                 <a href="{{ url('admin:index') }}" class="hover:underline">Admin</a>
                 {% if object|default(false) and object|get_admin_model_detail_url %}
                 <a class="inline-flex items-center p-1 text-blue-500 hover:text-blue-400" href="{{ object|get_admin_model_detail_url }}">
@@ -34,53 +218,19 @@
                 </a>
                 {% endif %}
                 {% include "toolbar/links.html" ignore missing %}
-                <button data-plaintoolbar-expand class="hover:text-orange-500" type="button">
+                <button data-plaintoolbar-expand class="hover:text-orange-500 cursor-pointer" type="button">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M3.646 9.146a.5.5 0 0 1 .708 0L8 12.793l3.646-3.647a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 0-.708zm0-2.292a.5.5 0 0 0 .708 0L8 3.207l3.646 3.647a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 0 0 0 .708z"/>
+                    </svg>
+                </button>
+                <button data-plaintoolbar-hide class="hover:text-red-500 cursor-pointer" type="button" title="Hide for 1 hour">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x w-4 h-4" viewBox="0 0 16 16">
+                        <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
                     </svg>
                 </button>
             </div>
         </div>
     </div>
-    <div id="plaintoolbar-details" class="{% if not exception %}hidden{% endif %} p-4 overflow-auto text-sm space-y-2">
 
-        {% if exception %}
-        <div class="p-2 border-amber-500 border rounded">
-            <div class="text-amber-500 text-lg flex justify-between items-center">
-                <div>
-                    <span class="font-bold">Exception</span>
-                    {{ exception }}
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-5 h-5 bi bi-exclamation-triangle-fill" viewBox="0 0 16 16">
-                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
-                </svg>
-            </div>
-            <div class="text-amber-400 text-xs mt-3 bg-white/5 p-2 rounded overflow-auto">
-                <pre><code>{{ exception._traceback_string }}</code></pre>
-            </div>
-        </div>
-        {% endif %}
-
-        <table>
-            <tbody>
-            {% for k, v in toolbar.metadata.items() %}
-            <tr>
-                <td class="pr-2 font-medium whitespace-nowrap">{{ k }}</td>
-                <td class="whitespace-nowrap">{{ v }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-
-        {% if object|default(false) %}
-        <div class="font-mono" title="PK: {{ object.pk|default('unknown') }}">
-            {{ object.__repr__() }}
-        </div>
-        {% endif %}
-
-        <button data-plaintoolbar-hide class="hover:text-red-500" type="button">
-            Hide toolbar for 1 hour
-        </button>
-    </div>
 </div>
 {% endif %}
