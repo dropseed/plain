@@ -35,6 +35,7 @@ class TemplateView(View):
     def get_template_context(self) -> dict:
         return {
             "request": self.request,
+            "template_names": self.get_template_names(),
             "csrf_input": csrf_input_lazy(self.request),
             "csrf_token": csrf_token_lazy(self.request),
             "DEBUG": settings.DEBUG,

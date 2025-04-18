@@ -84,6 +84,13 @@
                     </dd>
                     {% endif %}
 
+                    {% if template_names is defined %}
+                    <dt>Template names</dt>
+                    <dd class="text-sm text-stone-400">
+                        <pre><code>{{ template_names }}</code></pre>
+                    </dd>
+                    {% endif %}
+
                     {% if object|default(false) %}
                     <dt>Primary object</dt>
                     <dd class="text-sm text-stone-400" title="PK: {{ object.pk|default('unknown') }}">
