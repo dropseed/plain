@@ -38,6 +38,6 @@ class TestVersionedAPIView(VersionedAPIView):
 class AppRouter(Router):
     namespace = ""
     urls = [
-        path("test", TestView.as_view(), name="test"),
-        path("test-versioned", TestVersionedAPIView.as_view(), name="test_versioned"),
+        path("test", TestView, name="test"),
+        path("test-versioned", TestVersionedAPIView, name="test_versioned"),
     ]

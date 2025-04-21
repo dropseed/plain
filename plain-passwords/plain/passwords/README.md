@@ -12,7 +12,7 @@ from plain.urls import path
 from plain.passwords.views import PasswordLoginView
 
 urlpatterns = [
-    path('login/', PasswordLoginView.as_view(), name='login'),
+    path('login/', PasswordLoginView, name='login'),
     # ...
 ]
 ```
@@ -53,7 +53,7 @@ from plain.urls import path
 from .views import MyPasswordLoginView
 
 urlpatterns = [
-    path('login/', MyPasswordLoginView.as_view(), name='login'),
+    path('login/', MyPasswordLoginView, name='login'),
     # ...
 ]
 ```

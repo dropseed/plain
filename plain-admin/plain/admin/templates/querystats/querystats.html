@@ -8,7 +8,8 @@
 </head>
 <body class="text-stone-300">
 
-    <div class="flex items-center justify-between border-b border-white/5 py-2 px-6">
+    {% if querystats_enabled %}
+    <div class="flex items-center justify-between border-b border-white/5 px-6 h-14 fixed top-0 left-0 right-0 bg-stone-950 z-10">
         <!-- <h1 class="text-lg font-semibold">Querystats</h1> -->
         <div></div>
         <div class="flex items-center space-x-2">
@@ -28,88 +29,114 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
-    <div class="space-y-6 mt-2 px-6">
-        {% for request_id, qs in querystats.items() %}
-        <div class="p-3 bg-white/5 rounded">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h2 class="font-medium"><span class="font-semibold">{{ qs.request.method }}</span> {{ qs.request.path }}</h2>
-                    <p class="text-sm text-stone-400">{{ qs.summary }}</p>
-                </div>
-                <div class=text-xs>
-                    <p>Request ID <code>{{ qs.request.unique_id }}</code></p>
-                    <p>Timestamp {{ qs.timestamp }}</p>
-                    <details>
-                        <summary>Headers</summary>
-                        <pre><code>{{ qs.request.get("headers", {})|pprint }}</code></pre>
-                    </details>
-                </div>
-            </div>
-
-            <div class="flex w-full mt-3 overflow-auto rounded-sm">
-                {% for query in qs.queries %}
-                <a href="#query-{{ loop.index }}"
-                    {{ loop.cycle('class=\"h-2 bg-amber-400\"', 'class=\"h-2 bg-orange-400\"', 'class="h-2 bg-yellow-400"', 'class="h-2 bg-amber-600"')|safe }}
-                    title="[{{ query.duration_display }}] {{ query.sql_display }}"
-                    style="width: {{ query.duration / qs.total_time * 100 }}%">
-                </a>
+    {% if querystats %}
+    <div class="flex mt-2 h-full">
+        <aside id="sidebar" class="fixed left-0 top-14 bottom-0 w-82 overflow-auto p-4">
+            <ul class="space-y-2">
+                {% for request_id, qs in querystats.items() %}
+                <li>
+                    <button data-request-id="{{ request_id }}" class="w-full text-left px-2 py-1 rounded hover:bg-stone-700 cursor-pointer">
+                        <span class="text-sm">{{ qs.request.path }}</span>
+                        <span class="font-semibold bg-white/5 rounded-sm px-1 py-0.5 text-xs">{{ qs.request.method }}</span>
+                        <div class="text-xs text-stone-400">{{ qs.summary }}</div>
+                        <div class="text-xs text-stone-500">{{ qs.timestamp|timesince }} ago</div>
+                    </button>
+                </li>
                 {% endfor %}
-            </div>
+            </ul>
+        </aside>
 
-            <div class="mt-4 space-y-3 text-xs">
-                {% for query in qs.queries %}
-                <details id="query-{{ loop.index }}" class="p-2 rounded bg-zinc-800">
-                    <summary class="truncate">
-                        <div class="float-right px-2 py-px mb-px ml-2 text-xs rounded-full bg-zinc-700">
-                            <span>{{ query.duration_display }}</span>
-                            {% if query.duplicate_count is defined %}
-                            <span class="text-red-500">&nbsp; duplicated {{ query.duplicate_count }} times</span>
-                            {% endif %}
-
-                            {#
-                            <div>many {{ query.many }}</div>
-                            <div>result {{ query.result }}</div>
-                            #}
-                        </div>
-                        <code class="font-mono">{{ query.sql }}</code>
-                    </summary>
-                    <div class="space-y-3 mt-3">
-                        <div>
-                            <pre><code class="font-mono whitespace-pre-wrap text-zinc-100">{{ query.sql_display }}</code></pre>
-                        </div>
-                        <div class="text-zinc-400">
-                            <span class="font-medium">Parameters</span>
-                            <pre><code class="font-mono">{{ query.params|pprint }}</code></pre>
-                        </div>
-                        <details>
-                            <summary>Traceback</summary>
-                            <pre><code class="block overflow-x-auto font-mono text-xs">{{ query.tb }}</code></pre>
-                        </details>
+        <main id="content" class="flex-1 p-6 overflow-auto ml-82 mt-14">
+            {% for request_id, qs in querystats.items() %}
+            <div class="request-detail" data-request-id="{{ request_id }}" style="display: none;">
+                <div class="flex justify-between">
+                    <div>
+                        <h2 class="font-medium text-sm"><span class="font-semibold">{{ qs.request.method }}</span> {{ qs.request.path }}</h2>
+                        <p class="text-sm text-white/70">{{ qs.summary }}</p>
                     </div>
-                </details>
-                {% else %}
-                <div>No queries...</div>
-                {% endfor %}
+                    <div class="text-right">
+                        <div class="text-xs text-white/60">Request ID <code>{{ qs.request.unique_id }}</code></div>
+                        <div class="text-xs text-white/60"><code>{{ qs.timestamp }}</code></div>
+                    </div>
+                </div>
+
+                <div class="flex w-full mt-3 overflow-auto rounded-sm">
+                    {% for query in qs.queries %}
+                    <a href="#query-{{ loop.index }}"
+                        {{ loop.cycle('class=\"h-2 bg-amber-400\"', 'class=\"h-2 bg-orange-400\"', 'class=\"h-2 bg-yellow-400\"', 'class=\"h-2 bg-amber-600\"')|safe }}
+                        title="[{{ query.duration_display }}] {{ query.sql_display }}"
+                        style="width: {{ query.duration / qs.total_time * 100 }}%">
+                    </a>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-4 space-y-3 text-xs">
+                    {% for query in qs.queries %}
+                    <details id="query-{{ loop.index }}" class="p-2 rounded bg-white/5">
+                        <summary class="truncate">
+                            <div class="float-right px-2 py-px mb-px ml-2 text-xs rounded-full bg-zinc-700">
+                                <span>{{ query.duration_display }}</span>
+                                {% if query.duplicate_count is defined %}
+                                <span class="text-red-500">&nbsp; duplicated {{ query.duplicate_count }} times</span>
+                                {% endif %}
+                            </div>
+                            <code class="font-mono">{{ query.sql }}</code>
+                        </summary>
+                        <div class="space-y-3 mt-3">
+                            <div>
+                                <pre><code class="font-mono whitespace-pre-wrap text-zinc-100">{{ query.sql_display }}</code></pre>
+                            </div>
+                            <div class="text-zinc-400">
+                                <span class="font-medium">Parameters</span>
+                                <pre><code class="font-mono">{{ query.params|pprint }}</code></pre>
+                            </div>
+                            <details>
+                                <summary>Traceback</summary>
+                                <pre><code class="block overflow-x-auto font-mono text-xs">{{ query.tb }}</code></pre>
+                            </details>
+                        </div>
+                    </details>
+                    {% else %}
+                    <div>No queries...</div>
+                    {% endfor %}
+                </div>
             </div>
-        </div>
-
-        {% else %}
-
-        <div class="text-center">
-            {% if "querystats" in request.session %}
-            <div class="text-stone-500">Querystats are enabled but nothing has been tracked yet.</div>
-            {% else %}
-            <form method="post" action=".">
-                {{ csrf_input }}
-                <input type="hidden" name="querystats_action" value="enable">
-                <button type="submit" class="px-2 rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer whitespace-nowrap">Enable querystats</button>
-            </form>
-            {% endif %}
-        </div>
-
-        {% endfor %}
+            {% endfor %}
+        </main>
     </div>
+    {% elif querystats_enabled %}
+    <div class="text-center text-white/30 py-8">Querystats are enabled but nothing has been recorded yet.</div>
+    {% else %}
+    <div class="text-center py-8">
+        <div class="text-white/30">Querystats are disabled.</div>
+        <form method="post" action=".">
+            {{ csrf_input }}
+            <input type="hidden" name="querystats_action" value="enable">
+            <button type="submit" class="mt-2 px-2 py-px text-sm rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer whitespace-nowrap">Enable</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const buttons = document.querySelectorAll('#sidebar [data-request-id]');
+            const details = document.querySelectorAll('#content .request-detail');
+            buttons.forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const id = this.getAttribute('data-request-id');
+                    details.forEach(div => div.style.display = 'none');
+                    const sel = document.querySelector('#content .request-detail[data-request-id="' + id + '"]');
+                    if (sel) sel.style.display = 'block';
+                    buttons.forEach(b => b.classList.remove('bg-stone-700', 'text-white'));
+                    this.classList.add('bg-stone-700', 'text-white');
+                });
+            });
+            if (buttons.length > 0) buttons[0].click();
+        });
+    </script>
 
     </body>
 </html>
