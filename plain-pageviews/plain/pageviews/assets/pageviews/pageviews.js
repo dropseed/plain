@@ -20,7 +20,7 @@
     }
   }
 
-  // Function to send a pageview event using the Beacon API
+    // Function to send a pageview event using the Beacon API
     const data = {
         url: window.location.href, // Current page URL
         title: document.title, // Current page title
@@ -28,8 +28,13 @@
         timestamp: new Date().toISOString(), // ISO 8601 timestamp
     };
 
+    // So we can send the content type header
+    const dataBlob = new Blob([JSON.stringify(data)], {
+        type: "application/json",
+    });
+
     try {
-        const success = navigator.sendBeacon(trackUrl, JSON.stringify(data));
+        const success = navigator.sendBeacon(trackUrl, dataBlob);
         if (!success) {
         console.warn("Beacon API failed to send pageview event.");
         }
