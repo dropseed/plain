@@ -247,12 +247,11 @@ class URLPattern:
             from .resolvers import ResolverMatch
 
             return ResolverMatch(
-                self.view,
-                args,
-                captured_kwargs,
-                self.pattern.name,
+                view=self.view,
+                args=args,
+                kwargs=captured_kwargs,
+                url_name=self.pattern.name,
                 route=str(self.pattern),
-                captured_kwargs=captured_kwargs,
             )
 
     @cached_property

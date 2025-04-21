@@ -8,7 +8,6 @@ attributes of the resolved URL match.
 
 import functools
 import re
-from pickle import PicklingError
 from threading import local
 from urllib.parse import quote
 
@@ -26,65 +25,28 @@ from .patterns import RegexPattern, URLPattern
 class ResolverMatch:
     def __init__(
         self,
-        func,
+        *,
+        view,
         args,
         kwargs,
         url_name=None,
         namespaces=None,
         route=None,
-        tried=None,
-        captured_kwargs=None,
-        extra_kwargs=None,
     ):
-        self.func = func
+        self.view = view
         self.args = args
         self.kwargs = kwargs
         self.url_name = url_name
         self.route = route
-        self.tried = tried
-        self.captured_kwargs = captured_kwargs
-        self.extra_kwargs = extra_kwargs
 
         # If a URLRegexResolver doesn't have a namespace or namespace, it passes
         # in an empty value.
         self.namespaces = [x for x in namespaces if x] if namespaces else []
         self.namespace = ":".join(self.namespaces)
 
-        if hasattr(func, "view_class"):
-            func = func.view_class
-        if not hasattr(func, "__name__"):
-            # A class-based view
-            self._func_path = func.__class__.__module__ + "." + func.__class__.__name__
-        else:
-            # A function-based view
-            self._func_path = func.__module__ + "." + func.__name__
-
-        view_path = url_name or self._func_path
-        self.view_name = ":".join(self.namespaces + [view_path])
-
-    def __repr__(self):
-        if isinstance(self.func, functools.partial):
-            func = repr(self.func)
-        else:
-            func = self._func_path
-        return (
-            "ResolverMatch(func={}, args={!r}, kwargs={!r}, url_name={!r}, "
-            "namespaces={!r}, route={!r}{}{})".format(
-                func,
-                self.args,
-                self.kwargs,
-                self.url_name,
-                self.namespaces,
-                self.route,
-                f", captured_kwargs={self.captured_kwargs!r}"
-                if self.captured_kwargs
-                else "",
-                f", extra_kwargs={self.extra_kwargs!r}" if self.extra_kwargs else "",
-            )
+        self.namespaced_url_name = (
+            ":".join(self.namespaces + [url_name]) if url_name else None
         )
-
-    def __reduce_ex__(self, protocol):
-        raise PicklingError(f"Cannot pickle {self.__class__.__qualname__}.")
 
 
 def get_resolver(router=None):
@@ -258,13 +220,6 @@ class URLResolver:
         return self._app_dict
 
     @staticmethod
-    def _extend_tried(tried, pattern, sub_tried=None):
-        if sub_tried is None:
-            tried.append([pattern])
-        else:
-            tried.extend([pattern, *t] for t in sub_tried)
-
-    @staticmethod
     def _join_route(route1, route2):
         """Join two routes, without the starting ^ in the second route."""
         if not route1:
@@ -274,15 +229,14 @@ class URLResolver:
 
     def resolve(self, path):
         path = str(path)  # path may be a reverse_lazy object
-        tried = []
         match = self.pattern.match(path)
         if match:
             new_path, args, kwargs = match
             for pattern in self.url_patterns:
                 try:
                     sub_match = pattern.resolve(new_path)
-                except Resolver404 as e:
-                    self._extend_tried(tried, pattern, e.args[0].get("tried"))
+                except Resolver404:
+                    pass
                 else:
                     if sub_match:
                         # Merge captured arguments in match with submatch
@@ -299,20 +253,15 @@ class URLResolver:
                             if isinstance(pattern, URLPattern)
                             else str(pattern.pattern)
                         )
-                        self._extend_tried(tried, pattern, sub_match.tried)
                         return ResolverMatch(
-                            sub_match.func,
-                            sub_match_args,
-                            sub_match_dict,
-                            sub_match.url_name,
-                            [self.namespace] + sub_match.namespaces,
-                            self._join_route(current_route, sub_match.route),
-                            tried,
-                            captured_kwargs=sub_match.captured_kwargs,
-                            extra_kwargs=sub_match.extra_kwargs,
+                            view=sub_match.view,
+                            args=sub_match_args,
+                            kwargs=sub_match_dict,
+                            url_name=sub_match.url_name,
+                            namespaces=[self.namespace] + sub_match.namespaces,
+                            route=self._join_route(current_route, sub_match.route),
                         )
-                    tried.append([pattern])
-            raise Resolver404({"tried": tried, "path": new_path})
+            raise Resolver404({"path": new_path})
         raise Resolver404({"path": path})
 
     def reverse(self, lookup_view, *args, **kwargs):

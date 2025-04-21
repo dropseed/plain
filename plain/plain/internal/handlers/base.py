@@ -80,12 +80,12 @@ class BaseHandler:
         """
         resolver_match = self.resolve_request(request)
 
-        response = resolver_match.func(
+        response = resolver_match.view(
             request, *resolver_match.args, **resolver_match.kwargs
         )
 
         # Complain if the view returned None (a common error).
-        self.check_response(response, resolver_match.func)
+        self.check_response(response, resolver_match.view)
 
         return response
 
