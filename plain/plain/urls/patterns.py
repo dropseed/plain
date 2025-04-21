@@ -1,13 +1,10 @@
-import functools
-import inspect
 import re
 import string
 
 from plain.exceptions import ImproperlyConfigured
 from plain.internal import internalcode
-from plain.preflight import Error, Warning
+from plain.preflight import Warning
 from plain.runtime import settings
-from plain.utils.functional import cached_property
 from plain.utils.regex_helper import _lazy_re_compile
 
 from .converters import get_converter
@@ -226,20 +223,6 @@ class URLPattern:
         else:
             return []
 
-    def _check_view(self):
-        from plain.views import View
-
-        view = self.view
-        if inspect.isclass(view) and issubclass(view, View):
-            return [
-                Error(
-                    f"Your URL pattern {self.pattern.describe()} has an invalid view, pass {view.__name__}.as_view() "
-                    f"instead of {view.__name__}.",
-                    id="urls.E009",
-                )
-            ]
-        return []
-
     def resolve(self, path):
         match = self.pattern.match(path)
         if match:
@@ -253,18 +236,3 @@ class URLPattern:
                 url_name=self.pattern.name,
                 route=str(self.pattern),
             )
-
-    @cached_property
-    def lookup_str(self):
-        """
-        A string that identifies the view (e.g. 'path.to.view_function' or
-        'path.to.ClassBasedView').
-        """
-        view = self.view
-        if isinstance(view, functools.partial):
-            view = view.func
-        if hasattr(view, "view_class"):
-            view = view.view_class
-        elif not hasattr(view, "__name__"):
-            return view.__module__ + "." + view.__class__.__name__
-        return view.__module__ + "." + view.__qualname__
