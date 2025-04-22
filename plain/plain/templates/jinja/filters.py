@@ -19,6 +19,8 @@ default_filters = {
     # The standard Python ones
     "strftime": datetime.datetime.strftime,
     "strptime": datetime.datetime.strptime,
+    "fromtimestamp": datetime.datetime.fromtimestamp,
+    "fromisoformat": datetime.datetime.fromisoformat,
     # To convert to user time zone
     "localtime": localtime_filter,
     "timeuntil": timeuntil,

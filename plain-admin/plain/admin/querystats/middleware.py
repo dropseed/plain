@@ -55,14 +55,15 @@ class QueryStatsMiddleware:
         if self.should_ignore_request(request):
             return self.get_response(request)
 
-        # Previously we wrapped this in execute_wrapper too,
-        # but now there's a chicken and the egg issue with "querystats" being by the view,
-        # which hasn't been processed yet (on the initial request)
-        is_admin = self.is_admin_request(request)
+        def is_tracking():
+            return "querystats" in request.session
+
+        querystats = QueryStats(include_tracebacks=is_tracking())
+
+        with connection.execute_wrapper(querystats):
+            is_admin = self.is_admin_request(request)
 
         if settings.DEBUG or is_admin:
-            tracking = "querystats" in request.session
-            querystats = QueryStats(include_tracebacks=tracking)
             with connection.execute_wrapper(querystats):
                 response = self.get_response(request)
 
@@ -74,7 +75,7 @@ class QueryStatsMiddleware:
             # by using the server timing API which can be parsed client-side
             response.headers["Server-Timing"] = querystats.as_server_timing()
 
-            if tracking and querystats.num_queries > 0:
+            if is_tracking() and querystats.num_queries > 0:
                 request.session["querystats"][request.unique_id] = json.dumps(
                     querystats.as_context_dict(request), cls=QueryStatsJSONEncoder
                 )

@@ -1,4 +1,3 @@
-import datetime
 import json
 
 from plain.auth.views import AuthViewMixin
@@ -55,10 +54,6 @@ class QuerystatsView(AuthViewMixin, TemplateView):
                 reverse=True,
             )
         )
-
-        # Convert the timestamps back to a python datetime object
-        for data in querystats.values():
-            data["timestamp"] = datetime.datetime.fromtimestamp(data["timestamp"])
 
         context["querystats"] = querystats
         context["querystats_enabled"] = "querystats" in self.request.session

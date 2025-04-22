@@ -1,3 +1,4 @@
+import datetime
 import time
 import traceback
 from collections import Counter
@@ -143,7 +144,7 @@ class QueryStats:
                 "method": request.method,
                 "unique_id": request.unique_id,
             },
-            "timestamp": time.time(),
+            "timestamp": datetime.datetime.now().isoformat(),
             "total_time_display": self.total_time_display,
             "queries": self.queries,
         }

@@ -41,7 +41,7 @@
                         <span class="text-sm">{{ qs.request.path }}</span>
                         <span class="font-semibold bg-white/5 rounded-sm px-1 py-0.5 text-xs">{{ qs.request.method }}</span>
                         <div class="text-xs text-stone-400">{{ qs.summary }}</div>
-                        <div class="text-xs text-stone-500">{{ qs.timestamp|timesince }} ago</div>
+                        <div class="text-xs text-stone-500">{{ qs.timestamp|fromisoformat|timesince }} ago</div>
                     </button>
                 </li>
                 {% endfor %}
@@ -58,7 +58,7 @@
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-white/60">Request ID <code>{{ qs.request.unique_id }}</code></div>
-                        <div class="text-xs text-white/60"><code>{{ qs.timestamp }}</code></div>
+                        <div class="text-xs text-white/60"><code>{{ qs.timestamp|fromisoformat }}</code></div>
                     </div>
                 </div>
 
@@ -92,10 +92,12 @@
                                 <span class="font-medium">Parameters</span>
                                 <pre><code class="font-mono">{{ query.params|pprint }}</code></pre>
                             </div>
+                            {% if query.tb|default(false) %}
                             <details>
                                 <summary>Traceback</summary>
                                 <pre><code class="block overflow-x-auto font-mono text-xs">{{ query.tb }}</code></pre>
                             </details>
+                            {% endif %}
                         </div>
                     </details>
                     {% else %}
