@@ -50,6 +50,12 @@ var plainToolbar = {
     var toolbar = document.querySelector("#plaintoolbar");
     var tab = toolbar.querySelector("div[data-toolbar-tab=" + tabName + "]");
 
+    // If the tab doesn't exist for some reason, quit
+    if (!tab) {
+      console.warn("Toolbar tab " + tabName + " does not exist");
+      return;
+    }
+
     // Hide all children in the tab parent
     for (var i = 0; i < tab.parentNode.children.length; i++) {
       var child = tab.parentNode.children[i];

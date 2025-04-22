@@ -1,0 +1,15 @@
+<dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8 px-6 py-4">
+    <dt>Session ID</dt>
+    <dd class="text-sm text-white/50">{{ request.session.session_key }}</dd>
+
+    {% for k, v in request.session.items() %}
+    <dt>session["{{ k }}"]</dt>
+    <dd class="text-sm text-white/50 max-h-32 overflow-auto">
+        {% if v is iterable and not v|string %}
+        <pre><code>{{ v }}</code></pre>
+        {% else %}
+        {{ v }}
+        {% endif %}
+    </dd>
+    {% endfor %}
+</dl>
