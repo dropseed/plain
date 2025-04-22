@@ -32,7 +32,7 @@
 
         <div class="overflow-auto h-[30vh] flex flex-col">
             {% for panel in panels %}
-            <div data-toolbar-tab="{{ panel.name }}" {% if not loop.first %}style="display: none;"{% endif %}>
+            <div data-toolbar-tab="{{ panel.name }}" class="h-full" {% if not loop.first %}style="display: none;"{% endif %}>
                 {{ panel.render() }}
             </div>
             {% endfor %}
