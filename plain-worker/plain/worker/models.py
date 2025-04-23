@@ -260,7 +260,15 @@ class JobResultQuerySet(models.QuerySet):
 
     def retry_failed_jobs(self):
         for result in self.retryable():
-            result.retry_job()
+            try:
+                result.retry_job()
+            except Exception:
+                # If something went wrong (like a job class being deleted)
+                # then we immediately increment the retry_attempt on the existing obj
+                # so it won't retry forever.
+                logger.exception()
+                result.retry_attempt += 1
+                result.save(update_fields=["retry_attempt"])
 
 
 class JobResultStatuses(models.TextChoices):
@@ -331,9 +339,6 @@ class JobResult(models.Model):
         job = jobs_registry.load_job(self.job_class, self.parameters)
         retry_delay = delay or job.get_retry_delay(retry_attempt)
 
-        # TODO a job class could have been deleted, and it would fail to load.
-        # What do we do then? Increment the retry attempt and leave it in the db?
-
         with transaction.atomic():
             result = job.run_in_worker(
                 # Pass most of what we know through so it stays consistent
@@ -345,15 +350,11 @@ class JobResult(models.Model):
                 # Unique key could be passed also?
             )
 
-            # It's possible this could return a list of pending
-            # jobs, so we need to check if we actually created a new job
-            if isinstance(result, JobRequest):
-                # We need to know the retry request for this result
-                self.retry_job_request_uuid = result.uuid
-                self.save(update_fields=["retry_job_request_uuid"])
-            else:
-                # What to do in this situation? Will continue to run the retry
-                # logic until it successfully retries or it is deleted.
-                pass
+            # TODO it is actually possible that result is a list
+            # of pending jobs, which would need to be handled...
+            # Right now it will throw an exception which could be caught by retry_failed_jobs.
+
+            self.retry_job_request_uuid = result.uuid
+            self.save(update_fields=["retry_job_request_uuid"])
 
         return result
