@@ -331,6 +331,9 @@ class JobResult(models.Model):
         job = jobs_registry.load_job(self.job_class, self.parameters)
         retry_delay = delay or job.get_retry_delay(retry_attempt)
 
+        # TODO a job class could have been deleted, and it would fail to load.
+        # What do we do then? Increment the retry attempt and leave it in the db?
+
         with transaction.atomic():
             result = job.run_in_worker(
                 # Pass most of what we know through so it stays consistent
