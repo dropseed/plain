@@ -751,7 +751,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-worker"
-version = "0.22.0"
+version = "0.22.1"
 source = { editable = "plain-worker" }
 dependencies = [
     { name = "plain" },
