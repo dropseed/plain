@@ -266,7 +266,9 @@ class JobResultQuerySet(models.QuerySet):
                 # If something went wrong (like a job class being deleted)
                 # then we immediately increment the retry_attempt on the existing obj
                 # so it won't retry forever.
-                logger.exception()
+                logger.exception(
+                    "Failed to retry job (incrementing retry_attempt): %s", result
+                )
                 result.retry_attempt += 1
                 result.save(update_fields=["retry_attempt"])
 
