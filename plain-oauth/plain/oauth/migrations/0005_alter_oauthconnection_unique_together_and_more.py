@@ -6,7 +6,6 @@ from plain.models import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("users", "__first__"),
         ("plainoauth", "0004_alter_oauthconnection_access_token_and_more"),
     ]
 

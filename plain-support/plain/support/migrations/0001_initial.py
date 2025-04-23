@@ -5,13 +5,14 @@ import uuid
 import plain.models.deletion
 from plain import models
 from plain.models import migrations
+from plain.runtime import settings
 
 
 class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("users", "0001_reset"),
+        migrations.settings_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
