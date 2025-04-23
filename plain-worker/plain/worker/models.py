@@ -328,17 +328,8 @@ class JobResult(models.Model):
 
     def retry_job(self, delay: int | None = None):
         retry_attempt = self.retry_attempt + 1
-
-        try:
-            job = jobs_registry.load_job(self.job_class, self.parameters)
-            class_delay = job.get_retry_delay(retry_attempt)
-        except Exception as e:
-            # If this fails at all (loading model instance from str, class not existing, user code error)
-            # then we just continue without a delay. The job request itself can handle the failure like normal.
-            logger.exception(e)
-            class_delay = None
-
-        retry_delay = delay or class_delay
+        job = jobs_registry.load_job(self.job_class, self.parameters)
+        retry_delay = delay or job.get_retry_delay(retry_attempt)
 
         with transaction.atomic():
             result = job.run_in_worker(
