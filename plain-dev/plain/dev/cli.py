@@ -49,8 +49,8 @@ ENTRYPOINT_GROUP = "plain.dev"
 @click.option(
     "--log-level",
     "-l",
-    default="info",
-    type=click.Choice(["debug", "info", "warning", "error", "critical"]),
+    default="",
+    type=click.Choice(["debug", "info", "warning", "error", "critical", ""]),
     help="Log level",
 )
 def cli(ctx, port, hostname, log_level):
@@ -145,10 +145,14 @@ class Dev:
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
             "PLAIN_DEV": "true",
-            "PLAIN_LOG_LEVEL": self.log_level.upper(),
-            "APP_LOG_LEVEL": self.log_level.upper(),
-            **os.environ,
         }
+
+        if log_level:
+            self.plain_env["PLAIN_LOG_LEVEL"] = log_level.upper()
+            self.plain_env["APP_LOG_LEVEL"] = log_level.upper()
+
+        self.plain_env.update(os.environ)
+
         self.custom_process_env = {
             **self.plain_env,
             "PORT": str(self.port),
@@ -404,7 +408,7 @@ class Dev:
             "--timeout",
             "60",
             "--log-level",
-            self.log_level,
+            self.log_level or "info",
             "--access-logfile",
             "-",
             "--error-logfile",
