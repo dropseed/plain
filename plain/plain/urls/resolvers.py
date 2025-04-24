@@ -103,7 +103,6 @@ class URLResolver:
         self.router = router
         self._reverse_dict = {}
         self._namespace_dict = {}
-        self._app_dict = {}
         self._populated = False
         self._local = local()
 
@@ -132,7 +131,6 @@ class URLResolver:
             self._local.populating = True
             lookups = MultiValueDict()
             namespaces = {}
-            packages = {}
             for url_pattern in reversed(self.url_patterns):
                 p_pattern = url_pattern.pattern.regex.pattern
                 p_pattern = p_pattern.removeprefix("^")
@@ -158,9 +156,6 @@ class URLResolver:
                 else:  # url_pattern is a URLResolver.
                     url_pattern._populate()
                     if url_pattern.namespace:
-                        packages.setdefault(url_pattern.namespace, []).append(
-                            url_pattern.namespace
-                        )
                         namespaces[url_pattern.namespace] = (p_pattern, url_pattern)
                     else:
                         for name in url_pattern.reverse_dict:
@@ -189,13 +184,7 @@ class URLResolver:
                             current_converters = url_pattern.pattern.converters
                             sub_pattern.pattern.converters.update(current_converters)
                             namespaces[namespace] = (p_pattern + prefix, sub_pattern)
-                        for (
-                            namespace,
-                            namespace_list,
-                        ) in url_pattern.app_dict.items():
-                            packages.setdefault(namespace, []).extend(namespace_list)
             self._namespace_dict = namespaces
-            self._app_dict = packages
             self._reverse_dict = lookups
             self._populated = True
         finally:
@@ -212,12 +201,6 @@ class URLResolver:
         if not self._namespace_dict:
             self._populate()
         return self._namespace_dict
-
-    @property
-    def app_dict(self):
-        if not self._app_dict:
-            self._populate()
-        return self._app_dict
 
     @staticmethod
     def _join_route(route1, route2):
@@ -272,6 +255,7 @@ class URLResolver:
             self._populate()
 
         possibilities = self.reverse_dict.getlist(lookup_view)
+        print(self.reverse_dict)
 
         for possibility, pattern, converters in possibilities:
             for result, params in possibility:
