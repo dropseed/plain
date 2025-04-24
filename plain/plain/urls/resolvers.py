@@ -255,7 +255,6 @@ class URLResolver:
             self._populate()
 
         possibilities = self.reverse_dict.getlist(lookup_view)
-        print(self.reverse_dict)
 
         for possibility, pattern, converters in possibilities:
             for result, params in possibility:
