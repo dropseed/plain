@@ -201,7 +201,7 @@ class Dev:
 
         self.symlink_plain_src()
         self.modify_hosts_file()
-        self.set_csrf_and_allowed_hosts()
+        self.set_allowed_hosts()
         self.run_preflight()
 
         # If we start services ourselves, we should manage the pidfile
@@ -354,22 +354,13 @@ class Dev:
                 )
                 sys.exit(1)
 
-    def set_csrf_and_allowed_hosts(self):
-        if "PLAIN_CSRF_TRUSTED_ORIGINS" not in os.environ:
-            csrf_trusted_origins = json.dumps(
-                [
-                    self.url,
-                ]
-            )
-            self.plain_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
-            self.custom_process_env["PLAIN_CSRF_TRUSTED_ORIGINS"] = csrf_trusted_origins
-            click.secho(
-                f"Automatically set PLAIN_CSRF_TRUSTED_ORIGINS={csrf_trusted_origins}",
-                dim=True,
-            )
-
+    def set_allowed_hosts(self):
         if "PLAIN_ALLOWED_HOSTS" not in os.environ:
-            allowed_hosts = json.dumps([self.hostname])
+            hostnames = [self.hostname]
+            if self.tunnel_url:
+                # Add the tunnel URL to the allowed hosts
+                hostnames.append(self.tunnel_url.split("://")[1])
+            allowed_hosts = json.dumps(hostnames)
             self.plain_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
             self.custom_process_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
             click.secho(
