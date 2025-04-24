@@ -145,13 +145,12 @@ class Dev:
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
             "PLAIN_DEV": "true",
+            **os.environ,
         }
 
         if log_level:
             self.plain_env["PLAIN_LOG_LEVEL"] = log_level.upper()
             self.plain_env["APP_LOG_LEVEL"] = log_level.upper()
-
-        self.plain_env.update(os.environ)
 
         self.custom_process_env = {
             **self.plain_env,
