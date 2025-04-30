@@ -26,7 +26,10 @@ class PageView(PageViewMixin, TemplateView):
         Allow for more specific user templates like
         markdown.html or html.html
         """
-        return [self.page.get_template_name()] + super().get_template_names()
+        if template_name := self.page.get_template_name():
+            return [template_name]
+
+        return super().get_template_names()
 
     def get_template_context(self):
         context = super().get_template_context()
