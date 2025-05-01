@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.42.2"
+version = "0.43.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -310,7 +310,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.29.1"
+version = "0.30.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -405,7 +405,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-dev"
-version = "0.29.2"
+version = "0.30.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -492,7 +492,7 @@ dev = [
 
 [[package]]
 name = "plain-htmx"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
@@ -503,7 +503,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-importmap"
-version = "0.8.0"
+version = "0.8.1"
 source = { editable = "plain-importmap" }
 dependencies = [
     { name = "marshmallow" },
@@ -537,7 +537,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.29.0"
+version = "0.30.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -606,7 +606,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.15.2"
+version = "0.15.3"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -689,7 +689,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.12.0"
+version = "0.12.1"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
@@ -723,7 +723,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tunnel"
-version = "0.5.2"
+version = "0.5.3"
 source = { editable = "plain-tunnel" }
 dependencies = [
     { name = "plain" },
