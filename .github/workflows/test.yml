@@ -31,4 +31,4 @@ jobs:
     - working-directory: plain-code
       run: uv sync
     - working-directory: plain-code
-      run: uv run plain-code check ..
+      run: uv run --package plain-code --isolated plain-code check .
