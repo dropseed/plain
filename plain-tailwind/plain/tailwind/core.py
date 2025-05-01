@@ -8,14 +8,14 @@ import tomlkit
 
 from plain.internal import internalcode
 from plain.packages import packages_registry
-from plain.runtime import APP_PATH, settings
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH, settings
 
 
 @internalcode
 class Tailwind:
     @property
     def target_directory(self) -> str:
-        return str(settings.PLAIN_TEMP_PATH)
+        return str(PLAIN_TEMP_PATH)
 
     @property
     def standalone_path(self) -> str:

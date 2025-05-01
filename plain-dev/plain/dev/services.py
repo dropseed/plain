@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from plain.runtime import APP_PATH, settings
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .poncho.manager import Manager as PonchoManager
 from .utils import has_pyproject_toml
@@ -15,7 +15,7 @@ from .utils import has_pyproject_toml
 
 class ServicesPid:
     def __init__(self):
-        self.pidfile = settings.PLAIN_TEMP_PATH / "dev" / "services.pid"
+        self.pidfile = PLAIN_TEMP_PATH / "dev" / "services.pid"
 
     def write(self):
         pid = os.getpid()

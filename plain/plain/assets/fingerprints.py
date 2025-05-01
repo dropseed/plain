@@ -2,7 +2,7 @@ import hashlib
 import json
 from functools import cache
 
-from plain.runtime import settings
+from plain.runtime import PLAIN_TEMP_PATH
 
 FINGERPRINT_LENGTH = 7
 
@@ -13,7 +13,7 @@ class AssetsFingerprintsManifest(dict):
     """
 
     def __init__(self):
-        self.path = settings.PLAIN_TEMP_PATH / "assets" / "fingerprints.json"
+        self.path = PLAIN_TEMP_PATH / "assets" / "fingerprints.json"
 
     def load(self):
         if self.path.exists():

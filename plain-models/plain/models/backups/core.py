@@ -2,7 +2,7 @@ import datetime
 import os
 from pathlib import Path
 
-from plain.runtime import settings
+from plain.runtime import PLAIN_TEMP_PATH
 
 from .. import connections
 from .clients import PostgresBackupClient
@@ -10,7 +10,7 @@ from .clients import PostgresBackupClient
 
 class DatabaseBackups:
     def __init__(self):
-        self.path = settings.PLAIN_TEMP_PATH / "backups"
+        self.path = PLAIN_TEMP_PATH / "backups"
 
     def find_backups(self):
         if not self.path.exists():

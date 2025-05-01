@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.text import Text
 
 from plain.cli import register_cli
-from plain.runtime import APP_PATH, settings
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .mkcert import MkcertManager
 from .poncho.manager import Manager as PonchoManager
@@ -196,7 +196,7 @@ class Dev:
         mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
         self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
             domain=self.hostname,
-            storage_path=Path(settings.PLAIN_TEMP_PATH) / "dev" / "certs",
+            storage_path=Path(PLAIN_TEMP_PATH) / "dev" / "certs",
         )
 
         self.symlink_plain_src()
@@ -279,10 +279,10 @@ class Dev:
         plain_path = Path(
             importlib.util.find_spec("plain.runtime").origin
         ).parent.parent
-        if not settings.PLAIN_TEMP_PATH.exists():
-            settings.PLAIN_TEMP_PATH.mkdir()
+        if not PLAIN_TEMP_PATH.exists():
+            PLAIN_TEMP_PATH.mkdir()
 
-        symlink_path = settings.PLAIN_TEMP_PATH / "src"
+        symlink_path = PLAIN_TEMP_PATH / "src"
 
         # The symlink is broken
         if symlink_path.is_symlink() and not symlink_path.exists():

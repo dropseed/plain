@@ -6,7 +6,7 @@ import traceback
 
 import requests
 
-from plain.runtime import settings
+from plain.runtime import PLAIN_TEMP_PATH, settings
 from plain.signals import got_request_exception
 
 
@@ -18,7 +18,7 @@ class RequestLog:
 
     @staticmethod
     def storage_path():
-        return str(settings.PLAIN_TEMP_PATH / "dev" / "requestlog")
+        return str(PLAIN_TEMP_PATH / "dev" / "requestlog")
 
     @classmethod
     def replay_request(cls, name):

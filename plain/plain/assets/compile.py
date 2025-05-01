@@ -2,7 +2,7 @@ import gzip
 import os
 import shutil
 
-from plain.runtime import settings
+from plain.runtime import PLAIN_TEMP_PATH
 
 from .finders import iter_assets
 from .fingerprints import AssetsFingerprintsManifest, get_file_fingerprint
@@ -46,7 +46,7 @@ def get_compiled_path():
 
     There's no reason currently for this to be a user-facing setting.
     """
-    return settings.PLAIN_TEMP_PATH / "assets" / "compiled"
+    return PLAIN_TEMP_PATH / "assets" / "compiled"
 
 
 def compile_assets(*, target_dir, keep_original, fingerprint, compress):

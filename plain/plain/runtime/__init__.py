@@ -13,6 +13,7 @@ except importlib.metadata.PackageNotFoundError:
 
 # Made available without setup or settings
 APP_PATH = Path.cwd() / "app"
+PLAIN_TEMP_PATH = Path.cwd() / ".plain"
 
 # from plain.runtime import settings
 settings = Settings()
