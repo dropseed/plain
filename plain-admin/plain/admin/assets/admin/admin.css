@@ -6,136 +6,138 @@ We shouldn't use many custom classes in here (like .btn) because the user
 could unintentionally overwrite those since our CSS is combined.
  */
 table {
-    width: 100%;
-    font-size: .875rem;
-    line-height: 1.25rem;
-    table-layout: auto;
+  width: 100%;
+  font-size: .875rem;
+  line-height: 1.25rem;
+  table-layout: auto;
 }
 
 th {
-    text-align: left;
-    padding: 0.5rem 0.5rem;
+  text-align: left;
+  padding: 0.5rem 0.5rem;
 }
 
 table th a {
-    color: rgba(255, 255, 255, 0.60);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 table td a {
-    color: white;
+  color: white;
 
-    &:hover {
-        text-decoration: none;
-    }
+  &:hover {
+    text-decoration: none;
+  }
 }
 
 tbody tr:hover {
-    background-color: rgb(255, 255, 255, 0.1);
+  background-color: rgb(255, 255, 255, 0.1);
 }
 
 td {
-    padding: 0.5rem 0.5rem;
-    white-space: nowrap;
-    border-bottom: 1px solid rgb(255, 255, 255, 0.1);
+  padding: 0.5rem 0.5rem;
+  white-space: nowrap;
+  border-bottom: 1px solid rgb(255, 255, 255, 0.1);
 }
 tr:last-child td {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 table img {
-    height: 1.2rem;
-    border-radius: 2px;
+  height: 1.2rem;
+  border-radius: 2px;
 }
 
 main a {
-    color: rgb(37, 99, 235);
+  color: rgb(37, 99, 235);
 }
 
 main a:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 select {
-    border-radius: 6px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.actions a, .actions button, main button {
-    display: inline-block;
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    color: #ffffff;
-    text-align: center;
-    text-decoration: none;
-    background-color: #2a2826;
-    border: 1px solid #3f3d3b;
-    border-radius: 6px;
-    transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
-    cursor: pointer;
-    flex-shrink: 0;
+.actions a,
+.actions button,
+main button {
+  display: inline-block;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  text-align: center;
+  text-decoration: none;
+  background-color: #2a2826;
+  border: 1px solid #3f3d3b;
+  border-radius: 6px;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
+  cursor: pointer;
+  flex-shrink: 0;
 
-    @media (max-width: 640px) {
-        font-size: 12px;
-        padding: 6px 12px;
-    }
+  @media (max-width: 640px) {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
 
-    &:hover {
-        background-color: #2a2928;
-        border-color: #504e4c;
-        transform: translateY(-1px);
-    }
+  &:hover {
+    background-color: #2a2928;
+    border-color: #504e4c;
+    transform: translateY(-1px);
+  }
 
-    &:active {
-        background-color: #141312;
-        border-color: #3f3d3b;
-        transform: translateY(0);
-    }
+  &:active {
+    background-color: #141312;
+    border-color: #3f3d3b;
+    transform: translateY(0);
+  }
 
-    &:focus {
-        outline: 2px solid #e5e7eb;
-        outline-offset: 2px;
-    }
+  &:focus {
+    outline: 2px solid #e5e7eb;
+    outline-offset: 2px;
+  }
 }
 
 main button[type="submit"] {
-    background-color: #2563eb;
-    border-color: #2563eb;
+  background-color: #2563eb;
+  border-color: #2563eb;
 
-    &:hover {
-        background-color: #1d4ed8;
-        border-color: #1d4ed8;
-    }
-    &:focus {
-        outline: 2px solid #2563eb;
-        outline-offset: 2px;
-    }
+  &:hover {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+  &:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
 }
 
 /* Cards use these? */
 section {
-    border: rgba(255, 255, 255, 0.1) 1px solid;
-    border-radius: 0.275rem;
-    overflow: auto;
-    background-color: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.8);
-    display: flex;
-    flex-direction: column;
+  border: rgba(255, 255, 255, 0.1) 1px solid;
+  border-radius: 0.275rem;
+  overflow: auto;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
 }
 
 section > header {
-    padding: 0.5rem;
-    /* background-color: #FFFCF0; */
-    border-bottom: rgba(255, 255, 255, 0.05) 1px solid;
+  padding: 0.5rem;
+  /* background-color: #FFFCF0; */
+  border-bottom: rgba(255, 255, 255, 0.05) 1px solid;
 }
 
 section > div {
-    padding: 0.75rem 0.5rem;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: auto;
+  padding: 0.75rem 0.5rem;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
 }
