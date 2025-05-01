@@ -13,3 +13,5 @@ plain*/tests/.plain
 .aider*
 
 /llms-full.txt
+
+/.plain

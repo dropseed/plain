@@ -62,3 +62,6 @@ members = [
     "plain-vendor",
     "plain-worker",
 ]
+
+[tool.plain.code.biome]
+version = "1.9.4"

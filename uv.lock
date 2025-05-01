@@ -390,13 +390,17 @@ version = "0.6.1"
 source = { editable = "plain-code" }
 dependencies = [
     { name = "plain" },
+    { name = "requests" },
     { name = "ruff" },
+    { name = "tomlkit" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "requests", specifier = ">=2.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
+    { name = "tomlkit", specifier = ">=0.11.0" },
 ]
 
 [[package]]
