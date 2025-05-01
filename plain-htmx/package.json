@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "copy-assets": "rm -r plain/htmx/assets/htmx/src && cp -r node_modules/htmx.org/dist plain/htmx/assets/htmx/src && rm -r plain/htmx/assets/htmx/idiomorph && cp -r node_modules/idiomorph/dist plain/htmx/assets/htmx/idiomorph"
+    "copy-assets": "rm -r plain/htmx/assets/htmx/vendor && mkdir plain/htmx/assets/htmx/vendor && cp -r node_modules/htmx.org/dist plain/htmx/assets/htmx/vendor/src && cp -r node_modules/idiomorph/dist plain/htmx/assets/htmx/vendor/idiomorph"
   },
   "dependencies": {
     "htmx.org": "^2.0.0",

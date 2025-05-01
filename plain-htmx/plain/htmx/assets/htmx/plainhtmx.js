@@ -1,16 +1,17 @@
 // Expect a data-csrftoken attribute on our own script tag
-var csrfToken = document.currentScript.dataset.csrftoken;
-var csrfHeader = document.currentScript.dataset.csrfheader;
+const csrfToken = document.currentScript.dataset.csrftoken;
+const csrfHeader = document.currentScript.dataset.csrfheader;
 
-htmx.on("htmx:configRequest", function (event) {
+htmx.on("htmx:configRequest", (event) => {
   // Custom header for Plain-HX-Action
-  var actionElt = htmx.closest(event.detail.elt, "[plain-hx-action]");
+  const actionElt = htmx.closest(event.detail.elt, "[plain-hx-action]");
   if (actionElt) {
-    event.detail.headers["Plain-HX-Action"] = actionElt.getAttribute("plain-hx-action");
+    event.detail.headers["Plain-HX-Action"] =
+      actionElt.getAttribute("plain-hx-action");
   }
 
   // Custom header for Plain-HX-Fragment
-  var fragmentElt = htmx.closest(event.detail.elt, "[plain-hx-fragment]");
+  const fragmentElt = htmx.closest(event.detail.elt, "[plain-hx-fragment]");
   if (fragmentElt) {
     event.detail.headers["Plain-HX-Fragment"] =
       fragmentElt.getAttribute("plain-hx-fragment");
@@ -23,12 +24,12 @@ htmx.on("htmx:configRequest", function (event) {
 });
 
 htmx.defineExtension("error-classes", {
-  onEvent: function (name, evt) {
+  onEvent: (name, evt) => {
     if (name === "htmx:beforeRequest") {
       // TODO use the value from hx-indicator
-      var target = evt.detail.target;
+      const target = evt.detail.target;
       // Remove every class that starts with htmx-error
-      for (var i = 0; i < target.classList.length; i++) {
+      for (let i = 0; i < target.classList.length; i++) {
         if (target.classList[i].startsWith("htmx-error-")) {
           target.classList.remove(target.classList[i]);
         }
@@ -36,13 +37,13 @@ htmx.defineExtension("error-classes", {
     }
 
     if (name === "htmx:responseError") {
-      var target = evt.detail.target;
+      const target = evt.detail.target;
       htmx.addClass(target, "htmx-error-response");
-      htmx.addClass(target, "htmx-error-response-" + evt.detail.xhr.status);
+      htmx.addClass(target, `htmx-error-response-${evt.detail.xhr.status}`);
     }
 
     if (name === "htmx:sendError") {
-      var target = evt.detail.target;
+      const target = evt.detail.target;
       htmx.addClass(target, "htmx-error-send");
     }
   },
@@ -52,6 +53,6 @@ htmx.defineExtension("error-classes", {
 // *after* our fragment extension is added.
 // Use with hx-trigger="plainhtmx:load from:body"
 // (this used to work without the timeout -- I'm not sure why there's a race condition now?)
-setTimeout(function () {
+setTimeout(() => {
   htmx.trigger(document.body, "plainhtmx:load");
 }, 250);
