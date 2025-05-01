@@ -439,7 +439,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-email"
-version = "0.9.1"
+version = "0.10.0"
 source = { editable = "plain-email" }
 dependencies = [
     { name = "plain" },
@@ -518,7 +518,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-loginlink"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
@@ -617,7 +617,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-passwords"
-version = "0.8.1"
+version = "0.9.0"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
@@ -685,7 +685,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
