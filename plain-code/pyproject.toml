@@ -8,6 +8,8 @@ requires-python = ">=3.11"
 dependencies = [
     "plain<1.0.0",
     "ruff>=0.1.0",
+    "requests>=2.0.0",
+    "tomlkit>=0.11.0",
 ]
 
 # Make this available as a standalone command

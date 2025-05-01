@@ -1,0 +1,13 @@
+{
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignore": ["**/vendor/**", "**/*.min.*", "**/tests/**"]
+  },
+  "formatter": {
+    "indentStyle": "space"
+  }
+}
