@@ -568,10 +568,10 @@ class TemplateEmail(EmailMultiAlternatives):
             return ""
 
     def get_plain_template_name(self):
-        return f"mail/{self.template}.txt"
+        return f"email/{self.template}.txt"
 
     def get_html_template_name(self):
-        return f"mail/{self.template}.html"
+        return f"email/{self.template}.html"
 
     def get_subject_template_name(self):
-        return f"mail/{self.template}.subject.txt"
+        return f"email/{self.template}.subject.txt"
