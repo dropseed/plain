@@ -1,8 +1,10 @@
+{% use_elements %}
+
 <div>
     <div class="flex items-center space-x-2">
-        <admin.Checkbox field=field />
-        <admin.Label field=field>{{ label }}</admin.Label>
-        {% if help is defined %}<admin.Help help=help />{% endif %}
+        <admin.Checkbox field={field} />
+        <admin.Label field={field}>{{ label }}</admin.Label>
+        {% if help is defined %}<admin.Help help={help} />{% endif %}
     </div>
-    <admin.FieldErrors field=field />
+    <admin.FieldErrors field={field} />
 </div>

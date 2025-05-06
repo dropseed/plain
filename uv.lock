@@ -438,8 +438,16 @@ dependencies = [
     { name = "plain" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "plain", editable = "plain" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-email"

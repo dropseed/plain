@@ -1,11 +1,13 @@
 {% extends "admin/base.html" %}
 
+{% use_elements %}
+
 {% block content %}
 
 <form method="post" class="space-y-4">
     {{ csrf_input }}
-    <admin.InputField label="Key" field=form.key />
-    <admin.InputField label="Value" field=form.value />
+    <admin.InputField label="Key" field={form.key} />
+    <admin.InputField label="Value" field={form.value} />
     <div class="flex justify-end">
         <button class="mt-5" type="submit">
             Save
