@@ -58,9 +58,6 @@ class ElementsExtension(Extension):
             # If we have a use_elements tag, we need to replace the template element tags
             # with the Element() calls
             source = self.replace_template_element_tags(source)
-            print(name, "-------------------------------")
-            print(source)
-            print("-------------------------------")
 
         return source
 
@@ -100,12 +97,11 @@ class ElementsExtension(Extension):
         for k, v in re.findall(r"([a-zA-Z0-9_]+)='([^']*)'", s):
             attrs[k] = f"'{v}'"
 
-        # Bare attrs
+        # Bare attrs (assume they are strings)
         for k, v in re.findall(r"([a-zA-Z0-9_]+)=([a-zA-Z0-9_\.]+)", s):
-            if k not in attrs:
-                attrs[k] = v
+            attrs[k] = f'"{v}"'
 
-        # Braced attrs (remove the braces)
+        # Braced Python variables (remove the braces)
         for k, raw in re.findall(r"([a-zA-Z0-9_]+)=({[^}]*})", s):
             expr = raw[1:-1]
             attrs[k] = expr
