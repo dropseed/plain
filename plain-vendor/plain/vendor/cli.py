@@ -99,7 +99,7 @@ def update(name):
 def add(url, name, sourcemap):
     """Add a new vendored dependency to pyproject.toml"""
     if not name:
-        name = url.split("/")[-1]
+        name = url.split("/")[-1].split("?")[0].split("#")[0]
 
     dep = Dependency(name, url=url, sourcemap=sourcemap)
 
