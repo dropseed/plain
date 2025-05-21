@@ -166,6 +166,8 @@ class Dependency:
         else:
             # Otherwise, use the filename from the URL
             filename = response.url.split("/")[-1]
+            # Remove any query string or fragment
+            filename = filename.split("?")[0].split("#")[0]
 
         vendored_path = VENDOR_DIR / filename
 
