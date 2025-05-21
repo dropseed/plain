@@ -29,7 +29,6 @@ An element can be used in any other template by enabling them with `{% use_eleme
 {% endblock %}
 ```
 
-
 ## Installation
 
 Install [`plain.elements` from PyPI](https://pypi.org/project/plain.elements/) and add it to your `INSTALLED_PACKAGES` setting. That's it! The Jinja extension will be enabled automatically.

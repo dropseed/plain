@@ -15,7 +15,6 @@ requires-python = ">=3.11"
 "plain-esbuild" = { workspace = true }
 "plain-flags" = { workspace = true }
 "plain-htmx" = { workspace = true }
-"plain-importmap" = { workspace = true }
 "plain-loginlink" = { workspace = true }
 "plain-email" = { workspace = true }
 "plain-models" = { workspace = true }
@@ -45,7 +44,6 @@ members = [
     "plain-esbuild",
     "plain-flags",
     "plain-htmx",
-    "plain-importmap",
     "plain-loginlink",
     "plain-email",
     "plain-models",
