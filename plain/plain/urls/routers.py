@@ -23,7 +23,7 @@ class Router:
 
 
 def include(
-    route: str | re.Pattern, router_or_urls: list | tuple | str | Router
+    route: str | re.Pattern, router_or_urls: list | tuple | str | type[Router]
 ) -> URLResolver:
     """
     Include URLs from another module or a nested list of URL patterns.
@@ -57,7 +57,7 @@ def include(
         )
 
 
-def path(route: str | re.Pattern, view: "View", *, name: str = "") -> URLPattern:
+def path(route: str | re.Pattern, view: type["View"], *, name: str = "") -> URLPattern:
     """
     Standard URL with a view.
     """
