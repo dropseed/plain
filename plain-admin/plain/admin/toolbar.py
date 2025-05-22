@@ -105,5 +105,5 @@ class _RequestToolbarPanel(ToolbarPanel):
 
 @register_toolbar_panel
 class _QuerystatsToolbarPanel(ToolbarPanel):
-    name = "Querystats"
+    name = "Queries"
     template_name = "toolbar/querystats.html"
