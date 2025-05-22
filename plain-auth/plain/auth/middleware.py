@@ -22,6 +22,7 @@ class AuthenticationMiddleware:
                 "'plain.sessions.middleware.SessionMiddleware' before "
                 "'plain.auth.middleware.AuthenticationMiddleware'."
             )
+
         request.user = SimpleLazyObject(lambda: get_user(request))
-        response = self.get_response(request)
-        return response
+
+        return self.get_response(request)
