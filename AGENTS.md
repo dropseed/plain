@@ -1,5 +1,7 @@
 # Agents
 
+This is the only AGENTS.md file in the repo -- you don't need to look for others.
+
 ## Scripts
 
 The `scripts` directory contains various shortcuts for common tasks. To run tests for all packages, for example, you can run `./scripts/test`. Linting and formatting can be run with `./scripts/fix`.
