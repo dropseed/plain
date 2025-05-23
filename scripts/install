@@ -15,14 +15,15 @@ if [ ! -f .git/hooks/pre-commit ]; then
     cp scripts/pre-commit .git/hooks/pre-commit
 fi
 
-# Install prettier so formatting works offline
+# Make sure prettier and other network-reliant tools are installed
+# (Codex only has network access during setup)
+
 if ! command -v prettier >/dev/null 2>&1; then
     echo ""
     echo "${BOLD}Prefetching prettier${NORMAL}"
     npx --yes prettier --version >/dev/null
 fi
 
-# Ensure Biome is available
 echo ""
-echo "${BOLD}Installing Biome${NORMAL}"
+echo "${BOLD}Installing plain-code tools${NORMAL}"
 uv run --package plain-code --isolated plain-code install
