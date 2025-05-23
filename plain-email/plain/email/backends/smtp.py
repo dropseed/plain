@@ -3,9 +3,9 @@
 import smtplib
 import ssl
 import threading
+from functools import cached_property
 
 from plain.runtime import settings
-from plain.utils.functional import cached_property
 
 from ..backends.base import BaseEmailBackend
 from ..message import sanitize_address

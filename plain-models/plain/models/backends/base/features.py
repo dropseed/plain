@@ -1,4 +1,4 @@
-from plain.utils.functional import cached_property
+from functools import cached_property
 
 
 class BaseDatabaseFeatures:

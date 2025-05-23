@@ -1,7 +1,7 @@
 import datetime
 import decimal
 import uuid
-from functools import lru_cache
+from functools import cached_property, lru_cache
 
 from plain import models
 from plain.exceptions import FieldError
@@ -11,7 +11,6 @@ from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.expressions import Col
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
-from plain.utils.functional import cached_property
 
 
 class DatabaseOperations(BaseDatabaseOperations):

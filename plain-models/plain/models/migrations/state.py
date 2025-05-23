@@ -1,7 +1,7 @@
 import copy
 from collections import defaultdict
 from contextlib import contextmanager
-from functools import partial
+from functools import cached_property, partial
 
 from plain import models
 from plain.exceptions import FieldDoesNotExist
@@ -12,7 +12,6 @@ from plain.models.options import DEFAULT_NAMES
 from plain.models.registry import ModelsRegistry
 from plain.models.registry import models_registry as global_models
 from plain.packages import packages_registry
-from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
 
 from .exceptions import InvalidBasesError

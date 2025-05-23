@@ -1,7 +1,7 @@
 import threading
 import warnings
 from contextlib import contextmanager
-from functools import lru_cache
+from functools import cached_property, lru_cache
 
 import psycopg as Database
 from psycopg import IsolationLevel, adapt, adapters, sql
@@ -16,7 +16,6 @@ from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.db import DatabaseError as WrappedDatabaseError
 from plain.models.db import connections
-from plain.utils.functional import cached_property
 
 # Some of these import psycopg, so import them after checking if it's installed.
 from .client import DatabaseClient  # NOQA isort:skip

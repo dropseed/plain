@@ -46,6 +46,8 @@ reverse many-to-one relation.
    ``ReverseManyToManyDescriptor``, use ``ManyToManyDescriptor`` instead.
 """
 
+from functools import cached_property
+
 from plain.exceptions import FieldError
 from plain.models import transaction
 from plain.models.db import (
@@ -60,7 +62,6 @@ from plain.models.lookups import GreaterThan, LessThanOrEqual
 from plain.models.query import QuerySet
 from plain.models.query_utils import DeferredAttribute, Q
 from plain.models.utils import resolve_callables
-from plain.utils.functional import cached_property
 
 
 class ForeignKeyDeferredAttribute(DeferredAttribute):

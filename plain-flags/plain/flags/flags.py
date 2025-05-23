@@ -1,9 +1,9 @@
 import logging
+from functools import cached_property
 from typing import Any
 
 from plain.runtime import settings
 from plain.utils import timezone
-from plain.utils.functional import cached_property
 
 from . import exceptions
 from .utils import coerce_key

@@ -1,11 +1,11 @@
 import uuid
+from functools import cached_property
 from io import IOBase
 from urllib.parse import quote
 
 from plain import signals
 from plain.http import HttpRequest, QueryDict, parse_cookie
 from plain.internal.handlers import base
-from plain.utils.functional import cached_property
 from plain.utils.regex_helper import _lazy_re_compile
 
 _slashes_re = _lazy_re_compile(rb"/+")

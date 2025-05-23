@@ -1,7 +1,7 @@
+from functools import cached_property
 from threading import local
 
 from plain.runtime import settings as plain_settings
-from plain.utils.functional import cached_property
 
 
 class ConnectionProxy:

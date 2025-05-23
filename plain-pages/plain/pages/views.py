@@ -1,6 +1,7 @@
+from functools import cached_property
+
 from plain.assets.views import AssetView
 from plain.http import Http404, ResponsePermanentRedirect, ResponseRedirect
-from plain.utils.functional import cached_property
 from plain.views import TemplateView, View
 
 from .exceptions import PageNotFoundError, RedirectPageError

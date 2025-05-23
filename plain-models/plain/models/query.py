@@ -5,6 +5,7 @@ The main QuerySet implementation. This provides the public API for the ORM.
 import copy
 import operator
 import warnings
+from functools import cached_property
 from itertools import chain, islice
 
 import plain.runtime
@@ -37,7 +38,7 @@ from plain.models.utils import (
     resolve_callables,
 )
 from plain.utils import timezone
-from plain.utils.functional import cached_property, partition
+from plain.utils.functional import partition
 
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21

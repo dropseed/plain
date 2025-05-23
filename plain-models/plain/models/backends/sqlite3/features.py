@@ -1,9 +1,9 @@
 import operator
+from functools import cached_property
 
 from plain.models import transaction
 from plain.models.backends.base.features import BaseDatabaseFeatures
 from plain.models.db import OperationalError
-from plain.utils.functional import cached_property
 
 from .base import Database
 

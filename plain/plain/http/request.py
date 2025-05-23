@@ -2,6 +2,7 @@ import codecs
 import copy
 import json
 import uuid
+from functools import cached_property
 from io import BytesIO
 from itertools import chain
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
@@ -25,7 +26,6 @@ from plain.utils.datastructures import (
     MultiValueDict,
 )
 from plain.utils.encoding import iri_to_uri
-from plain.utils.functional import cached_property
 from plain.utils.http import is_same_domain, parse_header_parameters
 from plain.utils.regex_helper import _lazy_re_compile
 

@@ -1,5 +1,6 @@
 import itertools
 import math
+from functools import cached_property
 
 from plain.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Expression, Func, Value
@@ -13,7 +14,6 @@ from plain.models.fields import (
 )
 from plain.models.query_utils import RegisterLookupMixin
 from plain.utils.datastructures import OrderedSet
-from plain.utils.functional import cached_property
 from plain.utils.hashable import make_hashable
 
 

@@ -9,8 +9,9 @@ They also act as reverse fields for the purposes of the Meta API because
 they're the closest concept currently available.
 """
 
+from functools import cached_property
+
 from plain import exceptions
-from plain.utils.functional import cached_property
 from plain.utils.hashable import make_hashable
 
 from . import BLANK_CHOICE_DASH

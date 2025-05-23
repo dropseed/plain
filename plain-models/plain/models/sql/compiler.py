@@ -1,7 +1,7 @@
 import collections
 import json
 import re
-from functools import partial
+from functools import cached_property, partial
 from itertools import chain
 
 from plain.exceptions import EmptyResultSet, FieldError, FullResultSet
@@ -22,7 +22,6 @@ from plain.models.sql.constants import (
 from plain.models.sql.query import Query, get_order_dir
 from plain.models.sql.where import AND
 from plain.models.transaction import TransactionManagementError
-from plain.utils.functional import cached_property
 from plain.utils.hashable import make_hashable
 from plain.utils.regex_helper import _lazy_re_compile
 

@@ -6,7 +6,7 @@ import operator
 import uuid
 import warnings
 from base64 import b64decode, b64encode
-from functools import partialmethod, total_ordering
+from functools import cached_property, partialmethod, total_ordering
 
 from plain import exceptions, preflight, validators
 from plain.models.constants import LOOKUP_SEP
@@ -22,7 +22,7 @@ from plain.utils.dateparse import (
     parse_time,
 )
 from plain.utils.duration import duration_microseconds, duration_string
-from plain.utils.functional import Promise, cached_property
+from plain.utils.functional import Promise
 from plain.utils.ipv6 import clean_ipv6_address
 from plain.utils.itercompat import is_iterable
 

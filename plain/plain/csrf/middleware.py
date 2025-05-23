@@ -8,6 +8,7 @@ against request forgeries from other sites.
 import logging
 import string
 from collections import defaultdict
+from functools import cached_property
 from urllib.parse import urlparse
 
 from plain.exceptions import DisallowedHost
@@ -16,7 +17,6 @@ from plain.logs import log_response
 from plain.runtime import settings
 from plain.utils.cache import patch_vary_headers
 from plain.utils.crypto import constant_time_compare, get_random_string
-from plain.utils.functional import cached_property
 from plain.utils.http import is_same_domain
 from plain.utils.regex_helper import _lazy_re_compile
 
