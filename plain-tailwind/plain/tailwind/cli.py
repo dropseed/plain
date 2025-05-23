@@ -32,11 +32,12 @@ def init(ctx):
 
 
 @cli.command()
+@click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
-def install(ctx):
+def install(ctx, force):
     tailwind = Tailwind()
 
-    if not tailwind.is_installed() or tailwind.needs_update():
+    if force or not tailwind.is_installed() or tailwind.needs_update():
         version_to_install = tailwind.get_version_from_config()
         if version_to_install:
             click.secho(

@@ -21,18 +21,26 @@ def cli():
 
 
 @cli.command()
+@click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
-def install(ctx):
+def install(ctx, force):
     """Install or update the Biome standalone per configuration."""
-    if version := get_code_config().get("biome", {}).get("version", ""):
-        biome = Biome()
-        click.secho(
-            f"Installing Biome standalone version {version}...", bold=True, nl=False
-        )
-        installed = biome.install(version)
-        click.secho(f"Biome {installed} installed", fg="green")
+    biome = Biome()
+
+    if force or not biome.is_installed() or biome.needs_update():
+        version_to_install = get_code_config().get("biome", {}).get("version", "")
+        if version_to_install:
+            click.secho(
+                f"Installing Biome standalone version {version_to_install}...",
+                bold=True,
+                nl=False,
+            )
+            installed = biome.install(version_to_install)
+            click.secho(f"Biome {installed} installed", fg="green")
+        else:
+            ctx.invoke(update)
     else:
-        ctx.invoke(update)
+        click.secho("Biome already installed", fg="green")
 
 
 @cli.command()
