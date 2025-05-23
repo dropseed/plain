@@ -18,7 +18,7 @@ from plain.json import PlainJSONEncoder
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.datastructures import CaseInsensitiveMapping
-from plain.utils.encoding import iri_to_uri
+from plain.utils.encoding import force_bytes, iri_to_uri
 from plain.utils.http import content_disposition_header, http_date
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -258,7 +258,17 @@ class ResponseBase:
             self.cookies[key]["samesite"] = samesite
 
     def set_signed_cookie(self, key, value, salt="", **kwargs):
-        value = signing.get_cookie_signer(salt=key + salt).sign(value)
+        """Set a cookie signed with the SECRET_KEY."""
+
+        def _cookie_key(k):
+            return b"plain.http.cookies" + force_bytes(k)
+
+        signer = signing.TimestampSigner(
+            key=_cookie_key(settings.SECRET_KEY),
+            fallback_keys=map(_cookie_key, settings.SECRET_KEY_FALLBACKS),
+            salt=key + salt,
+        )
+        value = signer.sign(value)
         return self.set_cookie(key, value, **kwargs)
 
     def delete_cookie(self, key, path="/", domain=None, samesite=None):
