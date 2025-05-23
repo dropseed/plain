@@ -5,7 +5,7 @@ from pathlib import Path
 from plain.runtime import PLAIN_TEMP_PATH
 
 from .. import connections
-from .clients import PostgresBackupClient
+from .clients import PostgresBackupClient, SQLiteBackupClient
 
 
 class DatabaseBackups:
@@ -64,10 +64,14 @@ class DatabaseBackup:
         for connection_alias in connections:
             connection = connections[connection_alias]
             backup_path = self.path / f"{connection_alias}.backup"
+
             if connection.vendor == "postgresql":
                 PostgresBackupClient(connection).create_backup(
-                    backup_path, **create_kwargs
+                    backup_path,
+                    pg_dump=create_kwargs.get("pg_dump", "pg_dump"),
                 )
+            elif connection.vendor == "sqlite":
+                SQLiteBackupClient(connection).create_backup(backup_path)
             else:
                 raise Exception("Unsupported database vendor")
 
@@ -90,8 +94,11 @@ class DatabaseBackup:
 
             if connection.vendor == "postgresql":
                 PostgresBackupClient(connection).restore_backup(
-                    backup_file, **restore_kwargs
+                    backup_file,
+                    pg_restore=restore_kwargs.get("pg_restore", "pg_restore"),
                 )
+            elif connection.vendor == "sqlite":
+                SQLiteBackupClient(connection).restore_backup(backup_file)
             else:
                 raise Exception("Unsupported database vendor")
 
