@@ -1,7 +1,7 @@
 #!/bin/sh -e
 
 workflow=".github/workflows/test.yml"
-packages=$(awk -F'[][]' '/package:/ {gsub(/"|,/, "", $2); print $2}' $workflow)
+packages=$(grep 'PACKAGES:' "$workflow" | sed -E 's/^.*PACKAGES: *//')
 
 function bold {
     echo "\033[1m$1\033[0m"
