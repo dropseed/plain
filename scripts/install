@@ -14,3 +14,8 @@ if [ ! -f .git/hooks/pre-commit ]; then
     echo "${BOLD}Installing git pre-commit hook${NORMAL}"
     cp scripts/pre-commit .git/hooks/pre-commit
 fi
+
+# Prefetch prettier using npx so formatting works offline
+echo ""
+echo "${BOLD}Prefetching prettier${NORMAL}"
+npx --yes prettier --version >/dev/null
