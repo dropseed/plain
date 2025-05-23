@@ -71,15 +71,6 @@ def build(ctx, watch, minify):
 
     ctx.invoke(install)
 
-    # https://github.com/tailwindlabs/tailwindcss/issues/15452
-    # Remove the .gitignore inside of .venv if it exists, so the sources
-    # are picked up correctly...
-    if os.path.exists(".venv/.gitignore"):
-        click.secho(
-            "Removing .venv/.gitignore to fix tailwind bug...", bold=True, fg="yellow"
-        )
-        os.remove(".venv/.gitignore")
-
     tailwind.update_plain_sources()
 
     args = []
