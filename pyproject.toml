@@ -33,32 +33,9 @@ requires-python = ">=3.11"
 
 [tool.uv.workspace]
 members = [
+    # By package name, or paths
     "plain",
-    "plain-admin",
-    "plain-api",
-    "plain-auth",
-    "plain-cache",
-    "plain-code",
-    "plain-dev",
-    "plain-elements",
-    "plain-esbuild",
-    "plain-flags",
-    "plain-htmx",
-    "plain-loginlink",
-    "plain-email",
-    "plain-models",
-    "plain-oauth",
-    "plain-pages",
-    "plain-pageviews",
-    "plain-passwords",
-    "plain-pytest",
-    "plain-redirection",
-    "plain-sessions",
-    "plain-support",
-    "plain-tailwind",
-    "plain-tunnel",
-    "plain-vendor",
-    "plain-worker",
+    "plain-*",
     "demos/*",
 ]
 
