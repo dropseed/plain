@@ -121,7 +121,9 @@ class Settings:
             if setting in self._settings:
                 setting_def = self._settings[setting]
                 try:
-                    parsed_value = _parse_env_value(value, setting_def.annotation)
+                    parsed_value = _parse_env_value(
+                        value, setting_def.annotation, setting
+                    )
                     setting_def.set_value(parsed_value, "env")
                 except ImproperlyConfigured as e:
                     self._errors.append(str(e))
@@ -211,9 +213,11 @@ class Settings:
         return f'<Settings "{self._settings_module}">'
 
 
-def _parse_env_value(value, annotation):
+def _parse_env_value(value, annotation, setting_name):
     if not annotation:
-        raise ImproperlyConfigured("Type hint required to set from environment.")
+        raise ImproperlyConfigured(
+            f"{setting_name}: Type hint required to set from environment."
+        )
 
     if annotation is bool:
         # Special case for bools
@@ -226,7 +230,7 @@ def _parse_env_value(value, annotation):
             return json.loads(value)
         except json.JSONDecodeError as e:
             raise ImproperlyConfigured(
-                f"Invalid JSON value for setting: {e.msg}"
+                f"Invalid JSON value for setting '{setting_name}': {e.msg}"
             ) from e
 
 
