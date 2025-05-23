@@ -82,6 +82,12 @@ class Manager:
 
         return proc
 
+    def num_processes(self):
+        """
+        Return the number of processes managed by this instance.
+        """
+        return len(self._processes)
+
     def loop(self):
         """
         Start all the added processes and multiplex their output onto the bound
