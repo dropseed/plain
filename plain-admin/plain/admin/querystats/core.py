@@ -2,10 +2,9 @@ import datetime
 import time
 import traceback
 from collections import Counter
+from functools import cached_property
 
 import sqlparse
-
-from plain.utils.functional import cached_property
 
 IGNORE_STACK_FILES = [
     "threading",

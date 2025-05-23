@@ -1,7 +1,7 @@
 import operator
+from functools import cached_property
 
 from plain.models.backends.base.features import BaseDatabaseFeatures
-from plain.utils.functional import cached_property
 
 
 class DatabaseFeatures(BaseDatabaseFeatures):

@@ -1,8 +1,8 @@
 import os
+from functools import cached_property
 from io import UnsupportedOperation
 
 from plain.internal.files.utils import FileProxyMixin
-from plain.utils.functional import cached_property
 
 
 class File(FileProxyMixin):

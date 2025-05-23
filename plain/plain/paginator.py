@@ -1,9 +1,9 @@
 import collections.abc
 import inspect
 import warnings
+from functools import cached_property
 from math import ceil
 
-from plain.utils.functional import cached_property
 from plain.utils.inspect import method_has_no_args
 
 

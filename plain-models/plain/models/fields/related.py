@@ -1,6 +1,6 @@
 import functools
 import inspect
-from functools import partial
+from functools import cached_property, partial
 
 from plain import exceptions, preflight
 from plain.models.constants import LOOKUP_SEP
@@ -9,7 +9,6 @@ from plain.models.deletion import SET_DEFAULT, SET_NULL
 from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
 from plain.runtime import SettingsReference, settings
-from plain.utils.functional import cached_property
 
 from ..registry import models_registry
 from . import Field

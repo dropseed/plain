@@ -2,6 +2,7 @@ import bisect
 import copy
 import inspect
 from collections import defaultdict
+from functools import cached_property
 
 from plain.exceptions import FieldDoesNotExist
 from plain.models import models_registry
@@ -10,7 +11,6 @@ from plain.models.db import connections
 from plain.models.fields import BigAutoField
 from plain.models.manager import Manager
 from plain.utils.datastructures import ImmutableList
-from plain.utils.functional import cached_property
 
 PROXY_PARENTS = object()
 

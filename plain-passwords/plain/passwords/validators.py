@@ -1,11 +1,11 @@
 import gzip
+from functools import cached_property
 from pathlib import Path
 
 from plain.exceptions import (
     ValidationError,
 )
 from plain.utils.deconstruct import deconstructible
-from plain.utils.functional import cached_property
 from plain.utils.text import pluralize
 
 

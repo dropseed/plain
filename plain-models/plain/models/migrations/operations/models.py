@@ -1,8 +1,9 @@
+from functools import cached_property
+
 from plain import models
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.state import ModelState
 from plain.models.migrations.utils import field_references, resolve_relation
-from plain.utils.functional import cached_property
 
 from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
 

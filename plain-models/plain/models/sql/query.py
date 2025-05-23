@@ -13,6 +13,7 @@ import functools
 import sys
 from collections import Counter, namedtuple
 from collections.abc import Iterator, Mapping
+from functools import cached_property
 from itertools import chain, count, product
 from string import ascii_uppercase
 
@@ -41,7 +42,6 @@ from plain.models.query_utils import (
 from plain.models.sql.constants import INNER, LOUTER, ORDER_DIR, SINGLE
 from plain.models.sql.datastructures import BaseTable, Empty, Join, MultiJoin
 from plain.models.sql.where import AND, OR, ExtraWhere, NothingNode, WhereNode
-from plain.utils.functional import cached_property
 from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.tree import Node
 

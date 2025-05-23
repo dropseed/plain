@@ -1,11 +1,11 @@
 import pkgutil
+from functools import cached_property
 from importlib import import_module
 
 from plain import signals
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 from plain.utils.connection import BaseConnectionHandler, ConnectionProxy
-from plain.utils.functional import cached_property
 from plain.utils.module_loading import import_string
 
 DEFAULT_DB_ALIAS = "default"

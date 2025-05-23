@@ -8,6 +8,7 @@ import warnings
 import zoneinfo
 from collections import deque
 from contextlib import contextmanager
+from functools import cached_property
 
 from plain.models.backends import utils
 from plain.models.backends.base.validation import BaseDatabaseValidation
@@ -20,7 +21,6 @@ from plain.models.db import (
 )
 from plain.models.transaction import TransactionManagementError
 from plain.runtime import settings
-from plain.utils.functional import cached_property
 
 NO_DB_ALIAS = "__no_db__"
 RAN_DB_VERSION_CHECK = set()

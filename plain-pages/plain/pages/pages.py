@@ -1,9 +1,9 @@
 import os
+from functools import cached_property
 
 import frontmatter
 
 from plain.templates import Template
-from plain.utils.functional import cached_property
 
 from .markdown import render_markdown
 

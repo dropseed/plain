@@ -3,9 +3,9 @@ Form classes
 """
 
 import copy
+from functools import cached_property
 
 from plain.exceptions import NON_FIELD_ERRORS
-from plain.utils.functional import cached_property
 
 from .exceptions import ValidationError
 from .fields import Field, FileField
