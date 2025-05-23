@@ -1,0 +1,4 @@
+#!/bin/sh -e
+uv sync
+uv run plain code install
+uv run plain tailwind install

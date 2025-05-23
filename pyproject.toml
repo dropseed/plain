@@ -59,6 +59,7 @@ members = [
     "plain-tunnel",
     "plain-vendor",
     "plain-worker",
+    "demos/*",
 ]
 
 [tool.plain.code.biome]
