@@ -4,7 +4,7 @@ for package in plain*;
 do
     echo ""
     echo "${BOLD}Installing dependencies for $package${NORMAL}"
-    cd $package
+    cd "$package"
     uv sync
     cd ..
 done

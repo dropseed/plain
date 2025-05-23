@@ -3,7 +3,7 @@
 workflow=".github/workflows/test.yml"
 packages=$(grep 'PACKAGES:' "$workflow" | sed -E 's/^.*PACKAGES: *//')
 
-function bold {
+bold() {
     echo "\033[1m$1\033[0m"
 }
 
