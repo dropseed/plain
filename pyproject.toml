@@ -35,7 +35,9 @@ requires-python = ">=3.11"
 members = [
     # By package name, or paths
     "plain",
+    "plain/tests",
     "plain-*",
+    # "plain-*/tests",
     "demos/*",
 ]
 
