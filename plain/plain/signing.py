@@ -41,8 +41,6 @@ import zlib
 
 from plain.runtime import settings
 from plain.utils.crypto import constant_time_compare, salted_hmac
-from plain.utils.encoding import force_bytes
-from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
 
 _SEP_UNSAFE = _lazy_re_compile(r"^[A-z0-9-_=]*$")
@@ -99,20 +97,6 @@ def base64_hmac(salt, value, key, algorithm="sha1"):
     return b64_encode(
         salted_hmac(salt, value, key, algorithm=algorithm).digest()
     ).decode()
-
-
-def _cookie_signer_key(key):
-    # SECRET_KEYS items may be str or bytes.
-    return b"plain.http.cookies" + force_bytes(key)
-
-
-def get_cookie_signer(salt="plain.signing.get_cookie_signer"):
-    Signer = import_string(settings.COOKIE_SIGNING_BACKEND)
-    return Signer(
-        key=_cookie_signer_key(settings.SECRET_KEY),
-        fallback_keys=map(_cookie_signer_key, settings.SECRET_KEY_FALLBACKS),
-        salt=salt,
-    )
 
 
 class JSONSerializer:

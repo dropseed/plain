@@ -109,12 +109,6 @@ HTTP_ERROR_VIEWS: dict[int] = {}
 # phase the middleware will be applied in reverse order.
 MIDDLEWARE: list[str] = []
 
-###########
-# SIGNING #
-###########
-
-COOKIE_SIGNING_BACKEND = "plain.signing.TimestampSigner"
-
 ########
 # CSRF #
 ########
