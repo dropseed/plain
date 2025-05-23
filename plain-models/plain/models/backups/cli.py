@@ -1,10 +1,10 @@
 import os
 import time
-from pathlib import Path
 
 import click
 
 from plain.cli import register_cli
+from plain.runtime import PROJECT_PATH
 
 from .core import DatabaseBackups
 
@@ -55,7 +55,7 @@ def create_backup(backup_name, pg_dump):
         click.secho(str(e), fg="red")
         exit(1)
 
-    click.secho(f"Backup created in {backup_dir.relative_to(Path.cwd())}", fg="green")
+    click.secho(f"Backup created in {backup_dir.relative_to(PROJECT_PATH)}", fg="green")
 
 
 @cli.command("restore")

@@ -2,6 +2,8 @@ import os
 
 from dotenv import load_dotenv
 
+from plain.runtime import PROJECT_PATH
+
 from .debug import set_breakpoint_hook
 
 
@@ -18,6 +20,6 @@ def setup():
 
     # Load environment variables from .env file
     if plain_env := os.environ.get("PLAIN_ENV", ""):
-        load_dotenv(f".env.{plain_env}")
+        load_dotenv(PROJECT_PATH / f".env.{plain_env}")
     else:
-        load_dotenv(".env")
+        load_dotenv(PROJECT_PATH / ".env")

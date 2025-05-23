@@ -3,7 +3,31 @@ import click
 import plain.runtime
 
 
-@click.command()
+@click.group()
+def runtime():
+    """Runtime settings"""
+    pass
+
+
+@runtime.command()
+def project_path():
+    """Print the project path"""
+    click.echo(plain.runtime.PLAIN_PROJECT_PATH)
+
+
+@runtime.command()
+def app_path():
+    """Print the application path"""
+    click.echo(plain.runtime.PLAIN_APP_PATH)
+
+
+@runtime.command()
+def temp_path():
+    """Print the temporary path"""
+    click.echo(plain.runtime.PLAIN_TEMP_PATH)
+
+
+@runtime.command()
 @click.argument("setting_name")
 def setting(setting_name):
     """Print the value of a setting at runtime"""

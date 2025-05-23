@@ -2,7 +2,8 @@ import os
 import platform
 import subprocess
 import sys
-from pathlib import Path
+
+from plain.runtime import PROJECT_PATH
 
 from . import pdb
 
@@ -22,7 +23,7 @@ def set_breakpoint_hook():
         system = platform.system()
 
         if system == "Darwin":
-            pwd = Path.cwd()
+            pwd = PROJECT_PATH
             script = f"""
             tell application "Terminal"
                 activate

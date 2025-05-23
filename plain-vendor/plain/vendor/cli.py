@@ -1,9 +1,8 @@
-from pathlib import Path
-
 import click
 
 from plain.assets.finders import APP_ASSETS_DIR
 from plain.cli import register_cli
+from plain.runtime import PROJECT_PATH
 
 from .deps import Dependency, get_deps
 from .exceptions import DependencyError
@@ -43,7 +42,7 @@ def sync():
             click.secho(f"  {e}", fg="red")
             errors.append(e)
 
-        vendored_path = vendored_path.relative_to(Path.cwd())
+        vendored_path = vendored_path.relative_to(PROJECT_PATH)
 
         click.secho(f" {dep.installed}", fg="green", nl=False)
         click.secho(f" -> {vendored_path}")
@@ -79,7 +78,7 @@ def update(name):
         click.secho(f"Updating {dep.name} {dep.installed}...", bold=True, nl=False)
         try:
             vendored_path = dep.update()
-            vendored_path = vendored_path.relative_to(Path.cwd())
+            vendored_path = vendored_path.relative_to(PROJECT_PATH)
 
             click.secho(f" {dep.installed}", fg="green", nl=False)
             click.secho(f" -> {vendored_path}")
@@ -111,7 +110,7 @@ def add(url, name, sourcemap):
         click.secho(f"  {e}", fg="red")
         exit(1)
 
-    vendored_path = vendored_path.relative_to(Path.cwd())
+    vendored_path = vendored_path.relative_to(PROJECT_PATH)
 
     click.secho(f" {dep.installed}", fg="green", nl=False)
     click.secho(f" -> {vendored_path}")

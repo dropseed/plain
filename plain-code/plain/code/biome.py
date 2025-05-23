@@ -10,7 +10,7 @@ import requests
 import tomlkit
 
 from plain.internal import internalcode
-from plain.runtime import PLAIN_TEMP_PATH
+from plain.runtime import PLAIN_TEMP_PATH, PROJECT_PATH
 
 
 @internalcode
@@ -146,5 +146,5 @@ class Biome:
         config_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "biome_defaults.json")
         )
-        args = list(args) + ["--config-path", config_path, "--vcs-root", os.getcwd()]
+        args = list(args) + ["--config-path", config_path, "--vcs-root", PROJECT_PATH]
         return subprocess.run([self.standalone_path, *args], cwd=cwd)

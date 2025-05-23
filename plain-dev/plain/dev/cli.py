@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.text import Text
 
 from plain.cli import register_cli
-from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH, PROJECT_PATH
 
 from .mkcert import MkcertManager
 from .poncho.manager import Manager as PonchoManager
@@ -60,9 +60,7 @@ def cli(ctx, port, hostname, log_level):
         return
 
     if not hostname:
-        project_name = os.path.basename(
-            os.getcwd()
-        )  # Use the directory name by default
+        project_name = PROJECT_PATH.name  # Use the directory name by default
 
         if has_pyproject_toml(APP_PATH.parent):
             with open(Path(APP_PATH.parent, "pyproject.toml"), "rb") as f:

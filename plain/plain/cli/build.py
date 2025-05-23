@@ -94,7 +94,12 @@ def build(keep_original, fingerprint, compress):
             click.secho(" → ", fg="yellow", nl=False)
             click.echo(resolved_url_path)
 
-        print("\n".join(f"  {Path(p).relative_to(Path.cwd())}" for p in compiled_paths))
+        print(
+            "\n".join(
+                f"  {Path(p).relative_to(plain.runtime.PROJECT_PATH)}"
+                for p in compiled_paths
+            )
+        )
 
         total_files += 1
         total_compiled += len(compiled_paths)

@@ -11,9 +11,20 @@ except importlib.metadata.PackageNotFoundError:
     __version__ = "dev"
 
 
+def _find_project_root() -> Path:
+    """Return the closest ancestor directory containing `pyproject.toml`."""
+    start = Path.cwd()
+    current = start.resolve()
+    for path in [current, *current.parents]:
+        if (path / "pyproject.toml").exists():
+            return path
+    return current
+
+
 # Made available without setup or settings
-APP_PATH = Path.cwd() / "app"
-PLAIN_TEMP_PATH = Path.cwd() / ".plain"
+PROJECT_PATH = _find_project_root()
+APP_PATH = PROJECT_PATH / "app"
+PLAIN_TEMP_PATH = PROJECT_PATH / ".plain"
 
 # from plain.runtime import settings
 settings = Settings()

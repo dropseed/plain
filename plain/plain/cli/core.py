@@ -12,8 +12,8 @@ from .docs import docs
 from .formatting import PlainContext
 from .preflight import preflight_checks
 from .registry import cli_registry
+from .runtime import runtime
 from .scaffold import create
-from .settings import setting
 from .shell import run, shell
 from .urls import urls
 from .utils import utils
@@ -31,7 +31,7 @@ plain_cli.add_command(chores)
 plain_cli.add_command(build)
 plain_cli.add_command(utils)
 plain_cli.add_command(urls)
-plain_cli.add_command(setting)
+plain_cli.add_command(runtime)
 plain_cli.add_command(shell)
 plain_cli.add_command(run)
 
