@@ -105,6 +105,12 @@ class Biome:
             )
         resp = requests.get(url, stream=True)
         resp.raise_for_status()
+
+        # Make sure the target directory exists
+        td = self.target_directory
+        if not os.path.isdir(td):
+            os.makedirs(td, exist_ok=True)
+
         with open(self.standalone_path, "wb") as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 f.write(chunk)
