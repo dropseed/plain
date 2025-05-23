@@ -10,6 +10,7 @@ members = [
     "plain-auth",
     "plain-cache",
     "plain-code",
+    "plain-demo-full",
     "plain-dev",
     "plain-elements",
     "plain-email",
@@ -388,6 +389,69 @@ requires-dist = [
     { name = "requests", specifier = ">=2.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "tomlkit", specifier = ">=0.11.0" },
+]
+
+[[package]]
+name = "plain-demo-full"
+version = "0.0.0"
+source = { virtual = "demos/full" }
+dependencies = [
+    { name = "plain" },
+    { name = "plain-admin" },
+    { name = "plain-api" },
+    { name = "plain-auth" },
+    { name = "plain-cache" },
+    { name = "plain-code" },
+    { name = "plain-dev" },
+    { name = "plain-elements" },
+    { name = "plain-email" },
+    { name = "plain-esbuild" },
+    { name = "plain-flags" },
+    { name = "plain-htmx" },
+    { name = "plain-loginlink" },
+    { name = "plain-models" },
+    { name = "plain-oauth" },
+    { name = "plain-pages" },
+    { name = "plain-pageviews" },
+    { name = "plain-passwords" },
+    { name = "plain-pytest" },
+    { name = "plain-redirection" },
+    { name = "plain-sessions" },
+    { name = "plain-support" },
+    { name = "plain-tailwind" },
+    { name = "plain-tunnel" },
+    { name = "plain-vendor" },
+    { name = "plain-worker" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-admin", editable = "plain-admin" },
+    { name = "plain-api", editable = "plain-api" },
+    { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-cache", editable = "plain-cache" },
+    { name = "plain-code", editable = "plain-code" },
+    { name = "plain-dev", editable = "plain-dev" },
+    { name = "plain-elements", editable = "plain-elements" },
+    { name = "plain-email", editable = "plain-email" },
+    { name = "plain-esbuild", editable = "plain-esbuild" },
+    { name = "plain-flags", editable = "plain-flags" },
+    { name = "plain-htmx", editable = "plain-htmx" },
+    { name = "plain-loginlink", editable = "plain-loginlink" },
+    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-oauth", editable = "plain-oauth" },
+    { name = "plain-pages", editable = "plain-pages" },
+    { name = "plain-pageviews", editable = "plain-pageviews" },
+    { name = "plain-passwords", editable = "plain-passwords" },
+    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-redirection", editable = "plain-redirection" },
+    { name = "plain-sessions", editable = "plain-sessions" },
+    { name = "plain-support", editable = "plain-support" },
+    { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-tunnel", editable = "plain-tunnel" },
+    { name = "plain-vendor", editable = "plain-vendor" },
+    { name = "plain-worker", editable = "plain-worker" },
 ]
 
 [[package]]

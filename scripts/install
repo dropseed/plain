@@ -9,6 +9,15 @@ do
     cd ..
 done
 
+for demo in demos/*;
+do
+    echo ""
+    echo "${BOLD}Installing dependencies for $demo${NORMAL}"
+    cd "$demo"
+    ./scripts/install
+    cd ../..
+done
+
 if [ ! -f .git/hooks/pre-commit ]; then
     echo ""
     echo "${BOLD}Installing git pre-commit hook${NORMAL}"

@@ -234,6 +234,12 @@ class Dev:
                 target=_process_task, args=(self.plain_env,)
             )
             process.start()
+
+            # If there are no poncho processes, then let this process finish before
+            # continuing (vs running in parallel)
+            if self.poncho.num_processes() == 0:
+                # Wait for the process to finish
+                process.join()
         else:
             # Start the app processes immediately
             self.start_app(None, None)
