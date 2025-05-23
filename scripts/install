@@ -14,3 +14,15 @@ if [ ! -f .git/hooks/pre-commit ]; then
     echo "${BOLD}Installing git pre-commit hook${NORMAL}"
     cp scripts/pre-commit .git/hooks/pre-commit
 fi
+
+# Install prettier so formatting works offline
+if ! command -v prettier >/dev/null 2>&1; then
+    echo ""
+    echo "${BOLD}Prefetching prettier${NORMAL}"
+    npx --yes prettier --version >/dev/null
+fi
+
+# Ensure Biome is available
+echo ""
+echo "${BOLD}Installing Biome${NORMAL}"
+uv run --package plain-code --isolated plain-code install
