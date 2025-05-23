@@ -18,7 +18,7 @@ def cli():
 @cli.command()
 @click.pass_context
 def init(ctx):
-    """Install Tailwind, create a tailwind.config.js and app/assets/src/tailwind.css"""
+    """Install Tailwind and create tailwind.css"""
     tailwind = Tailwind()
 
     if not tailwind.is_installed():

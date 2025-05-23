@@ -38,11 +38,9 @@ Create a new `tailwind.config.js` file in your project root:
 plain tailwind init
 ```
 
-This will also create a `tailwind.css` file at `static/src/tailwind.css` where additional CSS can be added.
-You can customize where these files are located if you need to,
-but this is the default (requires `STATICFILES_DIR = BASE_DIR / "static"`).
+This will also create a `tailwind.css` file at at the root of your repo.
 
-The `src/tailwind.css` file is then compiled into `dist/tailwind.css` by running `tailwind build`:
+The `tailwind.css` file is then compiled into `app/assets/tailwind.min.css` by running `tailwind build`:
 
 ```sh
 plain tailwind build
@@ -111,7 +109,7 @@ it should be done in `app/static/src/tailwind.css`.
 
 ## Deployment
 
-If possible, you should add `static/dist/tailwind.css` to your `.gitignore` and run the `plain tailwind build --minify` command as a part of your deployment pipeline.
+If possible, you should add `app/assets/tailwind.min.css` to your `.gitignore` and run the `plain tailwind build --minify` command as a part of your deployment pipeline.
 
 When you run `plain tailwind build`, it will automatically check whether the Tailwind standalone CLI has been installed, and install it if it isn't.
 
