@@ -17,3 +17,11 @@ do
     uv run --package "$package" --isolated pytest "$@"
     cd ../..
 done
+
+for demo in demos/*; do
+    echo
+    bold "Testing $demo"
+    cd "$demo"
+    uv run pytest "$@"
+    cd ..
+done

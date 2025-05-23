@@ -1,3 +1,4 @@
+import gzip
 import os
 import subprocess
 
@@ -96,3 +97,29 @@ class PostgresBackupClient:
         subprocess.run(
             cmd, env={**os.environ, **self.get_env()}, check=True, shell=True
         )
+
+
+class SQLiteBackupClient:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def create_backup(self, backup_path):
+        self.connection.ensure_connection()
+        src_conn = self.connection.connection
+        dump = "\n".join(src_conn.iterdump())
+        with gzip.open(backup_path, "wt") as f:
+            f.write(dump)
+
+    def restore_backup(self, backup_path):
+        with gzip.open(backup_path, "rt") as f:
+            sql = f.read()
+
+        self.connection.close()
+        self.connection.connect()
+        dest_conn = self.connection.connection
+        cur = dest_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        for (name,) in cur.fetchall():
+            if not name.startswith("sqlite_"):
+                dest_conn.execute(f'DROP TABLE IF EXISTS "{name}"')
+        dest_conn.executescript(sql)
+        dest_conn.commit()
