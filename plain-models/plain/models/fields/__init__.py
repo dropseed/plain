@@ -2,6 +2,7 @@ import collections.abc
 import copy
 import datetime
 import decimal
+import enum
 import operator
 import uuid
 import warnings
@@ -187,6 +188,8 @@ class Field(RegisterLookupMixin):
         self.default = default
         if isinstance(choices, ChoicesMeta):
             choices = choices.choices
+        elif isinstance(choices, enum.EnumMeta):
+            choices = [(member.value, member.name) for member in choices]
         if isinstance(choices, collections.abc.Iterator):
             choices = list(choices)
         self.choices = choices

@@ -4,6 +4,7 @@ Field classes.
 
 import copy
 import datetime
+import enum
 import json
 import math
 import re
@@ -773,6 +774,8 @@ class ChoiceField(Field):
         super().__init__(**kwargs)
         if hasattr(choices, "choices"):
             choices = choices.choices
+        elif isinstance(choices, enum.EnumMeta):
+            choices = [(member.value, member.name) for member in choices]
         self.choices = choices
 
     def __deepcopy__(self, memo):
