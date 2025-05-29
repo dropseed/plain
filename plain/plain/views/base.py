@@ -71,25 +71,36 @@ class View:
         return self.convert_value_to_response(result)
 
     def convert_value_to_response(self, value) -> ResponseBase:
-        """Convert a value to a Response."""
+        """Convert a return value to a Response."""
         if isinstance(value, ResponseBase):
             return value
-
-        if isinstance(value, str):
-            # Assume a str is rendered HTML
-            return Response(value)
-
-        if isinstance(value, list):
-            return JsonResponse(value, safe=False)
-
-        if isinstance(value, dict):
-            return JsonResponse(value)
 
         if isinstance(value, int):
             return Response(status_code=value)
 
         if value is None:
+            # TODO raise 404 instead?
             return ResponseNotFound()
+
+        status_code = 200
+
+        if isinstance(value, tuple):
+            if len(value) != 2:
+                raise ValueError(
+                    "Tuple response must be of length 2 (status_code, value)"
+                )
+
+            status_code = value[0]
+            value = value[1]
+
+        if isinstance(value, str):
+            return Response(value, status_code=status_code)
+
+        if isinstance(value, list):
+            return JsonResponse(value, status_code=status_code, safe=False)
+
+        if isinstance(value, dict):
+            return JsonResponse(value, status_code=status_code)
 
         raise ValueError(f"Unexpected view return type: {type(value)}")
 
