@@ -1,8 +1,8 @@
 {% use_elements %}
 
 <div class="space-y-1">
-    <admin.Label field=field>{{ label }}</admin.Label>
-    <admin.Textarea field=field />
-    {% if help is defined %}<admin.Help help=help />{% endif %}
-    <admin.FieldErrors field=field />
+    <admin.Label field={field}>{{ label }}</admin.Label>
+    <admin.Textarea field={field} />
+    {% if help is defined %}<admin.Help help={help} />{% endif %}
+    <admin.FieldErrors field={field} />
 </div>
