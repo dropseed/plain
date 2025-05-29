@@ -7,10 +7,11 @@ from plain.auth import login as auth_login
 from plain.http import HttpRequest, Response, ResponseRedirect
 from plain.runtime import settings
 from plain.urls import reverse
+from plain.utils.cache import add_never_cache_headers
 from plain.utils.crypto import get_random_string
 from plain.utils.module_loading import import_string
 
-from .exceptions import OAuthError, OAuthStateMismatchError
+from .exceptions import OAuthError, OAuthStateMismatchError, OAuthStateMissingError
 from .models import OAuthConnection
 
 SESSION_STATE_KEY = "plainoauth_state"
@@ -105,7 +106,11 @@ class OAuthProvider:
         if error := request.query_params.get("error"):
             raise OAuthError(error)
 
-        state = request.query_params["state"]
+        try:
+            state = request.query_params["state"]
+        except KeyError as e:
+            raise OAuthStateMissingError() from e
+
         expected_state = request.session.pop(SESSION_STATE_KEY)
         request.session.save()  # Make sure the pop is saved (won't save on an exception)
         if not secrets.compare_digest(state, expected_state):
@@ -130,7 +135,7 @@ class OAuthProvider:
         # Sort authorization params for consistency
         sorted_authorization_params = sorted(authorization_params.items())
         redirect_url = authorization_url + "?" + urlencode(sorted_authorization_params)
-        return ResponseRedirect(redirect_url)
+        return self.get_redirect_response(redirect_url)
 
     def handle_connect_request(
         self, *, request: HttpRequest, redirect_to: str = ""
@@ -144,7 +149,7 @@ class OAuthProvider:
         )
         connection.delete()
         redirect_url = self.get_disconnect_redirect_url(request=request)
-        return ResponseRedirect(redirect_url)
+        return self.get_redirect_response(redirect_url)
 
     def handle_callback_request(self, *, request: HttpRequest) -> Response:
         self.check_request_state(request=request)
@@ -174,7 +179,7 @@ class OAuthProvider:
             self.login(request=request, user=user)
 
         redirect_url = self.get_login_redirect_url(request=request)
-        return ResponseRedirect(redirect_url)
+        return self.get_redirect_response(redirect_url)
 
     def login(self, *, request: HttpRequest, user: Any) -> Response:
         auth_login(request=request, user=user)
@@ -184,6 +189,15 @@ class OAuthProvider:
 
     def get_disconnect_redirect_url(self, *, request: HttpRequest) -> str:
         return request.data.get("next", "/")
+
+    def get_redirect_response(self, redirect_url: str) -> Response:
+        """
+        Returns a redirect response to the given URL.
+        This is a utility method to ensure consistent redirect handling.
+        """
+        response = ResponseRedirect(redirect_url)
+        add_never_cache_headers(response)
+        return response
 
 
 def get_oauth_provider_instance(*, provider_key: str) -> OAuthProvider:

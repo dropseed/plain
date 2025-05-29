@@ -1,14 +1,11 @@
 import logging
 
 from plain.auth.views import AuthViewMixin
-from plain.http import ResponseBadRequest, ResponseRedirect
-from plain.templates import Template
-from plain.views import View
+from plain.http import ResponseRedirect
+from plain.views import TemplateView, View
 
 from .exceptions import (
     OAuthError,
-    OAuthStateMismatchError,
-    OAuthUserAlreadyExistsError,
 )
 from .providers import get_oauth_provider_instance
 
@@ -26,39 +23,29 @@ class OAuthLoginView(View):
         return provider_instance.handle_login_request(request=request)
 
 
-class OAuthCallbackView(View):
+class OAuthCallbackView(TemplateView):
     """
     The callback view is used for signup, login, and connect.
     """
 
+    template_name = "oauth/callback.html"
+
     def get(self):
-        request = self.request
         provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         try:
-            return provider_instance.handle_callback_request(request=request)
-        except OAuthUserAlreadyExistsError:
-            template = Template("oauth/error.html")
-            return ResponseBadRequest(
-                template.render(
-                    {
-                        "oauth_error": "A user already exists with this email address. Please log in first and then connect this OAuth provider to the existing account."
-                    }
-                )
-            )
-        except OAuthStateMismatchError:
-            template = Template("oauth/error.html")
-            return ResponseBadRequest(
-                template.render(
-                    {
-                        "oauth_error": "The state parameter did not match. Please try again."
-                    }
-                )
-            )
+            return provider_instance.handle_callback_request(request=self.request)
         except OAuthError as e:
             logger.exception("OAuth error")
-            template = Template("oauth/error.html")
-            return ResponseBadRequest(template.render({"oauth_error": str(e)}))
+            self.oauth_error = e
+
+            # Return a regular template response with the error
+            return 400, super().get()
+
+    def get_template_context(self) -> dict:
+        context = super().get_template_context()
+        context["oauth_error"] = getattr(self, "oauth_error", None)
+        return context
 
 
 class OAuthConnectView(AuthViewMixin, View):
