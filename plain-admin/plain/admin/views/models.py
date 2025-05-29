@@ -110,10 +110,9 @@ class AdminModelListView(AdminListView):
                 # Fallback to sorting in Python if the field is not valid
                 # Note this can be an expensive operation!
                 if order_by.startswith("-"):
-                    order_by = order_by[1:]
                     queryset = sorted(
                         queryset,
-                        key=lambda obj: self.get_field_value(obj, order_by),
+                        key=lambda obj: self.get_field_value(obj, order_by[1:]),
                         reverse=True,
                     )
                 else:
