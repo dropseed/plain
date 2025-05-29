@@ -113,13 +113,13 @@ class AdminModelListView(AdminListView):
                     queryset = sorted(
                         queryset,
                         key=lambda obj: self.get_field_value(obj, order_by[1:]),
-                        reverse=True,
+                        reverse=False,
                     )
                 else:
                     queryset = sorted(
                         queryset,
                         key=lambda obj: self.get_field_value(obj, order_by),
-                        reverse=False,
+                        reverse=True,
                     )
         elif self.queryset_order:
             queryset = queryset.order_by(*self.queryset_order)
