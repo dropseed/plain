@@ -150,6 +150,37 @@ TODO
 
 TODO
 
+## List `displays`
+
+On admin list views, you can define different `displays` to build predefined views of your data. The display choices will be shown in the UI, and you can use the current `self.display` in your view.
+
+```python
+# app/users/admin.py
+from plain.admin.views import AdminModelListView, register_viewset
+
+from .models import User
+
+
+@register_viewset
+class UserAdmin(AdminViewset):
+    class ListView(AdminModelListView):
+        model = User
+        fields = [
+            "id",
+            "email",
+            "created_at__date",
+        ]
+        displays = ["Users without email"]
+
+        def get_objects(self):
+            objects = super().get_objects()
+
+            if self.display == "Users without email":
+                objects = objects.filter(email="")
+
+            return objects
+```
+
 ## Toolbar
 
 TODO

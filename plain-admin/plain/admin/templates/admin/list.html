@@ -41,7 +41,7 @@
         <form method="GET" class="inline-flex space-x-5">
             {% if displays %}
             <select data-autosubmit name="display" class="text-sm">
-                <option value="">Displays</option>
+                <option value="">Choose a display</option>
                 {% for display in displays %}
                 <option {% if display == current_display %}selected{% endif %}>{{ display }}</option>
                 {% endfor %}
@@ -89,9 +89,9 @@
                         {% else %}
                         <a
                             data-merge-params
-                            class="font-mono text-xs font-normal"
+                            class="font-mono text-xs font-normal flex space-x-1 items-center"
                             href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
-                            {{ field }}
+                            <span>{{ field }}</span>
                             {% if field == order_by_field %}
                             {% if order_by_direction == "-" %}
                             <span class="text-xs">▲</span>
