@@ -1,3 +1,5 @@
+import json
+
 from plain.runtime import settings
 from plain.views import View
 from plain.views.csrf import CsrfExemptViewMixin
@@ -11,12 +13,18 @@ class TrackView(CsrfExemptViewMixin, View):
             # Don't track page views if we're impersonating a user
             return 200
 
-        data = self.request.data
+        try:
+            data = self.request.data
+        except json.JSONDecodeError:
+            return 400
 
-        url = data["url"]
-        title = data["title"]
-        referrer = data["referrer"]
-        timestamp = data["timestamp"]
+        try:
+            url = data["url"]
+            title = data["title"]
+            referrer = data["referrer"]
+            timestamp = data["timestamp"]
+        except KeyError:
+            return 400
 
         if user := getattr(self.request, "user", None):
             user_id = user.pk
