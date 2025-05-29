@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from plain import models
+from plain.exceptions import FieldError
 from plain.models import Manager, Q
 
 from .objects import (
@@ -92,8 +93,8 @@ class AdminModelListView(AdminListView):
 
     def get_objects(self):
         queryset = self.get_initial_queryset()
-        queryset = self.order_queryset(queryset)
         queryset = self.search_queryset(queryset)
+        queryset = self.order_queryset(queryset)
         return queryset
 
     def get_initial_queryset(self):
@@ -103,7 +104,24 @@ class AdminModelListView(AdminListView):
 
     def order_queryset(self, queryset):
         if order_by := self.request.query_params.get("order_by"):
-            queryset = queryset.order_by(order_by)
+            try:
+                queryset = queryset.order_by(order_by)
+            except FieldError:
+                # Fallback to sorting in Python if the field is not valid
+                # Note this can be an expensive operation!
+                if order_by.startswith("-"):
+                    order_by = order_by[1:]
+                    queryset = sorted(
+                        queryset,
+                        key=lambda obj: self.get_field_value(obj, order_by),
+                        reverse=True,
+                    )
+                else:
+                    queryset = sorted(
+                        queryset,
+                        key=lambda obj: self.get_field_value(obj, order_by),
+                        reverse=False,
+                    )
         elif self.queryset_order:
             queryset = queryset.order_by(*self.queryset_order)
 
