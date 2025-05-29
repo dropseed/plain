@@ -38,6 +38,8 @@ def create(package_name):
         (package_dir / "urls.py").write_text(
             f"""from plain.urls import path, Router
 
+from . import views
+
 
 class {package_name.capitalize()}Router(Router):
     namespace = f"{package_name}"
