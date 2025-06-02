@@ -2,9 +2,11 @@
 
 This is the only AGENTS.md file in the repo -- you don't need to look for others.
 
-## Scripts
+## Commands
 
-The `scripts` directory contains various shortcuts for common tasks. To run tests for all packages, for example, you can run `./scripts/test`. Linting and formatting can be run with `./scripts/fix`.
+- Run tests on all packages: `./scripts/test`
+- Lint and format code: `./scripts/fix`
+- Make database migrations: `cd demos/full && uv run plain makemigrations`
 
 ## READMEs
 
