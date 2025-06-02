@@ -20,7 +20,8 @@ def cli(pytest_args):
 
     if os.path.exists(".env.test"):
         click.secho("Loading environment variables from .env.test", fg="yellow")
-        load_dotenv(".env.test")
+        # plain.dev may load .env files first, so make sure we override any existing variables
+        load_dotenv(".env.test", override=True)
 
     returncode = pytest.main(list(pytest_args))
     if returncode:
