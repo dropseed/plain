@@ -481,24 +481,17 @@ def migrate(
 
     def migration_progress_callback(action, migration=None, fake=False):
         if verbosity >= 1:
-            compute_time = verbosity > 1
             if action == "apply_start":
-                if compute_time:
-                    start = time.monotonic()
                 click.echo(f"  Applying {migration}...", nl=False)
             elif action == "apply_success":
-                elapsed = f" ({time.monotonic() - start:.3f}s)" if compute_time else ""
                 if fake:
-                    click.echo(click.style(f" FAKED{elapsed}", fg="green"))
+                    click.echo(click.style(" FAKED", fg="green"))
                 else:
-                    click.echo(click.style(f" OK{elapsed}", fg="green"))
+                    click.echo(click.style(" OK", fg="green"))
             elif action == "render_start":
-                if compute_time:
-                    start = time.monotonic()
                 click.echo("  Rendering model states...", nl=False)
             elif action == "render_success":
-                elapsed = f" ({time.monotonic() - start:.3f}s)" if compute_time else ""
-                click.echo(click.style(f" DONE{elapsed}", fg="green"))
+                click.echo(click.style(" DONE", fg="green"))
 
     def describe_operation(operation):
         """Return a string that describes a migration operation for --plan."""
