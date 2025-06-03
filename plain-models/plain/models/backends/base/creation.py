@@ -23,9 +23,7 @@ class BaseDatabaseCreation:
     def log(self, msg):
         sys.stderr.write(msg + os.linesep)
 
-    def create_test_db(
-        self, verbosity=1, autoclobber=False, serialize=True, keepdb=False
-    ):
+    def create_test_db(self, verbosity=1, autoclobber=False, serialize=True):
         """
         Create a test database, prompting the user for confirmation if the
         database already exists. Return the name of the test database created.
@@ -35,20 +33,11 @@ class BaseDatabaseCreation:
         test_database_name = self._get_test_db_name()
 
         if verbosity >= 1:
-            action = "Creating"
-            if keepdb:
-                action = "Using existing"
-
             self.log(
-                f"{action} test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
+                f"Creating test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
             )
 
-        # We could skip this call if keepdb is True, but we instead
-        # give it the keepdb param. This is to handle the case
-        # where the test DB doesn't exist, in which case we need to
-        # create it, then just not destroy it. If we instead skip
-        # this, we will get an exception.
-        self._create_test_db(verbosity, autoclobber, keepdb)
+        self._create_test_db(verbosity, autoclobber)
 
         self.connection.close()
         settings.DATABASES[self.connection.alias]["NAME"] = test_database_name
@@ -161,10 +150,10 @@ class BaseDatabaseCreation:
             return self.connection.settings_dict["TEST"]["NAME"]
         return TEST_DATABASE_PREFIX + self.connection.settings_dict["NAME"]
 
-    def _execute_create_test_db(self, cursor, parameters, keepdb=False):
+    def _execute_create_test_db(self, cursor, parameters):
         cursor.execute("CREATE DATABASE {dbname} {suffix}".format(**parameters))
 
-    def _create_test_db(self, verbosity, autoclobber, keepdb=False):
+    def _create_test_db(self, verbosity, autoclobber):
         """
         Internal implementation - create the test db tables.
         """
@@ -176,13 +165,8 @@ class BaseDatabaseCreation:
         # Create the test database and connect to it.
         with self._nodb_cursor() as cursor:
             try:
-                self._execute_create_test_db(cursor, test_db_params, keepdb)
+                self._execute_create_test_db(cursor, test_db_params)
             except Exception as e:
-                # if we want to keep the db, then no need to do any of the below,
-                # just return and skip it all.
-                if keepdb:
-                    return test_database_name
-
                 self.log(f"Got an error creating the test database: {e}")
                 if not autoclobber:
                     confirm = input(
@@ -202,7 +186,7 @@ class BaseDatabaseCreation:
                         cursor.execute(
                             "DROP DATABASE {dbname}".format(**test_db_params)
                         )
-                        self._execute_create_test_db(cursor, test_db_params, keepdb)
+                        self._execute_create_test_db(cursor, test_db_params)
                     except Exception as e:
                         self.log(f"Got an error recreating the test database: {e}")
                         sys.exit(2)
@@ -225,9 +209,7 @@ class BaseDatabaseCreation:
             "NAME": "{}_{}".format(orig_settings_dict["NAME"], suffix),
         }
 
-    def destroy_test_db(
-        self, old_database_name=None, verbosity=1, keepdb=False, suffix=None
-    ):
+    def destroy_test_db(self, old_database_name=None, verbosity=1, suffix=None):
         """
         Destroy a test database, prompting the user for confirmation if the
         database already exists.
@@ -239,17 +221,10 @@ class BaseDatabaseCreation:
             test_database_name = self.get_test_db_clone_settings(suffix)["NAME"]
 
         if verbosity >= 1:
-            action = "Destroying"
-            if keepdb:
-                action = "Preserving"
             self.log(
-                f"{action} test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
+                f"Destroying test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
             )
-
-        # if we want to preserve the database
-        # skip the actual destroying piece.
-        if not keepdb:
-            self._destroy_test_db(test_database_name, verbosity)
+        self._destroy_test_db(test_database_name, verbosity)
 
         # Restore the original database name
         if old_database_name is not None:

@@ -5,7 +5,6 @@ from plain.models import DEFAULT_DB_ALIAS, connections
 def setup_databases(
     verbosity,
     *,
-    keepdb=False,
     aliases=None,
     serialized_aliases=None,
     **kwargs,
@@ -31,7 +30,6 @@ def setup_databases(
                 connection.creation.create_test_db(
                     verbosity=verbosity,
                     autoclobber=True,
-                    keepdb=keepdb,
                     serialize=serialize_alias,
                 )
             # Configure all other connections as mirrors of the first one
@@ -105,11 +103,11 @@ def get_unique_databases_and_mirrors(aliases=None):
     return test_databases, mirrored_aliases
 
 
-def teardown_databases(old_config, verbosity, keepdb=False):
+def teardown_databases(old_config, verbosity):
     """Destroy all the non-mirror databases."""
     for connection, old_name, destroy in old_config:
         if destroy:
-            connection.creation.destroy_test_db(old_name, verbosity, keepdb)
+            connection.creation.destroy_test_db(old_name, verbosity)
 
 
 def dependency_ordered(test_databases, dependencies):

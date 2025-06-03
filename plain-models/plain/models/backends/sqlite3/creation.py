@@ -20,11 +20,9 @@ class DatabaseCreation(BaseDatabaseCreation):
             return f"file:memorydb_{self.connection.alias}?mode=memory&cache=shared"
         return test_database_name
 
-    def _create_test_db(self, verbosity, autoclobber, keepdb=False):
+    def _create_test_db(self, verbosity, autoclobber):
         test_database_name = self._get_test_db_name()
 
-        if keepdb:
-            return test_database_name
         if not self.is_in_memory_db(test_database_name):
             # Erase the old test database
             if verbosity >= 1:

@@ -13,9 +13,9 @@ class DatabaseCreation(BaseDatabaseCreation):
             suffix.append("COLLATE {}".format(test_settings["COLLATION"]))
         return " ".join(suffix)
 
-    def _execute_create_test_db(self, cursor, parameters, keepdb=False):
+    def _execute_create_test_db(self, cursor, parameters):
         try:
-            super()._execute_create_test_db(cursor, parameters, keepdb)
+            super()._execute_create_test_db(cursor, parameters)
         except Exception as e:
             if len(e.args) < 1 or e.args[0] != 1007:
                 # All errors except "database exists" (1007) cancel tests.
