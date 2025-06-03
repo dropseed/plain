@@ -1,16 +1,16 @@
 from io import BytesIO
 
+from plain.internal.handlers.wsgi import WSGIHandler
 
-def test_wsgi_app():
+
+def test_wsgi_handler():
     """
     Test the default plain.wsgi.app import and
     basic behavior with minimal environ input.
     """
-    # Import this here because just importing triggers setup()
-    # which is usually fine in wsgi usage but not what we want related to our other tests
-    from plain.wsgi import app
 
-    response = app(
+    wsgi = WSGIHandler()
+    response = wsgi(
         {
             "REQUEST_METHOD": "GET",
             "wsgi.input": BytesIO(b""),

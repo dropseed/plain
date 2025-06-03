@@ -18,8 +18,14 @@ PLAIN_TEMP_PATH = Path.cwd() / ".plain"
 # from plain.runtime import settings
 settings = Settings()
 
+_is_setup_complete = False
+
 
 class AppPathNotFound(RuntimeError):
+    pass
+
+
+class SetupError(RuntimeError):
     pass
 
 
@@ -28,6 +34,15 @@ def setup():
     Configure the settings (this happens as a side effect of accessing the
     first setting), configure logging and populate the app registry.
     """
+    global _is_setup_complete
+
+    if _is_setup_complete:
+        raise SetupError(
+            "Plain runtime is already set up. You can only call `setup()` once."
+        )
+    else:
+        # Make sure we don't call setup() again
+        _is_setup_complete = True
 
     # Packages can hook into the setup process through an entrypoint.
     for entry_point in entry_points().select(group="plain.setup"):
