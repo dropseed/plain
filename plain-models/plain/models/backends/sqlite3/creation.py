@@ -1,10 +1,8 @@
-import multiprocessing
 import os
 import sys
 from pathlib import Path
 
 from plain.models.backends.base.creation import BaseDatabaseCreation
-from plain.models.db import NotSupportedError
 
 
 class DatabaseCreation(BaseDatabaseCreation):
@@ -14,17 +12,25 @@ class DatabaseCreation(BaseDatabaseCreation):
             database_name == ":memory:" or "mode=memory" in database_name
         )
 
-    def _get_test_db_name(self):
-        test_database_name = self.connection.settings_dict["TEST"]["NAME"] or ":memory:"
-        if test_database_name == ":memory:":
+    def _get_test_db_name(self, prefix=""):
+        raw_name = self.connection.settings_dict["TEST"]["NAME"] or ":memory:"
+        # Special in-memory case
+        if raw_name == ":memory:":
             return f"file:memorydb_{self.connection.alias}?mode=memory&cache=shared"
+
+        test_database_name = raw_name
+
+        if prefix:
+            test_database_name = f"{prefix}_{test_database_name}"
+
         return test_database_name
 
-    def _create_test_db(self, verbosity, autoclobber):
-        test_database_name = self._get_test_db_name()
-
+    def _create_test_db(self, *, test_database_name, verbosity, autoclobber):
+        """
+        Internal implementation - delete existing SQLite test DB file if needed.
+        """
         if not self.is_in_memory_db(test_database_name):
-            # Erase the old test database
+            # Erase the old test database file.
             if verbosity >= 1:
                 self.log(
                     f"Destroying old test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
@@ -46,13 +52,12 @@ class DatabaseCreation(BaseDatabaseCreation):
                     sys.exit(1)
         return test_database_name
 
-
     def _destroy_test_db(self, test_database_name, verbosity):
         if test_database_name and not self.is_in_memory_db(test_database_name):
             # Remove the SQLite database file
             os.remove(test_database_name)
 
-    def test_db_signature(self):
+    def test_db_signature(self, prefix=""):
         """
         Return a tuple that uniquely identifies a test database.
 
@@ -60,7 +65,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         SQLite since the databases will be distinct despite having the same
         TEST NAME. See https://www.sqlite.org/inmemorydb.html
         """
-        test_database_name = self._get_test_db_name()
+        test_database_name = self._get_test_db_name(prefix)
         sig = [self.connection.settings_dict["NAME"]]
         if self.is_in_memory_db(test_database_name):
             sig.append(self.connection.alias)

@@ -23,21 +23,26 @@ class BaseDatabaseCreation:
     def log(self, msg):
         sys.stderr.write(msg + os.linesep)
 
-    def create_test_db(self, verbosity=1, autoclobber=False):
+    def create_test_db(self, verbosity=1, prefix=""):
         """
         Create a test database, prompting the user for confirmation if the
         database already exists. Return the name of the test database created.
+
+        If prefix is provided, it will be prepended to the database name
+        to isolate it from other test databases.
         """
         from plain.models.cli import migrate
 
-        test_database_name = self._get_test_db_name()
+        test_database_name = self._get_test_db_name(prefix)
 
         if verbosity >= 1:
             self.log(
                 f"Creating test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
             )
 
-        self._create_test_db(verbosity, autoclobber)
+        self._create_test_db(
+            test_database_name=test_database_name, verbosity=verbosity, autoclobber=True
+        )
 
         self.connection.close()
         settings.DATABASES[self.connection.alias]["NAME"] = test_database_name
@@ -132,13 +137,22 @@ class BaseDatabaseCreation:
             (f" ('{database_name}')") if verbosity >= 2 else "",
         )
 
-    def _get_test_db_name(self):
+    def _get_test_db_name(self, prefix=""):
         """
         Internal implementation - return the name of the test DB that will be
         created. Only useful when called from create_test_db() and
         _create_test_db() and when no external munging is done with the 'NAME'
         settings.
+
+        If prefix is provided, it will be prepended to the database name.
         """
+        # Determine the base name: explicit TEST.NAME overrides base NAME.
+        base_name = (
+            self.connection.settings_dict["TEST"]["NAME"]
+            or self.connection.settings_dict["NAME"]
+        )
+        if prefix:
+            return f"{prefix}_{base_name}"
         if self.connection.settings_dict["TEST"]["NAME"]:
             return self.connection.settings_dict["TEST"]["NAME"]
         return TEST_DATABASE_PREFIX + self.connection.settings_dict["NAME"]
@@ -146,11 +160,10 @@ class BaseDatabaseCreation:
     def _execute_create_test_db(self, cursor, parameters):
         cursor.execute("CREATE DATABASE {dbname} {suffix}".format(**parameters))
 
-    def _create_test_db(self, verbosity, autoclobber):
+    def _create_test_db(self, *, test_database_name, verbosity, autoclobber):
         """
         Internal implementation - create the test db tables.
         """
-        test_database_name = self._get_test_db_name()
         test_db_params = {
             "dbname": self.connection.ops.quote_name(test_database_name),
             "suffix": self.sql_table_creation_suffix(),
@@ -188,7 +201,6 @@ class BaseDatabaseCreation:
                     sys.exit(1)
 
         return test_database_name
-
 
     def destroy_test_db(self, old_database_name=None, verbosity=1):
         """
@@ -229,7 +241,7 @@ class BaseDatabaseCreation:
         """
         return ""
 
-    def test_db_signature(self):
+    def test_db_signature(self, prefix=""):
         """
         Return a tuple with elements of self.connection.settings_dict (a
         DATABASES setting value) that uniquely identify a database
@@ -240,5 +252,5 @@ class BaseDatabaseCreation:
             settings_dict["HOST"],
             settings_dict["PORT"],
             settings_dict["ENGINE"],
-            self._get_test_db_name(),
+            self._get_test_db_name(prefix),
         )

@@ -2,10 +2,15 @@ from plain.exceptions import ImproperlyConfigured
 from plain.models import DEFAULT_DB_ALIAS, connections
 
 
-def setup_databases(verbosity):
-    """Create the test databases."""
+def setup_databases(*, verbosity, prefix=""):
+    """
+    Create the test databases.
 
-    test_databases, mirrored_aliases = get_unique_databases_and_mirrors()
+    If prefix is provided, each test database name will be prefixed with
+    "<prefix>_" to isolate it from the default test database.
+    """
+
+    test_databases, mirrored_aliases = get_unique_databases_and_mirrors(prefix=prefix)
 
     old_names = []
 
@@ -20,7 +25,7 @@ def setup_databases(verbosity):
                 first_alias = alias
                 connection.creation.create_test_db(
                     verbosity=verbosity,
-                    autoclobber=True,
+                    prefix=prefix,
                 )
             # Configure all other connections as mirrors of the first one
             else:
@@ -37,7 +42,7 @@ def setup_databases(verbosity):
     return old_names
 
 
-def get_unique_databases_and_mirrors():
+def get_unique_databases_and_mirrors(prefix=""):
     """
     Figure out which databases actually need to be created.
 
@@ -54,7 +59,7 @@ def get_unique_databases_and_mirrors():
     mirrored_aliases = {}
     test_databases = {}
     dependencies = {}
-    default_sig = connections[DEFAULT_DB_ALIAS].creation.test_db_signature()
+    default_sig = connections[DEFAULT_DB_ALIAS].creation.test_db_signature(prefix)
 
     for alias in connections:
         connection = connections[alias]
@@ -68,7 +73,7 @@ def get_unique_databases_and_mirrors():
             # If we have two aliases with the same values for that tuple,
             # we only need to create the test database once.
             item = test_databases.setdefault(
-                connection.creation.test_db_signature(),
+                connection.creation.test_db_signature(prefix),
                 (connection.settings_dict["NAME"], []),
             )
             # The default database must be the first because data migrations
@@ -83,7 +88,7 @@ def get_unique_databases_and_mirrors():
             else:
                 if (
                     alias != DEFAULT_DB_ALIAS
-                    and connection.creation.test_db_signature() != default_sig
+                    and connection.creation.test_db_signature(prefix) != default_sig
                 ):
                     dependencies[alias] = test_settings.get(
                         "DEPENDENCIES", [DEFAULT_DB_ALIAS]

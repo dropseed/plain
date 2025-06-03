@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from plain.signals import request_finished, request_started
@@ -21,12 +23,12 @@ def _db_disabled():
     def cursor_disabled(self):
         pytest.fail("Database access not allowed without the `db` fixture")
 
-    BaseDatabaseWrapper._old_cursor = BaseDatabaseWrapper.cursor
+    BaseDatabaseWrapper._enabled_cursor = BaseDatabaseWrapper.cursor
     BaseDatabaseWrapper.cursor = cursor_disabled
 
     yield
 
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._old_cursor
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
 
 @pytest.fixture(scope="session")
@@ -56,8 +58,8 @@ def setup_db(request):
 
 @pytest.fixture
 def db(setup_db):
-    # Set .cursor() back to the original implementation
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._old_cursor
+    # Set .cursor() back to the original implementation to unblock it
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
     # Keep track of the atomic blocks so we can roll them back
     atomics = {}
@@ -90,3 +92,28 @@ def db(setup_db):
         atomic.__exit__(None, None, None)
 
         connection.close()
+
+
+@pytest.fixture
+def isolated_db(request):
+    """
+    Create and destroy a unique test database for each test, using a prefix
+    derived from the test function name to ensure isolation from the default
+    test database.
+    """
+    # Set .cursor() back to the original implementation to unblock it
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
+
+    verbosity = 1
+
+    # Derive a safe prefix from the test function name
+    raw_name = request.node.name
+    prefix = re.sub(r"[^0-9A-Za-z_]+", "_", raw_name)
+
+    # Set up a fresh test database for this test, using the prefix
+    _old_db_config = setup_databases(verbosity=verbosity, prefix=prefix)
+
+    yield
+
+    # Tear down the test database created for this test
+    teardown_databases(_old_db_config, verbosity=verbosity)
