@@ -1,10 +1,10 @@
 import os
+import subprocess
 import sys
 
 import click
 from dotenv import load_dotenv
 
-import pytest
 from plain.cli import register_cli
 
 
@@ -16,13 +16,20 @@ from plain.cli import register_cli
 )
 @click.argument("pytest_args", nargs=-1, type=click.UNPROCESSED)
 def cli(pytest_args):
-    """Run tests with pytest"""
+    """Run pytest with .env.test loaded"""
 
     if os.path.exists(".env.test"):
         click.secho("Loading environment variables from .env.test", fg="yellow")
         # plain.dev may load .env files first, so make sure we override any existing variables
         load_dotenv(".env.test", override=True)
 
-    returncode = pytest.main(list(pytest_args))
-    if returncode:
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+    ] + list(pytest_args)
+
+    result = subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+
+    if returncode := result.returncode:
         sys.exit(returncode)
