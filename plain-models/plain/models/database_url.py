@@ -25,8 +25,6 @@
 # ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-import logging
-import os
 import urllib.parse as urlparse
 from typing import Any, TypedDict
 
@@ -62,36 +60,13 @@ class DBConfig(TypedDict, total=False):
     USER: str
 
 
-def config(
-    env: str = DEFAULT_ENV,
-    default: str | None = None,
-    engine: str | None = None,
-    conn_max_age: int | None = 0,
-    conn_health_checks: bool = False,
-    ssl_require: bool = False,
-    test_options: dict | None = None,
-) -> DBConfig:
-    """Returns configured DATABASE dictionary from DATABASE_URL."""
-    s = os.environ.get(env, default)
-
-    if s is None:
-        logging.warning(f"No {env} environment variable set, and so no databases setup")
-
-    if s:
-        return parse(
-            s, engine, conn_max_age, conn_health_checks, ssl_require, test_options
-        )
-
-    return {}
-
-
 def parse(
     url: str,
     engine: str | None = None,
     conn_max_age: int | None = 0,
     conn_health_checks: bool = False,
-    ssl_require: bool = False,
-    test_options: dict | None = None,
+    # ssl_require: bool = False,
+    # test_options: dict | None = None,
 ) -> DBConfig:
     """Parses a database URL."""
     if url == "sqlite://:memory:":
@@ -104,8 +79,8 @@ def parse(
     # otherwise parse the url as normal
     parsed_config: DBConfig = {}
 
-    if test_options is None:
-        test_options = {}
+    # if test_options is None:
+    #     test_options = {}
 
     spliturl = urlparse.urlsplit(url)
 
@@ -153,12 +128,12 @@ def parse(
             "ENGINE": engine,
         }
     )
-    if test_options:
-        parsed_config.update(
-            {
-                "TEST": test_options,
-            }
-        )
+    # if test_options:
+    #     parsed_config.update(
+    #         {
+    #             "TEST": test_options,
+    #         }
+    #     )
 
     # Pass the query string into OPTIONS.
     options: dict[str, Any] = {}
@@ -169,12 +144,12 @@ def parse(
 
         options[key] = values[-1]
 
-    if ssl_require:
-        options["sslmode"] = "require"
+    # if ssl_require:
+    #     options["sslmode"] = "require"
 
     # Support for Postgres Schema URLs
-    if "currentSchema" in options and engine == "plain.models.backends.postgresql":
-        options["options"] = "-c search_path={}".format(options.pop("currentSchema"))
+    # if "currentSchema" in options and engine == "plain.models.backends.postgresql":
+    #     options["options"] = "-c search_path={}".format(options.pop("currentSchema"))
 
     if options:
         parsed_config["OPTIONS"] = options
