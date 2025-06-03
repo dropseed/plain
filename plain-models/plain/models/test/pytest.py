@@ -44,7 +44,7 @@ def setup_db(request):
     request_started.disconnect(close_old_connections)
     request_finished.disconnect(close_old_connections)
 
-    yield _old_db_config
+    yield
 
     # Put the signals back...
     request_started.connect(close_old_connections)
@@ -76,7 +76,7 @@ def db(setup_db):
         atomic.__enter__()
         atomics[connection] = atomic
 
-    yield setup_db
+    yield
 
     for connection, atomic in atomics.items():
         if (
