@@ -2,16 +2,10 @@ from plain.exceptions import ImproperlyConfigured
 from plain.models import DEFAULT_DB_ALIAS, connections
 
 
-def setup_databases(
-    verbosity,
-    *,
-    aliases=None,
-    serialized_aliases=None,
-    **kwargs,
-):
+def setup_databases(verbosity):
     """Create the test databases."""
 
-    test_databases, mirrored_aliases = get_unique_databases_and_mirrors(aliases)
+    test_databases, mirrored_aliases = get_unique_databases_and_mirrors()
 
     old_names = []
 
@@ -24,13 +18,9 @@ def setup_databases(
             # Actually create the database for the first connection
             if first_alias is None:
                 first_alias = alias
-                serialize_alias = (
-                    serialized_aliases is None or alias in serialized_aliases
-                )
                 connection.creation.create_test_db(
                     verbosity=verbosity,
                     autoclobber=True,
-                    serialize=serialize_alias,
                 )
             # Configure all other connections as mirrors of the first one
             else:
@@ -47,7 +37,7 @@ def setup_databases(
     return old_names
 
 
-def get_unique_databases_and_mirrors(aliases=None):
+def get_unique_databases_and_mirrors():
     """
     Figure out which databases actually need to be created.
 
@@ -59,8 +49,8 @@ def get_unique_databases_and_mirrors(aliases=None):
                       where all aliases share the same underlying database.
     - mirrored_aliases: mapping of mirror aliases to original aliases.
     """
-    if aliases is None:
-        aliases = connections
+
+    aliases = connections
     mirrored_aliases = {}
     test_databases = {}
     dependencies = {}

@@ -23,7 +23,7 @@ class BaseDatabaseCreation:
     def log(self, msg):
         sys.stderr.write(msg + os.linesep)
 
-    def create_test_db(self, verbosity=1, autoclobber=False, serialize=True):
+    def create_test_db(self, verbosity=1, autoclobber=False):
         """
         Create a test database, prompting the user for confirmation if the
         database already exists. Return the name of the test database created.
@@ -58,13 +58,6 @@ class BaseDatabaseCreation:
             prune=False,
             verbosity=max(verbosity - 1, 0),
         )
-
-        # We then serialize the current state of the database into a string
-        # and store it on the connection. This slightly horrific process is so people
-        # who are testing on databases without transactions or who are using
-        # a TransactionTestCase still get a clean database on every test run.
-        # if serialize:
-        #     self.connection._test_serialized_contents = self.serialize_db_to_string()
 
         # Ensure a connection for the side effect of initializing the test database.
         self.connection.ensure_connection()

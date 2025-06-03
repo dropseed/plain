@@ -90,14 +90,3 @@ def db(setup_db):
         atomic.__exit__(None, None, None)
 
         connection.close()
-
-
-# @pytest.fixture(scope="function")
-# def transactional_db(request, _plain_db_setup):
-#     BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._cursor
-
-#     yield
-
-#     # Flush databases instead of rolling back transactions...
-
-#     connections.close_all()
