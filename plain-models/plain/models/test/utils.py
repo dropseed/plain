@@ -6,7 +6,6 @@ def setup_databases(
     verbosity,
     *,
     keepdb=False,
-    debug_sql=False,
     aliases=None,
     serialized_aliases=None,
     **kwargs,
@@ -46,10 +45,6 @@ def setup_databases(
         connections[alias].creation.set_as_test_mirror(
             connections[mirror_alias].settings_dict
         )
-
-    if debug_sql:
-        for alias in connections:
-            connections[alias].force_debug_cursor = True
 
     return old_names
 
