@@ -46,25 +46,6 @@ class DatabaseCreation(BaseDatabaseCreation):
                     sys.exit(1)
         return test_database_name
 
-    def get_test_db_clone_settings(self, suffix):
-        orig_settings_dict = self.connection.settings_dict
-        source_database_name = orig_settings_dict["NAME"]
-
-        if not self.is_in_memory_db(source_database_name):
-            root, ext = os.path.splitext(source_database_name)
-            return {**orig_settings_dict, "NAME": f"{root}_{suffix}{ext}"}
-
-        start_method = multiprocessing.get_start_method()
-        if start_method == "fork":
-            return orig_settings_dict
-        if start_method == "spawn":
-            return {
-                **orig_settings_dict,
-                "NAME": f"{self.connection.alias}_{suffix}.sqlite3",
-            }
-        raise NotSupportedError(
-            f"Cloning with start method {start_method!r} is not supported."
-        )
 
     def _destroy_test_db(self, test_database_name, verbosity):
         if test_database_name and not self.is_in_memory_db(test_database_name):
