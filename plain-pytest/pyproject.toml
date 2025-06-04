@@ -11,6 +11,7 @@ dependencies = [
     "click>=8.0.0",
     "pytest>=7.0.0",
     "python-dotenv~=1.0.0",
+    "cryptography",
 ]
 
 [project.entry-points."plain.setup"]

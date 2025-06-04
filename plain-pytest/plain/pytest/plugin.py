@@ -2,6 +2,8 @@ import pytest
 from plain.runtime import settings as plain_settings
 from plain.runtime import setup
 
+from .browser import TestBrowser
+
 
 def pytest_configure(config):
     # Run Plain setup before anything else
@@ -38,3 +40,46 @@ def settings():
     proxy = SettingsProxy()
     yield proxy
     proxy._restore()
+
+
+@pytest.fixture
+def testbrowser(browser, request):
+    """Use playwright and pytest-playwright to run browser tests against a test server."""
+    try:
+        # Check if isolated_db fixture is available from the plain-models package.
+        # If it is, then we need to run a server that has a database connection to the isolated database for this test.
+        request.getfixturevalue("isolated_db")
+
+        from plain.models import DEFAULT_DB_ALIAS, connections
+
+        def connection_to_url(
+            connection,
+        ) -> str:
+            """Converts a database configuration to a URL string."""
+            config = connection.settings_dict
+
+            engine = config["ENGINE"].split(".")[-1]
+            # Cheap for now...
+            url = f"{engine}://{config['USER']}:{config['PASSWORD']}@{config['HOST']}:{config['PORT']}/{config['NAME']}"
+
+            # Add options as query parameters.
+            options = config["OPTIONS"]
+            if options:
+                query = "&".join(f"{k}={v}" for k, v in options.items())
+                url += f"?{query}"
+
+            return url
+
+        # Get a database url for the isolated db that we can have gunicorn connect to also.
+        database_url = connection_to_url(connections[DEFAULT_DB_ALIAS])
+    except pytest.FixtureLookupError:
+        # isolated_db fixture not available, use empty database_url
+        database_url = ""
+
+    testbrowser = TestBrowser(browser=browser, database_url=database_url)
+
+    try:
+        testbrowser.run_server()
+        yield testbrowser
+    finally:
+        testbrowser.cleanup_server()
