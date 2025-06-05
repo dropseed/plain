@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import time
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -105,13 +106,7 @@ class TestBrowser:
             # Move the url from to_visit to visited
             url = to_visit.pop()
 
-            try:
-                response = page.goto(url)
-            except Exception as e:
-                # Mailto links, some other things
-                if "Protocol error" in str(e):
-                    continue
-                raise
+            response = page.goto(url)
 
             visited.add(url)
 
@@ -128,12 +123,18 @@ class TestBrowser:
                         # Empty URL, skip it
                         continue
 
-                    if href.startswith("http") and not href.startswith(self.base_url):
-                        # Skip external links
+                    parsed = urlparse(href)
+                    # Skip non-http(s) links (mailto:, tel:, javascript:, etc.)
+                    if parsed.scheme and parsed.scheme not in ("http", "https"):
+                        continue
+
+                    # Skip external HTTP links
+                    if parsed.scheme in ("http", "https") and not href.startswith(
+                        self.base_url
+                    ):
                         continue
 
                     visit_url = relative_url(href)
-
                     if visit_url not in visited:
                         to_visit.add(visit_url)
 
