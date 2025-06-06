@@ -6,8 +6,8 @@ __pycache__
 *.DS_Store
 .coverage
 
-# Personal workspace
-/*.code-workspace
+# Symlinks to personal packages
+/ext
 
 # Test apps
 plain*/tests/.plain
