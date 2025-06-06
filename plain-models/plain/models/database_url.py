@@ -155,3 +155,65 @@ def parse(
         parsed_config["OPTIONS"] = options
 
     return parsed_config
+
+
+def build_database_url(config: dict) -> str:
+    """Build a database URL from a configuration dictionary."""
+    engine = config.get("ENGINE")
+    if not engine:
+        raise ValueError("ENGINE is required to build a database URL")
+
+    reverse_schemes: dict[str, str] = {}
+    for scheme, eng in SCHEMES.items():
+        reverse_schemes.setdefault(eng, scheme)
+
+    scheme = reverse_schemes.get(engine)
+    if scheme is None:
+        raise ValueError(
+            f"No scheme known for engine '{engine}'. We support: {', '.join(sorted(SCHEMES.values()))}"
+        )
+
+    options = config.get("OPTIONS") or {}
+    query_parts: list[tuple[str, Any]] = []
+    for key, value in options.items():
+        if scheme == "mysql" and key == "ssl" and isinstance(value, dict):
+            ca = value.get("ca")
+            if ca:
+                query_parts.append(("ssl-ca", ca))
+            continue
+
+        query_parts.append((key, value))
+
+    query = urlparse.urlencode(query_parts)
+
+    if scheme == "sqlite":
+        name = config.get("NAME", "")
+        if name == ":memory:":
+            url = "sqlite://:memory:"
+        else:
+            url = f"sqlite:///{urlparse.quote(name, safe='/')}"
+
+        if query:
+            url += f"?{query}"
+
+        return url
+
+    user = urlparse.quote(str(config.get("USER", "")))
+    password = urlparse.quote(str(config.get("PASSWORD", "")))
+    host = config.get("HOST", "")
+    port = config.get("PORT", "")
+    name = urlparse.quote(str(config.get("NAME", "")))
+
+    netloc = ""
+    if user or password:
+        netloc += user
+        if password:
+            netloc += f":{password}"
+        netloc += "@"
+    netloc += host
+    if port:
+        netloc += f":{port}"
+
+    path = f"/{name}"
+    url = urlparse.urlunsplit((scheme, netloc, path, query, ""))
+    return url
