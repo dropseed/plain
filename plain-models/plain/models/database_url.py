@@ -26,9 +26,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import urllib.parse as urlparse
-from typing import Any, TypedDict
+from typing import Any
 
-DEFAULT_ENV = "DATABASE_URL"
+from .connections import DatabaseConfig
 
 SCHEMES = {
     "postgres": "plain.models.backends.postgresql",
@@ -44,28 +44,12 @@ for key in SCHEMES.keys():
     urlparse.uses_netloc.append(key)
 
 
-class DBConfig(TypedDict, total=False):
-    AUTOCOMMIT: bool
-    CONN_MAX_AGE: int | None
-    CONN_HEALTH_CHECKS: bool
-    DISABLE_SERVER_SIDE_CURSORS: bool
-    ENGINE: str
-    HOST: str
-    NAME: str
-    OPTIONS: dict[str, Any] | None
-    PASSWORD: str
-    PORT: str | int
-    TEST: dict[str, Any]
-    TIME_ZONE: str
-    USER: str
-
-
 def parse_database_url(
     url: str,
     engine: str | None = None,
     conn_max_age: int | None = 0,
     conn_health_checks: bool = False,
-) -> DBConfig:
+) -> DatabaseConfig:
     """Parses a database URL."""
     if url == "sqlite://:memory:":
         # this is a special case, because if we pass this URL into
@@ -75,7 +59,7 @@ def parse_database_url(
         # note: no other settings are required for sqlite
 
     # otherwise parse the url as normal
-    parsed_config: DBConfig = {}
+    parsed_config: DatabaseConfig = {}
 
     spliturl = urlparse.urlsplit(url)
 
