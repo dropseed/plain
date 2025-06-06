@@ -130,21 +130,18 @@ class ConnectionHandler:
     and convenience methods for managing multiple database connections.
     """
 
-    settings_name = "DATABASES"
-    exception_class = ConnectionDoesNotExist
-
-    def __init__(self, settings=None):
-        self._settings = settings
+    def __init__(self):
+        self._settings = None
         self._connections = local()
 
     @cached_property
     def settings(self):
-        self._settings = self.configure_settings(self._settings)
+        self._settings = self.configure_settings()
         return self._settings
 
-    def configure_settings(self, databases):
-        if databases is None:
-            databases = getattr(plain_settings, self.settings_name)
+    def configure_settings(self):
+        databases = plain_settings.DATABASES
+
         if DEFAULT_DB_ALIAS not in databases:
             raise ImproperlyConfigured(
                 f"You must define a '{DEFAULT_DB_ALIAS}' database."
@@ -169,6 +166,7 @@ class ConnectionHandler:
             ]
             for key, value in default_test_settings:
                 test_settings.setdefault(key, value)
+
         return databases
 
     def create_connection(self, alias):
@@ -181,7 +179,7 @@ class ConnectionHandler:
             return getattr(self._connections, alias)
         except AttributeError:
             if alias not in self.settings:
-                raise self.exception_class(f"The connection '{alias}' doesn't exist.")
+                raise ConnectionDoesNotExist(f"The connection '{alias}' doesn't exist.")
         conn = self.create_connection(alias)
         setattr(self._connections, alias, conn)
         return conn
