@@ -39,8 +39,9 @@ class OAuthCallbackView(TemplateView):
             logger.exception("OAuth error")
             self.oauth_error = e
 
-            # Return a regular template response with the error
-            return 400, super().get()
+            response = super().get()
+            response.status_code = 400
+            return response
 
     def get_template_context(self) -> dict:
         context = super().get_template_context()

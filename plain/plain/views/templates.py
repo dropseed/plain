@@ -1,5 +1,6 @@
 from plain.csrf.middleware import get_token
 from plain.exceptions import ImproperlyConfigured
+from plain.http import Response
 from plain.runtime import settings
 from plain.templates import Template, TemplateFileMissing
 from plain.utils.functional import lazy
@@ -69,5 +70,5 @@ class TemplateView(View):
     def render_template(self) -> str:
         return self.get_template().render(self.get_template_context())
 
-    def get(self):
-        return self.render_template()
+    def get(self) -> Response:
+        return Response(self.render_template())
