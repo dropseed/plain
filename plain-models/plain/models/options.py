@@ -7,7 +7,7 @@ from functools import cached_property
 from plain.exceptions import FieldDoesNotExist
 from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
-from plain.models.db import connections
+from plain.models.db import DEFAULT_DB_ALIAS, connections
 from plain.models.fields import BigAutoField
 from plain.models.manager import Manager
 from plain.utils.datastructures import ImmutableList
@@ -105,7 +105,7 @@ class Options:
 
     def contribute_to_class(self, cls, name):
         from plain.models.backends.utils import truncate_name
-        from plain.models.db import connection
+        from plain.models.db import connections
 
         cls._meta = self
         self.model = cls
@@ -154,7 +154,8 @@ class Options:
         if not self.db_table:
             self.db_table = f"{self.package_label}_{self.model_name}"
             self.db_table = truncate_name(
-                self.db_table, connection.ops.max_name_length()
+                self.db_table,
+                connections[DEFAULT_DB_ALIAS].ops.max_name_length(),
             )
 
     def _format_names_with_class(self, cls, objs):

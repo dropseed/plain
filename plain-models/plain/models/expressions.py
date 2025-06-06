@@ -11,7 +11,12 @@ from uuid import UUID
 from plain.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models import fields
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import DatabaseError, NotSupportedError, connection
+from plain.models.db import (
+    DEFAULT_DB_ALIAS,
+    DatabaseError,
+    NotSupportedError,
+    connections,
+)
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable
@@ -1777,18 +1782,20 @@ class WindowFrame(Expression):
 
     def __str__(self):
         if self.start.value is not None and self.start.value < 0:
-            start = "%d %s" % (abs(self.start.value), connection.ops.PRECEDING)  # noqa: UP031
+            start = (
+                f"{abs(self.start.value)} {connections[DEFAULT_DB_ALIAS].ops.PRECEDING}"
+            )
         elif self.start.value is not None and self.start.value == 0:
-            start = connection.ops.CURRENT_ROW
+            start = connections[DEFAULT_DB_ALIAS].ops.CURRENT_ROW
         else:
-            start = connection.ops.UNBOUNDED_PRECEDING
+            start = connections[DEFAULT_DB_ALIAS].ops.UNBOUNDED_PRECEDING
 
         if self.end.value is not None and self.end.value > 0:
-            end = "%d %s" % (self.end.value, connection.ops.FOLLOWING)  # noqa: UP031
+            end = f"{self.end.value} {connections[DEFAULT_DB_ALIAS].ops.FOLLOWING}"
         elif self.end.value is not None and self.end.value == 0:
-            end = connection.ops.CURRENT_ROW
+            end = connections[DEFAULT_DB_ALIAS].ops.CURRENT_ROW
         else:
-            end = connection.ops.UNBOUNDED_FOLLOWING
+            end = connections[DEFAULT_DB_ALIAS].ops.UNBOUNDED_FOLLOWING
         return self.template % {
             "frame_type": self.frame_type,
             "start": start,

@@ -16,9 +16,9 @@ from plain.models import models_registry, transaction
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import CheckConstraint, UniqueConstraint
 from plain.models.db import (
+    DEFAULT_DB_ALIAS,
     PLAIN_VERSION_PICKLE_KEY,
     DatabaseError,
-    connection,
     connections,
     router,
 )
@@ -858,7 +858,9 @@ class Model(metaclass=ModelBase):
                 # TODO: Handle multiple backends with different feature flags.
                 if lookup_value is None or (
                     lookup_value == ""
-                    and connection.features.interprets_empty_strings_as_nulls
+                    and connections[
+                        DEFAULT_DB_ALIAS
+                    ].features.interprets_empty_strings_as_nulls
                 ):
                     # no value, skip the lookup
                     continue

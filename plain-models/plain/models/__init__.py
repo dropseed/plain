@@ -20,7 +20,6 @@ from .db import (
     OperationalError,
     ProgrammingError,
     close_old_connections,
-    connection,
     connections,
     reset_queries,
     router,
@@ -128,7 +127,6 @@ __all__ += [
 
 # DB-related exports
 __all__ += [
-    "connection",
     "connections",
     "router",
     "reset_queries",

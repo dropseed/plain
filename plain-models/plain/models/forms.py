@@ -770,11 +770,13 @@ def modelfield_to_formfield(
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
         # TODO: Handle multiple backends with different feature flags.
-        from plain.models.db import connection
+        from plain.models.db import DEFAULT_DB_ALIAS, connections
 
         if (
             modelfield.allow_null
-            and not connection.features.interprets_empty_strings_as_nulls
+            and not connections[
+                DEFAULT_DB_ALIAS
+            ].features.interprets_empty_strings_as_nulls
         ):
             defaults["empty_value"] = None
         return fields.CharField(

@@ -3,7 +3,6 @@ from plain import signals
 from .connections import (
     DEFAULT_DB_ALIAS,
     ConnectionHandler,
-    ConnectionProxy,
     ConnectionRouter,
 )
 from .exceptions import (
@@ -26,9 +25,6 @@ PLAIN_VERSION_PICKLE_KEY = "_plain_version"
 connections = ConnectionHandler()
 
 router = ConnectionRouter()
-
-# For backwards compatibility. Prefer connections['default'] instead.
-connection = ConnectionProxy(connections, DEFAULT_DB_ALIAS)
 
 
 # Register an event to reset saved queries when a Plain request is started.
@@ -53,7 +49,6 @@ signals.request_finished.connect(close_old_connections)
 
 __all__ = [
     "connections",
-    "connection",
     "router",
     "DEFAULT_DB_ALIAS",
     "PLAIN_VERSION_PICKLE_KEY",

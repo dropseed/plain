@@ -3,7 +3,7 @@ import logging
 import re
 
 from plain.json import PlainJSONEncoder
-from plain.models import connection
+from plain.models import DEFAULT_DB_ALIAS, connections
 from plain.runtime import settings
 
 from .core import QueryStats
@@ -60,11 +60,11 @@ class QueryStatsMiddleware:
 
         querystats = QueryStats(include_tracebacks=is_tracking())
 
-        with connection.execute_wrapper(querystats):
+        with connections[DEFAULT_DB_ALIAS].execute_wrapper(querystats):
             is_admin = self.is_admin_request(request)
 
         if settings.DEBUG or is_admin:
-            with connection.execute_wrapper(querystats):
+            with connections[DEFAULT_DB_ALIAS].execute_wrapper(querystats):
                 response = self.get_response(request)
 
             if settings.DEBUG:

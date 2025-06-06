@@ -200,7 +200,7 @@ def check_lazy_references(package_configs=None, **kwargs):
 
 @register_check
 def check_database_tables(package_configs, **kwargs):
-    from plain.models.db import connection
+    from plain.models.db import connections
 
     databases = kwargs.get("databases", None)
     if not databases:
@@ -209,8 +209,9 @@ def check_database_tables(package_configs, **kwargs):
     errors = []
 
     for database in databases:
-        db_tables = connection.introspection.table_names()
-        model_tables = connection.introspection.plain_table_names()
+        conn = connections[database]
+        db_tables = conn.introspection.table_names()
+        model_tables = conn.introspection.plain_table_names()
 
         unknown_tables = set(db_tables) - set(model_tables)
         unknown_tables.discard("plainmigrations")  # Know this could be there

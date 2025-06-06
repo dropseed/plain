@@ -192,26 +192,3 @@ class ConnectionRouter:
         """Return app models allowed to be migrated on provided db."""
         models = models_registry.get_models(package_label=package_label)
         return [model for model in models if self.allow_migrate_model(db, model)]
-
-
-class ConnectionProxy:
-    """Proxy for accessing a connection object's attributes."""
-
-    def __init__(self, connections, alias):
-        self.__dict__["_connections"] = connections
-        self.__dict__["_alias"] = alias
-
-    def __getattr__(self, item):
-        return getattr(self._connections[self._alias], item)
-
-    def __setattr__(self, name, value):
-        return setattr(self._connections[self._alias], name, value)
-
-    def __delattr__(self, name):
-        return delattr(self._connections[self._alias], name)
-
-    def __contains__(self, key):
-        return key in self._connections[self._alias]
-
-    def __eq__(self, other):
-        return self._connections[self._alias] == other

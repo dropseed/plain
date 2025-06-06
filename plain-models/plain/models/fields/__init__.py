@@ -11,7 +11,7 @@ from functools import cached_property, partialmethod, total_ordering
 
 from plain import exceptions, preflight, validators
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import connection, connections, router
+from plain.models.db import DEFAULT_DB_ALIAS, connections, router
 from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import DeferredAttribute, RegisterLookupMixin
 from plain.utils import timezone
@@ -372,7 +372,9 @@ class Field(RegisterLookupMixin):
         if (
             self.primary_key
             and self.allow_null
-            and not connection.features.interprets_empty_strings_as_nulls
+            and not connections[
+                DEFAULT_DB_ALIAS
+            ].features.interprets_empty_strings_as_nulls
         ):
             # We cannot reliably check this for backends like Oracle which
             # consider NULL and '' to be equal (and thus set up
@@ -894,7 +896,9 @@ class Field(RegisterLookupMixin):
         if (
             not self.empty_strings_allowed
             or self.allow_null
-            and not connection.features.interprets_empty_strings_as_nulls
+            and not connections[
+                DEFAULT_DB_ALIAS
+            ].features.interprets_empty_strings_as_nulls
         ):
             return return_None
         return str  # return empty string
@@ -1021,7 +1025,7 @@ class CharField(Field):
     def _check_max_length_attribute(self, **kwargs):
         if self.max_length is None:
             if (
-                connection.features.supports_unlimited_charfield
+                connections[DEFAULT_DB_ALIAS].features.supports_unlimited_charfield
                 or "supports_unlimited_charfield"
                 in self.model._meta.required_db_features
             ):
@@ -1712,10 +1716,12 @@ class IntegerField(Field):
     @cached_property
     def validators(self):
         # These validators can't be added at field initialization time since
-        # they're based on values retrieved from `connection`.
+        # they're based on values retrieved from `connections[DEFAULT_DB_ALIAS]`.
         validators_ = super().validators
         internal_type = self.get_internal_type()
-        min_value, max_value = connection.ops.integer_field_range(internal_type)
+        min_value, max_value = connections[DEFAULT_DB_ALIAS].ops.integer_field_range(
+            internal_type
+        )
         if min_value is not None and not any(
             (
                 isinstance(validator, validators.MinValueValidator)
