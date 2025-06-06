@@ -29,3 +29,6 @@ class SupportFormEntry(models.Model):
                 fields=["uuid"], name="plainsupport_supportformentry_unique_uuid"
             ),
         ]
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]

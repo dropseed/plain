@@ -31,6 +31,7 @@ class Redirect(models.Model):
         ordering = ["order", "-created_at"]
         indexes = [
             models.Index(fields=["order"]),
+            models.Index(fields=["created_at"]),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -91,6 +92,9 @@ class RedirectLog(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]
 
     @classmethod
     def from_redirect(cls, redirect, request):
@@ -127,6 +131,9 @@ class NotFoundLog(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]
 
     @classmethod
     def from_request(cls, request):
