@@ -1,10 +1,10 @@
-import plain.models.database_url as database_url
+from plain.models import database_url
 
 
 def roundtrip(url: str):
-    config = database_url.parse(url)
+    config = database_url.parse_database_url(url)
     rebuilt = database_url.build_database_url(config)
-    assert database_url.parse(rebuilt) == config
+    assert database_url.parse_database_url(rebuilt) == config
 
 
 def test_postgres_roundtrip():

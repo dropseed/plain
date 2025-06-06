@@ -85,7 +85,7 @@ DATABASES: dict
 # Automatically configure DATABASES if a DATABASE_URL was given in the environment
 if "DATABASE_URL" in environ:
     DATABASES = {
-        "default": database_url.parse(
+        "default": database_url.parse_database_url(
             environ["DATABASE_URL"],
             # Enable persistent connections by default
             conn_max_age=int(environ.get("DATABASE_CONN_MAX_AGE", 600)),

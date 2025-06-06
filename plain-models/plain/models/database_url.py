@@ -60,13 +60,11 @@ class DBConfig(TypedDict, total=False):
     USER: str
 
 
-def parse(
+def parse_database_url(
     url: str,
     engine: str | None = None,
     conn_max_age: int | None = 0,
     conn_health_checks: bool = False,
-    # ssl_require: bool = False,
-    # test_options: dict | None = None,
 ) -> DBConfig:
     """Parses a database URL."""
     if url == "sqlite://:memory:":
@@ -78,9 +76,6 @@ def parse(
 
     # otherwise parse the url as normal
     parsed_config: DBConfig = {}
-
-    # if test_options is None:
-    #     test_options = {}
 
     spliturl = urlparse.urlsplit(url)
 
@@ -128,12 +123,6 @@ def parse(
             "ENGINE": engine,
         }
     )
-    # if test_options:
-    #     parsed_config.update(
-    #         {
-    #             "TEST": test_options,
-    #         }
-    #     )
 
     # Pass the query string into OPTIONS.
     options: dict[str, Any] = {}
@@ -143,13 +132,6 @@ def parse(
             continue
 
         options[key] = values[-1]
-
-    # if ssl_require:
-    #     options["sslmode"] = "require"
-
-    # Support for Postgres Schema URLs
-    # if "currentSchema" in options and engine == "plain.models.backends.postgresql":
-    #     options["options"] = "-c search_path={}".format(options.pop("currentSchema"))
 
     if options:
         parsed_config["OPTIONS"] = options
