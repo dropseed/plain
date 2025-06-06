@@ -1,3 +1,4 @@
+import importlib.util
 from importlib import import_module
 
 from plain.packages import packages_registry
@@ -25,24 +26,21 @@ class JinjaEnvironment(LazyObject):
         self._wrapped = env
 
         for package_config in packages_registry.get_package_configs():
-            # Allow this to fail in case there are import errors inside of their file
+            # Autoload template helpers if the package provides a ``templates`` module
             import_name = f"{package_config.name}.templates"
             if import_name in self._imported_modules:
                 continue
-            try:
-                import_module(import_name)
-                self._imported_modules.add(import_name)
-            except ModuleNotFoundError:
-                pass
+            if importlib.util.find_spec(import_name) is None:
+                continue
+            import_module(import_name)
+            self._imported_modules.add(import_name)
 
-        # Allow this to fail in case there are import errors inside of their file
+        # Autoload template helpers from the local ``app`` package if present
         import_name = "app.templates"
         if import_name not in self._imported_modules:
-            try:
+            if importlib.util.find_spec(import_name) is not None:
                 import_module(import_name)
                 self._imported_modules.add(import_name)
-            except ModuleNotFoundError:
-                pass
 
 
 environment = JinjaEnvironment()
