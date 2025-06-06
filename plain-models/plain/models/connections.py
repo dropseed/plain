@@ -35,15 +35,15 @@ class ConnectionHandler:
     """
 
     def __init__(self):
-        self._settings = None
+        self._settings: dict[str, DatabaseConfig] = {}
         self._connections = local()
 
     @cached_property
-    def settings(self):
+    def settings(self) -> DatabaseConfig:
         self._settings = self.configure_settings()
         return self._settings
 
-    def configure_settings(self):
+    def configure_settings(self) -> DatabaseConfig:
         databases = plain_settings.DATABASES
 
         if DEFAULT_DB_ALIAS not in databases:
@@ -74,9 +74,9 @@ class ConnectionHandler:
         return databases
 
     def create_connection(self, alias):
-        db = self.settings[alias]
-        backend = import_module(f"{db['ENGINE']}.base")
-        return backend.DatabaseWrapper(db, alias)
+        database_config = self.settings[alias]
+        backend = import_module(f"{database_config['ENGINE']}.base")
+        return backend.DatabaseWrapper(database_config, alias)
 
     def __getitem__(self, alias):
         try:
