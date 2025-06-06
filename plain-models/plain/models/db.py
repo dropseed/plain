@@ -1,4 +1,3 @@
-import pkgutil
 from functools import cached_property
 from importlib import import_module
 
@@ -98,37 +97,6 @@ class DatabaseErrorWrapper:
         return inner
 
 
-def load_backend(backend_name):
-    """
-    Return a database backend's "base" module given a fully qualified database
-    backend name, or raise an error if it doesn't exist.
-    """
-    try:
-        return import_module(f"{backend_name}.base")
-    except ImportError as e_user:
-        # The database backend wasn't found. Display a helpful error message
-        # listing all built-in database backends.
-        import plain.models.backends
-
-        builtin_backends = [
-            name
-            for _, name, ispkg in pkgutil.iter_modules(plain.models.backends.__path__)
-            if ispkg and name not in {"base", "dummy"}
-        ]
-        if backend_name not in [f"plain.models.backends.{b}" for b in builtin_backends]:
-            backend_reprs = map(repr, sorted(builtin_backends))
-            raise ImproperlyConfigured(
-                "{!r} isn't an available database backend or couldn't be "
-                "imported. Check the above exception. To use one of the "
-                "built-in backends, use 'plain.models.backends.XXX', where XXX "
-                "is one of:\n"
-                "    {}".format(backend_name, ", ".join(backend_reprs))
-            ) from e_user
-        else:
-            # If there's some other error, this must be an error in Plain
-            raise
-
-
 class ConnectionHandler(BaseConnectionHandler):
     settings_name = "DATABASES"
 
@@ -162,7 +130,7 @@ class ConnectionHandler(BaseConnectionHandler):
 
     def create_connection(self, alias):
         db = self.settings[alias]
-        backend = load_backend(db["ENGINE"])
+        backend = import_module(f"{db['ENGINE']}.base")
         return backend.DatabaseWrapper(db, alias)
 
 
