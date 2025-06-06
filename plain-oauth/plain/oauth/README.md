@@ -89,10 +89,12 @@ class ExampleOAuthProvider(OAuthProvider):
         data = response.json()
         return OAuthUser(
             # The provider ID is required
-            id=data["id"],
-            # And you can populate any of your User model fields with additional kwargs
-            email=data["email"],
-            username=data["username"],
+            provider_id=data["id"],
+            # Populate your User model fields using the user_model_fields dict
+            user_model_fields={
+                "email": data["email"],
+                "username": data["username"],
+            },
         )
 ```
 

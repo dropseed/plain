@@ -38,9 +38,11 @@ class DummyProvider(OAuthProvider):
 
     def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
         return OAuthUser(
-            id="dummy_id",
-            email="dummy@example.com",
-            username="dummy_username",
+            provider_id="dummy_id",
+            user_model_fields={
+                "email": "dummy@example.com",
+                "username": "dummy_username",
+            },
         )
 
 

@@ -10,9 +10,11 @@ class DummyProvider(OAuthProvider):
 
     def get_oauth_user(self, *, oauth_token):
         return OAuthUser(
-            id="dummy_user_id",
-            username="dummy_username",
-            email="dummy@example.com",
+            provider_id="dummy_user_id",
+            user_model_fields={
+                "username": "dummy_username",
+                "email": "dummy@example.com",
+            },
         )
 
     def check_request_state(self, *, request):

@@ -76,7 +76,7 @@ class OAuthConnection(models.Model):
         self.refresh_token_expires_at = oauth_token.refresh_token_expires_at
 
     def set_user_fields(self, oauth_user: "OAuthUser"):
-        self.provider_user_id = oauth_user.id
+        self.provider_user_id = oauth_user.provider_id
 
     def access_token_expired(self) -> bool:
         return (
@@ -97,7 +97,7 @@ class OAuthConnection(models.Model):
         try:
             connection = cls.objects.get(
                 provider_key=provider_key,
-                provider_user_id=oauth_user.id,
+                provider_user_id=oauth_user.provider_id,
             )
             connection.set_token_fields(oauth_token)
             connection.save()
@@ -137,7 +137,7 @@ class OAuthConnection(models.Model):
             connection = cls.objects.get(
                 user=user,
                 provider_key=provider_key,
-                provider_user_id=oauth_user.id,
+                provider_user_id=oauth_user.provider_id,
             )
         except cls.DoesNotExist:
             # Create our own instance (not using get_or_create)
@@ -145,7 +145,7 @@ class OAuthConnection(models.Model):
             connection = cls(
                 user=user,
                 provider_key=provider_key,
-                provider_user_id=oauth_user.id,
+                provider_user_id=oauth_user.provider_id,
             )
 
         connection.set_user_fields(oauth_user)

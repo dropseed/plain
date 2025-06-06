@@ -13,9 +13,11 @@ class DummyGitHubOAuthProvider(GitHubOAuthProvider):
 
     def get_oauth_user(self, oauth_token):
         return OAuthUser(
-            id="99",
-            username="userone",
-            email="user@example.com",
+            provider_id="99",
+            user_model_fields={
+                "username": "userone",
+                "email": "user@example.com",
+            },
         )
 
 

@@ -95,7 +95,9 @@ class GitHubOAuthProvider(OAuthProvider):
             raise OAuthError("A verified primary email address is required on GitHub")
 
         return OAuthUser(
-            id=user_id,
-            email=verified_primary_email,
-            username=username,
+            provider_id=user_id,
+            user_model_fields={
+                "email": verified_primary_email,
+                "username": username,
+            },
         )

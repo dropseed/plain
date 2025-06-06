@@ -51,7 +51,9 @@ class GitLabOAuthProvider(OAuthProvider):
         response.raise_for_status()
         data = response.json()
         return OAuthUser(
-            id=data["id"],
-            email=data["email"],
-            username=data["username"],
+            provider_id=data["id"],
+            user_model_fields={
+                "email": data["email"],
+                "username": data["username"],
+            },
         )

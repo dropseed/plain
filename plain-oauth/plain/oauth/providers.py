@@ -34,16 +34,16 @@ class OAuthToken:
 
 
 class OAuthUser:
-    def __init__(self, *, id: str, **user_model_fields: dict):
-        self.id = id  # ID on the provider's system
-        self.user_model_fields = user_model_fields
+    def __init__(self, *, provider_id: str, user_model_fields: dict | None = None):
+        self.provider_id = provider_id  # ID on the provider's system
+        self.user_model_fields = user_model_fields or {}
 
     def __str__(self):
         if "email" in self.user_model_fields:
             return self.user_model_fields["email"]
         if "username" in self.user_model_fields:
             return self.user_model_fields["username"]
-        return str(self.id)
+        return str(self.provider_id)
 
 
 class OAuthProvider:

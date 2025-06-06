@@ -69,7 +69,9 @@ class BitbucketOAuthProvider(OAuthProvider):
         ][0]
 
         return OAuthUser(
-            id=user_id,
-            email=confirmed_primary_email,
-            username=username,
+            provider_id=user_id,
+            user_model_fields={
+                "email": confirmed_primary_email,
+                "username": username,
+            },
         )
