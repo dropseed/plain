@@ -24,8 +24,8 @@ class OAuthToken:
         *,
         access_token: str,
         refresh_token: str = "",
-        access_token_expires_at: datetime.datetime = None,
-        refresh_token_expires_at: datetime.datetime = None,
+        access_token_expires_at: datetime.datetime | None = None,
+        refresh_token_expires_at: datetime.datetime | None = None,
     ):
         self.access_token = access_token
         self.refresh_token = refresh_token
@@ -181,7 +181,7 @@ class OAuthProvider:
         redirect_url = self.get_login_redirect_url(request=request)
         return self.get_redirect_response(redirect_url)
 
-    def login(self, *, request: HttpRequest, user: Any) -> Response:
+    def login(self, *, request: HttpRequest, user: Any) -> None:
         auth_login(request=request, user=user)
 
     def get_login_redirect_url(self, *, request: HttpRequest) -> str:
