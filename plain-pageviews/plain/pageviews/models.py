@@ -11,7 +11,9 @@ class Pageview(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     title = models.CharField(max_length=512, required=False)
-    referrer = models.URLField(max_length=1024, required=False)
+    # Referrers may not always be valid URLs (e.g. `android-app://...`).
+    # Use a plain CharField so we don't validate the scheme or format.
+    referrer = models.CharField(max_length=1024, required=False)
 
     user_id = models.CharField(max_length=255, required=False)
     session_key = models.CharField(max_length=255, required=False)
