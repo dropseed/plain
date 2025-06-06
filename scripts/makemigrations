@@ -1,0 +1,3 @@
+#!/bin/sh -e
+cd demos/full
+uv run plain makemigrations

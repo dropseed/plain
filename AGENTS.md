@@ -6,7 +6,7 @@ This is the only AGENTS.md file in the repo -- you don't need to look for others
 
 - Run tests on all packages (or specify a package to test): `./scripts/test [package] [pytest options]`
 - Lint and format code: `./scripts/fix`
-- Make database migrations: `cd demos/full && uv run plain makemigrations`
+- Make database migrations: `./scripts/makemigrations`
 
 ## READMEs
 
