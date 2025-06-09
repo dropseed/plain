@@ -57,7 +57,9 @@ def setup_db(request):
 
 
 @pytest.fixture
-def db(setup_db):
+def db(setup_db, request):
+    if "isolated_db" in request.fixturenames:
+        pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
     BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
@@ -101,6 +103,8 @@ def isolated_db(request):
     derived from the test function name to ensure isolation from the default
     test database.
     """
+    if "db" in request.fixturenames:
+        pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
     BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
