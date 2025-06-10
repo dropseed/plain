@@ -30,6 +30,12 @@ Run a Python script in the context of your app.
 
 View the runtime value of a named setting.
 
+### `plain help`
+
+Print help for all available commands and subcommands.
+Each command's help output is prefixed with the full command name for
+readability.
+
 ### `plain shell`
 
 Open a Python shell with the Plain loaded.
