@@ -5,7 +5,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["**/vendor/**", "**/*.min.*", "**/tests/**", "**/htmlcov/**"]
+    "ignore": ["**/vendor/**", "**/*.min.*", "**/tests/**", "**/htmlcov/**", "**/.venv/**"]
   },
   "formatter": {
     "indentStyle": "space"
