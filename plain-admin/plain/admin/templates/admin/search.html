@@ -37,7 +37,7 @@ Search
     {% for view in searchable_views %}
     <div
         hx-get="{{ view.get_view_url() }}?search={{ global_search_query }}&page_size=5"
-        hx-trigger="plainhtmx:load from:body"
+        hx-trigger="load from:body"
         plain-hx-fragment="list">
     </div>
     {% endfor %}

@@ -386,7 +386,7 @@ This app also includes an HTMX extension for adding error classes for failed req
 - `htmx-error-response-{{ status_code }}` for `htmx:responseError`
 - `htmx-error-send` for `htmx:sendError`
 
-To enable them, use `hx-ext="error-classes"`.
+To enable them, use `hx-ext="plain-errors"`.
 
 You can add the ones you want as Tailwind variants and use them to show error messages.
 

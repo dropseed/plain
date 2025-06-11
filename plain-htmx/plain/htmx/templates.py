@@ -85,7 +85,7 @@ class HTMXFragmentExtension(Extension):
             attrs.setdefault("hx-target", "this")
             attrs.setdefault("hx-indicator", "this")
             attrs_str = attrs_to_str(attrs)
-            return f'<{as_element} plain-hx-fragment="{fragment_name}" hx-get hx-trigger="plainhtmx:load from:body" {attrs_str}></{as_element}>'
+            return f'<{as_element} plain-hx-fragment="{fragment_name}" hx-get hx-trigger="load from:body" {attrs_str}></{as_element}>'
         else:
             # Swap innerHTML so we can re-run hx calls inside the fragment automatically
             # (render_template_fragment won't render this part of the node again, just the inner nodes)
