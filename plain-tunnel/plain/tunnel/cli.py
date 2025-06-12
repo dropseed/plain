@@ -28,6 +28,9 @@ def cli(destination, subdomain, tunnel_host, log_level):
     if not destination.startswith("http://") and not destination.startswith("https://"):
         destination = f"https://{destination}"
 
+    # Strip trailing slashes from the destination URL (maybe even enforce no path at all?)
+    destination = destination.rstrip("/")
+
     if not log_level:
         log_level = "INFO"
 
