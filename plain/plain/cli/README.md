@@ -52,7 +52,7 @@ __all__ = [
 ]
 ```
 
-### `plain urls`
+### `plain urls list`
 
 List all the URL patterns in your app.
 

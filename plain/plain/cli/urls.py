@@ -3,9 +3,15 @@ import sys
 import click
 
 
-@click.command()
+@click.group()
+def urls():
+    """URL related commands"""
+    pass
+
+
+@urls.command("list")
 @click.option("--flat", is_flag=True, help="List all URLs in a flat list")
-def urls(flat):
+def list_urls(flat):
     """Print all URL patterns under settings.URLS_ROUTER"""
     from plain.runtime import settings
     from plain.urls import URLResolver, get_resolver
