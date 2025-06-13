@@ -3,6 +3,7 @@ import os
 import pathlib
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from typing import TYPE_CHECKING
@@ -205,9 +206,11 @@ class TestBrowser:
         if self.database_url:
             env["DATABASE_URL"] = self.database_url
 
+        gunicorn = pathlib.Path(sys.executable).with_name("gunicorn")
+
         self.server_process = subprocess.Popen(
             [
-                "gunicorn",
+                str(gunicorn),
                 self.wsgi,
                 "--bind",
                 f"{self.host}:{self.port}",
