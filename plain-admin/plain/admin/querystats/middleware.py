@@ -21,7 +21,6 @@ class QueryStatsJSONEncoder(PlainJSONEncoder):
         try:
             return super().default(obj)
         except TypeError:
-            print(type(obj))
             if psycopg and isinstance(obj, psycopg.types.json.Json):
                 return obj.obj
             elif psycopg and isinstance(obj, psycopg.types.json.Jsonb):
