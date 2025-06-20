@@ -1,2 +1,1 @@
 # plain-passwords changelog
-

@@ -1,2 +1,1 @@
 # plain-htmx changelog
-

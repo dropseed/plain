@@ -1,2 +1,1 @@
 # plain-pytest changelog
-
