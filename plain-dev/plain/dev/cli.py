@@ -4,6 +4,7 @@ import multiprocessing
 import os
 import platform
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -36,9 +37,12 @@ ENTRYPOINT_GROUP = "plain.dev"
 @click.option(
     "--port",
     "-p",
-    default=8443,
-    type=int,
-    help="Port to run the web server on",
+    default="",
+    type=str,
+    help=(
+        "Port to run the web server on. If omitted, tries 8443 and "
+        "picks the next free port"
+    ),
 )
 @click.option(
     "--hostname",
@@ -137,11 +141,20 @@ def entrypoint(show_list, entrypoint):
 
 class Dev:
     def __init__(self, *, port, hostname, log_level):
-        self.port = port
         self.hostname = hostname
         self.log_level = log_level
 
         self.pid = DevPid()
+
+        if port:
+            self.port = int(port)
+            if not self._port_available(self.port):
+                click.secho(f"Port {self.port} in use", fg="red")
+                raise SystemExit(1)
+        else:
+            self.port = self._find_open_port(8443)
+            if self.port != 8443:
+                click.secho(f"Port 8443 in use, using {self.port}", fg="yellow")
 
         self.ssl_key_path = None
         self.ssl_cert_path = None
@@ -197,6 +210,18 @@ class Dev:
         self.console_status = self.console.status(status_bar)
 
         self.poncho = PonchoManager(printer=Printer(lambda s: self.console.out(s)))
+
+    def _find_open_port(self, start_port):
+        port = start_port
+        while not self._port_available(port):
+            port += 1
+        return port
+
+    def _port_available(self, port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(0.5)
+            result = sock.connect_ex(("127.0.0.1", port))
+        return result != 0
 
     def run(self):
         self.pid.write()
