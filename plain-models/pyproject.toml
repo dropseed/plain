@@ -8,6 +8,9 @@ requires-python = ">=3.11"
 dependencies = [
     "plain<1.0.0",
     "sqlparse>=0.3.1",
+    # plain.models relies on OpenTelemetry semantic conventions for
+    # span/attribute constants used in observability helpers.
+    "opentelemetry-semantic-conventions>=0.55b1",
 ]
 
 [project.entry-points."plain.setup"]

@@ -1,6 +1,8 @@
 import logging
 from http import HTTPMethod
 
+from opentelemetry import trace
+
 from plain.http import (
     HttpRequest,
     JsonResponse,
@@ -14,6 +16,9 @@ from plain.utils.decorators import classonlymethod
 from .exceptions import ResponseException
 
 logger = logging.getLogger("plain.request")
+
+
+tracer = trace.get_tracer(__name__)
 
 
 class View:
@@ -35,9 +40,10 @@ class View:
     @classonlymethod
     def as_view(cls, *init_args, **init_kwargs):
         def view(request, *url_args, **url_kwargs):
-            v = cls(*init_args, **init_kwargs)
-            v.setup(request, *url_args, **url_kwargs)
-            return v.get_response()
+            with tracer.start_as_current_span("plain.view"):
+                v = cls(*init_args, **init_kwargs)
+                v.setup(request, *url_args, **url_kwargs)
+                return v.get_response()
 
         view.view_class = cls
 

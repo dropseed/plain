@@ -1,6 +1,9 @@
 import logging
 import types
 
+from opentelemetry import trace
+from opentelemetry.semconv.attributes import http_attributes, url_attributes
+
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import log_response
 from plain.runtime import settings
@@ -24,6 +27,9 @@ BUILTIN_AFTER_MIDDLEWARE = [
     # can immediately redirect to the slash-appended path if there is one.
     "plain.internal.middleware.slash.RedirectSlashMiddleware",
 ]
+
+
+tracer = trace.get_tracer(__name__)
 
 
 class BaseHandler:
@@ -59,18 +65,32 @@ class BaseHandler:
 
     def get_response(self, request):
         """Return a Response object for the given HttpRequest."""
-        # Setup default url resolver for this thread
-        response = self._middleware_chain(request)
-        response._resource_closers.append(request.close)
-        if response.status_code >= 400:
-            log_response(
-                "%s: %s",
-                response.reason_phrase,
-                request.path,
-                response=response,
-                request=request,
+
+        # Almost need to set request_for_tracing(request) here...
+        # maybe it isn't even a tracing thing -- just an available context var?
+
+        # By moving this here instead of _get_response, we don't have our sampler configured yet
+        # for custom use...
+        with tracer.start_as_current_span("plain.get_response") as span:
+            span.set_attribute("plain.request_id", request.unique_id)
+            span.set_attribute(http_attributes.HTTP_REQUEST_METHOD, request.method)
+
+            response = self._middleware_chain(request)
+            response._resource_closers.append(request.close)
+
+            span.set_attribute(
+                http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
             )
-        return response
+
+            if response.status_code >= 400:
+                log_response(
+                    "%s: %s",
+                    response.reason_phrase,
+                    request.path,
+                    response=response,
+                    request=request,
+                )
+            return response
 
     def _get_response(self, request):
         """
@@ -94,9 +114,17 @@ class BaseHandler:
         Retrieve/set the urlrouter for the request. Return the view resolved,
         with its args and kwargs.
         """
+
+        span = trace.get_current_span()
+        # TODO set the other url stuff
+        span.set_attribute(url_attributes.URL_PATH, request.path_info)
+
         resolver = get_resolver()
         # Resolve the view, and assign the match object back to the request.
         resolver_match = resolver.resolve(request.path_info)
+
+        span.set_attribute(http_attributes.HTTP_ROUTE, resolver_match.route)
+
         request.resolver_match = resolver_match
         return resolver_match
 

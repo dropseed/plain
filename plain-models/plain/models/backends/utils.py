@@ -7,6 +7,9 @@ from contextlib import contextmanager
 from hashlib import md5
 
 from plain.models.db import NotSupportedError
+
+# OpenTelemetry observability helpers (centralised).
+from plain.models.observability import db_span
 from plain.utils.dateparse import parse_time
 
 logger = logging.getLogger("plain.models.backends")
@@ -80,18 +83,28 @@ class CursorWrapper:
         return executor(sql, params, many, context)
 
     def _execute(self, sql, params, *ignored_wrapper_args):
-        self.db.validate_no_broken_transaction()
-        with self.db.wrap_database_errors:
-            if params is None:
-                # params default might be backend specific.
-                return self.cursor.execute(sql)
-            else:
-                return self.cursor.execute(sql, params)
+        # Wrap in an OpenTelemetry span with standard attributes.
+        with db_span(self.db, sql):
+            self.db.validate_no_broken_transaction()
+            with self.db.wrap_database_errors:
+                if params is None:
+                    return self.cursor.execute(sql)
+                else:
+                    return self.cursor.execute(sql, params)
 
     def _executemany(self, sql, param_list, *ignored_wrapper_args):
-        self.db.validate_no_broken_transaction()
-        with self.db.wrap_database_errors:
-            return self.cursor.executemany(sql, param_list)
+        # Determine batch size when param_list is sized; may be expensive for
+        # generators, so guard with try/except.
+        batch_size = None
+        try:
+            batch_size = len(param_list)
+        except TypeError:
+            pass
+
+        with db_span(self.db, sql, many=True, batch_size=batch_size):
+            self.db.validate_no_broken_transaction()
+            with self.db.wrap_database_errors:
+                return self.cursor.executemany(sql, param_list)
 
 
 class CursorDebugWrapper(CursorWrapper):

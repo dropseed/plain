@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Querystats</title>
+    {% tailwind_css %}
+</head>
+<body class="text-stone-300">
+
+    {% if observability_enabled %}
+    <div class="flex items-center justify-between border-b border-white/5 px-6 h-14 fixed top-0 left-0 right-0 bg-stone-950 z-10">
+        <!-- <h1 class="text-lg font-semibold">Querystats</h1> -->
+        <div></div>
+        <div class="flex items-center space-x-2">
+            <form method="get" action=".">
+                {{ csrf_input }}
+                <button type="submit" class="px-2 py-px text-sm rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer whitespace-nowrap">Reload</button>
+            </form>
+            <form method="post" action=".">
+                {{ csrf_input }}
+                <input type="hidden" name="querystats_action" value="clear">
+                <button type="submit" class="px-2 py-px text-sm rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer whitespace-nowrap">Clear</button>
+            </form>
+            <form method="post" action=".">
+                {{ csrf_input }}
+                <input type="hidden" name="querystats_action" value="disable">
+                <button type="submit" class="px-2 py-px text-sm rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer whitespace-nowrap">Disable</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if observability %}
+    <div class="flex mt-2 h-full">
+        <aside id="sidebar" class="fixed left-0 top-14 bottom-0 w-82 overflow-auto p-4">
+            <ul class="space-y-2">
+                {% for request_id, request_data in observability.get("requests", {}).items() %}
+                <li>
+                    <button data-request-id="{{ request_id }}" class="w-full text-left px-2 py-1 rounded hover:bg-stone-700 cursor-pointer">
+                        <span class="text-sm">{{ request_id }}</span>
+                        <span class="font-semibold bg-white/5 rounded-sm px-1 py-0.5 text-xs"></span>
+                        <div class="text-xs text-stone-400"></div>
+                        <div class="text-xs text-stone-500"></div>
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <main id="content" class="flex-1 p-6 overflow-auto ml-82 mt-14">
+            {% for request_id, request_data in observability.get("requests", {}).items() %}
+            <div class="request-detail" data-request-id="{{ request_id }}" style="display: none;">
+
+                <div class="mt-4 space-y-3 text-xs">
+                    {% for span in request_data.get("spans", []) %}
+                    <details id="{{ request_id }}-span-{{ loop.index }}" class="p-2 rounded bg-white/5">
+                        <summary class="truncate">
+                            {{ span.name }}
+                        </summary>
+                        {{ span }}
+                    </details>
+                    {% else %}
+                    <div>No spans...</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </main>
+    </div>
+    {% elif observability_enabled %}
+    <div class="text-center text-white/30 py-8">Querystats are enabled but nothing has been recorded yet.</div>
+    {% else %}
+    <div class="text-center py-8">
+        <div class="text-white/30">Querystats are disabled.</div>
+        <form method="post" action=".">
+            {{ csrf_input }}
+            <input type="hidden" name="querystats_action" value="enable">
+            <button type="submit" class="mt-2 px-2 py-px text-sm rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer whitespace-nowrap">Enable</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const buttons = document.querySelectorAll('#sidebar [data-request-id]');
+            const details = document.querySelectorAll('#content .request-detail');
+            buttons.forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const id = this.getAttribute('data-request-id');
+                    details.forEach(div => div.style.display = 'none');
+                    const sel = document.querySelector('#content .request-detail[data-request-id="' + id + '"]');
+                    if (sel) sel.style.display = 'block';
+                    buttons.forEach(b => b.classList.remove('bg-stone-700', 'text-white'));
+                    this.classList.add('bg-stone-700', 'text-white');
+                });
+            });
+            if (buttons.length > 0) buttons[0].click();
+        });
+    </script>
+
+    </body>
+</html>

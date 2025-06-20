@@ -30,6 +30,7 @@ dependencies = [
     "plain-tunnel",
     "plain-vendor",
     "plain-worker",
+    "plain-observe",
 ]
 
 [tool.plain.tailwind]

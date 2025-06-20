@@ -30,6 +30,7 @@ requires-python = ">=3.11"
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }
 "plain-worker" = { workspace = true }
+"plain-observe" = { workspace = true }
 
 [tool.uv.workspace]
 members = [

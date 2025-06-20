@@ -20,6 +20,7 @@ INSTALLED_PACKAGES = [
     "plain.tailwind",
     "plain.worker",
     "plain.redirection",
+    "plain.observe",
     "app.users",
 ]
 
@@ -38,6 +39,7 @@ DATABASES = {
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
     "plain.auth.middleware.AuthenticationMiddleware",
+    "plain.observe.middelware.ObserveMiddleware",
     "plain.admin.AdminMiddleware",
 ]
 
