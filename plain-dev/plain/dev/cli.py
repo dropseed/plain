@@ -20,6 +20,7 @@ from rich.text import Text
 from plain.cli import register_cli
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
+from .dev_pid import DevPid
 from .mkcert import MkcertManager
 from .poncho.manager import Manager as PonchoManager
 from .poncho.printer import Printer
@@ -58,6 +59,10 @@ def cli(ctx, port, hostname, log_level):
 
     if ctx.invoked_subcommand:
         return
+
+    if DevPid().exists():
+        click.secho("`plain dev` already running", fg="yellow")
+        sys.exit(1)
 
     if not hostname:
         project_name = os.path.basename(
@@ -136,6 +141,8 @@ class Dev:
         self.hostname = hostname
         self.log_level = log_level
 
+        self.pid = DevPid()
+
         self.ssl_key_path = None
         self.ssl_cert_path = None
 
@@ -192,6 +199,7 @@ class Dev:
         self.poncho = PonchoManager(printer=Printer(lambda s: self.console.out(s)))
 
     def run(self):
+        self.pid.write()
         mkcert_manager = MkcertManager()
         mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
         self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
@@ -253,6 +261,7 @@ class Dev:
             # Remove the status bar
             self.console_status.stop()
         finally:
+            self.pid.rm()
             # Make sure the services pid gets removed if we set it
             if services_pid:
                 services_pid.rm()
