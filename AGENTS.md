@@ -2,6 +2,8 @@
 
 This is the only AGENTS.md file in the repo -- you don't need to look for others.
 
+When you need a `python` shell, use `uv run python`.
+
 ## Commands
 
 - Run tests on all packages (or specify a package to test): `./scripts/test [package] [pytest options]`
