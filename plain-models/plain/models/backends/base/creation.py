@@ -243,7 +243,7 @@ class BaseDatabaseCreation:
     def test_db_signature(self, prefix=""):
         """
         Return a tuple with elements of self.connection.settings_dict (a
-        DATABASES setting value) that uniquely identify a database
+        DATABASE setting value) that uniquely identify a database
         accordingly to the RDBMS particularities.
         """
         settings_dict = self.connection.settings_dict

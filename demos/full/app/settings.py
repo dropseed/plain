@@ -28,11 +28,9 @@ EMAIL_DEFAULT_FROM = "from@example.com"
 SUPPORT_EMAIL = "support@example.com"
 OAUTH_LOGIN_PROVIDERS = {}
 
-DATABASES = {
-    "default": {
-        "ENGINE": "plain.models.backends.sqlite3",
-        "NAME": ":memory:",
-    }
+DATABASE = {
+    "ENGINE": "plain.models.backends.sqlite3",
+    "NAME": ":memory:",
 }
 
 MIDDLEWARE = [
