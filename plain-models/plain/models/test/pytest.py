@@ -6,10 +6,10 @@ from plain.signals import request_finished, request_started
 
 from .. import transaction
 from ..backends.base.base import BaseDatabaseWrapper
-from ..db import close_old_connections, connections
+from ..db import close_old_connections, db_connection
 from .utils import (
-    setup_databases,
-    teardown_databases,
+    setup_database,
+    teardown_database,
 )
 
 
@@ -40,7 +40,7 @@ def setup_db(request):
     verbosity = request.config.option.verbose
 
     # Set up the test db across the entire session
-    _old_db_config = setup_databases(verbosity=verbosity)
+    _old_db_name = setup_database(verbosity=verbosity)
 
     # Keep connections open during request client / testing
     request_started.disconnect(close_old_connections)
@@ -53,7 +53,7 @@ def setup_db(request):
     request_finished.connect(close_old_connections)
 
     # When the test session is done, tear down the test db
-    teardown_databases(_old_db_config, verbosity=verbosity)
+    teardown_database(_old_db_name, verbosity=verbosity)
 
 
 @pytest.fixture
@@ -63,37 +63,26 @@ def db(setup_db, request):
     # Set .cursor() back to the original implementation to unblock it
     BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
-    # Keep track of the atomic blocks so we can roll them back
-    atomics = {}
+    if not db_connection.features.supports_transactions:
+        pytest.fail("Database does not support transactions")
 
-    for connection in connections.all():
-        # By default we use transactions to rollback changes,
-        # so we need to ensure the database supports transactions
-        if not connection.features.supports_transactions:
-            pytest.fail("Database does not support transactions")
-
-        # Clear the queries log before each test?
-        # connection.queries_log.clear()
-
-        atomic = transaction.atomic(using=connection.alias)
-        atomic._from_testcase = True  # TODO remove this somehow?
-        atomic.__enter__()
-        atomics[connection] = atomic
+    atomic = transaction.atomic()
+    atomic._from_testcase = True  # TODO remove this somehow?
+    atomic.__enter__()
 
     yield
 
-    for connection, atomic in atomics.items():
-        if (
-            connection.features.can_defer_constraint_checks
-            and not connection.needs_rollback
-            and connection.is_usable()
-        ):
-            connection.check_constraints()
+    if (
+        db_connection.features.can_defer_constraint_checks
+        and not db_connection.needs_rollback
+        and db_connection.is_usable()
+    ):
+        db_connection.check_constraints()
 
-        transaction.set_rollback(True, using=connection.alias)
-        atomic.__exit__(None, None, None)
+    db_connection.set_rollback(True)
+    atomic.__exit__(None, None, None)
 
-        connection.close()
+    db_connection.close()
 
 
 @pytest.fixture
@@ -115,9 +104,9 @@ def isolated_db(request):
     prefix = re.sub(r"[^0-9A-Za-z_]+", "_", raw_name)
 
     # Set up a fresh test database for this test, using the prefix
-    _old_db_config = setup_databases(verbosity=verbosity, prefix=prefix)
+    _old_db_name = setup_database(verbosity=verbosity, prefix=prefix)
 
     yield
 
     # Tear down the test database created for this test
-    teardown_databases(_old_db_config, verbosity=verbosity)
+    teardown_database(_old_db_name, verbosity=verbosity)

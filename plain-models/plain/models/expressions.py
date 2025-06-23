@@ -12,10 +12,9 @@ from plain.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models import fields
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import (
-    DEFAULT_DB_ALIAS,
     DatabaseError,
     NotSupportedError,
-    connections,
+    db_connection,
 )
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
@@ -1782,20 +1781,18 @@ class WindowFrame(Expression):
 
     def __str__(self):
         if self.start.value is not None and self.start.value < 0:
-            start = (
-                f"{abs(self.start.value)} {connections[DEFAULT_DB_ALIAS].ops.PRECEDING}"
-            )
+            start = f"{abs(self.start.value)} {db_connection.ops.PRECEDING}"
         elif self.start.value is not None and self.start.value == 0:
-            start = connections[DEFAULT_DB_ALIAS].ops.CURRENT_ROW
+            start = db_connection.ops.CURRENT_ROW
         else:
-            start = connections[DEFAULT_DB_ALIAS].ops.UNBOUNDED_PRECEDING
+            start = db_connection.ops.UNBOUNDED_PRECEDING
 
         if self.end.value is not None and self.end.value > 0:
-            end = f"{self.end.value} {connections[DEFAULT_DB_ALIAS].ops.FOLLOWING}"
+            end = f"{self.end.value} {db_connection.ops.FOLLOWING}"
         elif self.end.value is not None and self.end.value == 0:
-            end = connections[DEFAULT_DB_ALIAS].ops.CURRENT_ROW
+            end = db_connection.ops.CURRENT_ROW
         else:
-            end = connections[DEFAULT_DB_ALIAS].ops.UNBOUNDED_FOLLOWING
+            end = db_connection.ops.UNBOUNDED_FOLLOWING
         return self.template % {
             "frame_type": self.frame_type,
             "start": start,

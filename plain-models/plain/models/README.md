@@ -60,19 +60,17 @@ To connect to a database, you can provide a `DATABASE_URL` environment variable.
 DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 ```
 
-Or you can manually define the `DATABASES` setting.
+Or you can manually define the `DATABASE` setting.
 
 ```python
 # app/settings.py
-DATABASES = {
-    "default": {
-        "ENGINE": "plain.models.backends.postgresql",
-        "NAME": "dbname",
-        "USER": "user",
-        "PASSWORD": "password",
-        "HOST": "localhost",
-        "PORT": "5432",
-    }
+DATABASE = {
+    "ENGINE": "plain.models.backends.postgresql",
+    "NAME": "dbname",
+    "USER": "user",
+    "PASSWORD": "password",
+    "HOST": "localhost",
+    "PORT": "5432",
 }
 ```
 

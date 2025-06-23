@@ -5,21 +5,16 @@ from itertools import chain
 from plain.models.registry import models_registry
 from plain.packages import packages_registry
 from plain.preflight import Error, Warning, register_check
-from plain.runtime import settings
 
 
 @register_check
-def check_database_backends(databases=None, **kwargs):
-    if databases is None:
+def check_database_backends(database=False, **kwargs):
+    if not database:
         return []
 
-    from plain.models.db import connections
+    from plain.models.db import db_connection
 
-    issues = []
-    for alias in databases:
-        conn = connections[alias]
-        issues.extend(conn.validation.check(**kwargs))
-    return issues
+    return db_connection.validation.check(**kwargs)
 
 
 @register_check
@@ -51,24 +46,14 @@ def check_all_models(package_configs=None, **kwargs):
             indexes[model_index.name].append(model._meta.label)
         for model_constraint in model._meta.constraints:
             constraints[model_constraint.name].append(model._meta.label)
-    if settings.DATABASE_ROUTERS:
-        error_class, error_id = Warning, "models.W035"
-        error_hint = (
-            "You have configured settings.DATABASE_ROUTERS. Verify that %s "
-            "are correctly routed to separate databases."
-        )
-    else:
-        error_class, error_id = Error, "models.E028"
-        error_hint = None
     for db_table, model_labels in db_table_models.items():
         if len(model_labels) != 1:
             model_labels_str = ", ".join(model_labels)
             errors.append(
-                error_class(
+                Error(
                     f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
                     obj=db_table,
-                    hint=(error_hint % model_labels_str) if error_hint else None,
-                    id=error_id,
+                    id="models.E028",
                 )
             )
     for index_name, model_labels in indexes.items():
@@ -200,34 +185,30 @@ def check_lazy_references(package_configs=None, **kwargs):
 
 @register_check
 def check_database_tables(package_configs, **kwargs):
-    from plain.models.db import connections
+    from plain.models.db import db_connection
 
-    databases = kwargs.get("databases", None)
-    if not databases:
+    if not kwargs.get("database", False):
         return []
 
     errors = []
 
-    for database in databases:
-        conn = connections[database]
-        db_tables = conn.introspection.table_names()
-        model_tables = conn.introspection.plain_table_names()
-
-        unknown_tables = set(db_tables) - set(model_tables)
-        unknown_tables.discard("plainmigrations")  # Know this could be there
-        if unknown_tables:
-            table_names = ", ".join(unknown_tables)
-            specific_hint = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
-            errors.append(
-                Warning(
-                    f"Unknown tables in {database} database: {table_names}",
-                    hint=(
-                        "Tables may be from packages/models that have been uninstalled. "
-                        "Make sure you have a backup and delete the tables manually "
-                        f"(ex. `{specific_hint}`)."
-                    ),
-                    id="plain.models.W001",
-                )
+    db_tables = db_connection.introspection.table_names()
+    model_tables = db_connection.introspection.plain_table_names()
+    unknown_tables = set(db_tables) - set(model_tables)
+    unknown_tables.discard("plainmigrations")  # Know this could be there
+    if unknown_tables:
+        table_names = ", ".join(unknown_tables)
+        specific_hint = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
+        errors.append(
+            Warning(
+                f"Unknown tables in default database: {table_names}",
+                hint=(
+                    "Tables may be from packages/models that have been uninstalled. "
+                    "Make sure you have a backup and delete the tables manually "
+                    f"(ex. `{specific_hint}`)."
+                ),
+                id="plain.models.W001",
             )
+        )
 
     return errors

@@ -8,7 +8,7 @@ from plain.models import (
     sql,
     transaction,
 )
-from plain.models.db import IntegrityError, connections
+from plain.models.db import IntegrityError, db_connection
 from plain.models.query import QuerySet
 
 
@@ -31,7 +31,7 @@ def CASCADE(collector, field, sub_objs, using):
         nullable=field.allow_null,
         fail_on_restricted=False,
     )
-    if field.allow_null and not connections[using].features.can_defer_constraint_checks:
+    if field.allow_null and not db_connection.features.can_defer_constraint_checks:
         collector.add_field_update(field, None, sub_objs)
 
 
@@ -93,8 +93,7 @@ def get_candidate_relations_to_delete(opts):
 
 
 class Collector:
-    def __init__(self, using, origin=None):
-        self.using = using
+    def __init__(self, origin=None):
         # A Model or QuerySet object.
         self.origin = origin
         # Initially, {model: {instances}}, later values become lists.
@@ -210,11 +209,12 @@ class Collector:
 
     def get_del_batches(self, objs, fields):
         """
-        Return the objs in suitably sized batches for the used connection.
+        Return the objs in suitably sized batches for the used db_connection.
         """
         field_names = [field.name for field in fields]
         conn_batch_size = max(
-            connections[self.using].ops.bulk_batch_size(field_names, objs), 1
+            db_connection.ops.bulk_batch_size(field_names, objs),
+            1,
         )
         if len(objs) > conn_batch_size:
             return [
@@ -300,7 +300,7 @@ class Collector:
                     sub_objs = sub_objs.only(*tuple(referenced_fields))
                 if getattr(on_delete, "lazy_sub_objs", False) or sub_objs:
                     try:
-                        on_delete(self, field, sub_objs, self.using)
+                        on_delete(self, field, sub_objs)
                     except ProtectedError as error:
                         key = f"'{field.model.__name__}.{field.name}'"
                         protected_objects[key] += error.protected_objects
@@ -352,7 +352,7 @@ class Collector:
             [(f"{related_field.name}__in", objs) for related_field in related_fields],
             connector=query_utils.Q.OR,
         )
-        return related_model._base_manager.using(self.using).filter(predicate)
+        return related_model._base_manager.filter(predicate)
 
     def sort(self):
         sorted_models = []
@@ -388,17 +388,15 @@ class Collector:
         if len(self.data) == 1 and len(instances) == 1:
             instance = list(instances)[0]
             if self.can_fast_delete(instance):
-                with transaction.mark_for_rollback_on_error(self.using):
-                    count = sql.DeleteQuery(model).delete_batch(
-                        [instance.pk], self.using
-                    )
+                with transaction.mark_for_rollback_on_error():
+                    count = sql.DeleteQuery(model).delete_batch([instance.pk])
                 setattr(instance, model._meta.pk.attname, None)
                 return count, {model._meta.label: count}
 
-        with transaction.atomic(using=self.using, savepoint=False):
+        with transaction.atomic(savepoint=False):
             # fast deletes
             for qs in self.fast_deletes:
-                count = qs._raw_delete(using=self.using)
+                count = qs._raw_delete()
                 if count:
                     deleted_counter[qs.model._meta.label] += count
 
@@ -421,7 +419,7 @@ class Collector:
                     model = objs[0].__class__
                     query = sql.UpdateQuery(model)
                     query.update_batch(
-                        list({obj.pk for obj in objs}), {field.name: value}, self.using
+                        list({obj.pk for obj in objs}), {field.name: value}
                     )
 
             # reverse instance collections
@@ -432,7 +430,7 @@ class Collector:
             for model, instances in self.data.items():
                 query = sql.DeleteQuery(model)
                 pk_list = [obj.pk for obj in instances]
-                count = query.delete_batch(pk_list, self.using)
+                count = query.delete_batch(pk_list)
                 if count:
                     deleted_counter[model._meta.label] += count
 

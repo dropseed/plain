@@ -50,11 +50,11 @@ def testbrowser(browser, request):
         # If it is, then we need to run a server that has a database connection to the isolated database for this test.
         request.getfixturevalue("isolated_db")
 
-        from plain.models import DEFAULT_DB_ALIAS, connections
+        from plain.models import db_connection
         from plain.models.database_url import build_database_url
 
         # Get a database url for the isolated db that we can have gunicorn connect to also.
-        database_url = build_database_url(connections[DEFAULT_DB_ALIAS].settings_dict)
+        database_url = build_database_url(db_connection.settings_dict)
     except pytest.FixtureLookupError:
         # isolated_db fixture not available, use empty database_url
         database_url = ""

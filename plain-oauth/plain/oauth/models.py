@@ -164,34 +164,31 @@ class OAuthConnection(models.Model):
         """
         errors = super().check(**kwargs)
 
-        databases = kwargs.get("databases", None)
-        if not databases:
+        database = kwargs.get("database", False)
+        if not database:
             return errors
 
         from .providers import get_provider_keys
 
-        for database in databases:
-            try:
-                keys_in_db = set(
-                    cls.objects.using(database)
-                    .values_list("provider_key", flat=True)
-                    .distinct()
-                )
-            except (OperationalError, ProgrammingError):
-                # Check runs on manage.py migrate, and the table may not exist yet
-                # or it may not be installed on the particular database intentionally
-                continue
+        try:
+            keys_in_db = set(
+                cls.objects.values_list("provider_key", flat=True).distinct()
+            )
+        except (OperationalError, ProgrammingError):
+            # Check runs on manage.py migrate, and the table may not exist yet
+            # or it may not be installed on the particular database intentionally
+            return errors
 
-            keys_in_settings = set(get_provider_keys())
+        keys_in_settings = set(get_provider_keys())
 
-            if keys_in_db - keys_in_settings:
-                errors.append(
-                    Error(
-                        "The following OAuth providers are in the database but not in the settings: {}".format(
-                            ", ".join(keys_in_db - keys_in_settings)
-                        ),
-                        id="plain.oauth.E001",
-                    )
+        if keys_in_db - keys_in_settings:
+            errors.append(
+                Error(
+                    "The following OAuth providers are in the database but not in the settings: {}".format(
+                        ", ".join(keys_in_db - keys_in_settings)
+                    ),
+                    id="plain.oauth.E001",
                 )
+            )
 
         return errors

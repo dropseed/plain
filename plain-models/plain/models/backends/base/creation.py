@@ -45,7 +45,7 @@ class BaseDatabaseCreation:
         )
 
         self.connection.close()
-        settings.DATABASES[self.connection.alias]["NAME"] = test_database_name
+        settings.DATABASE["NAME"] = test_database_name
         self.connection.settings_dict["NAME"] = test_database_name
 
         # We report migrate messages at one level lower than that
@@ -54,7 +54,6 @@ class BaseDatabaseCreation:
         migrate.callback(
             package_label=None,
             migration_name=None,
-            database=self.connection.alias,
             fake=False,
             fake_initial=False,
             plan=False,
@@ -219,7 +218,7 @@ class BaseDatabaseCreation:
 
         # Restore the original database name
         if old_database_name is not None:
-            settings.DATABASES[self.connection.alias]["NAME"] = old_database_name
+            settings.DATABASE["NAME"] = old_database_name
             self.connection.settings_dict["NAME"] = old_database_name
 
     def _destroy_test_db(self, test_database_name, verbosity):
@@ -244,7 +243,7 @@ class BaseDatabaseCreation:
     def test_db_signature(self, prefix=""):
         """
         Return a tuple with elements of self.connection.settings_dict (a
-        DATABASES setting value) that uniquely identify a database
+        DATABASE setting value) that uniquely identify a database
         accordingly to the RDBMS particularities.
         """
         settings_dict = self.connection.settings_dict

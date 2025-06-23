@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from plain import signing
 from plain.exceptions import SuspiciousOperation
-from plain.models import DatabaseError, IntegrityError, router, transaction
+from plain.models import DatabaseError, IntegrityError, transaction
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.crypto import get_random_string
@@ -228,14 +228,12 @@ class SessionStore:
             expires_at=timezone.now() + timedelta(seconds=settings.SESSION_COOKIE_AGE),
         )
 
-        using = router.db_for_write(self._model, instance=obj)
         try:
-            with transaction.atomic(using=using):
+            with transaction.atomic():
                 obj.save(
                     clean_and_validate=False,
                     force_insert=must_create,
                     force_update=not must_create,
-                    using=using,
                 )
         except IntegrityError:
             if must_create:

@@ -92,7 +92,7 @@ class CreateModel(ModelOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         model = to_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
+        if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.create_model(model)
 
     def describe(self):
@@ -249,7 +249,7 @@ class DeleteModel(ModelOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         model = from_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
+        if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.delete_model(model)
 
     def references_model(self, name, package_label):
@@ -293,7 +293,7 @@ class RenameModel(ModelOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         new_model = to_state.models_registry.get_model(package_label, self.new_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, new_model):
+        if self.allow_migrate_model(schema_editor.connection, new_model):
             old_model = from_state.models_registry.get_model(
                 package_label, self.old_name
             )
@@ -384,7 +384,7 @@ class AlterModelTable(ModelOptionOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         new_model = to_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, new_model):
+        if self.allow_migrate_model(schema_editor.connection, new_model):
             old_model = from_state.models_registry.get_model(package_label, self.name)
             schema_editor.alter_db_table(
                 new_model,
@@ -422,7 +422,7 @@ class AlterModelTableComment(ModelOptionOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         new_model = to_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection.alias, new_model):
+        if self.allow_migrate_model(schema_editor.connection, new_model):
             old_model = from_state.models_registry.get_model(package_label, self.name)
             schema_editor.alter_db_table_comment(
                 new_model,
@@ -535,7 +535,7 @@ class AddIndex(IndexOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
+        if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_index(model, self.index)
 
     def deconstruct(self):
@@ -579,7 +579,7 @@ class RemoveIndex(IndexOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         model = from_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
+        if self.allow_migrate_model(schema_editor.connection, model):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             index = from_model_state.get_index_by_name(self.name)
             schema_editor.remove_index(model, index)
@@ -654,7 +654,7 @@ class RenameIndex(IndexOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if not self.allow_migrate_model(schema_editor.connection.alias, model):
+        if not self.allow_migrate_model(schema_editor.connection, model):
             return
 
         if self.old_fields:
@@ -740,7 +740,7 @@ class AddConstraint(IndexOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
+        if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_constraint(model, self.constraint)
 
     def deconstruct(self):
@@ -773,7 +773,7 @@ class RemoveConstraint(IndexOperation):
 
     def database_forwards(self, package_label, schema_editor, from_state, to_state):
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection.alias, model):
+        if self.allow_migrate_model(schema_editor.connection, model):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             constraint = from_model_state.get_constraint_by_name(self.name)
             schema_editor.remove_constraint(model, constraint)

@@ -7,7 +7,7 @@ from functools import cached_property
 from plain.exceptions import FieldDoesNotExist
 from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
-from plain.models.db import DEFAULT_DB_ALIAS, connections
+from plain.models.db import db_connection
 from plain.models.fields import BigAutoField
 from plain.models.manager import Manager
 from plain.utils.datastructures import ImmutableList
@@ -105,7 +105,6 @@ class Options:
 
     def contribute_to_class(self, cls, name):
         from plain.models.backends.utils import truncate_name
-        from plain.models.db import connections
 
         cls._meta = self
         self.model = cls
@@ -155,7 +154,7 @@ class Options:
             self.db_table = f"{self.package_label}_{self.model_name}"
             self.db_table = truncate_name(
                 self.db_table,
-                connections[DEFAULT_DB_ALIAS].ops.max_name_length(),
+                db_connection.ops.max_name_length(),
             )
 
     def _format_names_with_class(self, cls, objs):
@@ -223,11 +222,9 @@ class Options:
 
     def can_migrate(self, connection):
         """
-        Return True if the model can/should be migrated on the `connection`.
-        `connection` can be either a real connection or a connection alias.
+        Return True if the model can/should be migrated on the given
+        `connection` object.
         """
-        if isinstance(connection, str):
-            connection = connections[connection]
         if self.required_db_vendor:
             return self.required_db_vendor == connection.vendor
         if self.required_db_features:

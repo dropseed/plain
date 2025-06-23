@@ -14,7 +14,6 @@ from plain.models.backends import utils
 from plain.models.backends.base.validation import BaseDatabaseValidation
 from plain.models.backends.utils import debug_transaction
 from plain.models.db import (
-    DEFAULT_DB_ALIAS,
     DatabaseError,
     DatabaseErrorWrapper,
     NotSupportedError,
@@ -22,8 +21,7 @@ from plain.models.db import (
 from plain.models.transaction import TransactionManagementError
 from plain.runtime import settings
 
-NO_DB_ALIAS = "__no_db__"
-RAN_DB_VERSION_CHECK = set()
+RAN_DB_VERSION_CHECK = False
 
 logger = logging.getLogger("plain.models.backends.base")
 
@@ -51,7 +49,7 @@ class BaseDatabaseWrapper:
 
     queries_limit = 9000
 
-    def __init__(self, settings_dict, alias=DEFAULT_DB_ALIAS):
+    def __init__(self, settings_dict):
         # Connection related attributes.
         # The underlying database connection.
         self.connection = None
@@ -59,7 +57,6 @@ class BaseDatabaseWrapper:
         # NAME, USER, etc. It's called `settings_dict` instead of `settings`
         # to disambiguate it from Plain settings modules.
         self.settings_dict = settings_dict
-        self.alias = alias
         # Query logging in debug mode or when explicitly enabled.
         self.queries_log = deque(maxlen=self.queries_limit)
         self.force_debug_cursor = False
@@ -120,10 +117,7 @@ class BaseDatabaseWrapper:
         self.validation = self.validation_class(self)
 
     def __repr__(self):
-        return (
-            f"<{self.__class__.__qualname__} "
-            f"vendor={self.vendor!r} alias={self.alias!r}>"
-        )
+        return f"<{self.__class__.__qualname__} vendor={self.vendor!r}>"
 
     def ensure_timezone(self):
         """
@@ -218,9 +212,9 @@ class BaseDatabaseWrapper:
     def init_connection_state(self):
         """Initialize the database connection settings."""
         global RAN_DB_VERSION_CHECK
-        if self.alias not in RAN_DB_VERSION_CHECK:
+        if not RAN_DB_VERSION_CHECK:
             self.check_database_version_supported()
-            RAN_DB_VERSION_CHECK.add(self.alias)
+            RAN_DB_VERSION_CHECK = True
 
     def create_cursor(self, name=None):
         """Create a cursor. Assume that a connection is established."""
@@ -593,8 +587,8 @@ class BaseDatabaseWrapper:
         if not (self.allow_thread_sharing or self._thread_ident == _thread.get_ident()):
             raise DatabaseError(
                 "DatabaseWrapper objects created in a "
-                "thread can only be used in that same thread. The object "
-                f"with alias '{self.alias}' was created in thread id {self._thread_ident} and this is "
+                "thread can only be used in that same thread. The connection "
+                f"was created in thread id {self._thread_ident} and this is "
                 f"thread id {_thread.get_ident()}."
             )
 
@@ -656,7 +650,7 @@ class BaseDatabaseWrapper:
         being exposed to potential child threads while (or after) the test
         database is destroyed. Refs #10868, #17786, #16969.
         """
-        conn = self.__class__({**self.settings_dict, "NAME": None}, alias=NO_DB_ALIAS)
+        conn = self.__class__({**self.settings_dict, "NAME": None})
         try:
             with conn.cursor() as cursor:
                 yield cursor
@@ -729,13 +723,11 @@ class BaseDatabaseWrapper:
         finally:
             self.execute_wrappers.pop()
 
-    def copy(self, alias=None):
+    def copy(self):
         """
         Return a copy of this connection.
 
         For tests that require two connections to the same database.
         """
         settings_dict = copy.deepcopy(self.settings_dict)
-        if alias is None:
-            alias = self.alias
-        return type(self)(settings_dict, alias)
+        return type(self)(settings_dict)

@@ -1,9 +1,7 @@
-import copy
 import inspect
 from functools import wraps
 from importlib import import_module
 
-from plain.models.db import router
 from plain.models.query import QuerySet
 
 
@@ -29,7 +27,6 @@ class BaseManager:
         self._set_creation_counter()
         self.model = None
         self.name = None
-        self._db = None
         self._hints = {}
 
     def __str__(self):
@@ -132,16 +129,6 @@ class BaseManager:
         self.creation_counter = BaseManager.creation_counter
         BaseManager.creation_counter += 1
 
-    def db_manager(self, using=None, hints=None):
-        obj = copy.copy(self)
-        obj._db = using or self._db
-        obj._hints = hints or self._hints
-        return obj
-
-    @property
-    def db(self):
-        return self._db or router.db_for_read(self.model, **self._hints)
-
     #######################
     # PROXIES TO QUERYSET #
     #######################
@@ -151,7 +138,7 @@ class BaseManager:
         Return a new QuerySet object. Subclasses can override this method to
         customize the behavior of the Manager.
         """
-        return self._queryset_class(model=self.model, using=self._db, hints=self._hints)
+        return self._queryset_class(model=self.model, hints=self._hints)
 
     def all(self):
         # We can't proxy this method through the `QuerySet` like we do for the

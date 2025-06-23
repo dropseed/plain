@@ -16,7 +16,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         raw_name = self.connection.settings_dict["TEST"]["NAME"] or ":memory:"
         # Special in-memory case
         if raw_name == ":memory:":
-            return f"file:memorydb_{self.connection.alias}?mode=memory&cache=shared"
+            return "file:memorydb?mode=memory&cache=shared"
 
         test_database_name = raw_name
 
@@ -68,7 +68,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         test_database_name = self._get_test_db_name(prefix)
         sig = [self.connection.settings_dict["NAME"]]
         if self.is_in_memory_db(test_database_name):
-            sig.append(self.connection.alias)
+            sig.append(":memory:")
         else:
             sig.append(test_database_name)
         return tuple(sig)

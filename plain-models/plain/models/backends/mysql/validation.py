@@ -14,7 +14,7 @@ class DatabaseValidation(BaseDatabaseValidation):
         ):
             return [
                 preflight.Warning(
-                    f"{self.connection.display_name} Strict Mode is not set for database connection '{self.connection.alias}'",
+                    f"{self.connection.display_name} Strict Mode is not set for the database connection",
                     hint=(
                         f"{self.connection.display_name}'s Strict Mode fixes many data integrity problems in "
                         f"{self.connection.display_name}, such as data truncation upon insertion, by "

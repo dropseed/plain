@@ -9,11 +9,9 @@ INSTALLED_PACKAGES = [
     "plain.admin",
     "app.users",
 ]
-DATABASES = {
-    "default": {
-        "ENGINE": "plain.models.backends.sqlite3",
-        "NAME": ":memory:",
-    }
+DATABASE = {
+    "ENGINE": "plain.models.backends.sqlite3",
+    "NAME": ":memory:",
 }
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",

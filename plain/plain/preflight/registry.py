@@ -42,7 +42,7 @@ class CheckRegistry:
         self,
         package_configs=None,
         include_deployment_checks=False,
-        databases=None,
+        database=False,
     ):
         """
         Run all registered checks and return list of Errors and Warnings.
@@ -51,7 +51,7 @@ class CheckRegistry:
         checks = self.get_checks(include_deployment_checks)
 
         for check in checks:
-            new_errors = check(package_configs=package_configs, databases=databases)
+            new_errors = check(package_configs=package_configs, database=database)
             if not is_iterable(new_errors):
                 raise TypeError(
                     f"The function {check!r} did not return a list. All functions "

@@ -4,11 +4,10 @@ from functools import cached_property, partial
 
 from plain import exceptions, preflight
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import router
 from plain.models.deletion import SET_DEFAULT, SET_NULL
 from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
-from plain.runtime import SettingsReference, settings
+from plain.runtime import SettingsReference
 
 from ..registry import models_registry
 from . import Field
@@ -929,8 +928,7 @@ class ForeignKey(ForeignObject):
         if value is None:
             return
 
-        using = router.db_for_read(self.remote_field.model, instance=model_instance)
-        qs = self.remote_field.model._base_manager.using(using).filter(
+        qs = self.remote_field.model._base_manager.filter(
             **{self.remote_field.field_name: value}
         )
         qs = qs.complex_filter(self.get_limit_choices_to())
@@ -1373,23 +1371,13 @@ class ManyToManyField(RelatedField):
             != self.remote_field.through._meta.concrete_model
         ):
             clashing_obj = model._meta.label
-            if settings.DATABASE_ROUTERS:
-                error_class, error_id = preflight.Warning, "fields.W344"
-                error_hint = (
-                    "You have configured settings.DATABASE_ROUTERS. Verify "
-                    f"that the table of {clashing_obj!r} is correctly routed to a separate "
-                    "database."
-                )
-            else:
-                error_class, error_id = preflight.Error, "fields.E340"
-                error_hint = None
             return [
-                error_class(
+                preflight.Error(
                     f"The field's intermediary table '{m2m_db_table}' clashes with the "
                     f"table name of '{clashing_obj}'.",
                     obj=self,
-                    hint=error_hint,
-                    id=error_id,
+                    hint=None,
+                    id="fields.E340",
                 )
             ]
         return []

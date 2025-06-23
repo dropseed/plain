@@ -2,7 +2,7 @@ from enum import Enum
 from types import NoneType
 
 from plain.exceptions import FieldError, ValidationError
-from plain.models.db import DEFAULT_DB_ALIAS, connections
+from plain.models.db import db_connection
 from plain.models.expressions import Exists, ExpressionList, F, OrderBy
 from plain.models.indexes import IndexExpression
 from plain.models.lookups import Exact
@@ -41,7 +41,7 @@ class BaseConstraint:
     def remove_sql(self, model, schema_editor):
         raise NotImplementedError("This method must be implemented by a subclass.")
 
-    def validate(self, model, instance, exclude=None, using=DEFAULT_DB_ALIAS):
+    def validate(self, model, instance, exclude=None):
         raise NotImplementedError("This method must be implemented by a subclass.")
 
     def get_violation_error_message(self):
@@ -83,7 +83,7 @@ class CheckConstraint(BaseConstraint):
     def _get_check_sql(self, model, schema_editor):
         query = Query(model=model, alias_cols=False)
         where = query.build_where(self.check)
-        compiler = query.get_compiler(connection=schema_editor.connection)
+        compiler = query.get_compiler()
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
@@ -98,10 +98,10 @@ class CheckConstraint(BaseConstraint):
     def remove_sql(self, model, schema_editor):
         return schema_editor._delete_check_sql(model, self.name)
 
-    def validate(self, model, instance, exclude=None, using=DEFAULT_DB_ALIAS):
+    def validate(self, model, instance, exclude=None):
         against = instance._get_field_value_map(meta=model._meta, exclude=exclude)
         try:
-            if not Q(self.check).check(against, using=using):
+            if not Q(self.check).check(against):
                 raise ValidationError(
                     self.get_violation_error_message(), code=self.violation_error_code
                 )
@@ -227,7 +227,7 @@ class UniqueConstraint(BaseConstraint):
             return None
         query = Query(model=model, alias_cols=False)
         where = query.build_where(self.condition)
-        compiler = query.get_compiler(connection=schema_editor.connection)
+        compiler = query.get_compiler()
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
@@ -347,8 +347,8 @@ class UniqueConstraint(BaseConstraint):
             kwargs["opclasses"] = self.opclasses
         return path, self.expressions, kwargs
 
-    def validate(self, model, instance, exclude=None, using=DEFAULT_DB_ALIAS):
-        queryset = model._default_manager.using(using)
+    def validate(self, model, instance, exclude=None):
+        queryset = model._default_manager
         if self.fields:
             lookup_kwargs = {}
             for field_name in self.fields:
@@ -358,7 +358,7 @@ class UniqueConstraint(BaseConstraint):
                 lookup_value = getattr(instance, field.attname)
                 if lookup_value is None or (
                     lookup_value == ""
-                    and connections[using].features.interprets_empty_strings_as_nulls
+                    and db_connection.features.interprets_empty_strings_as_nulls
                 ):
                     # A composite constraint containing NULL value cannot cause
                     # a violation since NULL != NULL in SQL.
@@ -410,7 +410,7 @@ class UniqueConstraint(BaseConstraint):
             against = instance._get_field_value_map(meta=model._meta, exclude=exclude)
             try:
                 if (self.condition & Exists(queryset.filter(self.condition))).check(
-                    against, using=using
+                    against
                 ):
                     raise ValidationError(
                         self.get_violation_error_message(),

@@ -19,11 +19,10 @@ from plain.packages import packages_registry
 )
 @click.option(
     "--database",
-    "databases",
-    multiple=True,
-    help="Run database related checks against these aliases.",
+    is_flag=True,
+    help="Run database related checks as part of preflight.",
 )
-def preflight_checks(package_label, deploy, fail_level, databases):
+def preflight_checks(package_label, deploy, fail_level, database):
     """
     Use the system check framework to validate entire Plain project.
     Raise CommandError for any serious message (error or critical errors).
@@ -42,7 +41,7 @@ def preflight_checks(package_label, deploy, fail_level, databases):
     all_issues = preflight.run_checks(
         package_configs=package_configs,
         include_deployment_checks=include_deployment_checks,
-        databases=databases,
+        database=database,
     )
 
     header, body, footer = "", "", ""
