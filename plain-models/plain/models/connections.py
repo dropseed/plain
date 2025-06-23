@@ -61,16 +61,17 @@ class DatabaseConnection:
     def has_connection(self):
         return hasattr(self._local, "conn")
 
-    def ensure_connection(self):
-        if not hasattr(self._local, "conn"):
-            self._local.conn = self.create_connection()
-        return self._local.conn
-
     def __getattr__(self, attr):
-        return getattr(self.ensure_connection(), attr)
+        if not self.has_connection():
+            self._local.conn = self.create_connection()
+
+        return getattr(self._local.conn, attr)
 
     def __setattr__(self, name, value):
         if name.startswith("_"):
             super().__setattr__(name, value)
         else:
-            setattr(self.ensure_connection(), name, value)
+            if not self.has_connection():
+                self._local.conn = self.create_connection()
+
+            setattr(self._local.conn, name, value)
