@@ -317,7 +317,7 @@ class MigrationLoader:
                             continue
                     raise InconsistentMigrationHistory(
                         f"Migration {migration[0]}.{migration[1]} is applied before its dependency "
-                        f"{parent[0]}.{parent[1]} on database '{connection.alias}'."
+                        f"{parent[0]}.{parent[1]} on the database."
                     )
 
     def detect_conflicts(self):

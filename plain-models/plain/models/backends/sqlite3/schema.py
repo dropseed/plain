@@ -136,7 +136,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     "supported on SQLite < 3.26 because it would break referential "
                     "integrity. Try adding `atomic = False` to the Migration class."
                 )
-            with atomic(self.connection.alias):
+            with atomic():
                 super().alter_field(model, old_field, new_field, strict=strict)
                 # Follow SQLite's documented procedure for performing changes
                 # that don't affect the on-disk content.

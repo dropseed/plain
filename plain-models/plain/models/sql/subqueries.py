@@ -14,16 +14,16 @@ class DeleteQuery(Query):
 
     compiler = "SQLDeleteCompiler"
 
-    def do_query(self, table, where, using):
+    def do_query(self, table, where):
         self.alias_map = {table: self.alias_map[table]}
         self.where = where
-        cursor = self.get_compiler(using).execute_sql(CURSOR)
+        cursor = self.get_compiler().execute_sql(CURSOR)
         if cursor:
             with cursor:
                 return cursor.rowcount
         return 0
 
-    def delete_batch(self, pk_list, using):
+    def delete_batch(self, pk_list):
         """
         Set up and execute delete queries for all the objects in pk_list.
 
@@ -39,9 +39,7 @@ class DeleteQuery(Query):
                 f"{field.attname}__in",
                 pk_list[offset : offset + GET_ITERATOR_CHUNK_SIZE],
             )
-            num_deleted += self.do_query(
-                self.get_meta().db_table, self.where, using=using
-            )
+            num_deleted += self.do_query(self.get_meta().db_table, self.where)
         return num_deleted
 
 
@@ -68,14 +66,14 @@ class UpdateQuery(Query):
         obj.related_updates = self.related_updates.copy()
         return obj
 
-    def update_batch(self, pk_list, values, using):
+    def update_batch(self, pk_list, values):
         self.add_update_values(values)
         for offset in range(0, len(pk_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
             self.add_filter(
                 "pk__in", pk_list[offset : offset + GET_ITERATOR_CHUNK_SIZE]
             )
-            self.get_compiler(using).execute_sql(NO_RESULTS)
+            self.get_compiler().execute_sql(NO_RESULTS)
 
     def add_update_values(self, values):
         """

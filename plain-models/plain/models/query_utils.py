@@ -13,7 +13,7 @@ from collections import namedtuple
 
 from plain.exceptions import FieldError
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import DEFAULT_DB_ALIAS, DatabaseError, connections
+from plain.models.db import DatabaseError, db_connection
 from plain.utils import tree
 
 logger = logging.getLogger("plain.models")
@@ -111,7 +111,7 @@ class Q(tree.Node):
             else:
                 yield child
 
-    def check(self, against, using=DEFAULT_DB_ALIAS):
+    def check(self, against):
         """
         Do a database query to check if the expressions of the Q instance
         matches against the expressions.
@@ -130,11 +130,11 @@ class Q(tree.Node):
             query.add_annotation(value, name, select=False)
         query.add_annotation(Value(1), "_check")
         # This will raise a FieldError if a field is missing in "against".
-        if connections[using].features.supports_comparing_boolean_expr:
+        if db_connection.features.supports_comparing_boolean_expr:
             query.add_q(Q(Coalesce(self, True, output_field=BooleanField())))
         else:
             query.add_q(self)
-        compiler = query.get_compiler(using=using)
+        compiler = query.get_compiler()
         try:
             return compiler.execute_sql(SINGLE) is not None
         except DatabaseError as e:

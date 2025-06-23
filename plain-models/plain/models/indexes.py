@@ -85,11 +85,11 @@ class Index:
             return None
         query = Query(model=model, alias_cols=False)
         where = query.build_where(self.condition)
-        compiler = query.get_compiler(connection=schema_editor.connection)
+        compiler = query.get_compiler()
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
-    def create_sql(self, model, schema_editor, using="", **kwargs):
+    def create_sql(self, model, schema_editor, **kwargs):
         include = [
             model._meta.get_field(field_name).column for field_name in self.include
         ]
@@ -119,7 +119,6 @@ class Index:
             model,
             fields=fields,
             name=self.name,
-            using=using,
             col_suffixes=col_suffixes,
             opclasses=self.opclasses,
             condition=condition,

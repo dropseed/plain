@@ -1,5 +1,4 @@
 from plain.models import migrations
-from plain.models.db import router
 
 from .loader import MigrationLoader
 from .recorder import MigrationRecorder
@@ -179,16 +178,6 @@ class MigrationExecutor:
         on initial migrations (as it only looks for CreateModel and AddField).
         """
 
-        def should_skip_detecting_model(migration, model):
-            """
-            No need to detect tables for models that can't be migrated on the current database.
-            """
-            return not router.allow_migrate(
-                self.connection.alias,
-                migration.package_label,
-                model_name=model._meta.model_name,
-            )
-
         if migration.initial is None:
             # Bail if the migration isn't the first one in its app
             if any(
@@ -224,8 +213,6 @@ class MigrationExecutor:
                     migration.package_label, operation.name
                 )
 
-                if should_skip_detecting_model(migration, model):
-                    continue
                 db_table = model._meta.db_table
                 if fold_identifier_case:
                     db_table = db_table.casefold()
@@ -236,9 +223,6 @@ class MigrationExecutor:
                 model = models_registry.get_model(
                     migration.package_label, operation.model_name
                 )
-
-                if should_skip_detecting_model(migration, model):
-                    continue
 
                 table = model._meta.db_table
                 field = model._meta.get_field(operation.name)

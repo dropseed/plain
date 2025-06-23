@@ -143,7 +143,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         settings_dict = self.settings_dict
         if not settings_dict["NAME"]:
             raise ImproperlyConfigured(
-                "settings.DATABASES is improperly configured. "
+                "settings.DATABASE is improperly configured. "
                 "Please supply the NAME value."
             )
         kwargs = {

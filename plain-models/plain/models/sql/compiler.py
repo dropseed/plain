@@ -42,10 +42,9 @@ class SQLCompiler:
         re.MULTILINE | re.DOTALL,
     )
 
-    def __init__(self, query, connection, using, elide_empty=True):
+    def __init__(self, query, connection, elide_empty=True):
         self.query = query
         self.connection = connection
-        self.using = using
         # Some queries, e.g. coalesced aggregation, need to be executed even if
         # they would return an empty result set.
         self.elide_empty = elide_empty
@@ -63,7 +62,7 @@ class SQLCompiler:
         return (
             f"<{self.__class__.__qualname__} "
             f"model={self.query.model.__qualname__} "
-            f"connection={self.connection!r} using={self.using!r}>"
+            f"connection={self.connection!r}>"
         )
 
     def setup_query(self, with_col_aliases=False):
@@ -532,7 +531,7 @@ class SQLCompiler:
     def get_combinator_sql(self, combinator, all):
         features = self.connection.features
         compilers = [
-            query.get_compiler(self.using, self.connection, self.elide_empty)
+            query.get_compiler(elide_empty=self.elide_empty)
             for query in self.query.combined_queries
         ]
         if not features.supports_slicing_ordering_in_compound:
@@ -660,9 +659,7 @@ class SQLCompiler:
                     {expr: Ref(alias, expr) for expr, alias in replacements.items()}
                 )
             )
-        inner_query_compiler = inner_query.get_compiler(
-            self.using, connection=self.connection, elide_empty=self.elide_empty
-        )
+        inner_query_compiler = inner_query.get_compiler(elide_empty=self.elide_empty)
         inner_sql, inner_params = inner_query_compiler.as_sql(
             # The limits must be applied to the outer query to avoid pruning
             # results too eagerly.
@@ -1822,7 +1819,7 @@ class SQLDeleteCompiler(SQLCompiler):
         if not self.connection.features.update_can_self_select:
             # Force the materialization of the inner query to allow reference
             # to the target table on MySQL.
-            sql, params = innerq.get_compiler(connection=self.connection).as_sql()
+            sql, params = innerq.get_compiler().as_sql()
             innerq = RawSQL(f"SELECT * FROM ({sql}) subquery", params)
         outerq.add_filter("pk__in", innerq)
         return self._as_sql(outerq)
@@ -1907,7 +1904,7 @@ class SQLUpdateCompiler(SQLCompiler):
             if cursor:
                 cursor.close()
         for query in self.query.get_related_updates():
-            aux_rows = query.get_compiler(self.using).execute_sql(result_type)
+            aux_rows = query.get_compiler().execute_sql(result_type)
             if is_empty and aux_rows:
                 rows = aux_rows
                 is_empty = False
@@ -1957,7 +1954,7 @@ class SQLUpdateCompiler(SQLCompiler):
             # selecting from the updating table (e.g. MySQL).
             idents = []
             related_ids = collections.defaultdict(list)
-            for rows in query.get_compiler(self.using).execute_sql(MULTI):
+            for rows in query.get_compiler().execute_sql(MULTI):
                 idents.extend(r[0] for r in rows)
                 for parent, index in related_ids_index:
                     related_ids[parent].extend(r[index] for r in rows)
@@ -1986,7 +1983,6 @@ class SQLAggregateCompiler(SQLCompiler):
         params = tuple(params)
 
         inner_query_sql, inner_query_params = self.query.inner_query.get_compiler(
-            self.using,
             elide_empty=self.elide_empty,
         ).as_sql(with_col_aliases=True)
         sql = f"SELECT {sql} FROM ({inner_query_sql}) subquery"

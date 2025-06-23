@@ -3,7 +3,7 @@ import json
 from plain import exceptions, preflight
 from plain.models import expressions, lookups
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import NotSupportedError, connections, router
+from plain.models.db import NotSupportedError, db_connection
 from plain.models.fields import TextField
 from plain.models.lookups import (
     FieldGetDbPrepValueMixin,
@@ -42,28 +42,25 @@ class JSONField(CheckFieldDefaultMixin, Field):
 
     def check(self, **kwargs):
         errors = super().check(**kwargs)
-        databases = kwargs.get("databases") or []
-        errors.extend(self._check_supported(databases))
+        database = kwargs.get("database", False)
+        errors.extend(self._check_supported(database))
         return errors
 
-    def _check_supported(self, databases):
+    def _check_supported(self, database):
         errors = []
-        for db in databases:
-            if not router.allow_migrate_model(db, self.model):
-                continue
-            connection = connections[db]
+        if database:
             if (
                 self.model._meta.required_db_vendor
-                and self.model._meta.required_db_vendor != connection.vendor
+                and self.model._meta.required_db_vendor != db_connection.vendor
             ):
-                continue
+                return errors
             if not (
                 "supports_json_field" in self.model._meta.required_db_features
-                or connection.features.supports_json_field
+                or db_connection.features.supports_json_field
             ):
                 errors.append(
                     preflight.Error(
-                        f"{connection.display_name} does not support JSONFields.",
+                        f"{db_connection.display_name} does not support JSONFields.",
                         obj=self.model,
                         id="fields.E180",
                     )

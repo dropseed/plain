@@ -448,13 +448,6 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
         return super().get_prep_lookup()
 
     def process_rhs(self, compiler, connection):
-        db_rhs = getattr(self.rhs, "_db", None)
-        if db_rhs is not None and db_rhs != connection.alias:
-            raise ValueError(
-                "Subqueries aren't allowed across different databases. Force "
-                "the inner query to be evaluated using `list(inner_query)`."
-            )
-
         if self.rhs_is_direct_value():
             # Remove None from the list as NULL is never equal to anything.
             try:

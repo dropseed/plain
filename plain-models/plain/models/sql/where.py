@@ -351,5 +351,5 @@ class SubqueryConstraint:
     def as_sql(self, compiler, connection):
         query = self.query_object
         query.set_values(self.targets)
-        query_compiler = query.get_compiler(connection=connection)
+        query_compiler = query.get_compiler()
         return query_compiler.as_subquery_condition(self.alias, self.columns, compiler)

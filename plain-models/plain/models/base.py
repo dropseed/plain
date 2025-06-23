@@ -16,11 +16,9 @@ from plain.models import models_registry, transaction
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import CheckConstraint, UniqueConstraint
 from plain.models.db import (
-    DEFAULT_DB_ALIAS,
     PLAIN_VERSION_PICKLE_KEY,
     DatabaseError,
-    connections,
-    router,
+    db_connection,
 )
 from plain.models.deletion import Collector
 from plain.models.expressions import RawSQL, Value
@@ -202,7 +200,6 @@ class ModelStateFieldsCacheDescriptor:
 class ModelState:
     """Store model instance state."""
 
-    db = None
     # If true, uniqueness validation checks will consider this a new, unsaved
     # object. Necessary for correct validation of new instances of objects with
     # explicit (non-auto) PKs. This impacts validation only; it has no effect
@@ -322,7 +319,7 @@ class Model(metaclass=ModelBase):
         super().__init__()
 
     @classmethod
-    def from_db(cls, db, field_names, values):
+    def from_db(cls, field_names, values):
         if len(values) != len(cls._meta.concrete_fields):
             values_iter = iter(values)
             values = [
@@ -331,7 +328,6 @@ class Model(metaclass=ModelBase):
             ]
         new = cls(*values)
         new._state.adding = False
-        new._state.db = db
         return new
 
     def __repr__(self):
@@ -418,7 +414,7 @@ class Model(metaclass=ModelBase):
             if f.attname not in self.__dict__
         }
 
-    def refresh_from_db(self, using=None, fields=None):
+    def refresh_from_db(self, fields=None):
         """
         Reload field values from the database.
 
@@ -449,10 +445,7 @@ class Model(metaclass=ModelBase):
                     "are not allowed in fields."
                 )
 
-        hints = {"instance": self}
-        db_instance_qs = self.__class__._base_manager.db_manager(
-            using, hints=hints
-        ).filter(pk=self.pk)
+        db_instance_qs = self.__class__._base_manager.get_queryset().filter(pk=self.pk)
 
         # Use provided fields, if not set then reload all non-deferred fields.
         deferred_fields = self.get_deferred_fields()
@@ -483,8 +476,6 @@ class Model(metaclass=ModelBase):
             if field.is_cached(self):
                 field.delete_cached_value(self)
 
-        self._state.db = db_instance._state.db
-
     def serializable_value(self, field_name):
         """
         Return the value of the field name for this instance. If the field is
@@ -508,7 +499,6 @@ class Model(metaclass=ModelBase):
         clean_and_validate=True,
         force_insert=False,
         force_update=False,
-        using=None,
         update_fields=None,
     ):
         """
@@ -521,7 +511,6 @@ class Model(metaclass=ModelBase):
         """
         self._prepare_related_fields_for_save(operation_name="save")
 
-        using = using or router.db_for_write(self.__class__, instance=self)
         if force_insert and (force_update or update_fields):
             raise ValueError("Cannot force both insert and updating in model saving.")
 
@@ -545,9 +534,9 @@ class Model(metaclass=ModelBase):
                     )
                 )
 
-        # If saving to the same database, and this model is deferred, then
-        # automatically do an "update_fields" save on the loaded fields.
-        elif not force_insert and deferred_fields and using == self._state.db:
+        # If this model is deferred, automatically do an "update_fields" save
+        # on the loaded fields.
+        elif not force_insert and deferred_fields:
             field_names = set()
             for field in self._meta.concrete_fields:
                 if not field.primary_key and not hasattr(field, "through"):
@@ -560,7 +549,6 @@ class Model(metaclass=ModelBase):
             self.full_clean(exclude=deferred_fields)
 
         self.save_base(
-            using=using,
             force_insert=force_insert,
             force_update=force_update,
             update_fields=update_fields,
@@ -572,7 +560,6 @@ class Model(metaclass=ModelBase):
         raw=False,
         force_insert=False,
         force_update=False,
-        using=None,
         update_fields=None,
     ):
         """
@@ -584,22 +571,18 @@ class Model(metaclass=ModelBase):
         models and not to do any changes to the values before save. This
         is used by fixture loading.
         """
-        using = using or router.db_for_write(self.__class__, instance=self)
         assert not (force_insert and (force_update or update_fields))
         assert update_fields is None or update_fields
         cls = self.__class__
 
-        with transaction.mark_for_rollback_on_error(using=using):
+        with transaction.mark_for_rollback_on_error():
             self._save_table(
                 raw,
                 cls,
                 force_insert,
                 force_update,
-                using,
                 update_fields,
             )
-        # Store the database on which the object was saved
-        self._state.db = using
         # Once saved, this is no longer a to-be-added instance.
         self._state.adding = False
 
@@ -609,7 +592,6 @@ class Model(metaclass=ModelBase):
         cls=None,
         force_insert=False,
         force_update=False,
-        using=None,
         update_fields=None,
     ):
         """
@@ -645,7 +627,7 @@ class Model(metaclass=ModelBase):
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
         if pk_set and not force_insert:
-            base_qs = cls._base_manager.using(using)
+            base_qs = cls._base_manager
             values = [
                 (
                     f,
@@ -656,7 +638,7 @@ class Model(metaclass=ModelBase):
             ]
             forced_update = update_fields or force_update
             updated = self._do_update(
-                base_qs, using, pk_val, values, update_fields, forced_update
+                base_qs, pk_val, values, update_fields, forced_update
             )
             if force_update and not updated:
                 raise DatabaseError("Forced update did not affect any rows.")
@@ -668,15 +650,13 @@ class Model(metaclass=ModelBase):
                 fields = [f for f in fields if f is not meta.auto_field]
 
             returning_fields = meta.db_returning_fields
-            results = self._do_insert(
-                cls._base_manager, using, fields, returning_fields, raw
-            )
+            results = self._do_insert(cls._base_manager, fields, returning_fields, raw)
             if results:
                 for value, field in zip(results[0], returning_fields):
                     setattr(self, field.attname, value)
         return updated
 
-    def _do_update(self, base_qs, using, pk_val, values, update_fields, forced_update):
+    def _do_update(self, base_qs, pk_val, values, update_fields, forced_update):
         """
         Try to update the model. Return True if the model was updated (if an
         update query was done and a matching row was found in the DB).
@@ -691,7 +671,7 @@ class Model(metaclass=ModelBase):
             return update_fields is not None or filtered.exists()
         return filtered._update(values) > 0
 
-    def _do_insert(self, manager, using, fields, returning_fields, raw):
+    def _do_insert(self, manager, fields, returning_fields, raw):
         """
         Do an INSERT. If returning_fields is defined then this method should
         return the newly created data for the model.
@@ -700,7 +680,6 @@ class Model(metaclass=ModelBase):
             [self],
             fields=fields,
             returning_fields=returning_fields,
-            using=using,
             raw=raw,
         )
 
@@ -741,14 +720,13 @@ class Model(metaclass=ModelBase):
                 ):
                     field.delete_cached_value(self)
 
-    def delete(self, using=None):
+    def delete(self):
         if self.pk is None:
             raise ValueError(
                 f"{self._meta.object_name} object can't be deleted because its {self._meta.pk.attname} attribute is set "
                 "to None."
             )
-        using = using or router.db_for_write(self.__class__, instance=self)
-        collector = Collector(using=using, origin=self)
+        collector = Collector(origin=self)
         collector.collect([self])
         return collector.delete()
 
@@ -769,8 +747,7 @@ class Model(metaclass=ModelBase):
         q = Q.create([(field.name, param), (f"pk__{op}", self.pk)], connector=Q.AND)
         q = Q.create([q, (f"{field.name}__{op}", param)], connector=Q.OR)
         qs = (
-            self.__class__._default_manager.using(self._state.db)
-            .filter(**kwargs)
+            self.__class__._default_manager.filter(**kwargs)
             .filter(q)
             .order_by(f"{order}{field.name}", f"{order}pk")
         )
@@ -858,9 +835,7 @@ class Model(metaclass=ModelBase):
                 # TODO: Handle multiple backends with different feature flags.
                 if lookup_value is None or (
                     lookup_value == ""
-                    and connections[
-                        DEFAULT_DB_ALIAS
-                    ].features.interprets_empty_strings_as_nulls
+                    and db_connection.features.interprets_empty_strings_as_nulls
                 ):
                     # no value, skip the lookup
                     continue
@@ -941,13 +916,12 @@ class Model(metaclass=ModelBase):
 
     def validate_constraints(self, exclude=None):
         constraints = self.get_constraints()
-        using = router.db_for_write(self.__class__, instance=self)
 
         errors = {}
         for model_class, model_constraints in constraints:
             for constraint in model_constraints:
                 try:
-                    constraint.validate(model_class, self, exclude=exclude, using=using)
+                    constraint.validate(model_class, self, exclude=exclude)
                 except ValidationError as e:
                     if (
                         getattr(e, "code", None) == "unique"
@@ -1039,11 +1013,11 @@ class Model(metaclass=ModelBase):
             *cls._check_managers(**kwargs),
         ]
 
-        databases = kwargs.get("databases") or []
+        database = kwargs.get("database", False)
         errors += [
             *cls._check_fields(**kwargs),
             *cls._check_m2m_through_same_relationship(),
-            *cls._check_long_column_names(databases),
+            *cls._check_long_column_names(database),
         ]
         clash_errors = (
             *cls._check_id_field(),
@@ -1058,35 +1032,31 @@ class Model(metaclass=ModelBase):
         if not clash_errors:
             errors.extend(cls._check_column_name_clashes())
         errors += [
-            *cls._check_indexes(databases),
+            *cls._check_indexes(database),
             *cls._check_ordering(),
-            *cls._check_constraints(databases),
-            *cls._check_db_table_comment(databases),
+            *cls._check_constraints(database),
+            *cls._check_db_table_comment(database),
         ]
 
         return errors
 
     @classmethod
-    def _check_db_table_comment(cls, databases):
-        if not cls._meta.db_table_comment:
+    def _check_db_table_comment(cls, database):
+        if not cls._meta.db_table_comment or not database:
             return []
         errors = []
-        for db in databases:
-            if not router.allow_migrate_model(db, cls):
-                continue
-            connection = connections[db]
-            if not (
-                connection.features.supports_comments
-                or "supports_comments" in cls._meta.required_db_features
-            ):
-                errors.append(
-                    preflight.Warning(
-                        f"{connection.display_name} does not support comments on "
-                        f"tables (db_table_comment).",
-                        obj=cls,
-                        id="models.W046",
-                    )
+        if not (
+            db_connection.features.supports_comments
+            or "supports_comments" in cls._meta.required_db_features
+        ):
+            errors.append(
+                preflight.Warning(
+                    f"{db_connection.display_name} does not support comments on "
+                    f"tables (db_table_comment).",
+                    obj=cls,
+                    id="models.W046",
                 )
+            )
         return errors
 
     @classmethod
@@ -1275,7 +1245,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_indexes(cls, databases):
+    def _check_indexes(cls, database):
         """Check fields, names, and conditions of indexes."""
         errors = []
         references = set()
@@ -1305,55 +1275,63 @@ class Model(metaclass=ModelBase):
                     references.update(
                         ref[0] for ref in cls._get_expr_references(expression)
                     )
-        for db in databases:
-            if not router.allow_migrate_model(db, cls):
-                continue
-            connection = connections[db]
-            if not (
-                connection.features.supports_partial_indexes
+        if (
+            database
+            and not (
+                db_connection.features.supports_partial_indexes
                 or "supports_partial_indexes" in cls._meta.required_db_features
-            ) and any(index.condition is not None for index in cls._meta.indexes):
-                errors.append(
-                    preflight.Warning(
-                        f"{connection.display_name} does not support indexes with conditions.",
-                        hint=(
-                            "Conditions will be ignored. Silence this warning "
-                            "if you don't care about it."
-                        ),
-                        obj=cls,
-                        id="models.W037",
-                    )
+            )
+            and any(index.condition is not None for index in cls._meta.indexes)
+        ):
+            errors.append(
+                preflight.Warning(
+                    f"{db_connection.display_name} does not support indexes with conditions.",
+                    hint=(
+                        "Conditions will be ignored. Silence this warning "
+                        "if you don't care about it."
+                    ),
+                    obj=cls,
+                    id="models.W037",
                 )
-            if not (
-                connection.features.supports_covering_indexes
+            )
+        if (
+            database
+            and not (
+                db_connection.features.supports_covering_indexes
                 or "supports_covering_indexes" in cls._meta.required_db_features
-            ) and any(index.include for index in cls._meta.indexes):
-                errors.append(
-                    preflight.Warning(
-                        f"{connection.display_name} does not support indexes with non-key columns.",
-                        hint=(
-                            "Non-key columns will be ignored. Silence this "
-                            "warning if you don't care about it."
-                        ),
-                        obj=cls,
-                        id="models.W040",
-                    )
+            )
+            and any(index.include for index in cls._meta.indexes)
+        ):
+            errors.append(
+                preflight.Warning(
+                    f"{db_connection.display_name} does not support indexes with non-key columns.",
+                    hint=(
+                        "Non-key columns will be ignored. Silence this "
+                        "warning if you don't care about it."
+                    ),
+                    obj=cls,
+                    id="models.W040",
                 )
-            if not (
-                connection.features.supports_expression_indexes
+            )
+        if (
+            database
+            and not (
+                db_connection.features.supports_expression_indexes
                 or "supports_expression_indexes" in cls._meta.required_db_features
-            ) and any(index.contains_expressions for index in cls._meta.indexes):
-                errors.append(
-                    preflight.Warning(
-                        f"{connection.display_name} does not support indexes on expressions.",
-                        hint=(
-                            "An index won't be created. Silence this warning "
-                            "if you don't care about it."
-                        ),
-                        obj=cls,
-                        id="models.W043",
-                    )
+            )
+            and any(index.contains_expressions for index in cls._meta.indexes)
+        ):
+            errors.append(
+                preflight.Warning(
+                    f"{db_connection.display_name} does not support indexes on expressions.",
+                    hint=(
+                        "An index won't be created. Silence this warning "
+                        "if you don't care about it."
+                    ),
+                    obj=cls,
+                    id="models.W043",
                 )
+            )
         fields = [
             field for index in cls._meta.indexes for field, _ in index.fields_orders
         ]
@@ -1508,33 +1486,19 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_long_column_names(cls, databases):
+    def _check_long_column_names(cls, database):
         """
         Check that any auto-generated column names are shorter than the limits
         for each database in which the model will be created.
         """
-        if not databases:
+        if not database:
             return []
         errors = []
         allowed_len = None
-        db_alias = None
 
-        # Find the minimum max allowed length among all specified db_aliases.
-        for db in databases:
-            # skip databases where the model won't be created
-            if not router.allow_migrate_model(db, cls):
-                continue
-            connection = connections[db]
-            max_name_length = connection.ops.max_name_length()
-            if max_name_length is None or connection.features.truncates_names:
-                continue
-            else:
-                if allowed_len is None:
-                    allowed_len = max_name_length
-                    db_alias = db
-                elif max_name_length < allowed_len:
-                    allowed_len = max_name_length
-                    db_alias = db
+        max_name_length = db_connection.ops.max_name_length()
+        if max_name_length is not None and not db_connection.features.truncates_names:
+            allowed_len = max_name_length
 
         if allowed_len is None:
             return errors
@@ -1552,7 +1516,7 @@ class Model(metaclass=ModelBase):
                 errors.append(
                     preflight.Error(
                         f'Autogenerated column name too long for field "{column_name}". '
-                        f'Maximum length is "{allowed_len}" for database "{db_alias}".',
+                        f'Maximum length is "{allowed_len}" for the database.',
                         hint="Set the column name manually using 'db_column'.",
                         obj=cls,
                         id="models.E018",
@@ -1576,7 +1540,7 @@ class Model(metaclass=ModelBase):
                     errors.append(
                         preflight.Error(
                             "Autogenerated column name too long for M2M field "
-                            f'"{rel_name}". Maximum length is "{allowed_len}" for database "{db_alias}".',
+                            f'"{rel_name}". Maximum length is "{allowed_len}" for the database.',
                             hint=(
                                 "Use 'through' to create a separate model for "
                                 "M2M and then set column_name using 'db_column'."
@@ -1605,14 +1569,11 @@ class Model(metaclass=ModelBase):
                 yield from cls._get_expr_references(src_expr)
 
     @classmethod
-    def _check_constraints(cls, databases):
+    def _check_constraints(cls, database):
         errors = []
-        for db in databases:
-            if not router.allow_migrate_model(db, cls):
-                continue
-            connection = connections[db]
+        if database:
             if not (
-                connection.features.supports_table_check_constraints
+                db_connection.features.supports_table_check_constraints
                 or "supports_table_check_constraints" in cls._meta.required_db_features
             ) and any(
                 isinstance(constraint, CheckConstraint)
@@ -1620,7 +1581,7 @@ class Model(metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        f"{connection.display_name} does not support check constraints.",
+                        f"{db_connection.display_name} does not support check constraints.",
                         hint=(
                             "A constraint won't be created. Silence this "
                             "warning if you don't care about it."
@@ -1630,7 +1591,7 @@ class Model(metaclass=ModelBase):
                     )
                 )
             if not (
-                connection.features.supports_partial_indexes
+                db_connection.features.supports_partial_indexes
                 or "supports_partial_indexes" in cls._meta.required_db_features
             ) and any(
                 isinstance(constraint, UniqueConstraint)
@@ -1639,7 +1600,7 @@ class Model(metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        f"{connection.display_name} does not support unique constraints with "
+                        f"{db_connection.display_name} does not support unique constraints with "
                         "conditions.",
                         hint=(
                             "A constraint won't be created. Silence this "
@@ -1650,7 +1611,7 @@ class Model(metaclass=ModelBase):
                     )
                 )
             if not (
-                connection.features.supports_deferrable_unique_constraints
+                db_connection.features.supports_deferrable_unique_constraints
                 or "supports_deferrable_unique_constraints"
                 in cls._meta.required_db_features
             ) and any(
@@ -1660,7 +1621,7 @@ class Model(metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        f"{connection.display_name} does not support deferrable unique constraints.",
+                        f"{db_connection.display_name} does not support deferrable unique constraints.",
                         hint=(
                             "A constraint won't be created. Silence this "
                             "warning if you don't care about it."
@@ -1670,7 +1631,7 @@ class Model(metaclass=ModelBase):
                     )
                 )
             if not (
-                connection.features.supports_covering_indexes
+                db_connection.features.supports_covering_indexes
                 or "supports_covering_indexes" in cls._meta.required_db_features
             ) and any(
                 isinstance(constraint, UniqueConstraint) and constraint.include
@@ -1678,7 +1639,7 @@ class Model(metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        f"{connection.display_name} does not support unique constraints with non-key "
+                        f"{db_connection.display_name} does not support unique constraints with non-key "
                         "columns.",
                         hint=(
                             "A constraint won't be created. Silence this "
@@ -1689,7 +1650,7 @@ class Model(metaclass=ModelBase):
                     )
                 )
             if not (
-                connection.features.supports_expression_indexes
+                db_connection.features.supports_expression_indexes
                 or "supports_expression_indexes" in cls._meta.required_db_features
             ) and any(
                 isinstance(constraint, UniqueConstraint)
@@ -1698,7 +1659,7 @@ class Model(metaclass=ModelBase):
             ):
                 errors.append(
                     preflight.Warning(
-                        f"{connection.display_name} does not support unique constraints on "
+                        f"{db_connection.display_name} does not support unique constraints on "
                         "expressions.",
                         hint=(
                             "A constraint won't be created. Silence this "
@@ -1708,90 +1669,83 @@ class Model(metaclass=ModelBase):
                         id="models.W044",
                     )
                 )
-            fields = set(
-                chain.from_iterable(
-                    (*constraint.fields, *constraint.include)
-                    for constraint in cls._meta.constraints
-                    if isinstance(constraint, UniqueConstraint)
-                )
+        fields = set(
+            chain.from_iterable(
+                (*constraint.fields, *constraint.include)
+                for constraint in cls._meta.constraints
+                if isinstance(constraint, UniqueConstraint)
             )
-            references = set()
-            for constraint in cls._meta.constraints:
-                if isinstance(constraint, UniqueConstraint):
-                    if (
-                        connection.features.supports_partial_indexes
-                        or "supports_partial_indexes"
-                        not in cls._meta.required_db_features
-                    ) and isinstance(constraint.condition, Q):
-                        references.update(
-                            cls._get_expr_references(constraint.condition)
-                        )
-                    if (
-                        connection.features.supports_expression_indexes
-                        or "supports_expression_indexes"
-                        not in cls._meta.required_db_features
-                    ) and constraint.contains_expressions:
-                        for expression in constraint.expressions:
-                            references.update(cls._get_expr_references(expression))
-                elif isinstance(constraint, CheckConstraint):
-                    if (
-                        connection.features.supports_table_check_constraints
-                        or "supports_table_check_constraints"
-                        not in cls._meta.required_db_features
-                    ):
-                        if isinstance(constraint.check, Q):
-                            references.update(
-                                cls._get_expr_references(constraint.check)
-                            )
-                        if any(
-                            isinstance(expr, RawSQL)
-                            for expr in constraint.check.flatten()
-                        ):
-                            errors.append(
-                                preflight.Warning(
-                                    f"Check constraint {constraint.name!r} contains "
-                                    f"RawSQL() expression and won't be validated "
-                                    f"during the model full_clean().",
-                                    hint=(
-                                        "Silence this warning if you don't care about "
-                                        "it."
-                                    ),
-                                    obj=cls,
-                                    id="models.W045",
-                                ),
-                            )
-            for field_name, *lookups in references:
-                # pk is an alias that won't be found by opts.get_field.
-                if field_name != "pk":
-                    fields.add(field_name)
-                if not lookups:
-                    # If it has no lookups it cannot result in a JOIN.
-                    continue
-                try:
-                    if field_name == "pk":
-                        field = cls._meta.pk
-                    else:
-                        field = cls._meta.get_field(field_name)
-                    if not field.is_relation or field.many_to_many or field.one_to_many:
-                        continue
-                except FieldDoesNotExist:
-                    continue
-                # JOIN must happen at the first lookup.
-                first_lookup = lookups[0]
+        )
+        references = set()
+        for constraint in cls._meta.constraints:
+            if isinstance(constraint, UniqueConstraint):
                 if (
-                    hasattr(field, "get_transform")
-                    and hasattr(field, "get_lookup")
-                    and field.get_transform(first_lookup) is None
-                    and field.get_lookup(first_lookup) is None
+                    db_connection.features.supports_partial_indexes
+                    or "supports_partial_indexes" not in cls._meta.required_db_features
+                ) and isinstance(constraint.condition, Q):
+                    references.update(cls._get_expr_references(constraint.condition))
+                if (
+                    db_connection.features.supports_expression_indexes
+                    or "supports_expression_indexes"
+                    not in cls._meta.required_db_features
+                ) and constraint.contains_expressions:
+                    for expression in constraint.expressions:
+                        references.update(cls._get_expr_references(expression))
+            elif isinstance(constraint, CheckConstraint):
+                if (
+                    db_connection.features.supports_table_check_constraints
+                    or "supports_table_check_constraints"
+                    not in cls._meta.required_db_features
                 ):
-                    errors.append(
-                        preflight.Error(
-                            f"'constraints' refers to the joined field '{LOOKUP_SEP.join([field_name] + lookups)}'.",
-                            obj=cls,
-                            id="models.E041",
+                    if isinstance(constraint.check, Q):
+                        references.update(cls._get_expr_references(constraint.check))
+                    if any(
+                        isinstance(expr, RawSQL) for expr in constraint.check.flatten()
+                    ):
+                        errors.append(
+                            preflight.Warning(
+                                f"Check constraint {constraint.name!r} contains "
+                                f"RawSQL() expression and won't be validated "
+                                f"during the model full_clean().",
+                                hint=(
+                                    "Silence this warning if you don't care about it."
+                                ),
+                                obj=cls,
+                                id="models.W045",
+                            ),
                         )
+        for field_name, *lookups in references:
+            # pk is an alias that won't be found by opts.get_field.
+            if field_name != "pk":
+                fields.add(field_name)
+            if not lookups:
+                # If it has no lookups it cannot result in a JOIN.
+                continue
+            try:
+                if field_name == "pk":
+                    field = cls._meta.pk
+                else:
+                    field = cls._meta.get_field(field_name)
+                if not field.is_relation or field.many_to_many or field.one_to_many:
+                    continue
+            except FieldDoesNotExist:
+                continue
+            # JOIN must happen at the first lookup.
+            first_lookup = lookups[0]
+            if (
+                hasattr(field, "get_transform")
+                and hasattr(field, "get_lookup")
+                and field.get_transform(first_lookup) is None
+                and field.get_lookup(first_lookup) is None
+            ):
+                errors.append(
+                    preflight.Error(
+                        f"'constraints' refers to the joined field '{LOOKUP_SEP.join([field_name] + lookups)}'.",
+                        obj=cls,
+                        id="models.E041",
                     )
-            errors.extend(cls._check_local_fields(fields, "constraints"))
+                )
+        errors.extend(cls._check_local_fields(fields, "constraints"))
         return errors
 
 
