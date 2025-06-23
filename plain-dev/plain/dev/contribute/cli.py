@@ -35,6 +35,8 @@ def cli(packages, repo, reset, all_packages):
 
         return
 
+    packages = list(packages)
+
     repo = Path(repo)
     if not repo.exists():
         click.secho(f"Repo not found at {repo}", fg="red")
@@ -57,6 +59,7 @@ def cli(packages, repo, reset, all_packages):
 
     plain_packages = []
     plainx_packages = []
+    skipped_plainx_packages = []
 
     if all_packages:
         # get all installed plain packages
@@ -67,11 +70,23 @@ def cli(packages, repo, reset, all_packages):
             click.secho("No installed packages found", fg="red")
             sys.exit(1)
 
-        packages = [
-            line.split("==")[0]
-            for line in installed_packages.splitlines()
-            if line.startswith("plain")
-        ]
+        packages = []
+        for line in installed_packages.splitlines():
+            if not line.startswith("plain"):
+                continue
+            package = line.split("==")[0]
+            if package.startswith("plainx-"):
+                skipped_plainx_packages.append(package)
+            else:
+                packages.append(package)
+
+        if skipped_plainx_packages:
+            click.secho(
+                "Skipping plainx packages: "
+                + ", ".join(sorted(skipped_plainx_packages))
+                + " (unknown repo)",
+                fg="yellow",
+            )
 
     for package in packages:
         package = package.replace(".", "-")
