@@ -1,4 +1,3 @@
-from functools import cached_property
 from importlib import import_module
 from threading import local
 from typing import Any, TypedDict
@@ -25,14 +24,11 @@ class DatabaseConfig(TypedDict, total=False):
 class DatabaseConnection:
     """Lazy access to the single configured database connection."""
 
+    __slots__ = ("_settings", "_local")
+
     def __init__(self):
         self._settings: DatabaseConfig = {}
         self._local = local()
-
-    @cached_property
-    def settings(self) -> DatabaseConfig:
-        self._settings = self.configure_settings()
-        return self._settings
 
     def configure_settings(self) -> DatabaseConfig:
         database = plain_settings.DATABASE
@@ -58,12 +54,12 @@ class DatabaseConnection:
         return database
 
     def create_connection(self):
-        database_config = self.settings
+        database_config = self.configure_settings()
         backend = import_module(f"{database_config['ENGINE']}.base")
         return backend.DatabaseWrapper(database_config)
 
     def has_connection(self):
-        return hasattr(self._local, "conn") and self._local.conn is not None
+        return hasattr(self._local, "conn")
 
     def ensure_connection(self):
         if not hasattr(self._local, "conn"):
@@ -72,3 +68,9 @@ class DatabaseConnection:
 
     def __getattr__(self, attr):
         return getattr(self.ensure_connection(), attr)
+
+    def __setattr__(self, name, value):
+        if name.startswith("_"):
+            super().__setattr__(name, value)
+        else:
+            setattr(self.ensure_connection(), name, value)
