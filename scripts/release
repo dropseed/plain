@@ -143,6 +143,8 @@ def main():
             print("Aborting release.")
             continue
 
+        subprocess.check_call(["./scripts/fix"], cwd=repo_path)
+
         run(f"git add {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'} uv.lock", repo_path)
         run(
             f"git commit -m 'Release {package} {new_version}' -n", repo_path
