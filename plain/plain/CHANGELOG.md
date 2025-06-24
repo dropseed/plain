@@ -11,23 +11,25 @@
 ### Upgrade instructions
 
 - Update any scripts or documentation that call `plain urls …`:
-  - Replace `plain urls --flat` with `plain urls list --flat`
+    - Replace `plain urls --flat` with `plain urls list --flat`
 - If you invoke preflight checks in CI or locally:
-  - Replace `plain preflight --database <alias>` (or multiple aliases) with the new boolean flag: `plain preflight --database`
+    - Replace `plain preflight --database <alias>` (or multiple aliases) with the new boolean flag: `plain preflight --database`
 - In `settings.py` migrate to the new database configuration:
-  ```python
-  # Before
-  DATABASES = {
-      "default": {
-          "ENGINE": "plain.backends.sqlite3",
-          "NAME": BASE_DIR / "db.sqlite3",
-      }
-  }
 
-  # After
-  DATABASE = {
-      "ENGINE": "plain.backends.sqlite3",
-      "NAME": BASE_DIR / "db.sqlite3",
-  }
-  ```
-  Remove any `DATABASES` and `DATABASE_ROUTERS` settings – they are no longer read.
+    ```python
+    # Before
+    DATABASES = {
+        "default": {
+            "ENGINE": "plain.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
+    # After
+    DATABASE = {
+        "ENGINE": "plain.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+    ```
+
+    Remove any `DATABASES` and `DATABASE_ROUTERS` settings – they are no longer read.

@@ -10,4 +10,3 @@
 ### Upgrade instructions
 
 - No changes required
-

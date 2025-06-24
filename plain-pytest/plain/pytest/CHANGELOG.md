@@ -9,4 +9,3 @@
 ### Upgrade instructions
 
 - Upgrade your project to `plain>=0.50.0` (which introduces the single `DATABASE` setting). No other changes required.
-
