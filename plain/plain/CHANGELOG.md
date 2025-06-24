@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.51.0](https://github.com/dropseed/plain/releases/plain@0.51.0) (2025-06-24)
+
+### What's changed
+
+- New `plain changelog` CLI sub-command to quickly view a package’s changelog from the terminal. Supports `--from`/`--to` flags to limit the version range ([50f0de7](https://github.com/dropseed/plain/commit/50f0de721f263ec6274852bd8838f4e5037b27dc)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.50.0](https://github.com/dropseed/plain/releases/plain@0.50.0) (2025-06-23)
 
 ### What's changed
