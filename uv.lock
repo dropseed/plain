@@ -825,7 +825,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.12.2"
+version = "0.12.3"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
