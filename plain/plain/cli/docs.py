@@ -7,6 +7,8 @@ import click
 
 from plain.packages import packages_registry
 
+from .output import iterate_markdown
+
 
 @click.command()
 @click.option("--llm", "llm", is_flag=True)
@@ -59,43 +61,7 @@ def docs(module, llm, open):
         if open:
             click.launch(str(readme_path))
         else:
-
-            def _iterate_markdown(content):
-                """
-                Iterator that does basic markdown for a Click pager.
-
-                Headings are yellow and bright, code blocks are indented.
-                """
-
-                in_code_block = False
-                for line in content.splitlines():
-                    if line.startswith("```"):
-                        in_code_block = not in_code_block
-
-                    if in_code_block:
-                        yield click.style(line, dim=True)
-                    elif line.startswith("# "):
-                        yield click.style(line, fg="yellow", bold=True)
-                    elif line.startswith("## "):
-                        yield click.style(line, fg="yellow", bold=True)
-                    elif line.startswith("### "):
-                        yield click.style(line, fg="yellow", bold=True)
-                    elif line.startswith("#### "):
-                        yield click.style(line, fg="yellow", bold=True)
-                    elif line.startswith("##### "):
-                        yield click.style(line, fg="yellow", bold=True)
-                    elif line.startswith("###### "):
-                        yield click.style(line, fg="yellow", bold=True)
-                    elif line.startswith("**") and line.endswith("**"):
-                        yield click.style(line, bold=True)
-                    elif line.startswith("> "):
-                        yield click.style(line, italic=True)
-                    else:
-                        yield line
-
-                    yield "\n"
-
-            click.echo_via_pager(_iterate_markdown(readme_path.read_text()))
+            click.echo_via_pager(iterate_markdown(readme_path.read_text()))
 
 
 class LLMDocs:
