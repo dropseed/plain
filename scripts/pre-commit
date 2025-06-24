@@ -2,8 +2,8 @@
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-echo "${BOLD}Checking with plain-code${NORMAL}"
-uv run --package plain-code --isolated plain-code check .
+echo "${BOLD}Checking formatting and linting${NORMAL}"
+./scripts/fix --check
 
 echo ""
 echo "${BOLD}Running tests${NORMAL}"
