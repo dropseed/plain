@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.9.1](https://github.com/dropseed/plain/releases/plain-pytest@0.9.1) (2025-06-26)
+
+### What's changed
+
+- No functional code changes. This release only updates internal tooling and documentation.
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-pytest@0.9.0) (2025-06-23)
 
 ### What's changed
