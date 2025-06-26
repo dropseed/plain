@@ -1,6 +1,6 @@
 [project]
 name = "plain.code"
-version = "0.8.2"
+version = "0.8.3"
 description = "Code formatting and linting for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
