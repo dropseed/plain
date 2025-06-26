@@ -450,7 +450,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-cache"
-version = "0.14.2"
+version = "0.14.3"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
