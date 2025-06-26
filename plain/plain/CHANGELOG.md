@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.52.0](https://github.com/dropseed/plain/releases/plain@0.52.0) (2025-06-26)
+
+### What's changed
+
+- Added `plain-changelog` as a standalone executable so you can view changelogs without importing the full framework ([e4e7324](https://github.com/dropseed/plain/commit/e4e7324cd284c800ff957933748d6639615cbea6))
+- Removed the runtime dependency on the `packaging` library by replacing it with an internal version-comparison helper ([e4e7324](https://github.com/dropseed/plain/commit/e4e7324cd284c800ff957933748d6639615cbea6))
+- Improved the error message when a package changelog cannot be found, now showing the path that was looked up ([f3c82bb](https://github.com/dropseed/plain/commit/f3c82bb59e07c1bddbdb2557f2043e039c1cd1e9))
+- Fixed an f-string issue that broke `plain.debug.dd` on Python 3.11 ([ed24276](https://github.com/dropseed/plain/commit/ed24276a12191e4c8903369002dd32b69eb358b3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.51.0](https://github.com/dropseed/plain/releases/plain@0.51.0) (2025-06-24)
 
 ### What's changed
