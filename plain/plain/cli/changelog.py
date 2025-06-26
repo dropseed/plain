@@ -3,9 +3,41 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
-from packaging.version import Version
 
 from .output import style_markdown
+
+
+def parse_version(version_str):
+    """Parse a version string into a tuple of integers for comparison."""
+    # Remove 'v' prefix if present and split by dots
+    clean_version = version_str.lstrip("v")
+    parts = []
+    for part in clean_version.split("."):
+        # Extract numeric part from each segment
+        numeric_part = re.match(r"\d+", part)
+        if numeric_part:
+            parts.append(int(numeric_part.group()))
+        else:
+            parts.append(0)
+    return tuple(parts)
+
+
+def compare_versions(v1, v2):
+    """Compare two version strings. Returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2."""
+    parsed_v1 = parse_version(v1)
+    parsed_v2 = parse_version(v2)
+
+    # Pad shorter version with zeros
+    max_len = max(len(parsed_v1), len(parsed_v2))
+    parsed_v1 += (0,) * (max_len - len(parsed_v1))
+    parsed_v2 += (0,) * (max_len - len(parsed_v2))
+
+    if parsed_v1 < parsed_v2:
+        return -1
+    elif parsed_v1 > parsed_v2:
+        return 1
+    else:
+        return 0
 
 
 @click.command("changelog")
@@ -52,7 +84,7 @@ def changelog(package_label, from_version, to_version):
         entries.append((current_version, current_lines))
 
     def version_found(version):
-        return any(Version(v) == Version(version) for v, _ in entries)
+        return any(compare_versions(v, version) == 0 for v, _ in entries)
 
     if from_version and not version_found(from_version):
         click.secho(
@@ -63,10 +95,9 @@ def changelog(package_label, from_version, to_version):
 
     selected_lines = []
     for version, lines in entries:
-        v = Version(version)
-        if from_version and v <= Version(from_version):
+        if from_version and compare_versions(version, from_version) <= 0:
             continue
-        if to_version and v > Version(to_version):
+        if to_version and compare_versions(version, to_version) > 0:
             continue
         selected_lines.extend(lines)
 
