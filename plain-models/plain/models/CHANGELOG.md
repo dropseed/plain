@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.34.1](https://github.com/dropseed/plain/releases/plain-models@0.34.1) (2025-06-23)
+
+### What's changed
+
+- Fixed Markdown bullet indentation in the 0.34.0 release notes so they render correctly ([2fc81de](https://github.com/dropseed/plain/commit/2fc81de)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-models@0.34.0) (2025-06-23)
 
 ### What's changed
