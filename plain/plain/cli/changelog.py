@@ -60,7 +60,9 @@ def changelog(package_label, from_version, to_version):
 
     changelog_path = package_path / "CHANGELOG.md"
     if not changelog_path.exists():
-        raise click.ClickException(f"Changelog not found for {package_label}")
+        raise click.ClickException(
+            f"Changelog not found for {package_label} ({changelog_path})"
+        )
 
     content = changelog_path.read_text()
 
