@@ -116,7 +116,8 @@ def main():
             for h, s in commits:
                 print(f"{h[:7]} - {s}")
         else:
-            print(f"{package}: No changes since last version change.")
+            print(f"{package}: No changes since last version change. Skipping.")
+            continue
 
         while True:
             choice = input("\nRelease type (major/minor/patch/skip) [skip]: ").strip()
