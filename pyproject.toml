@@ -28,6 +28,7 @@ requires-python = ">=3.11"
 "plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-tunnel" = { workspace = true }
+"plain-upgrade" = { workspace = true }
 "plain-vendor" = { workspace = true }
 "plain-worker" = { workspace = true }
 

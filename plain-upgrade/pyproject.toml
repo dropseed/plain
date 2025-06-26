@@ -1,0 +1,19 @@
+[project]
+name = "plain.upgrade"
+version = "0.1.0"
+description = "Generate upgrade prompts for Plain packages."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.0.0",
+]
+
+[project.scripts]
+plain-upgrade = "plain.upgrade.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
