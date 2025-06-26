@@ -3,6 +3,37 @@ name = "plain-workspace"
 version = "0.0.0"
 requires-python = ">=3.11"
 
+[tool.uv]
+dev-dependencies = [
+    "plain",
+    "plain-admin",
+    "plain-api",
+    "plain-auth",
+    "plain-cache",
+    "plain-code",
+    "plain-dev",
+    "plain-elements",
+    "plain-esbuild",
+    "plain-flags",
+    "plain-htmx",
+    "plain-loginlink",
+    "plain-email",
+    "plain-models",
+    "plain-oauth",
+    "plain-pages",
+    "plain-pageviews",
+    "plain-passwords",
+    "plain-pytest",
+    "plain-redirection",
+    "plain-sessions",
+    "plain-support",
+    "plain-tailwind",
+    "plain-tunnel",
+    "plain-upgrade",
+    "plain-vendor",
+    "plain-worker",
+]
+
 [tool.uv.sources]
 "plain" = { workspace = true }
 "plain-admin" = { workspace = true }

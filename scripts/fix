@@ -2,11 +2,11 @@
 
 if [ "$1" = "--check" ]; then
     shift
-    uv run --package plain-code --isolated plain-code check . "$@"
+    uv run plain-code check . "$@"
     # Check formatting of markdown files
     npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --check
 else
-    uv run --package plain-code --isolated plain-code fix . "$@"
+    uv run plain-code fix . "$@"
     # Format all markdown files
     npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --write
 fi
