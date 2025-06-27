@@ -5,6 +5,7 @@ description = "Generate upgrade prompts for Plain packages."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "ast-grep-cli>=0.38.5",
     "click>=8.0.0",
 ]
 

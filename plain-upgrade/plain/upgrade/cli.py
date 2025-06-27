@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import shlex
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -155,13 +154,15 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
     ]
     for pkg, (before, after) in before_after.items():
         lines.append(f"- {pkg}: {before} -> {after}")
+
+    ast_grep_path = shutil.which("ast-grep")
+
     lines.extend(
         [
             "",
-            'For each package run `plain-changelog {package} --from {before} --to {after}` and read the "Upgrade instructions" for what to do.',
-            "Work through each package in order, making all necessary code changes (if applicable).",
-            "When ALL of the package upgrade steps have been completed, you can check the results with `plain preflight` and `plain test`.",
-            "Do not commit any changes.",
+            'Work through each package in order. Use `plain-changelog {package} --from {before} --to {after}` and read the "Upgrade instructions" to see if any changes need to be made.',
+            "Do not test after each package -- wait until ALL packages are done before checking results with `plain preflight` and `plain test`.",
+            f"Do not commit any changes. You can also use the ast-grep CLI tool for code structural search and rewriting (located at {ast_grep_path}).",
         ]
     )
     return "\n".join(lines)

@@ -50,6 +50,21 @@ wheels = [
 ]
 
 [[package]]
+name = "ast-grep-cli"
+version = "0.38.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/63/23/eb834ed35bcfeb096e4832059bd7b0fed26999b1dd7209be7f25098644ce/ast_grep_cli-0.38.5.tar.gz", hash = "sha256:3e292e1e194fac91d78c49cc6e584d5b2af29a8fe87a4f5b3aee58d49f5b2a6e", size = 200256, upload-time = "2025-06-08T17:30:28.628Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/40/b518cca7003ca6c4d9e0e4d9d9ba4f72a984dbb8ff4d61a775b66e3e79ee/ast_grep_cli-0.38.5-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:51ff1d97c5ed2acd47aa4be474642331b64da71528c1ac0657018a97f953106e", size = 13596146, upload-time = "2025-06-08T17:30:15.238Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/f2/013ff470e66c2a79a7680a0a2e1e8f6ee0457425c08df14985b2c39fa9f7/ast_grep_cli-0.38.5-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:6dda939f065e0eac2732dd6a07d05738cefb8d8717e03fe7e5c8d92e5b9906ee", size = 6815843, upload-time = "2025-06-08T17:30:17.99Z" },
+    { url = "https://files.pythonhosted.org/packages/89/df/07f2d9b71efa4f750f223090561d09b839cfdb513f69c57e00d3515a41b5/ast_grep_cli-0.38.5-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:66a125070cd7cddab0f02feb4463d8fee3ec05eb371136ab448356774516a1a9", size = 6626013, upload-time = "2025-06-08T17:30:19.793Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/5b/fbc76a265eba2ba7d4942eec121fe042483628eb2a85008f712a65f02206/ast_grep_cli-0.38.5-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:f681ed2272bfba1855ba8b77b457300b03e960c56b540460dd3c9b128f29a061", size = 6957253, upload-time = "2025-06-08T17:30:21.403Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/f4/1468a183104f95117b277138303a9ded8fddb91f33e4b7254337ba918b8c/ast_grep_cli-0.38.5-py3-none-win32.whl", hash = "sha256:35036ad8e4983ccd3698f7df0fdb3153f2efe4e6f949acc5c170ac4a07a8b4bf", size = 6518664, upload-time = "2025-06-08T17:30:23.503Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/d0/415a0975d1f0a3b92578a06d7f9a2fc5cbb4be0f501fce28b08f4337d560/ast_grep_cli-0.38.5-py3-none-win_amd64.whl", hash = "sha256:2245ee61d59c7a76c9a0d19e01f699b3d448d4e8e7b4d77684ce3b0aa743ac3c", size = 6867868, upload-time = "2025-06-08T17:30:25.139Z" },
+    { url = "https://files.pythonhosted.org/packages/91/14/4b3111af8e85f1ad2af38903bdefd3315bf8dee171093636b14d585b6e33/ast_grep_cli-0.38.5-py3-none-win_arm64.whl", hash = "sha256:dfa16667597691c832edc02730193098e0d5346c6245cd69e1ed1479bcfc67ba", size = 6572523, upload-time = "2025-06-08T17:30:26.774Z" },
+]
+
+[[package]]
 name = "certifi"
 version = "2025.6.15"
 source = { registry = "https://pypi.org/simple" }
@@ -878,11 +893,15 @@ name = "plain-upgrade"
 version = "0.1.0"
 source = { editable = "plain-upgrade" }
 dependencies = [
+    { name = "ast-grep-cli" },
     { name = "click" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
+requires-dist = [
+    { name = "ast-grep-cli", specifier = ">=0.38.5" },
+    { name = "click", specifier = ">=8.0.0" },
+]
 
 [[package]]
 name = "plain-vendor"
