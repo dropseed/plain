@@ -1,5 +1,5 @@
 import click
-from click.core import MultiCommand
+from click.core import Group
 
 
 @click.command("help")
@@ -18,7 +18,7 @@ def help_cmd(ctx):
         click.secho("-" * len(title), fg="green")
         click.echo(sub_ctx.get_help())
 
-        if isinstance(cmd, MultiCommand):
+        if isinstance(cmd, Group):
             for name in cmd.list_commands(sub_ctx):
                 click.echo()
                 sub_cmd = cmd.get_command(sub_ctx, name)
