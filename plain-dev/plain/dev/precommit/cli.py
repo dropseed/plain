@@ -67,7 +67,6 @@ def cli(install):
                 "plain",
                 "preflight",
                 "--database",
-                "default",
             )
             check_short("Checking Plain migrations", "plain", "migrate", "--check")
             check_short(
