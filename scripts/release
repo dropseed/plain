@@ -92,6 +92,13 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--force", action="store_true", help="Ignore dirty git status")
+    # Skip running the local pre-commit script and any git commit hooks. Mirrors `git commit -n`.
+    parser.add_argument(
+        "-n",
+        "--no-verify",
+        action="store_true",
+        help="Skip running pre-commit checks before releasing",
+    )
     parser.add_argument("packages", nargs="*", help="Packages to release")
     args = parser.parse_args()
 
@@ -102,8 +109,10 @@ def main():
             print("Error: git status not clean -- commit or stash changes, or use --force")
             sys.exit(1)
 
-    # Run pre-commit first instead of for each release
-    subprocess.check_call(["./scripts/pre-commit"], cwd=repo_path)
+    # Optionally run pre-commit before starting the release process unless the
+    # caller has requested to skip verification.
+    if not args.no_verify:
+        subprocess.check_call(["./scripts/pre-commit"], cwd=repo_path)
 
     packages = args.packages if args.packages else discover_packages(repo_path)
 
