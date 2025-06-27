@@ -379,7 +379,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     **self.settings_dict,
                     "NAME": db_connection.settings_dict["NAME"],
                 },
-                alias=self.alias,
             )
             try:
                 with conn.cursor() as cursor:
