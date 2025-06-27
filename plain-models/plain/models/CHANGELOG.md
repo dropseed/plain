@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.34.2](https://github.com/dropseed/plain/releases/plain-models@0.34.2) (2025-06-27)
+
+### What's changed
+
+- Fixed PostgreSQL `_nodb_cursor` fallback that could raise `TypeError: __init__() got an unexpected keyword argument 'alias'` when the maintenance database wasn't available ([3e49683](https://github.com/dropseed/plain/commit/3e49683)).
+- Restored support for the `USING` clause when creating PostgreSQL indexes; custom index types such as `GIN` and `GIST` are now generated correctly again ([9d2b8fe](https://github.com/dropseed/plain/commit/9d2b8fe)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.1](https://github.com/dropseed/plain/releases/plain-models@0.34.1) (2025-06-23)
 
 ### What's changed
