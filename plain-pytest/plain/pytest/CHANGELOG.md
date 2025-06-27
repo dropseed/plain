@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-pytest@0.10.0) (2025-06-27)
+
+### What's changed
+
+- `TestBrowser.discover_urls` now accepts _one_ argument: a list of URL strings. Previously it accepted a variable number of positional arguments. This provides clearer typing and usage ([3d56b1f](https://github.com/dropseed/plain/commit/3d56b1f)).
+
+### Upgrade instructions
+
+- Wrap the URLs you pass to `testbrowser.discover_urls` in a list. For example, change `testbrowser.discover_urls("/", "/about/")` to `testbrowser.discover_urls(["/", "/about/"])`.
+
 ## [0.9.1](https://github.com/dropseed/plain/releases/plain-pytest@0.9.1) (2025-06-26)
 
 ### What's changed
