@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.52.1](https://github.com/dropseed/plain/releases/plain@0.52.1) (2025-06-27)
+
+### What's changed
+
+- Fixed `plain help` output on newer versions of Click by switching from `MultiCommand` to `Group` when determining sub-commands ([9482e42](https://github.com/dropseed/plain/commit/9482e421ac408ac043d341edda3dba9f27694f08))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.52.0](https://github.com/dropseed/plain/releases/plain@0.52.0) (2025-06-26)
 
 ### What's changed
