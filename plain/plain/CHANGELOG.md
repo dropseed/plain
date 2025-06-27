@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.52.2](https://github.com/dropseed/plain/releases/plain@0.52.2) (2025-06-27)
+
+### What's changed
+
+- Improved documentation for the assets subsystem: the `AssetsRouter` reference in the Assets README now links directly to the source code for quicker navigation ([65437e9](https://github.com/dropseed/plain/commit/65437e9bb1a522c7ababe0fc195f63bc5fd6c4d4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.52.1](https://github.com/dropseed/plain/releases/plain@0.52.1) (2025-06-27)
 
 ### What's changed
