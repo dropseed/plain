@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.32.1](https://github.com/dropseed/plain/releases/plain-dev@0.32.1) (2025-06-27)
+
+### What's changed
+
+- Fixed an error when running `plain dev precommit` (or the `plain precommit` helper) that passed an extra `default` argument to `plain preflight --database`. The flag now correctly aligns with the current `plain preflight` CLI ([db65930](https://github.com/dropseed/plain/commit/db659304129a453676c0dcc20c13b606254ce1c2)).
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.32.0](https://github.com/dropseed/plain/releases/plain-dev@0.32.0) (2025-06-23)
 
 ### What's changed
