@@ -1247,6 +1247,7 @@ class BaseDatabaseSchemaEditor:
         fields=None,
         name=None,
         suffix="",
+        using="",
         col_suffixes=(),
         sql=None,
         opclasses=(),
@@ -1276,6 +1277,7 @@ class BaseDatabaseSchemaEditor:
             sql_create_index,
             table=Table(table, self.quote_name),
             name=IndexName(table, columns, suffix, create_index_name),
+            using=using,
             columns=(
                 self._index_columns(table, columns, col_suffixes, opclasses)
                 if columns
