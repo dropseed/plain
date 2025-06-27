@@ -2,13 +2,13 @@
 
 This is the only AGENTS.md file in the repo -- you don't need to look for others.
 
-When you need a `python` shell, use `uv run python`.
+## Commands and tools
 
-## Commands
-
+- Open a Python shell: `uv run python`
 - Run tests on all packages (or specify a package to test): `./scripts/test [package] [pytest options]`
 - Lint and format code: `./scripts/fix`
 - Make database migrations: `./scripts/makemigrations`
+- Another way to search and rewrite code: `uv run ast-grep`
 
 ## READMEs
 

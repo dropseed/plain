@@ -950,6 +950,7 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "ast-grep-cli" },
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-api" },
@@ -983,6 +984,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "ast-grep-cli", specifier = ">=0.38.5" },
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-api", editable = "plain-api" },
