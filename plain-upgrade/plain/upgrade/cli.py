@@ -161,7 +161,7 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
         [
             "",
             'Work through each package in order. Use `plain-changelog {package} --from {before} --to {after}` and read the "Upgrade instructions" to see if any changes need to be made.',
-            "Do not test after each package -- wait until ALL packages are done before checking results with `plain preflight` and `plain test`.",
+            "Do not test after each package -- wait until ALL packages are done before checking results with `plain pre-commit`.",
             f"Do not commit any changes. You can also use the ast-grep CLI tool for code structural search and rewriting (located at {ast_grep_path}).",
         ]
     )
