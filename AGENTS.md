@@ -14,6 +14,8 @@ When you need a `python` shell, use `uv run python`.
 
 Inside each top level subdirectory is a `README.md` that is a symlink to the `README.md` in the of the Python package itself. You only need to edit the `README.md` inside of the package itself.
 
+The README is the main written documentation for the package (or module). You can structure it using [`plain/assets/README.md`](/plain/plain/assets/README.md) as an example.
+
 ## Verifying changes
 
 Not everything needs a test, but be liberal about using `print()` statements to verify changes and show the before and after effects of your changes. Make sure those print statements are removed before committing your changes.
