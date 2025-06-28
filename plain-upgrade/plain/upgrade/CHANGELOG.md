@@ -1,3 +1,15 @@
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.0) (2025-06-27)
+
+### What's changed
+
+- `plain-upgrade` no longer requires the current working directory to be inside a Git repository, making it easier to run in fresh projects or CI environments ([371f35f](https://github.com/dropseed/plain/commit/371f35f)).
+- The generated upgrade prompt now prefixes follow-up commands with `uv run` (e.g. `uv run plain-changelog` and `uv run plain pre-commit`) so they execute inside the same virtual environment ([3f71c44](https://github.com/dropseed/plain/commit/3f71c44)).
+- Documentation improvements and clearer package description (no functional changes) ([a22dc9c](https://github.com/dropseed/plain/commit/a22dc9c)).
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-upgrade@0.2.0) (2025-06-27)
 
 ### What's changed
