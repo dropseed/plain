@@ -24,8 +24,6 @@ def cli(
     packages: tuple[str, ...], diff: bool, agent_command: str | None = None
 ) -> None:
     """Generate an upgrade prompt for plain packages."""
-    require_git_repo()
-
     if not packages:
         click.secho("Getting installed packages...", bold=True, err=True)
         packages = tuple(sorted(get_installed_plain_packages()))
@@ -76,14 +74,6 @@ def cli(
             err=True,
         )
         click.echo(prompt)
-
-
-def require_git_repo() -> None:
-    result = subprocess.run(
-        ["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True
-    )
-    if result.returncode != 0 or result.stdout.strip() != "true":
-        raise click.UsageError("This command must be run inside a git repository")
 
 
 def get_installed_plain_packages() -> list[str]:
