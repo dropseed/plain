@@ -15,3 +15,5 @@ Updating Plain is then as simple as running:
 ```bash
 uvx plain-upgrade
 ```
+
+Note that this command only supports `uv` currently. Run `uvx plain-upgrade --help` for more options.
