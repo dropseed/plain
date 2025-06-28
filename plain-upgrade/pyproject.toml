@@ -1,7 +1,7 @@
 [project]
 name = "plain.upgrade"
 version = "0.2.0"
-description = "Generate upgrade prompts for Plain packages."
+description = "Upgrade Plain packages using AI agents."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
