@@ -32,9 +32,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         if not self.is_in_memory_db(test_database_name):
             # Erase the old test database file.
             if verbosity >= 1:
-                self.log(
-                    f"Destroying old test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
-                )
+                self.log(f"Destroying old test database '{test_database_name}'...")
             if os.access(test_database_name, os.F_OK):
                 if not autoclobber:
                     confirm = input(

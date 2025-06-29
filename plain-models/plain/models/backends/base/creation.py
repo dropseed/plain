@@ -36,9 +36,7 @@ class BaseDatabaseCreation:
         test_database_name = self._get_test_db_name(prefix)
 
         if verbosity >= 1:
-            self.log(
-                f"Creating test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
-            )
+            self.log(f"Creating test database '{test_database_name}'...")
 
         self._create_test_db(
             test_database_name=test_database_name, verbosity=verbosity, autoclobber=True
@@ -127,15 +125,6 @@ class BaseDatabaseCreation:
     #         # because constraint checks were disabled.
     #         self.connection.check_constraints(table_names=table_names)
 
-    def _get_database_display_str(self, verbosity, database_name):
-        """
-        Return display string for a database for use in various actions.
-        """
-        return "'{}'{}".format(
-            self.connection.alias,
-            (f" ('{database_name}')") if verbosity >= 2 else "",
-        )
-
     def _get_test_db_name(self, prefix=""):
         """
         Internal implementation - return the name of the test DB that will be
@@ -182,11 +171,7 @@ class BaseDatabaseCreation:
                     try:
                         if verbosity >= 1:
                             self.log(
-                                "Destroying old test database for alias {}...".format(
-                                    self._get_database_display_str(
-                                        verbosity, test_database_name
-                                    ),
-                                )
+                                f"Destroying old test database '{test_database_name}'..."
                             )
                         cursor.execute(
                             "DROP DATABASE {dbname}".format(**test_db_params)
@@ -211,9 +196,7 @@ class BaseDatabaseCreation:
         test_database_name = self.connection.settings_dict["NAME"]
 
         if verbosity >= 1:
-            self.log(
-                f"Destroying test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
-            )
+            self.log(f"Destroying test database '{test_database_name}'...")
         self._destroy_test_db(test_database_name, verbosity)
 
         # Restore the original database name
