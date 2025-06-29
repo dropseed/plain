@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.34.3](https://github.com/dropseed/plain/releases/plain-models@0.34.3) (2025-06-29)
+
+### What's changed
+
+- Simplified log output when creating or destroying test databases during test setup. The messages now display the test database name directly and no longer reference the deprecated "alias" terminology ([a543706](https://github.com/dropseed/plain/commit/a543706)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.2](https://github.com/dropseed/plain/releases/plain-models@0.34.2) (2025-06-27)
 
 ### What's changed
