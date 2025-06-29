@@ -974,11 +974,7 @@ class ForeignKey(ForeignObject):
 
     def get_db_prep_save(self, value, connection):
         if value is None or (
-            value == ""
-            and (
-                not self.target_field.empty_strings_allowed
-                or connection.features.interprets_empty_strings_as_nulls
-            )
+            value == "" and not self.target_field.empty_strings_allowed
         ):
             return None
         else:
@@ -1019,8 +1015,6 @@ class ForeignKey(ForeignObject):
 
     def get_db_converters(self, connection):
         converters = super().get_db_converters(connection)
-        if connection.features.interprets_empty_strings_as_nulls:
-            converters += [self.convert_empty_strings]
         return converters
 
     def get_col(self, alias, output_field=None):

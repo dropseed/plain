@@ -833,10 +833,7 @@ class Model(metaclass=ModelBase):
                 f = self._meta.get_field(field_name)
                 lookup_value = getattr(self, f.attname)
                 # TODO: Handle multiple backends with different feature flags.
-                if lookup_value is None or (
-                    lookup_value == ""
-                    and db_connection.features.interprets_empty_strings_as_nulls
-                ):
+                if lookup_value is None:
                     # no value, skip the lookup
                     continue
                 if f.primary_key and not self._state.adding:

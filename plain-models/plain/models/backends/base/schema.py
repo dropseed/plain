@@ -297,14 +297,6 @@ class BaseDatabaseSchemaEditor:
                 else:
                     yield column_default
                     params.append(default_value)
-        # Oracle treats the empty string ('') as null, so coerce the null
-        # option whenever '' is a possible value.
-        if (
-            field.empty_strings_allowed
-            and not field.primary_key
-            and self.connection.features.interprets_empty_strings_as_nulls
-        ):
-            null = True
 
         if not null:
             yield "NOT NULL"
@@ -1042,27 +1034,20 @@ class BaseDatabaseSchemaEditor:
         Return a (sql, params) fragment to set a column to null or non-null
         as required by new_field, or None if no changes are required.
         """
-        if (
-            self.connection.features.interprets_empty_strings_as_nulls
-            and new_field.empty_strings_allowed
-        ):
-            # The field is nullable in the database anyway, leave it alone.
-            return
-        else:
-            new_db_params = new_field.db_parameters(connection=self.connection)
-            sql = (
-                self.sql_alter_column_null
-                if new_field.allow_null
-                else self.sql_alter_column_not_null
-            )
-            return (
-                sql
-                % {
-                    "column": self.quote_name(new_field.column),
-                    "type": new_db_params["type"],
-                },
-                [],
-            )
+        new_db_params = new_field.db_parameters(connection=self.connection)
+        sql = (
+            self.sql_alter_column_null
+            if new_field.allow_null
+            else self.sql_alter_column_not_null
+        )
+        return (
+            sql
+            % {
+                "column": self.quote_name(new_field.column),
+                "type": new_db_params["type"],
+            },
+            [],
+        )
 
     def _alter_column_default_sql(self, model, old_field, new_field, drop=False):
         """

@@ -365,11 +365,7 @@ class Field(RegisterLookupMixin):
         return errors
 
     def _check_null_allowed_for_primary_keys(self):
-        if (
-            self.primary_key
-            and self.allow_null
-            and not db_connection.features.interprets_empty_strings_as_nulls
-        ):
+        if self.primary_key and self.allow_null:
             # We cannot reliably check this for backends like Oracle which
             # consider NULL and '' to be equal (and thus set up
             # character-based fields a little differently).
@@ -885,11 +881,7 @@ class Field(RegisterLookupMixin):
                 return self.default
             return lambda: self.default
 
-        if (
-            not self.empty_strings_allowed
-            or self.allow_null
-            and not db_connection.features.interprets_empty_strings_as_nulls
-        ):
+        if not self.empty_strings_allowed or self.allow_null:
             return return_None
         return str  # return empty string
 

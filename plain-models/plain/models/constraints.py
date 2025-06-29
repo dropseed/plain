@@ -2,7 +2,6 @@ from enum import Enum
 from types import NoneType
 
 from plain.exceptions import FieldError, ValidationError
-from plain.models.db import db_connection
 from plain.models.expressions import Exists, ExpressionList, F, OrderBy
 from plain.models.indexes import IndexExpression
 from plain.models.lookups import Exact
@@ -356,10 +355,7 @@ class UniqueConstraint(BaseConstraint):
                     return
                 field = model._meta.get_field(field_name)
                 lookup_value = getattr(instance, field.attname)
-                if lookup_value is None or (
-                    lookup_value == ""
-                    and db_connection.features.interprets_empty_strings_as_nulls
-                ):
+                if lookup_value is None:
                     # A composite constraint containing NULL value cannot cause
                     # a violation since NULL != NULL in SQL.
                     return

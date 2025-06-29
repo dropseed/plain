@@ -769,13 +769,7 @@ def modelfield_to_formfield(
         # Passing max_length to forms.CharField means that the value's length
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
-        # TODO: Handle multiple backends with different feature flags.
-        from plain.models.db import db_connection
-
-        if (
-            modelfield.allow_null
-            and not db_connection.features.interprets_empty_strings_as_nulls
-        ):
+        if modelfield.allow_null:
             defaults["empty_value"] = None
         return fields.CharField(
             max_length=modelfield.max_length,

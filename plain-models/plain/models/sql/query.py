@@ -1233,16 +1233,6 @@ class Query(BaseExpression):
                 raise ValueError("Cannot use None as a query value")
             return lhs.get_lookup("isnull")(lhs, True)
 
-        # For Oracle '' is equivalent to null. The check must be done at this
-        # stage because join promotion can't be done in the compiler. A similar
-        # thing is done in is_nullable(), too.
-        if (
-            lookup_name == "exact"
-            and lookup.rhs == ""
-            and db_connection.features.interprets_empty_strings_as_nulls
-        ):
-            return lhs.get_lookup("isnull")(lhs, True)
-
         return lookup
 
     def try_transform(self, lhs, name):
@@ -2466,20 +2456,11 @@ class Query(BaseExpression):
         return trimmed_prefix, contains_louter
 
     def is_nullable(self, field):
-        """
-        Check if the given field should be treated as nullable.
-
-        Some backends treat '' as null and Plain treats such fields as
-        nullable for those backends. In such situations field.allow_null can be
-        False even if we should treat the field as nullable.
-        """
+        """Check if the given field should be treated as nullable."""
         # QuerySet does not have knowledge of which connection is going to be
         # used. For the single-database setup we always reference the default
         # connection here.
-        return field.allow_null or (
-            field.empty_strings_allowed
-            and db_connection.features.interprets_empty_strings_as_nulls
-        )
+        return field.allow_null
 
 
 def get_order_dir(field, default="ASC"):

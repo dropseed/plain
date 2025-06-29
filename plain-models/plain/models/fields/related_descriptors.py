@@ -369,15 +369,12 @@ def create_reverse_many_to_one_manager(superclass, rel):
             """
             Filter the queryset for the instance this manager is bound to.
             """
-            empty_strings_as_null = (
-                db_connection.features.interprets_empty_strings_as_nulls
-            )
             queryset._add_hints(instance=self.instance)
             queryset._defer_next_filter = True
             queryset = queryset.filter(**self.core_filters)
             for field in self.field.foreign_related_fields:
                 val = getattr(self.instance, field.attname)
-                if val is None or (val == "" and empty_strings_as_null):
+                if val is None:
                     return queryset.none()
             if self.field.many_to_one:
                 # Guard against field-like objects such as GenericRelation

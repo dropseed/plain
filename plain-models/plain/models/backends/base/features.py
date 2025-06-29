@@ -9,9 +9,6 @@ class BaseDatabaseFeatures:
     empty_fetchmany_value = []
     update_can_self_select = True
 
-    # Does the backend distinguish between '' and None?
-    interprets_empty_strings_as_nulls = False
-
     # Does the backend support initially deferrable unique constraints?
     supports_deferrable_unique_constraints = False
 
