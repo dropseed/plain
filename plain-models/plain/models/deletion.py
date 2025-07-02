@@ -24,7 +24,7 @@ class RestrictedError(IntegrityError):
         super().__init__(msg, restricted_objects)
 
 
-def CASCADE(collector, field, sub_objs, using):
+def CASCADE(collector, field, sub_objs):
     collector.collect(
         sub_objs,
         source=field.remote_field.model,
@@ -35,7 +35,7 @@ def CASCADE(collector, field, sub_objs, using):
         collector.add_field_update(field, None, sub_objs)
 
 
-def PROTECT(collector, field, sub_objs, using):
+def PROTECT(collector, field, sub_objs):
     raise ProtectedError(
         f"Cannot delete some instances of model '{field.remote_field.model.__name__}' because they are "
         f"referenced through a protected foreign key: '{sub_objs[0].__class__.__name__}.{field.name}'",
@@ -43,7 +43,7 @@ def PROTECT(collector, field, sub_objs, using):
     )
 
 
-def RESTRICT(collector, field, sub_objs, using):
+def RESTRICT(collector, field, sub_objs):
     collector.add_restricted_objects(field, sub_objs)
     collector.add_dependency(field.remote_field.model, field.model)
 
@@ -51,12 +51,12 @@ def RESTRICT(collector, field, sub_objs, using):
 def SET(value):
     if callable(value):
 
-        def set_on_delete(collector, field, sub_objs, using):
+        def set_on_delete(collector, field, sub_objs):
             collector.add_field_update(field, value(), sub_objs)
 
     else:
 
-        def set_on_delete(collector, field, sub_objs, using):
+        def set_on_delete(collector, field, sub_objs):
             collector.add_field_update(field, value, sub_objs)
 
     set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})
@@ -64,21 +64,21 @@ def SET(value):
     return set_on_delete
 
 
-def SET_NULL(collector, field, sub_objs, using):
+def SET_NULL(collector, field, sub_objs):
     collector.add_field_update(field, None, sub_objs)
 
 
 SET_NULL.lazy_sub_objs = True
 
 
-def SET_DEFAULT(collector, field, sub_objs, using):
+def SET_DEFAULT(collector, field, sub_objs):
     collector.add_field_update(field, field.get_default(), sub_objs)
 
 
 SET_DEFAULT.lazy_sub_objs = True
 
 
-def DO_NOTHING(collector, field, sub_objs, using):
+def DO_NOTHING(collector, field, sub_objs):
     pass
 
 
