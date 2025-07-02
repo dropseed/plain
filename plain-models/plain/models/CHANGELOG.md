@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.34.4](https://github.com/dropseed/plain/releases/plain-models@0.34.4) (2025-07-02)
+
+### What's changed
+
+- The built-in `on_delete` behaviors (`CASCADE`, `PROTECT`, `RESTRICT`, `SET_NULL`, `SET_DEFAULT`, and the callables returned by `SET(...)`) no longer receive the legacy `using` argument. Their signatures are now `(collector, field, sub_objs)` ([20325a1](https://github.com/dropseed/plain/commit/20325a1)).
+- Removed the unused `interprets_empty_strings_as_nulls` backend feature flag and the related fallback logic ([285378c](https://github.com/dropseed/plain/commit/285378c)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.3](https://github.com/dropseed/plain/releases/plain-models@0.34.3) (2025-06-29)
 
 ### What's changed
