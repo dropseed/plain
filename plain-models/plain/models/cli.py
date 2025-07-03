@@ -96,6 +96,37 @@ def db_wait():
             break
 
 
+@cli.command(name="list")
+@click.argument("package_labels", nargs=-1)
+@click.option(
+    "--app-only",
+    is_flag=True,
+    help="Only show models from packages that start with 'app'.",
+)
+def list_models(package_labels, app_only):
+    """List installed models."""
+
+    packages = set(package_labels)
+
+    for model in sorted(
+        models_registry.get_models(),
+        key=lambda m: (m._meta.package_label, m._meta.model_name),
+    ):
+        pkg = model._meta.package_label
+        pkg_name = packages_registry.get_package_config(pkg).name
+        if app_only and not pkg_name.startswith("app"):
+            continue
+        if packages and pkg not in packages:
+            continue
+        fields = ", ".join(f.name for f in model._meta.get_fields())
+        click.echo(
+            f"{click.style(pkg, fg='cyan')}.{click.style(model.__name__, fg='blue')}"
+        )
+        click.echo(f"  table: {model._meta.db_table}")
+        click.echo(f"  fields: {fields}")
+        click.echo(f"  package: {pkg_name}\n")
+
+
 @register_cli("makemigrations")
 @cli.command()
 @click.argument("package_labels", nargs=-1)
