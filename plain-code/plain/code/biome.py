@@ -18,6 +18,8 @@ from plain.runtime import PLAIN_TEMP_PATH
 class Biome:
     """Download, install, and invoke the Biome CLI standalone binary."""
 
+    TAG_PREFIX = "@biomejs/biome@"
+
     @property
     def target_directory(self) -> str:
         # Directory under .plain to store the binary and lockfile
@@ -93,10 +95,8 @@ class Biome:
         # Build download URL based on version (tag: cli/vX.Y.Z) or latest
         slug = self.detect_platform_slug()
         if version:
-            tag = version if version.startswith("v") else f"v{version}"
-            release = f"cli/{tag}"
             url = (
-                f"https://github.com/biomejs/biome/releases/download/{release}/"
+                f"https://github.com/biomejs/biome/releases/download/{self.TAG_PREFIX}{version}/"
                 f"biome-{slug}"
             )
         else:
@@ -104,6 +104,7 @@ class Biome:
                 f"https://github.com/biomejs/biome/releases/latest/download/"
                 f"biome-{slug}"
             )
+
         resp = requests.get(url, stream=True)
         resp.raise_for_status()
 
@@ -134,12 +135,11 @@ class Biome:
         else:
             resolved = ""
             if resp.history:
-                # Look for redirect to tag cli/vX.Y.Z
+                # Look for redirect to actual tag version
                 loc = resp.history[0].headers.get("Location", "")
-                parts = loc.split("/")
-                if "cli" in parts:
-                    idx = parts.index("cli")
-                    resolved = parts[idx + 1].lstrip("v")
+                if self.TAG_PREFIX in loc:
+                    remaining = loc.split(self.TAG_PREFIX, 1)[-1]
+                    resolved = remaining.split("/")[0]
 
             if not resolved:
                 raise RuntimeError("Failed to determine resolved version from redirect")
