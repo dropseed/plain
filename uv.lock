@@ -456,12 +456,20 @@ dependencies = [
     { name = "plain-sessions" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-models", editable = "plain-models" },
     { name = "plain-sessions", editable = "plain-sessions" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cache"
