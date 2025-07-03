@@ -6,6 +6,7 @@ import os
 import platform
 import subprocess
 
+import click
 import requests
 import tomlkit
 
@@ -111,9 +112,20 @@ class Biome:
         if not os.path.isdir(td):
             os.makedirs(td, exist_ok=True)
 
+        total = int(resp.headers.get("Content-Length", 0))
         with open(self.standalone_path, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=8192):
-                f.write(chunk)
+            if total:
+                with click.progressbar(
+                    length=total,
+                    label="Downloading Biome",
+                    width=0,
+                ) as bar:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                        bar.update(len(chunk))
+            else:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
         os.chmod(self.standalone_path, 0o755)
 
         # Determine resolved version for lockfile
