@@ -15,7 +15,7 @@
     try {
       const scriptUrl = new URL(scriptTag.src);
       trackUrl = `${scriptUrl.origin}${defaultTrackPath}`;
-    } catch (error) {
+    } catch (_error) {
       trackUrl = defaultTrackPath;
     }
   }

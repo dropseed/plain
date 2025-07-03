@@ -7,7 +7,7 @@ could unintentionally overwrite those since our CSS is combined.
  */
 table {
   width: 100%;
-  font-size: .875rem;
+  font-size: 0.875rem;
   line-height: 1.25rem;
   table-layout: auto;
 }
@@ -74,7 +74,10 @@ main button {
   background-color: #2a2826;
   border: 1px solid #3f3d3b;
   border-radius: 6px;
-  transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    transform 0.2s;
   cursor: pointer;
   flex-shrink: 0;
 
