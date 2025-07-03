@@ -150,7 +150,7 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
     lines.extend(
         [
             "",
-            'Work through each package in order. Use `uv run plain-changelog {package} --from {before} --to {after}` and read the "Upgrade instructions" to see if any changes need to be made.',
+            'Work through each package in order. Use `uv run plain-changelog {package} --from {before} --to {after}` and read the "Upgrade instructions" to see if any changes need to be made. If it says "No changes required", then you don\'t need to do anything for that version.',
             "Do not test after each package -- wait until ALL packages are done before checking results with `uv run plain pre-commit`.",
             f"Do not commit any changes. You can also use the ast-grep CLI tool for code structural search and rewriting (located at {ast_grep_path}).",
         ]
