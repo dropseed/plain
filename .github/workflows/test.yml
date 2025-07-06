@@ -54,11 +54,11 @@ jobs:
             ;;
           postgres)
             echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/plain" >> "$GITHUB_ENV"
-            uv pip install psycopg[binary]
+            uv pip install psycopg[binary] --system
             ;;
           mysql)
             echo "DATABASE_URL=mysql://root:mysql@localhost:3306/plain" >> "$GITHUB_ENV"
-            uv pip install mysqlclient
+            uv pip install mysqlclient --system
             ;;
         esac
     - name: Run tests
