@@ -18,6 +18,7 @@ class SessionStore(MutableMapping):
         self.session_key = session_key
         self.accessed = False
         self.modified = False
+        self._session_cache: dict | None = None
 
         # Lazy import
         from .models import Session
@@ -54,10 +55,7 @@ class SessionStore(MutableMapping):
 
     def is_empty(self):
         "Return True when there is no session_key and the session is empty."
-        try:
-            return not self.session_key and not self._session_cache
-        except AttributeError:
-            return True
+        return not self.session_key and not self._session_cache
 
     def _get_new_session_key(self):
         "Return session key that isn't being used."
@@ -73,21 +71,26 @@ class SessionStore(MutableMapping):
         """
         self.accessed = True
 
-        try:
+        # If the cache has already been populated (even with an empty dict),
+        # simply return it.
+        if self._session_cache is not None:
             return self._session_cache
-        except AttributeError:
-            if self.session_key is None or no_load:
-                self._session_cache = {}
-            else:
-                try:
-                    session = self._model.objects.get(
-                        session_key=self.session_key, expires_at__gt=timezone.now()
-                    )
-                except self._model.DoesNotExist:
-                    self.session_key = None
-                    session = None
 
-                self._session_cache = session.session_data if session else {}
+        # The cache hasn't been populated yet so either initialise it to an
+        # empty dictionary (when "no_load" is True or there is no session
+        # key) or fetch the data from the database.
+        if self.session_key is None or no_load:
+            self._session_cache = {}
+        else:
+            try:
+                session = self._model.objects.get(
+                    session_key=self.session_key, expires_at__gt=timezone.now()
+                )
+            except self._model.DoesNotExist:
+                self.session_key = None
+                session = None
+
+            self._session_cache = session.session_data if session else {}
 
         return self._session_cache
 
