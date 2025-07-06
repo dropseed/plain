@@ -955,6 +955,9 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 name = "plain-workspace"
 version = "0.0.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "psycopg", extra = ["binary"] },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -989,6 +992,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "psycopg", extras = ["binary"], specifier = ">=3.2.9" }]
 
 [package.metadata.requires-dev]
 dev = [
