@@ -18,5 +18,7 @@ def test_admin_login_required(db):
     user.is_admin = True
     user.save()
 
-    # Now admin
-    assert client.get("/admin/").status_code == 200
+    # Now admin (currently redirects to the first view)
+    resp = client.get("/admin/")
+    assert resp.status_code == 302
+    assert resp.url == "/admin/p/session/"

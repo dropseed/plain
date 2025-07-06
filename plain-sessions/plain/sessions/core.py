@@ -1,30 +1,10 @@
-import logging
 import string
 from datetime import timedelta
 
-from plain import signing
-from plain.exceptions import SuspiciousOperation
-from plain.models import DatabaseError, IntegrityError, transaction
+from plain.models import transaction
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.crypto import get_random_string
-
-
-class CreateError(Exception):
-    """
-    Used internally as a consistent exception type to catch from save (see the
-    docstring for SessionBase.save() for details).
-    """
-
-    pass
-
-
-class UpdateError(Exception):
-    """
-    Occurs if Plain tries to update a session that was deleted.
-    """
-
-    pass
 
 
 class SessionStore:
@@ -59,10 +39,6 @@ class SessionStore:
         del self._session[key]
         self.modified = True
 
-    @property
-    def key_salt(self):
-        return "plain.sessions." + self.__class__.__qualname__
-
     def get(self, key, default=None):
         return self._session.get(key, default)
 
@@ -78,26 +54,6 @@ class SessionStore:
             self.modified = True
             self._session[key] = value
             return value
-
-    def _encode(self, session_dict):
-        "Return the given session dictionary serialized and encoded as a string."
-        return signing.dumps(
-            session_dict,
-            salt=self.key_salt,
-            compress=True,
-        )
-
-    def _decode(self, session_data):
-        try:
-            return signing.loads(session_data, salt=self.key_salt)
-        except signing.BadSignature:
-            logger = logging.getLogger("plain.security.SuspiciousSession")
-            logger.warning("Session data corrupted")
-        except Exception:
-            # ValueError, unpickling exceptions. If any of these happen, just
-            # return an empty dictionary (an empty session).
-            pass
-        return {}
 
     def update(self, dict_):
         self._session.update(dict_)
@@ -190,56 +146,39 @@ class SessionStore:
             session = self._model.objects.get(
                 session_key=self.session_key, expires_at__gt=timezone.now()
             )
-        except (self._model.DoesNotExist, SuspiciousOperation) as e:
-            if isinstance(e, SuspiciousOperation):
-                logger = logging.getLogger(f"plain.security.{e.__class__.__name__}")
-                logger.warning(str(e))
+        except self._model.DoesNotExist:
             self.session_key = None
             session = None
 
-        return self._decode(session.session_data) if session else {}
+        return session.session_data if session else {}
 
     def create(self):
-        while True:
-            self.session_key = self._get_new_session_key()
-            try:
-                # Save immediately to ensure we have a unique entry in the
-                # database.
-                self.save(must_create=True)
-            except CreateError:
-                # Key wasn't unique. Try again.
-                continue
+        self.session_key = self._get_new_session_key()
+        data = self._get_session(no_load=True)
+        with transaction.atomic():
+            self._model.objects.create(
+                session_key=self.session_key,
+                session_data=data,
+                expires_at=timezone.now()
+                + timedelta(seconds=settings.SESSION_COOKIE_AGE),
+            )
+        self.modified = True
+
+    def save(self):
+        """
+        Save the current session data to the database using update_or_create.
+        """
+        data = self._get_session(no_load=False)
+
+        with transaction.atomic():
+            _, created = self._model.objects.update_or_create(
+                session_key=self._get_or_create_session_key(),
+                defaults={
+                    "session_data": data,
+                    "expires_at": timezone.now()
+                    + timedelta(seconds=settings.SESSION_COOKIE_AGE),
+                },
+            )
+
+        if created:
             self.modified = True
-            return
-
-    def save(self, must_create=False):
-        """
-        Save the current session data to the database. If 'must_create' is
-        True, raise a database error if the saving operation doesn't create a
-        new entry (as opposed to possibly updating an existing entry).
-        """
-        if self.session_key is None:
-            return self.create()
-        data = self._get_session(no_load=must_create)
-
-        obj = self._model(
-            session_key=self._get_or_create_session_key(),
-            session_data=self._encode(data),
-            expires_at=timezone.now() + timedelta(seconds=settings.SESSION_COOKIE_AGE),
-        )
-
-        try:
-            with transaction.atomic():
-                obj.save(
-                    clean_and_validate=False,
-                    force_insert=must_create,
-                    force_update=not must_create,
-                )
-        except IntegrityError:
-            if must_create:
-                raise CreateError
-            raise
-        except DatabaseError:
-            if not must_create:
-                raise UpdateError
-            raise
