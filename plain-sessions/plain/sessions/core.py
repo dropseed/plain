@@ -66,24 +66,29 @@ class SessionStore(MutableMapping):
             if not self._model.objects.filter(session_key=session_key).exists():
                 return session_key
 
-    def _get_or_create_session_key(self):
-        if self.session_key is None:
-            self.session_key = self._get_new_session_key()
-        return self.session_key
-
     def _get_session(self, no_load=False):
         """
         Lazily load session from storage (unless "no_load" is True, when only
         an empty dict is stored) and store it in the current instance.
         """
         self.accessed = True
+
         try:
             return self._session_cache
         except AttributeError:
             if self.session_key is None or no_load:
                 self._session_cache = {}
             else:
-                self._session_cache = self._load()
+                try:
+                    session = self._model.objects.get(
+                        session_key=self.session_key, expires_at__gt=timezone.now()
+                    )
+                except self._model.DoesNotExist:
+                    self.session_key = None
+                    session = None
+
+                self._session_cache = session.session_data if session else {}
+
         return self._session_cache
 
     _session = property(_get_session)
@@ -114,17 +119,6 @@ class SessionStore(MutableMapping):
             except self._model.DoesNotExist:
                 pass
 
-    def _load(self):
-        try:
-            session = self._model.objects.get(
-                session_key=self.session_key, expires_at__gt=timezone.now()
-            )
-        except self._model.DoesNotExist:
-            self.session_key = None
-            session = None
-
-        return session.session_data if session else {}
-
     def create(self):
         self.session_key = self._get_new_session_key()
         data = self._get_session(no_load=True)
@@ -144,8 +138,11 @@ class SessionStore(MutableMapping):
         data = self._get_session(no_load=False)
 
         with transaction.atomic():
+            if self.session_key is None:
+                self.session_key = self._get_new_session_key()
+
             _, created = self._model.objects.update_or_create(
-                session_key=self._get_or_create_session_key(),
+                session_key=self.session_key,
                 defaults={
                     "session_data": data,
                     "expires_at": timezone.now()
