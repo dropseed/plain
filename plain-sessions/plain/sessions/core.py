@@ -91,7 +91,12 @@ class SessionStore(MutableMapping):
 
         return self._session_cache
 
-    _session = property(_get_session)
+    @property
+    def _session(self):
+        """
+        Property to access the session data, ensuring it is loaded.
+        """
+        return self._get_session()
 
     def flush(self):
         """
