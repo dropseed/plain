@@ -986,6 +986,7 @@ dev = [
     { name = "plain-upgrade" },
     { name = "plain-vendor" },
     { name = "plain-worker" },
+    { name = "psycopg", extra = ["binary"] },
 ]
 
 [package.metadata]
@@ -1020,6 +1021,7 @@ dev = [
     { name = "plain-upgrade", editable = "plain-upgrade" },
     { name = "plain-vendor", editable = "plain-vendor" },
     { name = "plain-worker", editable = "plain-worker" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.9" },
 ]
 
 [[package]]

@@ -33,6 +33,7 @@ dev-dependencies = [
     "plain-vendor",
     "plain-worker",
     "ast-grep-cli>=0.38.5",
+    "psycopg[binary]>=3.2.9",
 ]
 
 [tool.uv.sources]
