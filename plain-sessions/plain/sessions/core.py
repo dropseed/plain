@@ -64,7 +64,7 @@ class SessionStore(MutableMapping):
             if not self._model.objects.filter(session_key=session_key).exists():
                 return session_key
 
-    def _get_session(self, no_load=False):
+    def _get_session_data(self, no_load=False):
         """
         Lazily load session from storage (unless "no_load" is True, when only
         an empty dict is stored) and store it in the current instance.
@@ -81,25 +81,25 @@ class SessionStore(MutableMapping):
         # key) or fetch the data from the database.
         if self.session_key is None or no_load:
             self._session_cache = {}
-        else:
-            try:
-                session = self._model.objects.get(
-                    session_key=self.session_key, expires_at__gt=timezone.now()
-                )
-            except self._model.DoesNotExist:
-                self.session_key = None
-                session = None
+            return self._session_cache
 
-            self._session_cache = session.session_data if session else {}
-
-        return self._session_cache
+        try:
+            session = self._model.objects.get(
+                session_key=self.session_key, expires_at__gt=timezone.now()
+            )
+            self._session_cache = session.session_data
+            return self._session_cache
+        except self._model.DoesNotExist:
+            self.session_key = None
+            self._session_cache = {}
+            return self._session_cache
 
     @property
     def _session(self):
         """
         Property to access the session data, ensuring it is loaded.
         """
-        return self._get_session()
+        return self._get_session_data()
 
     def flush(self):
         """
@@ -129,7 +129,7 @@ class SessionStore(MutableMapping):
 
     def create(self):
         self.session_key = self._get_new_session_key()
-        data = self._get_session(no_load=True)
+        data = self._get_session_data(no_load=True)
         with transaction.atomic():
             self._model.objects.create(
                 session_key=self.session_key,
@@ -143,7 +143,7 @@ class SessionStore(MutableMapping):
         """
         Save the current session data to the database using update_or_create.
         """
-        data = self._get_session(no_load=False)
+        data = self._get_session_data(no_load=False)
 
         with transaction.atomic():
             if self.session_key is None:
