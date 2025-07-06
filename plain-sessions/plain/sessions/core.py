@@ -1,4 +1,5 @@
 import string
+from collections.abc import MutableMapping
 from datetime import timedelta
 
 from plain.models import transaction
@@ -7,13 +8,11 @@ from plain.utils import timezone
 from plain.utils.crypto import get_random_string
 
 
-class SessionStore:
+class SessionStore(MutableMapping):
     """
     The actual session object that gets attached to a request,
     backed by the underlying Session model for the storage.
     """
-
-    __not_given = object()
 
     def __init__(self, session_key=None):
         self.session_key = session_key
@@ -39,37 +38,11 @@ class SessionStore:
         del self._session[key]
         self.modified = True
 
-    def get(self, key, default=None):
-        return self._session.get(key, default)
+    def __iter__(self):
+        return iter(self._session)
 
-    def pop(self, key, default=__not_given):
-        self.modified = self.modified or key in self._session
-        args = () if default is self.__not_given else (default,)
-        return self._session.pop(key, *args)
-
-    def setdefault(self, key, value):
-        if key in self._session:
-            return self._session[key]
-        else:
-            self.modified = True
-            self._session[key] = value
-            return value
-
-    def update(self, dict_):
-        self._session.update(dict_)
-        self.modified = True
-
-    def has_key(self, key):
-        return key in self._session
-
-    def keys(self):
-        return self._session.keys()
-
-    def values(self):
-        return self._session.values()
-
-    def items(self):
-        return self._session.items()
+    def __len__(self):
+        return len(self._session)
 
     def clear(self):
         # To avoid unnecessary persistent storage accesses, we set up the
