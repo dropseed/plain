@@ -9,10 +9,6 @@ INSTALLED_PACKAGES = [
     "plain.oauth",
     "app.users",
 ]
-DATABASE = {
-    "ENGINE": "plain.models.backends.sqlite3",
-    "NAME": ":memory:",
-}
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
     "plain.auth.middleware.AuthenticationMiddleware",

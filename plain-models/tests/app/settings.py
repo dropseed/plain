@@ -4,7 +4,3 @@ INSTALLED_PACKAGES = [
     "plain.models",
     "app.examples",
 ]
-DATABASE = {
-    "ENGINE": "plain.models.backends.sqlite3",
-    "NAME": ":memory:",
-}

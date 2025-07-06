@@ -12,6 +12,13 @@ bold() {
     echo "\033[1m$1\033[0m"
 }
 
+if [ -z "$DATABASE_URL" ]; then
+    echo "DATABASE_URL is not set, using DATABASE_URL=sqlite://:memory:"
+    export DATABASE_URL="sqlite://:memory:"
+else
+    echo "Using DATABASE_URL: $DATABASE_URL"
+fi
+
 bold "Found packages to test in $workflow: $packages"
 
 for package in $packages;

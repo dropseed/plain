@@ -4,7 +4,3 @@ INSTALLED_PACKAGES = [
     "plain.models",
     "plain.flags",
 ]
-DATABASE = {
-    "ENGINE": "plain.models.backends.sqlite3",
-    "NAME": ":memory:",
-}
