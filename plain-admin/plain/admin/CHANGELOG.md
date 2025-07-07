@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.33.2](https://github.com/dropseed/plain/releases/plain-admin@0.33.2) (2025-07-07)
+
+### What's changed
+
+- No user-facing changes in this release. Internal CSS cleanup and linter adjustments were made to the bundled admin styles ([3265f5f](https://github.com/dropseed/plain/commit/3265f5f)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.33.1](https://github.com/dropseed/plain/releases/plain-admin@0.33.1) (2025-06-26)
 
 ### What's changed
