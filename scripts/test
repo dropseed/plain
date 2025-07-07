@@ -89,7 +89,6 @@ for demo in demos/*; do
   bold "Testing $demo"
   cd "$demo"
   uv run \
-    --isolated \
     --with psycopg[binary] \
     --with mysqlclient \
     pytest \
