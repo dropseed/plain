@@ -43,7 +43,6 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-        database: [sqlite, postgres, mysql]
 
     steps:
     - uses: actions/checkout@v4
@@ -51,27 +50,22 @@ jobs:
       uses: astral-sh/setup-uv@v2
     - name: Set up Python
       run: uv python install ${{ matrix.python-version }}
-    - name: Install system libraries for database clients
-      if: ${{ matrix.database == 'mysql' }}
+    - name: Install system libraries for MySQL client build
       run: |
         sudo apt-get update -y
-        # Required to compile mysqlclient when prebuilt wheels are not
-        # available for the current Python version / architecture.
         sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
-    - name: Configure DATABASE_URL
-      run: |
-        case "${{ matrix.database }}" in
-          sqlite)
-            echo "DATABASE_URL=sqlite://:memory:" >> "$GITHUB_ENV"
-            ;;
-          postgres)
-            echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/plain" >> "$GITHUB_ENV"
-            ;;
-          mysql)
-            echo "DATABASE_URL=mysql://root:mysql@localhost:3306/plain" >> "$GITHUB_ENV"
-            ;;
-        esac
-    - name: Run tests
+
+    - name: Run tests (SQLite)
+      run: ./scripts/test
+
+    - name: Run tests (PostgreSQL)
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/plain
+      run: ./scripts/test
+
+    - name: Run tests (MySQL)
+      env:
+        DATABASE_URL: mysql://root:mysql@localhost:3306/plain
       run: ./scripts/test
 
   lint:
