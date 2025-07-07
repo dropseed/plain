@@ -16,3 +16,5 @@ plain*/tests/.plain
 
 # Plain temp dirs
 .plain
+
+coverage.xml

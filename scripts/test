@@ -1,7 +1,21 @@
 #!/bin/sh -e
 
-workflow=".github/workflows/test.yml"
-packages=$(grep 'PACKAGES:' "$workflow" | sed -E 's/^.*PACKAGES: *//')
+ROOT_DIR="$(pwd)"
+PACKAGES="$(cat <<EOF
+plain
+plain-models
+plain-sessions
+plain-worker
+plain-flags
+plain-admin
+plain-oauth
+plain-auth
+plain-api
+plain-elements
+plain-htmx
+EOF
+)"
+packages=$PACKAGES
 
 if [ $# -gt 0 ] && printf '%s\n' $packages | grep -x "$1" >/dev/null; then
   packages=$1
@@ -12,14 +26,26 @@ bold() {
     echo "\033[1m$1\033[0m"
 }
 
-bold "Found packages to test in $workflow: $packages"
+bold "Packages to test: $packages"
+
+# Store all coverage data in a single file at the repository root so that
+# successive test runs (one per package/demo) can append to it. This makes it
+# trivial to generate a combined report without shuffling files around.
+export COVERAGE_FILE="$(pwd)/.coverage"
 
 for package in $packages;
 do
     echo
     bold "Testing $package"
     cd "$package/tests"
-    uv run --package "$package" --isolated pytest "$@"
+
+    uv run --package "$package" --with pytest-cov --isolated \
+        pytest \
+        --cov=plain \
+        --cov-append \
+        --cov-report=xml:"$ROOT_DIR/coverage.xml" \
+        --cov-report=html:"$ROOT_DIR/htmlcov" \
+        "$@"
     cd ../..
 done
 
@@ -30,3 +56,5 @@ for demo in demos/*; do
     uv run pytest "$@"
     cd ..
 done
+
+echo "\nCombined coverage reports generated. Open $ROOT_DIR/htmlcov/index.html in a browser." >&2

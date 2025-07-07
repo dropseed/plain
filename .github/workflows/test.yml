@@ -10,9 +10,6 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
-    env:
-      PACKAGES: plain plain-worker plain-flags plain-sessions plain-admin plain-oauth plain-auth plain-models plain-api plain-elements plain-htmx
-
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
@@ -20,11 +17,7 @@ jobs:
     - name: Set up Python
       run: uv python install ${{ matrix.python-version }}
     - name: Run tests
-      run: |
-        for package in $PACKAGES; do
-          echo "Testing $package"
-          (cd "$package/tests" && uv run --isolated pytest)
-        done
+      run: ./scripts/test
 
   lint:
     runs-on: ubuntu-latest
