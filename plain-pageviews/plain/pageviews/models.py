@@ -7,7 +7,12 @@ from plain import models
 class Pageview(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4)
 
-    url = models.URLField(max_length=1024)
+    # A full URL can be thousands of characters, but MySQL has a 3072-byte limit
+    # on indexed columns (when using the default ``utf8mb4`` character set that
+    # stores up to 4 bytes per character). The ``url`` field is indexed below,
+    # so we keep the length at 768 characters (768 × 4 = 3072 bytes) to ensure
+    # the index can be created on all supported database backends.
+    url = models.URLField(max_length=768)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     title = models.CharField(max_length=512, required=False)

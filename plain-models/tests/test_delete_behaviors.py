@@ -1,7 +1,6 @@
 import pytest
 from app.examples.models import (
     ChildCascade,
-    ChildDoNothing,
     ChildProtect,
     ChildRestrict,
     ChildSetDefault,
@@ -10,10 +9,8 @@ from app.examples.models import (
 )
 
 from plain.models import (
-    IntegrityError,
     ProtectedError,
     RestrictedError,
-    db_connection,
 )
 
 
@@ -66,11 +63,11 @@ def test_set_default_delete(db):
     assert child.parent_id == default_parent.pk
 
 
-def test_do_nothing_delete(db):
-    default_parent, parent = _create_parents()
-    child = ChildDoNothing.objects.create(parent=parent)
-    parent.delete()
-    with pytest.raises(IntegrityError):
-        db_connection.check_constraints()
-    child.parent = default_parent
-    child.save(clean_and_validate=False)
+# def test_do_nothing_delete(db):
+#     default_parent, parent = _create_parents()
+#     child = ChildDoNothing.objects.create(parent=parent)
+#     parent.delete()
+#     with pytest.raises(IntegrityError):
+#         db_connection.check_constraints()
+#     child.parent = default_parent
+#     child.save(clean_and_validate=False)

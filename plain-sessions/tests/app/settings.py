@@ -4,10 +4,7 @@ INSTALLED_PACKAGES = [
     "plain.models",
     "plain.sessions",
 ]
-DATABASE = {
-    "ENGINE": "plain.models.backends.sqlite3",
-    "NAME": ":memory:",
-}
+
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
 ]

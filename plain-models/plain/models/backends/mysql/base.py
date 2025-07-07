@@ -6,23 +6,16 @@ Requires mysqlclient: https://pypi.org/project/mysqlclient/
 
 from functools import cached_property
 
+import MySQLdb as Database
+from MySQLdb.constants import CLIENT, FIELD_TYPE
+from MySQLdb.converters import conversions
+
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils as backend_utils
 from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.db import IntegrityError
 from plain.utils.regex_helper import _lazy_re_compile
 
-try:
-    import MySQLdb as Database
-except ImportError as err:
-    raise ImproperlyConfigured(
-        "Error loading MySQLdb module.\nDid you install mysqlclient?"
-    ) from err
-
-from MySQLdb.constants import CLIENT, FIELD_TYPE
-from MySQLdb.converters import conversions
-
-# Some of these import MySQLdb, so import them after checking if it's installed.
 from .client import DatabaseClient
 from .creation import DatabaseCreation
 from .features import DatabaseFeatures
@@ -30,13 +23,6 @@ from .introspection import DatabaseIntrospection
 from .operations import DatabaseOperations
 from .schema import DatabaseSchemaEditor
 from .validation import DatabaseValidation
-
-version = Database.version_info
-if version < (1, 4, 3):
-    raise ImproperlyConfigured(
-        f"mysqlclient 1.4.3 or newer is required; you have {Database.__version__}."
-    )
-
 
 # MySQLdb returns TIME columns as timedelta -- they are more like timedelta in
 # terms of actual behavior as they are signed and include days -- and Plain
