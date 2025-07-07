@@ -47,10 +47,13 @@ class ChildSetNull(models.Model):
 
 @models.register_model
 class ChildSetDefault(models.Model):
+    def default_parent_pk():
+        return DeleteParent.objects.get(name="default").pk
+
     parent = models.ForeignKey(
         DeleteParent,
         on_delete=models.SET_DEFAULT,
-        default=1,
+        default=default_parent_pk,
     )
 
 
