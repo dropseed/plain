@@ -12,7 +12,7 @@ class Pageview(models.Model):
     # stores up to 4 bytes per character). The ``url`` field is indexed below,
     # so we keep the length at 768 characters (768 × 4 = 3072 bytes) to ensure
     # the index can be created on all supported database backends.
-    url = models.URLField(max_length=768)
+    url = models.URLField(max_length=750)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     title = models.CharField(max_length=512, required=False)
