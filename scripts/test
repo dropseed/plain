@@ -70,10 +70,10 @@ for package in $packages; do
   extra_pkgs=""
   case "$DATABASE_URL" in
     postgres:*|postgresql:*)
-      extra_pkgs="--with psycopg[binary]"
+      extra_pkgs="--with=psycopg[binary]"
       ;;
     mysql:*)
-      extra_pkgs="--with mysqlclient"
+      extra_pkgs="--with=mysqlclient"
       ;;
   esac
 
