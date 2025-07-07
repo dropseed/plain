@@ -267,37 +267,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         with self.wrap_database_errors:
             self.connection.autocommit(autocommit)
 
-    def disable_constraint_checking(self):
-        """
-        Disable foreign key checks, primarily for use in adding rows with
-        forward references. Always return True to indicate constraint checks
-        need to be re-enabled.
-        """
-        with self.cursor() as cursor:
-            cursor.execute("SET foreign_key_checks=0")
-        return True
-
-    def enable_constraint_checking(self):
-        """
-        Re-enable foreign key checks after they have been disabled.
-        """
-        # Override needs_rollback in case constraint_checks_disabled is
-        # nested inside transaction.atomic.
-        self.needs_rollback, needs_rollback = False, self.needs_rollback
-        try:
-            with self.cursor() as cursor:
-                cursor.execute("SET foreign_key_checks=1")
-        finally:
-            self.needs_rollback = needs_rollback
-
     def check_constraints(self, table_names=None):
-        """
-        Check each table name in `table_names` for rows with invalid foreign
-        key references. This method is intended to be used in conjunction with
-        `disable_constraint_checking()` and `enable_constraint_checking()`, to
-        determine if rows with invalid references were entered while constraint
-        checks were off.
-        """
+        """Check ``table_names`` for rows with invalid foreign key references."""
         with self.cursor() as cursor:
             if table_names is None:
                 table_names = self.introspection.table_names(cursor)
