@@ -1,41 +1,95 @@
 #!/bin/sh -e
 
-workflow=".github/workflows/test.yml"
-packages=$(grep 'PACKAGES:' "$workflow" | sed -E 's/^.*PACKAGES: *//')
+# Run the test-suite for every first–party package as well as the demo
+# projects that live under ./demos.
+#
+# Features combined from both historical versions of this helper:
+# 1. If DATABASE_URL is not provided it falls back to an in-memory sqlite
+#    database so that the tests can run without any additional setup.
+# 2. Coverage from all packages is accumulated into a single .coverage file
+#    in the repository root and HTML / XML reports are generated there as
+#    well so that they can be inspected after the run.
+# 3. psycopg[binary] and mysqlclient wheels are installed for the duration
+#    of the test run so that back-ends that rely on them are available.
 
+ROOT_DIR="$(pwd)"
+
+# Explicit list so that package order is deterministic.  Keep this in sync
+# with the top-level directories that contain first-party code.
+PACKAGES="$(cat <<EOF
+plain
+plain-models
+plain-sessions
+plain-worker
+plain-flags
+plain-admin
+plain-oauth
+plain-auth
+plain-api
+plain-elements
+plain-htmx
+EOF
+)"
+
+# Allow the caller to pass a single package name to limit the scope of the
+# run (useful while iterating locally).
+packages=$PACKAGES
 if [ $# -gt 0 ] && printf '%s\n' $packages | grep -x "$1" >/dev/null; then
   packages=$1
   shift
 fi
 
+# Convenience function for bold log lines.
 bold() {
-    echo "\033[1m$1\033[0m"
+  echo "\033[1m$1\033[0m"
 }
 
+# Ensure a DATABASE_URL so that Django settings can always connect.
 if [ -z "$DATABASE_URL" ]; then
-    echo "DATABASE_URL is not set, using DATABASE_URL=sqlite://:memory:"
-    export DATABASE_URL="sqlite://:memory:"
+  echo "DATABASE_URL is not set, using DATABASE_URL=sqlite://:memory:"
+  export DATABASE_URL="sqlite://:memory:"
 else
-    echo "Using DATABASE_URL: $DATABASE_URL"
+  echo "Using DATABASE_URL: $DATABASE_URL"
 fi
 
-bold "Found packages to test in $workflow: $packages"
+# Store all coverage data in one place so that successive pytest invocations
+# (one per package) append to the same file.
+export COVERAGE_FILE="$ROOT_DIR/.coverage"
 
-for package in $packages;
-do
-    echo
-    bold "Testing $package"
+bold "Packages to test: $packages"
 
-    cd "$package/tests"
+for package in $packages; do
+  echo
+  bold "Testing $package"
 
-    uv run --package "$package" --isolated --with psycopg[binary] --with mysqlclient pytest "$@"
-    cd ../..
+  cd "$package/tests"
+
+  # Use an isolated venv for each invocation and ensure optional database
+  # drivers and coverage plugins are available.
+  uv run \
+    --package "$package" \
+    --isolated \
+    --with psycopg[binary] \
+    --with mysqlclient \
+    --with pytest-cov \
+    pytest \
+    --cov=plain \
+    --cov-append \
+    --cov-report=xml:"$ROOT_DIR/coverage.xml" \
+    --cov-report=html:"$ROOT_DIR/htmlcov" \
+    "$@"
+
+  cd ../..
 done
 
+# Run the tests for each demo project as a smoke test.  These do not need
+# coverage data.
 for demo in demos/*; do
-    echo
-    bold "Testing $demo"
-    cd "$demo"
-    uv run pytest "$@"
-    cd ..
+  echo
+  bold "Testing $demo"
+  cd "$demo"
+  uv run pytest "$@"
+  cd ..
 done
+
+echo "\nCombined coverage reports generated. Open $ROOT_DIR/htmlcov/index.html in a browser." >&2

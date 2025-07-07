@@ -45,9 +45,6 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
         database: [sqlite, postgres, mysql]
 
-    env:
-      PACKAGES: plain plain-worker plain-flags plain-sessions plain-admin plain-oauth plain-auth plain-models plain-api plain-elements plain-htmx
-
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
