@@ -12,7 +12,6 @@ dependencies = [
     "python-dotenv~=1.0.0",
     "gunicorn>20",
     "requests>=2.0.0",
-    "psycopg[binary]~=3.2.2",
     "rich",
     "inotify",
 ]
