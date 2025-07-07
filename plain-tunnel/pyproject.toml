@@ -1,6 +1,6 @@
 [project]
 name = "plain.tunnel"
-version = "0.5.4"
+version = "0.5.5"
 description = ""
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
