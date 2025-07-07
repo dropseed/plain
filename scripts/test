@@ -1,221 +1,101 @@
-#!/usr/bin/env python3
+#!/bin/sh -e
 
-"""Project-wide test runner.
+# Run the test-suite for each first-party package as well as the demo projects.
+#
+#  • Optional “--cov” flag controls whether pytest-cov is used and reports are
+#    generated.  CI will pass this flag, local devs needn’t pay the overhead.
+#  • Installs database driver wheels on-demand based on the current
+#    $DATABASE_URL scheme (postgres → psycopg, mysql → mysqlclient).
 
-This helper replaces the former Bash script with an idiomatic, self-contained
-Python implementation that:
-
-* Allows an optional ``--cov`` flag to enable coverage reporting.
-* Falls back to an in-memory SQLite database when ``$DATABASE_URL`` isn’t set.
-* Conditionally installs database driver wheels (``psycopg[binary]`` or
-  ``mysqlclient``) based on the *scheme* in ``DATABASE_URL``.
-* Runs every first-party package’s tests in its own isolated *uv* environment
-  so dependencies declared in that package’s ``pyproject.toml`` are honoured.
-* Smoke-tests each demo project afterwards (without coverage so they don’t
-  skew results).
-
-Examples
---------
-::
-
-    scripts/test               # all packages, no coverage
-    scripts/test --cov         # all packages, with coverage
-    scripts/test plain-models  # single package
-    scripts/test --cov plain-models -- -k "foo and not bar"  # extra pytest args
-
-Any arguments following ``--`` are forwarded verbatim to *pytest*.
-"""
-
-from __future__ import annotations
-
-import argparse
-import os
-import shlex
-import subprocess
-import sys
-from pathlib import Path
-from typing import Iterable, Sequence
-from urllib.parse import urlparse
-
-ROOT_DIR = Path(__file__).resolve().parent.parent
-
-# Keep list sorted for deterministic output.
-FIRST_PARTY_PACKAGES: tuple[str, ...] = (
-    "plain",
-    "plain-models",
-    "plain-sessions",
-    "plain-worker",
-    "plain-flags",
-    "plain-admin",
-    "plain-oauth",
-    "plain-auth",
-    "plain-api",
-    "plain-elements",
-    "plain-htmx",
-)
-
+ROOT_DIR="$(pwd)"
 
 # ---------------------------------------------------------------------------
-# Utility helpers
+# CLI option parsing
 # ---------------------------------------------------------------------------
+COVERAGE=0
+if [ "$1" = "--coverage" ]; then
+  COVERAGE=1
+  shift
+fi
 
+# A single package name may be supplied to limit the run; otherwise test all
+# first-party packages in a deterministic order.
+ALL_PACKAGES="$(cat <<EOF
+plain
+plain-models
+plain-sessions
+plain-worker
+plain-flags
+plain-admin
+plain-oauth
+plain-auth
+plain-api
+plain-elements
+plain-htmx
+EOF
+)"
 
-def bold(text: str) -> str:
-    """Return *text* wrapped in ANSI bold escape codes."""
+packages=$ALL_PACKAGES
+if [ $# -gt 0 ] && printf '%s\n' $ALL_PACKAGES | grep -x "$1" >/dev/null; then
+  packages=$1
+  shift
+fi
 
-    return f"\033[1m{text}\033[0m"
-
-
-def extra_wheels_for(url: str) -> list[str]:
-    """Return a list of optional wheels required for *url*’s database scheme."""
-
-    match urlparse(url).scheme:
-        case "postgres" | "postgresql":
-            return ["psycopg[binary]"]
-        case "mysql":
-            return ["mysqlclient"]
-        case _:
-            return []
-
-
-def install_args_for_wheels(wheels: Iterable[str]) -> list[str]:
-    """Return a ``--with <wheel>`` pair for each wheel in *wheels*."""
-
-    args: list[str] = []
-    for wheel in wheels:
-        args.extend(("--with", wheel))
-    return args
-
-
-def run(
-    cmd: Sequence[str] | str,
-    *,
-    cwd: Path | None = None,
-    env: dict[str, str] | None = None,
-) -> None:
-    """Wrapper around :pyfunc:`subprocess.run` with nicer error-printing."""
-
-    if isinstance(cmd, str):
-        printable = cmd
-    else:
-        printable = " ".join(shlex.quote(part) for part in cmd)
-
-    print(bold("$") + " " + printable)
-    subprocess.run(cmd, check=True, cwd=cwd, env=env)
-
+# Convenience for bold headings.
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 
 # ---------------------------------------------------------------------------
-# Main entry-point
+# Database URL / optional client wheels
 # ---------------------------------------------------------------------------
+if [ -z "$DATABASE_URL" ]; then
+  echo "DATABASE_URL is not set, using sqlite://:memory:"
+  export DATABASE_URL="sqlite://:memory:"
+else
+  echo "Using DATABASE_URL: $DATABASE_URL"
+fi
 
+WITH=""
+case "$DATABASE_URL" in
+  postgres:*|postgresql:*) WITH="--with psycopg[binary]" ;;
+  mysql:*)                 WITH="--with mysqlclient"    ;;
+esac
 
-def main(argv: list[str] | None = None) -> None:  # pragma: no cover
-    parser = argparse.ArgumentParser(add_help=False)
+# ---------------------------------------------------------------------------
+# Coverage configuration (if requested)
+# ---------------------------------------------------------------------------
+COV_ARGS=""
+if [ "$COVERAGE" -eq 1 ]; then
+  export COVERAGE_FILE="$ROOT_DIR/.coverage"
+  WITH="$WITH --with pytest-cov"
+  COV_ARGS="--cov=plain --cov-append --cov-report=xml:$ROOT_DIR/coverage.xml --cov-report=html:$ROOT_DIR/htmlcov"
+fi
 
-    parser.add_argument(
-        "--coverage",
-        action="store_true",
-        help="Enable pytest-cov and write combined HTML/XML reports.",
-    )
-    parser.add_argument(
-        "package",
-        nargs="?",
-        choices=FIRST_PARTY_PACKAGES,
-        help="Run only this package’s tests (default: all packages)",
-    )
-    parser.add_argument(
-        "--",
-        dest="pytest_args",
-        nargs=argparse.REMAINDER,
-        help="Arguments following ‘--’ are forwarded to pytest.",
-    )
+bold "Packages to test: $packages"
 
-    ns = parser.parse_args(argv)
+for package in $packages; do
+  echo
+  bold "Testing $package"
 
-    if not os.getenv("DATABASE_URL"):
-        os.environ["DATABASE_URL"] = "sqlite://:memory:"
-        print("DATABASE_URL not set – using sqlite://:memory:")
-    else:
-        print(f"Using DATABASE_URL: {os.environ['DATABASE_URL']}")
+  cd "$package/tests"
 
-    wheels: list[str] = extra_wheels_for(os.environ["DATABASE_URL"])
+  uv run \
+    --isolated \
+    --package "$package" \
+    $WITH \
+    pytest $COV_ARGS "$@"
 
-    # Coverage configuration.
-    if ns.coverage:
-        wheels.append("pytest-cov")
-        os.environ["COVERAGE_FILE"] = str(ROOT_DIR / ".coverage")
-        cov_pytest_args = [
-            "--cov=plain",
-            "--cov-append",
-            f"--cov-report=xml:{ROOT_DIR / 'coverage.xml'}",
-            f"--cov-report=html:{ROOT_DIR / 'htmlcov'}",
-        ]
-    else:
-        cov_pytest_args = []
+  cd ../..
+done
 
-    optional_with_args = install_args_for_wheels(wheels)
+# Demo projects (smoke-tests only)
+for demo in demos/*; do
+  echo
+  bold "Testing $demo"
+  cd "$demo"
+  uv run --isolated $WITH pytest "$@"
+  cd ..
+done
 
-    # Build pytest base args once.
-    pytest_base_args = [*cov_pytest_args, *(ns.pytest_args or [])]
-
-    packages: Iterable[str]
-    if ns.package:
-        packages = (ns.package,)
-    else:
-        packages = FIRST_PARTY_PACKAGES
-
-    print(bold("Packages to test:") + " " + ", ".join(packages))
-
-    # ---------------------------------------------------------------------
-    # First-party packages
-    # ---------------------------------------------------------------------
-
-    for pkg in packages:
-        print("\n" + bold(f"Testing {pkg}"))
-        tests_dir = ROOT_DIR / pkg / "tests"
-
-        run(
-            [
-                "uv",
-                "run",
-                "--isolated",
-                "--package",
-                pkg,
-                *optional_with_args,
-                "pytest",
-                *pytest_base_args,
-            ],
-            cwd=tests_dir,
-        )
-
-    # ---------------------------------------------------------------------
-    # Demo projects (smoke-tests only, no coverage)
-    # ---------------------------------------------------------------------
-
-    demos_root = ROOT_DIR / "demos"
-    for demo in sorted(demos_root.iterdir()):
-        if not demo.is_dir():
-            continue
-        print("\n" + bold(f"Testing {demo}"))
-        run(
-            [
-                "uv",
-                "run",
-                "--isolated",
-                *install_args_for_wheels(wheels),
-                "pytest",
-                *(ns.pytest_args or []),
-            ],
-            cwd=demo,
-        )
-
-    if ns.coverage:
-        print(
-            bold("Coverage reports:")
-            + f" HTML {ROOT_DIR / 'htmlcov' / 'index.html'}  •  XML {ROOT_DIR / 'coverage.xml'}",
-            file=sys.stderr,
-        )
-
-
-if __name__ == "__main__":
-    main()
+if [ "$COVERAGE" -eq 1 ]; then
+  echo "\nCombined coverage reports generated. Open $ROOT_DIR/htmlcov/index.html in a browser." >&2
+fi
