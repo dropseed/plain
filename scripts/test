@@ -64,13 +64,25 @@ for package in $packages; do
 
   cd "$package/tests"
 
-  # Use an isolated venv for each invocation and ensure optional database
-  # drivers and coverage plugins are available.
+  # Decide which (if any) optional database client wheels we need based on the
+  # DATABASE_URL currently in the environment.  "localhost" resolves to the
+  # TCP socket so simply checking for the scheme is enough.
+  extra_pkgs=""
+  case "$DATABASE_URL" in
+    postgres:*|postgresql:*)
+      extra_pkgs="--with psycopg[binary]"
+      ;;
+    mysql:*)
+      extra_pkgs="--with mysqlclient"
+      ;;
+  esac
+
+  # Use an isolated venv for each invocation and install only the packages
+  # that are relevant for the current backend.
   uv run \
     --package "$package" \
     --isolated \
-    --with psycopg[binary] \
-    --with mysqlclient \
+    "$extra_pkgs" \
     --with pytest-cov \
     pytest \
     --cov=plain \
@@ -90,8 +102,7 @@ for demo in demos/*; do
   cd "$demo"
   uv run \
     --isolated \
-    --with psycopg[binary] \
-    --with mysqlclient \
+    "$extra_pkgs" \
     pytest \
     "$@"
   cd ..
