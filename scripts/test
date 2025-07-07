@@ -25,8 +25,34 @@ for package in $packages;
 do
     echo
     bold "Testing $package"
+# Install database client libraries as needed for the database matrix.
+# We always include both clients so the isolated environment can connect to any
+# of the databases used in the GitHub Actions matrix without having to know
+# which one is active at runtime. Because the environments are temporary and
+# recreated for every package, the additional installation overhead is
+# negligible compared to the reliability gain.
+
     cd "$package/tests"
-    uv run --package "$package" --isolated pytest "$@"
+
+# Install database client libraries based on the DATABASE_URL scheme. Doing the
+# conditional install avoids unnecessary compilation of libraries that may not
+# have pre-built wheels available for the current platform (e.g. mysqlclient on
+# macOS when only Linux wheels are published).
+
+    with_args=""
+    case "$DATABASE_URL" in
+        postgres://*)
+            with_args="--with psycopg[binary]"
+            ;;
+        mysql://*)
+            with_args="--with mysqlclient"
+            ;;
+        *)
+            # sqlite or unknown scheme -> no additional clients needed
+            ;;
+    esac
+
+    uv run --package "$package" --isolated $with_args pytest "$@"
     cd ../..
 done
 
