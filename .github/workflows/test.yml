@@ -1,6 +1,14 @@
 name: test
 on:
-  push: {}
+  # Run the full test matrix for code merged to the default branch or on tags
+  push:
+    branches:
+      - master
+    tags:
+      - '*'  # allow running the workflow for any tag (e.g. releases)
+
+  # Run once per pull request (not on the accompanying branch push) so we don't
+  # get duplicate CI runs for the same commit.
   pull_request: {}
 
 jobs:
