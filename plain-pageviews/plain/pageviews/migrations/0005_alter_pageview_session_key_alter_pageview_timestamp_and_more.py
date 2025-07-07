@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="pageview",
             name="url",
-            field=models.URLField(max_length=1024),
+            field=models.URLField(max_length=99),
         ),
         migrations.AlterField(
             model_name="pageview",
