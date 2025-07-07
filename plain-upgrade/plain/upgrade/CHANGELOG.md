@@ -1,3 +1,13 @@
+## [0.3.1](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.1) (2025-07-07)
+
+### What's changed
+
+- The generated upgrade prompt now explicitly states that you can skip a package version if its changelog says "No changes required" ([9a9e79a](https://github.com/dropseed/plain/commit/9a9e79a)).
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.0) (2025-06-27)
 
 ### What's changed
