@@ -1,15 +1,9 @@
 name: test
 on:
-  # Run the full test matrix for code merged to the default branch or on tags
+  pull_request: {}
   push:
     branches:
       - master
-    tags:
-      - '*'  # allow running the workflow for any tag (e.g. releases)
-
-  # Run once per pull request (not on the accompanying branch push) so we don't
-  # get duplicate CI runs for the same commit.
-  pull_request: {}
 
 jobs:
   test:
@@ -55,18 +49,20 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
 
-    - name: Run tests (SQLite)
+    - name: Test (SQLite)
       run: ./scripts/test
+      env:
+        DATABASE_URL: "sqlite://:memory:"
 
-    - name: Run tests (PostgreSQL)
+    - name: Test (PostgreSQL)
+      run: ./scripts/test
       env:
         DATABASE_URL: postgres://postgres:postgres@localhost:5432/plain
-      run: ./scripts/test
 
-    - name: Run tests (MySQL)
+    - name: Test (MySQL)
+      run: ./scripts/test
       env:
         DATABASE_URL: mysql://root:mysql@127.0.0.1:3306/plain
-      run: ./scripts/test
 
   lint:
     runs-on: ubuntu-latest
