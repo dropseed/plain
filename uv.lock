@@ -824,7 +824,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-sessions"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
