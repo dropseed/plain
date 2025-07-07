@@ -42,7 +42,10 @@ do
     with_args=""
     case "$DATABASE_URL" in
         postgres://*)
-            with_args="--with psycopg[binary]"
+            # Install both the meta-package (psycopg) and the binary wheels in
+            # case the resolver skips the meta-package when only the extra is
+            # specified (which can lead to `ModuleNotFoundError: psycopg`).
+            with_args="--with psycopg[binary] --with psycopg-binary"
             ;;
         mysql://*)
             with_args="--with mysqlclient"
