@@ -88,7 +88,12 @@ for demo in demos/*; do
   echo
   bold "Testing $demo"
   cd "$demo"
-  uv run pytest "$@"
+  uv run \
+    --isolated \
+    --with psycopg[binary] \
+    --with mysqlclient \
+    pytest \
+    "$@"
   cd ..
 done
 
