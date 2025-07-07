@@ -58,6 +58,19 @@ export COVERAGE_FILE="$ROOT_DIR/.coverage"
 
 bold "Packages to test: $packages"
 
+extra_pkgs=""
+case "$DATABASE_URL" in
+  postgres:*|postgresql:*)
+    extra_pkgs="--with pytest-cov --with psycopg[binary]"
+    ;;
+  mysql:*)
+    extra_pkgs="--with pytest-cov --with mysqlclient"
+    ;;
+  *)
+    extra_pkgs="--with pytest-cov"
+    ;;
+esac
+
 for package in $packages; do
   echo
   bold "Testing $package"
@@ -69,9 +82,7 @@ for package in $packages; do
   uv run \
     --package "$package" \
     --isolated \
-    --with pytest-cov \
-    --with psycopg[binary] \
-    --with mysqlclient \
+    $extra_pkgs \
     pytest \
     --cov=plain \
     --cov-append \
@@ -89,8 +100,8 @@ for demo in demos/*; do
   bold "Testing $demo"
   cd "$demo"
   uv run \
-    --with psycopg[binary] \
-    --with mysqlclient \
+    --isolated \
+    $extra_pkgs \
     pytest \
     "$@"
   cd ..
