@@ -1,6 +1,6 @@
 [project]
 name = "plain.models"
-version = "0.34.4"
+version = "0.35.0"
 description = "Database models for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"

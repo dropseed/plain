@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-models@0.35.0) (2025-07-07)
+
+### What's changed
+
+- Added the `plain models list` CLI command which prints a nicely formatted list of all installed models, including their table name, fields, and originating package. You can pass package labels to filter the output or use the `--app-only` flag to only show first-party app models ([1bc40ce](https://github.com/dropseed/plain/commit/1bc40ce)).
+- The MySQL backend no longer enforces a strict `mysqlclient >= 1.4.3` version check and had several unused constraint-handling methods removed, reducing boilerplate and improving compatibility with a wider range of `mysqlclient` versions ([6322400](https://github.com/dropseed/plain/commit/6322400), [67f21f6](https://github.com/dropseed/plain/commit/67f21f6)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.4](https://github.com/dropseed/plain/releases/plain-models@0.34.4) (2025-07-02)
 
 ### What's changed
