@@ -56,7 +56,7 @@ fi
 
 WITH=""
 case "$DATABASE_URL" in
-  postgres:*|postgresql:*) WITH="--with psycopg[binary]" ;;
+  postgres:*|postgresql:*) WITH="--with 'psycopg[binary]'" ;;
   mysql:*)                 WITH="--with mysqlclient"    ;;
 esac
 
