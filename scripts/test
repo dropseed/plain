@@ -56,8 +56,10 @@ fi
 
 WITH=""
 case "$DATABASE_URL" in
-  postgres:*|postgresql:*) WITH="--with psycopg[binary]" ;;
-  mysql:*)                 WITH="--with mysqlclient"    ;;
+  # For some reason, if I try to run this without pytest-cov then it fails to find the db client...
+  postgres:*|postgresql:*) WITH="--with pytest-cov --with psycopg[binary]" ;;
+  mysql:*)                 WITH="--with pytest-cov --with mysqlclient"    ;;
+  sqlite:*|sqlite3:*)     WITH="--with pytest-cov"         ;;
 esac
 
 # ---------------------------------------------------------------------------
@@ -66,7 +68,6 @@ esac
 COV_ARGS=""
 if [ "$COVERAGE" -eq 1 ]; then
   export COVERAGE_FILE="$ROOT_DIR/.coverage"
-  WITH="$WITH --with pytest-cov"
   COV_ARGS="--cov=plain --cov-append --cov-report=xml:$ROOT_DIR/coverage.xml --cov-report=html:$ROOT_DIR/htmlcov"
 fi
 
@@ -78,11 +79,13 @@ for package in $packages; do
 
   cd "$package/tests"
 
+  set -x
   uv run \
     --isolated \
     --package "$package" \
     $WITH \
     pytest $COV_ARGS "$@"
+  set +x
 
   cd ../..
 done
