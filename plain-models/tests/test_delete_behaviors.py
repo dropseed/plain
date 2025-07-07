@@ -1,7 +1,6 @@
 import pytest
 from app.examples.models import (
     ChildCascade,
-    ChildDoNothing,
     ChildProtect,
     ChildRestrict,
     ChildSetDefault,
@@ -10,10 +9,8 @@ from app.examples.models import (
 )
 
 from plain.models import (
-    IntegrityError,
     ProtectedError,
     RestrictedError,
-    db_connection,
 )
 
 
