@@ -5,6 +5,8 @@ end-user to drop in HTML elements and have a decent, consistent starting point.
 We shouldn't use many custom classes in here (like .btn) because the user
 could unintentionally overwrite those since our CSS is combined.
  */
+
+/* biome-disable lint/style/noDescendingSpecificity */
 table {
   width: 100%;
   font-size: 0.875rem;
@@ -15,6 +17,14 @@ table {
 th {
   text-align: left;
   padding: 0.5rem 0.5rem;
+}
+
+main a {
+  color: rgb(37, 99, 235);
+}
+
+main a:hover {
+  text-decoration: underline;
 }
 
 table th a {
@@ -47,23 +57,15 @@ table img {
   border-radius: 2px;
 }
 
-main a {
-  color: rgb(37, 99, 235);
-}
-
-main a:hover {
-  text-decoration: underline;
-}
-
 select {
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.actions a,
+main button,
 .actions button,
-main button {
+.actions a {
   display: inline-block;
   padding: 8px 16px;
   font-size: 14px;

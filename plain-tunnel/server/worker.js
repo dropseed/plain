@@ -101,7 +101,7 @@ export class Tunnel {
   }
 
   handleResponseMetadata(data) {
-    const { id, status, headers, has_body, totalBodyChunks } = data;
+    const { id, has_body, totalBodyChunks } = data;
     const pendingRequest = this.pendingRequests.get(id);
     if (pendingRequest) {
       console.info(
