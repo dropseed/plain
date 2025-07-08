@@ -8,6 +8,7 @@ The `plain.dev` package can be [installed from PyPI](https://pypi.org/project/pl
 
 - [`plain dev`](#plain-dev)
 - [`plain dev services`](#plain-dev-services)
+- [`plain dev logs`](#plain-dev-logs)
 - [`plain pre-commit`](#plain-pre-commit)
 - [`plain contrib`](#plain-contrib)
 - [VS Code debugging](#vscode-debugging)
@@ -44,12 +45,26 @@ Unlike [services](#services), custom processes are _only_ run during `plain dev`
 ```toml
 # pyproject.toml
 [tool.plain.dev.run]
-ngrok = {command = "ngrok http $PORT"}
+    ngrok = {command = "ngrok http $PORT"}
 ```
 
 ## `plain dev services`
 
 Starts your [services](#services) by themselves.
+Logs are stored in `.plain/dev/logs/services/`.
+
+## `plain dev logs`
+
+Show output from recent `plain dev` runs.
+
+Logs are stored in `.plain/dev/logs/run/`.
+
+```bash
+plain dev logs        # print last log
+plain dev logs -f     # follow the latest log
+plain dev logs --pid 1234
+plain dev logs --path
+```
 
 ## `plain pre-commit`
 
