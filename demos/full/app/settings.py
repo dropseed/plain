@@ -8,6 +8,7 @@ INSTALLED_PACKAGES = [
     "plain.cache",
     "plain.elements",
     "plain.email",
+    "plain.flags",
     "plain.htmx",
     "plain.loginlink",
     "plain.models",
