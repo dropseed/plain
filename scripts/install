@@ -14,7 +14,7 @@ do
     echo ""
     echo "${BOLD}Installing dependencies for $demo${NORMAL}"
     cd "$demo"
-    ./scripts/install
+    DATABASE_URL=sqlite://:memory: ./scripts/install
     cd ../..
 done
 
