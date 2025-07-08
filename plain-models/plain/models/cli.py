@@ -92,7 +92,7 @@ def db_wait():
                 )
             time.sleep(1.5)
         else:
-            click.secho("Database ready", fg="green")
+            click.secho("✔ Database ready", fg="green")
             break
 
 

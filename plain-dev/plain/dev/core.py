@@ -1,8 +1,6 @@
 import json
-import multiprocessing
 import os
 import platform
-import signal
 import socket
 import subprocess
 import sys
@@ -20,7 +18,6 @@ from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .mkcert import MkcertManager
 from .process import ProcessManager
-from .services import ServicesProcess
 from .utils import has_pyproject_toml
 
 ENTRYPOINT_GROUP = "plain.dev"
@@ -132,7 +129,6 @@ class DevProcess(ProcessManager):
 
     def run(self):
         self.write_pidfile()
-        click.secho(f"PID: {self.pid_value}", dim=True)
         mkcert_manager = MkcertManager()
         mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
         self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
@@ -143,49 +139,39 @@ class DevProcess(ProcessManager):
         self.symlink_plain_src()
         self.modify_hosts_file()
         self.set_allowed_hosts()
+
+        click.secho("→ Running preflight checks... ", dim=True, nl=False)
         self.run_preflight()
 
-        # If we start services ourselves, we should manage the pidfile
-        services_proc = None
+        # if ServicesProcess.running_pid():
+        #     self.poncho.add_process(
+        #         "services",
+        #         f"{sys.executable} -m plain dev logs --services --follow",
+        #     )
 
-        # Services start first (or are already running from a separate command)
-        if running_pid := ServicesProcess().running_pid():
-            click.secho(f"Services already running (pid={running_pid})", fg="yellow")
-        elif services := ServicesProcess.get_services(APP_PATH.parent):
-            click.secho("\nStarting services...", italic=True, dim=True)
-            services_proc = ServicesProcess()
-            services_proc.write_pidfile()
-
-            for name, data in services.items():
-                env = {
-                    **os.environ,
-                    "PYTHONUNBUFFERED": "true",
-                    **data.get("env", {}),
-                }
-                self.poncho.add_process(name, data["cmd"], env=env)
-
-        # If plain.models is installed (common) then we
-        # will do a couple extra things before starting all of the app-related
-        # processes (this way they don't all have to db-wait or anything)
-        process = None
-        if find_spec("plain.models") is not None:
-            # Use a custom signal to tell the main thread to add
-            # the app processes once the db is ready
-            signal.signal(signal.SIGUSR1, self.start_app)
-
-            process = multiprocessing.Process(
-                target=_process_task, args=(self.plain_env,)
+        if find_spec("plain.models"):
+            click.secho("→ Waiting for database... ", dim=True, nl=False)
+            subprocess.run(
+                [sys.executable, "-m", "plain", "models", "db-wait"],
+                env=self.plain_env,
+                check=True,
             )
-            process.start()
+            click.secho("→ Running migrations...", dim=True)
+            subprocess.run(
+                [sys.executable, "-m", "plain", "migrate", "--backup"],
+                env=self.plain_env,
+                check=True,
+            )
 
-            # If there are no poncho processes, then let this process finish before
-            # continuing (vs running in parallel)
-            if self.poncho.num_processes() == 0:
-                # Wait for the process to finish
-                process.join()
-        else:
-            # Start the app processes immediately
-            self.start_app(None, None)
+        click.secho("\n→ Starting app...", dim=True)
+
+        # Manually start the status bar now so it isn't bungled by
+        # another thread checking db stuff...
+        self.console_status.start()
+
+        self.add_gunicorn()
+        self.add_entrypoints()
+        self.add_pyproject_run()
 
         try:
             # Start processes we know about and block the main thread
@@ -195,34 +181,9 @@ class DevProcess(ProcessManager):
             self.console_status.stop()
         finally:
             self.rm_pidfile()
-            # Make sure the services pid gets removed if we set it
-            if services_proc:
-                services_proc.rm_pidfile()
-
             self.close()
 
-            # Make sure the process is terminated if it is still running
-            if process and process.is_alive():
-                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-                process.join(timeout=3)
-                if process.is_alive():
-                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                    process.join()
-
         return self.poncho.returncode
-
-    def start_app(self, signum, frame):
-        # This runs in the main thread when SIGUSR1 is received
-        # (or called directly if no thread).
-        click.secho("\nStarting app...", italic=True, dim=True)
-
-        # Manually start the status bar now so it isn't bungled by
-        # another thread checking db stuff...
-        self.console_status.start()
-
-        self.add_gunicorn()
-        self.add_entrypoints()
-        self.add_pyproject_run()
 
     def symlink_plain_src(self):
         """Symlink the plain package into .plain so we can look at it easily"""
@@ -316,7 +277,6 @@ class DevProcess(ProcessManager):
             )
 
     def run_preflight(self):
-        click.echo()
         if subprocess.run(["plain", "preflight"], env=self.plain_env).returncode:
             click.secho("Preflight check failed!", fg="red")
             sys.exit(1)
@@ -386,16 +346,3 @@ class DevProcess(ProcessManager):
                 **data.get("env", {}),
             }
             self.poncho.add_process(name, data["cmd"], env=env)
-
-
-def _process_task(env):
-    # Make this process the leader of a new group which can be killed together if it doesn't finish
-    os.setsid()
-
-    subprocess.run(["plain", "models", "db-wait"], env=env, check=True)
-    subprocess.run(["plain", "migrate", "--backup"], env=env, check=True)
-
-    # preflight with db?
-
-    # Send SIGUSR1 to the parent process so the parent's handler is invoked
-    os.kill(os.getppid(), signal.SIGUSR1)

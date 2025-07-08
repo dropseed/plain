@@ -42,7 +42,7 @@ class DevGroup(click.Group):
             return
 
         click.secho(
-            "Starting dev services in the background (use `plain dev --stop` to kill)...",
+            "Starting background dev services (terminate with `plain dev --stop`)...",
             dim=True,
         )
 
@@ -52,6 +52,20 @@ class DevGroup(click.Group):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+
+        time.sleep(0.5)  # Give it a moment to start
+
+        # If it's already dead, show the output and quit
+        if not ServicesProcess.running_pid():
+            click.secho(
+                "Failed to start dev services. Here are the logs:",
+                fg="red",
+            )
+            subprocess.run(
+                ["plain", "dev", "logs", "--services"],
+                check=False,
+            )
+            sys.exit(1)
 
 
 @register_cli("dev")
@@ -103,6 +117,8 @@ def cli(ctx, port, hostname, log_level, start, stop):
         raise click.UsageError(
             "You cannot use both --start and --stop at the same time."
         )
+
+    os.environ["PLAIN_DEV_SERVICES_AUTO"] = "false"
 
     dev = DevProcess(
         port=port,
