@@ -43,6 +43,10 @@ const plainToolbar = {
     document.querySelector("#plaintoolbar-details").classList.add("hidden");
     localStorage.setItem("plaintoolbar.expanded", "0");
   },
+  expandTemporary: function () {
+    this.expanded = true;
+    document.querySelector("#plaintoolbar-details").classList.remove("hidden");
+  },
   showTab: function (tabName) {
     this.expand();
 
@@ -95,6 +99,14 @@ window.addEventListener("load", () => {
     plainToolbar.collapse();
   }
   const toolbar = document.querySelector("#plaintoolbar");
+  const hasException = toolbar.querySelector('[data-toolbar-tab="Exception"]');
+
+  if (hasException) {
+    plainToolbar.show();
+    if (!plainToolbar.expanded) {
+      plainToolbar.expandTemporary();
+    }
+  }
 
   for (const tab of toolbar.querySelectorAll("button[data-toolbar-tab]")) {
     tab.addEventListener("click", () => {
