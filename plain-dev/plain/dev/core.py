@@ -1,4 +1,3 @@
-import importlib
 import json
 import multiprocessing
 import os
@@ -20,14 +19,14 @@ from rich.text import Text
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .mkcert import MkcertManager
-from .process import Process
+from .process import ProcessManager
 from .services import ServicesProcess
 from .utils import has_pyproject_toml
 
 ENTRYPOINT_GROUP = "plain.dev"
 
 
-class DevProcess(Process):
+class DevProcess(ProcessManager):
     pidfile = PLAIN_TEMP_PATH / "dev" / "dev.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "run"
 
@@ -227,9 +226,7 @@ class DevProcess(Process):
 
     def symlink_plain_src(self):
         """Symlink the plain package into .plain so we can look at it easily"""
-        plain_path = Path(
-            importlib.util.find_spec("plain.runtime").origin
-        ).parent.parent
+        plain_path = Path(find_spec("plain.runtime").origin).parent.parent
         if not PLAIN_TEMP_PATH.exists():
             PLAIN_TEMP_PATH.mkdir()
 

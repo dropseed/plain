@@ -6,7 +6,7 @@ from .poncho.manager import Manager as PonchoManager
 from .poncho.printer import Printer
 
 
-class Process:
+class ProcessManager:
     pidfile: Path
     log_dir: Path
 

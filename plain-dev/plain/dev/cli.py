@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import time
@@ -6,14 +7,55 @@ from importlib.metadata import entry_points
 import click
 
 from plain.cli import register_cli
-from plain.runtime import PLAIN_TEMP_PATH
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .core import ENTRYPOINT_GROUP, DevProcess
 from .services import ServicesProcess
 
 
+class DevGroup(click.Group):
+    """Custom group that ensures *services* are running on CLI startup."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._auto_start_services()
+
+    @staticmethod
+    def _auto_start_services():
+        """Start dev *services* in the background if not already running."""
+
+        if os.environ.get("PLAIN_DEV_SERVICES_AUTO", "true") not in [
+            "1",
+            "true",
+            "yes",
+        ]:
+            return
+
+        # Don't do anything if it looks like a "services" command is being run explicitly
+        if "services" in sys.argv:
+            return
+
+        if not ServicesProcess.get_services(APP_PATH.parent):
+            return
+
+        if ServicesProcess.running_pid():
+            return
+
+        click.secho(
+            "Starting dev services in the background (use `plain dev --stop` to kill)...",
+            dim=True,
+        )
+
+        subprocess.Popen(
+            [sys.executable, "-m", "plain", "dev", "services", "--start"],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
 @register_cli("dev")
-@click.group(invoke_without_command=True)
+@click.group(cls=DevGroup, invoke_without_command=True)
 @click.pass_context
 @click.option(
     "--port",

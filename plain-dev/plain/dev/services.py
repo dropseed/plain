@@ -4,11 +4,11 @@ from pathlib import Path
 
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
-from .process import Process
+from .process import ProcessManager
 from .utils import has_pyproject_toml
 
 
-class ServicesProcess(Process):
+class ServicesProcess(ProcessManager):
     pidfile = PLAIN_TEMP_PATH / "dev" / "services.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "services"
 
