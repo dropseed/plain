@@ -261,8 +261,7 @@ def logs(follow, pid, path, services):
 def entrypoint(show_list, entrypoint):
     """Entrypoints registered under plain.dev"""
     if not show_list and not entrypoint:
-        click.secho("Please provide an entrypoint name or use --list", fg="red")
-        sys.exit(1)
+        raise click.UsageError("Please provide an entrypoint name or use --list")
 
     for entry_point in entry_points().select(group=ENTRYPOINT_GROUP):
         if show_list:

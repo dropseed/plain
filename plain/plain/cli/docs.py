@@ -1,6 +1,5 @@
 import ast
 import importlib.util
-import sys
 from pathlib import Path
 
 import click
@@ -16,8 +15,7 @@ from .output import iterate_markdown
 @click.argument("module", default="")
 def docs(module, llm, open):
     if not module and not llm:
-        click.secho("You must specify a module or use --llm", fg="red")
-        sys.exit(1)
+        raise click.UsageError("You must specify a module or use --llm")
 
     if llm:
         paths = [Path(__file__).parent.parent]
@@ -49,14 +47,12 @@ def docs(module, llm, open):
         # Get the README.md file for the module
         spec = importlib.util.find_spec(module)
         if not spec:
-            click.secho(f"Module {module} not found", fg="red")
-            sys.exit(1)
+            raise click.UsageError(f"Module {module} not found")
 
         module_path = Path(spec.origin).parent
         readme_path = module_path / "README.md"
         if not readme_path.exists():
-            click.secho(f"README.md not found for {module}", fg="red")
-            sys.exit(1)
+            raise click.UsageError(f"README.md not found for {module}")
 
         if open:
             click.launch(str(readme_path))

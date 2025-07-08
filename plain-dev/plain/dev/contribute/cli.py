@@ -96,8 +96,7 @@ def cli(packages, repo, reset, all_packages):
         elif package.startswith("plainx-"):
             plainx_packages.append(str(repo))
         else:
-            click.secho(f"Unknown package {package}", fg="red")
-            sys.exit(2)
+            raise click.UsageError(f"Unknown package {package}")
 
     if plain_packages:
         result = subprocess.run(["uv", "add", "--editable", "--dev"] + plain_packages)

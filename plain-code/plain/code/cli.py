@@ -100,8 +100,7 @@ def fix(ctx, path, unsafe_fixes, add_noqa):
         ruff_args.extend(["--exclude", e])
 
     if unsafe_fixes and add_noqa:
-        print("Cannot use both --unsafe-fixes and --add-noqa")
-        sys.exit(1)
+        raise click.UsageError("Cannot use both --unsafe-fixes and --add-noqa")
 
     if unsafe_fixes:
         print_event("Ruff fix (with unsafe fixes)")
