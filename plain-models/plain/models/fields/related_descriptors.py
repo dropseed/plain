@@ -51,10 +51,8 @@ from functools import cached_property
 from plain.exceptions import FieldError
 from plain.models import transaction
 from plain.models.db import (
-    DEFAULT_DB_ALIAS,
     NotSupportedError,
-    connections,
-    router,
+    db_connection,
 )
 from plain.models.expressions import Window
 from plain.models.functions import RowNumber
@@ -75,17 +73,14 @@ class ForeignKeyDeferredAttribute(DeferredAttribute):
 
 def _filter_prefetch_queryset(queryset, field_name, instances):
     predicate = Q(**{f"{field_name}__in": instances})
-    db = queryset._db or DEFAULT_DB_ALIAS
     if queryset.query.is_sliced:
-        if not connections[db].features.supports_over_clause:
+        if not db_connection.features.supports_over_clause:
             raise NotSupportedError(
                 "Prefetching from a limited queryset is only supported on backends "
                 "that support window functions."
             )
         low_mark, high_mark = queryset.query.low_mark, queryset.query.high_mark
-        order_by = [
-            expr for expr, _ in queryset.query.get_compiler(using=db).get_order_by()
-        ]
+        order_by = [expr for expr, _ in queryset.query.get_compiler().get_order_by()]
         window = Window(RowNumber(), partition_by=field_name, order_by=order_by)
         predicate &= GreaterThan(window, low_mark)
         if high_mark is not None:
@@ -127,7 +122,9 @@ class ForwardManyToOneDescriptor:
         return self.field.is_cached(instance)
 
     def get_queryset(self, **hints):
-        return self.field.remote_field.model._base_manager.db_manager(hints=hints).all()
+        qs = self.field.remote_field.model._base_manager.get_queryset()
+        qs._add_hints(**hints)
+        return qs.all()
 
     def get_prefetch_queryset(self, instances, queryset=None):
         if queryset is None:
@@ -232,21 +229,6 @@ class ForwardManyToOneDescriptor:
             raise ValueError(
                 f'Cannot assign "{value!r}": "{instance._meta.object_name}.{self.field.name}" must be a "{self.field.remote_field.model._meta.object_name}" instance.'
             )
-        elif value is not None:
-            if instance._state.db is None:
-                instance._state.db = router.db_for_write(
-                    instance.__class__, instance=value
-                )
-            if value._state.db is None:
-                value._state.db = router.db_for_write(
-                    value.__class__, instance=instance
-                )
-            if not router.allow_relation(value, instance):
-                raise ValueError(
-                    f'Cannot assign "{value!r}": the current database router prevents this '
-                    "relation."
-                )
-
         remote_field = self.field.remote_field
         # If we're setting the value of a OneToOneField to None, we need to clear
         # out the cache on any old related object. Otherwise, deleting the
@@ -387,18 +369,12 @@ def create_reverse_many_to_one_manager(superclass, rel):
             """
             Filter the queryset for the instance this manager is bound to.
             """
-            db = self._db or router.db_for_read(self.model, instance=self.instance)
-            empty_strings_as_null = connections[
-                db
-            ].features.interprets_empty_strings_as_nulls
             queryset._add_hints(instance=self.instance)
-            if self._db:
-                queryset = queryset.using(self._db)
             queryset._defer_next_filter = True
             queryset = queryset.filter(**self.core_filters)
             for field in self.field.foreign_related_fields:
                 val = getattr(self.instance, field.attname)
-                if val is None or (val == "" and empty_strings_as_null):
+                if val is None:
                     return queryset.none()
             if self.field.many_to_one:
                 # Guard against field-like objects such as GenericRelation
@@ -453,7 +429,6 @@ def create_reverse_many_to_one_manager(superclass, rel):
                 queryset = super().get_queryset()
 
             queryset._add_hints(instance=instances[0])
-            queryset = queryset.using(queryset._db or self._db)
 
             rel_obj_attr = self.field.get_local_related_value
             instance_attr = self.field.get_foreign_related_value
@@ -472,7 +447,6 @@ def create_reverse_many_to_one_manager(superclass, rel):
         def add(self, *objs, bulk=True):
             self._check_fk_val()
             self._remove_prefetched_objects()
-            db = router.db_for_write(self.model, instance=self.instance)
 
             def check_and_update_obj(obj):
                 if not isinstance(obj, self.model):
@@ -485,19 +459,19 @@ def create_reverse_many_to_one_manager(superclass, rel):
                 pks = []
                 for obj in objs:
                     check_and_update_obj(obj)
-                    if obj._state.adding or obj._state.db != db:
+                    if obj._state.adding:
                         raise ValueError(
                             f"{obj!r} instance isn't saved. Use bulk=False or save "
                             "the object first."
                         )
                     pks.append(obj.pk)
-                self.model._base_manager.using(db).filter(pk__in=pks).update(
+                self.model._base_manager.filter(pk__in=pks).update(
                     **{
                         self.field.name: self.instance,
                     }
                 )
             else:
-                with transaction.atomic(using=db, savepoint=False):
+                with transaction.atomic(savepoint=False):
                     for obj in objs:
                         check_and_update_obj(obj)
                         obj.save()
@@ -505,20 +479,17 @@ def create_reverse_many_to_one_manager(superclass, rel):
         def create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
-            db = router.db_for_write(self.model, instance=self.instance)
-            return super(RelatedManager, self.db_manager(db)).create(**kwargs)
+            return super().create(**kwargs)
 
         def get_or_create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
-            db = router.db_for_write(self.model, instance=self.instance)
-            return super(RelatedManager, self.db_manager(db)).get_or_create(**kwargs)
+            return super().get_or_create(**kwargs)
 
         def update_or_create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
-            db = router.db_for_write(self.model, instance=self.instance)
-            return super(RelatedManager, self.db_manager(db)).update_or_create(**kwargs)
+            return super().update_or_create(**kwargs)
 
         # remove() and clear() are only provided if the ForeignKey can have a
         # value of null.
@@ -550,13 +521,11 @@ def create_reverse_many_to_one_manager(superclass, rel):
 
             def _clear(self, queryset, bulk):
                 self._remove_prefetched_objects()
-                db = router.db_for_write(self.model, instance=self.instance)
-                queryset = queryset.using(db)
                 if bulk:
                     # `QuerySet.update()` is intrinsically atomic.
                     queryset.update(**{self.field.name: None})
                 else:
-                    with transaction.atomic(using=db, savepoint=False):
+                    with transaction.atomic(savepoint=False):
                         for obj in queryset:
                             setattr(obj, self.field.name, None)
                             obj.save(update_fields=[self.field.name])
@@ -568,13 +537,12 @@ def create_reverse_many_to_one_manager(superclass, rel):
             objs = tuple(objs)
 
             if self.field.allow_null:
-                db = router.db_for_write(self.model, instance=self.instance)
-                with transaction.atomic(using=db, savepoint=False):
+                with transaction.atomic(savepoint=False):
                     if clear:
                         self.clear(bulk=bulk)
                         self.add(*objs, bulk=bulk)
                     else:
-                        old_objs = set(self.using(db).all())
+                        old_objs = set(self.all())
                         new_objs = []
                         for obj in objs:
                             if obj in old_objs:
@@ -726,8 +694,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             Filter the queryset for the instance this manager is bound to.
             """
             queryset._add_hints(instance=self.instance)
-            if self._db:
-                queryset = queryset.using(self._db)
             queryset._defer_next_filter = True
             return queryset._next_is_sticky().filter(**self.core_filters)
 
@@ -749,7 +715,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 queryset = super().get_queryset()
 
             queryset._add_hints(instance=instances[0])
-            queryset = queryset.using(queryset._db or self._db)
             queryset = _filter_prefetch_queryset(
                 queryset._next_is_sticky(), self.query_field_name, instances
             )
@@ -763,8 +728,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             # dealing with PK values.
             fk = self.through._meta.get_field(self.source_field_name)
             join_table = fk.model._meta.db_table
-            connection = connections[queryset.db]
-            qn = connection.ops.quote_name
+            qn = db_connection.ops.quote_name
             queryset = queryset.extra(
                 select={
                     f"_prefetch_related_val_{f.attname}": f"{qn(join_table)}.{qn(f.column)}"
@@ -778,7 +742,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     for f in fk.local_related_fields
                 ),
                 lambda inst: tuple(
-                    f.get_db_prep_value(getattr(inst, f.attname), connection)
+                    f.get_db_prep_value(getattr(inst, f.attname), db_connection)
                     for f in fk.foreign_related_fields
                 ),
                 False,
@@ -788,8 +752,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
 
         def add(self, *objs, through_defaults=None):
             self._remove_prefetched_objects()
-            db = router.db_for_write(self.through, instance=self.instance)
-            with transaction.atomic(using=db, savepoint=False):
+            with transaction.atomic(savepoint=False):
                 self._add_items(
                     self.source_field_name,
                     self.target_field_name,
@@ -811,25 +774,23 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             self._remove_items(self.source_field_name, self.target_field_name, *objs)
 
         def clear(self):
-            db = router.db_for_write(self.through, instance=self.instance)
-            with transaction.atomic(using=db, savepoint=False):
+            with transaction.atomic(savepoint=False):
                 self._remove_prefetched_objects()
-                filters = self._build_remove_filters(super().get_queryset().using(db))
-                self.through._default_manager.using(db).filter(filters).delete()
+                filters = self._build_remove_filters(super().get_queryset())
+                self.through._default_manager.filter(filters).delete()
 
         def set(self, objs, *, clear=False, through_defaults=None):
             # Force evaluation of `objs` in case it's a queryset whose value
             # could be affected by `manager.clear()`. Refs #19816.
             objs = tuple(objs)
 
-            db = router.db_for_write(self.through, instance=self.instance)
-            with transaction.atomic(using=db, savepoint=False):
+            with transaction.atomic(savepoint=False):
                 if clear:
                     self.clear()
                     self.add(*objs, through_defaults=through_defaults)
                 else:
                     old_ids = set(
-                        self.using(db).values_list(
+                        self.values_list(
                             self.target_field.target_field.attname, flat=True
                         )
                     )
@@ -850,16 +811,12 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     self.add(*new_objs, through_defaults=through_defaults)
 
         def create(self, *, through_defaults=None, **kwargs):
-            db = router.db_for_write(self.instance.__class__, instance=self.instance)
-            new_obj = super(ManyRelatedManager, self.db_manager(db)).create(**kwargs)
+            new_obj = super().create(**kwargs)
             self.add(new_obj, through_defaults=through_defaults)
             return new_obj
 
         def get_or_create(self, *, through_defaults=None, **kwargs):
-            db = router.db_for_write(self.instance.__class__, instance=self.instance)
-            obj, created = super(ManyRelatedManager, self.db_manager(db)).get_or_create(
-                **kwargs
-            )
+            obj, created = super().get_or_create(**kwargs)
             # We only need to add() if created because if we got an object back
             # from get() then the relationship already exists.
             if created:
@@ -867,10 +824,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             return obj, created
 
         def update_or_create(self, *, through_defaults=None, **kwargs):
-            db = router.db_for_write(self.instance.__class__, instance=self.instance)
-            obj, created = super(
-                ManyRelatedManager, self.db_manager(db)
-            ).update_or_create(**kwargs)
+            obj, created = super().update_or_create(**kwargs)
             # We only need to add() if created because if we got an object back
             # from get() then the relationship already exists.
             if created:
@@ -887,11 +841,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             target_field = self.through._meta.get_field(target_field_name)
             for obj in objs:
                 if isinstance(obj, self.model):
-                    if not router.allow_relation(obj, self.instance):
-                        raise ValueError(
-                            f'Cannot add "{obj!r}": instance is on database "{self.instance._state.db}", '
-                            f'value is on database "{obj._state.db}"'
-                        )
                     target_id = target_field.get_foreign_related_value(obj)[0]
                     if target_id is None:
                         raise ValueError(
@@ -907,21 +856,19 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             return target_ids
 
         def _get_missing_target_ids(
-            self, source_field_name, target_field_name, db, target_ids
+            self, source_field_name, target_field_name, target_ids
         ):
             """
             Return the subset of ids of `objs` that aren't already assigned to
             this relationship.
             """
-            vals = (
-                self.through._default_manager.using(db)
-                .values_list(target_field_name, flat=True)
-                .filter(
-                    **{
-                        source_field_name: self.related_val[0],
-                        f"{target_field_name}__in": target_ids,
-                    }
-                )
+            vals = self.through._default_manager.values_list(
+                target_field_name, flat=True
+            ).filter(
+                **{
+                    source_field_name: self.related_val[0],
+                    f"{target_field_name}__in": target_ids,
+                }
             )
             return target_ids.difference(vals)
 
@@ -937,14 +884,13 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
 
             through_defaults = dict(resolve_callables(through_defaults or {}))
             target_ids = self._get_target_ids(target_field_name, objs)
-            db = router.db_for_write(self.through, instance=self.instance)
 
             missing_target_ids = self._get_missing_target_ids(
-                source_field_name, target_field_name, db, target_ids
+                source_field_name, target_field_name, target_ids
             )
-            with transaction.atomic(using=db, savepoint=False):
+            with transaction.atomic(savepoint=False):
                 # Add the ones that aren't there already.
-                self.through._default_manager.using(db).bulk_create(
+                self.through._default_manager.bulk_create(
                     [
                         self.through(
                             **through_defaults,
@@ -974,16 +920,15 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 else:
                     old_ids.add(obj)
 
-            db = router.db_for_write(self.through, instance=self.instance)
-            with transaction.atomic(using=db, savepoint=False):
+            with transaction.atomic(savepoint=False):
                 target_model_qs = super().get_queryset()
                 if target_model_qs._has_filters():
-                    old_vals = target_model_qs.using(db).filter(
+                    old_vals = target_model_qs.filter(
                         **{f"{self.target_field.target_field.attname}__in": old_ids}
                     )
                 else:
                     old_vals = old_ids
                 filters = self._build_remove_filters(old_vals)
-                self.through._default_manager.using(db).filter(filters).delete()
+                self.through._default_manager.filter(filters).delete()
 
     return ManyRelatedManager

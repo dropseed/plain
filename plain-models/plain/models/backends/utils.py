@@ -142,16 +142,14 @@ class CursorDebugWrapper(CursorWrapper):
                 }
             )
             logger.debug(
-                "(%.3f) %s; args=%s; alias=%s",
+                "(%.3f) %s; args=%s",
                 duration,
                 sql,
                 params,
-                self.db.alias,
                 extra={
                     "duration": duration,
                     "sql": sql,
                     "params": params,
-                    "alias": self.db.alias,
                 },
             )
 
@@ -172,15 +170,13 @@ def debug_transaction(connection, sql):
                 }
             )
             logger.debug(
-                "(%.3f) %s; args=%s; alias=%s",
+                "(%.3f) %s; args=%s",
                 duration,
                 sql,
                 None,
-                connection.alias,
                 extra={
                     "duration": duration,
                     "sql": sql,
-                    "alias": connection.alias,
                 },
             )
 

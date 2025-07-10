@@ -87,7 +87,7 @@ class TestBrowser:
         """Create a new page in the current context."""
         return self.context.new_page()
 
-    def discover_urls(self, *urls) -> list[str]:
+    def discover_urls(self, urls: list[str]) -> list[str]:
         """Recursively discover all URLs on the page and related pages until we don't see anything new"""
 
         def relative_url(url: str) -> str:

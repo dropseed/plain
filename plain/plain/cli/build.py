@@ -37,12 +37,9 @@ def build(keep_original, fingerprint, compress):
     """Pre-deployment build step (compile assets, css, js, etc.)"""
 
     if not keep_original and not fingerprint:
-        click.secho(
-            "You must either keep the original assets or fingerprint them.",
-            fg="red",
-            err=True,
+        raise click.UsageError(
+            "You must either keep the original assets or fingerprint them."
         )
-        sys.exit(1)
 
     # Run user-defined build commands first
     pyproject_path = plain.runtime.APP_PATH.parent / "pyproject.toml"

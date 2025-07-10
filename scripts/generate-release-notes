@@ -14,6 +14,8 @@ Example release notes:
 
 ---
 
+## [0.50.0](https://github.com/dropseed/plain/releases/plain@0.50.0) (2025-06-23)
+
 ### What's changed
 
 - The \`testbrowser\` uses \`gunicorn\` relative to the running Python executable ([abc1234](https://github.com/dropseed/plain/commit/abc1234))
@@ -30,25 +32,21 @@ Write the release notes to the CHANGELOG.md file in the associated package (i.e.
 
 Once the CHANGELOG.md is updated and you are finished, simply output the release notes for this version, nothing else. This command will be piped to another command.
 
-Generate release notes for this version (also the git tag):"
+Generate release notes for this package version (the current commit which is not yet tagged but will be as {pkg}@{version}):"
 
-TAG="$1"
-if [ -z "$TAG" ]; then
-  echo "Usage: $0 <tag>"
+PKG="$1"
+VERSION="$2"
+if [ -z "$PKG" ]; then
+  echo "Usage: $0 <PKG> <VERSION>"
   exit 1
 fi
 
-# Make sure the tag exists
-if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "Tag '$TAG' does not exist."
-  exit 1
-fi
-
-NOTES=$(codex -m o3 --full-auto --no-project-doc -q "$PROMPT $TAG" | tee /dev/stderr | jq --raw-output --slurp '.[-1].content[0].text')
+NOTES=$(codex -m o3 --flex-mode --full-auto --no-project-doc -q "$PROMPT $PKG $VERSION" | tee /dev/stderr | jq --raw-output --slurp '.[-1].content[0].text')
 
 echo "\n\n"
 
 echo "$NOTES"
+
 if [ -z "$NOTES" ]; then
   echo "No release notes generated. Exiting."
   exit 1
@@ -63,4 +61,4 @@ echo "\n\n"
 #     exit 0
 # fi
 
-gh release create "$TAG" --notes "$NOTES" --verify-tag --latest=false
+# gh release create "$TAG" --notes "$NOTES" --verify-tag --latest=false

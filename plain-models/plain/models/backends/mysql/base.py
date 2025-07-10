@@ -6,23 +6,16 @@ Requires mysqlclient: https://pypi.org/project/mysqlclient/
 
 from functools import cached_property
 
+import MySQLdb as Database
+from MySQLdb.constants import CLIENT, FIELD_TYPE
+from MySQLdb.converters import conversions
+
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils as backend_utils
 from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.db import IntegrityError
 from plain.utils.regex_helper import _lazy_re_compile
 
-try:
-    import MySQLdb as Database
-except ImportError as err:
-    raise ImproperlyConfigured(
-        "Error loading MySQLdb module.\nDid you install mysqlclient?"
-    ) from err
-
-from MySQLdb.constants import CLIENT, FIELD_TYPE
-from MySQLdb.converters import conversions
-
-# Some of these import MySQLdb, so import them after checking if it's installed.
 from .client import DatabaseClient
 from .creation import DatabaseCreation
 from .features import DatabaseFeatures
@@ -30,13 +23,6 @@ from .introspection import DatabaseIntrospection
 from .operations import DatabaseOperations
 from .schema import DatabaseSchemaEditor
 from .validation import DatabaseValidation
-
-version = Database.version_info
-if version < (1, 4, 3):
-    raise ImproperlyConfigured(
-        f"mysqlclient 1.4.3 or newer is required; you have {Database.__version__}."
-    )
-
 
 # MySQLdb returns TIME columns as timedelta -- they are more like timedelta in
 # terms of actual behavior as they are signed and include days -- and Plain
@@ -281,37 +267,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         with self.wrap_database_errors:
             self.connection.autocommit(autocommit)
 
-    def disable_constraint_checking(self):
-        """
-        Disable foreign key checks, primarily for use in adding rows with
-        forward references. Always return True to indicate constraint checks
-        need to be re-enabled.
-        """
-        with self.cursor() as cursor:
-            cursor.execute("SET foreign_key_checks=0")
-        return True
-
-    def enable_constraint_checking(self):
-        """
-        Re-enable foreign key checks after they have been disabled.
-        """
-        # Override needs_rollback in case constraint_checks_disabled is
-        # nested inside transaction.atomic.
-        self.needs_rollback, needs_rollback = False, self.needs_rollback
-        try:
-            with self.cursor() as cursor:
-                cursor.execute("SET foreign_key_checks=1")
-        finally:
-            self.needs_rollback = needs_rollback
-
     def check_constraints(self, table_names=None):
-        """
-        Check each table name in `table_names` for rows with invalid foreign
-        key references. This method is intended to be used in conjunction with
-        `disable_constraint_checking()` and `enable_constraint_checking()`, to
-        determine if rows with invalid references were entered while constraint
-        checks were off.
-        """
+        """Check ``table_names`` for rows with invalid foreign key references."""
         with self.cursor() as cursor:
             if table_names is None:
                 table_names = self.introspection.table_names(cursor)

@@ -1,6 +1,3 @@
-from plain.models.db import router
-
-
 class Operation:
     """
     Base class for migration operations.
@@ -100,16 +97,12 @@ class Operation:
         """
         return self.references_model(model_name, package_label)
 
-    def allow_migrate_model(self, connection_alias, model):
-        """
-        Return whether or not a model may be migrated.
-
-        This is a thin wrapper around router.allow_migrate_model().
-        """
-        if not model._meta.can_migrate(connection_alias):
+    def allow_migrate_model(self, connection, model):
+        """Return whether or not a model may be migrated."""
+        if not model._meta.can_migrate(connection):
             return False
 
-        return router.allow_migrate_model(connection_alias, model)
+        return True
 
     def reduce(self, operation, package_label):
         """

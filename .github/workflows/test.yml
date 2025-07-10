@@ -1,17 +1,42 @@
 name: test
 on:
-  push: {}
   pull_request: {}
+  push:
+    branches:
+      - master
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plain
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+          MYSQL_DATABASE: plain
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root --password=mysql"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-
-    env:
-      PACKAGES: plain plain-worker plain-flags plain-sessions plain-admin plain-oauth plain-models plain-api plain-elements plain-htmx
 
     steps:
     - uses: actions/checkout@v4
@@ -19,12 +44,25 @@ jobs:
       uses: astral-sh/setup-uv@v2
     - name: Set up Python
       run: uv python install ${{ matrix.python-version }}
-    - name: Run tests
+    - name: Install system libraries for MySQL client build
       run: |
-        for package in $PACKAGES; do
-          echo "Testing $package"
-          (cd "$package/tests" && uv run --isolated pytest)
-        done
+        sudo apt-get update -y
+        sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
+
+    - name: Test (SQLite)
+      run: ./scripts/test
+      env:
+        DATABASE_URL: "sqlite://:memory:"
+
+    - name: Test (PostgreSQL)
+      run: ./scripts/test
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/plain
+
+    - name: Test (MySQL)
+      run: ./scripts/test
+      env:
+        DATABASE_URL: mysql://root:mysql@127.0.0.1:3306/plain
 
   lint:
     runs-on: ubuntu-latest
@@ -36,5 +74,4 @@ jobs:
       run: uv python install
     - working-directory: plain-code
       run: uv sync
-    - working-directory: plain-code
-      run: uv run --package plain-code --isolated plain-code check .
+    - run: uv run --package plain-code --isolated plain-code check .

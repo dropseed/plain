@@ -70,10 +70,9 @@ def update(name):
         deps = [dep for dep in deps if dep.name in name]
         if len(deps) != len(name):
             not_found = set(name) - {dep.name for dep in deps}
-            click.secho(
-                f"Some dependencies not found: {', '.join(not_found)}", fg="red"
+            raise click.UsageError(
+                f"Some dependencies not found: {', '.join(not_found)}"
             )
-            exit(1)
 
     for dep in deps:
         click.secho(f"Updating {dep.name} {dep.installed}...", bold=True, nl=False)

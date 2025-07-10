@@ -1,6 +1,6 @@
 [project]
 name = "plain.auth"
-version = "0.12.1"
+version = "0.13.0"
 description = "User authentication and authorization for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
@@ -11,6 +11,11 @@ dependencies = [
     # Technically you can swap out sessions entirely with your own,
     # so long as the request.session exists and has a similar API.
     "plain.sessions<1.0.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "plain.pytest<1.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]

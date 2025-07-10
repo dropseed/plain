@@ -14,3 +14,49 @@ class Car(models.Model):
 
 class UnregisteredModel(models.Model):
     pass
+
+
+@models.register_model
+class DeleteParent(models.Model):
+    name = models.CharField(max_length=100)
+
+
+@models.register_model
+class ChildCascade(models.Model):
+    parent = models.ForeignKey(DeleteParent, on_delete=models.CASCADE)
+
+
+@models.register_model
+class ChildProtect(models.Model):
+    parent = models.ForeignKey(DeleteParent, on_delete=models.PROTECT)
+
+
+@models.register_model
+class ChildRestrict(models.Model):
+    parent = models.ForeignKey(DeleteParent, on_delete=models.RESTRICT)
+
+
+@models.register_model
+class ChildSetNull(models.Model):
+    parent = models.ForeignKey(
+        DeleteParent,
+        on_delete=models.SET_NULL,
+        allow_null=True,
+    )
+
+
+@models.register_model
+class ChildSetDefault(models.Model):
+    def default_parent_pk():
+        return DeleteParent.objects.get(name="default").pk
+
+    parent = models.ForeignKey(
+        DeleteParent,
+        on_delete=models.SET_DEFAULT,
+        default=default_parent_pk,
+    )
+
+
+@models.register_model
+class ChildDoNothing(models.Model):
+    parent = models.ForeignKey(DeleteParent, on_delete=models.DO_NOTHING)

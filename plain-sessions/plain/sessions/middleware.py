@@ -1,11 +1,10 @@
 import time
 
 from plain.runtime import settings
-from plain.sessions.exceptions import SessionInterrupted
 from plain.utils.cache import patch_vary_headers
 from plain.utils.http import http_date
 
-from .core import SessionStore, UpdateError
+from .core import SessionStore
 
 
 class SessionMiddleware:
@@ -51,14 +50,7 @@ class SessionMiddleware:
                 # Save the session data and refresh the client cookie.
                 # Skip session save for 5xx responses.
                 if response.status_code < 500:
-                    try:
-                        request.session.save()
-                    except UpdateError:
-                        raise SessionInterrupted(
-                            "The request's session was deleted before the "
-                            "request completed. The user may have logged "
-                            "out in a concurrent request, for example."
-                        )
+                    request.session.save()
                     response.set_cookie(
                         settings.SESSION_COOKIE_NAME,
                         request.session.session_key,

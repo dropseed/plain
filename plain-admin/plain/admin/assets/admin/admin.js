@@ -2,7 +2,7 @@ jQuery(($) => {
   $("[data-toggle]").on("click", function (e) {
     e.preventDefault();
     const targets = $(this).data("toggle").split(",");
-    $.each(targets, (index, target) => {
+    $.each(targets, (_index, target) => {
       const $target = $(target);
       if ($target.data("toggle-class")) {
         $target.toggleClass($target.data("toggle-class"));
@@ -12,7 +12,7 @@ jQuery(($) => {
     });
   });
 
-  $("[data-autosubmit]").on("change", function (e) {
+  $("[data-autosubmit]").on("change", function (_e) {
     $(this).closest("form").submit();
   });
 

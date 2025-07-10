@@ -79,33 +79,30 @@ class Flag(models.Model):
         """
         errors = super().check(**kwargs)
 
-        databases = kwargs["databases"]
-        if not databases:
+        database = kwargs.get("database", False)
+        if not database:
             return errors
 
-        for database in databases:
-            flag_names = (
-                cls.objects.using(database).all().values_list("name", flat=True)
-            )
+        flag_names = cls.objects.all().values_list("name", flat=True)
 
+        try:
+            flag_names = set(flag_names)
+        except ProgrammingError:
+            # The table doesn't exist yet
+            # (migrations probably haven't run yet),
+            # so we can't check it.
+            return errors
+
+        for flag_name in flag_names:
             try:
-                flag_names = set(flag_names)
-            except ProgrammingError:
-                # The table doesn't exist yet
-                # (migrations probably haven't run yet),
-                # so we can't check it.
-                continue
-
-            for flag_name in flag_names:
-                try:
-                    get_flag_class(flag_name)
-                except FlagImportError:
-                    errors.append(
-                        Info(
-                            f"Flag {flag_name} is not used.",
-                            hint=f"Remove the flag from the database or define it in the {settings.FLAGS_MODULE} module.",
-                            id="plain.flags.I001",
-                        )
+                get_flag_class(flag_name)
+            except FlagImportError:
+                errors.append(
+                    Info(
+                        f"Flag {flag_name} is not used.",
+                        hint=f"Remove the flag from the database or define it in the {settings.FLAGS_MODULE} module.",
+                        id="plain.flags.I001",
                     )
+                )
 
         return errors

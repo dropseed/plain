@@ -114,7 +114,7 @@ class Migration:
             if not schema_editor.atomic_migration and atomic_operation:
                 # Force a transaction on a non-transactional-DDL backend or an
                 # atomic operation inside a non-atomic migration.
-                with atomic(schema_editor.connection.alias):
+                with atomic():
                     operation.database_forwards(
                         self.package_label, schema_editor, old_state, project_state
                     )

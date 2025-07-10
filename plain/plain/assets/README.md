@@ -6,7 +6,7 @@
 
 To serve assets, put them in `app/assets` or `app/{package}/assets`.
 
-Then include the `AssetsRouter` in your own router, typically under the `assets/` path.
+Then include the [`AssetsRouter`](./urls.py#AssetsRouter) in your own router, typically under the `assets/` path.
 
 ```python
 # app/urls.py
@@ -40,7 +40,7 @@ In production, one of your deployment steps should be to compile the assets.
 plain build
 ```
 
-By default, this [generates "fingerprinted" and compressed versions of the assets](fingerprints.py#get_file_fingerprint), which are then served by your app. This means that a file like `main.css` will result in two new files, like `main.d0db67b.css` and `main.d0db67b.css.gz`.
+By default, this [generates "fingerprinted" and compressed versions of the assets](./fingerprints.py#get_file_fingerprint), which are then served by your app. This means that a file like `main.css` will result in two new files, like `main.d0db67b.css` and `main.d0db67b.css.gz`.
 
 The purpose of fingerprinting the assets is to allow the browser to cache them indefinitely. When the content of the file changes, the fingerprint will change, and the browser will use the newer file. This cuts down on the number of requests that your app has to handle related to assets.
 
@@ -63,6 +63,8 @@ class AppRouter(Router):
 ## FAQs
 
 ### How do you reference assets in Python code?
+
+There is a [`get_asset_url`](./urls.py#get_asset_url) function that you can use to get the URL of an asset in Python code. This is useful if you need to reference an asset in a non-template context, such as in a redirect or an API response.
 
 ```python
 from plain.assets.urls import get_asset_url
@@ -94,7 +96,7 @@ ls .plain/assets/compiled
 ./example-upload-to-cdn-script
 ```
 
-Use the `ASSETS_BASE_URL` setting to tell the `{{ asset() }}` template function where to point.
+Use the [`ASSETS_BASE_URL`](../runtime/global_settings.py#ASSETS_BASE_URL) setting to tell the `{{ asset() }}` template function where to point.
 
 ```python
 # app/settings.py
@@ -107,4 +109,4 @@ The default behavior is to fingerprint assets, which is an exact copy of the ori
 
 If you need the originals for any reason, you can use `plain build --keep-original`, though this will typically be combined with `--no-fingerprint` otherwise the fingerprinted files will still get priority in `{{ asset() }}` template calls.
 
-Note that by default, the `ASSETS_REDIRECT_ORIGINAL` setting is `True`, which will redirect requests for the original file to the fingerprinted file.
+Note that by default, the [`ASSETS_REDIRECT_ORIGINAL`](../runtime/global_settings.py#ASSETS_REDIRECT_ORIGINAL) setting is `True`, which will redirect requests for the original file to the fingerprinted file.

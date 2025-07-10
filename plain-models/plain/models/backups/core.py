@@ -4,7 +4,7 @@ from pathlib import Path
 
 from plain.runtime import PLAIN_TEMP_PATH
 
-from .. import connections
+from .. import db_connection
 from .clients import PostgresBackupClient, SQLiteBackupClient
 
 
@@ -61,19 +61,17 @@ class DatabaseBackup:
     def create(self, **create_kwargs):
         self.path.mkdir(parents=True, exist_ok=True)
 
-        for connection_alias in connections:
-            connection = connections[connection_alias]
-            backup_path = self.path / f"{connection_alias}.backup"
+        backup_path = self.path / "default.backup"
 
-            if connection.vendor == "postgresql":
-                PostgresBackupClient(connection).create_backup(
-                    backup_path,
-                    pg_dump=create_kwargs.get("pg_dump", "pg_dump"),
-                )
-            elif connection.vendor == "sqlite":
-                SQLiteBackupClient(connection).create_backup(backup_path)
-            else:
-                raise Exception("Unsupported database vendor")
+        if db_connection.vendor == "postgresql":
+            PostgresBackupClient(db_connection).create_backup(
+                backup_path,
+                pg_dump=create_kwargs.get("pg_dump", "pg_dump"),
+            )
+        elif db_connection.vendor == "sqlite":
+            SQLiteBackupClient(db_connection).create_backup(backup_path)
+        else:
+            raise Exception("Unsupported database vendor")
 
         return self.path
 
@@ -87,18 +85,13 @@ class DatabaseBackup:
 
     def restore(self, **restore_kwargs):
         for backup_file in self.iter_files():
-            connection_alias = backup_file.stem
-            connection = connections[connection_alias]
-            if not connection:
-                raise Exception(f"Connection {connection_alias} not found")
-
-            if connection.vendor == "postgresql":
-                PostgresBackupClient(connection).restore_backup(
+            if db_connection.vendor == "postgresql":
+                PostgresBackupClient(db_connection).restore_backup(
                     backup_file,
                     pg_restore=restore_kwargs.get("pg_restore", "pg_restore"),
                 )
-            elif connection.vendor == "sqlite":
-                SQLiteBackupClient(connection).restore_backup(backup_file)
+            elif db_connection.vendor == "sqlite":
+                SQLiteBackupClient(db_connection).restore_backup(backup_file)
             else:
                 raise Exception("Unsupported database vendor")
 

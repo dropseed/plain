@@ -20,7 +20,7 @@ from string import ascii_uppercase
 from plain.exceptions import FieldDoesNotExist, FieldError
 from plain.models.aggregates import Count
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import DEFAULT_DB_ALIAS, NotSupportedError, connections
+from plain.models.db import NotSupportedError, db_connection
 from plain.models.expressions import (
     BaseExpression,
     Col,
@@ -83,10 +83,9 @@ JoinInfo = namedtuple(
 class RawQuery:
     """A single raw SQL query."""
 
-    def __init__(self, sql, using, params=()):
+    def __init__(self, sql, params=()):
         self.params = params
         self.sql = sql
-        self.using = using
         self.cursor = None
 
         # Mirror some properties of a normal query so that
@@ -95,23 +94,23 @@ class RawQuery:
         self.extra_select = {}
         self.annotation_select = {}
 
-    def chain(self, using):
-        return self.clone(using)
+    def chain(self):
+        return self.clone()
 
-    def clone(self, using):
-        return RawQuery(self.sql, using, params=self.params)
+    def clone(self):
+        return RawQuery(self.sql, params=self.params)
 
     def get_columns(self):
         if self.cursor is None:
             self._execute_query()
-        converter = connections[self.using].introspection.identifier_converter
+        converter = db_connection.introspection.identifier_converter
         return [converter(column_meta[0]) for column_meta in self.cursor.description]
 
     def __iter__(self):
         # Always execute a new query for a new iterator.
         # This could be optimized with a cache at the expense of RAM.
         self._execute_query()
-        if not connections[self.using].features.can_use_chunked_reads:
+        if not db_connection.features.can_use_chunked_reads:
             # If the database can't use chunked reads we need to make sure we
             # evaluate the entire query up front.
             result = list(self.cursor)
@@ -134,12 +133,10 @@ class RawQuery:
         return self.sql % self.params_type(self.params)
 
     def _execute_query(self):
-        connection = connections[self.using]
-
         # Adapt parameters to the database, as much as possible considering
         # that the target type isn't known. See #17755.
         params_type = self.params_type
-        adapter = connection.ops.adapt_unknown_value
+        adapter = db_connection.ops.adapt_unknown_value
         if params_type is tuple:
             params = tuple(adapter(val) for val in self.params)
         elif params_type is dict:
@@ -149,7 +146,7 @@ class RawQuery:
         else:
             raise RuntimeError(f"Unexpected params type: {params_type}")
 
-        self.cursor = connection.cursor()
+        self.cursor = db_connection.cursor()
         self.cursor.execute(self.sql, params)
 
 
@@ -286,7 +283,7 @@ class Query(BaseExpression):
         Return the query as an SQL string and the parameters that will be
         substituted into the query.
         """
-        return self.get_compiler(DEFAULT_DB_ALIAS).as_sql()
+        return self.get_compiler().as_sql()
 
     def __deepcopy__(self, memo):
         """Limit the amount of work when a Query is deepcopied."""
@@ -294,13 +291,9 @@ class Query(BaseExpression):
         memo[id(self)] = result
         return result
 
-    def get_compiler(self, using=None, connection=None, elide_empty=True):
-        if using is None and connection is None:
-            raise ValueError("Need either using or connection")
-        if using:
-            connection = connections[using]
-        return connection.ops.compiler(self.compiler)(
-            self, connection, using, elide_empty
+    def get_compiler(self, *, elide_empty=True):
+        return db_connection.ops.compiler(self.compiler)(
+            self, db_connection, elide_empty
         )
 
     def get_meta(self):
@@ -382,7 +375,7 @@ class Query(BaseExpression):
             alias = None
         return target.get_col(alias, field)
 
-    def get_aggregation(self, using, aggregate_exprs):
+    def get_aggregation(self, aggregate_exprs):
         """
         Return the dictionary with the values of the existing aggregations.
         """
@@ -519,7 +512,7 @@ class Query(BaseExpression):
         outer_query.clear_limits()
         outer_query.select_for_update = False
         outer_query.select_related = False
-        compiler = outer_query.get_compiler(using, elide_empty=elide_empty)
+        compiler = outer_query.get_compiler(elide_empty=elide_empty)
         result = compiler.execute_sql(SINGLE)
         if result is None:
             result = empty_set_result
@@ -529,12 +522,12 @@ class Query(BaseExpression):
 
         return dict(zip(outer_query.annotation_select, result))
 
-    def get_count(self, using):
+    def get_count(self):
         """
         Perform a COUNT() query using the current filter constraints.
         """
         obj = self.clone()
-        return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+        return obj.get_aggregation({"__count": Count("*")})["__count"]
 
     def has_filters(self):
         return self.where
@@ -561,12 +554,12 @@ class Query(BaseExpression):
         q.add_annotation(Value(1), "a")
         return q
 
-    def has_results(self, using):
-        q = self.exists(using)
-        compiler = q.get_compiler(using=using)
+    def has_results(self):
+        q = self.exists()
+        compiler = q.get_compiler()
         return compiler.has_results()
 
-    def explain(self, using, format=None, **options):
+    def explain(self, format=None, **options):
         q = self.clone()
         for option_name in options:
             if (
@@ -575,7 +568,7 @@ class Query(BaseExpression):
             ):
                 raise ValueError(f"Invalid option name: {option_name!r}.")
         q.explain_info = ExplainInfo(format, options)
-        compiler = q.get_compiler(using=using)
+        compiler = q.get_compiler()
         return "\n".join(compiler.explain_query())
 
     def combine(self, rhs, connector):
@@ -1110,12 +1103,12 @@ class Query(BaseExpression):
         # unnecessary ORDER BY clause.
         if (
             self.subquery
-            and not connection.features.ignores_unnecessary_order_by_in_subqueries
+            and not db_connection.features.ignores_unnecessary_order_by_in_subqueries
         ):
             self.clear_ordering(force=False)
             for query in self.combined_queries:
                 query.clear_ordering(force=False)
-        sql, params = self.get_compiler(connection=connection).as_sql()
+        sql, params = self.get_compiler().as_sql()
         if self.subquery:
             sql = f"({sql})"
         return sql, params
@@ -1238,17 +1231,6 @@ class Query(BaseExpression):
         if lookup.rhs is None and not lookup.can_use_none_as_rhs:
             if lookup_name not in ("exact", "iexact"):
                 raise ValueError("Cannot use None as a query value")
-            return lhs.get_lookup("isnull")(lhs, True)
-
-        # For Oracle '' is equivalent to null. The check must be done at this
-        # stage because join promotion can't be done in the compiler. Using
-        # DEFAULT_DB_ALIAS isn't nice but it's the best that can be done here.
-        # A similar thing is done in is_nullable(), too.
-        if (
-            lookup_name == "exact"
-            and lookup.rhs == ""
-            and connections[DEFAULT_DB_ALIAS].features.interprets_empty_strings_as_nulls
-        ):
             return lhs.get_lookup("isnull")(lhs, True)
 
         return lookup
@@ -2474,22 +2456,11 @@ class Query(BaseExpression):
         return trimmed_prefix, contains_louter
 
     def is_nullable(self, field):
-        """
-        Check if the given field should be treated as nullable.
-
-        Some backends treat '' as null and Plain treats such fields as
-        nullable for those backends. In such situations field.allow_null can be
-        False even if we should treat the field as nullable.
-        """
-        # We need to use DEFAULT_DB_ALIAS here, as QuerySet does not have
-        # (nor should it have) knowledge of which connection is going to be
-        # used. The proper fix would be to defer all decisions where
-        # is_nullable() is needed to the compiler stage, but that is not easy
-        # to do currently.
-        return field.allow_null or (
-            field.empty_strings_allowed
-            and connections[DEFAULT_DB_ALIAS].features.interprets_empty_strings_as_nulls
-        )
+        """Check if the given field should be treated as nullable."""
+        # QuerySet does not have knowledge of which connection is going to be
+        # used. For the single-database setup we always reference the default
+        # connection here.
+        return field.allow_null
 
 
 def get_order_dir(field, default="ASC"):

@@ -66,12 +66,10 @@ def restore_backup(backup_name, latest, pg_restore):
     backups_handler = DatabaseBackups()
 
     if backup_name and latest:
-        click.secho("Only one of --latest or backup_name is allowed", fg="red")
-        exit(1)
+        raise click.UsageError("Only one of --latest or backup_name is allowed")
 
     if not backup_name and not latest:
-        click.secho("Backup name or --latest is required", fg="red")
-        exit(1)
+        raise click.UsageError("Backup name or --latest is required")
 
     if not backup_name and latest:
         backup_name = backups_handler.find_backups()[0].name

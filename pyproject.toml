@@ -3,6 +3,38 @@ name = "plain-workspace"
 version = "0.0.0"
 requires-python = ">=3.11"
 
+[tool.uv]
+dev-dependencies = [
+    "plain",
+    "plain-admin",
+    "plain-api",
+    "plain-auth",
+    "plain-cache",
+    "plain-code",
+    "plain-dev",
+    "plain-elements",
+    "plain-esbuild",
+    "plain-flags",
+    "plain-htmx",
+    "plain-loginlink",
+    "plain-email",
+    "plain-models",
+    "plain-oauth",
+    "plain-pages",
+    "plain-pageviews",
+    "plain-passwords",
+    "plain-pytest",
+    "plain-redirection",
+    "plain-sessions",
+    "plain-support",
+    "plain-tailwind",
+    "plain-tunnel",
+    "plain-upgrade",
+    "plain-vendor",
+    "plain-worker",
+    "ast-grep-cli>=0.38.5",
+]
+
 [tool.uv.sources]
 "plain" = { workspace = true }
 "plain-admin" = { workspace = true }
@@ -28,6 +60,7 @@ requires-python = ">=3.11"
 "plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-tunnel" = { workspace = true }
+"plain-upgrade" = { workspace = true }
 "plain-vendor" = { workspace = true }
 "plain-worker" = { workspace = true }
 "plain-observe" = { workspace = true }
@@ -41,4 +74,4 @@ members = [
 ]
 
 [tool.plain.code.biome]
-version = "1.9.4"
+version = "2.0.6"

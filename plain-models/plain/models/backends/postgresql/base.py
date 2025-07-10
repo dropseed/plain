@@ -15,7 +15,7 @@ from plain.exceptions import ImproperlyConfigured
 from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.db import DatabaseError as WrappedDatabaseError
-from plain.models.db import connections
+from plain.models.db import db_connection
 
 # Some of these import psycopg, so import them after checking if it's installed.
 from .client import DatabaseClient  # NOQA isort:skip
@@ -185,14 +185,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             "service"
         ):
             raise ImproperlyConfigured(
-                "settings.DATABASES is improperly configured. "
+                "settings.DATABASE is improperly configured. "
                 "Please supply the NAME or OPTIONS['service'] value."
             )
         if len(settings_dict["NAME"] or "") > self.ops.max_name_length():
             raise ImproperlyConfigured(
                 "The database name '%s' (%d characters) is longer than "  # noqa: UP031
                 "PostgreSQL's limit of %d characters. Supply a shorter NAME "
-                "in settings.DATABASES."
+                "in settings.DATABASE."
                 % (
                     settings_dict["NAME"],
                     len(settings_dict["NAME"]),
@@ -374,26 +374,17 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                 "and will use the first PostgreSQL database instead.",
                 RuntimeWarning,
             )
-            for connection in connections.all():
-                if (
-                    connection.vendor == "postgresql"
-                    and connection.settings_dict["NAME"] != "postgres"
-                ):
-                    conn = self.__class__(
-                        {
-                            **self.settings_dict,
-                            "NAME": connection.settings_dict["NAME"],
-                        },
-                        alias=self.alias,
-                    )
-                    try:
-                        with conn.cursor() as cursor:
-                            yield cursor
-                    finally:
-                        conn.close()
-                    break
-            else:
-                raise
+            conn = self.__class__(
+                {
+                    **self.settings_dict,
+                    "NAME": db_connection.settings_dict["NAME"],
+                },
+            )
+            try:
+                with conn.cursor() as cursor:
+                    yield cursor
+            finally:
+                conn.close()
 
     @cached_property
     def pg_version(self):

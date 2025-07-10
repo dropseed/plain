@@ -1,32 +1,104 @@
 #!/bin/sh -e
 
-workflow=".github/workflows/test.yml"
-packages=$(grep 'PACKAGES:' "$workflow" | sed -E 's/^.*PACKAGES: *//')
+# Run the test-suite for each first-party package as well as the demo projects.
+#
+#  • Optional “--cov” flag controls whether pytest-cov is used and reports are
+#    generated.  CI will pass this flag, local devs needn’t pay the overhead.
+#  • Installs database driver wheels on-demand based on the current
+#    $DATABASE_URL scheme (postgres → psycopg, mysql → mysqlclient).
 
-if [ $# -gt 0 ] && printf '%s\n' $packages | grep -x "$1" >/dev/null; then
+ROOT_DIR="$(pwd)"
+
+# ---------------------------------------------------------------------------
+# CLI option parsing
+# ---------------------------------------------------------------------------
+COVERAGE=0
+if [ "$1" = "--coverage" ]; then
+  COVERAGE=1
+  shift
+fi
+
+# A single package name may be supplied to limit the run; otherwise test all
+# first-party packages in a deterministic order.
+ALL_PACKAGES="$(cat <<EOF
+plain
+plain-models
+plain-sessions
+plain-worker
+plain-flags
+plain-admin
+plain-oauth
+plain-auth
+plain-api
+plain-elements
+plain-htmx
+EOF
+)"
+
+packages=$ALL_PACKAGES
+if [ $# -gt 0 ] && printf '%s\n' $ALL_PACKAGES | grep -x "$1" >/dev/null; then
   packages=$1
   shift
 fi
 
-bold() {
-    echo "\033[1m$1\033[0m"
-}
+# Convenience for bold headings.
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 
-bold "Found packages to test in $workflow: $packages"
+# ---------------------------------------------------------------------------
+# Database URL / optional client wheels
+# ---------------------------------------------------------------------------
+if [ -z "$DATABASE_URL" ]; then
+  echo "DATABASE_URL is not set, using sqlite://:memory:"
+  export DATABASE_URL="sqlite://:memory:"
+else
+  echo "Using DATABASE_URL: $DATABASE_URL"
+fi
 
-for package in $packages;
-do
-    echo
-    bold "Testing $package"
-    cd "$package/tests"
-    uv run --package "$package" --isolated pytest "$@"
-    cd ../..
+WITH=""
+case "$DATABASE_URL" in
+  # For some reason, if I try to run this without pytest-cov then it fails to find the db client...
+  postgres:*|postgresql:*) WITH="--with pytest-cov --with psycopg[binary]" ;;
+  mysql:*)                 WITH="--with pytest-cov --with mysqlclient"    ;;
+  sqlite:*|sqlite3:*)     WITH="--with pytest-cov"         ;;
+esac
+
+# ---------------------------------------------------------------------------
+# Coverage configuration (if requested)
+# ---------------------------------------------------------------------------
+COV_ARGS=""
+if [ "$COVERAGE" -eq 1 ]; then
+  export COVERAGE_FILE="$ROOT_DIR/.coverage"
+  COV_ARGS="--cov=plain --cov-append --cov-report=xml:$ROOT_DIR/coverage.xml --cov-report=html:$ROOT_DIR/htmlcov"
+fi
+
+bold "Packages to test: $packages"
+
+for package in $packages; do
+  echo
+  bold "Testing $package"
+
+  cd "$package/tests"
+
+  set -x
+  uv run \
+    --isolated \
+    --package "$package" \
+    $WITH \
+    pytest $COV_ARGS "$@"
+  set +x
+
+  cd ../..
 done
 
+# Demo projects (smoke-tests only)
 for demo in demos/*; do
-    echo
-    bold "Testing $demo"
-    cd "$demo"
-    uv run pytest "$@"
-    cd ..
+  echo
+  bold "Testing $demo"
+  cd "$demo"
+  uv run --isolated $WITH pytest "$@"
+  cd ..
 done
+
+if [ "$COVERAGE" -eq 1 ]; then
+  echo "\nCombined coverage reports generated. Open $ROOT_DIR/htmlcov/index.html in a browser." >&2
+fi

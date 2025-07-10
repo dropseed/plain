@@ -1,16 +1,18 @@
 {
+  "root": true,
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": [
-      "**/vendor/**",
-      "**/*.min.*",
-      "**/tests/**",
-      "**/htmlcov/**",
-      "**/.venv/**"
+    "includes": [
+      "**",
+      "!**/vendor/**",
+      "!**/*.min.*",
+      "!**/tests/**",
+      "!**/htmlcov/**",
+      "!**/.venv/**"
     ]
   },
   "formatter": {

@@ -6,9 +6,6 @@ __pycache__
 *.DS_Store
 .coverage
 
-# Symlinks to personal packages
-/ext
-
 # Test apps
 plain*/tests/.plain
 
@@ -19,3 +16,5 @@ plain*/tests/.plain
 
 # Plain temp dirs
 .plain
+
+coverage.xml

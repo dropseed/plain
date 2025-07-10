@@ -79,14 +79,13 @@ class BaseDatabaseIntrospection:
 
     def get_migratable_models(self):
         from plain.models import models_registry
-        from plain.models.db import router
         from plain.packages import packages_registry
 
         return (
             model
             for package_config in packages_registry.get_package_configs()
-            for model in router.get_migratable_models(
-                models_registry, package_config.package_label, self.connection.alias
+            for model in models_registry.get_models(
+                package_label=package_config.package_label
             )
             if model._meta.can_migrate(self.connection)
         )

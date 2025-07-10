@@ -16,7 +16,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         raw_name = self.connection.settings_dict["TEST"]["NAME"] or ":memory:"
         # Special in-memory case
         if raw_name == ":memory:":
-            return f"file:memorydb_{self.connection.alias}?mode=memory&cache=shared"
+            return "file:memorydb?mode=memory&cache=shared"
 
         test_database_name = raw_name
 
@@ -32,9 +32,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         if not self.is_in_memory_db(test_database_name):
             # Erase the old test database file.
             if verbosity >= 1:
-                self.log(
-                    f"Destroying old test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
-                )
+                self.log(f"Destroying old test database '{test_database_name}'...")
             if os.access(test_database_name, os.F_OK):
                 if not autoclobber:
                     confirm = input(
@@ -68,7 +66,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         test_database_name = self._get_test_db_name(prefix)
         sig = [self.connection.settings_dict["NAME"]]
         if self.is_in_memory_db(test_database_name):
-            sig.append(self.connection.alias)
+            sig.append(":memory:")
         else:
             sig.append(test_database_name)
         return tuple(sig)

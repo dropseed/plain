@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+BOLD = '\033[1m'
+END = '\033[0m'
+
+
+def run(cmd: str, cwd: Path) -> str:
+    return subprocess.check_output(cmd, cwd=cwd, text=True, shell=True).strip()
+
+
+def discover_packages(repo_path: Path):
+    return [
+        d
+        for d in os.listdir(repo_path)
+        if os.path.isdir(d) and d.startswith("plain") and not d.endswith(".egg-info")
+    ]
+
+
+def get_commits_since_version_change(repo_path: Path, package_path: Path):
+    pyproject_path = package_path / "pyproject.toml"
+    rel_pyproject = pyproject_path.relative_to(repo_path)
+    log_cmd = f'git log --format="%H" -- {rel_pyproject}'
+    commits = run(log_cmd, repo_path).split("\n")
+
+    last_version_commit = None
+    current_version = None
+
+    for commit in commits:
+        file_at_commit = run(f'git show {commit}:{rel_pyproject}', repo_path)
+        version = None
+        for line in file_at_commit.splitlines():
+            if line.strip().startswith("version"):
+                version = line.split("=")[1].strip().strip('"').strip("'")
+                break
+        if version != current_version:
+            last_version_commit = commit
+            break
+        current_version = version
+
+    if last_version_commit is None:
+        last_version_commit = commits[-1] if commits else None
+
+    if not last_version_commit:
+        return []
+
+    log_cmd = (
+        f'git log --format="%H %s" {last_version_commit}..HEAD -- '
+        f'{package_path.relative_to(repo_path)} ":(exclude){package_path.relative_to(repo_path)}/tests"'
+    )
+    lines = run(log_cmd, repo_path).split("\n")
+    return [line.split(" ", 1) for line in lines if line]
+
+
+def bump_version(version: str, bump_type: str) -> str:
+    major, minor, patch = map(int, version.split("."))
+    if bump_type == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == "minor":
+        minor += 1
+        patch = 0
+    elif bump_type == "patch":
+        patch += 1
+    else:
+        print(f"Error: Unknown bump type: {bump_type}")
+        sys.exit(1)
+    return f"{major}.{minor}.{patch}"
+
+
+def update_version_in_file(file_path: Path, old_version: str, new_version: str):
+    content = file_path.read_text()
+    content = content.replace(f'version = "{old_version}"', f'version = "{new_version}"')
+    file_path.write_text(content)
+
+
+def get_current_version(package_path: Path) -> str:
+    pyproject = package_path / "pyproject.toml"
+    for line in pyproject.read_text().splitlines():
+        if line.strip().startswith("version"):
+            return line.split("=")[1].strip().strip('"').strip("'")
+    print(f"Error: Could not find version in {pyproject}")
+    sys.exit(1)
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force", action="store_true", help="Ignore dirty git status")
+    # Skip running the local pre-commit script and any git commit hooks. Mirrors `git commit -n`.
+    parser.add_argument(
+        "-n",
+        "--no-verify",
+        action="store_true",
+        help="Skip running pre-commit checks before releasing",
+    )
+    parser.add_argument("packages", nargs="*", help="Packages to release")
+    args = parser.parse_args()
+
+    repo_path = Path.cwd()
+    if not args.force:
+        status = run("git status --porcelain", repo_path)
+        if status:
+            print("Error: git status not clean -- commit or stash changes, or use --force")
+            sys.exit(1)
+
+    # Optionally run pre-commit before starting the release process unless the
+    # caller has requested to skip verification.
+    if not args.no_verify:
+        subprocess.check_call(["./scripts/pre-commit"], cwd=repo_path)
+
+    packages = args.packages if args.packages else discover_packages(repo_path)
+
+    for package in packages:
+        pkg_path = repo_path / package
+        commits = get_commits_since_version_change(repo_path, pkg_path)
+        print()
+        if commits:
+            print(f"{BOLD}Commits for {package}:{END}")
+            for h, s in commits:
+                print(f"{h[:7]} - {s}")
+        else:
+            print(f"{package}: No changes since last version change. Skipping.")
+            continue
+
+        while True:
+            choice = input("\nRelease type (major/minor/patch/skip) [skip]: ").strip()
+            if not choice:
+                choice = "skip"
+            if choice in ["major", "minor", "patch", "skip"]:
+                break
+            print("Invalid choice. Please enter major, minor, patch, or skip.")
+
+        if choice == "skip":
+            continue
+
+        old_version = get_current_version(pkg_path)
+        new_version = bump_version(old_version, choice)
+        update_version_in_file(pkg_path / "pyproject.toml", old_version, new_version)
+        run("uv sync", repo_path)
+
+        # Need to update the changelog here so it's in the commit
+        subprocess.check_call(["./scripts/generate-release-notes", package, new_version])
+
+        # Ask if they are ready to commit
+        confirm = input("Are you ready to commit? (y/n): ")
+        if confirm.lower() != "y":
+            print("Aborting release.")
+            continue
+
+        subprocess.check_call(["./scripts/fix"], cwd=repo_path)
+
+        run(f"git add {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'} uv.lock", repo_path)
+        run(
+            f"git commit -m 'Release {package} {new_version}' -n", repo_path
+        )
+        run(
+            f"git tag -a {package}@{new_version} -m 'Release {package} {new_version}'",
+            repo_path,
+        )
+        print(f"Released {package} {new_version}")
+
+    # Push all changes
+    confirm = input("Push all changes? (y/n): ")
+    if confirm.lower() == "y":
+        run("git push --follow-tags", repo_path)
+        print("Changes pushed successfully.")
+
+
+if __name__ == "__main__":
+    main()

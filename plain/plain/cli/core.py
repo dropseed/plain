@@ -7,6 +7,7 @@ import plain.runtime
 from plain.exceptions import ImproperlyConfigured
 
 from .build import build
+from .changelog import changelog
 from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
@@ -32,6 +33,7 @@ plain_cli.add_command(chores)
 plain_cli.add_command(build)
 plain_cli.add_command(utils)
 plain_cli.add_command(urls)
+plain_cli.add_command(changelog)
 plain_cli.add_command(setting)
 plain_cli.add_command(shell)
 plain_cli.add_command(run)

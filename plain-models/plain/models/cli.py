@@ -14,7 +14,7 @@ from plain.utils.text import Truncator
 from . import migrations
 from .backups.cli import cli as backups_cli
 from .backups.cli import create_backup
-from .db import DEFAULT_DB_ALIAS, OperationalError, connections, router
+from .db import OperationalError, db_connection
 from .migrations.autodetector import MigrationAutodetector
 from .migrations.executor import MigrationExecutor
 from .migrations.loader import AmbiguityError, MigrationLoader
@@ -42,27 +42,18 @@ cli.add_command(backups_cli)
 
 
 @cli.command()
-@click.option(
-    "--database",
-    default=DEFAULT_DB_ALIAS,
-    help=(
-        "Nominates a database onto which to open a shell. Defaults to the "
-        '"default" database.'
-    ),
-)
 @click.argument("parameters", nargs=-1)
-def db_shell(database, parameters):
+def db_shell(parameters):
     """Runs the command-line client for specified database, or the default database if none is provided."""
-    connection = connections[database]
     try:
-        connection.client.runshell(parameters)
+        db_connection.client.runshell(parameters)
     except FileNotFoundError:
         # Note that we're assuming the FileNotFoundError relates to the
         # command missing. It could be raised for some other reason, in
         # which case this error message would be inaccurate. Still, this
         # message catches the common case.
         click.secho(
-            f"You appear not to have the {connection.client.executable_name!r} program installed or on your path.",
+            f"You appear not to have the {db_connection.client.executable_name!r} program installed or on your path.",
             fg="red",
             err=True,
         )
@@ -85,25 +76,55 @@ def db_wait():
     attempts = 0
     while True:
         attempts += 1
-        waiting_for = []
+        waiting_for = False
 
-        for conn in connections.all():
-            try:
-                conn.ensure_connection()
-            except OperationalError:
-                waiting_for.append(conn.alias)
+        try:
+            db_connection.ensure_connection()
+        except OperationalError:
+            waiting_for = True
 
         if waiting_for:
             if attempts > 1:
                 # After the first attempt, start printing them
                 click.secho(
-                    f"Waiting for database (attempt {attempts}): {', '.join(waiting_for)}",
+                    f"Waiting for database (attempt {attempts})",
                     fg="yellow",
                 )
             time.sleep(1.5)
         else:
-            click.secho(f"Database ready: {', '.join(connections)}", fg="green")
+            click.secho("✔ Database ready", fg="green")
             break
+
+
+@cli.command(name="list")
+@click.argument("package_labels", nargs=-1)
+@click.option(
+    "--app-only",
+    is_flag=True,
+    help="Only show models from packages that start with 'app'.",
+)
+def list_models(package_labels, app_only):
+    """List installed models."""
+
+    packages = set(package_labels)
+
+    for model in sorted(
+        models_registry.get_models(),
+        key=lambda m: (m._meta.package_label, m._meta.model_name),
+    ):
+        pkg = model._meta.package_label
+        pkg_name = packages_registry.get_package_config(pkg).name
+        if app_only and not pkg_name.startswith("app"):
+            continue
+        if packages and pkg not in packages:
+            continue
+        fields = ", ".join(f.name for f in model._meta.get_fields())
+        click.echo(
+            f"{click.style(pkg, fg='cyan')}.{click.style(model.__name__, fg='blue')}"
+        )
+        click.echo(f"  table: {model._meta.db_table}")
+        click.echo(f"  fields: {fields}")
+        click.echo(f"  package: {pkg_name}\n")
 
 
 @register_cli("makemigrations")
@@ -318,21 +339,8 @@ def makemigrations(
     loader = MigrationLoader(None, ignore_no_migrations=True)
 
     # Raise an error if any migrations are applied before their dependencies.
-    consistency_check_labels = {
-        config.package_label for config in packages_registry.get_package_configs()
-    }
-    # Non-default databases are only checked if database routers used.
-    aliases_to_check = connections if settings.DATABASE_ROUTERS else [DEFAULT_DB_ALIAS]
-    for alias in sorted(aliases_to_check):
-        connection = connections[alias]
-        if any(
-            router.allow_migrate(
-                connection.alias, package_label, model_name=model._meta.object_name
-            )
-            for package_label in consistency_check_labels
-            for model in models_registry.get_models(package_label=package_label)
-        ):
-            loader.check_consistent_history(connection)
+    # Only the default db_connection is supported.
+    loader.check_consistent_history(db_connection)
 
     # Check for conflicts
     conflicts = loader.detect_conflicts()
@@ -423,11 +431,6 @@ def makemigrations(
 @click.argument("package_label", required=False)
 @click.argument("migration_name", required=False)
 @click.option(
-    "--database",
-    default=DEFAULT_DB_ALIAS,
-    help="Nominates a database to synchronize. Defaults to the 'default' database.",
-)
-@click.option(
     "--fake", is_flag=True, help="Mark migrations as run without actually running them."
 )
 @click.option(
@@ -468,7 +471,6 @@ def makemigrations(
 def migrate(
     package_label,
     migration_name,
-    database,
     fake,
     fake_initial,
     plan,
@@ -512,16 +514,14 @@ def migrate(
         return prefix + operation.describe() + truncated.chars(40), is_error
 
     # Get the database we're operating from
-    connection = connections[database]
-
     # Hook for backends needing any database preparation
-    connection.prepare_database()
+    db_connection.prepare_database()
 
     # Work out which packages have migrations and which do not
-    executor = MigrationExecutor(connection, migration_progress_callback)
+    executor = MigrationExecutor(db_connection, migration_progress_callback)
 
     # Raise an error if any migrations are applied before their dependencies.
-    executor.loader.check_consistent_history(connection)
+    executor.loader.check_consistent_history(db_connection)
 
     # Before anything else, see if there's conflicting packages and drop out
     # hard if there are any
@@ -865,11 +865,6 @@ def optimize_migration(package_label, migration_name, check, verbosity):
 @cli.command()
 @click.argument("package_labels", nargs=-1)
 @click.option(
-    "--database",
-    default=DEFAULT_DB_ALIAS,
-    help="Nominates a database to show migrations for. Defaults to the 'default' database.",
-)
-@click.option(
     "--format",
     type=click.Choice(["list", "plan"]),
     default="list",
@@ -882,7 +877,7 @@ def optimize_migration(package_label, migration_name, check, verbosity):
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
-def show_migrations(package_labels, database, format, verbosity):
+def show_migrations(package_labels, format, verbosity):
     """Shows all available migrations for the current project"""
 
     def _validate_package_names(package_names):
@@ -896,14 +891,14 @@ def show_migrations(package_labels, database, format, verbosity):
         if has_bad_names:
             sys.exit(2)
 
-    def show_list(connection, package_names):
+    def show_list(db_connection, package_names):
         """
         Show a list of all migrations on the system, or only those of
         some named packages.
         """
         # Load migrations from disk/DB
-        loader = MigrationLoader(connection, ignore_no_migrations=True)
-        recorder = MigrationRecorder(connection)
+        loader = MigrationLoader(db_connection, ignore_no_migrations=True)
+        recorder = MigrationRecorder(db_connection)
         recorded_migrations = recorder.applied_migrations()
 
         graph = loader.graph
@@ -972,13 +967,13 @@ def show_migrations(package_labels, database, format, verbosity):
                 for name in sorted(prunable_by_package[package]):
                     click.echo(f"    - {name}")
 
-    def show_plan(connection, package_names):
+    def show_plan(db_connection, package_names):
         """
         Show all known migrations (or only those of the specified package_names)
         in the order they will be applied.
         """
         # Load migrations from disk/DB
-        loader = MigrationLoader(connection)
+        loader = MigrationLoader(db_connection)
         graph = loader.graph
         if package_names:
             _validate_package_names(package_names)
@@ -1017,12 +1012,11 @@ def show_migrations(package_labels, database, format, verbosity):
             click.secho("(no migrations)", fg="red")
 
     # Get the database we're operating from
-    connection = connections[database]
 
     if format == "plan":
-        show_plan(connection, package_labels)
+        show_plan(db_connection, package_labels)
     else:
-        show_list(connection, package_labels)
+        show_list(db_connection, package_labels)
 
 
 @cli.command()
@@ -1082,7 +1076,7 @@ def squash_migrations(
         raise click.ClickException(str(err))
 
     # Load the current graph state, check the app and migration they asked for exists
-    loader = MigrationLoader(connections[DEFAULT_DB_ALIAS])
+    loader = MigrationLoader(db_connection)
     if package_label not in loader.migrated_packages:
         raise click.ClickException(
             f"Package '{package_label}' does not have migrations (so squashmigrations on it makes no sense)"

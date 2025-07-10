@@ -20,8 +20,7 @@ from plain.models.db import (
     PLAIN_VERSION_PICKLE_KEY,
     IntegrityError,
     NotSupportedError,
-    connections,
-    router,
+    db_connection,
 )
 from plain.models.expressions import Case, F, Value, When
 from plain.models.fields import (
@@ -61,8 +60,7 @@ class ModelIterable(BaseIterable):
 
     def __iter__(self):
         queryset = self.queryset
-        db = queryset.db
-        compiler = queryset.query.get_compiler(using=db)
+        compiler = queryset.query.get_compiler()
         # Execute the query. This will also fill compiler.select, klass_info,
         # and annotations.
         results = compiler.execute_sql(
@@ -79,7 +77,7 @@ class ModelIterable(BaseIterable):
         init_list = [
             f[0].target.attname for f in select[model_fields_start:model_fields_end]
         ]
-        related_populators = get_related_populators(klass_info, select, db)
+        related_populators = get_related_populators(klass_info, select)
         known_related_objects = [
             (
                 field,
@@ -96,9 +94,7 @@ class ModelIterable(BaseIterable):
             for field, related_objs in queryset._known_related_objects.items()
         ]
         for row in compiler.results_iter(results):
-            obj = model_cls.from_db(
-                db, init_list, row[model_fields_start:model_fields_end]
-            )
+            obj = model_cls.from_db(init_list, row[model_fields_start:model_fields_end])
             for rel_populator in related_populators:
                 rel_populator.populate(row, obj)
             if annotation_col_map:
@@ -128,10 +124,8 @@ class RawModelIterable(BaseIterable):
 
     def __iter__(self):
         # Cache some things for performance reasons outside the loop.
-        db = self.queryset.db
         query = self.queryset.query
-        connection = connections[db]
-        compiler = connection.ops.compiler("SQLCompiler")(query, connection, db)
+        compiler = db_connection.ops.compiler("SQLCompiler")(query, db_connection)
         query_iterator = iter(query)
 
         try:
@@ -154,7 +148,7 @@ class RawModelIterable(BaseIterable):
             for values in query_iterator:
                 # Associate fields to values
                 model_init_values = [values[pos] for pos in model_init_pos]
-                instance = model_cls.from_db(db, model_init_names, model_init_values)
+                instance = model_cls.from_db(model_init_names, model_init_values)
                 if annotation_fields:
                     for column, pos in annotation_fields:
                         setattr(instance, column, values[pos])
@@ -173,7 +167,7 @@ class ValuesIterable(BaseIterable):
     def __iter__(self):
         queryset = self.queryset
         query = queryset.query
-        compiler = query.get_compiler(queryset.db)
+        compiler = query.get_compiler()
 
         # extra(select=...) cols are always at the start of the row.
         names = [
@@ -197,7 +191,7 @@ class ValuesListIterable(BaseIterable):
     def __iter__(self):
         queryset = self.queryset
         query = queryset.query
-        compiler = query.get_compiler(queryset.db)
+        compiler = query.get_compiler()
 
         if queryset._fields:
             # extra(select=...) cols are always at the start of the row.
@@ -258,7 +252,7 @@ class FlatValuesListIterable(BaseIterable):
 
     def __iter__(self):
         queryset = self.queryset
-        compiler = queryset.query.get_compiler(queryset.db)
+        compiler = queryset.query.get_compiler()
         for row in compiler.results_iter(
             chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
         ):
@@ -268,9 +262,8 @@ class FlatValuesListIterable(BaseIterable):
 class QuerySet:
     """Represent a lazy database lookup for a set of objects."""
 
-    def __init__(self, model=None, query=None, using=None, hints=None):
+    def __init__(self, model=None, query=None, hints=None):
         self.model = model
-        self._db = using
         self._hints = hints or {}
         self._query = query or sql.Query(self.model)
         self._result_cache = None
@@ -500,7 +493,7 @@ class QuerySet:
                 )
         elif chunk_size <= 0:
             raise ValueError("Chunk size must be strictly positive.")
-        use_chunked_fetch = not connections[self.db].settings_dict.get(
+        use_chunked_fetch = not db_connection.settings_dict.get(
             "DISABLE_SERVER_SIDE_CURSORS"
         )
         return self._iterator(use_chunked_fetch, chunk_size)
@@ -528,7 +521,7 @@ class QuerySet:
                 raise TypeError("Complex aggregates require an alias")
             kwargs[arg.default_alias] = arg
 
-        return self.query.chain().get_aggregation(self.db, kwargs)
+        return self.query.chain().get_aggregation(kwargs)
 
     def count(self):
         """
@@ -541,7 +534,7 @@ class QuerySet:
         if self._result_cache is not None:
             return len(self._result_cache)
 
-        return self.query.get_count(using=self.db)
+        return self.query.get_count()
 
     def get(self, *args, **kwargs):
         """
@@ -559,7 +552,7 @@ class QuerySet:
         limit = None
         if (
             not clone.query.select_for_update
-            or connections[clone.db].features.supports_select_for_update_with_limit
+            or db_connection.features.supports_select_for_update_with_limit
         ):
             limit = MAX_GET_RESULTS
             clone.query.set_limits(high=limit)
@@ -584,7 +577,7 @@ class QuerySet:
         """
         obj = self.model(**kwargs)
         self._for_write = True
-        obj.save(force_insert=True, using=self.db)
+        obj.save(force_insert=True)
         return obj
 
     def _prepare_for_bulk_create(self, objs):
@@ -597,7 +590,7 @@ class QuerySet:
     def _check_bulk_create_options(
         self, update_conflicts, update_fields, unique_fields
     ):
-        db_features = connections[self.db].features
+        db_features = db_connection.features
         if update_conflicts:
             if not db_features.supports_update_conflicts:
                 raise NotSupportedError(
@@ -686,7 +679,7 @@ class QuerySet:
         fields = opts.concrete_fields
         objs = list(objs)
         self._prepare_for_bulk_create(objs)
-        with transaction.atomic(using=self.db, savepoint=False):
+        with transaction.atomic(savepoint=False):
             objs_with_pk, objs_without_pk = partition(lambda o: o.pk is None, objs)
             if objs_with_pk:
                 returned_columns = self._batched_insert(
@@ -703,7 +696,6 @@ class QuerySet:
                             setattr(obj_with_pk, field.attname, result)
                 for obj_with_pk in objs_with_pk:
                     obj_with_pk._state.adding = False
-                    obj_with_pk._state.db = self.db
             if objs_without_pk:
                 fields = [f for f in fields if not isinstance(f, AutoField)]
                 returned_columns = self._batched_insert(
@@ -714,9 +706,8 @@ class QuerySet:
                     update_fields=update_fields,
                     unique_fields=unique_fields,
                 )
-                connection = connections[self.db]
                 if (
-                    connection.features.can_return_rows_from_bulk_insert
+                    db_connection.features.can_return_rows_from_bulk_insert
                     and on_conflict is None
                 ):
                     assert len(returned_columns) == len(objs_without_pk)
@@ -724,7 +715,6 @@ class QuerySet:
                     for result, field in zip(results, opts.db_returning_fields):
                         setattr(obj_without_pk, field.attname, result)
                     obj_without_pk._state.adding = False
-                    obj_without_pk._state.db = self.db
 
         return objs
 
@@ -753,10 +743,9 @@ class QuerySet:
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
         self._for_write = True
-        connection = connections[self.db]
-        max_batch_size = connection.ops.bulk_batch_size(["pk", "pk"] + fields, objs)
+        max_batch_size = db_connection.ops.bulk_batch_size(["pk", "pk"] + fields, objs)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
-        requires_casting = connection.features.requires_casted_case_in_updates
+        requires_casting = db_connection.features.requires_casted_case_in_updates
         batches = (objs[i : i + batch_size] for i in range(0, len(objs), batch_size))
         updates = []
         for batch_objs in batches:
@@ -774,8 +763,8 @@ class QuerySet:
                 update_kwargs[field.attname] = case_statement
             updates.append(([obj.pk for obj in batch_objs], update_kwargs))
         rows_updated = 0
-        queryset = self.using(self.db)
-        with transaction.atomic(using=self.db, savepoint=False):
+        queryset = self._chain()
+        with transaction.atomic(savepoint=False):
             for pks, update_kwargs in updates:
                 rows_updated += queryset.filter(pk__in=pks).update(**update_kwargs)
         return rows_updated
@@ -795,7 +784,7 @@ class QuerySet:
             params = self._extract_model_params(defaults, **kwargs)
             # Try to create an object using passed params.
             try:
-                with transaction.atomic(using=self.db):
+                with transaction.atomic():
                     params = dict(resolve_callables(params))
                     return self.create(**params), True
             except (IntegrityError, ValidationError):
@@ -826,7 +815,7 @@ class QuerySet:
         else:
             update_defaults = defaults or {}
         self._for_write = True
-        with transaction.atomic(using=self.db):
+        with transaction.atomic():
             # Lock the row so that a concurrent update is blocked until
             # update_or_create() has performed its save.
             obj, created = self.select_for_update().get_or_create(
@@ -852,9 +841,9 @@ class QuerySet:
                         update_fields.add(field.name)
                         if field.name != field.attname:
                             update_fields.add(field.attname)
-                obj.save(using=self.db, update_fields=update_fields)
+                obj.save(update_fields=update_fields)
             else:
-                obj.save(using=self.db)
+                obj.save()
         return obj, False
 
     def _extract_model_params(self, defaults, **kwargs):
@@ -965,7 +954,7 @@ class QuerySet:
             if not id_list:
                 return {}
             filter_key = f"{field_name}__in"
-            batch_size = connections[self.db].features.max_query_params
+            batch_size = db_connection.features.max_query_params
             id_list = tuple(id_list)
             # If the database has a limit on the number of query parameters
             # (e.g. SQLite), retrieve objects in batches if necessary.
@@ -1004,7 +993,7 @@ class QuerySet:
 
         from plain.models.deletion import Collector
 
-        collector = Collector(using=del_query.db, origin=self)
+        collector = Collector(origin=self)
         collector.collect(del_query)
         deleted, _rows_count = collector.delete()
 
@@ -1014,14 +1003,14 @@ class QuerySet:
 
     delete.queryset_only = True
 
-    def _raw_delete(self, using):
+    def _raw_delete(self):
         """
         Delete objects found from the given queryset in single direct SQL
         query. No signals are sent and there is no protection for cascades.
         """
         query = self.query.clone()
         query.__class__ = sql.DeleteQuery
-        cursor = query.get_compiler(using).execute_sql(CURSOR)
+        cursor = query.get_compiler().execute_sql(CURSOR)
         if cursor:
             with cursor:
                 return cursor.rowcount
@@ -1061,8 +1050,8 @@ class QuerySet:
 
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}
-        with transaction.mark_for_rollback_on_error(using=self.db):
-            rows = query.get_compiler(self.db).execute_sql(CURSOR)
+        with transaction.mark_for_rollback_on_error():
+            rows = query.get_compiler().execute_sql(CURSOR)
         self._result_cache = None
         return rows
 
@@ -1080,7 +1069,7 @@ class QuerySet:
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}
         self._result_cache = None
-        return query.get_compiler(self.db).execute_sql(CURSOR)
+        return query.get_compiler().execute_sql(CURSOR)
 
     _update.queryset_only = False
 
@@ -1089,7 +1078,7 @@ class QuerySet:
         Return True if the QuerySet would have any results, False otherwise.
         """
         if self._result_cache is None:
-            return self.query.has_results(using=self.db)
+            return self.query.has_results()
         return bool(self._result_cache)
 
     def contains(self, obj):
@@ -1123,21 +1112,18 @@ class QuerySet:
         Runs an EXPLAIN on the SQL query this QuerySet would perform, and
         returns the results.
         """
-        return self.query.explain(using=self.db, format=format, **options)
+        return self.query.explain(format=format, **options)
 
     ##################################################
     # PUBLIC METHODS THAT RETURN A QUERYSET SUBCLASS #
     ##################################################
 
-    def raw(self, raw_query, params=(), translations=None, using=None):
-        if using is None:
-            using = self.db
+    def raw(self, raw_query, params=(), translations=None):
         qs = RawQuerySet(
             raw_query,
             model=self.model,
             params=params,
             translations=translations,
-            using=using,
         )
         qs._prefetch_related_lookups = self._prefetch_related_lookups[:]
         return qs
@@ -1570,12 +1556,6 @@ class QuerySet:
         clone.query.add_immediate_loading(fields)
         return clone
 
-    def using(self, alias):
-        """Select which database this QuerySet should execute against."""
-        clone = self._chain()
-        clone._db = alias
-        return clone
-
     ###################################
     # PUBLIC INTROSPECTION ATTRIBUTES #
     ###################################
@@ -1601,13 +1581,6 @@ class QuerySet:
         else:
             return False
 
-    @property
-    def db(self):
-        """Return the database used if this query is executed now."""
-        if self._for_write:
-            return self._db or router.db_for_write(self.model, **self._hints)
-        return self._db or router.db_for_read(self.model, **self._hints)
-
     ###################
     # PRIVATE METHODS #
     ###################
@@ -1618,7 +1591,6 @@ class QuerySet:
         fields,
         returning_fields=None,
         raw=False,
-        using=None,
         on_conflict=None,
         update_fields=None,
         unique_fields=None,
@@ -1628,8 +1600,6 @@ class QuerySet:
         the InsertQuery class and is how Model.save() is implemented.
         """
         self._for_write = True
-        if using is None:
-            using = self.db
         query = sql.InsertQuery(
             self.model,
             on_conflict=on_conflict,
@@ -1637,7 +1607,7 @@ class QuerySet:
             unique_fields=unique_fields,
         )
         query.insert_values(fields, objs, raw=raw)
-        return query.get_compiler(using=using).execute_sql(returning_fields)
+        return query.get_compiler().execute_sql(returning_fields)
 
     _insert.queryset_only = False
 
@@ -1653,19 +1623,17 @@ class QuerySet:
         """
         Helper method for bulk_create() to insert objs one batch at a time.
         """
-        connection = connections[self.db]
-        ops = connection.ops
+        ops = db_connection.ops
         max_batch_size = max(ops.bulk_batch_size(fields, objs), 1)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         inserted_rows = []
-        bulk_return = connection.features.can_return_rows_from_bulk_insert
+        bulk_return = db_connection.features.can_return_rows_from_bulk_insert
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
             if bulk_return and on_conflict is None:
                 inserted_rows.extend(
                     self._insert(
                         item,
                         fields=fields,
-                        using=self.db,
                         returning_fields=self.model._meta.db_returning_fields,
                     )
                 )
@@ -1673,7 +1641,6 @@ class QuerySet:
                 self._insert(
                     item,
                     fields=fields,
-                    using=self.db,
                     on_conflict=on_conflict,
                     update_fields=update_fields,
                     unique_fields=unique_fields,
@@ -1699,7 +1666,6 @@ class QuerySet:
         c = self.__class__(
             model=self.model,
             query=self.query.chain(),
-            using=self._db,
             hints=self._hints,
         )
         c._sticky_filter = self._sticky_filter
@@ -1754,7 +1720,6 @@ class QuerySet:
             # if they are set up to select only a single field.
             raise TypeError("Cannot use multi-field values as a filter value.")
         query = self.query.resolve_expression(*args, **kwargs)
-        query._db = self._db
         return query
 
     resolve_expression.queryset_only = True
@@ -1835,14 +1800,12 @@ class RawQuerySet:
         query=None,
         params=(),
         translations=None,
-        using=None,
         hints=None,
     ):
         self.raw_query = raw_query
         self.model = model
-        self._db = using
         self._hints = hints or {}
-        self.query = query or sql.RawQuery(sql=raw_query, using=self.db, params=params)
+        self.query = query or sql.RawQuery(sql=raw_query, params=params)
         self.params = params
         self.translations = translations or {}
         self._result_cache = None
@@ -1851,7 +1814,7 @@ class RawQuerySet:
 
     def resolve_model_init_order(self):
         """Resolve the init field names and value positions."""
-        converter = connections[self.db].introspection.identifier_converter
+        converter = db_connection.introspection.identifier_converter
         model_init_fields = [
             f for f in self.model._meta.fields if converter(f.column) in self.columns
         ]
@@ -1887,7 +1850,6 @@ class RawQuerySet:
             query=self.query,
             params=self.params,
             translations=self.translations,
-            using=self._db,
             hints=self._hints,
         )
         c._prefetch_related_lookups = self._prefetch_related_lookups[:]
@@ -1920,22 +1882,6 @@ class RawQuerySet:
     def __getitem__(self, k):
         return list(self)[k]
 
-    @property
-    def db(self):
-        """Return the database used if this query is executed now."""
-        return self._db or router.db_for_read(self.model, **self._hints)
-
-    def using(self, alias):
-        """Select the database this RawQuerySet should execute against."""
-        return RawQuerySet(
-            self.raw_query,
-            model=self.model,
-            query=self.query.chain(using=alias),
-            params=self.params,
-            translations=self.translations,
-            using=alias,
-        )
-
     @cached_property
     def columns(self):
         """
@@ -1957,7 +1903,7 @@ class RawQuerySet:
     @cached_property
     def model_fields(self):
         """A dict mapping column names to model field names."""
-        converter = connections[self.db].introspection.identifier_converter
+        converter = db_connection.introspection.identifier_converter
         model_fields = {}
         for field in self.model._meta.fields:
             name, column = field.get_attname_column()
@@ -2367,8 +2313,7 @@ class RelatedPopulator:
     model instance.
     """
 
-    def __init__(self, klass_info, select, db):
-        self.db = db
+    def __init__(self, klass_info, select):
         # Pre-compute needed attributes. The attributes are:
         #  - model_cls: the possibly deferred model class to instantiate
         #  - either:
@@ -2403,7 +2348,7 @@ class RelatedPopulator:
 
         self.model_cls = klass_info["model"]
         self.pk_idx = self.init_list.index(self.model_cls._meta.pk.attname)
-        self.related_populators = get_related_populators(klass_info, select, self.db)
+        self.related_populators = get_related_populators(klass_info, select)
         self.local_setter = klass_info["local_setter"]
         self.remote_setter = klass_info["remote_setter"]
 
@@ -2415,7 +2360,7 @@ class RelatedPopulator:
         if obj_data[self.pk_idx] is None:
             obj = None
         else:
-            obj = self.model_cls.from_db(self.db, self.init_list, obj_data)
+            obj = self.model_cls.from_db(self.init_list, obj_data)
             for rel_iter in self.related_populators:
                 rel_iter.populate(row, obj)
         self.local_setter(from_obj, obj)
@@ -2423,10 +2368,10 @@ class RelatedPopulator:
             self.remote_setter(obj, from_obj)
 
 
-def get_related_populators(klass_info, select, db):
+def get_related_populators(klass_info, select):
     iterators = []
     related_klass_infos = klass_info.get("related_klass_infos", [])
     for rel_klass_info in related_klass_infos:
-        rel_cls = RelatedPopulator(rel_klass_info, select, db)
+        rel_cls = RelatedPopulator(rel_klass_info, select)
         iterators.append(rel_cls)
     return iterators

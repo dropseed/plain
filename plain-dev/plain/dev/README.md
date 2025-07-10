@@ -8,6 +8,7 @@ The `plain.dev` package can be [installed from PyPI](https://pypi.org/project/pl
 
 - [`plain dev`](#plain-dev)
 - [`plain dev services`](#plain-dev-services)
+- [`plain dev logs`](#plain-dev-logs)
 - [`plain pre-commit`](#plain-pre-commit)
 - [`plain contrib`](#plain-contrib)
 - [VS Code debugging](#vscode-debugging)
@@ -20,6 +21,7 @@ The `plain dev` command does several things:
 - Runs `plain preflight` to check for any issues
 - Executes any pending model migrations
 - Starts `gunicorn` with `--reload`
+- Serves HTTPS on port 8443 by default (uses the next free port if 8443 is taken and no port is specified)
 - Runs `plain tailwind build --watch`, if `plain.tailwind` is installed
 - Any custom process defined in `pyproject.toml` at `tool.plain.dev.run`
 - Necessary services (ex. Postgres) defined in `pyproject.toml` at `tool.plain.dev.services`
@@ -43,12 +45,26 @@ Unlike [services](#services), custom processes are _only_ run during `plain dev`
 ```toml
 # pyproject.toml
 [tool.plain.dev.run]
-ngrok = {command = "ngrok http $PORT"}
+    ngrok = {command = "ngrok http $PORT"}
 ```
 
 ## `plain dev services`
 
 Starts your [services](#services) by themselves.
+Logs are stored in `.plain/dev/logs/services/`.
+
+## `plain dev logs`
+
+Show output from recent `plain dev` runs.
+
+Logs are stored in `.plain/dev/logs/run/`.
+
+```bash
+plain dev logs        # print last log
+plain dev logs -f     # follow the latest log
+plain dev logs --pid 1234
+plain dev logs --path
+```
 
 ## `plain pre-commit`
 

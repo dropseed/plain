@@ -8,7 +8,6 @@ from .aggregates import __all__ as aggregates_all
 from .constraints import *  # NOQA
 from .constraints import __all__ as constraints_all
 from .db import (
-    DEFAULT_DB_ALIAS,
     PLAIN_VERSION_PICKLE_KEY,
     DatabaseError,
     DataError,
@@ -20,9 +19,8 @@ from .db import (
     OperationalError,
     ProgrammingError,
     close_old_connections,
-    connections,
+    db_connection,
     reset_queries,
-    router,
 )
 from .deletion import (
     CASCADE,
@@ -127,8 +125,7 @@ __all__ += [
 
 # DB-related exports
 __all__ += [
-    "connections",
-    "router",
+    "db_connection",
     "reset_queries",
     "close_old_connections",
     "DatabaseError",
@@ -140,7 +137,6 @@ __all__ += [
     "Error",
     "InterfaceError",
     "OperationalError",
-    "DEFAULT_DB_ALIAS",
     "PLAIN_VERSION_PICKLE_KEY",
 ]
 

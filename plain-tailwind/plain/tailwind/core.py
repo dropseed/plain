@@ -3,6 +3,7 @@ import platform
 import subprocess
 import sys
 
+import click
 import requests
 import tomlkit
 
@@ -120,9 +121,20 @@ class Tailwind:
 
         with requests.get(url, stream=True) as response:
             response.raise_for_status()
+            total = int(response.headers.get("Content-Length", 0))
             with open(self.standalone_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
+                if total:
+                    with click.progressbar(
+                        length=total,
+                        label="Downloading Tailwind",
+                        width=0,
+                    ) as bar:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                            bar.update(len(chunk))
+                else:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
 
         os.chmod(self.standalone_path, 0o755)
 

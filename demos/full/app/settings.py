@@ -8,6 +8,7 @@ INSTALLED_PACKAGES = [
     "plain.cache",
     "plain.elements",
     "plain.email",
+    "plain.flags",
     "plain.htmx",
     "plain.loginlink",
     "plain.models",
@@ -28,13 +29,6 @@ EMAIL_BACKEND = "plain.email.backends.console.EmailBackend"
 EMAIL_DEFAULT_FROM = "from@example.com"
 SUPPORT_EMAIL = "support@example.com"
 OAUTH_LOGIN_PROVIDERS = {}
-
-DATABASES = {
-    "default": {
-        "ENGINE": "plain.models.backends.sqlite3",
-        "NAME": ":memory:",
-    }
-}
 
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",

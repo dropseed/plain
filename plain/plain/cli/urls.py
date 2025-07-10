@@ -1,5 +1,3 @@
-import sys
-
 import click
 
 
@@ -17,8 +15,7 @@ def list_urls(flat):
     from plain.urls import URLResolver, get_resolver
 
     if not settings.URLS_ROUTER:
-        click.secho("URLS_ROUTER is not set", fg="red")
-        sys.exit(1)
+        raise click.UsageError("URLS_ROUTER is not set")
 
     resolver = get_resolver(settings.URLS_ROUTER)
     if flat:

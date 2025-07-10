@@ -36,16 +36,14 @@ class BaseDatabaseCreation:
         test_database_name = self._get_test_db_name(prefix)
 
         if verbosity >= 1:
-            self.log(
-                f"Creating test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
-            )
+            self.log(f"Creating test database '{test_database_name}'...")
 
         self._create_test_db(
             test_database_name=test_database_name, verbosity=verbosity, autoclobber=True
         )
 
         self.connection.close()
-        settings.DATABASES[self.connection.alias]["NAME"] = test_database_name
+        settings.DATABASE["NAME"] = test_database_name
         self.connection.settings_dict["NAME"] = test_database_name
 
         # We report migrate messages at one level lower than that
@@ -54,7 +52,6 @@ class BaseDatabaseCreation:
         migrate.callback(
             package_label=None,
             migration_name=None,
-            database=self.connection.alias,
             fake=False,
             fake_initial=False,
             plan=False,
@@ -128,15 +125,6 @@ class BaseDatabaseCreation:
     #         # because constraint checks were disabled.
     #         self.connection.check_constraints(table_names=table_names)
 
-    def _get_database_display_str(self, verbosity, database_name):
-        """
-        Return display string for a database for use in various actions.
-        """
-        return "'{}'{}".format(
-            self.connection.alias,
-            (f" ('{database_name}')") if verbosity >= 2 else "",
-        )
-
     def _get_test_db_name(self, prefix=""):
         """
         Internal implementation - return the name of the test DB that will be
@@ -183,11 +171,7 @@ class BaseDatabaseCreation:
                     try:
                         if verbosity >= 1:
                             self.log(
-                                "Destroying old test database for alias {}...".format(
-                                    self._get_database_display_str(
-                                        verbosity, test_database_name
-                                    ),
-                                )
+                                f"Destroying old test database '{test_database_name}'..."
                             )
                         cursor.execute(
                             "DROP DATABASE {dbname}".format(**test_db_params)
@@ -212,14 +196,12 @@ class BaseDatabaseCreation:
         test_database_name = self.connection.settings_dict["NAME"]
 
         if verbosity >= 1:
-            self.log(
-                f"Destroying test database for alias {self._get_database_display_str(verbosity, test_database_name)}..."
-            )
+            self.log(f"Destroying test database '{test_database_name}'...")
         self._destroy_test_db(test_database_name, verbosity)
 
         # Restore the original database name
         if old_database_name is not None:
-            settings.DATABASES[self.connection.alias]["NAME"] = old_database_name
+            settings.DATABASE["NAME"] = old_database_name
             self.connection.settings_dict["NAME"] = old_database_name
 
     def _destroy_test_db(self, test_database_name, verbosity):
@@ -244,7 +226,7 @@ class BaseDatabaseCreation:
     def test_db_signature(self, prefix=""):
         """
         Return a tuple with elements of self.connection.settings_dict (a
-        DATABASES setting value) that uniquely identify a database
+        DATABASE setting value) that uniquely identify a database
         accordingly to the RDBMS particularities.
         """
         settings_dict = self.connection.settings_dict

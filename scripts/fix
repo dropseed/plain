@@ -1,5 +1,12 @@
 #!/bin/sh -e
-uv run --package plain-code --isolated plain-code fix . "$@"
 
-# Format all markdown files
-npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --write
+if [ "$1" = "--check" ]; then
+    shift
+    uv run plain-code check . "$@"
+    # Check formatting of markdown files
+    npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --check
+else
+    uv run plain-code fix . "$@"
+    # Format all markdown files
+    npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --write
+fi

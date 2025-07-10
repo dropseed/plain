@@ -11,7 +11,7 @@ from functools import cached_property, partialmethod, total_ordering
 
 from plain import exceptions, preflight, validators
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import DEFAULT_DB_ALIAS, connections, router
+from plain.models.db import db_connection
 from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import DeferredAttribute, RegisterLookupMixin
 from plain.utils import timezone
@@ -346,36 +346,26 @@ class Field(RegisterLookupMixin):
             )
         ]
 
-    def _check_db_comment(self, databases=None, **kwargs):
-        if not self.db_comment or not databases:
+    def _check_db_comment(self, database=False, **kwargs):
+        if not self.db_comment or not database:
             return []
         errors = []
-        for db in databases:
-            if not router.allow_migrate_model(db, self.model):
-                continue
-            connection = connections[db]
-            if not (
-                connection.features.supports_comments
-                or "supports_comments" in self.model._meta.required_db_features
-            ):
-                errors.append(
-                    preflight.Warning(
-                        f"{connection.display_name} does not support comments on "
-                        f"columns (db_comment).",
-                        obj=self,
-                        id="fields.W163",
-                    )
+        if not (
+            db_connection.features.supports_comments
+            or "supports_comments" in self.model._meta.required_db_features
+        ):
+            errors.append(
+                preflight.Warning(
+                    f"{db_connection.display_name} does not support comments on "
+                    f"columns (db_comment).",
+                    obj=self,
+                    id="fields.W163",
                 )
+            )
         return errors
 
     def _check_null_allowed_for_primary_keys(self):
-        if (
-            self.primary_key
-            and self.allow_null
-            and not connections[
-                DEFAULT_DB_ALIAS
-            ].features.interprets_empty_strings_as_nulls
-        ):
+        if self.primary_key and self.allow_null:
             # We cannot reliably check this for backends like Oracle which
             # consider NULL and '' to be equal (and thus set up
             # character-based fields a little differently).
@@ -393,13 +383,11 @@ class Field(RegisterLookupMixin):
         else:
             return []
 
-    def _check_backend_specific_checks(self, databases=None, **kwargs):
-        if databases is None:
+    def _check_backend_specific_checks(self, database=False, **kwargs):
+        if not database:
             return []
         errors = []
-        for alias in databases:
-            if router.allow_migrate_model(alias, self.model):
-                errors.extend(connections[alias].validation.check_field(self, **kwargs))
+        errors.extend(db_connection.validation.check_field(self, **kwargs))
         return errors
 
     def _check_validators(self):
@@ -893,13 +881,7 @@ class Field(RegisterLookupMixin):
                 return self.default
             return lambda: self.default
 
-        if (
-            not self.empty_strings_allowed
-            or self.allow_null
-            and not connections[
-                DEFAULT_DB_ALIAS
-            ].features.interprets_empty_strings_as_nulls
-        ):
+        if not self.empty_strings_allowed or self.allow_null:
             return return_None
         return str  # return empty string
 
@@ -1015,17 +997,17 @@ class CharField(Field):
             return "String (unlimited)"
 
     def check(self, **kwargs):
-        databases = kwargs.get("databases") or []
+        database = kwargs.get("database", False)
         return [
             *super().check(**kwargs),
-            *self._check_db_collation(databases),
+            *self._check_db_collation(database),
             *self._check_max_length_attribute(**kwargs),
         ]
 
     def _check_max_length_attribute(self, **kwargs):
         if self.max_length is None:
             if (
-                connections[DEFAULT_DB_ALIAS].features.supports_unlimited_charfield
+                db_connection.features.supports_unlimited_charfield
                 or "supports_unlimited_charfield"
                 in self.model._meta.required_db_features
             ):
@@ -1052,26 +1034,22 @@ class CharField(Field):
         else:
             return []
 
-    def _check_db_collation(self, databases):
+    def _check_db_collation(self, database):
         errors = []
-        for db in databases:
-            if not router.allow_migrate_model(db, self.model):
-                continue
-            connection = connections[db]
-            if not (
-                self.db_collation is None
-                or "supports_collation_on_charfield"
-                in self.model._meta.required_db_features
-                or connection.features.supports_collation_on_charfield
-            ):
-                errors.append(
-                    preflight.Error(
-                        f"{connection.display_name} does not support a database collation on "
-                        "CharFields.",
-                        obj=self,
-                        id="fields.E190",
-                    ),
-                )
+        if database and not (
+            self.db_collation is None
+            or "supports_collation_on_charfield"
+            in self.model._meta.required_db_features
+            or db_connection.features.supports_collation_on_charfield
+        ):
+            errors.append(
+                preflight.Error(
+                    f"{db_connection.display_name} does not support a database collation on "
+                    "CharFields.",
+                    obj=self,
+                    id="fields.E190",
+                ),
+            )
         return errors
 
     def cast_db_type(self, connection):
@@ -1716,12 +1694,10 @@ class IntegerField(Field):
     @cached_property
     def validators(self):
         # These validators can't be added at field initialization time since
-        # they're based on values retrieved from `connections[DEFAULT_DB_ALIAS]`.
+        # they're based on values retrieved from the database connection.
         validators_ = super().validators
         internal_type = self.get_internal_type()
-        min_value, max_value = connections[DEFAULT_DB_ALIAS].ops.integer_field_range(
-            internal_type
-        )
+        min_value, max_value = db_connection.ops.integer_field_range(internal_type)
         if min_value is not None and not any(
             (
                 isinstance(validator, validators.MinValueValidator)
@@ -1993,32 +1969,28 @@ class TextField(Field):
         self.db_collation = db_collation
 
     def check(self, **kwargs):
-        databases = kwargs.get("databases") or []
+        database = kwargs.get("database", False)
         return [
             *super().check(**kwargs),
-            *self._check_db_collation(databases),
+            *self._check_db_collation(database),
         ]
 
-    def _check_db_collation(self, databases):
+    def _check_db_collation(self, database):
         errors = []
-        for db in databases:
-            if not router.allow_migrate_model(db, self.model):
-                continue
-            connection = connections[db]
-            if not (
-                self.db_collation is None
-                or "supports_collation_on_textfield"
-                in self.model._meta.required_db_features
-                or connection.features.supports_collation_on_textfield
-            ):
-                errors.append(
-                    preflight.Error(
-                        f"{connection.display_name} does not support a database collation on "
-                        "TextFields.",
-                        obj=self,
-                        id="fields.E190",
-                    ),
-                )
+        if database and not (
+            self.db_collation is None
+            or "supports_collation_on_textfield"
+            in self.model._meta.required_db_features
+            or db_connection.features.supports_collation_on_textfield
+        ):
+            errors.append(
+                preflight.Error(
+                    f"{db_connection.display_name} does not support a database collation on "
+                    "TextFields.",
+                    obj=self,
+                    id="fields.E190",
+                ),
+            )
         return errors
 
     def db_parameters(self, connection):

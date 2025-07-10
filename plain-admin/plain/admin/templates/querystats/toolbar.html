@@ -66,7 +66,8 @@
                 }
                 for (const timing of entry.serverTiming) {
                     if (timing.name === "querystats") {
-                        console.log("Querystats timing", entry)
+                        // Log a helpful summary instead of the entire entry object
+                        console.log(`[Querystats] ${timing.description} on ${entry.name}`, entry)
                         timing.url = entry.name;  // Store this for reference later
                         for (const existingTiming of querystatsTimings) {
                             if (existingTiming == timing) {

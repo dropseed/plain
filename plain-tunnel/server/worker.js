@@ -1,5 +1,5 @@
 export default {
-  async fetch(request, env, context) {
+  async fetch(request, env, _context) {
     const url = new URL(request.url);
     let subdomain = null;
 
@@ -31,7 +31,7 @@ export default {
 };
 
 export class Tunnel {
-  constructor(state, env) {
+  constructor(_state, _env) {
     // this.state = state;
     // this.env = env;
     this.clientSocket = null;
@@ -47,7 +47,7 @@ export class Tunnel {
     return this.handleHttpRequest(request);
   }
 
-  handleWebSocket(request) {
+  handleWebSocket(_request) {
     const [client, server] = Object.values(new WebSocketPair());
 
     // Check against reserved subdomains
@@ -101,7 +101,7 @@ export class Tunnel {
   }
 
   handleResponseMetadata(data) {
-    const { id, status, headers, has_body, totalBodyChunks } = data;
+    const { id, has_body, totalBodyChunks } = data;
     const pendingRequest = this.pendingRequests.get(id);
     if (pendingRequest) {
       console.info(

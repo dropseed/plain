@@ -25,7 +25,7 @@ def test_oauth_provider_keys_check_pass(db, settings):
         access_token="test",
     )
 
-    errors = OAuthConnection.check(databases=["default"])
+    errors = OAuthConnection.check(database=True)
     assert len(errors) == 0
 
 
@@ -58,7 +58,7 @@ def test_oauth_provider_keys_check_fail(db, settings):
         access_token="test",
     )
 
-    errors = OAuthConnection.check(databases=["default"])
+    errors = OAuthConnection.check(database=True)
     assert len(errors) == 1
     assert (
         errors[0].msg

@@ -1,0 +1,20 @@
+[project]
+name = "plain.upgrade"
+version = "0.3.1"
+description = "Upgrade Plain packages using AI agents."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "ast-grep-cli>=0.38.5",
+    "click>=8.0.0",
+]
+
+[project.scripts]
+plain-upgrade = "plain.upgrade.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

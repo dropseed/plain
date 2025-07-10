@@ -6,7 +6,7 @@ from http.cookies import SimpleCookie
 from io import BytesIO, IOBase
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
-from plain.http import HttpHeaders, HttpRequest, QueryDict
+from plain.http import HttpHeaders, QueryDict
 from plain.internal import internalcode
 from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.wsgi import WSGIRequest
@@ -775,57 +775,20 @@ class Client(RequestFactory):
     @property
     def session(self):
         """Return the current session variables."""
-        from plain.sessions import SessionStore
+        from plain.sessions.test import get_client_session
 
-        cookie = self.cookies.get(settings.SESSION_COOKIE_NAME)
-        if cookie:
-            return SessionStore(cookie.value)
-        session = SessionStore()
-        session.save()
-        self.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
-        return session
+        return get_client_session(self)
 
     def force_login(self, user):
-        self._login(user)
+        from plain.auth.test import login_client
 
-    def _login(self, user):
-        from plain.auth import login
-        from plain.sessions import SessionStore
-
-        # Create a fake request to store login details.
-        request = HttpRequest()
-        if self.session:
-            request.session = self.session
-        else:
-            request.session = SessionStore()
-        login(request, user)
-        # Save the session values.
-        request.session.save()
-        # Set the cookie to represent the session.
-        session_cookie = settings.SESSION_COOKIE_NAME
-        self.cookies[session_cookie] = request.session.session_key
-        cookie_data = {
-            "max-age": None,
-            "path": "/",
-            "domain": settings.SESSION_COOKIE_DOMAIN,
-            "secure": settings.SESSION_COOKIE_SECURE or None,
-            "expires": None,
-        }
-        self.cookies[session_cookie].update(cookie_data)
+        login_client(self, user)
 
     def logout(self):
         """Log out the user by removing the cookies and session object."""
-        from plain.auth import get_user, logout
-        from plain.sessions import SessionStore
+        from plain.auth.test import logout_client
 
-        request = HttpRequest()
-        if self.session:
-            request.session = self.session
-            request.user = get_user(request)
-        else:
-            request.session = SessionStore()
-        logout(request)
-        self.cookies = SimpleCookie()
+        logout_client(self)
 
     def _parse_json(self, response, **extra):
         if not hasattr(response, "_json"):
