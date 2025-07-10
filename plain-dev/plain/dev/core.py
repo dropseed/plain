@@ -27,9 +27,7 @@ class DevProcess(ProcessManager):
     pidfile = PLAIN_TEMP_PATH / "dev" / "dev.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "run"
 
-    def __init__(self, *, port, hostname, log_level):
-        super().__init__()
-
+    def setup(self, *, port, hostname, log_level):
         if not hostname:
             project_name = os.path.basename(
                 os.getcwd()

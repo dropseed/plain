@@ -32,7 +32,7 @@ class DevGroup(click.Group):
             return
 
         # Don't do anything if it looks like a "services" command is being run explicitly
-        if "services" in sys.argv:
+        if "services" in sys.argv or "--stop" in sys.argv:
             return
 
         if not ServicesProcess.get_services(APP_PATH.parent):
@@ -120,11 +120,7 @@ def cli(ctx, port, hostname, log_level, start, stop):
 
     os.environ["PLAIN_DEV_SERVICES_AUTO"] = "false"
 
-    dev = DevProcess(
-        port=port,
-        hostname=hostname,
-        log_level=log_level,
-    )
+    dev = DevProcess()
 
     if stop:
         if ServicesProcess.running_pid():
@@ -164,6 +160,7 @@ def cli(ctx, port, hostname, log_level, start, stop):
         )
         return
 
+    dev.setup(port=port, hostname=hostname, log_level=log_level)
     returncode = dev.run()
     if returncode:
         sys.exit(returncode)
