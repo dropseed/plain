@@ -101,9 +101,3 @@ class _ExceptionToolbarPanel(ToolbarPanel):
 class _RequestToolbarPanel(ToolbarPanel):
     name = "Request"
     template_name = "toolbar/request.html"
-
-
-@register_toolbar_panel
-class _QuerystatsToolbarPanel(ToolbarPanel):
-    name = "Queries"
-    template_name = "toolbar/querystats.html"

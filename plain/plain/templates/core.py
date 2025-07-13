@@ -1,6 +1,9 @@
 import jinja2
+from opentelemetry import trace
 
 from .jinja import environment
+
+tracer = trace.get_tracer(__name__)
 
 
 class TemplateFileMissing(Exception):
@@ -21,4 +24,11 @@ class Template:
             raise TemplateFileMissing(filename)
 
     def render(self, context: dict) -> str:
-        return self._jinja_template.render(context)
+        with tracer.start_as_current_span(
+            f"Template {self.filename}",
+            attributes={
+                "template.filename": self.filename,
+                "template.context_keys": list(context.keys()),
+            },
+        ):
+            return self._jinja_template.render(context)

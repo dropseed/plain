@@ -7,6 +7,7 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_NAMESPACE,
     DB_OPERATION_BATCH_SIZE,
     DB_OPERATION_NAME,
+    DB_QUERY_SUMMARY,
     DB_QUERY_TEXT,
     DB_SYSTEM_NAME,
 )
@@ -55,24 +56,27 @@ def db_span(db, sql: Any, *, many: bool = False, batch_size: int | None = None):
         yield None
         return
 
-    # Derive operation keyword (SELECT, INSERT, …) if possible.
-    operation: str | None = None
-    if isinstance(sql, str):
-        stripped = sql.lstrip()
-        if stripped:
-            operation = stripped.split()[0].upper()
+    sql = str(sql)  # Ensure SQL is a string for span attributes.
 
-    # Span name per OTel SQL guidance.
-    if many:
-        span_name = (operation or "EXECUTEMANY") + " many"
+    # Derive operation keyword (SELECT, INSERT, …) if possible.
+    operation = sql.lstrip().split()[0]
+    if " FROM " in sql:
+        table_name = sql.split(" FROM ")[1].strip().split()[0]
+        summary = f"{operation} {table_name}"
     else:
-        span_name = operation or "QUERY"
+        summary = operation
+
+    if many:
+        summary = f"{summary} many"
+
+    span_name = summary[:255]
 
     # Build attribute set.
     attrs: dict[str, Any] = {
         DB_SYSTEM_NAME: db_system_for(db.vendor),
         DB_NAMESPACE: db.settings_dict.get("NAME"),
-        DB_QUERY_TEXT: sql if isinstance(sql, str) else str(sql),
+        DB_QUERY_TEXT: sql,
+        DB_QUERY_SUMMARY: summary,
     }
 
     if user := db.settings_dict.get("USER"):

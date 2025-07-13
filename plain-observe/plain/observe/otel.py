@@ -1,25 +1,54 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
-from collections.abc import Sequence
 
-from opentelemetry.sdk.trace import sampling
-from opentelemetry.sdk.trace.export import SpanExporter
+from opentelemetry import baggage, trace
+from opentelemetry.sdk.trace import TracerProvider, sampling
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 from opentelemetry.semconv.attributes import url_attributes
 from opentelemetry.trace import SpanKind
 
 from plain.models.observability import suppress_tracing
+from plain.runtime import settings
+
+logger = logging.getLogger(__name__)
+
+
+def has_existing_trace_provider() -> bool:
+    """Check if there is an existing trace provider."""
+    current_provider = trace.get_tracer_provider()
+    return current_provider and not isinstance(
+        current_provider, trace.ProxyTracerProvider
+    )
+
+
+def setup_debug_trace_provider() -> None:
+    sampler = PlainRequestSampler()
+    provider = TracerProvider(sampler=sampler)
+    provider.add_span_processor(BatchSpanProcessor(ObserveModelsExporter()))
+    trace.set_tracer_provider(provider)
+
+
+def is_debug_trace_provider() -> bool:
+    """Check if the current trace provider is the debug trace provider."""
+    current_provider = trace.get_tracer_provider()
+    if current_provider and current_provider.sampler is not None:
+        return isinstance(current_provider.sampler, PlainRequestSampler)
+    return False
 
 
 class PlainRequestSampler(sampling.Sampler):
     """Drops traces based on request path or user role."""
 
-    def __init__(
-        self, delegate: sampling.Sampler, ignore_url_paths: Sequence[re.Pattern]
-    ):
-        self._delegate = delegate
-        self._ignore_url_paths = ignore_url_paths
+    def __init__(self):
+        self._delegate = sampling.ParentBased(sampling.ALWAYS_ON)
+
+        # TODO ignore url namespace instead? admin, observe, assets
+        self._ignore_url_paths = [
+            re.compile(p) for p in settings.OBSERVE_IGNORE_URL_PATTERNS
+        ]
 
     def should_sample(
         self,
@@ -31,27 +60,32 @@ class PlainRequestSampler(sampling.Sampler):
         links=None,
         trace_state=None,
         **kwargs,
-    ):  # type: ignore[override]
-        # Can we get the request path from the context or something instead of contextvar?
-        # not sure what to do with is_admin and stuff then...
-
+    ):
+        # First, drop if the URL should be ignored.
         if attributes:
-            if url_path := attributes[url_attributes.URL_PATH]:
-                print("SHIT", url_path)
+            if url_path := attributes.get(url_attributes.URL_PATH, ""):
                 for pattern in self._ignore_url_paths:
                     if pattern.match(url_path):
-                        return sampling.SamplingResult(sampling.Decision.DROP)
+                        return sampling.SamplingResult(
+                            sampling.Decision.DROP,
+                            attributes=attributes,
+                        )
 
-            # Example rule: drop staff/admin requests entirely.
-            # if getattr(request, "user", None) and getattr(request.user, "is_staff", False):
-            #     return sampling.SamplingResult(sampling.Decision.DROP)
-
-        # In dev we always sample?
-
-        # Otherwise need an option to sample if session sampling enabled and is_admin
-
-        # does empty parent context tell us we're at a root, and only check this there?
-        # maybe is_admin should be an attribute, and observe_enabled could be an attribute
+        # Look for the "observe" cookie in the request and
+        # sample if it is set to "true".
+        if parent_context:
+            if cookies := baggage.get_baggage("http.request.cookies", parent_context):
+                # Using a signed cookie would be better -- only set by authed route
+                if cookies.get("observe") == "true":
+                    return sampling.SamplingResult(
+                        sampling.Decision.RECORD_AND_SAMPLE,
+                        attributes=attributes,
+                    )
+                else:
+                    return sampling.SamplingResult(
+                        sampling.Decision.DROP,
+                        attributes=attributes,
+                    )
 
         # Fallback to delegate sampler.
         return self._delegate.should_sample(
@@ -71,7 +105,7 @@ class PlainRequestSampler(sampling.Sampler):
 class ObserveModelsExporter(SpanExporter):
     """Exporter that writes spans into the observe models tables."""
 
-    def export(self, spans):  # type: ignore[override]
+    def export(self, spans):
         """Persist spans in bulk for efficiency."""
 
         from .models import Span, Trace
@@ -85,7 +119,14 @@ class ObserveModelsExporter(SpanExporter):
                 trace_id = span_data["context"]["trace_id"]
 
                 # There should be at least one span with this attribute
-                request_id = span_data["attributes"].get("plain.request_id", "")
+                request_id = span_data["attributes"].get("plain.request.id", "")
+                user_id = span_data["attributes"].get("user.id", "")
+                session_id = span_data["attributes"].get("session.id", "")
+
+                if not span_data["parent_id"]:
+                    description = span_data["name"]
+                else:
+                    description = ""
 
                 if trace := create_traces.get(trace_id):
                     if not trace.start_time:
@@ -102,12 +143,24 @@ class ObserveModelsExporter(SpanExporter):
 
                     if not trace.request_id:
                         trace.request_id = request_id
+
+                    if not trace.user_id:
+                        trace.user_id = user_id
+
+                    if not trace.session_id:
+                        trace.session_id = session_id
+
+                    if not trace.description:
+                        trace.description = description
                 else:
                     trace = Trace(
                         trace_id=trace_id,
                         start_time=span_data["start_time"],
                         end_time=span_data["end_time"],
                         request_id=request_id,
+                        user_id=user_id,
+                        session_id=session_id,
+                        description=description,
                     )
                     create_traces[trace_id] = trace
 
@@ -129,13 +182,23 @@ class ObserveModelsExporter(SpanExporter):
                     )
                 )
 
-            # Trace.objects.bulk_create(
-            #     create_traces.values()
-            # )  # , update_conflicts=True, update_fields=["start_time", "end_time", "request_id"])
-            # Span.objects.bulk_create(create_spans)
+            try:
+                Trace.objects.bulk_create(
+                    create_traces.values()
+                )  # , update_conflicts=True, update_fields=["start_time", "end_time", "request_id"])
+                Span.objects.bulk_create(create_spans)
+            except Exception as e:
+                logger.error(
+                    "Failed to export spans to database: %s",
+                    e,
+                    exc_info=True,
+                )
 
-            # TODO could delete old spans and stuff here instead of chore? or both?
-            # should be days based for sure (i.e. 30 days)
-            # could also be limit based as a fallback
+            # Delete oldest traces if we exceed the limit
+            if Trace.objects.count() > settings.OBSERVE_TRACE_LIMIT:
+                delete_ids = Trace.objects.order_by("start_time")[
+                    : settings.OBSERVE_TRACE_LIMIT
+                ].values_list("id", flat=True)
+                Trace.objects.filter(id__in=delete_ids).delete()
 
         return True

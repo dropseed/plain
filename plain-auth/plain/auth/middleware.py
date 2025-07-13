@@ -1,3 +1,5 @@
+from opentelemetry import trace
+
 from plain import auth
 from plain.exceptions import ImproperlyConfigured
 from plain.utils.functional import SimpleLazyObject
@@ -6,6 +8,8 @@ from plain.utils.functional import SimpleLazyObject
 def get_user(request):
     if not hasattr(request, "_cached_user"):
         request._cached_user = auth.get_user(request)
+        if request._cached_user:
+            trace.get_current_span().set_attribute("user.id", request._cached_user.id)
     return request._cached_user
 
 

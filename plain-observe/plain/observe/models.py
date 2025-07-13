@@ -1,3 +1,5 @@
+from opentelemetry.semconv.attributes import db_attributes
+
 from plain import models
 
 
@@ -6,6 +8,8 @@ class Trace(models.Model):
     trace_id = models.CharField(max_length=255)
     start_time = models.DateTimeField(allow_null=True, required=False)
     end_time = models.DateTimeField(allow_null=True, required=False)
+
+    description = models.TextField(default="", required=False)
 
     # Plain fields
     request_id = models.CharField(max_length=255, default="", required=False)
@@ -20,6 +24,14 @@ class Trace(models.Model):
                 name="observe_unique_trace_id",
             )
         ]
+
+    def __str__(self):
+        return self.trace_id
+
+    def duration_ms(self):
+        if self.start_time and self.end_time:
+            return (self.end_time - self.start_time).total_seconds() * 1000
+        return None
 
 
 @models.register_model
@@ -53,3 +65,18 @@ class Span(models.Model):
             models.Index(fields=["trace"]),
             models.Index(fields=["start_time"]),
         ]
+
+    def __str__(self):
+        return self.span_id
+
+    def duration_ms(self):
+        if self.start_time and self.end_time:
+            return (self.end_time - self.start_time).total_seconds() * 1000
+        return None
+
+    def description(self):
+        if summary := self.attributes.get(db_attributes.DB_QUERY_SUMMARY):
+            return summary
+        if query := self.attributes.get(db_attributes.DB_QUERY_TEXT):
+            return query
+        return self.name

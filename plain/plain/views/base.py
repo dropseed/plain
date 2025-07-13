@@ -40,7 +40,14 @@ class View:
     @classonlymethod
     def as_view(cls, *init_args, **init_kwargs):
         def view(request, *url_args, **url_kwargs):
-            with tracer.start_as_current_span("plain.view"):
+            with tracer.start_as_current_span(
+                f"View {cls.__name__}",
+                attributes={
+                    "view.class": cls.__name__,
+                    "view.url_args": url_args,
+                    # "view.url_kwargs": list(url_kwargs),  # can't be dict
+                },
+            ):
                 v = cls(*init_args, **init_kwargs)
                 v.setup(request, *url_args, **url_kwargs)
                 return v.get_response()

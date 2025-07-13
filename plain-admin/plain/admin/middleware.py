@@ -1,5 +1,4 @@
 from .impersonate.middleware import ImpersonateMiddleware
-from .querystats.middleware import QueryStatsMiddleware
 
 
 class AdminMiddleware:
@@ -9,4 +8,4 @@ class AdminMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        return QueryStatsMiddleware(ImpersonateMiddleware(self.get_response))(request)
+        return ImpersonateMiddleware(self.get_response)(request)
