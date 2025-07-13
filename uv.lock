@@ -753,7 +753,6 @@ name = "plain-models"
 version = "0.35.0"
 source = { editable = "plain-models" }
 dependencies = [
-    { name = "opentelemetry-semantic-conventions" },
     { name = "plain" },
     { name = "sqlparse" },
 ]
@@ -765,7 +764,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "opentelemetry-semantic-conventions", specifier = ">=0.55b1" },
     { name = "plain", editable = "plain" },
     { name = "sqlparse", specifier = ">=0.3.1" },
 ]
