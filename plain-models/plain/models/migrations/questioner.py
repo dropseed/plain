@@ -74,10 +74,6 @@ class MigrationQuestioner:
         """Was this model really renamed?"""
         return self.defaults.get("ask_rename_model", False)
 
-    def ask_merge(self, package_label):
-        """Should these migrations really be merged?"""
-        return self.defaults.get("ask_merge", False)
-
     def ask_auto_now_add_addition(self, field_name, model_name):
         """Adding an auto_now_add field to a model."""
         # None means quit
@@ -223,16 +219,6 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 old_model_state.package_label,
                 old_model_state.name,
                 new_model_state.name,
-            ),
-            default=False,
-        )
-
-    def ask_merge(self, package_label):
-        return self._boolean_input(
-            (
-                "\nMerging will only work if the operations printed above do not conflict\n"
-                "with each other (working on different fields or models)\n"
-                "Should these migration branches be merged?"
             ),
             default=False,
         )
