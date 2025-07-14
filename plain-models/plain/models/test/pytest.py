@@ -2,6 +2,7 @@ import re
 
 import pytest
 
+from plain.models.observability import suppress_db_tracing
 from plain.signals import request_finished, request_started
 
 from .. import transaction
@@ -60,29 +61,32 @@ def setup_db(request):
 def db(setup_db, request):
     if "isolated_db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
+
     # Set .cursor() back to the original implementation to unblock it
     BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
     if not db_connection.features.supports_transactions:
         pytest.fail("Database does not support transactions")
 
-    atomic = transaction.atomic()
-    atomic._from_testcase = True  # TODO remove this somehow?
-    atomic.__enter__()
+    with suppress_db_tracing():
+        atomic = transaction.atomic()
+        atomic._from_testcase = True  # TODO remove this somehow?
+        atomic.__enter__()
 
     yield
 
-    if (
-        db_connection.features.can_defer_constraint_checks
-        and not db_connection.needs_rollback
-        and db_connection.is_usable()
-    ):
-        db_connection.check_constraints()
+    with suppress_db_tracing():
+        if (
+            db_connection.features.can_defer_constraint_checks
+            and not db_connection.needs_rollback
+            and db_connection.is_usable()
+        ):
+            db_connection.check_constraints()
 
-    db_connection.set_rollback(True)
-    atomic.__exit__(None, None, None)
+        db_connection.set_rollback(True)
+        atomic.__exit__(None, None, None)
 
-    db_connection.close()
+        db_connection.close()
 
 
 @pytest.fixture
