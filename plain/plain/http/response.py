@@ -12,13 +12,14 @@ from http.client import responses
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse
 
-from plain import signals, signing
+from plain import signals
 from plain.exceptions import DisallowedRedirect
+from plain.http.cookie import sign_cookie_value
 from plain.json import PlainJSONEncoder
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.datastructures import CaseInsensitiveMapping
-from plain.utils.encoding import force_bytes, iri_to_uri
+from plain.utils.encoding import iri_to_uri
 from plain.utils.http import content_disposition_header, http_date
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -260,16 +261,8 @@ class ResponseBase:
     def set_signed_cookie(self, key, value, salt="", **kwargs):
         """Set a cookie signed with the SECRET_KEY."""
 
-        def _cookie_key(k):
-            return b"plain.http.cookies" + force_bytes(k)
-
-        signer = signing.TimestampSigner(
-            key=_cookie_key(settings.SECRET_KEY),
-            fallback_keys=map(_cookie_key, settings.SECRET_KEY_FALLBACKS),
-            salt=key + salt,
-        )
-        value = signer.sign(value)
-        return self.set_cookie(key, value, **kwargs)
+        signed_value = sign_cookie_value(key, value, salt)
+        return self.set_cookie(key, signed_value, **kwargs)
 
     def delete_cookie(self, key, path="/", domain=None, samesite=None):
         # Browsers can ignore the Set-Cookie header if the cookie doesn't use

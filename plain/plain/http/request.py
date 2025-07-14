@@ -13,6 +13,7 @@ from plain.exceptions import (
     RequestDataTooBig,
     TooManyFieldsSent,
 )
+from plain.http.cookie import unsign_cookie_value
 from plain.http.multipartparser import (
     MultiPartParser,
     MultiPartParserError,
@@ -426,6 +427,20 @@ class HttpRequest:
 
     def readlines(self):
         return list(self)
+
+    def get_signed_cookie(self, key, default=None, salt="", max_age=None):
+        """
+        Retrieve a cookie value signed with the SECRET_KEY.
+
+        Return default if the cookie doesn't exist or signature verification fails.
+        """
+
+        try:
+            cookie_value = self.cookies[key]
+        except KeyError:
+            return default
+
+        return unsign_cookie_value(key, cookie_value, salt, max_age, default)
 
 
 class HttpHeaders(CaseInsensitiveMapping):
