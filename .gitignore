@@ -18,3 +18,4 @@ plain*/tests/.plain
 .plain
 
 coverage.xml
+.vscode
