@@ -78,6 +78,15 @@ const plainToolbar = {
     }
     localStorage.setItem("plaintoolbar.tab", tabName);
   },
+  resetHeight: () => {
+    const content = document.querySelector(
+      "#plaintoolbar-details [data-resizer]",
+    )?.nextElementSibling;
+    if (content) {
+      content.style.height = "";
+      localStorage.removeItem("plaintoolbar.height");
+    }
+  },
 };
 
 // Render it hidden immediately if the user has hidden it before
@@ -94,6 +103,16 @@ window.addEventListener("load", () => {
     const lastTab = localStorage.getItem("plaintoolbar.tab");
     if (lastTab) {
       plainToolbar.showTab(lastTab);
+    }
+    // Restore custom height if it was set
+    const savedHeight = localStorage.getItem("plaintoolbar.height");
+    if (savedHeight) {
+      const content = document.querySelector(
+        "#plaintoolbar-details [data-resizer]",
+      )?.nextElementSibling;
+      if (content) {
+        content.style.height = savedHeight;
+      }
     }
   } else if (state === "0") {
     plainToolbar.collapse();
@@ -172,6 +191,8 @@ window.addEventListener("load", () => {
           isDragging = false;
           handle.style.cursor = "grab";
           document.body.style.userSelect = "";
+          // Save the new height to localStorage
+          localStorage.setItem("plaintoolbar.height", content.style.height);
         }
       });
     }
