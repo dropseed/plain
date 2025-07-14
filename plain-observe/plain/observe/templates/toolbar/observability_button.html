@@ -1,0 +1,49 @@
+{% if observer.is_enabled %}
+<form method="post" action="{{ url('observe:spans') }}" style="display: inline;">
+    <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
+    {% if observer.is_recording %}
+        {# Toggle from record to sample #}
+        <input type="hidden" name="observe_action" value="enable_sample">
+    {% else %}
+        {# Toggle from sample to record #}
+        <input type="hidden" name="observe_action" value="enable">
+    {% endif %}
+    <button
+        class="inline-flex items-center cursor-pointer text-xs rounded-full px-2 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"
+        type="submit"
+        data-toolbar-tab="Observability"
+        title="Toggle observability mode ({{ observer.mode }} mode){% if observer.get_current_trace_summary() %} - {{ observer.get_current_trace_summary() }}{% endif %} - Click to switch to {% if observer.is_recording %}sample{% else %}record{% endif %} mode">
+        {% if observer.is_sampling %}
+            <span class="relative inline-flex size-2 mr-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+                <span class="relative inline-flex size-2 rounded-full bg-green-500"></span>
+            </span>
+        {% elif observer.is_recording %}
+            <span class="relative inline-flex size-2 mr-2">
+                <span class="relative inline-flex size-2 rounded-full bg-yellow-500"></span>
+            </span>
+        {% endif %}
+        {% if observer.get_current_trace_summary() %}
+            <span class="font-mono">{{ observer.get_current_trace_summary() }}</span>
+        {% else %}
+            {% if observer.is_sampling %}Sampling{% elif observer.is_recording %}Recording{% else %}Observing{% endif %}
+        {% endif %}
+    </button>
+</form>
+{% else %}
+<form method="post" action="{{ url('observe:spans') }}" style="display: inline;">
+    <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
+    <input type="hidden" name="observe_action" value="enable">
+    <button
+        type="submit"
+        class="cursor-pointer text-xs rounded-full px-2 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"
+        title="Enable observability recording">
+        <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-1"></span>
+        {% if observer.get_current_trace_summary() %}
+        <span class="font-mono">{{ observer.get_current_trace_summary() }}</span>
+        {% else %}
+            Observe
+        {% endif %}
+    </button>
+</form>
+{% endif %}

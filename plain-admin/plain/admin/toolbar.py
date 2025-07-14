@@ -49,6 +49,7 @@ class Toolbar:
 class ToolbarPanel:
     name: str
     template_name: str
+    button_template_name: str = ""
 
     def __init__(self, request):
         self.request = request
@@ -60,6 +61,14 @@ class ToolbarPanel:
 
     def render(self):
         template = Template(self.template_name)
+        context = self.get_template_context()
+        return mark_safe(template.render(context))
+
+    def render_button(self):
+        """Render the toolbar button for the minimized state."""
+        if not self.button_template_name:
+            return ""
+        template = Template(self.button_template_name)
         context = self.get_template_context()
         return mark_safe(template.render(context))
 

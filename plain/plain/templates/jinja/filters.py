@@ -15,6 +15,25 @@ def localtime_filter(value, timezone=None):
     return localtime(value, timezone)
 
 
+def pluralize_filter(value, singular="", plural="s"):
+    """Returns plural suffix based on the value count.
+
+    Usage:
+        {{ count }} item{{ count|pluralize }}
+        {{ count }} ox{{ count|pluralize("en") }}
+        {{ count }} cact{{ count|pluralize("us","i") }}
+    """
+    try:
+        count = int(value)
+    except (ValueError, TypeError):
+        return singular
+
+    if count == 1:
+        return singular
+
+    return plural
+
+
 default_filters = {
     # The standard Python ones
     "strftime": datetime.datetime.strftime,
@@ -27,4 +46,5 @@ default_filters = {
     "timesince": timesince,
     "json_script": json_script,
     "islice": islice,  # slice for dict.items()
+    "pluralize": pluralize_filter,
 }

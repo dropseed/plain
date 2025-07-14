@@ -1,0 +1,11 @@
+{% extends "admin/detail.html" %}
+
+{% block content %}
+
+{{ super() }}
+
+<hr>
+<div class="mt-4">
+    {% include "observability/_trace_detail.html" %}
+</div>
+{% endblock %}

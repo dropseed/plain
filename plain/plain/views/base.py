@@ -41,16 +41,26 @@ class View:
     def as_view(cls, *init_args, **init_kwargs):
         def view(request, *url_args, **url_kwargs):
             with tracer.start_as_current_span(
-                f"View {cls.__name__}",
+                f"{cls.__name__}",
+                kind=trace.SpanKind.INTERNAL,
                 attributes={
-                    "view.class": cls.__name__,
-                    "view.url_args": url_args,
-                    # "view.url_kwargs": list(url_kwargs),  # can't be dict
+                    "code.function.name": "as_view",
+                    "code.namespace": f"{cls.__module__}.{cls.__qualname__}",
+                    "http.route": getattr(
+                        getattr(request, "resolver_match", None), "route", None
+                    ),
                 },
-            ):
-                v = cls(*init_args, **init_kwargs)
-                v.setup(request, *url_args, **url_kwargs)
-                return v.get_response()
+            ) as span:
+                try:
+                    v = cls(*init_args, **init_kwargs)
+                    v.setup(request, *url_args, **url_kwargs)
+                    response = v.get_response()
+                    span.set_status(trace.StatusCode.OK)
+                    return response
+                except Exception as e:
+                    span.record_exception(e)
+                    span.set_status(trace.StatusCode.ERROR, str(e))
+                    raise
 
         view.view_class = cls
 

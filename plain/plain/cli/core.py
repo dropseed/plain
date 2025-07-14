@@ -124,9 +124,15 @@ class PlainCommandCollection(click.CommandCollection):
                 "process.pid": str(os.getpid()),
                 # "process.command_args": sys.argv[1:],  # sensitive?
             },
-        ):
-            # process.exit.code
-            return super().main(*args, **kwargs)
+        ) as span:
+            try:
+                result = super().main(*args, **kwargs)
+                span.set_status(trace.StatusCode.OK)
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         cmd = super().get_command(ctx, cmd_name)

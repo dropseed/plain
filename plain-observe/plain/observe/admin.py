@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from plain.admin.toolbar import ToolbarPanel, register_toolbar_panel
 from plain.admin.views import (
     AdminModelDetailView,
@@ -6,6 +8,7 @@ from plain.admin.views import (
     register_viewset,
 )
 
+from .core import Observer
 from .models import Span, Trace
 
 
@@ -31,7 +34,15 @@ class TraceViewset(AdminViewset):
 
     class DetailView(AdminModelDetailView):
         model = Trace
-        # title = "Cached item"
+        template_name = "admin/observe/trace_detail.html"
+
+        def get_template_context(self):
+            context = super().get_template_context()
+            trace_id = self.url_kwargs["pk"]
+            context["trace"] = Trace.objects.get(pk=trace_id)
+            context["observability_enabled"] = True  # Always enabled in admin
+            context["show_delete_button"] = False
+            return context
 
 
 @register_viewset
@@ -77,3 +88,14 @@ class SpanViewset(AdminViewset):
 class ObservabilityToolbarPanel(ToolbarPanel):
     name = "Observability"
     template_name = "toolbar/observability.html"
+    button_template_name = "toolbar/observability_button.html"
+
+    @cached_property
+    def observer(self):
+        """Get the Observer instance for this request."""
+        return Observer(self.request)
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["observer"] = self.observer
+        return context

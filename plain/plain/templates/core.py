@@ -25,10 +25,20 @@ class Template:
 
     def render(self, context: dict) -> str:
         with tracer.start_as_current_span(
-            f"Template {self.filename}",
+            f"render {self.filename}",
+            kind=trace.SpanKind.INTERNAL,
             attributes={
+                "code.function.name": "render",
+                "code.namespace": f"{self.__class__.__module__}.{self.__class__.__qualname__}",
                 "template.filename": self.filename,
-                "template.context_keys": list(context.keys()),
+                "template.engine": "jinja2",
             },
-        ):
-            return self._jinja_template.render(context)
+        ) as span:
+            try:
+                result = self._jinja_template.render(context)
+                span.set_status(trace.StatusCode.OK)
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise

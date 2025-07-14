@@ -33,7 +33,6 @@ OAUTH_LOGIN_PROVIDERS = {}
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
     "plain.auth.middleware.AuthenticationMiddleware",
-    "plain.observe.middelware.ObserveMiddleware",
     "plain.admin.AdminMiddleware",
 ]
 

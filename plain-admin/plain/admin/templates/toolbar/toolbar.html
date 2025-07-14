@@ -68,6 +68,12 @@
                 </button>
                 {% endif %}
 
+                {% for panel in panels %}
+                {% if panel.button_template_name %}
+                {{ panel.render_button() }}
+                {% endif %}
+                {% endfor %}
+
                 <a href="{{ url('admin:index') }}" class="hover:underline">Admin</a>
 
                 {% include "toolbar/links.html" ignore missing %}
