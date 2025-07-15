@@ -2,7 +2,7 @@
 Core observability functionality and Observer class.
 """
 
-from .processor import get_span_processor
+from .processor import get_current_trace_summary
 
 
 class Observer:
@@ -21,8 +21,8 @@ class Observer:
 
     @property
     def is_enabled(self):
-        """Check if observability is enabled (either record or sample mode)."""
-        return self.mode in ("record", "sample")
+        """Check if observability is enabled (either view or sample mode)."""
+        return self.mode in ("view", "sample")
 
     @property
     def is_sampling(self):
@@ -30,14 +30,14 @@ class Observer:
         return self.mode == "sample"
 
     @property
-    def is_recording(self):
-        """Check if record-only mode is enabled."""
-        return self.mode == "record"
+    def is_viewing(self):
+        """Check if view-only mode is enabled."""
+        return self.mode == "view"
 
-    def enable_record_mode(self, response):
-        """Enable record-only mode (real-time monitoring, no DB export)."""
+    def enable_view_mode(self, response):
+        """Enable view-only mode (real-time monitoring, no DB export)."""
         response.set_signed_cookie(
-            self.COOKIE_NAME, "record", max_age=self.COOKIE_DURATION
+            self.COOKIE_NAME, "view", max_age=self.COOKIE_DURATION
         )
 
     def enable_sample_mode(self, response):
@@ -52,9 +52,4 @@ class Observer:
 
     def get_current_trace_summary(self):
         """Get performance summary string for the currently active trace."""
-
-        span_collector = get_span_processor()
-        if not span_collector:
-            return None
-
-        return span_collector.get_current_trace_summary()
+        return get_current_trace_summary()

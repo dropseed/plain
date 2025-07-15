@@ -1,10 +1,8 @@
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from plain.packages import PackageConfig, register_config
 
-from .exporter import ObserverExporter
 from .processor import ObserverSpanProcessor
 from .sampler import ObserverSampler
 
@@ -32,11 +30,8 @@ class Config(PackageConfig):
         sampler = ObserverSampler()
         provider = TracerProvider(sampler=sampler)
 
-        # Add the real-time span collector for immediate access
-        span_collector = ObserverSpanProcessor()
-        provider.add_span_processor(span_collector)
-
-        # Add the database exporter using SimpleSpanProcessor for immediate export
-        provider.add_span_processor(SimpleSpanProcessor(ObserverExporter()))
+        # Add our combined processor that handles both memory storage and export
+        observer_processor = ObserverSpanProcessor()
+        provider.add_span_processor(observer_processor)
 
         trace.set_tracer_provider(provider)

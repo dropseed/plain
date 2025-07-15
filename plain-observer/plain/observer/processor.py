@@ -1,138 +1,201 @@
+import logging
 import threading
+import time
 from collections import defaultdict
 
-from opentelemetry import trace
+import opentelemetry.context as context_api
+from opentelemetry import baggage, trace
 from opentelemetry.sdk.trace import SpanProcessor
+
+from plain.http.cookie import unsign_cookie_value
+
+from .exporter import ObserverExporter
+
+logger = logging.getLogger(__name__)
 
 
 def get_span_processor():
     """Get the span collector instance from the tracer provider."""
-    current_provider = trace.get_tracer_provider()
-    if not current_provider:
+    if not (current_provider := trace.get_tracer_provider()):
         return None
 
     # Look for ObserverSpanProcessor in the span processors
     # Check if the provider has a _active_span_processor attribute
     if hasattr(current_provider, "_active_span_processor"):
         # It's a composite processor, check its _span_processors
-        composite_processor = current_provider._active_span_processor
-        if hasattr(composite_processor, "_span_processors"):
-            for processor in composite_processor._span_processors:
-                if isinstance(processor, ObserverSpanProcessor):
-                    return processor
+        if composite_processor := current_provider._active_span_processor:
+            if hasattr(composite_processor, "_span_processors"):
+                for processor in composite_processor._span_processors:
+                    if isinstance(processor, ObserverSpanProcessor):
+                        return processor
 
     return None
 
 
+def get_current_trace_summary() -> str | None:
+    """Get performance summary for the currently active trace."""
+    if not (current_span := trace.get_current_span()):
+        return None
+
+    if not (processor := get_span_processor()):
+        return None
+
+    trace_id = format(current_span.get_span_context().trace_id, "032x")
+    return processor.get_trace_summary(trace_id)
+
+
 class ObserverSpanProcessor(SpanProcessor):
-    """Collects spans in real-time for current trace performance monitoring."""
+    """Collects spans in real-time for current trace performance monitoring.
+
+    This processor keeps spans in memory for traces that have the 'view' or 'sample'
+    cookie set. These spans can be accessed via get_current_trace_summary() for
+    real-time debugging. Spans with 'sample' cookie will also be persisted to the
+    database via the ObserverExporter.
+    """
 
     def __init__(self):
-        self.active_spans_by_trace = defaultdict(dict)  # trace_id -> {span_id: span}
-        self.completed_spans_by_trace = defaultdict(list)  # trace_id -> [spans]
-        self.lock = threading.Lock()
+        # Span storage
+        self._traces = defaultdict(
+            lambda: {
+                "active": {},  # span_id -> span
+                "completed": [],  # list of spans
+                "root_span_id": None,
+                "mode": None,
+                "should_keep": False,
+            }
+        )
+        self._traces_lock = threading.Lock()
+        self._exporter = ObserverExporter()
 
     def on_start(self, span, parent_context=None):
         """Called when a span starts."""
-        with self.lock:
-            trace_id = format(span.get_span_context().trace_id, "032x")
-            span_id = format(span.get_span_context().span_id, "016x")
-            self.active_spans_by_trace[trace_id][span_id] = span
+        trace_id = format(span.get_span_context().trace_id, "032x")
+        span_id = format(span.get_span_context().span_id, "016x")
+
+        with self._traces_lock:
+            trace_info = self._traces[trace_id]
+
+            # First span in trace - determine if we should keep it
+            if not trace_info["mode"]:
+                should_keep, mode = self._get_recording_decision(parent_context)
+                trace_info["should_keep"] = should_keep
+                trace_info["mode"] = mode
+
+                # Clean up old traces if too many
+                if len(self._traces) > 1000:
+                    # Remove oldest 100 traces
+                    oldest_ids = sorted(self._traces.keys())[:100]
+                    for old_id in oldest_ids:
+                        del self._traces[old_id]
+
+            # Store span if we're keeping this trace
+            if trace_info["should_keep"]:
+                trace_info["active"][span_id] = span
+
+                # Track root span
+                if not span.parent:
+                    trace_info["root_span_id"] = span_id
 
     def on_end(self, span):
         """Called when a span ends."""
-        with self.lock:
-            trace_id = format(span.get_span_context().trace_id, "032x")
-            span_id = format(span.get_span_context().span_id, "016x")
+        trace_id = format(span.get_span_context().trace_id, "032x")
+        span_id = format(span.get_span_context().span_id, "016x")
 
-            # Move from active to completed
-            if trace_id in self.active_spans_by_trace:
-                span_obj = self.active_spans_by_trace[trace_id].pop(span_id, None)
-                if span_obj:
-                    self.completed_spans_by_trace[trace_id].append(span_obj)
+        with self._traces_lock:
+            trace_info = self._traces.get(trace_id)
+            if not trace_info or not trace_info["should_keep"]:
+                return
 
-                # Clean up empty trace entries
-                if not self.active_spans_by_trace[trace_id]:
-                    del self.active_spans_by_trace[trace_id]
+            # Move span from active to completed
+            if span_obj := trace_info["active"].pop(span_id, None):
+                trace_info["completed"].append(span_obj)
 
-    def get_current_trace_summary(self):
-        """Get performance summary for the currently active trace."""
-        current_span = trace.get_current_span()
-        if not current_span:
-            # If no current span, check if we have any active traces at all
-            with self.lock:
-                if not self.active_spans_by_trace and not self.completed_spans_by_trace:
-                    return None
+            # Check if trace is complete (root span ended)
+            if span_id == trace_info["root_span_id"]:
+                # Export if in sample mode
+                if trace_info["mode"] == "sample" and trace_info["completed"]:
+                    logger.info(
+                        "Exporting %d spans for trace %s",
+                        len(trace_info["completed"]),
+                        trace_id,
+                    )
+                    self._exporter.export(trace_info["completed"])
 
-                # Get the most recent trace if we can't find current span
-                all_trace_ids = list(self.active_spans_by_trace.keys()) + list(
-                    self.completed_spans_by_trace.keys()
-                )
-                if not all_trace_ids:
-                    return None
-                trace_id = all_trace_ids[-1]  # Use most recent
-        else:
-            # Use the current span's trace
-            trace_id = format(current_span.get_span_context().trace_id, "032x")
+                # Clean up trace
+                del self._traces[trace_id]
 
-        with self.lock:
-            active_spans = list(self.active_spans_by_trace.get(trace_id, {}).values())
-            completed_spans = self.completed_spans_by_trace.get(trace_id, [])
-            all_spans = active_spans + completed_spans
-
-            if not all_spans:
+    def get_trace_summary(self, trace_id: str) -> str | None:
+        """Get performance summary for a specific trace."""
+        with self._traces_lock:
+            if (
+                not (trace_info := self._traces.get(trace_id))
+                or not trace_info["should_keep"]
+            ):
                 return None
 
-            # Calculate summary stats
-            db_queries = 0
+            # Combine active and completed spans
+            if not (
+                all_spans := list(trace_info["active"].values())
+                + trace_info["completed"]
+            ):
+                return None
+
+            # Calculate stats
             total_spans = len(all_spans)
-            earliest_start = None
-            latest_end = None
+            db_queries = sum(
+                1 for s in all_spans if s.attributes and s.attributes.get("db.system")
+            )
 
-            for span in all_spans:
-                # Count DB queries
-                if span.attributes and span.attributes.get("db.system"):
-                    db_queries += 1
+            # Calculate duration
+            start_times = [s.start_time for s in all_spans if s.start_time]
+            end_times = [s.end_time for s in all_spans if s.end_time]
 
-                # Calculate duration for completed spans
-                if span.end_time and span.start_time:
-                    if earliest_start is None or span.start_time < earliest_start:
-                        earliest_start = span.start_time
-
-                    if latest_end is None or span.end_time > latest_end:
-                        latest_end = span.end_time
-                elif span.start_time:
-                    # For active spans, track start time
-                    if earliest_start is None or span.start_time < earliest_start:
-                        earliest_start = span.start_time
-
-            # Calculate overall duration (for the whole trace)
             duration_ms = 0.0
-            if earliest_start and latest_end:
-                duration_ms = (latest_end - earliest_start) / 1_000_000  # ns to ms
-            elif earliest_start:
-                # If trace is still active, calculate duration so far
-                import time
+            if start_times:
+                earliest_start = min(start_times)
+                if end_times:
+                    latest_end = max(end_times)
+                    duration_ms = (latest_end - earliest_start) / 1_000_000
+                else:
+                    # Trace still active
+                    current_time_ns = int(time.time() * 1_000_000_000)
+                    duration_ms = (current_time_ns - earliest_start) / 1_000_000
 
-                current_time_ns = int(time.time() * 1_000_000_000)
-                duration_ms = (current_time_ns - earliest_start) / 1_000_000
-
-            # Build summary parts like the Trace model does
+            # Build summary
             parts = [f"{total_spans}sp"]
-
-            if db_queries > 0:
+            if db_queries:
                 parts.append(f"{db_queries}db")
-
-            if duration_ms > 0:
+            if duration_ms:
                 parts.append(f"{round(duration_ms, 1)}ms")
 
             return " ".join(parts)
 
+    def _get_recording_decision(self, parent_context=None) -> tuple[bool, str | None]:
+        """Determine if we should record this trace based on cookies."""
+        if not (context := parent_context or context_api.get_current()):
+            return False, None
+
+        if not (cookies := baggage.get_baggage("http.request.cookies", context)):
+            return False, None
+
+        if not (observer_cookie := cookies.get("observer")):
+            return False, None
+
+        try:
+            if (
+                mode := unsign_cookie_value("observer", observer_cookie, default=None)
+            ) in ("view", "sample"):
+                return True, mode
+        except Exception as e:
+            logger.warning("Failed to unsign observer cookie: %s", e)
+
+        return False, None
+
     def shutdown(self):
         """Cleanup when shutting down."""
-        with self.lock:
-            self.active_spans_by_trace.clear()
-            self.completed_spans_by_trace.clear()
+        with self._traces_lock:
+            self._traces.clear()
+        self._exporter.shutdown()
 
     def force_flush(self, timeout_millis=None):
         """Required by SpanProcessor interface."""

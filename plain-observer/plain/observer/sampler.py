@@ -1,5 +1,5 @@
+import logging
 import re
-import threading
 
 from opentelemetry import baggage
 from opentelemetry.sdk.trace import sampling
@@ -9,22 +9,20 @@ from opentelemetry.trace import SpanKind
 from plain.http.cookie import unsign_cookie_value
 from plain.runtime import settings
 
+logger = logging.getLogger(__name__)
+
 
 class ObserverSampler(sampling.Sampler):
-    """Drops traces based on request path or user role."""
+    """Samples traces based on request path and cookies."""
 
     def __init__(self):
-        # Custom parent-based sampler that properly handles RECORD_ONLY inheritance
+        # Custom parent-based sampler
         self._delegate = sampling.ParentBased(sampling.ALWAYS_OFF)
 
         # TODO ignore url namespace instead? admin, observer, assets
         self._ignore_url_paths = [
             re.compile(p) for p in settings.OBSERVER_IGNORE_URL_PATTERNS
         ]
-
-        # Track sampling decisions by trace ID
-        self._trace_decisions = {}  # trace_id -> Decision
-        self._lock = threading.Lock()
 
     def should_sample(
         self,
@@ -46,32 +44,22 @@ class ObserverSampler(sampling.Sampler):
                             attributes=attributes,
                         )
 
-        # Check if we already have a decision for this trace
-        with self._lock:
-            if trace_id in self._trace_decisions:
-                decision = self._trace_decisions[trace_id]
-                return sampling.SamplingResult(
-                    decision,
-                    attributes=attributes,
-                )
-
-        # For new traces, check cookies in the context
+        # If no processor decision, check cookies directly for root spans
         decision = None
         if parent_context:
-            # Check cookies for root spans
+            # Check cookies for sampling decision
             if cookies := baggage.get_baggage("http.request.cookies", parent_context):
                 if observer_cookie := cookies.get("observer"):
                     unsigned_value = unsign_cookie_value(
                         "observer", observer_cookie, default=False
                     )
 
-                    if unsigned_value == "sample":
+                    if unsigned_value in ("sample", "view"):
+                        # Always use RECORD_AND_SAMPLE so ParentBased works correctly
+                        # The exporter will check the span attribute to decide whether to export
                         decision = sampling.Decision.RECORD_AND_SAMPLE
-                    elif unsigned_value == "record":
-                        decision = sampling.Decision.RECORD_ONLY
-
-                if decision is None:
-                    decision = sampling.Decision.DROP
+                    else:
+                        decision = sampling.Decision.DROP
 
         # If no decision from cookies, use default
         if decision is None:
@@ -85,15 +73,6 @@ class ObserverSampler(sampling.Sampler):
                 trace_state=trace_state,
             )
             decision = result.decision
-
-        # Store the decision for this trace
-        with self._lock:
-            self._trace_decisions[trace_id] = decision
-            # Clean up old entries if too many (simple LRU)
-            if len(self._trace_decisions) > 1000:
-                # Remove oldest entries
-                for old_trace_id in list(self._trace_decisions.keys())[:100]:
-                    del self._trace_decisions[old_trace_id]
 
         return sampling.SamplingResult(
             decision,

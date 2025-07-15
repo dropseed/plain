@@ -43,9 +43,9 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, TemplateView):
         return context
 
     def htmx_post_enable(self):
-        """Enable record-only mode via HTMX."""
+        """Enable view-only mode via HTMX."""
         response = Response(self.get_template().render(self.get_template_context()))
-        self.observer.enable_record_mode(response)
+        self.observer.enable_view_mode(response)
         return response
 
     def htmx_post_enable_sample(self):
@@ -90,14 +90,13 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, TemplateView):
         observe_action = self.request.data["observe_action"]
 
         response = ResponseRedirect(self.request.data.get("redirect_url", "."))
-        observer = self.observer
 
         if observe_action == "enable":
-            observer.enable_record_mode(response)  # Default to record mode
+            self.observer.enable_view_mode(response)  # Default to view mode
         elif observe_action == "enable_sample":
-            observer.enable_sample_mode(response)
+            self.observer.enable_sample_mode(response)
         elif observe_action == "disable":
-            observer.disable(response)
+            self.observer.disable(response)
 
         # Redirect back to the page that submitted the form
         return response

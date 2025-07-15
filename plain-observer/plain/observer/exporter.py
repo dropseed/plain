@@ -12,89 +12,97 @@ logger = logging.getLogger(__name__)
 class ObserverExporter(SpanExporter):
     """Exporter that writes spans into the observe models tables.
 
-    Note: This should only receive spans with RECORD_AND_SAMPLE sampling decision.
-    Spans with RECORD_ONLY should not reach this exporter.
+    This exporter only receives spans that have been sampled (RECORD_AND_SAMPLE decision).
+    Spans that are only being viewed in real-time are kept in memory by the ObserverSpanProcessor.
     """
 
     def export(self, spans):
-        """Persist each span individually for immediate export."""
+        """Persist spans in bulk for a completed trace."""
 
         from .models import Span, Trace
 
+        if not spans:
+            return True
+
         with suppress_db_tracing():
-            for span in spans:
-                try:
-                    # Format IDs according to W3C Trace Context specification
-                    trace_id_hex = format(span.get_span_context().trace_id, "032x")
+            try:
+                # Get trace information from the first span
+                first_span = spans[0]
+                trace_id_hex = format(first_span.get_span_context().trace_id, "032x")
+
+                # Find trace boundaries and root span info
+                earliest_start = None
+                latest_end = None
+                root_span = None
+                request_id = ""
+                user_id = ""
+                session_id = ""
+
+                for span in spans:
+                    if span.start_time and (
+                        earliest_start is None or span.start_time < earliest_start
+                    ):
+                        earliest_start = span.start_time
+                    if span.end_time and (
+                        latest_end is None or span.end_time > latest_end
+                    ):
+                        latest_end = span.end_time
+
+                    # Get trace-level attributes from root span
+                    if not span.parent:
+                        root_span = span
+                        if span.attributes:
+                            request_id = span.attributes.get("plain.request.id", "")
+                            user_id = span.attributes.get("user.id", "")
+                            session_id = span.attributes.get("session.id", "")
+
+                # Convert timestamps
+                start_time = (
+                    datetime.fromtimestamp(earliest_start / 1_000_000_000, tz=UTC)
+                    if earliest_start
+                    else None
+                )
+                end_time = (
+                    datetime.fromtimestamp(latest_end / 1_000_000_000, tz=UTC)
+                    if latest_end
+                    else None
+                )
+
+                # Create or update trace
+                trace, created = Trace.objects.update_or_create(
+                    trace_id=trace_id_hex,
+                    defaults={
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "request_id": request_id,
+                        "user_id": user_id,
+                        "session_id": session_id,
+                        "description": root_span.name if root_span else "",
+                    },
+                )
+
+                # Prepare span objects for bulk creation
+                span_objs = []
+                for span in spans:
                     span_id_hex = format(span.get_span_context().span_id, "016x")
                     parent_id_hex = (
                         format(span.parent.span_id, "016x") if span.parent else ""
                     )
 
-                    # Extract attributes directly
-                    attributes = dict(span.attributes) if span.attributes else {}
-                    request_id = attributes.get("plain.request.id", "")
-                    user_id = attributes.get("user.id", "")
-                    session_id = attributes.get("session.id", "")
-
-                    # Set description for root spans
-                    description = span.name if not parent_id_hex else ""
-
-                    # Convert timestamps from nanoseconds to datetime
-                    start_time = (
+                    # Convert timestamps
+                    span_start = (
                         datetime.fromtimestamp(span.start_time / 1_000_000_000, tz=UTC)
                         if span.start_time
                         else None
                     )
-                    end_time = (
+                    span_end = (
                         datetime.fromtimestamp(span.end_time / 1_000_000_000, tz=UTC)
                         if span.end_time
                         else None
                     )
 
-                    # Get or create the trace
-                    trace, created = Trace.objects.get_or_create(
-                        trace_id=trace_id_hex,
-                        defaults={
-                            "start_time": start_time,
-                            "end_time": end_time,
-                            "request_id": request_id,
-                            "user_id": user_id,
-                            "session_id": session_id,
-                            "description": description,
-                        },
-                    )
-
-                    # Update trace if we have better data
-                    if not created:
-                        updated = False
-                        if start_time and (
-                            not trace.start_time or start_time < trace.start_time
-                        ):
-                            trace.start_time = start_time
-                            updated = True
-                        if end_time and (
-                            not trace.end_time or end_time > trace.end_time
-                        ):
-                            trace.end_time = end_time
-                            updated = True
-                        if request_id and not trace.request_id:
-                            trace.request_id = request_id
-                            updated = True
-                        if user_id and not trace.user_id:
-                            trace.user_id = user_id
-                            updated = True
-                        if session_id and not trace.session_id:
-                            trace.session_id = session_id
-                            updated = True
-                        if description and not trace.description:
-                            trace.description = description
-                            updated = True
-                        if updated:
-                            trace.save()
-
-                    # Extract span kind directly from the span object
-                    kind_str = span.kind.name if span.kind else "INTERNAL"
+                    # Extract attributes
+                    attributes = dict(span.attributes) if span.attributes else {}
 
                     # Convert events to JSON format
                     events_json = []
@@ -104,11 +112,9 @@ class ObserverExporter(SpanExporter):
                                 {
                                     "name": event.name,
                                     "timestamp": event.timestamp,
-                                    "attributes": (
-                                        dict(event.attributes)
-                                        if event.attributes
-                                        else {}
-                                    ),
+                                    "attributes": dict(event.attributes)
+                                    if event.attributes
+                                    else {},
                                 }
                             )
 
@@ -124,57 +130,58 @@ class ObserverExporter(SpanExporter):
                                         ),
                                         "span_id": format(link.context.span_id, "016x"),
                                     },
-                                    "attributes": (
-                                        dict(link.attributes) if link.attributes else {}
-                                    ),
+                                    "attributes": dict(link.attributes)
+                                    if link.attributes
+                                    else {},
                                 }
                             )
 
-                    # Create the span
-                    Span.objects.get_or_create(
-                        trace=trace,
-                        span_id=span_id_hex,
-                        defaults={
-                            "name": span.name,
-                            "kind": kind_str,
-                            "parent_id": parent_id_hex,
-                            "start_time": start_time,
-                            "end_time": end_time,
-                            "status": {
-                                "status_code": (
-                                    span.status.status_code.name
-                                    if span.status
-                                    else "UNSET"
-                                ),
+                    span_objs.append(
+                        Span(
+                            trace=trace,
+                            span_id=span_id_hex,
+                            name=span.name,
+                            kind=span.kind.name if span.kind else "INTERNAL",
+                            parent_id=parent_id_hex,
+                            start_time=span_start,
+                            end_time=span_end,
+                            status={
+                                "status_code": span.status.status_code.name
+                                if span.status
+                                else "UNSET",
                                 "description": span.status.description
                                 if span.status
                                 else "",
                             },
-                            "context": {
+                            context={
                                 "trace_id": trace_id_hex,
                                 "span_id": span_id_hex,
                                 "trace_flags": span.get_span_context().trace_flags,
-                                "trace_state": (
-                                    dict(span.get_span_context().trace_state)
-                                    if span.get_span_context().trace_state
-                                    else {}
-                                ),
+                                "trace_state": dict(span.get_span_context().trace_state)
+                                if span.get_span_context().trace_state
+                                else {},
                             },
-                            "attributes": attributes,
-                            "events": events_json,
-                            "links": links_json,
-                            "resource": (
-                                dict(span.resource.attributes) if span.resource else {}
-                            ),
-                        },
+                            attributes=attributes,
+                            events=events_json,
+                            links=links_json,
+                            resource=dict(span.resource.attributes)
+                            if span.resource
+                            else {},
+                        )
                     )
 
-                except Exception as e:
-                    logger.warning(
-                        "Failed to export span to database: %s",
-                        e,
-                        exc_info=True,
-                    )
+                # Bulk create spans
+                logger.info(
+                    "Bulk creating %d spans for trace %s", len(span_objs), trace_id_hex
+                )
+                Span.objects.bulk_create(span_objs)
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to export trace to database: %s",
+                    e,
+                    exc_info=True,
+                )
 
             # Delete oldest traces if we exceed the limit
             try:
