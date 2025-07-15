@@ -1,3 +1,0 @@
-# plain.observe
-
-**Monitor.**

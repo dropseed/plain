@@ -21,7 +21,7 @@ INSTALLED_PACKAGES = [
     "plain.tailwind",
     "plain.worker",
     "plain.redirection",
-    "plain.observe",
+    "plain.observer",
     "app.users",
 ]
 

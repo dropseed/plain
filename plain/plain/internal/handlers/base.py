@@ -74,22 +74,6 @@ class BaseHandler:
         }
         span_context = baggage.set_baggage("http.request.cookies", request.cookies)
 
-        # Set sampling decision in baggage for child spans to inherit
-        if observe_cookie := request.cookies.get("observe"):
-            from plain.http.cookie import unsign_cookie_value
-
-            unsigned_value = unsign_cookie_value(
-                "observe", observe_cookie, default=False
-            )
-            if unsigned_value == "sample":
-                span_context = baggage.set_baggage(
-                    "plain.sampling.decision", "RECORD_AND_SAMPLE", span_context
-                )
-            elif unsigned_value == "record":
-                span_context = baggage.set_baggage(
-                    "plain.sampling.decision", "RECORD_ONLY", span_context
-                )
-
         with tracer.start_as_current_span(
             f"{request.method} {request.path_info}",
             context=span_context,
@@ -145,6 +129,7 @@ class BaseHandler:
 
         span = trace.get_current_span()
         span.set_attribute(http_attributes.HTTP_ROUTE, resolver_match.route)
+
         # Route makes a better name
         if resolver_match.route:
             span.update_name(f"{request.method} {resolver_match.route}")

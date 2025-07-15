@@ -63,7 +63,7 @@ dev-dependencies = [
 "plain-upgrade" = { workspace = true }
 "plain-vendor" = { workspace = true }
 "plain-worker" = { workspace = true }
-"plain-observe" = { workspace = true }
+"plain-observer" = { workspace = true }
 
 [tool.uv.workspace]
 members = [

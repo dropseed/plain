@@ -20,7 +20,7 @@ members = [
     "plain-loginlink",
     "plain-models",
     "plain-oauth",
-    "plain-observe",
+    "plain-observer",
     "plain-pages",
     "plain-pageviews",
     "plain-passwords",
@@ -578,7 +578,7 @@ dependencies = [
     { name = "plain-loginlink" },
     { name = "plain-models" },
     { name = "plain-oauth" },
-    { name = "plain-observe" },
+    { name = "plain-observer" },
     { name = "plain-pages" },
     { name = "plain-pageviews" },
     { name = "plain-passwords" },
@@ -609,7 +609,7 @@ requires-dist = [
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-models", editable = "plain-models" },
     { name = "plain-oauth", editable = "plain-oauth" },
-    { name = "plain-observe", editable = "plain-observe" },
+    { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
     { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
@@ -801,9 +801,9 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
-name = "plain-observe"
+name = "plain-observer"
 version = "0.1.0"
-source = { editable = "plain-observe" }
+source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "plain" },
