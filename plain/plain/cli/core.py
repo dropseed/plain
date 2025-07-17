@@ -1,4 +1,5 @@
 import os
+import sys
 import traceback
 
 import click
@@ -119,24 +120,18 @@ class PlainCommandCollection(click.CommandCollection):
         Wrap the CLI invocation in an OpenTelemetry span to mark the start of a trace.
         """
         tracer = trace.get_tracer("plain")
+
+        command = "plain" if len(sys.argv) < 2 else f"plain {sys.argv[1]}"
+
         with tracer.start_as_current_span(
-            "plain",
+            command,
             kind=trace.SpanKind.INTERNAL,
             attributes={
                 PROCESS_EXECUTABLE_NAME: "plain",
-                # "process.executable.path": sys.executable,
-                PROCESS_PID: os.getpid(),  # This should be an int, not a string
-                # "process.command_args": sys.argv[1:],  # sensitive?
+                PROCESS_PID: os.getpid(),
             },
-        ) as span:
-            try:
-                result = super().main(*args, **kwargs)
-                span.set_status(trace.StatusCode.OK)
-                return result
-            except Exception as e:
-                span.record_exception(e)
-                span.set_status(trace.StatusCode.ERROR, str(e))
-                raise
+        ):
+            super().main(*args, **kwargs)
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         cmd = super().get_command(ctx, cmd_name)

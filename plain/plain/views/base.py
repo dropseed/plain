@@ -51,21 +51,13 @@ class View:
                 attributes={
                     CODE_FUNCTION_NAME: "as_view",
                     CODE_NAMESPACE: f"{cls.__module__}.{cls.__qualname__}",
-                    HTTP_ROUTE: getattr(
-                        getattr(request, "resolver_match", None), "route", None
-                    ),
                 },
             ) as span:
-                try:
-                    v = cls(*init_args, **init_kwargs)
-                    v.setup(request, *url_args, **url_kwargs)
-                    response = v.get_response()
-                    span.set_status(trace.StatusCode.OK)
-                    return response
-                except Exception as e:
-                    span.record_exception(e)
-                    span.set_status(trace.StatusCode.ERROR, str(e))
-                    raise
+                v = cls(*init_args, **init_kwargs)
+                v.setup(request, *url_args, **url_kwargs)
+                response = v.get_response()
+                span.set_status(trace.StatusCode.OK if response.status_code < 400 else trace.StatusCode.ERROR)
+                return response
 
         view.view_class = cls
 
