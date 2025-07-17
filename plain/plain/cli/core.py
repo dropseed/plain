@@ -118,7 +118,7 @@ class PlainCommandCollection(click.CommandCollection):
         """
         Wrap the CLI invocation in an OpenTelemetry span to mark the start of a trace.
         """
-        tracer = trace.get_tracer(__name__)
+        tracer = trace.get_tracer("plain")
         with tracer.start_as_current_span(
             "plain",
             kind=trace.SpanKind.INTERNAL,

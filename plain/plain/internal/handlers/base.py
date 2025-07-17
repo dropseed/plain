@@ -29,7 +29,7 @@ BUILTIN_AFTER_MIDDLEWARE = [
 ]
 
 
-tracer = trace.get_tracer(__name__)
+tracer = trace.get_tracer("plain")
 
 
 class BaseHandler:

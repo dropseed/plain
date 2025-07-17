@@ -40,7 +40,7 @@ from .models import Job, JobRequest, JobResult, JobResultStatuses
 from .registry import jobs_registry
 
 logger = logging.getLogger("plain.worker")
-tracer = trace.get_tracer(__name__)
+tracer = trace.get_tracer("plain.worker")
 
 
 class Worker:

@@ -7,7 +7,7 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
 
 from .jinja import environment
 
-tracer = trace.get_tracer(__name__)
+tracer = trace.get_tracer("plain")
 
 
 class TemplateFileMissing(Exception):

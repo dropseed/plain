@@ -23,7 +23,7 @@ from .exceptions import ResponseException
 logger = logging.getLogger("plain.request")
 
 
-tracer = trace.get_tracer(__name__)
+tracer = trace.get_tracer("plain")
 
 
 class View:

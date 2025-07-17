@@ -26,7 +26,7 @@ from plain.utils import timezone
 from .registry import JobParameters, jobs_registry
 
 logger = logging.getLogger(__name__)
-tracer = trace.get_tracer(__name__)
+tracer = trace.get_tracer("plain.worker")
 
 
 class JobType(type):
