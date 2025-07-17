@@ -1,14 +1,7 @@
-import os
-import sys
 import traceback
 
 import click
 from click.core import Command, Context
-from opentelemetry import trace
-from opentelemetry.semconv._incubating.attributes.process_attributes import (
-    PROCESS_EXECUTABLE_NAME,
-    PROCESS_PID,
-)
 
 import plain.runtime
 from plain.exceptions import ImproperlyConfigured
@@ -114,24 +107,6 @@ class PlainCommandCollection(click.CommandCollection):
         super().__init__(*args, **kwargs)
 
         self.sources = sources
-
-    def main(self, *args, **kwargs):
-        """
-        Wrap the CLI invocation in an OpenTelemetry span to mark the start of a trace.
-        """
-        tracer = trace.get_tracer("plain")
-
-        command = "plain" if len(sys.argv) < 2 else f"plain {sys.argv[1]}"
-
-        with tracer.start_as_current_span(
-            command,
-            kind=trace.SpanKind.INTERNAL,
-            attributes={
-                PROCESS_EXECUTABLE_NAME: "plain",
-                PROCESS_PID: os.getpid(),
-            },
-        ):
-            super().main(*args, **kwargs)
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         cmd = super().get_command(ctx, cmd_name)
