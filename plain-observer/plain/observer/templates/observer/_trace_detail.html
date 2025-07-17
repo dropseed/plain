@@ -1,60 +1,94 @@
 <!-- Reusable trace detail visualization -->
 {% if trace %}
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold">Trace: {{ trace.description }}</h2>
-        {% if show_delete_button|default(true) %}
-        <button
-            hx-delete="?trace_id={{ trace.id }}"
-            plain-hx-action="trace"
-            hx-swap="morph:innerHTML"
-            hx-target="#main-content"
-            class="flex items-center space-x-1 px-2 py-1 text-xs rounded-sm bg-red-600 text-white hover:bg-red-700 cursor-pointer"
-            title="Delete this trace">
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
-                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
-            </svg>
-            <span>Delete</span>
-        </button>
+    <div class="flex items-center justify-between mb-3">
+        <div>
+            <h2 class="text-lg font-semibold">{{ trace.root_span_name }}</h2>
+            <div class="text-xs text-stone-500 mt-1">
+                {{ trace.start_time|localtime|strftime("%b %-d, %-I:%M %p") }} • {{ "%.1f"|format(trace.duration_ms() or 0) }}ms
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button
+                onclick="copyTraceAsJson('{{ trace.id }}', this)"
+                class="p-1.5 rounded-sm bg-stone-700 text-stone-300 hover:bg-stone-600 cursor-pointer transition-colors"
+                title="Copy trace data as JSON">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                    <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                </svg>
+            </button>
+            {% if show_delete_button|default(true) %}
+            <button
+                hx-delete="?trace_id={{ trace.id }}"
+                plain-hx-action="trace"
+                hx-swap="morph:innerHTML"
+                hx-target="#main-content"
+                hx-confirm="Delete this trace?"
+                class="p-1.5 rounded-sm bg-stone-700 text-stone-300 hover:bg-red-600 hover:text-white cursor-pointer transition-colors"
+                title="Delete this trace">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                </svg>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500 mb-4">
+        <div>
+            <span class="text-stone-400">Trace ID:</span> <span class="font-mono">{{ trace.trace_id }}</span>
+        </div>
+        {% if trace.request_id %}
+        <div>
+            <span class="text-stone-400">Request:</span> <span class="font-mono">{{ trace.request_id }}</span>
+        </div>
         {% endif %}
-    </div>
-    <div class="text-sm text-stone-400 mb-2">
-        <span class="font-semibold">Trace ID:</span> {{ trace.trace_id }}
-        <span class="ml-4">{{ trace.start_time|localtime|strftime("%b %-d, %-I:%M %p") }}</span>
-    </div>
-    <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm">
+        {% if trace.user_id %}
         <div>
-            <span class="text-stone-400">Duration:</span> {{ "%.2f"|format(trace.duration_ms()) }}ms
+            <span class="text-stone-400">User:</span> {{ trace.user_id }}
         </div>
+        {% endif %}
+        {% if trace.session_id %}
         <div>
-            <span class="text-stone-400">Request ID:</span> {{ trace.request_id }}
+            <span class="text-stone-400">Session:</span> {{ trace.session_id }}
         </div>
-        <div>
-            <span class="text-stone-400">Session:</span> {{ trace.session_id or 'None' }}
-        </div>
-        <div>
-            <span class="text-stone-400">User:</span> {{ trace.user_id or 'Anonymous' }}
-        </div>
+        {% endif %}
     </div>
 
     <!-- Spans waterfall visualization -->
     <div class="mt-4 space-y-1 text-xs">
-        {% set ns = namespace(indent=0) %}
-        {% for span in trace.spans.all().order_by("start_time") %}
+        {# Build parent-child relationships and calculate indentation levels #}
+        {% set all_spans = trace.spans.all().order_by("start_time") %}
+        {% set span_levels = {} %}
+        {% set span_dict = {} %}
 
-        {% if not span.parent_id %}
-        {% set ns.indent = 0 %}
-        {% elif loop.changed(span.parent_id) %}
-        {% set ns.indent = ns.indent + 1 %}
-        {% endif %}
+        {# First pass: create span dictionary for easy lookup #}
+        {% for span in all_spans %}
+            {% set _ = span_dict.update({span.span_id: span}) %}
+        {% endfor %}
+
+        {# Second pass: calculate indentation level for each span #}
+        {% for span in all_spans %}
+            {% if not span.parent_id %}
+                {# Root span - level 0 #}
+                {% set _ = span_levels.update({span.span_id: 0}) %}
+            {% else %}
+                {# Find parent's level and add 1 #}
+                {% set parent_level = span_levels.get(span.parent_id, 0) %}
+                {% set _ = span_levels.update({span.span_id: parent_level + 1}) %}
+            {% endif %}
+        {% endfor %}
+
+        {% for span in all_spans %}
 
         <!-- Calculate relative positioning for waterfall -->
         {% set span_start_offset = ((span.start_time - trace.start_time).total_seconds() * 1000) %}
-        {% set span_duration = span.duration_ms() %}
+        {% set span_duration = span.duration_ms() or 0 %}
         {% set start_percent = (span_start_offset / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 %}
         {% set width_percent = (span_duration / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 %}
+        {% set indent_level = span_levels.get(span.span_id, 0) %}
 
-        <div style="padding-left: {{ ns.indent * 1 }}rem;" class="border-l border-stone-700">
+        <div style="padding-left: {{ indent_level * 1 }}rem;" class="border-l border-stone-700">
             <details id="{{ trace.id }}-span-{{ loop.index }}" class="rounded bg-white/5 hover:bg-white/10 transition-colors min-w-[600px]">
                 <summary class="cursor-pointer p-2 list-none [&::-webkit-details-marker]:hidden">
                     <div class="flex items-center">
@@ -136,6 +170,10 @@
                             <h4 class="text-sm font-semibold text-stone-300 mb-3">Basic Information</h4>
                             <div class="space-y-2 text-xs">
                                 <div class="flex">
+                                    <span class="text-stone-400 w-20">ID:</span>
+                                    <span class="text-stone-200 font-mono">{{ span.span_id }}</span>
+                                </div>
+                                <div class="flex">
                                     <span class="text-stone-400 w-20">Name:</span>
                                     <span class="text-stone-200">{{ span.name }}</span>
                                 </div>
@@ -153,7 +191,7 @@
                                 </div>
                                 <div class="flex">
                                     <span class="text-stone-400 w-20">Duration:</span>
-                                    <span class="text-stone-200">{{ "%.2f"|format(span.duration_ms()) }}ms</span>
+                                    <span class="text-stone-200">{{ "%.2f"|format(span.duration_ms() or 0) }}ms</span>
                                 </div>
                                 {% if span.parent_id %}
                                 <div class="flex">
@@ -175,15 +213,15 @@
                                     <span class="text-stone-400 w-20">Ended:</span>
                                     <span class="text-stone-200">{{ span.end_time|localtime|strftime("%-I:%M:%S.%f %p") }}</span>
                                 </div>
-                                {% if span.status and span.status.status_code != 'UNSET' %}
+                                {% if span.status and span.status != '' and span.status != 'UNSET' %}
                                 <div class="flex">
                                     <span class="text-stone-400 w-20">Status:</span>
                                     <span class="px-2 py-0.5 rounded text-xs font-medium
-                                               {% if span.status.status_code == 'ERROR' %}bg-red-500/20 text-red-300
-                                               {% elif span.status.status_code == 'OK' %}bg-green-500/20 text-green-300
+                                               {% if span.status == 'ERROR' %}bg-red-500/20 text-red-300
+                                               {% elif span.status == 'OK' %}bg-green-500/20 text-green-300
                                                {% else %}bg-yellow-500/20 text-yellow-300
                                                {% endif %}">
-                                        {{ span.status.status_code }}
+                                        {{ span.status }}
                                     </span>
                                 </div>
                                 {% endif %}
@@ -265,9 +303,28 @@
         {% endfor %}
     </div>
 {% else %}
-    <div class="text-center text-stone-400 py-12">
-        <p class="text-lg mb-2">Select a trace from the sidebar to view details</p>
-        <p class="text-sm">Click on any trace in the list to see its spans and timeline</p>
+    <div class="flex items-center justify-center min-h-[50vh]">
+        <div class="text-center max-w-md">
+            <!-- Icon -->
+            <div class="mb-4 flex justify-center">
+                <div class="p-3 bg-stone-800/30 rounded-full">
+                    <svg width="32" height="32" fill="currentColor" class="text-stone-500" viewBox="0 0 16 16">
+                        <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Message -->
+            <h3 class="text-base font-medium text-stone-300 mb-2">No Trace Selected</h3>
+            <p class="text-sm text-stone-400 mb-4">
+                Select a trace from the sidebar to view its detailed span timeline and performance metrics.
+            </p>
+
+            <!-- Keyboard shortcut hint -->
+            <div class="text-xs text-stone-500">
+                <p>Navigate traces using ↑ ↓ arrow keys</p>
+            </div>
+        </div>
     </div>
 {% endif %}
 
@@ -277,3 +334,33 @@
         transform: rotate(90deg);
     }
 </style>
+
+<script>
+async function copyTraceAsJson(traceId, button) {
+    try {
+        const response = await fetch(`?trace_id=${traceId}&format=json`);
+        const data = await response.json();
+
+        // Pretty print the JSON
+        const jsonString = JSON.stringify(data, null, 2);
+
+        // Copy to clipboard
+        await navigator.clipboard.writeText(jsonString);
+
+        // Show success feedback
+        const originalText = button.querySelector('span').textContent;
+        button.querySelector('span').textContent = 'Copied!';
+        button.classList.remove('bg-stone-700', 'hover:bg-stone-600');
+        button.classList.add('bg-green-600', 'hover:bg-green-700');
+
+        setTimeout(() => {
+            button.querySelector('span').textContent = originalText;
+            button.classList.remove('bg-green-600', 'hover:bg-green-700');
+            button.classList.add('bg-stone-700', 'hover:bg-stone-600');
+        }, 2000);
+    } catch (error) {
+        console.error('Failed to copy trace data:', error);
+        alert('Failed to copy trace data. See console for details.');
+    }
+}
+</script>

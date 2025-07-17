@@ -4,6 +4,10 @@ import traceback
 import click
 from click.core import Command, Context
 from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.process_attributes import (
+    PROCESS_EXECUTABLE_NAME,
+    PROCESS_PID,
+)
 
 import plain.runtime
 from plain.exceptions import ImproperlyConfigured
@@ -119,9 +123,9 @@ class PlainCommandCollection(click.CommandCollection):
             "plain",
             kind=trace.SpanKind.INTERNAL,
             attributes={
-                "process.executable.name": "plain",
+                PROCESS_EXECUTABLE_NAME: "plain",
                 # "process.executable.path": sys.executable,
-                "process.pid": str(os.getpid()),
+                PROCESS_PID: os.getpid(),  # This should be an int, not a string
                 # "process.command_args": sys.argv[1:],  # sensitive?
             },
         ) as span:

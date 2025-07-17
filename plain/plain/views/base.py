@@ -2,6 +2,11 @@ import logging
 from http import HTTPMethod
 
 from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.code_attributes import (
+    CODE_FUNCTION_NAME,
+    CODE_NAMESPACE,
+)
+from opentelemetry.semconv.attributes.http_attributes import HTTP_ROUTE
 
 from plain.http import (
     HttpRequest,
@@ -44,9 +49,9 @@ class View:
                 f"{cls.__name__}",
                 kind=trace.SpanKind.INTERNAL,
                 attributes={
-                    "code.function.name": "as_view",
-                    "code.namespace": f"{cls.__module__}.{cls.__qualname__}",
-                    "http.route": getattr(
+                    CODE_FUNCTION_NAME: "as_view",
+                    CODE_NAMESPACE: f"{cls.__module__}.{cls.__qualname__}",
+                    HTTP_ROUTE: getattr(
                         getattr(request, "resolver_match", None), "route", None
                     ),
                 },

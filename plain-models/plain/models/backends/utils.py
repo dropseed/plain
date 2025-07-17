@@ -7,9 +7,7 @@ from contextlib import contextmanager
 from hashlib import md5
 
 from plain.models.db import NotSupportedError
-
-# OpenTelemetry observability helpers (centralised).
-from plain.models.observability import db_span
+from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
 
 logger = logging.getLogger("plain.models.backends")

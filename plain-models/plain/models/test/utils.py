@@ -1,5 +1,5 @@
 from plain.models import db_connection
-from plain.models.observability import suppress_db_tracing
+from plain.models.otel import suppress_db_tracing
 
 
 def setup_database(*, verbosity, prefix=""):

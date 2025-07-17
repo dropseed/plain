@@ -40,7 +40,6 @@ class TraceViewset(AdminViewset):
             context = super().get_template_context()
             trace_id = self.url_kwargs["pk"]
             context["trace"] = Trace.objects.get(pk=trace_id)
-            context["observability_enabled"] = True  # Always enabled in admin
             context["show_delete_button"] = False
             return context
 
@@ -53,6 +52,7 @@ class SpanViewset(AdminViewset):
         fields = [
             "name",
             "kind",
+            "status",
             "span_id",
             "parent_id",
             "start_time",

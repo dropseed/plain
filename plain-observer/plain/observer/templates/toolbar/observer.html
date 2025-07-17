@@ -8,6 +8,20 @@
     var container = document.getElementById('observer-traces');
     var loaded = false;
     var parent = container.parentNode;
+    var observerMode = "{{ observer.mode() }}";
+
+    // Auto-enable summary mode if no mode is set
+    if (!observerMode || observerMode === "None") {
+        var form = new FormData();
+        form.append('observe_action', 'enable');
+
+        fetch("{{ url('observer:traces') }}", {
+            method: 'POST',
+            body: form,
+            credentials: 'same-origin'
+        });
+    }
+
     var observer = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
             if (entry.isIntersecting && !loaded) {

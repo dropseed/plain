@@ -5,13 +5,16 @@ from typing import Any
 from opentelemetry import context as otel_context
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
+    DB_USER,
+)
+from opentelemetry.semconv.attributes.db_attributes import (
     DB_COLLECTION_NAME,
     DB_NAMESPACE,
     DB_OPERATION_BATCH_SIZE,
     DB_OPERATION_NAME,
     DB_QUERY_SUMMARY,
     DB_QUERY_TEXT,
-    DB_SYSTEM,
+    DB_SYSTEM_NAME,
 )
 from opentelemetry.semconv.attributes.network_attributes import (
     NETWORK_PEER_ADDRESS,
@@ -26,7 +29,7 @@ tracer = trace.get_tracer("plain.models")
 
 
 def db_system_for(vendor: str) -> str:  # noqa: D401 – simple helper
-    """Return the canonical ``db.system`` value for a backend vendor."""
+    """Return the canonical ``db.system.name`` value for a backend vendor."""
 
     return {
         "postgresql": DbSystemValues.POSTGRESQL.value,
@@ -114,7 +117,7 @@ def db_span(db, sql: Any, *, many: bool = False, batch_size: int | None = None):
 
     # Build attribute set following semantic conventions
     attrs: dict[str, Any] = {
-        DB_SYSTEM: db_system_for(db.vendor),
+        DB_SYSTEM_NAME: db_system_for(db.vendor),
         DB_NAMESPACE: db.settings_dict.get("NAME"),
         DB_QUERY_TEXT: sql,  # Already parameterized from Django/Plain
         DB_QUERY_SUMMARY: summary,
@@ -125,9 +128,9 @@ def db_span(db, sql: Any, *, many: bool = False, batch_size: int | None = None):
     if collection_name:
         attrs[DB_COLLECTION_NAME] = collection_name
 
-    # Add user attribute (following newer conventions)
+    # Add user attribute
     if user := db.settings_dict.get("USER"):
-        attrs["db.user"] = user
+        attrs[DB_USER] = user
 
     # Network attributes
     if host := db.settings_dict.get("HOST"):

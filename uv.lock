@@ -464,7 +464,6 @@ dependencies = [
     { name = "plain-auth" },
     { name = "plain-htmx" },
     { name = "plain-tailwind" },
-    { name = "sqlparse" },
 ]
 
 [package.dev-dependencies]
@@ -478,7 +477,6 @@ requires-dist = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
-    { name = "sqlparse", specifier = ">=0.2.2" },
 ]
 
 [package.metadata.requires-dev]
@@ -807,9 +805,7 @@ source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "plain" },
-    { name = "plain-auth" },
-    { name = "plain-tailwind" },
-    { name = "sqlparse" },
+    { name = "plain-admin" },
 ]
 
 [package.dev-dependencies]
@@ -821,9 +817,7 @@ dev = [
 requires-dist = [
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
     { name = "plain", editable = "plain" },
-    { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-tailwind", editable = "plain-tailwind" },
-    { name = "sqlparse", specifier = ">=0.2.2" },
+    { name = "plain-admin", editable = "plain-admin" },
 ]
 
 [package.metadata.requires-dev]

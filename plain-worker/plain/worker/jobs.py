@@ -2,12 +2,31 @@ import datetime
 import inspect
 import logging
 
+from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.code_attributes import (
+    CODE_FILEPATH,
+    CODE_LINENO,
+)
+from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
+    MESSAGING_DESTINATION_NAME,
+    MESSAGING_MESSAGE_BODY_SIZE,
+    MESSAGING_MESSAGE_ENVELOPE_SIZE,
+    MESSAGING_MESSAGE_ID,
+    MESSAGING_OPERATION_NAME,
+    MESSAGING_OPERATION_TYPE,
+    MESSAGING_SYSTEM,
+    MessagingOperationTypeValues,
+)
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
+from opentelemetry.trace import SpanKind
+
 from plain.models import IntegrityError
 from plain.utils import timezone
 
 from .registry import JobParameters, jobs_registry
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 class JobType(type):
@@ -40,65 +59,105 @@ class Job(metaclass=JobType):
     ):
         from .models import JobRequest
 
-        try:
-            # Try to automatically annotate the source of the job
-            caller = inspect.stack()[1]
-            source = f"{caller.filename}:{caller.lineno}"
-        except (IndexError, AttributeError):
-            source = ""
+        job_class_name = jobs_registry.get_job_class_name(self.__class__)
 
-        parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
-
-        if queue is None:
-            queue = self.get_queue()
-
-        if priority is None:
-            priority = self.get_priority()
-
-        if retries is None:
-            retries = self.get_retries()
-
-        if delay is None:
-            start_at = None
-        elif isinstance(delay, int):
-            start_at = timezone.now() + datetime.timedelta(seconds=delay)
-        elif isinstance(delay, datetime.timedelta):
-            start_at = timezone.now() + delay
-        elif isinstance(delay, datetime.datetime):
-            start_at = delay
-        else:
-            raise ValueError(f"Invalid delay: {delay}")
-
-        if unique_key is None:
-            unique_key = self.get_unique_key()
-
-        if unique_key:
-            # Only need to look at in progress jobs
-            # if we also have a unique key.
-            # Otherwise it's up to the user to use _in_progress()
-            if running := self._in_progress(unique_key):
-                return running
-
-        try:
-            job_request = JobRequest(
-                job_class=jobs_registry.get_job_class_name(self.__class__),
-                parameters=parameters,
-                start_at=start_at,
-                source=source,
-                queue=queue,
-                priority=priority,
-                retries=retries,
-                retry_attempt=retry_attempt,
-                unique_key=unique_key,
+        with tracer.start_as_current_span(
+            f"send {queue or self.get_queue()}", kind=SpanKind.PRODUCER
+        ) as span:
+            span.set_attributes(
+                {
+                    MESSAGING_SYSTEM: "plain.worker",
+                    MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.SEND.value,
+                    MESSAGING_OPERATION_NAME: "send",
+                }
             )
-            job_request.save(
-                clean_and_validate=False
-            )  # So IntegrityError is raised on unique instead of potentially confusing ValidationError...
-            return job_request
-        except IntegrityError as e:
-            logger.warning("Job already in progress: %s", e)
-            # Try to return the _in_progress list again
-            return self._in_progress(unique_key)
+
+            try:
+                # Try to automatically annotate the source of the job
+                caller = inspect.stack()[1]
+                source = f"{caller.filename}:{caller.lineno}"
+                span.set_attributes(
+                    {
+                        CODE_FILEPATH: caller.filename,
+                        CODE_LINENO: caller.lineno,
+                    }
+                )
+            except (IndexError, AttributeError):
+                source = ""
+
+            parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
+
+            if queue is None:
+                queue = self.get_queue()
+
+            if priority is None:
+                priority = self.get_priority()
+
+            if retries is None:
+                retries = self.get_retries()
+
+            if delay is None:
+                start_at = None
+            elif isinstance(delay, int):
+                start_at = timezone.now() + datetime.timedelta(seconds=delay)
+            elif isinstance(delay, datetime.timedelta):
+                start_at = timezone.now() + delay
+            elif isinstance(delay, datetime.datetime):
+                start_at = delay
+            else:
+                raise ValueError(f"Invalid delay: {delay}")
+
+            if unique_key is None:
+                unique_key = self.get_unique_key()
+
+            span.set_attributes(
+                {
+                    MESSAGING_DESTINATION_NAME: queue,
+                    MESSAGING_MESSAGE_BODY_SIZE: len(str(parameters))
+                    if parameters
+                    else 0,
+                }
+            )
+
+            if unique_key:
+                # Only need to look at in progress jobs
+                # if we also have a unique key.
+                # Otherwise it's up to the user to use _in_progress()
+                if running := self._in_progress(unique_key):
+                    span.set_attribute(ERROR_TYPE, "DuplicateJob")
+                    return running
+
+            try:
+                job_request = JobRequest(
+                    job_class=job_class_name,
+                    parameters=parameters,
+                    start_at=start_at,
+                    source=source,
+                    queue=queue,
+                    priority=priority,
+                    retries=retries,
+                    retry_attempt=retry_attempt,
+                    unique_key=unique_key,
+                )
+                job_request.save(
+                    clean_and_validate=False
+                )  # So IntegrityError is raised on unique instead of potentially confusing ValidationError...
+
+                span.set_attributes(
+                    {
+                        MESSAGING_MESSAGE_ID: str(job_request.uuid),
+                        MESSAGING_MESSAGE_ENVELOPE_SIZE: len(job_request.parameters)
+                        if job_request.parameters
+                        else 0,
+                    }
+                )
+                return job_request
+            except IntegrityError as e:
+                span.set_attribute(ERROR_TYPE, "IntegrityError")
+                span.set_status(trace.Status(trace.StatusCode.ERROR, "Duplicate job"))
+                logger.warning("Job already in progress: %s", e)
+                # Try to return the _in_progress list again
+                return self._in_progress(unique_key)
 
     def _in_progress(self, unique_key):
         """Get all JobRequests and Jobs that are currently in progress, regardless of queue."""

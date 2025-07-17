@@ -2,7 +2,7 @@ from functools import cached_property
 
 from plain.auth.views import AuthViewMixin
 from plain.htmx.views import HTMXViewMixin
-from plain.http import Response, ResponseRedirect
+from plain.http import JsonResponse, Response, ResponseRedirect
 from plain.runtime import settings
 from plain.views import TemplateView
 
@@ -42,20 +42,30 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, TemplateView):
             context["trace"] = context["traces"].first()
         return context
 
-    def htmx_post_enable(self):
-        """Enable view-only mode via HTMX."""
+    def get(self):
+        # Check if JSON format is requested
+        if self.request.query_params.get("format") == "json":
+            if trace_id := self.request.query_params.get("trace_id"):
+                if trace := Trace.objects.filter(id=trace_id).first():
+                    return JsonResponse(trace.as_dict())
+            return JsonResponse({"error": "Trace not found"}, status=404)
+
+        return super().get()
+
+    def htmx_post_enable_summary(self):
+        """Enable summary mode via HTMX."""
         response = Response(self.get_template().render(self.get_template_context()))
-        self.observer.enable_view_mode(response)
+        self.observer.enable_summary_mode(response)
         return response
 
-    def htmx_post_enable_sample(self):
-        """Enable full sampling mode via HTMX."""
+    def htmx_post_enable_persist(self):
+        """Enable full persist mode via HTMX."""
         response = Response(self.get_template().render(self.get_template_context()))
-        self.observer.enable_sample_mode(response)
+        self.observer.enable_persist_mode(response)
         return response
 
     def htmx_post_disable(self):
-        """Disable observability via HTMX."""
+        """Disable observer via HTMX."""
         response = Response(self.get_template().render(self.get_template_context()))
         self.observer.disable(response)
         return response
@@ -92,9 +102,9 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, TemplateView):
         response = ResponseRedirect(self.request.data.get("redirect_url", "."))
 
         if observe_action == "enable":
-            self.observer.enable_view_mode(response)  # Default to view mode
-        elif observe_action == "enable_sample":
-            self.observer.enable_sample_mode(response)
+            self.observer.enable_summary_mode(response)  # Default to summary mode
+        elif observe_action == "enable_persist":
+            self.observer.enable_persist_mode(response)
         elif observe_action == "disable":
             self.observer.disable(response)
 

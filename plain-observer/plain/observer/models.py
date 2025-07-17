@@ -1,7 +1,13 @@
+import json
 from datetime import UTC, datetime
 from functools import cached_property
 
 import sqlparse
+from opentelemetry.semconv._incubating.attributes import (
+    exception_attributes,
+    session_attributes,
+    user_attributes,
+)
 from opentelemetry.semconv.attributes import db_attributes
 
 from plain import models
@@ -10,10 +16,10 @@ from plain import models
 @models.register_model
 class Trace(models.Model):
     trace_id = models.CharField(max_length=255)
-    start_time = models.DateTimeField(allow_null=True, required=False)
-    end_time = models.DateTimeField(allow_null=True, required=False)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
 
-    description = models.TextField(default="", required=False)
+    root_span_name = models.TextField(default="", required=False)
 
     # Plain fields
     request_id = models.CharField(max_length=255, default="", required=False)
@@ -33,32 +39,122 @@ class Trace(models.Model):
         return self.trace_id
 
     def duration_ms(self):
-        if self.start_time and self.end_time:
-            return (self.end_time - self.start_time).total_seconds() * 1000
-        return None
+        return (self.end_time - self.start_time).total_seconds() * 1000
 
-    def get_summary(self):
-        """Get a concise summary string for toolbar display."""
-        spans = self.spans.all()
+    def get_trace_summary(self, spans=None):
+        """Get a concise summary string for toolbar display.
 
-        if not spans.exists():
+        Args:
+            spans: Optional list of span objects. If not provided, will query from database.
+        """
+        # Get spans from database if not provided
+        if spans is None:
+            spans = list(self.spans.all())
+
+        if not spans:
             return ""
 
-        total_spans = spans.count()
-        db_queries = spans.filter(attributes__has_key="db.system").count()
+        # Count database queries and track duplicates
+        query_counts = {}
+        db_queries = 0
 
-        # Build summary parts
-        parts = [f"{total_spans}sp"]
+        for span in spans:
+            if span.attributes.get(db_attributes.DB_SYSTEM_NAME):
+                db_queries += 1
+                if query_text := span.attributes.get(db_attributes.DB_QUERY_TEXT):
+                    query_counts[query_text] = query_counts.get(query_text, 0) + 1
 
+        # Count duplicate queries (queries that appear more than once)
+        duplicate_count = sum(count - 1 for count in query_counts.values() if count > 1)
+
+        # Build summary: "n spans, n queries (n duplicates), Xms"
+        parts = []
+
+        # Queries count with duplicates
         if db_queries > 0:
-            parts.append(f"{db_queries}db")
+            query_part = f"{db_queries} quer{'y' if db_queries == 1 else 'ies'}"
+            if duplicate_count > 0:
+                query_part += f" ({duplicate_count} duplicate{'' if duplicate_count == 1 else 's'})"
+            parts.append(query_part)
 
-        # Add duration if available
-        duration_ms = self.duration_ms()
-        if duration_ms is not None:
+        # Duration
+        if (duration_ms := self.duration_ms()) is not None:
             parts.append(f"{round(duration_ms, 1)}ms")
 
-        return " ".join(parts)
+        return " • ".join(parts)
+
+    @classmethod
+    def from_opentelemetry_spans(cls, spans):
+        """Create a Trace instance from a list of OpenTelemetry spans."""
+        # Get trace information from the first span
+        first_span = spans[0]
+        trace_id = f"0x{first_span.get_span_context().trace_id:032x}"
+
+        # Find trace boundaries and root span info
+        earliest_start = None
+        latest_end = None
+        root_span = None
+        request_id = ""
+        user_id = ""
+        session_id = ""
+
+        for span in spans:
+            if not span.parent:
+                root_span = span
+
+            if span.start_time and (
+                earliest_start is None or span.start_time < earliest_start
+            ):
+                earliest_start = span.start_time
+            # Only update latest_end if the span has actually ended
+            if span.end_time and (latest_end is None or span.end_time > latest_end):
+                latest_end = span.end_time
+
+            # For OpenTelemetry spans, access attributes directly
+            span_attrs = getattr(span, "attributes", {})
+            request_id = request_id or span_attrs.get("plain.request.id", "")
+            user_id = user_id or span_attrs.get(user_attributes.USER_ID, "")
+            session_id = session_id or span_attrs.get(session_attributes.SESSION_ID, "")
+
+        # Convert timestamps
+        start_time = (
+            datetime.fromtimestamp(earliest_start / 1_000_000_000, tz=UTC)
+            if earliest_start
+            else None
+        )
+        end_time = (
+            datetime.fromtimestamp(latest_end / 1_000_000_000, tz=UTC)
+            if latest_end
+            else None
+        )
+
+        # Create trace instance
+        # Note: end_time might be None if there are active spans
+        # This is OK since this trace is only used for summaries, not persistence
+        return cls(
+            trace_id=trace_id,
+            start_time=start_time,
+            end_time=end_time
+            or start_time,  # Use start_time as fallback for active traces
+            request_id=request_id,
+            user_id=user_id,
+            session_id=session_id,
+            root_span_name=root_span.name if root_span else "",
+        )
+
+    def as_dict(self):
+        spans = [span.span_data for span in self.spans.all().order_by("start_time")]
+
+        return {
+            "trace_id": self.trace_id,
+            "start_time": self.start_time.isoformat(),
+            "end_time": self.end_time.isoformat(),
+            "duration_ms": self.duration_ms(),
+            "request_id": self.request_id,
+            "user_id": self.user_id,
+            "session_id": self.session_id,
+            "spans": spans,
+        }
 
 
 @models.register_model
@@ -70,14 +166,10 @@ class Span(models.Model):
     name = models.CharField(max_length=255)
     kind = models.CharField(max_length=50)
     parent_id = models.CharField(max_length=255, default="", required=False)
-    start_time = models.DateTimeField(allow_null=True, required=False)
-    end_time = models.DateTimeField(allow_null=True, required=False)
-    status = models.JSONField(default=dict)
-    context = models.JSONField(default=dict)
-    attributes = models.JSONField(default=dict, required=False)
-    events = models.JSONField(default=list, required=False)
-    links = models.JSONField(default=list, required=False)
-    resource = models.JSONField(default=dict, required=False)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    status = models.CharField(max_length=50, default="", required=False)
+    span_data = models.JSONField(default=dict, required=False)
 
     class Meta:
         ordering = ["-start_time"]
@@ -93,8 +185,56 @@ class Span(models.Model):
             models.Index(fields=["start_time"]),
         ]
 
+    @classmethod
+    def from_opentelemetry_span(cls, otel_span, trace):
+        """Create a Span instance from an OpenTelemetry span."""
+
+        span_data = json.loads(otel_span.to_json())
+
+        # Extract status code as string, default to empty string if unset
+        status = ""
+        if span_data.get("status") and span_data["status"].get("status_code"):
+            status = span_data["status"]["status_code"]
+
+        return cls(
+            trace=trace,
+            span_id=span_data["context"]["span_id"],
+            name=span_data["name"],
+            kind=span_data["kind"][len("SpanKind.") :],
+            parent_id=span_data["parent_id"] or "",
+            start_time=span_data["start_time"],
+            end_time=span_data["end_time"],
+            status=status,
+            span_data=span_data,
+        )
+
     def __str__(self):
         return self.span_id
+
+    @property
+    def attributes(self):
+        """Get attributes from span_data."""
+        return self.span_data.get("attributes", {})
+
+    @property
+    def events(self):
+        """Get events from span_data."""
+        return self.span_data.get("events", [])
+
+    @property
+    def links(self):
+        """Get links from span_data."""
+        return self.span_data.get("links", [])
+
+    @property
+    def resource(self):
+        """Get resource from span_data."""
+        return self.span_data.get("resource", {})
+
+    @property
+    def context(self):
+        """Get context from span_data."""
+        return self.span_data.get("context", {})
 
     def duration_ms(self):
         if self.start_time and self.end_time:
@@ -111,7 +251,7 @@ class Span(models.Model):
     @cached_property
     def sql_query(self):
         """Get the SQL query if this span contains one."""
-        return self.attributes.get("db.query.text")
+        return self.attributes.get(db_attributes.DB_QUERY_TEXT)
 
     def get_formatted_sql(self):
         """Get the pretty-formatted SQL query if this span contains one."""
@@ -153,5 +293,7 @@ class Span(models.Model):
 
         for event in self.events:
             if event.get("name") == "exception" and event.get("attributes"):
-                return event["attributes"].get("exception.stacktrace")
+                return event["attributes"].get(
+                    exception_attributes.EXCEPTION_STACKTRACE
+                )
         return None

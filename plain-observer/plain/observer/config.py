@@ -3,8 +3,7 @@ from opentelemetry.sdk.trace import TracerProvider
 
 from plain.packages import PackageConfig, register_config
 
-from .processor import ObserverSpanProcessor
-from .sampler import ObserverSampler
+from .otel import ObserverSampler, ObserverSpanProcessor
 
 
 @register_config

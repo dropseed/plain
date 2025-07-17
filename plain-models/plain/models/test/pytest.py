@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from plain.models.observability import suppress_db_tracing
+from plain.models.otel import suppress_db_tracing
 from plain.signals import request_finished, request_started
 
 from .. import transaction

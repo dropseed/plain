@@ -1,4 +1,5 @@
 from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.user_attributes import USER_ID
 
 from plain import auth
 from plain.exceptions import ImproperlyConfigured
@@ -9,7 +10,7 @@ def get_user(request):
     if not hasattr(request, "_cached_user"):
         request._cached_user = auth.get_user(request)
         if request._cached_user:
-            trace.get_current_span().set_attribute("user.id", request._cached_user.id)
+            trace.get_current_span().set_attribute(USER_ID, request._cached_user.id)
     return request._cached_user
 
 

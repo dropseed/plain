@@ -6,6 +6,29 @@ import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
 
+from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.code_attributes import (
+    CODE_FUNCTION_NAME,
+    CODE_NAMESPACE,
+)
+from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
+    MESSAGING_BATCH_MESSAGE_COUNT,
+    MESSAGING_CONSUMER_GROUP_NAME,
+    MESSAGING_DESTINATION_NAME,
+    MESSAGING_MESSAGE_BODY_SIZE,
+    MESSAGING_MESSAGE_CONVERSATION_ID,
+    MESSAGING_MESSAGE_ID,
+    MESSAGING_OPERATION_NAME,
+    MESSAGING_OPERATION_TYPE,
+    MESSAGING_SYSTEM,
+    MessagingOperationTypeValues,
+)
+from opentelemetry.semconv._incubating.attributes.process_attributes import (
+    PROCESS_PID,
+)
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
+from opentelemetry.trace import SpanKind
+
 from plain import models
 from plain.models import transaction
 from plain.runtime import settings
@@ -17,6 +40,7 @@ from .models import Job, JobRequest, JobResult, JobResultStatuses
 from .registry import jobs_registry
 
 logger = logging.getLogger("plain.worker")
+tracer = trace.get_tracer(__name__)
 
 
 class Worker:
@@ -86,35 +110,54 @@ class Worker:
                 time.sleep(0.1)
                 continue
 
-            with transaction.atomic():
-                job_request = (
-                    JobRequest.objects.select_for_update(skip_locked=True)
-                    .filter(
-                        queue__in=self.queues,
+            with tracer.start_as_current_span(
+                "receive job_queue",
+                kind=SpanKind.CLIENT,
+                attributes={
+                    MESSAGING_SYSTEM: "plain.worker",
+                    MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.RECEIVE.value,
+                    MESSAGING_OPERATION_NAME: "receive",
+                },
+            ) as span:
+                with transaction.atomic():
+                    job_request = (
+                        JobRequest.objects.select_for_update(skip_locked=True)
+                        .filter(
+                            queue__in=self.queues,
+                        )
+                        .filter(
+                            models.Q(start_at__isnull=True)
+                            | models.Q(start_at__lte=timezone.now())
+                        )
+                        .order_by("priority", "-start_at", "-created_at")
+                        .first()
                     )
-                    .filter(
-                        models.Q(start_at__isnull=True)
-                        | models.Q(start_at__lte=timezone.now())
+                    if not job_request:
+                        # Potentially no jobs to process (who knows for how long)
+                        # but sleep for a second to give the CPU and DB a break
+                        time.sleep(1)
+                        continue
+
+                    span.set_attributes(
+                        {
+                            MESSAGING_DESTINATION_NAME: job_request.queue,
+                            MESSAGING_MESSAGE_ID: str(job_request.uuid),
+                            MESSAGING_MESSAGE_BODY_SIZE: len(job_request.parameters)
+                            if job_request.parameters
+                            else 0,
+                        }
                     )
-                    .order_by("priority", "-start_at", "-created_at")
-                    .first()
-                )
-                if not job_request:
-                    # Potentially no jobs to process (who knows for how long)
-                    # but sleep for a second to give the CPU and DB a break
-                    time.sleep(1)
-                    continue
 
-                logger.info(
-                    'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queues="%s"',
-                    job_request.job_class,
-                    job_request.uuid,
-                    job_request.priority,
-                    job_request.source,
-                    job_request.queue,
-                )
+                    logger.info(
+                        'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queues="%s"',
+                        job_request.job_class,
+                        job_request.uuid,
+                        job_request.priority,
+                        job_request.source,
+                        job_request.queue,
+                    )
 
-                job = job_request.convert_to_job()
+                    job = job_request.convert_to_job()
 
             job_uuid = str(job.uuid)  # Make a str copy
 
@@ -176,34 +219,37 @@ class Worker:
         check_every = 60  # Only need to check once every 60 seconds
 
         if now - self._jobs_schedule_checked_at > check_every:
-            for job, schedule in self.jobs_schedule:
-                next_start_at = schedule.next()
-
-                # Leverage the unique_key to prevent duplicate scheduled
-                # jobs with the same start time (also works if unique_key == "")
-                schedule_unique_key = (
-                    f"{job.get_unique_key()}:scheduled:{int(next_start_at.timestamp())}"
+            with tracer.start_as_current_span("worker.schedule_jobs") as span:
+                span.set_attribute(
+                    MESSAGING_BATCH_MESSAGE_COUNT, len(self.jobs_schedule)
                 )
 
-                # Drawback here is if scheduled job is running, and detected by unique_key
-                # so it doesn't schedule the next one? Maybe an ok downside... prevents
-                # overlapping executions...?
-                result = job.run_in_worker(
-                    delay=next_start_at,
-                    unique_key=schedule_unique_key,
-                )
-                # Results are a list if it found scheduled/running jobs...
-                if not isinstance(result, list):
-                    logger.info(
-                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s" job_unique_key="%s"',
-                        result.job_class,
-                        result.queue,
-                        result.start_at,
-                        schedule,
-                        result.unique_key,
+                for job, schedule in self.jobs_schedule:
+                    next_start_at = schedule.next()
+
+                    # Leverage the unique_key to prevent duplicate scheduled
+                    # jobs with the same start time (also works if unique_key == "")
+                    schedule_unique_key = f"{job.get_unique_key()}:scheduled:{int(next_start_at.timestamp())}"
+
+                    # Drawback here is if scheduled job is running, and detected by unique_key
+                    # so it doesn't schedule the next one? Maybe an ok downside... prevents
+                    # overlapping executions...?
+                    result = job.run_in_worker(
+                        delay=next_start_at,
+                        unique_key=schedule_unique_key,
                     )
+                    # Results are a list if it found scheduled/running jobs...
+                    if not isinstance(result, list):
+                        logger.info(
+                            'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s" job_unique_key="%s"',
+                            result.job_class,
+                            result.queue,
+                            result.start_at,
+                            schedule,
+                            result.unique_key,
+                        )
 
-            self._jobs_schedule_checked_at = now
+                self._jobs_schedule_checked_at = now
 
     def log_stats(self):
         try:
@@ -227,9 +273,11 @@ class Worker:
 
     def rescue_job_results(self):
         """Find any lost or failed jobs on this worker's queues and handle them."""
-        # TODO return results and log them if there are any?
-        Job.objects.filter(queue__in=self.queues).mark_lost_jobs()
-        JobResult.objects.filter(queue__in=self.queues).retry_failed_jobs()
+        with tracer.start_as_current_span("worker.rescue_jobs"):
+            # Queue information is already in the messaging destination attributes
+            # TODO return results and log them if there are any?
+            Job.objects.filter(queue__in=self.queues).mark_lost_jobs()
+            JobResult.objects.filter(queue__in=self.queues).retry_failed_jobs()
 
 
 def future_finished_callback(job_uuid: str, future: Future):
@@ -242,59 +290,97 @@ def future_finished_callback(job_uuid: str, future: Future):
 
 
 def process_job(job_uuid):
-    try:
-        worker_pid = os.getpid()
+    with tracer.start_as_current_span("process job", kind=SpanKind.CONSUMER) as span:
+        try:
+            worker_pid = os.getpid()
+            span.set_attributes(
+                {
+                    MESSAGING_SYSTEM: "plain.worker",
+                    MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
+                    MESSAGING_OPERATION_NAME: "process",
+                    MESSAGING_MESSAGE_ID: job_uuid,
+                    PROCESS_PID: worker_pid,
+                }
+            )
 
-        request_started.send(sender=None)
+            request_started.send(sender=None)
 
-        job = Job.objects.get(uuid=job_uuid)
+            job = Job.objects.get(uuid=job_uuid)
 
-        logger.info(
-            'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queue="%s"',
-            worker_pid,
-            job.job_class,
-            job.job_request_uuid,
-            job.priority,
-            job.source,
-            job.queue,
-        )
+            span.set_attributes(
+                {
+                    MESSAGING_DESTINATION_NAME: job.queue,
+                    MESSAGING_CONSUMER_GROUP_NAME: job.queue,  # Workers consume from specific queues
+                    CODE_NAMESPACE: job.job_class,
+                }
+            )
 
-        def middleware_chain(job):
-            return job.run()
+            logger.info(
+                'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queue="%s"',
+                worker_pid,
+                job.job_class,
+                job.job_request_uuid,
+                job.priority,
+                job.source,
+                job.queue,
+            )
 
-        for middleware_path in reversed(settings.WORKER_MIDDLEWARE):
-            middleware_class = import_string(middleware_path)
-            middleware_instance = middleware_class(middleware_chain)
-            middleware_chain = middleware_instance
+            def middleware_chain(job):
+                with tracer.start_as_current_span(
+                    f"job.run.{job.job_class}"
+                ) as job_span:
+                    job_span.set_attributes(
+                        {
+                            CODE_FUNCTION_NAME: "run",
+                            CODE_NAMESPACE: job.job_class,
+                        }
+                    )
+                    return job.run()
 
-        job_result = middleware_chain(job)
+            for middleware_path in reversed(settings.WORKER_MIDDLEWARE):
+                middleware_class = import_string(middleware_path)
+                middleware_instance = middleware_class(middleware_chain)
+                middleware_chain = middleware_instance
 
-        # Release it now
-        del job
+            job_result = middleware_chain(job)
 
-        duration = job_result.ended_at - job_result.started_at
-        duration = duration.total_seconds()
+            # Release it now
+            del job
 
-        logger.info(
-            'Completed job worker_pid=%s job_class=%s job_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s',
-            worker_pid,
-            job_result.job_class,
-            job_result.job_uuid,
-            job_result.job_request_uuid,
-            job_result.uuid,
-            job_result.priority,
-            job_result.source,
-            job_result.queue,
-            duration,
-        )
+            duration = job_result.ended_at - job_result.started_at
+            duration = duration.total_seconds()
 
-        del job_result
-    except Exception as e:
-        # Raising exceptions inside the worker process doesn't
-        # seem to be caught/shown anywhere as configured.
-        # So we at least log it out here.
-        # (A job should catch it's own user-code errors, so this is for library errors)
-        logger.exception(e)
-    finally:
-        request_finished.send(sender=None)
-        gc.collect()
+            span.set_attributes(
+                {
+                    MESSAGING_MESSAGE_CONVERSATION_ID: str(
+                        job_result.job_request_uuid
+                    ),  # Links back to original request
+                }
+            )
+
+            logger.info(
+                'Completed job worker_pid=%s job_class=%s job_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s',
+                worker_pid,
+                job_result.job_class,
+                job_result.job_uuid,
+                job_result.job_request_uuid,
+                job_result.uuid,
+                job_result.priority,
+                job_result.source,
+                job_result.queue,
+                duration,
+            )
+
+            del job_result
+        except Exception as e:
+            # Raising exceptions inside the worker process doesn't
+            # seem to be caught/shown anywhere as configured.
+            # So we at least log it out here.
+            # (A job should catch it's own user-code errors, so this is for library errors)
+            span.record_exception(e)
+            span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+            span.set_attribute(ERROR_TYPE, type(e).__name__)
+            logger.exception(e)
+        finally:
+            request_finished.send(sender=None)
+            gc.collect()
