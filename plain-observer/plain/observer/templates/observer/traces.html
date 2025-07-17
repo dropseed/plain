@@ -53,8 +53,8 @@
                                 hx-target="#main-content"
                                 name="observe_action"
                                 class="bg-stone-800 text-stone-300 rounded px-2 py-1 text-xs border border-stone-700 focus:border-stone-600 focus:outline-none cursor-pointer">
-                                <option value="enable" {% if observer.is_summarizing() %}selected{% endif %}>Summary</option>
-                                <option value="enable_persist" {% if observer.is_persisting() %}selected{% endif %}>Recording</option>
+                                <option value="summary" {% if observer.is_summarizing() %}selected{% endif %}>Summary</option>
+                                <option value="persist" {% if observer.is_persisting() %}selected{% endif %}>Recording</option>
                                 <option disabled>───────</option>
                                 <option value="disable" {% if observer.is_disabled() %}selected{% endif %} class="text-stone-500">Disabled</option>
                             </select>
@@ -159,7 +159,7 @@
                             {% if observer.is_summarizing() %}
                             <form method="post" action="." style="display: inline;">
                                 {{ csrf_input }}
-                                <input type="hidden" name="observe_action" value="enable_persist">
+                                <input type="hidden" name="observe_action" value="persist">
                                 <button type="submit" class="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors">
                                     <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                         <circle cx="8" cy="8" r="8"/>
@@ -182,7 +182,7 @@
                             </button>
                             <form method="post" action="." style="display: inline;">
                                 {{ csrf_input }}
-                                <input type="hidden" name="observe_action" value="enable">
+                                <input type="hidden" name="observe_action" value="summary">
                                 <button type="submit" class="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-lg bg-stone-700 text-stone-200 hover:bg-stone-600 cursor-pointer transition-colors">
                                     <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                         <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
@@ -257,7 +257,7 @@
                         <div class="flex flex-col sm:flex-row items-center sm:items-start gap-2">
                             <form method="post" action=".">
                                 {{ csrf_input }}
-                                <input type="hidden" name="observe_action" value="enable">
+                                <input type="hidden" name="observe_action" value="summary">
                                 <button type="submit" class="flex items-center justify-center space-x-2 px-4 py-1.5 text-sm rounded-lg bg-stone-700 text-stone-200 hover:bg-stone-600 cursor-pointer transition-colors w-full sm:w-auto">
                                     <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                         <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
@@ -268,7 +268,7 @@
                             </form>
                             <form method="post" action=".">
                                 {{ csrf_input }}
-                                <input type="hidden" name="observe_action" value="enable_persist">
+                                <input type="hidden" name="observe_action" value="persist">
                                 <button type="submit" class="flex items-center justify-center space-x-2 px-4 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors w-full sm:w-auto">
                                     <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                         <circle cx="8" cy="8" r="8"/>

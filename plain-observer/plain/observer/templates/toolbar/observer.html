@@ -13,7 +13,7 @@
     // Auto-enable summary mode if no mode is set
     if (!observerMode || observerMode === "None") {
         var form = new FormData();
-        form.append('observe_action', 'enable');
+        form.append('observe_action', 'summary');
 
         fetch("{{ url('observer:traces') }}", {
             method: 'POST',

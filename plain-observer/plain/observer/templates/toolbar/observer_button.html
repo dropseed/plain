@@ -3,10 +3,10 @@
     <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
     {% if observer.is_summarizing() %}
         {# Toggle from summary to persist #}
-        <input type="hidden" name="observe_action" value="enable_persist">
+        <input type="hidden" name="observe_action" value="persist">
     {% else %}
         {# Toggle from persist to summary #}
-        <input type="hidden" name="observe_action" value="enable">
+        <input type="hidden" name="observe_action" value="summary">
     {% endif %}
     <button
         class="inline-flex items-center cursor-pointer text-xs rounded-full px-2.5 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"
@@ -33,7 +33,7 @@
 {% else %}
 <form method="post" action="{{ url('observer:traces') }}" style="display: inline;">
     <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
-    <input type="hidden" name="observe_action" value="enable">
+    <input type="hidden" name="observe_action" value="summary">
     <button
         type="submit"
         class="cursor-pointer text-xs rounded-full px-2 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"

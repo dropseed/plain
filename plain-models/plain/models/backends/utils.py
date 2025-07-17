@@ -82,7 +82,7 @@ class CursorWrapper:
 
     def _execute(self, sql, params, *ignored_wrapper_args):
         # Wrap in an OpenTelemetry span with standard attributes.
-        with db_span(self.db, sql):
+        with db_span(self.db, sql, params=params):
             self.db.validate_no_broken_transaction()
             with self.db.wrap_database_errors:
                 if params is None:
@@ -91,15 +91,7 @@ class CursorWrapper:
                     return self.cursor.execute(sql, params)
 
     def _executemany(self, sql, param_list, *ignored_wrapper_args):
-        # Determine batch size when param_list is sized; may be expensive for
-        # generators, so guard with try/except.
-        batch_size = None
-        try:
-            batch_size = len(param_list)
-        except TypeError:
-            pass
-
-        with db_span(self.db, sql, many=True, batch_size=batch_size):
+        with db_span(self.db, sql, many=True, params=param_list):
             self.db.validate_no_broken_transaction()
             with self.db.wrap_database_errors:
                 return self.cursor.executemany(sql, param_list)

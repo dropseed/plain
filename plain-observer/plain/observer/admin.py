@@ -60,6 +60,7 @@ class SpanViewset(AdminViewset):
         queryset_order = ["-pk"]
         allow_global_search = False
         displays = ["Parents only"]
+        search_fields = ["name", "span_id", "parent_id"]
 
         def get_objects(self):
             return (

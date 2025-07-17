@@ -8,7 +8,11 @@ from opentelemetry.semconv._incubating.attributes import (
     session_attributes,
     user_attributes,
 )
+from opentelemetry.semconv._incubating.attributes.db_attributes import (
+    DB_QUERY_PARAMETER_TEMPLATE,
+)
 from opentelemetry.semconv.attributes import db_attributes
+from opentelemetry.trace import format_trace_id
 
 from plain import models
 
@@ -88,7 +92,7 @@ class Trace(models.Model):
         """Create a Trace instance from a list of OpenTelemetry spans."""
         # Get trace information from the first span
         first_span = spans[0]
-        trace_id = f"0x{first_span.get_span_context().trace_id:032x}"
+        trace_id = f"0x{format_trace_id(first_span.get_span_context().trace_id)}"
 
         # Find trace boundaries and root span info
         earliest_start = None
@@ -141,6 +145,51 @@ class Trace(models.Model):
             session_id=session_id,
             root_span_name=root_span.name if root_span else "",
         )
+
+    def get_annotated_spans(self):
+        """Return spans with annotations and nesting information."""
+        spans = list(self.spans.all().order_by("start_time"))
+
+        # Build span dictionary for parent lookups
+        span_dict = {span.span_id: span for span in spans}
+
+        # Calculate nesting levels
+        for span in spans:
+            if not span.parent_id:
+                span.level = 0
+            else:
+                # Find parent's level and add 1
+                parent = span_dict.get(span.parent_id)
+                parent_level = parent.level if parent else 0
+                span.level = parent_level + 1
+
+        query_counts = {}
+
+        # First pass: count queries
+        for span in spans:
+            if sql_query := span.sql_query:
+                query_counts[sql_query] = query_counts.get(sql_query, 0) + 1
+
+        # Second pass: add annotations
+        query_occurrences = {}
+        for span in spans:
+            span.annotations = []
+
+            # Check for duplicate queries
+            if sql_query := span.sql_query:
+                count = query_counts[sql_query]
+                if count > 1:
+                    occurrence = query_occurrences.get(sql_query, 0) + 1
+                    query_occurrences[sql_query] = occurrence
+
+                    span.annotations.append(
+                        {
+                            "message": f"Duplicate query ({occurrence} of {count})",
+                            "severity": "warning",
+                        }
+                    )
+
+        return spans
 
     def as_dict(self):
         spans = [span.span_data for span in self.spans.all().order_by("start_time")]
@@ -239,19 +288,26 @@ class Span(models.Model):
     def duration_ms(self):
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds() * 1000
-        return None
-
-    def description(self):
-        if summary := self.attributes.get(db_attributes.DB_QUERY_SUMMARY):
-            return summary
-        if query := self.attributes.get(db_attributes.DB_QUERY_TEXT):
-            return query
-        return self.name
+        return 0
 
     @cached_property
     def sql_query(self):
         """Get the SQL query if this span contains one."""
         return self.attributes.get(db_attributes.DB_QUERY_TEXT)
+
+    @cached_property
+    def sql_query_params(self):
+        """Get query parameters from attributes that start with 'db.query.parameter.'"""
+        if not self.attributes:
+            return {}
+
+        query_params = {}
+        for key, value in self.attributes.items():
+            if key.startswith(DB_QUERY_PARAMETER_TEMPLATE + "."):
+                param_name = key.replace(DB_QUERY_PARAMETER_TEMPLATE + ".", "")
+                query_params[param_name] = value
+
+        return query_params
 
     def get_formatted_sql(self):
         """Get the pretty-formatted SQL query if this span contains one."""

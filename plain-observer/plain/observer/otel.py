@@ -7,13 +7,13 @@ import opentelemetry.context as context_api
 from opentelemetry import baggage, trace
 from opentelemetry.sdk.trace import SpanProcessor, sampling
 from opentelemetry.semconv.attributes import url_attributes
-from opentelemetry.trace import SpanKind
+from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
 from plain.http.cookie import unsign_cookie_value
 from plain.models.otel import suppress_db_tracing
 from plain.runtime import settings
 
-from .core import Observer
+from .core import Observer, ObserverMode
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def get_current_trace_summary() -> str | None:
     if not (processor := get_span_processor()):
         return None
 
-    trace_id = f"0x{current_span.get_span_context().trace_id:032x}"
+    trace_id = f"0x{format_trace_id(current_span.get_span_context().trace_id)}"
     return processor.get_trace_summary(trace_id)
 
 
@@ -90,12 +90,19 @@ class ObserverSampler(sampling.Sampler):
                         Observer.COOKIE_NAME, observer_cookie, default=False
                     )
 
-                    if unsigned_value in ("persist", "summary"):
+                    if unsigned_value in (
+                        ObserverMode.PERSIST.value,
+                        ObserverMode.SUMMARY.value,
+                    ):
                         # Always use RECORD_AND_SAMPLE so ParentBased works correctly
                         # The processor will check the mode to decide whether to export
                         decision = sampling.Decision.RECORD_AND_SAMPLE
                     else:
                         decision = sampling.Decision.DROP
+
+        # If there are links, assume it is to another trace/span that we are keeping
+        if links:
+            decision = sampling.Decision.RECORD_AND_SAMPLE
 
         # If no decision from cookies, use default
         if decision is None:
@@ -137,14 +144,14 @@ class ObserverSpanProcessor(SpanProcessor):
                 "completed_otel_spans": [],  # list of opentelemetry spans
                 "span_models": [],  # list of Span model instances
                 "root_span_id": None,
-                "mode": None,  # None, "summary", or "persist"
+                "mode": None,  # None, ObserverMode.SUMMARY.value, or ObserverMode.PERSIST.value
             }
         )
         self._traces_lock = threading.Lock()
 
     def on_start(self, span, parent_context=None):
         """Called when a span starts."""
-        trace_id = f"0x{span.get_span_context().trace_id:032x}"
+        trace_id = f"0x{format_trace_id(span.get_span_context().trace_id)}"
 
         with self._traces_lock:
             # Check if we already have this trace
@@ -152,7 +159,7 @@ class ObserverSpanProcessor(SpanProcessor):
                 trace_info = self._traces[trace_id]
             else:
                 # First span in trace - determine if we should record it
-                mode = self._get_recording_mode(parent_context)
+                mode = self._get_recording_mode(span, parent_context)
                 if not mode:
                     # Don't create trace entry for traces we won't record
                     return
@@ -168,7 +175,7 @@ class ObserverSpanProcessor(SpanProcessor):
                     for old_id in oldest_ids:
                         del self._traces[old_id]
 
-            span_id = f"0x{span.get_span_context().span_id:016x}"
+            span_id = f"0x{format_span_id(span.get_span_context().span_id)}"
 
             # Store span (we know mode is truthy if we get here)
             trace_info["active_otel_spans"][span_id] = span
@@ -179,8 +186,8 @@ class ObserverSpanProcessor(SpanProcessor):
 
     def on_end(self, span):
         """Called when a span ends."""
-        trace_id = f"0x{span.get_span_context().trace_id:032x}"
-        span_id = f"0x{span.get_span_context().span_id:016x}"
+        trace_id = f"0x{format_trace_id(span.get_span_context().trace_id)}"
+        span_id = f"0x{format_span_id(span.get_span_context().span_id)}"
 
         with self._traces_lock:
             # Skip if we don't have this trace (mode was None on start)
@@ -206,7 +213,7 @@ class ObserverSpanProcessor(SpanProcessor):
                 ]
 
                 # Export if in persist mode
-                if trace_info["mode"] == "persist":
+                if trace_info["mode"] == ObserverMode.PERSIST.value:
                     logger.debug(
                         "Exporting %d spans for trace %s",
                         len(trace_info["span_models"]),
@@ -275,19 +282,29 @@ class ObserverSpanProcessor(SpanProcessor):
                 )
 
             # Delete oldest traces if we exceed the limit
-            try:
-                if Trace.objects.count() > settings.OBSERVER_TRACE_LIMIT:
-                    delete_ids = Trace.objects.order_by("start_time")[
-                        : settings.OBSERVER_TRACE_LIMIT
-                    ].values_list("id", flat=True)
-                    Trace.objects.filter(id__in=delete_ids).delete()
-            except Exception as e:
-                logger.warning(
-                    "Failed to clean up old observer traces: %s", e, exc_info=True
-                )
+            if settings.OBSERVER_TRACE_LIMIT > 0:
+                try:
+                    if Trace.objects.count() > settings.OBSERVER_TRACE_LIMIT:
+                        delete_ids = Trace.objects.order_by("start_time")[
+                            : settings.OBSERVER_TRACE_LIMIT
+                        ].values_list("id", flat=True)
+                        Trace.objects.filter(id__in=delete_ids).delete()
+                except Exception as e:
+                    logger.warning(
+                        "Failed to clean up old observer traces: %s", e, exc_info=True
+                    )
 
-    def _get_recording_mode(self, parent_context=None) -> str | None:
-        """Determine recording mode based on cookies."""
+    def _get_recording_mode(self, span, parent_context) -> str | None:
+        # If the span has links, then we are going to export if the linked span is also exported
+        for link in span.links:
+            if link.context.is_valid and link.context.span_id:
+                from .models import Span
+
+                if Span.objects.filter(
+                    span_id=f"0x{format_span_id(link.context.span_id)}"
+                ).exists():
+                    return ObserverMode.PERSIST.value
+
         if not (context := parent_context or context_api.get_current()):
             return None
 
@@ -301,7 +318,7 @@ class ObserverSpanProcessor(SpanProcessor):
             mode = unsign_cookie_value(
                 Observer.COOKIE_NAME, observer_cookie, default=None
             )
-            if mode in ("summary", "persist"):
+            if mode in (ObserverMode.SUMMARY.value, ObserverMode.PERSIST.value):
                 return mode
         except Exception as e:
             logger.warning("Failed to unsign observer cookie: %s", e)

@@ -37,12 +37,6 @@ class Template:
                 "template.filename": self.filename,
                 "template.engine": "jinja2",
             },
-        ) as span:
-            try:
-                result = self._jinja_template.render(context)
-                span.set_status(trace.StatusCode.OK)
-                return result
-            except Exception as e:
-                span.record_exception(e)
-                span.set_status(trace.StatusCode.ERROR, str(e))
-                raise
+        ):
+            result = self._jinja_template.render(context)
+            return result

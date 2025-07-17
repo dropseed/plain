@@ -2,6 +2,15 @@ import logging
 from functools import cached_property
 from typing import Any
 
+from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.feature_flag_attributes import (
+    FEATURE_FLAG_KEY,
+    FEATURE_FLAG_PROVIDER_NAME,
+    FEATURE_FLAG_RESULT_REASON,
+    FEATURE_FLAG_RESULT_VALUE,
+    FeatureFlagResultReasonValues,
+)
+
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -9,6 +18,7 @@ from . import exceptions
 from .utils import coerce_key
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer("plain.flags")
 
 
 class Flag:
@@ -49,35 +59,75 @@ class Flag:
         """
         from .models import Flag, FlagResult  # So Plain app is ready...
 
-        # Create an associated DB Flag that we can use to enable/disable
-        # and tie the results to
-        flag_obj, _ = Flag.objects.update_or_create(
-            name=self.get_db_name(),
-            defaults={"used_at": timezone.now()},
-        )
-        if not flag_obj.enabled:
-            msg = f"The {flag_obj} flag has been disabled and should either not be called, or be re-enabled."
-            if settings.DEBUG:
-                raise exceptions.FlagDisabled(msg)
-            else:
-                logger.exception(msg)
-                # Might not be the type of return value expected! Better than totally crashing now though.
-                return None
+        flag_name = self.get_db_name()
 
-        key = self.get_key()
-        if not key:
-            # No key, so we always recompute the value and return it
-            return self.get_value()
+        with tracer.start_as_current_span(
+            f"flag {flag_name}",
+            attributes={
+                FEATURE_FLAG_PROVIDER_NAME: "plain.flags",
+            },
+        ) as span:
+            # Create an associated DB Flag that we can use to enable/disable
+            # and tie the results to
+            flag_obj, _ = Flag.objects.update_or_create(
+                name=flag_name,
+                defaults={"used_at": timezone.now()},
+            )
 
-        key = coerce_key(key)
+            if not flag_obj.enabled:
+                msg = f"The {flag_obj} flag has been disabled and should either not be called, or be re-enabled."
+                span.set_attribute(
+                    FEATURE_FLAG_RESULT_REASON,
+                    FeatureFlagResultReasonValues.DISABLED.value,
+                )
 
-        try:
-            flag_result = FlagResult.objects.get(flag=flag_obj, key=key)
-            return flag_result.value
-        except FlagResult.DoesNotExist:
-            value = self.get_value()
-            flag_result = FlagResult.objects.create(flag=flag_obj, key=key, value=value)
-            return flag_result.value
+                if settings.DEBUG:
+                    raise exceptions.FlagDisabled(msg)
+                else:
+                    logger.exception(msg)
+                    # Might not be the type of return value expected! Better than totally crashing now though.
+                    return None
+
+            key = self.get_key()
+            if not key:
+                # No key, so we always recompute the value and return it
+                value = self.get_value()
+
+                span.set_attribute(
+                    FEATURE_FLAG_RESULT_REASON,
+                    FeatureFlagResultReasonValues.DYNAMIC.value,
+                )
+                span.set_attribute(FEATURE_FLAG_RESULT_VALUE, str(value))
+
+                return value
+
+            key = coerce_key(key)
+
+            span.set_attribute(FEATURE_FLAG_KEY, key)
+
+            try:
+                flag_result = FlagResult.objects.get(flag=flag_obj, key=key)
+
+                span.set_attribute(
+                    FEATURE_FLAG_RESULT_REASON,
+                    FeatureFlagResultReasonValues.CACHED.value,
+                )
+                span.set_attribute(FEATURE_FLAG_RESULT_VALUE, str(flag_result.value))
+
+                return flag_result.value
+            except FlagResult.DoesNotExist:
+                value = self.get_value()
+                flag_result = FlagResult.objects.create(
+                    flag=flag_obj, key=key, value=value
+                )
+
+                span.set_attribute(
+                    FEATURE_FLAG_RESULT_REASON,
+                    FeatureFlagResultReasonValues.STATIC.value,
+                )
+                span.set_attribute(FEATURE_FLAG_RESULT_VALUE, str(value))
+
+                return flag_result.value
 
     @cached_property
     def value(self) -> Any:

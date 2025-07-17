@@ -54,59 +54,52 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, TemplateView):
 
     def htmx_post_enable_summary(self):
         """Enable summary mode via HTMX."""
-        response = Response(self.get_template().render(self.get_template_context()))
+        response = Response(status_code=204)
+        response.headers["HX-Refresh"] = "true"
         self.observer.enable_summary_mode(response)
         return response
 
     def htmx_post_enable_persist(self):
         """Enable full persist mode via HTMX."""
-        response = Response(self.get_template().render(self.get_template_context()))
+        response = Response(status_code=204)
+        response.headers["HX-Refresh"] = "true"
         self.observer.enable_persist_mode(response)
         return response
 
     def htmx_post_disable(self):
         """Disable observer via HTMX."""
-        response = Response(self.get_template().render(self.get_template_context()))
+        response = Response(status_code=204)
+        response.headers["HX-Refresh"] = "true"
         self.observer.disable(response)
         return response
 
     def htmx_delete_traces(self):
         """Clear all traces via HTMX DELETE."""
         Trace.objects.all().delete()
-
-        return Response(self.render_template())
+        response = Response(status_code=204)
+        response.headers["HX-Refresh"] = "true"
+        return response
 
     def htmx_delete_trace(self):
         """Delete a specific trace via HTMX DELETE."""
         trace_id = self.request.query_params.get("trace_id")
-        if trace_id:
-            try:
-                trace = Trace.objects.get(id=trace_id)
-                trace.delete()
-            except Trace.DoesNotExist:
-                pass
-
-        # Check if there are any traces left after deletion
-        remaining_traces = Trace.objects.all()
-        if not remaining_traces.exists():
-            # If no traces left, refresh the whole page to show empty state
-            response = Response(self.render_template())
-            response.headers["HX-Refresh"] = "true"
-            return response
-
-        return Response(self.render_template())
+        Trace.objects.get(id=trace_id).delete()
+        response = Response(status_code=204)
+        response.headers["HX-Refresh"] = "true"
+        return response
 
     def post(self):
+        """A standard, non-htmx post used by the button html (where htmx may not be available)."""
+
         observe_action = self.request.data["observe_action"]
 
         response = ResponseRedirect(self.request.data.get("redirect_url", "."))
 
-        if observe_action == "enable":
+        if observe_action == "summary":
             self.observer.enable_summary_mode(response)  # Default to summary mode
-        elif observe_action == "enable_persist":
+        elif observe_action == "persist":
             self.observer.enable_persist_mode(response)
         elif observe_action == "disable":
             self.observer.disable(response)
 
-        # Redirect back to the page that submitted the form
         return response

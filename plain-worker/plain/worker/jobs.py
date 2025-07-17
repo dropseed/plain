@@ -9,8 +9,6 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
 )
 from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_DESTINATION_NAME,
-    MESSAGING_MESSAGE_BODY_SIZE,
-    MESSAGING_MESSAGE_ENVELOPE_SIZE,
     MESSAGING_MESSAGE_ID,
     MESSAGING_OPERATION_NAME,
     MESSAGING_OPERATION_TYPE,
@@ -18,7 +16,7 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MessagingOperationTypeValues,
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-from opentelemetry.trace import SpanKind
+from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
 from plain.models import IntegrityError
 from plain.utils import timezone
@@ -61,17 +59,19 @@ class Job(metaclass=JobType):
 
         job_class_name = jobs_registry.get_job_class_name(self.__class__)
 
-        with tracer.start_as_current_span(
-            f"send {queue or self.get_queue()}", kind=SpanKind.PRODUCER
-        ) as span:
-            span.set_attributes(
-                {
-                    MESSAGING_SYSTEM: "plain.worker",
-                    MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.SEND.value,
-                    MESSAGING_OPERATION_NAME: "send",
-                }
-            )
+        if queue is None:
+            queue = self.get_queue()
 
+        with tracer.start_as_current_span(
+            f"run_in_worker {job_class_name}",
+            kind=SpanKind.PRODUCER,
+            attributes={
+                MESSAGING_SYSTEM: "plain.worker",
+                MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.SEND.value,
+                MESSAGING_OPERATION_NAME: "run_in_worker",
+                MESSAGING_DESTINATION_NAME: queue,
+            },
+        ) as span:
             try:
                 # Try to automatically annotate the source of the job
                 caller = inspect.stack()[1]
@@ -86,9 +86,6 @@ class Job(metaclass=JobType):
                 source = ""
 
             parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
-
-            if queue is None:
-                queue = self.get_queue()
 
             if priority is None:
                 priority = self.get_priority()
@@ -110,15 +107,6 @@ class Job(metaclass=JobType):
             if unique_key is None:
                 unique_key = self.get_unique_key()
 
-            span.set_attributes(
-                {
-                    MESSAGING_DESTINATION_NAME: queue,
-                    MESSAGING_MESSAGE_BODY_SIZE: len(str(parameters))
-                    if parameters
-                    else 0,
-                }
-            )
-
             if unique_key:
                 # Only need to look at in progress jobs
                 # if we also have a unique key.
@@ -126,6 +114,21 @@ class Job(metaclass=JobType):
                 if running := self._in_progress(unique_key):
                     span.set_attribute(ERROR_TYPE, "DuplicateJob")
                     return running
+
+            # Is recording is not enough here... because we also record for summaries!
+
+            # Capture current trace context
+            current_span = trace.get_current_span()
+            span_context = current_span.get_span_context()
+
+            # Only include trace context if the span is being recorded (sampled)
+            # This ensures jobs are only linked to traces that are actually being collected
+            if current_span.is_recording() and span_context.is_valid:
+                trace_id = f"0x{format_trace_id(span_context.trace_id)}"
+                span_id = f"0x{format_span_id(span_context.span_id)}"
+            else:
+                trace_id = None
+                span_id = None
 
             try:
                 job_request = JobRequest(
@@ -138,19 +141,22 @@ class Job(metaclass=JobType):
                     retries=retries,
                     retry_attempt=retry_attempt,
                     unique_key=unique_key,
+                    trace_id=trace_id,
+                    span_id=span_id,
                 )
                 job_request.save(
                     clean_and_validate=False
                 )  # So IntegrityError is raised on unique instead of potentially confusing ValidationError...
 
-                span.set_attributes(
-                    {
-                        MESSAGING_MESSAGE_ID: str(job_request.uuid),
-                        MESSAGING_MESSAGE_ENVELOPE_SIZE: len(job_request.parameters)
-                        if job_request.parameters
-                        else 0,
-                    }
+                span.set_attribute(
+                    MESSAGING_MESSAGE_ID,
+                    str(job_request.uuid),
                 )
+
+                # Add job UUID to current span for bidirectional linking
+                span.set_attribute("job.uuid", str(job_request.uuid))
+                span.set_status(trace.StatusCode.OK)
+
                 return job_request
             except IntegrityError as e:
                 span.set_attribute(ERROR_TYPE, "IntegrityError")

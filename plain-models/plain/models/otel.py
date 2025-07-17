@@ -5,12 +5,12 @@ from typing import Any
 from opentelemetry import context as otel_context
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
+    DB_QUERY_PARAMETER_TEMPLATE,
     DB_USER,
 )
 from opentelemetry.semconv.attributes.db_attributes import (
     DB_COLLECTION_NAME,
     DB_NAMESPACE,
-    DB_OPERATION_BATCH_SIZE,
     DB_OPERATION_NAME,
     DB_QUERY_SUMMARY,
     DB_QUERY_TEXT,
@@ -21,7 +21,9 @@ from opentelemetry.semconv.attributes.network_attributes import (
     NETWORK_PEER_PORT,
 )
 from opentelemetry.semconv.trace import DbSystemValues
-from opentelemetry.trace import SpanKind, StatusCode
+from opentelemetry.trace import SpanKind
+
+from plain.runtime import settings
 
 _SUPPRESS_KEY = object()
 
@@ -89,7 +91,7 @@ def _clean_identifier(identifier: str) -> str:
 
 
 @contextmanager
-def db_span(db, sql: Any, *, many: bool = False, batch_size: int | None = None):
+def db_span(db, sql: Any, *, many: bool = False, params=None):
     """Open an OpenTelemetry CLIENT span for a database query.
 
     All common attributes (`db.*`, `network.*`, etc.) are set automatically.
@@ -142,34 +144,30 @@ def db_span(db, sql: Any, *, many: bool = False, batch_size: int | None = None):
         except (TypeError, ValueError):
             pass
 
-    # Batch size for executemany operations
-    if batch_size and batch_size > 1:
-        attrs[DB_OPERATION_BATCH_SIZE] = batch_size
+    # Add query parameters as attributes when DEBUG is True
+    if settings.DEBUG and params is not None:
+        # Convert params to appropriate format based on type
+        if isinstance(params, dict):
+            # Dictionary params (e.g., for named placeholders)
+            for i, (key, value) in enumerate(params.items()):
+                attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.{key}"] = str(value)
+        elif isinstance(params, list | tuple):
+            # Sequential params (e.g., for %s or ? placeholders)
+            for i, value in enumerate(params):
+                attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.{i + 1}"] = str(value)
+        else:
+            # Single param (rare but possible)
+            attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.1"] = str(params)
 
-    with tracer.start_as_current_span(span_name, kind=SpanKind.CLIENT) as span:
-        # Set all non-None attributes
-        for key, value in attrs.items():
-            if value is not None:
-                span.set_attribute(key, value)
-
-        try:
-            yield span
-        except Exception as e:
-            # Record exception and set error status
-            span.record_exception(e)
-            span.set_status(StatusCode.ERROR, str(e))
-            raise
+    with tracer.start_as_current_span(
+        span_name, kind=SpanKind.CLIENT, attributes=attrs
+    ) as span:
+        yield span
+        span.set_status(trace.StatusCode.OK)
 
 
 @contextmanager
 def suppress_db_tracing():
-    """Temporarily disable **all** OpenTelemetry instrumentation.
-
-    This sets the standard suppression flag recognised by every official
-    instrumentation package, meaning *no spans* will be recorded for the
-    duration of the context – not just database spans.
-    """
-
     token = otel_context.attach(otel_context.set_value(_SUPPRESS_KEY, True))
     try:
         yield

@@ -68,10 +68,21 @@ class BaseHandler:
         span_attributes = {
             "plain.request.id": request.unique_id,
             http_attributes.HTTP_REQUEST_METHOD: request.method,
-            # TODO set the other url stuff?
             url_attributes.URL_PATH: request.path_info,
-            # http_attributes: request.content_type,
+            url_attributes.URL_SCHEME: request.scheme,
         }
+
+        # Add full URL if we can build it (requires proper WSGI environment)
+        try:
+            span_attributes[url_attributes.URL_FULL] = request.build_absolute_uri()
+        except KeyError:
+            # Missing required WSGI environment variables (e.g. in tests)
+            pass
+
+        # Add query string if present
+        if query_string := request.meta.get("QUERY_STRING"):
+            span_attributes[url_attributes.URL_QUERY] = query_string
+
         span_context = baggage.set_baggage("http.request.cookies", request.cookies)
 
         with tracer.start_as_current_span(
@@ -86,9 +97,12 @@ class BaseHandler:
             span.set_attribute(
                 http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
             )
-            # span.set_attribute(
-            #     http_attributes.HTTP_RESPONSE_REASON_PHRASE, response.reason_phrase
-            # )
+
+            span.set_status(
+                trace.StatusCode.OK
+                if response.status_code < 400
+                else trace.StatusCode.ERROR
+            )
 
             if response.status_code >= 400:
                 log_response(

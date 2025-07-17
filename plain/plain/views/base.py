@@ -6,7 +6,6 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
     CODE_FUNCTION_NAME,
     CODE_NAMESPACE,
 )
-from opentelemetry.semconv.attributes.http_attributes import HTTP_ROUTE
 
 from plain.http import (
     HttpRequest,
@@ -56,7 +55,11 @@ class View:
                 v = cls(*init_args, **init_kwargs)
                 v.setup(request, *url_args, **url_kwargs)
                 response = v.get_response()
-                span.set_status(trace.StatusCode.OK if response.status_code < 400 else trace.StatusCode.ERROR)
+                span.set_status(
+                    trace.StatusCode.OK
+                    if response.status_code < 400
+                    else trace.StatusCode.ERROR
+                )
                 return response
 
         view.view_class = cls

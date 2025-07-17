@@ -95,6 +95,7 @@ def register_toolbar_panel(panel_class):
 class _ExceptionToolbarPanel(ToolbarPanel):
     name = "Exception"
     template_name = "toolbar/exception.html"
+    button_template_name = "toolbar/exception_button.html"
 
     def __init__(self, request, exception):
         super().__init__(request)
