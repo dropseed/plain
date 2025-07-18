@@ -32,8 +32,9 @@ class DevGroup(click.Group):
             return
 
         # Don't do anything if it looks like a "services" command is being run explicitly
-        if "services" in sys.argv or "--stop" in sys.argv:
-            return
+        if "dev" in sys.argv:
+            if "logs" in sys.argv or "services" in sys.argv or "--stop" in sys.argv:
+                return
 
         if not ServicesProcess.get_services(APP_PATH.parent):
             return
