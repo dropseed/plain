@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.17.0) (2025-07-18)
+
+### What's changed
+
+- Migrations have been restarted and consolidated into a single initial migration that includes all model changes and database indexes ([484f1b6](https://github.com/dropseed/plain/commit/484f1b6))
+
+### Upgrade instructions
+
+- Run `plain migrate --prune plainpageviews` to remove old migration records and apply the consolidated migration
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.16.0) (2025-07-07)
 
 ### What's changed
