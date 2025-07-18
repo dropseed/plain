@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.9.1](https://github.com/dropseed/plain/releases/plain-code@0.9.1) (2025-07-18)
+
+### What's changed
+
+- Improved error handling by using `click.UsageError` instead of `print` and `sys.exit` for better CLI error messages ([88f06c5](https://github.com/dropseed/plain/commit/88f06c5))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-code@0.9.0) (2025-07-03)
 
 ### What's changed
