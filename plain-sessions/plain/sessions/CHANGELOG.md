@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-sessions@0.24.0) (2025-07-18)
+
+### What's changed
+
+- Migration history was consolidated into a single initial migration file. The new `0001_initial.py` includes all the current schema changes without the intermediate migration steps ([484f1b6](https://github.com/dropseed/plain/commit/484f1b6e93bfea486529f4806bcd9a9ec5c1217d)).
+
+### Upgrade instructions
+
+- Run `plain migrate --prune plainsessions` to run migrations and delete old ones from the database.
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-sessions@0.23.0) (2025-07-07)
 
 ### What's changed
