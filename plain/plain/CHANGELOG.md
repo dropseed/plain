@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.53.0](https://github.com/dropseed/plain/releases/plain@0.53.0) (2025-07-18)
+
+### What's changed
+
+- Added a `pluralize` filter for Jinja templates to handle singular/plural forms ([4cef9829ed](https://github.com/dropseed/plain/commit/4cef9829ed))
+- Added `get_signed_cookie()` method to `HttpRequest` for retrieving and verifying signed cookies ([f8796c8786](https://github.com/dropseed/plain/commit/f8796c8786))
+- Improved CLI error handling by using `click.UsageError` instead of manual error printing ([88f06c5184](https://github.com/dropseed/plain/commit/88f06c5184))
+- Simplified preflight check success message ([adffc06152](https://github.com/dropseed/plain/commit/adffc06152))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.52.2](https://github.com/dropseed/plain/releases/plain@0.52.2) (2025-06-27)
 
 ### What's changed
