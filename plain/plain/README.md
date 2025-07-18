@@ -48,6 +48,7 @@ The `plain` package includes everything you need to start handling web requests 
 - [plain.support](/plain-support/plain/support/README.md) - Customer support forms.
 - [plain.redirection](/plain-redirection/plain/redirection/README.md) - Redirects managed in the database.
 - [plain.pageviews](/plain-pageviews/plain/pageviews/README.md) - Basic self-hosted page view tracking and reporting.
+- [plain.observer](/plain-observer/plain/observer/README.md) - On-page telemetry reporting.
 
 ## Dev Packages
 
