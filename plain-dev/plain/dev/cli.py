@@ -24,6 +24,10 @@ class DevGroup(click.Group):
     def _auto_start_services():
         """Start dev *services* in the background if not already running."""
 
+        # Check if we're in CI and auto-start is not explicitly enabled
+        if os.environ.get("CI") and os.environ.get("PLAIN_DEV_SERVICES_AUTO") is None:
+            return
+
         if os.environ.get("PLAIN_DEV_SERVICES_AUTO", "true") not in [
             "1",
             "true",
