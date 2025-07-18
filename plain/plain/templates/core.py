@@ -1,6 +1,13 @@
 import jinja2
+from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.code_attributes import (
+    CODE_FUNCTION_NAME,
+    CODE_NAMESPACE,
+)
 
 from .jinja import environment
+
+tracer = trace.get_tracer("plain")
 
 
 class TemplateFileMissing(Exception):
@@ -21,4 +28,15 @@ class Template:
             raise TemplateFileMissing(filename)
 
     def render(self, context: dict) -> str:
-        return self._jinja_template.render(context)
+        with tracer.start_as_current_span(
+            f"render {self.filename}",
+            kind=trace.SpanKind.INTERNAL,
+            attributes={
+                CODE_FUNCTION_NAME: "render",
+                CODE_NAMESPACE: f"{self.__class__.__module__}.{self.__class__.__qualname__}",
+                "template.filename": self.filename,
+                "template.engine": "jinja2",
+            },
+        ):
+            result = self._jinja_template.render(context)
+            return result

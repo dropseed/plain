@@ -49,6 +49,7 @@ class Toolbar:
 class ToolbarPanel:
     name: str
     template_name: str
+    button_template_name: str = ""
 
     def __init__(self, request):
         self.request = request
@@ -60,6 +61,14 @@ class ToolbarPanel:
 
     def render(self):
         template = Template(self.template_name)
+        context = self.get_template_context()
+        return mark_safe(template.render(context))
+
+    def render_button(self):
+        """Render the toolbar button for the minimized state."""
+        if not self.button_template_name:
+            return ""
+        template = Template(self.button_template_name)
         context = self.get_template_context()
         return mark_safe(template.render(context))
 
@@ -86,6 +95,7 @@ def register_toolbar_panel(panel_class):
 class _ExceptionToolbarPanel(ToolbarPanel):
     name = "Exception"
     template_name = "toolbar/exception.html"
+    button_template_name = "toolbar/exception_button.html"
 
     def __init__(self, request, exception):
         super().__init__(request)
@@ -101,9 +111,3 @@ class _ExceptionToolbarPanel(ToolbarPanel):
 class _RequestToolbarPanel(ToolbarPanel):
     name = "Request"
     template_name = "toolbar/request.html"
-
-
-@register_toolbar_panel
-class _QuerystatsToolbarPanel(ToolbarPanel):
-    name = "Queries"
-    template_name = "toolbar/querystats.html"

@@ -1,8 +1,18 @@
 from datetime import datetime, timedelta
 from functools import cached_property
 
+from opentelemetry import trace
+from opentelemetry.semconv.attributes.db_attributes import (
+    DB_NAMESPACE,
+    DB_OPERATION_NAME,
+    DB_SYSTEM_NAME,
+)
+from opentelemetry.trace import SpanKind
+
 from plain.models import IntegrityError
 from plain.utils import timezone
+
+tracer = trace.get_tracer("plain.cache")
 
 
 class Cached:
@@ -38,17 +48,49 @@ class Cached:
         return self._model_instance.expires_at < timezone.now()
 
     def exists(self) -> bool:
-        if self._model_instance is None:
-            return False
+        with tracer.start_as_current_span(
+            "cache.exists",
+            kind=SpanKind.CLIENT,
+            attributes={
+                DB_SYSTEM_NAME: "plain.cache",
+                DB_OPERATION_NAME: "get",
+                DB_NAMESPACE: "cache",
+                "cache.key": self.key,
+            },
+        ) as span:
+            span.set_status(trace.StatusCode.OK)
 
-        return not self._is_expired()
+            if self._model_instance is None:
+                return False
+
+            return not self._is_expired()
 
     @property
     def value(self):
-        if not self.exists():
-            return None
+        with tracer.start_as_current_span(
+            "cache.get",
+            kind=SpanKind.CLIENT,
+            attributes={
+                DB_SYSTEM_NAME: "plain.cache",
+                DB_OPERATION_NAME: "get",
+                DB_NAMESPACE: "cache",
+                "cache.key": self.key,
+            },
+        ) as span:
+            if self._model_instance and self._model_instance.expires_at:
+                span.set_attribute(
+                    "cache.item.expires_at", self._model_instance.expires_at.isoformat()
+                )
 
-        return self._model_instance.value
+            exists = self.exists()
+
+            span.set_attribute("cache.hit", exists)
+            span.set_status(trace.StatusCode.OK if exists else trace.StatusCode.UNSET)
+
+            if not exists:
+                return None
+
+            return self._model_instance.value
 
     def set(self, value, expiration: datetime | timedelta | int | float | None = None):
         defaults = {
@@ -66,28 +108,57 @@ class Cached:
             pass
 
         # Make sure expires_at is timezone aware
-        if defaults["expires_at"] and not timezone.is_aware(defaults["expires_at"]):
+        if (
+            "expires_at" in defaults
+            and defaults["expires_at"]
+            and not timezone.is_aware(defaults["expires_at"])
+        ):
             defaults["expires_at"] = timezone.make_aware(defaults["expires_at"])
 
-        try:
-            item, _ = self._model_class.objects.update_or_create(
-                key=self.key, defaults=defaults
-            )
-        except IntegrityError:
-            # Most likely a race condition in creating the item,
-            # so trying again should do an update
-            item, _ = self._model_class.objects.update_or_create(
-                key=self.key, defaults=defaults
-            )
+        with tracer.start_as_current_span(
+            "cache.set",
+            kind=SpanKind.CLIENT,
+            attributes={
+                DB_SYSTEM_NAME: "plain.cache",
+                DB_OPERATION_NAME: "set",
+                DB_NAMESPACE: "cache",
+                "cache.key": self.key,
+            },
+        ) as span:
+            if expires_at := defaults.get("expires_at"):
+                span.set_attribute("cache.item.expires_at", expires_at.isoformat())
 
-        self.reload()
-        return item.value
+            try:
+                item, _ = self._model_class.objects.update_or_create(
+                    key=self.key, defaults=defaults
+                )
+            except IntegrityError:
+                # Most likely a race condition in creating the item,
+                # so trying again should do an update
+                item, _ = self._model_class.objects.update_or_create(
+                    key=self.key, defaults=defaults
+                )
+
+            self.reload()
+            span.set_status(trace.StatusCode.OK)
+            return item.value
 
     def delete(self) -> bool:
-        if not self._model_instance:
-            # A no-op, but a return value you can use to know whether it did anything
-            return False
+        with tracer.start_as_current_span(
+            "cache.delete",
+            kind=SpanKind.CLIENT,
+            attributes={
+                DB_SYSTEM_NAME: "plain.cache",
+                DB_OPERATION_NAME: "delete",
+                DB_NAMESPACE: "cache",
+                "cache.key": self.key,
+            },
+        ) as span:
+            span.set_status(trace.StatusCode.OK)
+            if not self._model_instance:
+                # A no-op, but a return value you can use to know whether it did anything
+                return False
 
-        self._model_instance.delete()
-        self.reload()
-        return True
+            self._model_instance.delete()
+            self.reload()
+            return True

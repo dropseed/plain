@@ -2,7 +2,6 @@ from plain.http import ResponseRedirect
 from plain.urls import Router, include, path
 
 from .impersonate.urls import ImpersonateRouter
-from .querystats.urls import QuerystatsRouter
 from .views.base import AdminView
 from .views.registry import registry
 
@@ -36,7 +35,6 @@ class AdminRouter(Router):
     urls = [
         path("search/", AdminSearchView, name="search"),
         include("impersonate/", ImpersonateRouter),
-        include("querystats/", QuerystatsRouter),
         include("", registry.get_urls()),
         path("", AdminIndexView, name="index"),
     ]

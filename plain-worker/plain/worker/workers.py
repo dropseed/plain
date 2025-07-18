@@ -237,6 +237,15 @@ def future_finished_callback(job_uuid: str, future: Future):
         logger.warning("Job cancelled job_uuid=%s", job_uuid)
         job = Job.objects.get(uuid=job_uuid)
         job.convert_to_result(status=JobResultStatuses.CANCELLED)
+    elif future.exception():
+        # This is an uncaught error in running process_job,
+        # which is likely an internal bug. Not sure if it should be marked as a failure and retried?
+        exception = future.exception()
+        logger.exception(
+            "process_job failed job_uuid=%s",
+            job_uuid,
+            exc_info=exception,
+        )
     else:
         logger.debug("Job finished job_uuid=%s", job_uuid)
 

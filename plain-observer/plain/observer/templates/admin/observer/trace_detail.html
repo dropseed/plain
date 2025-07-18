@@ -1,0 +1,10 @@
+{% extends "admin/detail.html" %}
+
+{% block content %}
+
+{{ super() }}
+
+<div class="mt-20">
+    {% include "observer/_trace_detail.html" %}
+</div>
+{% endblock %}

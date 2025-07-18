@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from hashlib import md5
 
 from plain.models.db import NotSupportedError
+from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
 
 logger = logging.getLogger("plain.models.backends")
@@ -80,18 +81,20 @@ class CursorWrapper:
         return executor(sql, params, many, context)
 
     def _execute(self, sql, params, *ignored_wrapper_args):
-        self.db.validate_no_broken_transaction()
-        with self.db.wrap_database_errors:
-            if params is None:
-                # params default might be backend specific.
-                return self.cursor.execute(sql)
-            else:
-                return self.cursor.execute(sql, params)
+        # Wrap in an OpenTelemetry span with standard attributes.
+        with db_span(self.db, sql, params=params):
+            self.db.validate_no_broken_transaction()
+            with self.db.wrap_database_errors:
+                if params is None:
+                    return self.cursor.execute(sql)
+                else:
+                    return self.cursor.execute(sql, params)
 
     def _executemany(self, sql, param_list, *ignored_wrapper_args):
-        self.db.validate_no_broken_transaction()
-        with self.db.wrap_database_errors:
-            return self.cursor.executemany(sql, param_list)
+        with db_span(self.db, sql, many=True, params=param_list):
+            self.db.validate_no_broken_transaction()
+            with self.db.wrap_database_errors:
+                return self.cursor.executemany(sql, param_list)
 
 
 class CursorDebugWrapper(CursorWrapper):

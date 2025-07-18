@@ -1,16 +1,15 @@
 [project]
-name = "plain.admin"
-version = "0.34.0"
-description = "Admin dashboard and tools for Plain."
+name = "plain.observer"
+version = "0.0.0"
+description = "On-page telemetry and observability tools for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "plain<1.0.0",
-    "plain.auth<1.0.0",
-    "plain.htmx<1.0.0",
-    "plain.tailwind<1.0.0",
+    "plain.admin<1.0.0",
+    "opentelemetry-sdk>=1.34.1",
 ]
 
 [tool.uv]

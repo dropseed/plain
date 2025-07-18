@@ -1,6 +1,12 @@
 import logging
 from http import HTTPMethod
 
+from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes.code_attributes import (
+    CODE_FUNCTION_NAME,
+    CODE_NAMESPACE,
+)
+
 from plain.http import (
     HttpRequest,
     JsonResponse,
@@ -14,6 +20,9 @@ from plain.utils.decorators import classonlymethod
 from .exceptions import ResponseException
 
 logger = logging.getLogger("plain.request")
+
+
+tracer = trace.get_tracer("plain")
 
 
 class View:
@@ -35,9 +44,23 @@ class View:
     @classonlymethod
     def as_view(cls, *init_args, **init_kwargs):
         def view(request, *url_args, **url_kwargs):
-            v = cls(*init_args, **init_kwargs)
-            v.setup(request, *url_args, **url_kwargs)
-            return v.get_response()
+            with tracer.start_as_current_span(
+                f"{cls.__name__}",
+                kind=trace.SpanKind.INTERNAL,
+                attributes={
+                    CODE_FUNCTION_NAME: "as_view",
+                    CODE_NAMESPACE: f"{cls.__module__}.{cls.__qualname__}",
+                },
+            ) as span:
+                v = cls(*init_args, **init_kwargs)
+                v.setup(request, *url_args, **url_kwargs)
+                response = v.get_response()
+                span.set_status(
+                    trace.StatusCode.OK
+                    if response.status_code < 400
+                    else trace.StatusCode.ERROR
+                )
+                return response
 
         view.view_class = cls
 

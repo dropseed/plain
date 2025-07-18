@@ -1,6 +1,9 @@
 import logging
 import types
 
+from opentelemetry import baggage, trace
+from opentelemetry.semconv.attributes import http_attributes, url_attributes
+
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import log_response
 from plain.runtime import settings
@@ -26,6 +29,9 @@ BUILTIN_AFTER_MIDDLEWARE = [
 ]
 
 
+tracer = trace.get_tracer("plain")
+
+
 class BaseHandler:
     _middleware_chain = None
 
@@ -35,8 +41,7 @@ class BaseHandler:
 
         Must be called after the environment is fixed (see __call__ in subclasses).
         """
-        get_response = self._get_response
-        handler = convert_exception_to_response(get_response)
+        handler = convert_exception_to_response(self._get_response)
 
         middlewares = reversed(
             BUILTIN_BEFORE_MIDDLEWARE + settings.MIDDLEWARE + BUILTIN_AFTER_MIDDLEWARE
@@ -59,18 +64,55 @@ class BaseHandler:
 
     def get_response(self, request):
         """Return a Response object for the given HttpRequest."""
-        # Setup default url resolver for this thread
-        response = self._middleware_chain(request)
-        response._resource_closers.append(request.close)
-        if response.status_code >= 400:
-            log_response(
-                "%s: %s",
-                response.reason_phrase,
-                request.path,
-                response=response,
-                request=request,
+
+        span_attributes = {
+            "plain.request.id": request.unique_id,
+            http_attributes.HTTP_REQUEST_METHOD: request.method,
+            url_attributes.URL_PATH: request.path_info,
+            url_attributes.URL_SCHEME: request.scheme,
+        }
+
+        # Add full URL if we can build it (requires proper WSGI environment)
+        try:
+            span_attributes[url_attributes.URL_FULL] = request.build_absolute_uri()
+        except KeyError:
+            # Missing required WSGI environment variables (e.g. in tests)
+            pass
+
+        # Add query string if present
+        if query_string := request.meta.get("QUERY_STRING"):
+            span_attributes[url_attributes.URL_QUERY] = query_string
+
+        span_context = baggage.set_baggage("http.request.cookies", request.cookies)
+
+        with tracer.start_as_current_span(
+            f"{request.method} {request.path_info}",
+            context=span_context,
+            attributes=span_attributes,
+            kind=trace.SpanKind.SERVER,
+        ) as span:
+            response = self._middleware_chain(request)
+            response._resource_closers.append(request.close)
+
+            span.set_attribute(
+                http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
             )
-        return response
+
+            span.set_status(
+                trace.StatusCode.OK
+                if response.status_code < 400
+                else trace.StatusCode.ERROR
+            )
+
+            if response.status_code >= 400:
+                log_response(
+                    "%s: %s",
+                    response.reason_phrase,
+                    request.path,
+                    response=response,
+                    request=request,
+                )
+            return response
 
     def _get_response(self, request):
         """
@@ -94,9 +136,18 @@ class BaseHandler:
         Retrieve/set the urlrouter for the request. Return the view resolved,
         with its args and kwargs.
         """
+
         resolver = get_resolver()
         # Resolve the view, and assign the match object back to the request.
         resolver_match = resolver.resolve(request.path_info)
+
+        span = trace.get_current_span()
+        span.set_attribute(http_attributes.HTTP_ROUTE, resolver_match.route)
+
+        # Route makes a better name
+        if resolver_match.route:
+            span.update_name(f"{request.method} {resolver_match.route}")
+
         request.resolver_match = resolver_match
         return resolver_match
 
