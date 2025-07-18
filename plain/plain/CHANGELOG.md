@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.54.0](https://github.com/dropseed/plain/releases/plain@0.54.0) (2025-07-18)
+
+### What's changed
+
+- Added OpenTelemetry instrumentation for HTTP requests, views, and template rendering ([b0224d0418](https://github.com/dropseed/plain/commit/b0224d0418))
+- Added `plain-observer` package reference to plain README ([f29ff4dafe](https://github.com/dropseed/plain/commit/f29ff4dafe))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.53.0](https://github.com/dropseed/plain/releases/plain@0.53.0) (2025-07-18)
 
 ### What's changed
