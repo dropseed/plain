@@ -8,8 +8,12 @@ BOLD = '\033[1m'
 END = '\033[0m'
 
 
-def run(cmd: str, cwd: Path) -> str:
-    return subprocess.check_output(cmd, cwd=cwd, text=True, shell=True).strip()
+def run(cmd: str, cwd: Path, capture=True) -> str:
+    if capture:
+        return subprocess.check_output(cmd, cwd=cwd, text=True, shell=True).strip()
+    else:
+        subprocess.check_call(cmd, cwd=cwd, shell=True)
+        return ""
 
 
 def discover_packages(repo_path: Path):
@@ -145,6 +149,7 @@ def main():
         run("uv sync", repo_path)
 
         # Need to update the changelog here so it's in the commit
+        print("Generating release notes...")
         subprocess.check_call(["./scripts/generate-release-notes", package, new_version])
 
         # Ask if they are ready to commit
@@ -155,20 +160,21 @@ def main():
 
         subprocess.check_call(["./scripts/fix"], cwd=repo_path)
 
-        run(f"git add {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'} uv.lock", repo_path)
+        run(f"git add {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'} uv.lock", repo_path, capture=False)
         run(
-            f"git commit -m 'Release {package} {new_version}' -n", repo_path
+            f"git commit -m 'Release {package} {new_version}' -n", repo_path, capture=False
         )
         run(
-            f"git tag -a {package}@{new_version} -m 'Release {package} {new_version}'",
+            f"git tag -a '{package}@{new_version}' -m 'Release {package} {new_version}'",
             repo_path,
+            capture=False,
         )
         print(f"Released {package} {new_version}")
 
     # Push all changes
     confirm = input("Push all changes? (y/n): ")
     if confirm.lower() == "y":
-        run("git push --follow-tags", repo_path)
+        run("git push --follow-tags", repo_path, capture=False)
         print("Changes pushed successfully.")
 
 
