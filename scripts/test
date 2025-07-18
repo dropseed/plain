@@ -1,11 +1,9 @@
-#!/bin/sh -e
+#!/bin/bash -e
 
 # Run the test-suite for each first-party package as well as the demo projects.
 #
 #  • Installs database driver wheels on-demand based on the current
 #    $DATABASE_URL scheme (postgres → psycopg, mysql → mysqlclient).
-
-ROOT_DIR="$(pwd)"
 
 # ---------------------------------------------------------------------------
 # CLI option parsing
@@ -66,7 +64,7 @@ for package in $packages; do
     --isolated \
     --package "$package" \
     $WITH \
-    pytest "$@"
+    python -m pytest "$@"
   set +x
 
   cd ../..
@@ -77,6 +75,6 @@ for demo in demos/*; do
   echo
   bold "Testing $demo"
   cd "$demo"
-  uv run --isolated $WITH pytest "$@"
+  uv run --isolated $WITH python -m pytest "$@"
   cd ..
 done
