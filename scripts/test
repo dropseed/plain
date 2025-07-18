@@ -2,8 +2,6 @@
 
 # Run the test-suite for each first-party package as well as the demo projects.
 #
-#  • Optional “--cov” flag controls whether pytest-cov is used and reports are
-#    generated.  CI will pass this flag, local devs needn’t pay the overhead.
 #  • Installs database driver wheels on-demand based on the current
 #    $DATABASE_URL scheme (postgres → psycopg, mysql → mysqlclient).
 
@@ -12,12 +10,6 @@ ROOT_DIR="$(pwd)"
 # ---------------------------------------------------------------------------
 # CLI option parsing
 # ---------------------------------------------------------------------------
-COVERAGE=0
-if [ "$1" = "--coverage" ]; then
-  COVERAGE=1
-  shift
-fi
-
 # A single package name may be supplied to limit the run; otherwise test all
 # first-party packages in a deterministic order.
 ALL_PACKAGES="$(cat <<EOF
@@ -56,20 +48,10 @@ fi
 
 WITH=""
 case "$DATABASE_URL" in
-  # For some reason, if I try to run this without pytest-cov then it fails to find the db client...
-  postgres:*|postgresql:*) WITH="--with pytest-cov --with psycopg[binary]" ;;
-  mysql:*)                 WITH="--with pytest-cov --with mysqlclient"    ;;
-  sqlite:*|sqlite3:*)     WITH="--with pytest-cov"         ;;
+  postgres:*|postgresql:*) WITH="--with psycopg[binary]" ;;
+  mysql:*)                 WITH="--with mysqlclient"    ;;
+  sqlite:*|sqlite3:*)     WITH=""         ;;
 esac
-
-# ---------------------------------------------------------------------------
-# Coverage configuration (if requested)
-# ---------------------------------------------------------------------------
-COV_ARGS=""
-if [ "$COVERAGE" -eq 1 ]; then
-  export COVERAGE_FILE="$ROOT_DIR/.coverage"
-  COV_ARGS="--cov=plain --cov-append --cov-report=xml:$ROOT_DIR/coverage.xml --cov-report=html:$ROOT_DIR/htmlcov"
-fi
 
 bold "Packages to test: $packages"
 
@@ -84,7 +66,7 @@ for package in $packages; do
     --isolated \
     --package "$package" \
     $WITH \
-    pytest $COV_ARGS "$@"
+    pytest "$@"
   set +x
 
   cd ../..
@@ -98,7 +80,3 @@ for demo in demos/*; do
   uv run --isolated $WITH pytest "$@"
   cd ..
 done
-
-if [ "$COVERAGE" -eq 1 ]; then
-  echo "\nCombined coverage reports generated. Open $ROOT_DIR/htmlcov/index.html in a browser." >&2
-fi

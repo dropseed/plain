@@ -4,7 +4,6 @@
 *.py[co]
 __pycache__
 *.DS_Store
-.coverage
 
 # Test apps
 plain*/tests/.plain
@@ -17,5 +16,4 @@ plain*/tests/.plain
 # Plain temp dirs
 .plain
 
-coverage.xml
 .vscode
