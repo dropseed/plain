@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-sessions@0.25.0) (2025-07-18)
+
+### What's changed
+
+- Session middleware now includes OpenTelemetry tracing support, automatically setting the session ID as a span attribute when available ([b0224d0](https://github.com/dropseed/plain/commit/b0224d0418da293553fc599ae766eec82f607326))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-sessions@0.24.0) (2025-07-18)
 
 ### What's changed
