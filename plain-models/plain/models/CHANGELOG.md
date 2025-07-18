@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-models@0.37.0) (2025-07-18)
+
+### What's changed
+
+- Added OpenTelemetry instrumentation for database operations - all SQL queries now automatically generate OpenTelemetry spans with standardized attributes following semantic conventions ([b0224d0](https://github.com/dropseed/plain/commit/b0224d0))
+- Database operations in tests are now wrapped with tracing suppression to avoid generating telemetry noise during test execution ([b0224d0](https://github.com/dropseed/plain/commit/b0224d0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-models@0.36.0) (2025-07-18)
 
 ### What's changed
