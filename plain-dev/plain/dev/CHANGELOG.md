@@ -1,5 +1,20 @@
 # plain-dev changelog
 
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-dev@0.33.0) (2025-07-18)
+
+### What's changed
+
+- Added automatic background startup of dev services when running `plain dev` commands. Services defined in `pyproject.toml` will now start automatically ([0a5ffc6de5](https://github.com/dropseed/plain/commit/0a5ffc6de5)).
+- Added `plain dev logs` command to view output from recent `plain dev` runs. Supports options like `--follow`, `--pid`, `--path`, and `--services` to manage and view different log outputs ([0a5ffc6de5](https://github.com/dropseed/plain/commit/0a5ffc6de5)).
+- Added `--start` and `--stop` flags to both `plain dev` and `plain dev services` commands for running processes in the background. Use `plain dev --start` to launch the dev server in background mode and `plain dev --stop` to terminate it ([0a5ffc6de5](https://github.com/dropseed/plain/commit/0a5ffc6de5)).
+- Improved process management with better PID tracking and graceful shutdown handling for both dev server and services ([0a5ffc6de5](https://github.com/dropseed/plain/commit/0a5ffc6de5)).
+- Improved CLI error handling by using `click.UsageError` instead of manual error printing and `sys.exit()` ([88f06c5184](https://github.com/dropseed/plain/commit/88f06c5184)).
+- Removed `psycopg[binary]` dependency from plain-dev as database drivers should be installed separately based on project needs ([63224001c9](https://github.com/dropseed/plain/commit/63224001c9)).
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.32.1](https://github.com/dropseed/plain/releases/plain-dev@0.32.1) (2025-06-27)
 
 ### What's changed
