@@ -1,3 +1,13 @@
+## [0.3.4](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.4) (2025-07-18)
+
+### What's changed
+
+- The generated upgrade prompt now provides more specific guidance about migrate backups, warning against using `--no-backup` option instead of the general "without backup enabled" ([ac5e642](https://github.com/dropseed/plain/commit/ac5e642df4a554368f7937459d39a0b44b598109))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.3](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.3) (2025-07-18)
 
 ### What's changed
