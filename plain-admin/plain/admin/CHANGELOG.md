@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-admin@0.35.0) (2025-07-18)
+
+### What's changed
+
+- The built-in QueryStats functionality has been completely removed from plain-admin in favor of the new OpenTelemetry-based observability tools in the `plain-observer` package ([b0224d0](https://github.com/dropseed/plain/commit/b0224d0))
+- QueryStats documentation has been removed from the admin README ([97fb69d](https://github.com/dropseed/plain/commit/97fb69d))
+
+### Upgrade instructions
+
+- Remove any querystats-related settings like `ADMIN_QUERYSTATS_IGNORE_URLS` from your configuration
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-admin@0.34.0) (2025-07-18)
 
 ### What's changed
