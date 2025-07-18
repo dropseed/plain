@@ -30,7 +30,7 @@ Example release notes:
 
 Write the release notes to the CHANGELOG.md file in the associated package (i.e. plain-admin/plain/admin/CHANGELOG.md). If the version isn't in the CHANGELOG yet, add it.
 
-Once the CHANGELOG.md is updated and you are finished, simply output the release notes for this version, nothing else. This command will be piped to another command.
+Once the CHANGELOG.md is updated and you are finished, simply output the release notes for this version, nothing else above or below it. This command will be piped to another command.
 
 Generate release notes for this package version (the current commit which is not yet tagged but will be as {pkg}@{version}):"
 
@@ -41,7 +41,7 @@ if [ -z "$PKG" ]; then
   exit 1
 fi
 
-NOTES=$(codex -m o3 --flex-mode --full-auto --no-project-doc -q "$PROMPT $PKG $VERSION" | tee /dev/stderr | jq --raw-output --slurp '.[-1].content[0].text')
+NOTES=$(claude --model sonnet --permission-mode acceptEdits -p "$PROMPT $PKG $VERSION")
 
 echo "\n\n"
 
