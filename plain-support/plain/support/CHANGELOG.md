@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-support@0.13.0) (2025-07-18)
+
+### What's changed
+
+- Migrations have been restarted and consolidated into a single initial migration file ([484f1b6e93](https://github.com/dropseed/plain/commit/484f1b6e93))
+
+### Upgrade instructions
+
+- Run `plain migrate --prune plainsupport` to update your migration history and remove references to the old migration files
+
 ## [0.12.3](https://github.com/dropseed/plain/releases/plain-support@0.12.3) (2025-06-24)
 
 ### What's changed
