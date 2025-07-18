@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-cache@0.16.0) (2025-07-18)
+
+### What's changed
+
+- Added OpenTelemetry tracing support for all cache operations (get, set, delete, exists) ([b0224d0](https://github.com/dropseed/plain/commit/b0224d0418))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-cache@0.15.0) (2025-07-18)
 
 ### What's changed

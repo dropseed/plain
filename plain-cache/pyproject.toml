@@ -3,7 +3,7 @@ name = "plain.cache"
 packages = [
     { include = "plain" },
 ]
-version = "0.15.0"
+version = "0.16.0"
 description = "Database-backed cache for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
