@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-models@0.36.0) (2025-07-18)
+
+### What's changed
+
+- Removed the `--merge` option from the `makemigrations` command ([d366663](https://github.com/dropseed/plain/commit/d366663))
+- Improved error handling in the `restore-backup` command using Click's error system ([88f06c5](https://github.com/dropseed/plain/commit/88f06c5))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-models@0.35.0) (2025-07-07)
 
 ### What's changed
