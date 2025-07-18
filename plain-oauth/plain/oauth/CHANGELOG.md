@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-oauth@0.23.0) (2025-07-18)
+
+### What's changed
+
+- Migrations have been restarted to consolidate the migration history into a single initial migration ([484f1b6](https://github.com/dropseed/plain/commit/484f1b6e93))
+
+### Upgrade instructions
+
+- Run `plain migrate --prune plainoauth` after upgrading to clean up old migration records
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-oauth@0.22.0) (2025-06-23)
 
 ### What's changed
