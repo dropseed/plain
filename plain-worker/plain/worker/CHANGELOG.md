@@ -1,5 +1,15 @@
 # plain-worker changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-worker@0.23.0) (2025-07-18)
+
+### What's changed
+
+- Migrations have been reset and consolidated into a single initial migration ([484f1b6e93](https://github.com/dropseed/plain/commit/484f1b6e93))
+
+### Upgrade instructions
+
+- Run `plain migrate --prune plainworker` to remove old migration records and apply the consolidated migration
+
 ## [0.22.5](https://github.com/dropseed/plain/releases/plain-worker@0.22.5) (2025-06-24)
 
 ### What's changed
