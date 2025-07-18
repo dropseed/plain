@@ -18,6 +18,8 @@ do
     cd ../..
 done
 
+uv sync
+
 if [ ! -f .git/hooks/pre-commit ]; then
     echo ""
     echo "${BOLD}Installing git pre-commit hook${NORMAL}"
