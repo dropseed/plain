@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.33.1](https://github.com/dropseed/plain/releases/plain-dev@0.33.1) (2025-07-18)
+
+### What's changed
+
+- Dev services are no longer automatically started when running in CI environments unless explicitly enabled with `PLAIN_DEV_SERVICES_AUTO=true` ([b8452bae74](https://github.com/dropseed/plain/commit/b8452bae74))
+- The `plain dev logs` command now skips automatic service startup to avoid conflicts ([ff65428bca](https://github.com/dropseed/plain/commit/ff65428bca))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-dev@0.33.0) (2025-07-18)
 
 ### What's changed
