@@ -1,3 +1,14 @@
+## [0.3.2](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.2) (2025-07-18)
+
+### What's changed
+
+- The generated upgrade prompt now provides clearer, more detailed instructions with numbered steps and improved formatting for better readability ([37fa6f3](https://github.com/dropseed/plain/commit/37fa6f3))
+- Documentation now uses Claude as the example AI agent command instead of Codex ([04e550b](https://github.com/dropseed/plain/commit/04e550b))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.1](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.1) (2025-07-07)
 
 ### What's changed
