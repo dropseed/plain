@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-flags@0.19.0) (2025-07-18)
+
+### What's changed
+
+- Migrations have been restarted and consolidated into a single initial migration ([484f1b6](https://github.com/dropseed/plain/commit/484f1b6e93))
+
+### Upgrade instructions
+
+- Run `plain migrate --prune plainflags` to clean up old migrations when upgrading from a previous version
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-flags@0.18.0) (2025-06-23)
 
 ### What's changed
