@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-flags@0.20.0) (2025-07-18)
+
+### What's changed
+
+- Added OpenTelemetry tracing support to flag evaluation with detailed spans and attributes ([b0224d0](https://github.com/dropseed/plain/commit/b0224d0418))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-flags@0.19.0) (2025-07-18)
 
 ### What's changed
