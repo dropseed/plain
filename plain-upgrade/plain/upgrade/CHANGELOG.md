@@ -1,3 +1,13 @@
+## [0.3.3](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.3) (2025-07-18)
+
+### What's changed
+
+- The generated upgrade prompt now includes `plain fix --unsafe-fixes` in the post-upgrade instructions to automatically fix code style issues before running pre-commit checks ([c7936fa](https://github.com/dropseed/plain/commit/c7936fa546f50d2cbc10a712f9bc4089315d2b8a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.2](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.2) (2025-07-18)
 
 ### What's changed

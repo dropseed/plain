@@ -896,7 +896,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-upgrade"
-version = "0.3.2"
+version = "0.3.3"
 source = { editable = "plain-upgrade" }
 dependencies = [
     { name = "ast-grep-cli" },
