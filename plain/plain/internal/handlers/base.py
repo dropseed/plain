@@ -142,11 +142,13 @@ class BaseHandler:
         resolver_match = resolver.resolve(request.path_info)
 
         span = trace.get_current_span()
-        span.set_attribute(http_attributes.HTTP_ROUTE, resolver_match.route)
 
         # Route makes a better name
         if resolver_match.route:
-            span.update_name(f"{request.method} {resolver_match.route}")
+            # Add leading slash for consistency with HTTP paths
+            route_with_slash = f"/{resolver_match.route}"
+            span.set_attribute(http_attributes.HTTP_ROUTE, route_with_slash)
+            span.update_name(f"{request.method} {route_with_slash}")
 
         request.resolver_match = resolver_match
         return resolver_match
