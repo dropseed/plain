@@ -38,4 +38,4 @@ Learn more at [plainframework.com](https://plainframework.com).
 
 ---
 
-_Plain is a fork of [Django](https://www.djangoproject.com/). It has no affiliation with the Django project or the Django Software Foundation._
+_Plain was originally a fork of [Django](https://www.djangoproject.com/). It has no affiliation with the Django project or the Django Software Foundation._
