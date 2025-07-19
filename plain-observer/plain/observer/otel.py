@@ -18,7 +18,7 @@ from .core import Observer, ObserverMode
 logger = logging.getLogger(__name__)
 
 
-def get_span_processor():
+def get_observer_span_processor():
     """Get the span collector instance from the tracer provider."""
     if not (current_provider := trace.get_tracer_provider()):
         return None
@@ -41,7 +41,7 @@ def get_current_trace_summary() -> str | None:
     if not (current_span := trace.get_current_span()):
         return None
 
-    if not (processor := get_span_processor()):
+    if not (processor := get_observer_span_processor()):
         return None
 
     trace_id = f"0x{format_trace_id(current_span.get_span_context().trace_id)}"
@@ -126,6 +126,50 @@ class ObserverSampler(sampling.Sampler):
         return "ObserverSampler"
 
 
+class ObserverCombinedSampler(sampling.Sampler):
+    """Combine another sampler with ``ObserverSampler``."""
+
+    def __init__(self, primary: sampling.Sampler, secondary: sampling.Sampler):
+        self.primary = primary
+        self.secondary = secondary
+
+    def should_sample(
+        self,
+        parent_context,
+        trace_id,
+        name,
+        kind: SpanKind | None = None,
+        attributes=None,
+        links=None,
+        trace_state=None,
+    ):
+        result = self.primary.should_sample(
+            parent_context,
+            trace_id,
+            name,
+            kind=kind,
+            attributes=attributes,
+            links=links,
+            trace_state=trace_state,
+        )
+
+        if result.decision is sampling.Decision.DROP:
+            return self.secondary.should_sample(
+                parent_context,
+                trace_id,
+                name,
+                kind=kind,
+                attributes=attributes,
+                links=links,
+                trace_state=trace_state,
+            )
+
+        return result
+
+    def get_description(self) -> str:
+        return f"ObserverCombinedSampler({self.primary.get_description()}, {self.secondary.get_description()})"
+
+
 class ObserverSpanProcessor(SpanProcessor):
     """Collects spans in real-time for current trace performance monitoring.
 
@@ -148,6 +192,9 @@ class ObserverSpanProcessor(SpanProcessor):
             }
         )
         self._traces_lock = threading.Lock()
+        self._ignore_url_paths = [
+            re.compile(p) for p in settings.OBSERVER_IGNORE_URL_PATTERNS
+        ]
 
     def on_start(self, span, parent_context=None):
         """Called when a span starts."""
@@ -295,6 +342,13 @@ class ObserverSpanProcessor(SpanProcessor):
                     )
 
     def _get_recording_mode(self, span, parent_context) -> str | None:
+        # Again check the span attributes, in case we relied on another sampler
+        if span.attributes:
+            if url_path := span.attributes.get(url_attributes.URL_PATH, ""):
+                for pattern in self._ignore_url_paths:
+                    if pattern.match(url_path):
+                        return None
+
         # If the span has links, then we are going to export if the linked span is also exported
         for link in span.links:
             if link.context.is_valid and link.context.span_id:
