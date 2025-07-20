@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.54.1](https://github.com/dropseed/plain/releases/plain@0.54.1) (2025-07-20)
+
+### What's changed
+
+- Fixed OpenTelemetry route naming to include leading slash for consistency with HTTP paths ([9d77268](https://github.com/dropseed/plain/commit/9d77268988))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.54.0](https://github.com/dropseed/plain/releases/plain@0.54.0) (2025-07-18)
 
 ### What's changed
