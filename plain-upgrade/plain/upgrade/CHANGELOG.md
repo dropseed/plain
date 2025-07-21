@@ -1,3 +1,14 @@
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-upgrade@0.4.0) (2025-07-21)
+
+### What's changed
+
+- The environment variable for configuring the AI agent command has been renamed from `PLAIN_UPGRADE_AGENT_COMMAND` to `PLAIN_AGENT_COMMAND` ([7be98d3](https://github.com/dropseed/plain/commit/7be98d3de11debca2a73402c85687e485c4234aa))
+- The prompt output now displays before the instruction message for better visibility ([684f208](https://github.com/dropseed/plain/commit/684f2087fc5fe7ba3637a2fd95d73629705f5ec0))
+
+### Upgrade instructions
+
+- Update any environment variable references from `PLAIN_UPGRADE_AGENT_COMMAND` to `PLAIN_AGENT_COMMAND` in your shell configuration files (`.zshrc`, `.bashrc`) or project environment files (`.env`)
+
 ## [0.3.4](https://github.com/dropseed/plain/releases/plain-upgrade@0.3.4) (2025-07-18)
 
 ### What's changed
