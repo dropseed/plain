@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.38.0](https://github.com/dropseed/plain/releases/plain-models@0.38.0) (2025-07-21)
+
+### What's changed
+
+- Added `get_or_none()` method to QuerySet which returns a single object matching the given arguments or None if no object is found ([48e07bf](https://github.com/dropseed/plain/commit/48e07bf))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.0](https://github.com/dropseed/plain/releases/plain-models@0.37.0) (2025-07-18)
 
 ### What's changed
