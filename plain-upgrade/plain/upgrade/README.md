@@ -7,7 +7,7 @@ The `plain-upgrade` command can be run using `uvx` (part of the `uv` package man
 The recommended way to use it is to define your preferred LLM/AI agent command either in your personal shell configuration (ex. `.zshrc` or `.bashrc`) or in your project (ex. `.env`).
 
 ```bash
-export PLAIN_UPGRADE_AGENT_COMMAND="claude --permission-mode acceptEdits"
+export PLAIN_AGENT_COMMAND="claude --permission-mode acceptEdits"
 ```
 
 Updating Plain is then as simple as running:

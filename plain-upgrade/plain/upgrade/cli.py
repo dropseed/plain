@@ -17,7 +17,7 @@ LOCK_FILE = Path("uv.lock")
 )
 @click.option(
     "--agent-command",
-    envvar="PLAIN_UPGRADE_AGENT_COMMAND",
+    envvar="PLAIN_AGENT_COMMAND",
     help="Run command with generated prompt",
 )
 def cli(
@@ -68,7 +68,7 @@ def cli(
             )
     else:
         click.secho(
-            "\nCopy this prompt to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_UPGRADE_AGENT_COMMAND environment variable.\n",
+            "\nCopy this prompt to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_AGENT_COMMAND environment variable.\n",
             dim=True,
             italic=True,
             err=True,
