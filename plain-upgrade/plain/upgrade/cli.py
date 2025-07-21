@@ -67,13 +67,13 @@ def cli(
                 err=True,
             )
     else:
+        click.echo(prompt)
         click.secho(
-            "\nCopy this prompt to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_AGENT_COMMAND environment variable.\n",
+            "\nCopy the prompt above to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_AGENT_COMMAND environment variable.",
             dim=True,
             italic=True,
             err=True,
         )
-        click.echo(prompt)
 
 
 def get_installed_plain_packages() -> list[str]:
