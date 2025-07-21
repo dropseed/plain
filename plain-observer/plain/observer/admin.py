@@ -34,14 +34,6 @@ class TraceViewset(AdminViewset):
 
     class DetailView(AdminModelDetailView):
         model = Trace
-        template_name = "admin/observer/trace_detail.html"
-
-        def get_template_context(self):
-            context = super().get_template_context()
-            trace_id = self.url_kwargs["pk"]
-            context["trace"] = Trace.objects.get(pk=trace_id)
-            context["show_delete_button"] = False
-            return context
 
 
 @register_viewset
