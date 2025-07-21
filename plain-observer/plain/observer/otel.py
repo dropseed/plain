@@ -45,6 +45,9 @@ def get_current_trace_summary() -> str | None:
         return None
 
     trace_id = f"0x{format_trace_id(current_span.get_span_context().trace_id)}"
+
+    # Technically we're still in the trace... so the duration and stuff could shift slightly
+    # (though we should be at the end of the template, hopefully)
     return processor.get_trace_summary(trace_id)
 
 
@@ -265,6 +268,10 @@ class ObserverSpanProcessor(SpanProcessor):
                         "Exporting %d spans for trace %s",
                         len(trace_info["span_models"]),
                         trace_id,
+                    )
+                    # The trace is done now, so we can get a more accurate summary
+                    trace_info["trace"].summary = trace_info["trace"].get_trace_summary(
+                        trace_info["span_models"]
                     )
                     self._export_trace(trace_info["trace"], trace_info["span_models"])
 

@@ -1,45 +1,29 @@
-{% if observer.is_enabled() %}
-<form method="post" action="{{ url('observer:traces') }}" style="display: inline;">
-    <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
-    {% if observer.is_summarizing() %}
-        {# Toggle from summary to persist #}
-        <input type="hidden" name="observe_action" value="persist">
-    {% else %}
-        {# Toggle from persist to summary #}
-        <input type="hidden" name="observe_action" value="summary">
+<button
+    type="button"
+    class="inline-flex items-center cursor-pointer text-xs rounded-full px-2.5 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"
+    data-toolbar-tab="Observer">
+    {% if observer.is_persisting() %}
+        <span class="relative inline-flex size-2 mr-2.5">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+            <span class="relative inline-flex size-2 rounded-full bg-red-500"></span>
+        </span>
+    {% elif observer.is_summarizing() %}
+        <span class="relative inline-flex size-2 mr-2">
+            <span class="relative inline-flex size-2 rounded-full bg-zinc-500"></span>
+        </span>
+    {% elif not observer.is_enabled() %}
+        <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-2"></span>
     {% endif %}
-    <button
-        class="inline-flex items-center cursor-pointer text-xs rounded-full px-2.5 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"
-        type="submit"
-        data-toolbar-tab="Observer"
-        title="Toggle observer mode ({% if observer.is_summarizing() %}summary{% elif observer.is_persisting() %}persist{% else %}disabled{% endif %} mode){% if observer.get_current_trace_summary() %} - {{ observer.get_current_trace_summary() }}{% endif %} - Click to switch to {% if observer.is_summarizing() %}persist{% else %}summary{% endif %} mode">
-        {% if observer.is_persisting() %}
-            <span class="relative inline-flex size-2 mr-2.5">
-                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-                <span class="relative inline-flex size-2 rounded-full bg-red-500"></span>
-            </span>
-        {% elif observer.is_summarizing() %}
-            <span class="relative inline-flex size-2 mr-2.5">
-                <span class="relative inline-flex size-2 rounded-full bg-zinc-500"></span>
-            </span>
-        {% endif %}
-        {% if observer.get_current_trace_summary() %}
-            <span class="font-mono tracking-tight">{{ observer.get_current_trace_summary() }}</span>
-        {% else %}
-            {% if observer.is_persisting() %}Recording{% elif observer.is_summarizing() %}Summary{% else %}Observing{% endif %}
-        {% endif %}
-    </button>
-</form>
-{% else %}
-<form method="post" action="{{ url('observer:traces') }}" style="display: inline;">
-    <input type="hidden" name="redirect_url" value="{{ request.get_full_path() }}">
-    <input type="hidden" name="observe_action" value="summary">
-    <button
-        type="submit"
-        class="cursor-pointer text-xs rounded-full px-2 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"
-        title="Enable observer">
-        <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-1"></span>
+
+    {% if observer.get_current_trace_summary() %}
+        {{ observer.get_current_trace_summary() }}
+    {% elif observer.is_persisting() %}
+        Recording
+    {% elif observer.is_summarizing() %}
+        Summary
+    {% elif observer.is_enabled() %}
+        Observing
+    {% else %}
         Observer disabled
-    </button>
-</form>
-{% endif %}
+    {% endif %}
+</button>

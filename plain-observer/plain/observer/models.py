@@ -1,4 +1,5 @@
 import json
+import secrets
 from datetime import UTC, datetime
 from functools import cached_property
 
@@ -15,6 +16,8 @@ from opentelemetry.semconv.attributes import db_attributes
 from opentelemetry.trace import format_trace_id
 
 from plain import models
+from plain.urls import reverse
+from plain.utils import timezone
 
 
 @models.register_model
@@ -24,11 +27,16 @@ class Trace(models.Model):
     end_time = models.DateTimeField()
 
     root_span_name = models.TextField(default="", required=False)
+    summary = models.CharField(max_length=255, default="", required=False)
 
     # Plain fields
     request_id = models.CharField(max_length=255, default="", required=False)
     session_id = models.CharField(max_length=255, default="", required=False)
     user_id = models.CharField(max_length=255, default="", required=False)
+
+    # Shareable URL fields
+    share_id = models.CharField(max_length=32, default="", required=False)
+    share_created_at = models.DateTimeField(allow_null=True, required=False)
 
     class Meta:
         ordering = ["-start_time"]
@@ -38,25 +46,43 @@ class Trace(models.Model):
                 name="observer_unique_trace_id",
             )
         ]
+        indexes = [
+            models.Index(fields=["trace_id"]),
+            models.Index(fields=["start_time"]),
+            models.Index(fields=["request_id"]),
+            models.Index(fields=["share_id"]),
+            models.Index(fields=["session_id"]),
+        ]
 
     def __str__(self):
         return self.trace_id
 
+    def get_absolute_url(self):
+        """Return the canonical URL for this trace."""
+        return reverse("observer:trace_detail", trace_id=self.trace_id)
+
+    def generate_share_id(self):
+        """Generate a unique share ID for this trace."""
+        self.share_id = secrets.token_urlsafe(24)
+        self.share_created_at = timezone.now()
+        self.save(update_fields=["share_id", "share_created_at"])
+        return self.share_id
+
+    def remove_share_id(self):
+        """Remove the share ID from this trace."""
+        self.share_id = ""
+        self.share_created_at = None
+        self.save(update_fields=["share_id", "share_created_at"])
+
     def duration_ms(self):
         return (self.end_time - self.start_time).total_seconds() * 1000
 
-    def get_trace_summary(self, spans=None):
+    def get_trace_summary(self, spans):
         """Get a concise summary string for toolbar display.
 
         Args:
             spans: Optional list of span objects. If not provided, will query from database.
         """
-        # Get spans from database if not provided
-        if spans is None:
-            spans = list(self.spans.all())
-
-        if not spans:
-            return ""
 
         # Count database queries and track duplicates
         query_counts = {}
@@ -132,9 +158,6 @@ class Trace(models.Model):
             else None
         )
 
-        # Create trace instance
-        # Note: end_time might be None if there are active spans
-        # This is OK since this trace is only used for summaries, not persistence
         return cls(
             trace_id=trace_id,
             start_time=start_time,
@@ -146,9 +169,27 @@ class Trace(models.Model):
             root_span_name=root_span.name if root_span else "",
         )
 
-    def get_annotated_spans(self):
-        """Return spans with annotations and nesting information."""
-        spans = list(self.spans.all().order_by("start_time"))
+    def as_dict(self):
+        spans = [span.span_data for span in self.spans.all().order_by("start_time")]
+
+        return {
+            "trace_id": self.trace_id,
+            "start_time": self.start_time.isoformat(),
+            "end_time": self.end_time.isoformat(),
+            "duration_ms": self.duration_ms(),
+            "summary": self.summary,
+            "root_span_name": self.root_span_name,
+            "request_id": self.request_id,
+            "user_id": self.user_id,
+            "session_id": self.session_id,
+            "spans": spans,
+        }
+
+
+class SpanQuerySet(models.QuerySet):
+    def annotate_spans(self):
+        """Annotate spans with nesting levels and duplicate query warnings."""
+        spans = list(self.order_by("start_time"))
 
         # Build span dictionary for parent lookups
         span_dict = {span.span_id: span for span in spans}
@@ -191,20 +232,6 @@ class Trace(models.Model):
 
         return spans
 
-    def as_dict(self):
-        spans = [span.span_data for span in self.spans.all().order_by("start_time")]
-
-        return {
-            "trace_id": self.trace_id,
-            "start_time": self.start_time.isoformat(),
-            "end_time": self.end_time.isoformat(),
-            "duration_ms": self.duration_ms(),
-            "request_id": self.request_id,
-            "user_id": self.user_id,
-            "session_id": self.session_id,
-            "spans": spans,
-        }
-
 
 @models.register_model
 class Span(models.Model):
@@ -219,6 +246,8 @@ class Span(models.Model):
     end_time = models.DateTimeField()
     status = models.CharField(max_length=50, default="", required=False)
     span_data = models.JSONField(default=dict, required=False)
+
+    objects = SpanQuerySet.as_manager()
 
     class Meta:
         ordering = ["-start_time"]

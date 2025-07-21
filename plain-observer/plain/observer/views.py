@@ -1,23 +1,21 @@
-from functools import cached_property
-
 from plain.auth.views import AuthViewMixin
 from plain.htmx.views import HTMXViewMixin
-from plain.http import JsonResponse, Response, ResponseRedirect
+from plain.http import JsonResponse, Response
 from plain.runtime import settings
-from plain.views import TemplateView
+from plain.urls import reverse
+from plain.views import DetailView, ListView
 
 from .core import Observer
 from .models import Trace
 
 
-class ObserverTracesView(AuthViewMixin, HTMXViewMixin, TemplateView):
+class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
     template_name = "observer/traces.html"
+    context_object_name = "traces"
     admin_required = True
 
-    @cached_property
-    def observer(self):
-        """Get the Observer instance for this request."""
-        return Observer(self.request)
+    def get_objects(self):
+        return Trace.objects.all()
 
     def check_auth(self):
         # Allow the view if we're in DEBUG
@@ -34,72 +32,108 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, TemplateView):
 
     def get_template_context(self):
         context = super().get_template_context()
-        context["observer"] = self.observer
-        context["traces"] = Trace.objects.all()
-        if trace_id := self.request.query_params.get("trace_id"):
-            context["trace"] = Trace.objects.filter(id=trace_id).first()
-        else:
-            context["trace"] = context["traces"].first()
+        context["observer"] = Observer(self.request)
         return context
 
-    def get(self):
-        # Check if JSON format is requested
-        if self.request.query_params.get("format") == "json":
-            if trace_id := self.request.query_params.get("trace_id"):
-                if trace := Trace.objects.filter(id=trace_id).first():
-                    return JsonResponse(trace.as_dict())
-            return JsonResponse({"error": "Trace not found"}, status=404)
+    def htmx_put_mode(self):
+        """Set observer mode via HTMX PUT."""
+        mode = self.request.data.get("mode")
+        observer = Observer(self.request)
 
-        return super().get()
-
-    def htmx_post_enable_summary(self):
-        """Enable summary mode via HTMX."""
         response = Response(status_code=204)
         response.headers["HX-Refresh"] = "true"
-        self.observer.enable_summary_mode(response)
-        return response
 
-    def htmx_post_enable_persist(self):
-        """Enable full persist mode via HTMX."""
-        response = Response(status_code=204)
-        response.headers["HX-Refresh"] = "true"
-        self.observer.enable_persist_mode(response)
-        return response
+        if mode == "summary":
+            observer.enable_summary_mode(response)
+        elif mode == "persist":
+            observer.enable_persist_mode(response)
+        elif mode == "disable":
+            observer.disable(response)
+        else:
+            return Response("Invalid mode", status_code=400)
 
-    def htmx_post_disable(self):
-        """Disable observer via HTMX."""
-        response = Response(status_code=204)
-        response.headers["HX-Refresh"] = "true"
-        self.observer.disable(response)
         return response
 
     def htmx_delete_traces(self):
         """Clear all traces via HTMX DELETE."""
-        Trace.objects.all().delete()
+        Trace.objects.filter(share_id="").delete()
         response = Response(status_code=204)
         response.headers["HX-Refresh"] = "true"
         return response
 
-    def htmx_delete_trace(self):
-        """Delete a specific trace via HTMX DELETE."""
-        trace_id = self.request.query_params.get("trace_id")
-        Trace.objects.get(id=trace_id).delete()
+
+class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
+    """Detail view for a specific trace."""
+
+    template_name = "observer/trace_detail.html"
+    context_object_name = "trace"
+    admin_required = True
+
+    def get_object(self):
+        return Trace.objects.get_or_none(trace_id=self.url_kwargs.get("trace_id"))
+
+    def check_auth(self):
+        # Allow the view if we're in DEBUG
+        if settings.DEBUG:
+            return
+        super().check_auth()
+
+    def get(self):
+        """Return trace data as HTML or JSON based on content negotiation."""
+        if (
+            "application/json" in self.request.headers.get("Accept", "")
+            or self.request.query_params.get("format") == "json"
+        ):
+            return self.get_object().as_dict()
+
+        return super().get()
+
+    def get_template_names(self):
+        if self.is_htmx_request():
+            # Use a different template for HTMX requests
+            return ["observer/trace.html"]
+        return super().get_template_names()
+
+    def htmx_delete(self):
+        trace = self.get_object()
+        trace.delete()
+
+        # Redirect to traces list after deletion
         response = Response(status_code=204)
-        response.headers["HX-Refresh"] = "true"
+        response.headers["HX-Redirect"] = reverse("observer:traces")
         return response
 
-    def post(self):
-        """A standard, non-htmx post used by the button html (where htmx may not be available)."""
+    def htmx_post_share(self):
+        trace = self.get_object()
+        trace.generate_share_id()
+        return super().get()
 
-        observe_action = self.request.data["observe_action"]
+    def htmx_delete_share(self):
+        trace = self.get_object()
+        trace.remove_share_id()
+        return super().get()
 
-        response = ResponseRedirect(self.request.data.get("redirect_url", "."))
 
-        if observe_action == "summary":
-            self.observer.enable_summary_mode(response)  # Default to summary mode
-        elif observe_action == "persist":
-            self.observer.enable_persist_mode(response)
-        elif observe_action == "disable":
-            self.observer.disable(response)
+class ObserverTraceSharedView(DetailView):
+    """Public view for shared trace data."""
 
-        return response
+    template_name = "observer/trace_share.html"
+    context_object_name = "trace"
+
+    def get_object(self):
+        return Trace.objects.get_or_none(share_id=self.url_kwargs["share_id"])
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["is_share_view"] = True
+        return context
+
+    def get(self):
+        """Return trace data as HTML or JSON based on content negotiation."""
+        if (
+            "application/json" in self.request.headers.get("Accept", "")
+            or self.request.query_params.get("format") == "json"
+        ):
+            return JsonResponse(self.get_object().as_dict())
+
+        return super().get()
