@@ -69,7 +69,7 @@ Here's an example:
 </header>
 
 <main>
-  {% htmxfragment main %}
+  {% htmxfragment "main" %}
   <p>The time is {% now "jS F Y H:i" %}</p>
 
   <button hx-get>Refresh</button>
@@ -86,7 +86,7 @@ If you want to render a fragment lazily,
 you can add the `lazy` attribute to the `{% htmxfragment %}` tag.
 
 ```html
-{% htmxfragment main lazy=True %}
+{% htmxfragment "main" lazy=True %}
 <!-- This content will be fetched with hx-get -->
 {% endhtmxfragment %}
 ```
@@ -109,7 +109,7 @@ class HomeView(HTMXViewMixin, TemplateView):
 ```
 
 ```html
-{% htmxfragment main lazy=True %}
+{% htmxfragment "main" lazy=True %}
 <ul>
   {% for item in items %}
     <li>{{ item }}</li>
@@ -174,7 +174,7 @@ In our template, we would use the `plain-hx-action` attribute to name the action
 </header>
 
 <main>
-  {% htmxfragment pullrequest %}
+  {% htmxfragment "pullrequest" %}
   <p>State: {{ pullrequest.state }}</p>
 
   {% if pullrequest.state == "open" %}
