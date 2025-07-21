@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.35.1](https://github.com/dropseed/plain/releases/plain-admin@0.35.1) (2025-07-21)
+
+### What's changed
+
+- The toolbar panel template context now includes a `panel` variable, making it easier for custom toolbar panels to reference themselves in templates ([47716ae](https://github.com/dropseed/plain/commit/47716ae))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-admin@0.35.0) (2025-07-18)
 
 ### What's changed
