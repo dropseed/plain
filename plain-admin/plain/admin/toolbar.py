@@ -57,6 +57,7 @@ class ToolbarPanel:
     def get_template_context(self):
         return {
             "request": self.request,
+            "panel": self,
         }
 
     def render(self):
