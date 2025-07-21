@@ -1,7 +1,7 @@
 import json
 import shlex
 import subprocess
-import urllib.parse
+import sys
 import urllib.request
 
 import click
@@ -487,55 +487,67 @@ def format_trace_output(trace):
 
 
 @observer_cli.command("diagnose")
-@click.argument("trace_id_or_url")
+@click.argument("trace_id", required=False)
+@click.option("--url", help="Fetch trace from a shareable URL")
+@click.option(
+    "--json", "json_input", help="Provide trace JSON data (use '-' for stdin)"
+)
 @click.option(
     "--agent-command",
     envvar="PLAIN_AGENT_COMMAND",
     help="Run command with generated prompt",
 )
-def diagnose(trace_id_or_url, agent_command):
+def diagnose(trace_id, url, json_input, agent_command):
     """Generate a diagnostic prompt for analyzing a trace.
 
-    Accepts either a trace ID or a shareable URL.
+    By default, provide a trace ID from the database. Use --url for a shareable
+    trace URL, or --json for raw trace data (--json - reads from stdin).
     """
 
-    # Check if it's a URL
-    if trace_id_or_url.startswith(("http://", "https://")):
-        # Extract JSON from URL
-        try:
-            # Create request with Accept header for JSON
-            request = urllib.request.Request(
-                trace_id_or_url, headers={"Accept": "application/json"}
-            )
+    input_count = sum(bool(x) for x in [trace_id, url, json_input])
+    if input_count == 0:
+        raise click.UsageError("Must provide trace ID, --url, or --json")
+    elif input_count > 1:
+        raise click.UsageError("Cannot specify multiple input methods")
 
-            # Fetch the JSON data
+    if json_input:
+        if json_input == "-":
+            try:
+                json_data = sys.stdin.read()
+                trace_data = json.loads(json_data)
+            except json.JSONDecodeError as e:
+                raise click.ClickException(f"Error parsing JSON from stdin: {e}")
+            except Exception as e:
+                raise click.ClickException(f"Error reading from stdin: {e}")
+        else:
+            try:
+                trace_data = json.loads(json_input)
+            except json.JSONDecodeError as e:
+                raise click.ClickException(f"Error parsing JSON: {e}")
+    elif url:
+        try:
+            request = urllib.request.Request(
+                url, headers={"Accept": "application/json"}
+            )
             with urllib.request.urlopen(request) as response:
                 trace_data = json.loads(response.read().decode())
         except Exception as e:
-            click.secho(f"Error fetching trace from URL: {e}", fg="red", err=True)
-            raise click.Abort()
+            raise click.ClickException(f"Error fetching trace from URL: {e}")
     else:
-        # It's a trace ID, get from database
         try:
-            trace = Trace.objects.get(trace_id=trace_id_or_url)
+            trace = Trace.objects.get(trace_id=trace_id)
             trace_data = trace.as_dict()
         except Trace.DoesNotExist:
-            click.secho(
-                f"Error: Trace with ID '{trace_id_or_url}' not found",
-                fg="red",
-                err=True,
-            )
-            raise click.Abort()
+            raise click.ClickException(f"Trace with ID '{trace_id}' not found")
 
-    # Build the diagnostic prompt
     prompt_lines = [
-        "I have an OpenTelemetry trace from a Plain application. Analyze it for performance issues or improvements.",
+        "I have an OpenTelemetry trace data JSON from a Plain application. Analyze it for performance issues or improvements.",
         "",
         "Focus on easy and obvious wins first and foremost. If there is nothing obvious, that's ok! Tell me that and ask whether there are specific things we should look deeper into.",
         "",
         "If potential code changes are found, briefly explain them and ask whether we should implement them.",
         "",
-        "## Trace Data",
+        "## Trace Data JSON",
         "",
         "```json",
         json.dumps(trace_data, indent=2),
@@ -545,21 +557,16 @@ def diagnose(trace_id_or_url, agent_command):
     prompt = "\n".join(prompt_lines)
 
     if agent_command:
-        # Run the agent command with the prompt
         click.echo("Running agent command...")
         cmd = shlex.split(agent_command)
         cmd.append(prompt)
         result = subprocess.run(cmd)
 
         if result.returncode != 0:
-            click.secho(
-                f"Agent command failed with exit code {result.returncode}",
-                fg="red",
-                err=True,
+            raise click.ClickException(
+                f"Agent command failed with exit code {result.returncode}"
             )
-            raise click.Abort()
     else:
-        # Just output the prompt
         click.echo()
         click.secho("Diagnostic Prompt", fg="bright_blue", bold=True)
         click.echo("=" * 60)
