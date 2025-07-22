@@ -48,15 +48,15 @@ class ModelInstanceParameter:
 
     @staticmethod
     def from_instance(instance):
-        return f"gid://{instance._meta.package_label}/{instance._meta.model_name}/{instance.pk}"
+        return f"gid://{instance._meta.package_label}/{instance._meta.model_name}/{instance.id}"
 
     @staticmethod
     def to_instance(s):
         if not s.startswith("gid://"):
             raise ValueError("Invalid ModelInstanceParameter string")
-        package, model, pk = s[6:].split("/")
+        package, model, obj_id = s[6:].split("/")
         model = models_registry.get_model(package, model)
-        return model.objects.get(pk=pk)
+        return model.objects.get(id=obj_id)
 
     @staticmethod
     def is_gid(x):

@@ -44,12 +44,8 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             # Required for pre-Plain 4.1 serial columns.
             description.default and "nextval" in description.default
         ):
-            if field_type == "IntegerField":
-                return "AutoField"
-            elif field_type == "BigIntegerField":
-                return "BigAutoField"
-            elif field_type == "SmallIntegerField":
-                return "SmallAutoField"
+            if field_type == "BigIntegerField":
+                return "PrimaryKeyField"
         return field_type
 
     def get_table_list(self, cursor):

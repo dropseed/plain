@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Car",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("make", models.CharField(max_length=100)),
                 ("model", models.CharField(max_length=100)),
             ],

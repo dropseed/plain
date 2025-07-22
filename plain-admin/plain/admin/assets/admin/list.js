@@ -1,18 +1,18 @@
 jQuery(($) => {
   const $actionCheckbox = $("[data-action-checkbox]");
-  const $actionPks = $('[name="action_pks"]');
+  const $actionIds = $('[name="action_ids"]');
   const $actionSelect = $('[name="action_name"]');
   const $actionSubmit = $('[data-actions-form] [type="submit"]');
   let $lastActionCheckboxChecked = null;
 
   $actionCheckbox.on("change", () => {
-    const pks = [];
+    const ids = [];
     $actionCheckbox.each(function () {
       if ($(this).is(":checked")) {
-        pks.push($(this).attr("name"));
+        ids.push($(this).attr("name"));
       }
     });
-    $actionPks.val(pks.join(","));
+    $actionIds.val(ids.join(","));
 
     updateActionSubmit();
   });
@@ -22,7 +22,7 @@ jQuery(($) => {
   });
 
   function updateActionSubmit() {
-    if ($actionPks.val() && $actionSelect.val()) {
+    if ($actionIds.val() && $actionSelect.val()) {
       // We've chosen an action
       $actionSubmit.prop("disabled", false);
     } else {

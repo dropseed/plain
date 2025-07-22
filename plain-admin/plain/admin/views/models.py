@@ -48,9 +48,9 @@ class AdminModelListView(AdminListView):
 
     model: "models.Model"
 
-    fields: list = ["pk"]
+    fields: list = ["id"]
     queryset_order = []
-    search_fields: list = ["pk"]
+    search_fields: list = ["id"]
 
     def get_title(self) -> str:
         if title := super().get_title():
@@ -162,7 +162,7 @@ class AdminModelDetailView(AdminDetailView):
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/<int:pk>/"
+        return f"{cls.model._meta.model_name}/<int:id>/"
 
     def get_fields(self):
         if fields := super().get_fields():
@@ -177,7 +177,7 @@ class AdminModelDetailView(AdminDetailView):
             return get_model_field(obj, field)
 
     def get_object(self):
-        return self.model.objects.get(pk=self.url_kwargs["pk"])
+        return self.model.objects.get(id=self.url_kwargs["id"])
 
 
 class AdminModelCreateView(AdminCreateView):
@@ -214,10 +214,10 @@ class AdminModelUpdateView(AdminUpdateView):
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/<int:pk>/update/"
+        return f"{cls.model._meta.model_name}/<int:id>/update/"
 
     def get_object(self):
-        return self.model.objects.get(pk=self.url_kwargs["pk"])
+        return self.model.objects.get(id=self.url_kwargs["id"])
 
 
 class AdminModelDeleteView(AdminDeleteView):
@@ -231,7 +231,7 @@ class AdminModelDeleteView(AdminDeleteView):
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/<int:pk>/delete/"
+        return f"{cls.model._meta.model_name}/<int:id>/delete/"
 
     def get_object(self):
-        return self.model.objects.get(pk=self.url_kwargs["pk"])
+        return self.model.objects.get(id=self.url_kwargs["id"])

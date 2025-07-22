@@ -167,8 +167,8 @@ class Collector:
         if model in self.restricted_objects:
             objs = set(
                 qs.filter(
-                    pk__in=[
-                        obj.pk
+                    id__in=[
+                        obj.id
                         for objs in self.restricted_objects[model].values()
                         for obj in objs
                     ]
@@ -375,7 +375,7 @@ class Collector:
     def delete(self):
         # sort instance collections
         for model, instances in self.data.items():
-            self.data[model] = sorted(instances, key=attrgetter("pk"))
+            self.data[model] = sorted(instances, key=attrgetter("id"))
 
         # if possible, bring the models in an order suitable for databases that
         # don't support transactions or cannot defer constraint checks until the
@@ -389,8 +389,8 @@ class Collector:
             instance = list(instances)[0]
             if self.can_fast_delete(instance):
                 with transaction.mark_for_rollback_on_error():
-                    count = sql.DeleteQuery(model).delete_batch([instance.pk])
-                setattr(instance, model._meta.pk.attname, None)
+                    count = sql.DeleteQuery(model).delete_batch([instance.id])
+                setattr(instance, model._meta.get_field("id").attname, None)
                 return count, {model._meta.label: count}
 
         with transaction.atomic(savepoint=False):
@@ -419,7 +419,7 @@ class Collector:
                     model = objs[0].__class__
                     query = sql.UpdateQuery(model)
                     query.update_batch(
-                        list({obj.pk for obj in objs}), {field.name: value}
+                        list({obj.id for obj in objs}), {field.name: value}
                     )
 
             # reverse instance collections
@@ -429,12 +429,12 @@ class Collector:
             # delete instances
             for model, instances in self.data.items():
                 query = sql.DeleteQuery(model)
-                pk_list = [obj.pk for obj in instances]
-                count = query.delete_batch(pk_list)
+                id_list = [obj.id for obj in instances]
+                count = query.delete_batch(id_list)
                 if count:
                     deleted_counter[model._meta.label] += count
 
         for model, instances in self.data.items():
             for instance in instances:
-                setattr(instance, model._meta.pk.attname, None)
+                setattr(instance, model._meta.get_field("id").attname, None)
         return sum(deleted_counter.values()), dict(deleted_counter)

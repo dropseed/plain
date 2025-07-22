@@ -408,10 +408,10 @@ def create_reverse_many_to_one_manager(superclass, rel):
                 pass  # nothing to clear from cache
 
         def get_queryset(self):
-            # Even if this relation is not to pk, we require still pk value.
+            # Even if this relation is not to primary key, we require still primary key value.
             # The wish is that the instance has been already saved to DB,
-            # although having a pk value isn't a guarantee of that.
-            if self.instance.pk is None:
+            # although having a primary key value isn't a guarantee of that.
+            if self.instance.id is None:
                 raise ValueError(
                     f"{self.instance.__class__.__name__!r} instance needs to have a "
                     f"primary key value before this relationship can be used."
@@ -456,7 +456,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
                 setattr(obj, self.field.name, self.instance)
 
             if bulk:
-                pks = []
+                ids = []
                 for obj in objs:
                     check_and_update_obj(obj)
                     if obj._state.adding:
@@ -464,8 +464,8 @@ def create_reverse_many_to_one_manager(superclass, rel):
                             f"{obj!r} instance isn't saved. Use bulk=False or save "
                             "the object first."
                         )
-                    pks.append(obj.pk)
-                self.model._base_manager.filter(pk__in=pks).update(
+                    ids.append(obj.id)
+                self.model._base_manager.filter(id__in=ids).update(
                     **{
                         self.field.name: self.instance,
                     }
@@ -508,12 +508,12 @@ def create_reverse_many_to_one_manager(superclass, rel):
                         )
                     # Is obj actually part of this descriptor set?
                     if self.field.get_local_related_value(obj) == val:
-                        old_ids.add(obj.pk)
+                        old_ids.add(obj.id)
                     else:
                         raise self.field.remote_field.model.DoesNotExist(
                             f"{obj!r} is not related to {self.instance!r}."
                         )
-                self._clear(self.filter(pk__in=old_ids), bulk)
+                self._clear(self.filter(id__in=old_ids), bulk)
 
             def clear(self, *, bulk=True):
                 self._check_fk_val()
@@ -641,22 +641,22 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             self.target_field = self.through._meta.get_field(self.target_field_name)
 
             self.core_filters = {}
-            self.pk_field_names = {}
+            self.id_field_names = {}
             for lh_field, rh_field in self.source_field.related_fields:
                 core_filter_key = f"{self.query_field_name}__{rh_field.name}"
                 self.core_filters[core_filter_key] = getattr(instance, rh_field.attname)
-                self.pk_field_names[lh_field.name] = rh_field.name
+                self.id_field_names[lh_field.name] = rh_field.name
 
             self.related_val = self.source_field.get_foreign_related_value(instance)
             if None in self.related_val:
                 raise ValueError(
-                    f'"{instance!r}" needs to have a value for field "{self.pk_field_names[self.source_field_name]}" before '
+                    f'"{instance!r}" needs to have a value for field "{self.id_field_names[self.source_field_name]}" before '
                     "this many-to-many relationship can be used."
                 )
-            # Even if this relation is not to pk, we require still pk value.
+            # Even if this relation is not to primary key, we require still primary key value.
             # The wish is that the instance has been already saved to DB,
-            # although having a pk value isn't a guarantee of that.
-            if instance.pk is None:
+            # although having a primary key value isn't a guarantee of that.
+            if instance.id is None:
                 raise ValueError(
                     f"{instance.__class__.__name__!r} instance needs to have a primary key value before "
                     "a many-to-many relationship can be used."

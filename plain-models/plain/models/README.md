@@ -19,6 +19,9 @@ class User(models.Model):
         return self.email
 ```
 
+Every model automatically includes an `id` field which serves as the primary
+key. The name `id` is reserved and can't be used for other fields.
+
 Create, update, and delete instances of your models:
 
 ```python

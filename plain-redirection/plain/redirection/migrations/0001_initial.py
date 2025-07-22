@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Redirect",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("from_pattern", models.CharField(max_length=255)),
                 ("to_pattern", models.CharField(max_length=255)),
                 ("http_status", models.PositiveSmallIntegerField(default=301)),
@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RedirectLog",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("from_url", models.URLField(max_length=512)),
                 ("to_url", models.URLField(max_length=512)),
                 ("http_status", models.PositiveSmallIntegerField(default=301)),
@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="NotFoundLog",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("url", models.URLField(max_length=512)),
                 ("ip_address", models.GenericIPAddressField()),
                 ("user_agent", models.CharField(max_length=512, required=False)),

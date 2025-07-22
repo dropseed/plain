@@ -23,7 +23,7 @@ class PageviewAdmin(AdminViewset):
         nav_section = "Pageviews"
         title = "Pageviews"
         fields = ["user_id", "url", "timestamp", "session_key"]
-        search_fields = ["pk", "user_id", "url", "session_key"]
+        search_fields = ["id", "user_id", "url", "session_key"]
         cards = [PageviewsTrendCard]
 
     class DetailView(AdminModelDetailView):
@@ -38,7 +38,7 @@ class UserPageviewsCard(Card):
         context = super().get_template_context()
 
         context["pageviews"] = Pageview.objects.filter(
-            user_id=self.view.object.pk
+            user_id=self.view.object.id
         ).order_by("-timestamp")[:50]
 
         return context

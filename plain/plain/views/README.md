@@ -169,7 +169,7 @@ class ExampleDetailView(DetailView):
 
     def get_object(self):
         return MyObjectClass.objects.get(
-            pk=self.url_kwargs["pk"],
+            id=self.url_kwargs["id"],
             user=self.request.user,  # Limit access
         )
 
@@ -187,7 +187,7 @@ class ExampleUpdateView(UpdateView):
 
     def get_object(self):
         return MyObjectClass.objects.get(
-            pk=self.url_kwargs["pk"],
+            id=self.url_kwargs["id"],
             user=self.request.user,  # Limit access
         )
 
@@ -201,7 +201,7 @@ class ExampleDeleteView(DeleteView):
 
     def get_object(self):
         return MyObjectClass.objects.get(
-            pk=self.url_kwargs["pk"],
+            id=self.url_kwargs["id"],
             user=self.request.user,  # Limit access
         )
 

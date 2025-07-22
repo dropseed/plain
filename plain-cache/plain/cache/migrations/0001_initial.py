@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="CachedItem",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("key", models.CharField(max_length=255)),
                 ("value", models.JSONField(allow_null=True, required=False)),
                 ("expires_at", models.DateTimeField(allow_null=True, required=False)),

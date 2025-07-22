@@ -28,9 +28,7 @@ class BaseDatabaseOperations:
         "PositiveBigIntegerField": (0, 9223372036854775807),
         "PositiveSmallIntegerField": (0, 32767),
         "PositiveIntegerField": (0, 2147483647),
-        "SmallAutoField": (-32768, 32767),
-        "AutoField": (-2147483648, 2147483647),
-        "BigAutoField": (-9223372036854775808, 9223372036854775807),
+        "PrimaryKeyField": (-9223372036854775808, 9223372036854775807),
     }
     set_operators = {
         "union": "UNION",

@@ -8,12 +8,6 @@ USER_ID_SESSION_KEY = "_auth_user_id"
 USER_HASH_SESSION_KEY = "_auth_user_hash"
 
 
-def _get_user_id_from_session(request):
-    # This value in the session is always serialized to a string, so we need
-    # to convert it back to Python whenever we access it.
-    return get_user_model()._meta.pk.to_python(request.session[USER_ID_SESSION_KEY])
-
-
 def get_session_auth_hash(user):
     """
     Return an HMAC of the password field.
@@ -62,7 +56,7 @@ def login(request, user):
         session_auth_hash = ""
 
     if USER_ID_SESSION_KEY in request.session:
-        if _get_user_id_from_session(request) != user.pk:
+        if int(request.session[USER_ID_SESSION_KEY]) != user.id:
             # To avoid reusing another user's session, create a new, empty
             # session if the existing session corresponds to a different
             # authenticated user.
@@ -78,7 +72,7 @@ def login(request, user):
         # typically done after user login to prevent session fixation attacks.
         request.session.cycle_key()
 
-    request.session[USER_ID_SESSION_KEY] = user._meta.pk.value_to_string(user)
+    request.session[USER_ID_SESSION_KEY] = user.id
     request.session[USER_HASH_SESSION_KEY] = session_auth_hash
     if hasattr(request, "user"):
         request.user = user
@@ -121,11 +115,9 @@ def get_user(request):
     if USER_ID_SESSION_KEY not in request.session:
         return None
 
-    user_id = _get_user_id_from_session(request)
-
     UserModel = get_user_model()
     try:
-        user = UserModel._default_manager.get(pk=user_id)
+        user = UserModel._default_manager.get(id=request.session[USER_ID_SESSION_KEY])
     except UserModel.DoesNotExist:
         return None
 

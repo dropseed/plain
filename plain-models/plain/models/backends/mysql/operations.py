@@ -21,9 +21,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         "PositiveBigIntegerField": (0, 18446744073709551615),
     }
     cast_data_types = {
-        "AutoField": "signed integer",
-        "BigAutoField": "signed integer",
-        "SmallAutoField": "signed integer",
+        "PrimaryKeyField": "signed integer",
         "CharField": "char(%(max_length)s)",
         "DecimalField": "decimal(%(max_digits)s, %(decimal_places)s)",
         "TextField": "char",
@@ -201,7 +199,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         # NO_AUTO_VALUE_ON_ZERO SQL mode.
         if value == 0 and not self.connection.features.allows_auto_pk_0:
             raise ValueError(
-                "The database backend does not accept 0 as a value for AutoField."
+                "The database backend does not accept 0 as a value for PrimaryKeyField."
             )
         return value
 

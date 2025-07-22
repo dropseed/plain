@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Session",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("session_key", models.CharField(max_length=40)),
                 ("session_data", models.JSONField(default=dict, required=False)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),

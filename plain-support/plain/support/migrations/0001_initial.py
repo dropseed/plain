@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="SupportFormEntry",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("uuid", models.UUIDField(default=uuid.uuid4)),
                 ("name", models.CharField(max_length=255)),
                 ("email", models.EmailField(max_length=254)),

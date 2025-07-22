@@ -334,22 +334,22 @@ class Model(metaclass=ModelBase):
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self):
-        return f"{self.__class__.__name__} object ({self.pk})"
+        return f"{self.__class__.__name__} object ({self.id})"
 
     def __eq__(self, other):
         if not isinstance(other, Model):
             return NotImplemented
         if self._meta.concrete_model != other._meta.concrete_model:
             return False
-        my_pk = self.pk
-        if my_pk is None:
+        my_id = self.id
+        if my_id is None:
             return self is other
-        return my_pk == other.pk
+        return my_id == other.id
 
     def __hash__(self):
-        if self.pk is None:
+        if self.id is None:
             raise TypeError("Model instances without primary key value are unhashable")
-        return hash(self.pk)
+        return hash(self.id)
 
     def __reduce__(self):
         data = self.__getstate__()
@@ -395,15 +395,6 @@ class Model(metaclass=ModelBase):
                 state[attr] = memoryview(value)
         self.__dict__.update(state)
 
-    def _get_pk_val(self, meta=None):
-        meta = meta or self._meta
-        return getattr(self, meta.pk.attname)
-
-    def _set_pk_val(self, value):
-        return setattr(self, self._meta.pk.attname, value)
-
-    pk = property(_get_pk_val, _set_pk_val)
-
     def get_deferred_fields(self):
         """
         Return a set containing names of deferred fields for this instance.
@@ -445,7 +436,7 @@ class Model(metaclass=ModelBase):
                     "are not allowed in fields."
                 )
 
-        db_instance_qs = self.__class__._base_manager.get_queryset().filter(pk=self.pk)
+        db_instance_qs = self.__class__._base_manager.get_queryset().filter(id=self.id)
 
         # Use provided fields, if not set then reload all non-deferred fields.
         deferred_fields = self.get_deferred_fields()
@@ -608,12 +599,13 @@ class Model(metaclass=ModelBase):
                 if f.name in update_fields or f.attname in update_fields
             ]
 
-        pk_val = self._get_pk_val(meta)
-        if pk_val is None:
-            pk_val = meta.pk.get_pk_value_on_save(self)
-            setattr(self, meta.pk.attname, pk_val)
-        pk_set = pk_val is not None
-        if not pk_set and (force_update or update_fields):
+        id_val = self.id
+        if id_val is None:
+            id_field = meta.get_field("id")
+            id_val = id_field.get_id_value_on_save(self)
+            setattr(self, id_field.attname, id_val)
+        id_set = id_val is not None
+        if not id_set and (force_update or update_fields):
             raise ValueError("Cannot force an update in save() with no primary key.")
         updated = False
         # Skip an UPDATE when adding an instance and primary key has a default.
@@ -621,12 +613,12 @@ class Model(metaclass=ModelBase):
             not raw
             and not force_insert
             and self._state.adding
-            and meta.pk.default
-            and meta.pk.default is not NOT_PROVIDED
+            and meta.get_field("id").default
+            and meta.get_field("id").default is not NOT_PROVIDED
         ):
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
-        if pk_set and not force_insert:
+        if id_set and not force_insert:
             base_qs = cls._base_manager
             values = [
                 (
@@ -638,7 +630,7 @@ class Model(metaclass=ModelBase):
             ]
             forced_update = update_fields or force_update
             updated = self._do_update(
-                base_qs, pk_val, values, update_fields, forced_update
+                base_qs, id_val, values, update_fields, forced_update
             )
             if force_update and not updated:
                 raise DatabaseError("Forced update did not affect any rows.")
@@ -646,8 +638,9 @@ class Model(metaclass=ModelBase):
                 raise DatabaseError("Save with update_fields did not affect any rows.")
         if not updated:
             fields = meta.local_concrete_fields
-            if not pk_set:
-                fields = [f for f in fields if f is not meta.auto_field]
+            if not id_set:
+                id_field = meta.get_field("id")
+                fields = [f for f in fields if f is not id_field]
 
             returning_fields = meta.db_returning_fields
             results = self._do_insert(cls._base_manager, fields, returning_fields, raw)
@@ -656,12 +649,12 @@ class Model(metaclass=ModelBase):
                     setattr(self, field.attname, value)
         return updated
 
-    def _do_update(self, base_qs, pk_val, values, update_fields, forced_update):
+    def _do_update(self, base_qs, id_val, values, update_fields, forced_update):
         """
         Try to update the model. Return True if the model was updated (if an
         update query was done and a matching row was found in the DB).
         """
-        filtered = base_qs.filter(pk=pk_val)
+        filtered = base_qs.filter(id=id_val)
         if not values:
             # We can end up here when saving a model in inheritance chain where
             # update_fields doesn't target any field in current model. In that
@@ -701,7 +694,7 @@ class Model(metaclass=ModelBase):
                 # database to raise an IntegrityError if applicable. If
                 # constraints aren't supported by the database, there's the
                 # unavoidable risk of data corruption.
-                if obj.pk is None:
+                if obj.id is None:
                     # Remove the object from a related instance cache.
                     if not field.remote_field.multiple:
                         field.remote_field.delete_cached_value(obj)
@@ -721,9 +714,9 @@ class Model(metaclass=ModelBase):
                     field.delete_cached_value(self)
 
     def delete(self):
-        if self.pk is None:
+        if self.id is None:
             raise ValueError(
-                f"{self._meta.object_name} object can't be deleted because its {self._meta.pk.attname} attribute is set "
+                f"{self._meta.object_name} object can't be deleted because its id attribute is set "
                 "to None."
             )
         collector = Collector(origin=self)
@@ -739,17 +732,17 @@ class Model(metaclass=ModelBase):
         )
 
     def _get_next_or_previous_by_FIELD(self, field, is_next, **kwargs):
-        if not self.pk:
+        if not self.id:
             raise ValueError("get_next/get_previous cannot be used on unsaved objects.")
         op = "gt" if is_next else "lt"
         order = "" if is_next else "-"
         param = getattr(self, field.attname)
-        q = Q.create([(field.name, param), (f"pk__{op}", self.pk)], connector=Q.AND)
+        q = Q.create([(field.name, param), (f"id__{op}", self.id)], connector=Q.AND)
         q = Q.create([q, (f"{field.name}__{op}", param)], connector=Q.OR)
         qs = (
             self.__class__._default_manager.filter(**kwargs)
             .filter(q)
-            .order_by(f"{order}{field.name}", f"{order}pk")
+            .order_by(f"{order}{field.name}", f"{order}id")
         )
         try:
             return qs[0]
@@ -769,7 +762,7 @@ class Model(metaclass=ModelBase):
         }
 
     def prepare_database_save(self, field):
-        if self.pk is None:
+        if self.id is None:
             raise ValueError(
                 f"Unsaved model instance {self!r} cannot be used in an ORM query."
             )
@@ -849,13 +842,11 @@ class Model(metaclass=ModelBase):
 
             # Exclude the current object from the query if we are editing an
             # instance (as opposed to creating a new one)
-            # Note that we need to use the pk as defined by model_class, not
-            # self.pk. These can be different fields because model inheritance
-            # allows single model to have effectively multiple primary keys.
-            # Refs #17615.
-            model_class_pk = self._get_pk_val(model_class._meta)
-            if not self._state.adding and model_class_pk is not None:
-                qs = qs.exclude(pk=model_class_pk)
+            # Use the primary key defined by model_class. In previous versions
+            # this could differ from `self.id` due to model inheritance.
+            model_class_id = getattr(self, "id")
+            if not self._state.adding and model_class_id is not None:
+                qs = qs.exclude(id=model_class_id)
             if qs.exists():
                 if len(unique_check) == 1:
                     key = unique_check[0]
@@ -1111,22 +1102,18 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_id_field(cls):
-        """Check if `id` field is a primary key."""
-        fields = [
-            f for f in cls._meta.local_fields if f.name == "id" and f != cls._meta.pk
-        ]
-        # fields is empty or consists of the invalid "id" field
-        if fields and not fields[0].primary_key and cls._meta.pk.name == "id":
+        """Disallow user-defined fields named ``id``."""
+        if any(
+            f for f in cls._meta.local_fields if f.name == "id" and not f.auto_created
+        ):
             return [
                 preflight.Error(
-                    "'id' can only be used as a field name if the field also "
-                    "sets 'primary_key=True'.",
+                    "'id' is a reserved word that cannot be used as a field name.",
                     obj=cls,
                     id="models.E004",
                 )
             ]
-        else:
-            return []
+        return []
 
     @classmethod
     def _check_field_name_clashes(cls):
@@ -1428,11 +1415,7 @@ class Model(metaclass=ModelBase):
             fld = None
             for part in field.split(LOOKUP_SEP):
                 try:
-                    # pk is an alias that won't be found by opts.get_field.
-                    if part == "pk":
-                        fld = _cls._meta.pk
-                    else:
-                        fld = _cls._meta.get_field(part)
+                    fld = _cls._meta.get_field(part)
                     if fld.is_relation:
                         _cls = fld.path_infos[-1].to_opts.model
                     else:
@@ -1450,10 +1433,6 @@ class Model(metaclass=ModelBase):
                             )
                         )
 
-        # Skip ordering on pk. This is always a valid order_by field
-        # but is an alias and therefore won't be found by opts.get_field.
-        fields = {f for f in fields if f != "pk"}
-
         # Check for invalid or nonexistent fields in ordering.
         invalid_fields = []
 
@@ -1469,7 +1448,7 @@ class Model(metaclass=ModelBase):
             )
         )
 
-        invalid_fields.extend(fields - valid_fields)
+        invalid_fields.extend(set(fields) - valid_fields)
 
         for invalid_field in invalid_fields:
             errors.append(
@@ -1712,17 +1691,12 @@ class Model(metaclass=ModelBase):
                             ),
                         )
         for field_name, *lookups in references:
-            # pk is an alias that won't be found by opts.get_field.
-            if field_name != "pk":
-                fields.add(field_name)
+            fields.add(field_name)
             if not lookups:
                 # If it has no lookups it cannot result in a JOIN.
                 continue
             try:
-                if field_name == "pk":
-                    field = cls._meta.pk
-                else:
-                    field = cls._meta.get_field(field_name)
+                field = cls._meta.get_field(field_name)
                 if not field.is_relation or field.many_to_many or field.one_to_many:
                     continue
             except FieldDoesNotExist:

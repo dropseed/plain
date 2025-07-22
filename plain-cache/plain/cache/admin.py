@@ -19,7 +19,7 @@ class CachedItemViewset(AdminViewset):
             "expires_at",
             "updated_at",
         ]
-        queryset_order = ["-pk"]
+        queryset_order = ["-id"]
         allow_global_search = False
 
         def get_objects(self):

@@ -42,7 +42,7 @@
 
     {% if object|default(false) %}
     <dt>Primary object</dt>
-    <dd class="text-sm text-white/50 inline-flex items-center" title="PK: {{ object.pk|default('unknown') }}">
+    <dd class="text-sm text-white/50 inline-flex items-center" title="ID: {{ object.id|default('unknown') }}">
         <pre><code>{{ object.__repr__() }}</code></pre>
         {% if object|get_admin_model_detail_url %}
         <a class="ml-2 inline-flex items-center p-1 text-blue-500 hover:text-blue-400" href="{{ object|get_admin_model_detail_url }}">

@@ -107,12 +107,12 @@ class SQLCompiler:
         #    SomeModel.objects.annotate(Count('somecol')).values('name')
         #    GROUP BY: all cols of the model
         #
-        #    SomeModel.objects.values('name', 'pk')
-        #    .annotate(Count('somecol')).values('pk')
-        #    GROUP BY: name, pk
+        #    SomeModel.objects.values('name', 'id')
+        #    .annotate(Count('somecol')).values('id')
+        #    GROUP BY: name, id
         #
-        #    SomeModel.objects.values('name').annotate(Count('somecol')).values('pk')
-        #    GROUP BY: name, pk
+        #    SomeModel.objects.values('name').annotate(Count('somecol')).values('id')
+        #    GROUP BY: name, id
         #
         # In fact, the self.query.group_by is the minimal set to GROUP BY. It
         # can't be ever restricted to a smaller set, but additional columns in
@@ -1000,14 +1000,13 @@ class SQLCompiler:
         ) = self._setup_joins(pieces, opts, alias)
 
         # If we get to this point and the field is a relation to another model,
-        # append the default ordering for that model unless it is the pk
-        # shortcut or the attribute name of the field that is specified or
+        # append the default ordering for that model unless it is the
+        # attribute name of the field that is specified or
         # there are transforms to process.
         if (
             field.is_relation
             and opts.ordering
             and getattr(field, "attname", None) != pieces[-1]
-            and name != "pk"
             and not getattr(transform_function, "has_transforms", False)
         ):
             # Firstly, avoid infinite loops.
@@ -1654,7 +1653,7 @@ class SQLInsertCompiler(SQLCompiler):
             on_conflict=self.query.on_conflict,
         )
         result = [f"{insert_statement} {qn(opts.db_table)}"]
-        fields = self.query.fields or [opts.pk]
+        fields = self.query.fields or [opts.get_field("id")]
         result.append("({})".format(", ".join(qn(f.column) for f in fields)))
 
         if self.query.fields:
@@ -1757,7 +1756,7 @@ class SQLInsertCompiler(SQLCompiler):
                         self.connection.ops.last_insert_id(
                             cursor,
                             opts.db_table,
-                            opts.pk.column,
+                            opts.get_field("id").column,
                         ),
                     )
                 ]
@@ -1813,15 +1812,15 @@ class SQLDeleteCompiler(SQLCompiler):
         innerq = self.query.clone()
         innerq.__class__ = Query
         innerq.clear_select_clause()
-        pk = self.query.model._meta.pk
-        innerq.select = [pk.get_col(self.query.get_initial_alias())]
+        id_field = self.query.model._meta.get_field("id")
+        innerq.select = [id_field.get_col(self.query.get_initial_alias())]
         outerq = Query(self.query.model)
         if not self.connection.features.update_can_self_select:
             # Force the materialization of the inner query to allow reference
             # to the target table on MySQL.
             sql, params = innerq.get_compiler().as_sql()
             innerq = RawSQL(f"SELECT * FROM ({sql}) subquery", params)
-        outerq.add_filter("pk__in", innerq)
+        outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
 
 
@@ -1930,12 +1929,11 @@ class SQLUpdateCompiler(SQLCompiler):
         query.clear_ordering(force=True)
         query.extra = {}
         query.select = []
-        meta = query.get_meta()
-        fields = [meta.pk.name]
+        fields = ["id"]
         related_ids_index = []
         for related in self.query.related_updates:
             # If a primary key chain exists to the targeted related update,
-            # then the meta.pk value can be used for it.
+            # then the primary key value can be used for it.
             related_ids_index.append((related, 0))
 
         query.add_fields(fields)
@@ -1958,11 +1956,11 @@ class SQLUpdateCompiler(SQLCompiler):
                 idents.extend(r[0] for r in rows)
                 for parent, index in related_ids_index:
                     related_ids[parent].extend(r[index] for r in rows)
-            self.query.add_filter("pk__in", idents)
+            self.query.add_filter("id__in", idents)
             self.query.related_ids = related_ids
         else:
             # The fast path. Filters and updates in one query.
-            self.query.add_filter("pk__in", query)
+            self.query.add_filter("id__in", query)
         self.query.reset_refcounts(refcounts_before)
 
 

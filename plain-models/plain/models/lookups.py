@@ -319,7 +319,7 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
             if self.rhs.has_limit_one():
                 if not self.rhs.has_select_fields:
                     self.rhs.clear_select_clause()
-                    self.rhs.add_fields(["pk"])
+                    self.rhs.add_fields(["id"])
             else:
                 raise ValueError(
                     "The QuerySet value for an exact lookup must be limited to "
@@ -444,7 +444,7 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
             self.rhs.clear_ordering(clear_default=True)
             if not self.rhs.has_select_fields:
                 self.rhs.clear_select_clause()
-                self.rhs.add_fields(["pk"])
+                self.rhs.add_fields(["id"])
         return super().get_prep_lookup()
 
     def process_rhs(self, compiler, connection):

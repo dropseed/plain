@@ -11,7 +11,7 @@ class ImpersonateStartView(View):
         # We *could* already be impersonating, so need to consider that
         impersonator = getattr(self.request, "impersonator", self.request.user)
         if impersonator and can_be_impersonator(impersonator):
-            self.request.session[IMPERSONATE_KEY] = self.url_kwargs["pk"]
+            self.request.session[IMPERSONATE_KEY] = self.url_kwargs["id"]
             return ResponseRedirect(self.request.query_params.get("next", "/"))
 
         return ResponseForbidden()

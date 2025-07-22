@@ -239,11 +239,7 @@ class BaseDatabaseSchemaEditor:
             column_sqls.append(f"{self.quote_name(field.column)} {definition}")
             # Autoincrement SQL (for backends with post table definition
             # variant).
-            if field.get_internal_type() in (
-                "AutoField",
-                "BigAutoField",
-                "SmallAutoField",
-            ):
+            if field.get_internal_type() in ("PrimaryKeyField",):
                 autoinc_sql = self.connection.ops.autoinc_sql(
                     model._meta.db_table, field.column
                 )

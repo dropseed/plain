@@ -26,7 +26,7 @@ class WelcomeUserJob(Job):
 You can then create an instance of the job and call `run_in_worker()` to enqueue it for a background worker to pick up.
 
 ```python
-user = User.objects.get(pk=1)
+user = User.objects.get(id=1)
 WelcomeUserJob(user).run_in_worker()
 ```
 

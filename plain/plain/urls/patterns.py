@@ -111,8 +111,8 @@ def _route_to_regex(route, is_endpoint=False):
     """
     Convert a path pattern into a regular expression. Return the regular
     expression and a dictionary mapping the capture names to the converters.
-    For example, 'foo/<int:pk>' returns '^foo\\/(?P<pk>[0-9]+)'
-    and {'pk': <plain.urls.converters.IntConverter>}.
+    For example, 'foo/<int:id>' returns '^foo\\/(?P<id>[0-9]+)'
+    and {'id': <plain.urls.converters.IntConverter>}.
     """
     original_route = route
     parts = ["^"]

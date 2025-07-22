@@ -34,7 +34,7 @@ def test_protect_delete(db):
     ChildProtect.objects.create(parent=parent)
     with pytest.raises(ProtectedError):
         parent.delete()
-    assert DeleteParent.objects.filter(pk=parent.pk).exists()
+    assert DeleteParent.objects.filter(id=parent.id).exists()
 
 
 def test_restrict_delete(db):
@@ -43,7 +43,7 @@ def test_restrict_delete(db):
     ChildRestrict.objects.create(parent=parent)
     with pytest.raises(RestrictedError):
         parent.delete()
-    assert DeleteParent.objects.filter(pk=parent.pk).exists()
+    assert DeleteParent.objects.filter(id=parent.id).exists()
 
 
 def test_set_null_delete(db):
@@ -60,7 +60,7 @@ def test_set_default_delete(db):
     child = ChildSetDefault.objects.create(parent=parent)
     parent.delete()
     child.refresh_from_db()
-    assert child.parent_id == default_parent.pk
+    assert child.parent_id == default_parent.id
 
 
 # def test_do_nothing_delete(db):

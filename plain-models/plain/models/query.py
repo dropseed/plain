@@ -24,10 +24,10 @@ from plain.models.db import (
 )
 from plain.models.expressions import Case, F, Value, When
 from plain.models.fields import (
-    AutoField,
     DateField,
     DateTimeField,
     Field,
+    PrimaryKeyField,
 )
 from plain.models.functions import Cast, Trunc
 from plain.models.query_utils import FilteredRelation, Q
@@ -135,7 +135,7 @@ class RawModelIterable(BaseIterable):
                 annotation_fields,
             ) = self.queryset.resolve_model_init_order()
             model_cls = self.queryset.model
-            if model_cls._meta.pk.attname not in model_init_names:
+            if "id" not in model_init_names:
                 raise exceptions.FieldDoesNotExist(
                     "Raw query must include the primary key"
                 )
@@ -271,7 +271,7 @@ class QuerySet:
         self._for_write = False
         self._prefetch_related_lookups = ()
         self._prefetch_done = False
-        self._known_related_objects = {}  # {rel_field: {pk: rel_obj}}
+        self._known_related_objects = {}  # {rel_field: {id: rel_obj}}
         self._iterable_class = ModelIterable
         self._fields = None
         self._defer_next_filter = False
@@ -432,12 +432,12 @@ class QuerySet:
         query = (
             self
             if self.query.can_filter()
-            else self.model._base_manager.filter(pk__in=self.values("pk"))
+            else self.model._base_manager.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.query.can_filter():
-            other = other.model._base_manager.filter(pk__in=other.values("pk"))
+            other = other.model._base_manager.filter(id__in=other.values("id"))
         combined.query.combine(other.query, sql.OR)
         return combined
 
@@ -451,12 +451,12 @@ class QuerySet:
         query = (
             self
             if self.query.can_filter()
-            else self.model._base_manager.filter(pk__in=self.values("pk"))
+            else self.model._base_manager.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.query.can_filter():
-            other = other.model._base_manager.filter(pk__in=other.values("pk"))
+            other = other.model._base_manager.filter(id__in=other.values("id"))
         combined.query.combine(other.query, sql.XOR)
         return combined
 
@@ -591,10 +591,11 @@ class QuerySet:
         return obj
 
     def _prepare_for_bulk_create(self, objs):
+        id_field = self.model._meta.get_field("id")
         for obj in objs:
-            if obj.pk is None:
-                # Populate new PK values.
-                obj.pk = obj._meta.pk.get_pk_value_on_save(obj)
+            if obj.id is None:
+                # Populate new primary key values.
+                obj.id = id_field.get_id_value_on_save(obj)
             obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
     def _check_bulk_create_options(
@@ -673,11 +674,7 @@ class QuerySet:
             return objs
         opts = self.model._meta
         if unique_fields:
-            # Primary key is allowed in unique_fields.
-            unique_fields = [
-                self.model._meta.get_field(opts.pk.name if name == "pk" else name)
-                for name in unique_fields
-            ]
+            unique_fields = [self.model._meta.get_field(name) for name in unique_fields]
         if update_fields:
             update_fields = [self.model._meta.get_field(name) for name in update_fields]
         on_conflict = self._check_bulk_create_options(
@@ -690,26 +687,27 @@ class QuerySet:
         objs = list(objs)
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
-            objs_with_pk, objs_without_pk = partition(lambda o: o.pk is None, objs)
-            if objs_with_pk:
+            objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)
+            if objs_with_id:
                 returned_columns = self._batched_insert(
-                    objs_with_pk,
+                    objs_with_id,
                     fields,
                     batch_size,
                     on_conflict=on_conflict,
                     update_fields=update_fields,
                     unique_fields=unique_fields,
                 )
-                for obj_with_pk, results in zip(objs_with_pk, returned_columns):
+                id_field = opts.get_field("id")
+                for obj_with_id, results in zip(objs_with_id, returned_columns):
                     for result, field in zip(results, opts.db_returning_fields):
-                        if field != opts.pk:
-                            setattr(obj_with_pk, field.attname, result)
-                for obj_with_pk in objs_with_pk:
-                    obj_with_pk._state.adding = False
-            if objs_without_pk:
-                fields = [f for f in fields if not isinstance(f, AutoField)]
+                        if field != id_field:
+                            setattr(obj_with_id, field.attname, result)
+                for obj_with_id in objs_with_id:
+                    obj_with_id._state.adding = False
+            if objs_without_id:
+                fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
                 returned_columns = self._batched_insert(
-                    objs_without_pk,
+                    objs_without_id,
                     fields,
                     batch_size,
                     on_conflict=on_conflict,
@@ -720,11 +718,11 @@ class QuerySet:
                     db_connection.features.can_return_rows_from_bulk_insert
                     and on_conflict is None
                 ):
-                    assert len(returned_columns) == len(objs_without_pk)
-                for obj_without_pk, results in zip(objs_without_pk, returned_columns):
+                    assert len(returned_columns) == len(objs_without_id)
+                for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, opts.db_returning_fields):
-                        setattr(obj_without_pk, field.attname, result)
-                    obj_without_pk._state.adding = False
+                        setattr(obj_without_id, field.attname, result)
+                    obj_without_id._state.adding = False
 
         return objs
 
@@ -737,7 +735,7 @@ class QuerySet:
         if not fields:
             raise ValueError("Field names must be given to bulk_update().")
         objs = tuple(objs)
-        if any(obj.pk is None for obj in objs):
+        if any(obj.id is None for obj in objs):
             raise ValueError("All bulk_update() objects must have a primary key set.")
         fields = [self.model._meta.get_field(name) for name in fields]
         if any(not f.concrete or f.many_to_many for f in fields):
@@ -753,7 +751,7 @@ class QuerySet:
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
         self._for_write = True
-        max_batch_size = db_connection.ops.bulk_batch_size(["pk", "pk"] + fields, objs)
+        max_batch_size = db_connection.ops.bulk_batch_size(["id", "id"] + fields, objs)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         requires_casting = db_connection.features.requires_casted_case_in_updates
         batches = (objs[i : i + batch_size] for i in range(0, len(objs), batch_size))
@@ -766,17 +764,17 @@ class QuerySet:
                     attr = getattr(obj, field.attname)
                     if not hasattr(attr, "resolve_expression"):
                         attr = Value(attr, output_field=field)
-                    when_statements.append(When(pk=obj.pk, then=attr))
+                    when_statements.append(When(id=obj.id, then=attr))
                 case_statement = Case(*when_statements, output_field=field)
                 if requires_casting:
                     case_statement = Cast(case_statement, output_field=field)
                 update_kwargs[field.attname] = case_statement
-            updates.append(([obj.pk for obj in batch_objs], update_kwargs))
+            updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
         with transaction.atomic(savepoint=False):
-            for pks, update_kwargs in updates:
-                rows_updated += queryset.filter(pk__in=pks).update(**update_kwargs)
+            for ids, update_kwargs in updates:
+                rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)
         return rows_updated
 
     def get_or_create(self, defaults=None, **kwargs):
@@ -924,7 +922,7 @@ class QuerySet:
             queryset = self
         else:
             self._check_ordering_first_last_queryset_aggregation(method="first")
-            queryset = self.order_by("pk")
+            queryset = self.order_by("id")
         for obj in queryset[:1]:
             return obj
 
@@ -934,11 +932,11 @@ class QuerySet:
             queryset = self.reverse()
         else:
             self._check_ordering_first_last_queryset_aggregation(method="last")
-            queryset = self.order_by("-pk")
+            queryset = self.order_by("-id")
         for obj in queryset[:1]:
             return obj
 
-    def in_bulk(self, id_list=None, *, field_name="pk"):
+    def in_bulk(self, id_list=None, *, field_name="id"):
         """
         Return a dictionary mapping each of the given IDs to the object with
         that ID. If `id_list` isn't provided, evaluate the entire QuerySet.
@@ -952,7 +950,7 @@ class QuerySet:
             if len(constraint.fields) == 1
         ]
         if (
-            field_name != "pk"
+            field_name != "id"
             and not opts.get_field(field_name).primary_key
             and field_name not in unique_fields
             and self.query.distinct_fields != (field_name,)
@@ -1106,11 +1104,11 @@ class QuerySet:
                 return False
         except AttributeError:
             raise TypeError("'obj' must be a model instance.")
-        if obj.pk is None:
+        if obj.id is None:
             raise ValueError("QuerySet.contains() cannot be used on unsaved objects.")
         if self._result_cache is not None:
             return obj in self._result_cache
-        return self.filter(pk=obj.pk).exists()
+        return self.filter(id=obj.id).exists()
 
     def _prefetch_related_objects(self):
         # This method can only be called once the result cache has been filled.
@@ -1774,7 +1772,8 @@ class QuerySet:
 
     def _check_ordering_first_last_queryset_aggregation(self, method):
         if isinstance(self.query.group_by, tuple) and not any(
-            col.output_field is self.model._meta.pk for col in self.query.group_by
+            col.output_field is self.model._meta.get_field("id")
+            for col in self.query.group_by
         ):
             raise TypeError(
                 f"Cannot use QuerySet.{method}() on an unordered queryset performing "
@@ -2337,7 +2336,7 @@ class RelatedPopulator:
         #      we have to reorder the parent data. The reorder_for_init
         #      attribute contains a function used to reorder the field data
         #      in the order __init__ expects it.
-        #  - pk_idx: the index of the primary key field in the reordered
+        #  - id_idx: the index of the primary key field in the reordered
         #    model data. Used to check if a related object exists at all.
         #  - init_list: the field attnames fetched from the database. For
         #    deferred models this isn't the same as all attnames of the
@@ -2357,7 +2356,7 @@ class RelatedPopulator:
         self.reorder_for_init = None
 
         self.model_cls = klass_info["model"]
-        self.pk_idx = self.init_list.index(self.model_cls._meta.pk.attname)
+        self.id_idx = self.init_list.index("id")
         self.related_populators = get_related_populators(klass_info, select)
         self.local_setter = klass_info["local_setter"]
         self.remote_setter = klass_info["remote_setter"]
@@ -2367,7 +2366,7 @@ class RelatedPopulator:
             obj_data = self.reorder_for_init(row)
         else:
             obj_data = row[self.cols_start : self.cols_end]
-        if obj_data[self.pk_idx] is None:
+        if obj_data[self.id_idx] is None:
             obj = None
         else:
             obj = self.model_cls.from_db(self.init_list, obj_data)

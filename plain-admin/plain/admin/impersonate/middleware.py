@@ -5,11 +5,11 @@ from .permissions import can_be_impersonator, can_impersonate_user
 from .views import IMPERSONATE_KEY
 
 
-def get_user_by_pk(pk):
+def get_user_by_id(id):
     UserModel = get_user_model()
 
     try:
-        return UserModel.objects.get(pk=pk)
+        return UserModel.objects.get(id=id)
     except UserModel.DoesNotExist:
         return None
 
@@ -24,7 +24,7 @@ class ImpersonateMiddleware:
             and request.user
             and can_be_impersonator(request.user)
         ):
-            user_to_impersonate = get_user_by_pk(request.session[IMPERSONATE_KEY])
+            user_to_impersonate = get_user_by_id(request.session[IMPERSONATE_KEY])
             if user_to_impersonate:
                 if not can_impersonate_user(request.user, user_to_impersonate):
                     # Can't impersonate this user, remove it and show an error

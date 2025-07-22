@@ -49,7 +49,7 @@ class AdminListView(HTMXViewMixin, AdminView):
 
         context["table_style"] = getattr(self, "_table_style", "default")
 
-        context["get_object_pk"] = self.get_object_pk
+        context["get_object_id"] = self.get_object_id
         context["get_field_value"] = self.get_field_value
         context["get_field_value_template"] = self.get_field_value_template
 
@@ -81,8 +81,8 @@ class AdminListView(HTMXViewMixin, AdminView):
         action_name = self.request.data.get("action_name")
         actions = self.get_actions()
         if action_name and action_name in actions:
-            target_pks = self.request.data["action_pks"].split(",")
-            response = self.perform_action(action_name, target_pks)
+            target_ids = self.request.data["action_ids"].split(",")
+            response = self.perform_action(action_name, target_ids)
             if response:
                 return response
             else:
@@ -91,7 +91,7 @@ class AdminListView(HTMXViewMixin, AdminView):
 
         raise ValueError("Invalid action")
 
-    def perform_action(self, action: str, target_pks: list) -> Response | None:
+    def perform_action(self, action: str, target_ids: list) -> Response | None:
         raise NotImplementedError
 
     def get_objects(self) -> list:
@@ -130,11 +130,8 @@ class AdminListView(HTMXViewMixin, AdminView):
         else:
             return attr
 
-    def get_object_pk(self, obj):
-        try:
-            return self.get_field_value(obj, "pk")
-        except AttributeError:
-            return self.get_field_value(obj, "id")
+    def get_object_id(self, obj):
+        return self.get_field_value(obj, "id")
 
     def get_field_value_template(self, obj, field: str, value):
         type_str = type(value).__name__.lower()

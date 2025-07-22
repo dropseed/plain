@@ -37,7 +37,7 @@ def construct_instance(form, instance, fields=None):
     cleaned_data = form.cleaned_data
     file_field_list = []
     for f in opts.fields:
-        if isinstance(f, models.AutoField) or f.name not in cleaned_data:
+        if isinstance(f, models.PrimaryKeyField) or f.name not in cleaned_data:
             continue
         if fields is not None and f.name not in fields:
             continue
@@ -411,21 +411,21 @@ class InlineForeignKeyField(Field):
         "invalid_choice": "The inline value did not match the parent instance.",
     }
 
-    def __init__(self, parent_instance, *args, pk_field=False, to_field=None, **kwargs):
+    def __init__(self, parent_instance, *args, id_field=False, to_field=None, **kwargs):
         self.parent_instance = parent_instance
-        self.pk_field = pk_field
+        self.id_field = id_field
         self.to_field = to_field
         if self.parent_instance is not None:
             if self.to_field:
                 kwargs["initial"] = getattr(self.parent_instance, self.to_field)
             else:
-                kwargs["initial"] = self.parent_instance.pk
+                kwargs["initial"] = self.parent_instance.id
         kwargs["required"] = False
         super().__init__(*args, **kwargs)
 
     def clean(self, value):
         if value in self.empty_values:
-            if self.pk_field:
+            if self.id_field:
                 return None
             # if there is no value act as we did before.
             return self.parent_instance
@@ -433,7 +433,7 @@ class InlineForeignKeyField(Field):
         if self.to_field:
             orig = getattr(self.parent_instance, self.to_field)
         else:
-            orig = self.parent_instance.pk
+            orig = self.parent_instance.id
         if str(value) != str(orig):
             raise ValidationError(
                 self.error_messages["invalid_choice"], code="invalid_choice"
@@ -564,14 +564,14 @@ class ModelChoiceField(ChoiceField):
             if self.to_field_name:
                 return value.serializable_value(self.to_field_name)
             else:
-                return value.pk
+                return value.id
         return super().prepare_value(value)
 
     def to_python(self, value):
         if value in self.empty_values:
             return None
         try:
-            key = self.to_field_name or "pk"
+            key = self.to_field_name or "id"
             if isinstance(value, self.queryset.model):
                 value = getattr(value, key)
             value = self.queryset.get(**{key: value})
@@ -598,7 +598,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
     default_error_messages = {
         "invalid_list": "Enter a list of values.",
         "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
-        "invalid_pk_value": "“%(pk)s” is not a valid value.",
+        "invalid_id_value": "'%(id)s' is not a valid value.",
     }
 
     def __init__(self, queryset, **kwargs):
@@ -632,7 +632,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
         corresponding objects. Raise a ValidationError if a given value is
         invalid (not a valid PK, not in the queryset, etc.)
         """
-        key = self.to_field_name or "pk"
+        key = self.to_field_name or "id"
         # deduplicate given values to avoid creating many querysets or
         # requiring the database backend deduplicate efficiently.
         try:
@@ -643,19 +643,19 @@ class ModelMultipleChoiceField(ModelChoiceField):
                 self.error_messages["invalid_list"],
                 code="invalid_list",
             )
-        for pk in value:
+        for id_val in value:
             try:
-                self.queryset.filter(**{key: pk})
+                self.queryset.filter(**{key: id_val})
             except (ValueError, TypeError):
                 raise ValidationError(
-                    self.error_messages["invalid_pk_value"],
-                    code="invalid_pk_value",
-                    params={"pk": pk},
+                    self.error_messages["invalid_id_value"],
+                    code="invalid_id_value",
+                    params={"id": id_val},
                 )
         qs = self.queryset.filter(**{f"{key}__in": value})
-        pks = {str(getattr(o, key)) for o in qs}
+        ids = {str(getattr(o, key)) for o in qs}
         for val in value:
-            if str(val) not in pks:
+            if str(val) not in ids:
                 raise ValidationError(
                     self.error_messages["invalid_choice"],
                     code="invalid_choice",
@@ -733,10 +733,8 @@ def modelfield_to_formfield(
     # Avoid a circular import
     from plain import models
 
-    # Auto fields aren't rendered by default
-    if isinstance(modelfield, models.AutoField) or issubclass(
-        modelfield.__class__, models.AutoField
-    ):
+    # Primary key fields aren't rendered by default
+    if isinstance(modelfield, models.PrimaryKeyField):
         return None
 
     if isinstance(modelfield, models.BooleanField):

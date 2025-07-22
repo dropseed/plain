@@ -438,7 +438,9 @@ class Query(BaseExpression):
                 # used.
                 if inner_query.default_cols and has_existing_aggregation:
                     inner_query.group_by = (
-                        self.model._meta.pk.get_col(inner_query.get_initial_alias()),
+                        self.model._meta.get_field("id").get_col(
+                            inner_query.get_initial_alias()
+                        ),
                     )
                 inner_query.default_cols = False
                 if not qualify:
@@ -480,7 +482,9 @@ class Query(BaseExpression):
                 # field selected in the inner query, yet we must use a subquery.
                 # So, make sure at least one field is selected.
                 inner_query.select = (
-                    self.model._meta.pk.get_col(inner_query.get_initial_alias()),
+                    self.model._meta.get_field("id").get_col(
+                        inner_query.get_initial_alias()
+                    ),
                 )
         else:
             outer_query = self
@@ -689,7 +693,7 @@ class Query(BaseExpression):
     def _get_defer_select_mask(self, opts, mask, select_mask=None):
         if select_mask is None:
             select_mask = {}
-        select_mask[opts.pk] = {}
+        select_mask[opts.get_field("id")] = {}
         # All concrete fields that are not part of the defer mask must be
         # loaded. If a relational field is encountered it gets added to the
         # mask for it be considered if `select_related` and the cycle continues
@@ -726,7 +730,7 @@ class Query(BaseExpression):
     def _get_only_select_mask(self, opts, mask, select_mask=None):
         if select_mask is None:
             select_mask = {}
-        select_mask[opts.pk] = {}
+        select_mask[opts.get_field("id")] = {}
         # Only include fields mentioned in the mask.
         for field_name, field_mask in mask.items():
             field = opts.get_field(field_name)
@@ -1567,8 +1571,6 @@ class Query(BaseExpression):
         path, names_with_path = [], []
         for pos, name in enumerate(names):
             cur_names_with_path = (name, [])
-            if name == "pk":
-                name = opts.pk.name
 
             field = None
             filtered_relation = None
@@ -1917,14 +1919,16 @@ class Query(BaseExpression):
         select_field = col.target
         alias = col.alias
         if alias in can_reuse:
-            pk = select_field.model._meta.pk
+            id_field = select_field.model._meta.get_field("id")
             # Need to add a restriction so that outer query's filters are in effect for
             # the subquery, too.
             query.bump_prefix(self)
             lookup_class = select_field.get_lookup("exact")
             # Note that the query.select[0].alias is different from alias
             # due to bump_prefix above.
-            lookup = lookup_class(pk.get_col(query.select[0].alias), pk.get_col(alias))
+            lookup = lookup_class(
+                id_field.get_col(query.select[0].alias), id_field.get_col(alias)
+            )
             query.where.add(lookup, AND)
             query.external_aliases[alias] = True
 
@@ -2257,9 +2261,6 @@ class Query(BaseExpression):
         """
         existing, defer = self.deferred_loading
         field_names = set(field_names)
-        if "pk" in field_names:
-            field_names.remove("pk")
-            field_names.add(self.get_meta().pk.name)
 
         if defer:
             # Remove any existing deferred names from the current set before

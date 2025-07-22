@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Trace",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("trace_id", models.CharField(max_length=255)),
                 ("start_time", models.DateTimeField()),
                 ("end_time", models.DateTimeField()),
@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Span",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("span_id", models.CharField(max_length=255)),
                 ("name", models.CharField(max_length=255)),
                 ("kind", models.CharField(max_length=50)),

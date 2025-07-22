@@ -7,5 +7,5 @@ class ImpersonateRouter(Router):
     namespace = "impersonate"
     urls = [
         path("stop/", ImpersonateStopView, name="stop"),
-        path("start/<pk>/", ImpersonateStartView, name="start"),
+        path("start/<id>/", ImpersonateStartView, name="start"),
     ]

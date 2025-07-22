@@ -384,9 +384,9 @@ class UniqueConstraint(BaseConstraint):
                     expr = expr.expression
                 expressions.append(Exact(expr, expr.replace_expressions(replacements)))
             queryset = queryset.filter(*expressions)
-        model_class_pk = instance._get_pk_val(model._meta)
-        if not instance._state.adding and model_class_pk is not None:
-            queryset = queryset.exclude(pk=model_class_pk)
+        model_class_id = instance.id
+        if not instance._state.adding and model_class_id is not None:
+            queryset = queryset.exclude(id=model_class_id)
         if not self.condition:
             if queryset.exists():
                 if self.expressions:

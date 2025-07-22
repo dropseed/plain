@@ -35,9 +35,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         ]
     )
     cast_data_types = {
-        "AutoField": "integer",
-        "BigAutoField": "bigint",
-        "SmallAutoField": "smallint",
+        "PrimaryKeyField": "bigint",
     }
 
     integerfield_type_map = {

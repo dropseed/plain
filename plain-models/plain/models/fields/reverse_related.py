@@ -172,7 +172,7 @@ class ForeignObjectRel(FieldCacheMixin):
         qs = self.related_model._default_manager.complex_filter(limit_choices_to)
         if ordering:
             qs = qs.order_by(*ordering)
-        return (blank_choice if include_blank else []) + [(x.pk, str(x)) for x in qs]
+        return (blank_choice if include_blank else []) + [(x.id, str(x)) for x in qs]
 
     def is_hidden(self):
         """Should the related object be hidden?"""
@@ -289,7 +289,7 @@ class ManyToOneRel(ForeignObjectRel):
         return field
 
     def set_field_name(self):
-        self.field_name = self.field_name or self.model._meta.pk.name
+        self.field_name = self.field_name or "id"
 
 
 class ManyToManyRel(ForeignObjectRel):

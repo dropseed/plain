@@ -106,9 +106,9 @@ class JobRequestViewset(AdminViewset):
         fields = ["id", "job_class", "priority", "created_at", "start_at", "unique_key"]
         actions = ["Delete"]
 
-        def perform_action(self, action: str, target_pks: list):
+        def perform_action(self, action: str, target_ids: list):
             if action == "Delete":
-                JobRequest.objects.filter(pk__in=target_pks).delete()
+                JobRequest.objects.filter(id__in=target_ids).delete()
 
     class DetailView(AdminModelDetailView):
         model = JobRequest
@@ -134,9 +134,9 @@ class JobViewset(AdminViewset):
             RunningJobsCard,
         ]
 
-        def perform_action(self, action: str, target_pks: list):
+        def perform_action(self, action: str, target_ids: list):
             if action == "Delete":
-                Job.objects.filter(pk__in=target_pks).delete()
+                Job.objects.filter(id__in=target_ids).delete()
 
     class DetailView(AdminModelDetailView):
         model = Job
@@ -218,9 +218,9 @@ class JobResultViewset(AdminViewset):
                 fields.append("retry_attempt")
             return fields
 
-        def perform_action(self, action: str, target_pks: list):
+        def perform_action(self, action: str, target_ids: list):
             if action == "Retry":
-                for result in JobResult.objects.filter(pk__in=target_pks):
+                for result in JobResult.objects.filter(id__in=target_ids):
                     result.retry_job(delay=0)
             else:
                 raise ValueError("Invalid action")

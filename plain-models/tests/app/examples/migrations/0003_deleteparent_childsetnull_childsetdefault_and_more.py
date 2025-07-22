@@ -14,14 +14,14 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="DeleteParent",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("name", models.CharField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
             name="ChildSetNull",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 (
                     "parent",
                     models.ForeignKey(
@@ -35,7 +35,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="ChildSetDefault",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 (
                     "parent",
                     models.ForeignKey(
@@ -49,7 +49,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="ChildDoNothing",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 (
                     "parent",
                     models.ForeignKey(
@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="ChildCascade",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 (
                     "parent",
                     models.ForeignKey(
@@ -75,7 +75,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="ChildRestrict",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 (
                     "parent",
                     models.ForeignKey(
@@ -88,7 +88,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="ChildProtect",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 (
                     "parent",
                     models.ForeignKey(

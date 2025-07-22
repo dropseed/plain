@@ -57,8 +57,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     # thing" given more verbose field definitions, so leave them as is so that
     # schema inspection is more useful.
     data_types = {
-        "AutoField": "integer",
-        "BigAutoField": "integer",
+        "PrimaryKeyField": "integer",
         "BinaryField": "BLOB",
         "BooleanField": "bool",
         "CharField": "varchar(%(max_length)s)",
@@ -75,7 +74,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "PositiveBigIntegerField": "bigint unsigned",
         "PositiveIntegerField": "integer unsigned",
         "PositiveSmallIntegerField": "smallint unsigned",
-        "SmallAutoField": "integer",
         "SmallIntegerField": "smallint",
         "TextField": "text",
         "TimeField": "time",
@@ -88,9 +86,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "PositiveSmallIntegerField": '"%(column)s" >= 0',
     }
     data_types_suffix = {
-        "AutoField": "AUTOINCREMENT",
-        "BigAutoField": "AUTOINCREMENT",
-        "SmallAutoField": "AUTOINCREMENT",
+        "PrimaryKeyField": "AUTOINCREMENT",
     }
     # SQLite requires LIKE statements to include an ESCAPE clause if the value
     # being escaped has a percent or underscore in it.

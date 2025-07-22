@@ -381,11 +381,7 @@ class RelatedField(FieldCacheMixin, Field):
         return base_q
 
     def set_attributes_from_rel(self):
-        self.name = self.name or (
-            self.remote_field.model._meta.model_name
-            + "_"
-            + self.remote_field.model._meta.pk.name
-        )
+        self.name = self.name or (self.remote_field.model._meta.model_name + "_" + "id")
         self.remote_field.set_field_name()
 
     def do_related_class(self, other, cls):
@@ -619,7 +615,7 @@ class ForeignObject(RelatedField):
                 else self.opts.get_field(from_field_name)
             )
             to_field = (
-                self.remote_field.model._meta.pk
+                self.remote_field.model._meta.get_field("id")
                 if to_field_name is None
                 else self.remote_field.model._meta.get_field(to_field_name)
             )
@@ -656,9 +652,9 @@ class ForeignObject(RelatedField):
         for field in fields:
             # Gotcha: in some cases (like fixture loading) a model can have
             # different values in parent_ptr_id and parent's id. So, use
-            # instance.pk (that is, parent_ptr_id) when asked for instance.id.
+            # instance.id when asked for instance.id.
             if field.primary_key:
-                ret.append(instance.pk)
+                ret.append(instance.id)
                 continue
             ret.append(getattr(instance, field.attname))
         return tuple(ret)
@@ -733,7 +729,7 @@ class ForeignObject(RelatedField):
             PathInfo(
                 from_opts=from_opts,
                 to_opts=opts,
-                target_fields=(opts.pk,),
+                target_fields=(opts.get_field("id"),),
                 join_field=self.remote_field,
                 m2m=not self.primary_key,
                 direct=False,
@@ -788,7 +784,7 @@ class ForeignKey(ForeignObject):
     Provide a many-to-one relation by adding a column to the local model
     to hold the remote value.
 
-    By default ForeignKey will target the pk of the remote model but this
+    By default ForeignKey will target the primary key of the remote model but this
     behavior can be changed by using the ``to_field`` argument.
     """
 
@@ -831,7 +827,7 @@ class ForeignKey(ForeignObject):
             # For backwards compatibility purposes, we need to *try* and set
             # the to_field during FK construction. It won't be guaranteed to
             # be correct until contribute_to_class is called. Refs #12190.
-            to_field = to_field or (to._meta.pk and to._meta.pk.name)
+            to_field = to_field or "id"
         if not callable(on_delete):
             raise TypeError("on_delete must be callable.")
 
@@ -909,7 +905,7 @@ class ForeignKey(ForeignObject):
         to_meta = getattr(self.remote_field.model, "_meta", None)
         if self.remote_field.field_name and (
             not to_meta
-            or (to_meta.pk and self.remote_field.field_name != to_meta.pk.name)
+            or (to_meta.get_field("id") and self.remote_field.field_name != "id")
         ):
             kwargs["to_field"] = self.remote_field.field_name
         return name, path, args, kwargs
@@ -938,10 +934,10 @@ class ForeignKey(ForeignObject):
                 code="invalid",
                 params={
                     "model": self.remote_field.model._meta.model_name,
-                    "pk": value,
+                    "id": value,
                     "field": self.remote_field.field_name,
                     "value": value,
-                },  # 'pk' is included for backwards compatibility
+                },
             )
 
     def resolve_related_fields(self):
@@ -989,7 +985,7 @@ class ForeignKey(ForeignObject):
     def contribute_to_related_class(self, cls, related):
         super().contribute_to_related_class(cls, related)
         if self.remote_field.field_name is None:
-            self.remote_field.field_name = cls._meta.pk.name
+            self.remote_field.field_name = "id"
 
     def db_check(self, connection):
         return None
@@ -1557,7 +1553,7 @@ class ManyToManyField(RelatedField):
         pass
 
     def value_from_object(self, obj):
-        return [] if obj.pk is None else list(getattr(obj, self.attname).all())
+        return [] if obj.id is None else list(getattr(obj, self.attname).all())
 
     def save_form_data(self, instance, data):
         getattr(instance, self.attname).set(data)

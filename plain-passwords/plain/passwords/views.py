@@ -29,7 +29,7 @@ class PasswordForgotView(FormView):
     def generate_password_reset_token(self, user):
         return signing.dumps(
             {
-                "pk": user.pk,
+                "id": user.id,
                 "email": user.email,
                 "password": user.password,  # Hashed password
                 "timestamp": datetime.now().timestamp(),  # Makes each token unique
@@ -67,7 +67,7 @@ class PasswordResetView(FormView):
 
         UserModel = get_user_model()
         try:
-            user = UserModel._default_manager.get(pk=data["pk"])
+            user = UserModel._default_manager.get(id=data["id"])
         except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
             return
 

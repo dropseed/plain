@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Pageview",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("uuid", models.UUIDField(default=uuid.uuid4)),
                 ("url", models.URLField(max_length=768)),
                 ("timestamp", models.DateTimeField(auto_now_add=True)),

@@ -8,7 +8,7 @@ from plain.exceptions import FieldDoesNotExist
 from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import db_connection
-from plain.models.fields import BigAutoField
+from plain.models.fields import PrimaryKeyField
 from plain.models.manager import Manager
 from plain.utils.datastructures import ImmutableList
 
@@ -78,8 +78,6 @@ class Options:
         self.required_db_features = []
         self.required_db_vendor = None
         self.meta = meta
-        self.pk = None
-        self.auto_field = None
 
         # For any non-abstract class, the concrete class is the model
         # in the end of the proxy_for_model chain. In particular, for
@@ -170,9 +168,8 @@ class Options:
         return new_objs
 
     def _prepare(self, model):
-        if self.pk is None:
-            auto = BigAutoField(primary_key=True, auto_created=True)
-            model.add_to_class("id", auto)
+        if not any(f.name == "id" for f in self.local_fields):
+            model.add_to_class("id", PrimaryKeyField())
 
     def add_manager(self, manager):
         self.local_managers.append(manager)
@@ -187,7 +184,6 @@ class Options:
             bisect.insort(self.local_many_to_many, field)
         else:
             bisect.insort(self.local_fields, field)
-            self.setup_pk(field)
 
         # If the field being added is a relation to another known field,
         # expire the cache on this field and the forward cache on the field
@@ -209,10 +205,6 @@ class Options:
             self._expire_cache()
         else:
             self._expire_cache(reverse=False)
-
-    def setup_pk(self, field):
-        if not self.pk and field.primary_key:
-            self.pk = field
 
     def __repr__(self):
         return f"<Options for {self.object_name}>"
@@ -624,7 +616,7 @@ class Options:
     @cached_property
     def _non_pk_concrete_field_names(self):
         """
-        Return a set of the non-pk concrete field names defined on the model.
+        Return a set of the non-primary key concrete field names defined on the model.
         """
         names = []
         for field in self.concrete_fields:

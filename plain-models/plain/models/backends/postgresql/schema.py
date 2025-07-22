@@ -166,11 +166,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         old_internal_type = old_field.get_internal_type()
         # Make ALTER TYPE with IDENTITY make sense.
         table = strip_quotes(model._meta.db_table)
-        auto_field_types = {
-            "AutoField",
-            "BigAutoField",
-            "SmallAutoField",
-        }
+        auto_field_types = {"PrimaryKeyField"}
         old_is_auto = old_internal_type in auto_field_types
         new_is_auto = new_internal_type in auto_field_types
         if new_is_auto and not old_is_auto:
@@ -229,11 +225,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 model, old_field, new_field, new_type, old_collation, new_collation
             )
             column = strip_quotes(new_field.column)
-            db_types = {
-                "AutoField": "integer",
-                "BigAutoField": "bigint",
-                "SmallAutoField": "smallint",
-            }
+            db_types = {"PrimaryKeyField": "bigint"}
             # Alter the sequence type if exists (Plain 4.1+ identity columns
             # don't have it).
             other_actions = []

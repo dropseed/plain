@@ -27,7 +27,7 @@ class TrackView(CsrfExemptViewMixin, View):
             return 400
 
         if user := getattr(self.request, "user", None):
-            user_id = user.pk
+            user_id = user.id
         else:
             user_id = ""
 

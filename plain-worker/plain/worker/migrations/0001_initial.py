@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Job",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("uuid", models.UUIDField(default=uuid.uuid4)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("started_at", models.DateTimeField(allow_null=True, required=False)),
@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="JobRequest",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("uuid", models.UUIDField(default=uuid.uuid4)),
                 ("job_class", models.CharField(max_length=255)),
@@ -56,7 +56,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="JobResult",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True)),
+                ("id", models.PrimaryKeyField()),
                 ("uuid", models.UUIDField(default=uuid.uuid4)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("job_uuid", models.UUIDField()),

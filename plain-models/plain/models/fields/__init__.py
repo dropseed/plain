@@ -30,9 +30,8 @@ from plain.utils.itercompat import is_iterable
 from ..registry import models_registry
 
 __all__ = [
-    "AutoField",
     "BLANK_CHOICE_DASH",
-    "BigAutoField",
+    "PrimaryKeyField",
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
@@ -54,7 +53,6 @@ __all__ = [
     "PositiveBigIntegerField",
     "PositiveIntegerField",
     "PositiveSmallIntegerField",
-    "SmallAutoField",
     "SmallIntegerField",
     "TextField",
     "TimeField",
@@ -93,9 +91,7 @@ def _load_field(package_label, model_name, field_name):
 #                "attname", except if db_column is specified.
 #
 # Code that introspects values, or does other dynamic things, should use
-# attname. For example, this gets the primary key value of object "obj":
-#
-#     getattr(obj, opts.pk.attname)
+# attname.
 
 
 def _empty(of_cls):
@@ -166,7 +162,6 @@ class Field(RegisterLookupMixin):
     def __init__(
         self,
         *,
-        primary_key=False,
         max_length=None,
         required=True,
         allow_null=False,
@@ -174,13 +169,11 @@ class Field(RegisterLookupMixin):
         default=NOT_PROVIDED,
         choices=None,
         db_column=None,
-        auto_created=False,
         validators=(),
         error_messages=None,
         db_comment=None,
     ):
         self.name = None  # Set by set_attributes_from_name
-        self.primary_key = primary_key
         self.max_length = max_length
         self.required, self.allow_null = required, allow_null
         self.remote_field = rel
@@ -195,15 +188,13 @@ class Field(RegisterLookupMixin):
         self.choices = choices
         self.db_column = db_column
         self.db_comment = db_comment
-        self.auto_created = auto_created
+
+        self.primary_key = False
+        self.auto_created = False
 
         # Adjust the appropriate creation counter, and save our local copy.
-        if auto_created:
-            self.creation_counter = Field.auto_creation_counter
-            Field.auto_creation_counter -= 1
-        else:
-            self.creation_counter = Field.creation_counter
-            Field.creation_counter += 1
+        self.creation_counter = Field.creation_counter
+        Field.creation_counter += 1
 
         self._validators = list(validators)  # Store for deconstruction later
 
@@ -241,7 +232,7 @@ class Field(RegisterLookupMixin):
     def _check_field_name(self):
         """
         Check if field name is valid, i.e. 1) does not end with an
-        underscore, 2) does not contain "__" and 3) is not "pk".
+        underscore, 2) does not contain "__" and 3) is not "id".
         """
         if self.name.endswith("_"):
             return [
@@ -259,10 +250,10 @@ class Field(RegisterLookupMixin):
                     id="fields.E002",
                 )
             ]
-        elif self.name == "pk":
+        elif self.name == "id":
             return [
                 preflight.Error(
-                    "'pk' is a reserved word that cannot be used as a field name.",
+                    "'id' is a reserved word that cannot be used as a field name.",
                     obj=self,
                     id="fields.E003",
                 )
@@ -492,7 +483,6 @@ class Field(RegisterLookupMixin):
         # Short-form way of fetching all the default parameters
         keywords = {}
         possibles = {
-            "primary_key": False,
             "max_length": None,
             "required": True,
             "allow_null": False,
@@ -500,7 +490,6 @@ class Field(RegisterLookupMixin):
             "choices": None,
             "db_column": None,
             "db_comment": None,
-            "auto_created": False,
             "validators": [],
             "error_messages": None,
         }
@@ -615,9 +604,9 @@ class Field(RegisterLookupMixin):
             self.name,
         )
 
-    def get_pk_value_on_save(self, instance):
+    def get_id_value_on_save(self, instance):
         """
-        Hook to generate new PK values on save. This method is called when
+        Hook to generate new primary key values on save. This method is called when
         saving instances with no primary key value set. If this method returns
         something else than None, then the returned value is used when saving
         the new instance.
@@ -910,7 +899,7 @@ class Field(RegisterLookupMixin):
         choice_func = operator.attrgetter(
             self.remote_field.get_related_field().attname
             if hasattr(self.remote_field, "get_related_field")
-            else "pk"
+            else "id"
         )
         qs = rel_model._default_manager.complex_filter(limit_choices_to)
         if ordering:
@@ -2234,36 +2223,28 @@ class UUIDField(Field):
         return value
 
 
-class AutoFieldMixin:
+class PrimaryKeyField(BigIntegerField):
     db_returning = True
 
-    def __init__(self, *args, **kwargs):
-        kwargs["required"] = False
-        super().__init__(*args, **kwargs)
+    def __init__(self):
+        super().__init__(required=False)
+        self.primary_key = True
+        self.auto_created = True
+        # Adjust creation counter for auto-created fields
+        # We need to undo the counter increment from Field.__init__ and use the auto counter
+        Field.creation_counter -= 1  # Undo the increment
+        self.creation_counter = Field.auto_creation_counter
+        Field.auto_creation_counter -= 1
 
     def check(self, **kwargs):
-        return [
-            *super().check(**kwargs),
-            *self._check_primary_key(),
-        ]
-
-    def _check_primary_key(self):
-        if not self.primary_key:
-            return [
-                preflight.Error(
-                    "AutoFields must set primary_key=True.",
-                    obj=self,
-                    id="fields.E100",
-                ),
-            ]
-        else:
-            return []
+        errors = super().check(**kwargs)
+        # Remove the E003 error for 'id' field name since PrimaryKeyField is allowed to use it
+        errors = [e for e in errors if e.id != "fields.E003"]
+        return errors
 
     def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        del kwargs["required"]
-        kwargs["primary_key"] = True
-        return name, path, args, kwargs
+        # PrimaryKeyField takes no parameters, so we return an empty kwargs dict
+        return (self.name, "plain.models.PrimaryKeyField", [], {})
 
     def validate(self, value, model_instance):
         pass
@@ -2275,65 +2256,10 @@ class AutoFieldMixin:
         return value
 
     def contribute_to_class(self, cls, name, **kwargs):
-        if cls._meta.auto_field:
-            raise ValueError(
-                f"Model {cls._meta.label} can't have more than one auto-generated field."
-            )
         super().contribute_to_class(cls, name, **kwargs)
-        cls._meta.auto_field = self
 
-
-class AutoFieldMeta(type):
-    """
-    Metaclass to maintain backward inheritance compatibility for AutoField.
-
-    It is intended that AutoFieldMixin become public API when it is possible to
-    create a non-integer automatically-generated field using column defaults
-    stored in the database.
-
-    In many areas Plain also relies on using isinstance() to check for an
-    automatically-generated field as a subclass of AutoField. A new flag needs
-    to be implemented on Field to be used instead.
-
-    When these issues have been addressed, this metaclass could be used to
-    deprecate inheritance from AutoField and use of isinstance() with AutoField
-    for detecting automatically-generated fields.
-    """
-
-    @property
-    def _subclasses(self):
-        return (BigAutoField, SmallAutoField)
-
-    def __instancecheck__(self, instance):
-        return isinstance(instance, self._subclasses) or super().__instancecheck__(
-            instance
-        )
-
-    def __subclasscheck__(self, subclass):
-        return issubclass(subclass, self._subclasses) or super().__subclasscheck__(
-            subclass
-        )
-
-
-class AutoField(AutoFieldMixin, IntegerField, metaclass=AutoFieldMeta):
     def get_internal_type(self):
-        return "AutoField"
-
-    def rel_db_type(self, connection):
-        return IntegerField().db_type(connection=connection)
-
-
-class BigAutoField(AutoFieldMixin, BigIntegerField):
-    def get_internal_type(self):
-        return "BigAutoField"
+        return "PrimaryKeyField"
 
     def rel_db_type(self, connection):
         return BigIntegerField().db_type(connection=connection)
-
-
-class SmallAutoField(AutoFieldMixin, SmallIntegerField):
-    def get_internal_type(self):
-        return "SmallAutoField"
-
-    def rel_db_type(self, connection):
-        return SmallIntegerField().db_type(connection=connection)

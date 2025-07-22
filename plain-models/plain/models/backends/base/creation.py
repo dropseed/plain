@@ -96,7 +96,7 @@ class BaseDatabaseCreation:
     #                     ) and router.allow_migrate_model(self.connection.alias, model):
     #                         queryset = model._base_manager.using(
     #                             self.connection.alias,
-    #                         ).order_by(model._meta.pk.name)
+    #                         ).order_by("id")
     #                         yield from queryset.iterator()
 
     #     # Serialize to a string

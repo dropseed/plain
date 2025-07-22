@@ -33,7 +33,7 @@
                 <option>{{ action }}</option>
                 {% endfor %}
             </select>
-            <input type="hidden" name="action_pks" value="" />
+            <input type="hidden" name="action_ids" value="" />
             <button type="submit" disabled>Apply</button>
         </form>
         {% endif %}
@@ -119,7 +119,7 @@
 
                 {% if table_style != "simple" and actions %}
                 <td class="p-0 pl-1">
-                    <input data-action-checkbox class="rounded-sm bg-white/10" type="checkbox" name="{{ get_object_pk(object) }}" />
+                    <input data-action-checkbox class="rounded-sm bg-white/10" type="checkbox" name="{{ get_object_id(object) }}" />
                 </td>
                 {% endif %}
 

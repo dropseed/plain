@@ -104,7 +104,7 @@ class AdminViewRegistry:
         from plain.admin.views.base import URL_NAMESPACE
         from plain.admin.views.models import AdminModelDetailView
 
-        if not getattr(instance, "pk", None):
+        if not getattr(instance, "id", None):
             # Has to actually be in the db
             return
 
@@ -115,7 +115,7 @@ class AdminViewRegistry:
             if view.model == instance.__class__:
                 return reverse_lazy(
                     f"{URL_NAMESPACE}:{view.view_name()}",
-                    pk=instance.pk,
+                    id=instance.id,
                 )
 
 

@@ -23,21 +23,21 @@ class DeleteQuery(Query):
                 return cursor.rowcount
         return 0
 
-    def delete_batch(self, pk_list):
+    def delete_batch(self, id_list):
         """
-        Set up and execute delete queries for all the objects in pk_list.
+        Set up and execute delete queries for all the objects in id_list.
 
         More than one physical query may be executed if there are a
-        lot of values in pk_list.
+        lot of values in id_list.
         """
         # number of objects deleted
         num_deleted = 0
-        field = self.get_meta().pk
-        for offset in range(0, len(pk_list), GET_ITERATOR_CHUNK_SIZE):
+        field = self.get_meta().get_field("id")
+        for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
             self.add_filter(
                 f"{field.attname}__in",
-                pk_list[offset : offset + GET_ITERATOR_CHUNK_SIZE],
+                id_list[offset : offset + GET_ITERATOR_CHUNK_SIZE],
             )
             num_deleted += self.do_query(self.get_meta().db_table, self.where)
         return num_deleted
@@ -66,12 +66,12 @@ class UpdateQuery(Query):
         obj.related_updates = self.related_updates.copy()
         return obj
 
-    def update_batch(self, pk_list, values):
+    def update_batch(self, id_list, values):
         self.add_update_values(values)
-        for offset in range(0, len(pk_list), GET_ITERATOR_CHUNK_SIZE):
+        for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
             self.add_filter(
-                "pk__in", pk_list[offset : offset + GET_ITERATOR_CHUNK_SIZE]
+                "id__in", id_list[offset : offset + GET_ITERATOR_CHUNK_SIZE]
             )
             self.get_compiler().execute_sql(NO_RESULTS)
 
@@ -132,7 +132,7 @@ class UpdateQuery(Query):
             query = UpdateQuery(model)
             query.values = values
             if self.related_ids is not None:
-                query.add_filter("pk__in", self.related_ids[model])
+                query.add_filter("id__in", self.related_ids[model])
             result.append(query)
         return result
 
