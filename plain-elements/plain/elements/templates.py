@@ -9,8 +9,8 @@ from plain.utils.safestring import mark_safe
 
 
 @pass_context
-def Element(ctx, name, **kwargs):
-    element_path_name = name.replace(".", os.sep)
+def Element(ctx, _element_name, **kwargs):
+    element_path_name = _element_name.replace(".", os.sep)
     template = ctx.environment.get_template(f"elements/{element_path_name}.html")
 
     if "caller" in kwargs and "children" not in kwargs:
