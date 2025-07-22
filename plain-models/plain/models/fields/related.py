@@ -784,8 +784,7 @@ class ForeignKey(ForeignObject):
     Provide a many-to-one relation by adding a column to the local model
     to hold the remote value.
 
-    By default ForeignKey will target the primary key of the remote model but this
-    behavior can be changed by using the ``to_field`` argument.
+    ForeignKey targets the primary key (id) of the remote model.
     """
 
     descriptor_class = ForeignKeyDeferredAttribute
@@ -810,7 +809,6 @@ class ForeignKey(ForeignObject):
         related_query_name=None,
         limit_choices_to=None,
         parent_link=False,
-        to_field=None,
         db_index=True,
         db_constraint=True,
         **kwargs,
@@ -823,18 +821,12 @@ class ForeignKey(ForeignObject):
                     f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKey must be "
                     f"either a model, a model name, or the string {RECURSIVE_RELATIONSHIP_CONSTANT!r}"
                 )
-        else:
-            # For backwards compatibility purposes, we need to *try* and set
-            # the to_field during FK construction. It won't be guaranteed to
-            # be correct until contribute_to_class is called. Refs #12190.
-            to_field = to_field or "id"
         if not callable(on_delete):
             raise TypeError("on_delete must be callable.")
 
         kwargs["rel"] = self.rel_class(
             self,
             to,
-            to_field,
             related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
@@ -849,7 +841,7 @@ class ForeignKey(ForeignObject):
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             from_fields=[RECURSIVE_RELATIONSHIP_CONSTANT],
-            to_fields=[to_field],
+            to_fields=["id"],
             **kwargs,
         )
         self.db_index = db_index
@@ -901,13 +893,6 @@ class ForeignKey(ForeignObject):
         if self.db_constraint is not True:
             kwargs["db_constraint"] = self.db_constraint
 
-        # Rel needs more work.
-        to_meta = getattr(self.remote_field.model, "_meta", None)
-        if self.remote_field.field_name and (
-            not to_meta
-            or (to_meta.get_field("id") and self.remote_field.field_name != "id")
-        ):
-            kwargs["to_field"] = self.remote_field.field_name
         return name, path, args, kwargs
 
     def to_python(self, value):
@@ -981,11 +966,6 @@ class ForeignKey(ForeignObject):
 
     def get_prep_value(self, value):
         return self.target_field.get_prep_value(value)
-
-    def contribute_to_related_class(self, cls, related):
-        super().contribute_to_related_class(cls, related)
-        if self.remote_field.field_name is None:
-            self.remote_field.field_name = "id"
 
     def db_check(self, connection):
         return None

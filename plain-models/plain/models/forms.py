@@ -411,15 +411,11 @@ class InlineForeignKeyField(Field):
         "invalid_choice": "The inline value did not match the parent instance.",
     }
 
-    def __init__(self, parent_instance, *args, id_field=False, to_field=None, **kwargs):
+    def __init__(self, parent_instance, *args, id_field=False, **kwargs):
         self.parent_instance = parent_instance
         self.id_field = id_field
-        self.to_field = to_field
         if self.parent_instance is not None:
-            if self.to_field:
-                kwargs["initial"] = getattr(self.parent_instance, self.to_field)
-            else:
-                kwargs["initial"] = self.parent_instance.id
+            kwargs["initial"] = self.parent_instance.id
         kwargs["required"] = False
         super().__init__(*args, **kwargs)
 
@@ -430,10 +426,7 @@ class InlineForeignKeyField(Field):
             # if there is no value act as we did before.
             return self.parent_instance
         # ensure the we compare the values as equal types.
-        if self.to_field:
-            orig = getattr(self.parent_instance, self.to_field)
-        else:
-            orig = self.parent_instance.id
+        orig = self.parent_instance.id
         if str(value) != str(orig):
             raise ValidationError(
                 self.error_messages["invalid_choice"], code="invalid_choice"
@@ -509,7 +502,6 @@ class ModelChoiceField(ChoiceField):
         empty_label="---------",
         required=True,
         initial=None,
-        to_field_name=None,
         **kwargs,
     ):
         # Call Field instead of ChoiceField __init__() because we don't need
@@ -525,7 +517,6 @@ class ModelChoiceField(ChoiceField):
         else:
             self.empty_label = empty_label
         self.queryset = queryset
-        self.to_field_name = to_field_name
 
     def __deepcopy__(self, memo):
         result = super(ChoiceField, self).__deepcopy__(memo)
@@ -561,17 +552,14 @@ class ModelChoiceField(ChoiceField):
 
     def prepare_value(self, value):
         if hasattr(value, "_meta"):
-            if self.to_field_name:
-                return value.serializable_value(self.to_field_name)
-            else:
-                return value.id
+            return value.id
         return super().prepare_value(value)
 
     def to_python(self, value):
         if value in self.empty_values:
             return None
         try:
-            key = self.to_field_name or "id"
+            key = "id"
             if isinstance(value, self.queryset.model):
                 value = getattr(value, key)
             value = self.queryset.get(**{key: value})
@@ -782,7 +770,6 @@ def modelfield_to_formfield(
     if isinstance(modelfield, models.ForeignKey):
         return ModelChoiceField(
             queryset=modelfield.remote_field.model._default_manager,
-            to_field_name=modelfield.remote_field.field_name,
             **defaults,
         )
 

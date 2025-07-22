@@ -299,8 +299,6 @@ class ProjectState:
             delay = False
             if reference.to:
                 remote_field, to_fields = reference.to
-                if getattr(remote_field, "field_name", None) == old_name:
-                    remote_field.field_name = new_name
                 if to_fields:
                     field.to_fields = tuple(
                         [

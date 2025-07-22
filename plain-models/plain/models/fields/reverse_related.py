@@ -249,7 +249,6 @@ class ManyToOneRel(ForeignObjectRel):
         self,
         field,
         to,
-        field_name,
         related_name=None,
         related_query_name=None,
         limit_choices_to=None,
@@ -266,7 +265,7 @@ class ManyToOneRel(ForeignObjectRel):
             on_delete=on_delete,
         )
 
-        self.field_name = field_name
+        self.field_name = "id"
 
     def __getstate__(self):
         state = super().__getstate__()
@@ -281,15 +280,13 @@ class ManyToOneRel(ForeignObjectRel):
         """
         Return the Field in the 'to' object to which this relationship is tied.
         """
-        field = self.model._meta.get_field(self.field_name)
+        field = self.model._meta.get_field("id")
         if not field.concrete:
-            raise exceptions.FieldDoesNotExist(
-                f"No related field named '{self.field_name}'"
-            )
+            raise exceptions.FieldDoesNotExist("No related field named 'id'")
         return field
 
     def set_field_name(self):
-        self.field_name = self.field_name or "id"
+        pass
 
 
 class ManyToManyRel(ForeignObjectRel):
