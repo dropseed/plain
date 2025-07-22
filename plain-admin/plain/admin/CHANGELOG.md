@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-admin@0.36.0) (2025-07-22)
+
+### What's changed
+
+- Admin URL patterns now use `id` instead of `pk` for model object routing (e.g., `/user/<int:id>/` instead of `/user/<int:pk>/`) ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+- Admin list view templates and JavaScript now reference object IDs consistently using `id` instead of `pk` ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+
+### Upgrade instructions
+
+- The `perform_action` admin view methods should be updated to use `target_ids` instead of `target_pks`
+- Any custom admin templates or views that reference model object IDs should be updated to use `id` instead of `pk`
+
 ## [0.35.1](https://github.com/dropseed/plain/releases/plain-admin@0.35.1) (2025-07-21)
 
 ### What's changed
