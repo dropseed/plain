@@ -106,3 +106,31 @@ TODO
 ## Forms
 
 TODO
+
+## Sharing fields across models
+
+To share common fields across multiple models, use Python classes as mixins. The final, registered model must inherit directly from `models.Model` and the mixins should not.
+
+```python
+from plain import models
+
+
+# Regular Python class for shared fields
+class TimestampedMixin:
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+# Models inherit from the mixin AND models.Model
+@models.register_model
+class User(TimestampedMixin, models.Model):
+    email = models.EmailField()
+    password = PasswordField()
+    is_admin = models.BooleanField(default=False)
+
+
+@models.register_model
+class Note(TimestampedMixin, models.Model):
+    content = models.TextField(max_length=1024)
+    liked = models.BooleanField(default=False)
+```
