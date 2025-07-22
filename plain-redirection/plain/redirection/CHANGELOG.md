@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-redirection@0.18.0) (2025-07-22)
+
+### What's changed
+
+- Database models now use the simplified `PrimaryKeyField` instead of `BigAutoField` for primary keys ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-redirection@0.17.0) (2025-07-18)
 
 ### What's changed
