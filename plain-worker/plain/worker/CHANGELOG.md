@@ -1,5 +1,18 @@
 # plain-worker changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-worker@0.25.0) (2025-07-22)
+
+### What's changed
+
+- Removed `pk` alias and auto fields in favor of a single automatic `id` PrimaryKeyField ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6aef126a15e48b5f85e0652adf841eb7b5c))
+- Admin interface methods now use `target_ids` parameter instead of `target_pks` for batch actions
+- Model instance registry now uses `.id` instead of `.pk` for Global ID generation
+- Updated database migrations to use `models.PrimaryKeyField()` instead of `models.BigAutoField()`
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-worker@0.24.0) (2025-07-18)
 
 ### What's changed
