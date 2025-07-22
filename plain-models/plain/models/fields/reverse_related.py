@@ -20,7 +20,7 @@ from .mixins import FieldCacheMixin
 
 class ForeignObjectRel(FieldCacheMixin):
     """
-    Used by ForeignObject to store information about the relation.
+    Used by ForeignKey to store information about the relation.
 
     ``_meta.get_fields()`` returns this class to provide access to the field
     flags for the reverse relation.

@@ -68,7 +68,6 @@ from .registry import models_registry, register_model
 from .base import DEFERRED, Model  # isort:skip
 from .fields.related import (  # isort:skip
     ForeignKey,
-    ForeignObject,
     ManyToManyField,
     ForeignObjectRel,
     ManyToOneRel,
@@ -116,7 +115,6 @@ __all__ += [
     "Model",
     "FilteredRelation",
     "ForeignKey",
-    "ForeignObject",
     "ManyToManyField",
     "ForeignObjectRel",
     "ManyToOneRel",

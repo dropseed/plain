@@ -428,10 +428,15 @@ class RelatedField(FieldCacheMixin, Field):
         return self.name
 
 
-class ForeignObject(RelatedField):
+class ForeignKey(RelatedField):
     """
-    Abstraction of the ForeignKey relation to support multi-column relations.
+    Provide a many-to-one relation by adding a column to the local model
+    to hold the remote value.
+
+    ForeignKey targets the primary key (id) of the remote model.
     """
+
+    descriptor_class = ForeignKeyDeferredAttribute
 
     # Field flags
     many_to_many = False
@@ -440,27 +445,44 @@ class ForeignObject(RelatedField):
 
     related_accessor_class = ReverseManyToOneDescriptor
     forward_related_accessor_class = ForwardManyToOneDescriptor
-    rel_class = ForeignObjectRel
+    rel_class = ManyToOneRel
+
+    empty_strings_allowed = False
+    default_error_messages = {
+        "invalid": "%(model)s instance with %(field)s %(value)r does not exist."
+    }
+    description = "Foreign Key (type determined by related field)"
 
     def __init__(
         self,
         to,
         on_delete,
-        rel=None,
         related_name=None,
         related_query_name=None,
         limit_choices_to=None,
+        db_index=True,
+        db_constraint=True,
         **kwargs,
     ):
-        if rel is None:
-            rel = self.rel_class(
-                self,
-                to,
-                related_name=related_name,
-                related_query_name=related_query_name,
-                limit_choices_to=limit_choices_to,
-                on_delete=on_delete,
-            )
+        try:
+            to._meta.model_name
+        except AttributeError:
+            if not isinstance(to, str):
+                raise TypeError(
+                    f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKey must be "
+                    f"either a model, a model name, or the string {RECURSIVE_RELATIONSHIP_CONSTANT!r}"
+                )
+        if not callable(on_delete):
+            raise TypeError("on_delete must be callable.")
+
+        rel = self.rel_class(
+            self,
+            to,
+            related_name=related_name,
+            related_query_name=related_query_name,
+            limit_choices_to=limit_choices_to,
+            on_delete=on_delete,
+        )
 
         super().__init__(
             rel=rel,
@@ -469,6 +491,11 @@ class ForeignObject(RelatedField):
             limit_choices_to=limit_choices_to,
             **kwargs,
         )
+        self.db_index = db_index
+        self.db_constraint = db_constraint
+
+    def __class_getitem__(cls, *args, **kwargs):
+        return cls
 
     def __copy__(self):
         obj = super().__copy__()
@@ -476,31 +503,6 @@ class ForeignObject(RelatedField):
         obj.__dict__.pop("path_infos", None)
         obj.__dict__.pop("reverse_path_infos", None)
         return obj
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        kwargs["on_delete"] = self.remote_field.on_delete
-
-        if isinstance(self.remote_field.model, SettingsReference):
-            kwargs["to"] = self.remote_field.model
-        elif isinstance(self.remote_field.model, str):
-            if "." in self.remote_field.model:
-                package_label, model_name = self.remote_field.model.split(".")
-                kwargs["to"] = f"{package_label}.{model_name.lower()}"
-            else:
-                kwargs["to"] = self.remote_field.model.lower()
-        else:
-            kwargs["to"] = self.remote_field.model._meta.label_lower
-        return name, path, args, kwargs
-
-    def resolve_related_fields(self):
-        if isinstance(self.remote_field.model, str):
-            raise ValueError(
-                f"Related model {self.remote_field.model!r} cannot be resolved"
-            )
-        from_field = self
-        to_field = self.remote_field.model._meta.get_field("id")
-        return [(from_field, to_field)]
 
     @cached_property
     def related_fields(self):
@@ -530,10 +532,6 @@ class ForeignObject(RelatedField):
     def get_foreign_related_value(self, instance):
         # Always returns the id of the foreign instance
         return (instance.id,)
-
-    def get_attname_column(self):
-        attname, column = super().get_attname_column()
-        return attname, None
 
     def get_joining_columns(self, reverse_join=False):
         # Always returns a single column pair
@@ -620,7 +618,8 @@ class ForeignObject(RelatedField):
     @functools.cache
     def get_class_lookups(cls):
         bases = inspect.getmro(cls)
-        bases = bases[: bases.index(ForeignObject) + 1]
+        # Find ForeignKey in the MRO instead of ForeignObject
+        bases = bases[: bases.index(ForeignKey) + 1]
         class_lookups = [parent.__dict__.get("class_lookups", {}) for parent in bases]
         return cls.merge_dicts(class_lookups)
 
@@ -643,83 +642,6 @@ class ForeignObject(RelatedField):
                 cls._meta.related_fkey_lookups.append(
                     self.remote_field.limit_choices_to
                 )
-
-
-ForeignObject.register_lookup(RelatedIn)
-ForeignObject.register_lookup(RelatedExact)
-ForeignObject.register_lookup(RelatedLessThan)
-ForeignObject.register_lookup(RelatedGreaterThan)
-ForeignObject.register_lookup(RelatedGreaterThanOrEqual)
-ForeignObject.register_lookup(RelatedLessThanOrEqual)
-ForeignObject.register_lookup(RelatedIsNull)
-
-
-class ForeignKey(ForeignObject):
-    """
-    Provide a many-to-one relation by adding a column to the local model
-    to hold the remote value.
-
-    ForeignKey targets the primary key (id) of the remote model.
-    """
-
-    descriptor_class = ForeignKeyDeferredAttribute
-    # Field flags
-    many_to_many = False
-    many_to_one = True
-    one_to_many = False
-
-    rel_class = ManyToOneRel
-
-    empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": "%(model)s instance with %(field)s %(value)r does not exist."
-    }
-    description = "Foreign Key (type determined by related field)"
-
-    def __init__(
-        self,
-        to,
-        on_delete,
-        related_name=None,
-        related_query_name=None,
-        limit_choices_to=None,
-        db_index=True,
-        db_constraint=True,
-        **kwargs,
-    ):
-        try:
-            to._meta.model_name
-        except AttributeError:
-            if not isinstance(to, str):
-                raise TypeError(
-                    f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKey must be "
-                    f"either a model, a model name, or the string {RECURSIVE_RELATIONSHIP_CONSTANT!r}"
-                )
-        if not callable(on_delete):
-            raise TypeError("on_delete must be callable.")
-
-        kwargs["rel"] = self.rel_class(
-            self,
-            to,
-            related_name=related_name,
-            related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
-            on_delete=on_delete,
-        )
-
-        super().__init__(
-            to,
-            on_delete,
-            related_name=related_name,
-            related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
-            **kwargs,
-        )
-        self.db_index = db_index
-        self.db_constraint = db_constraint
-
-    def __class_getitem__(cls, *args, **kwargs):
-        return cls
 
     def check(self, **kwargs):
         return [
@@ -755,6 +677,18 @@ class ForeignKey(ForeignObject):
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
+        kwargs["on_delete"] = self.remote_field.on_delete
+
+        if isinstance(self.remote_field.model, SettingsReference):
+            kwargs["to"] = self.remote_field.model
+        elif isinstance(self.remote_field.model, str):
+            if "." in self.remote_field.model:
+                package_label, model_name = self.remote_field.model.split(".")
+                kwargs["to"] = f"{package_label}.{model_name.lower()}"
+            else:
+                kwargs["to"] = self.remote_field.model.lower()
+        else:
+            kwargs["to"] = self.remote_field.model._meta.label_lower
 
         if self.db_index is not True:
             kwargs["db_index"] = self.db_index
@@ -793,7 +727,14 @@ class ForeignKey(ForeignObject):
             )
 
     def resolve_related_fields(self):
-        related_fields = super().resolve_related_fields()
+        if isinstance(self.remote_field.model, str):
+            raise ValueError(
+                f"Related model {self.remote_field.model!r} cannot be resolved"
+            )
+        from_field = self
+        to_field = self.remote_field.model._meta.get_field("id")
+        related_fields = [(from_field, to_field)]
+
         for from_field, to_field in related_fields:
             if (
                 to_field
@@ -868,6 +809,16 @@ class ForeignKey(ForeignObject):
                 if output_field is self:
                     raise ValueError("Cannot resolve output_field.")
         return super().get_col(alias, output_field)
+
+
+# Register lookups for ForeignKey
+ForeignKey.register_lookup(RelatedIn)
+ForeignKey.register_lookup(RelatedExact)
+ForeignKey.register_lookup(RelatedLessThan)
+ForeignKey.register_lookup(RelatedGreaterThan)
+ForeignKey.register_lookup(RelatedGreaterThanOrEqual)
+ForeignKey.register_lookup(RelatedLessThanOrEqual)
+ForeignKey.register_lookup(RelatedIsNull)
 
 
 class ManyToManyField(RelatedField):
