@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.55.0](https://github.com/dropseed/plain/releases/plain@0.55.0) (2025-07-22)
+
+### What's changed
+
+- Updated URL pattern documentation examples to use `id` instead of `pk` in URL kwargs ([b656ee6](https://github.com/dropseed/plain/commit/b656ee6e4e))
+- Updated views documentation examples to use `id` instead of `pk` for DetailView, UpdateView, and DeleteView ([b656ee6](https://github.com/dropseed/plain/commit/b656ee6e4e))
+
+### Upgrade instructions
+
+- Update your URL patterns from `<int:pk>` to `<int:id>` in your URLconf
+- Update view code that accesses `self.url_kwargs["pk"]` to use `self.url_kwargs["id"]` instead
+- Replace any QuerySet filters using `pk` with `id` (e.g., `Model.objects.get(pk=1)` becomes `Model.objects.get(id=1)`)
+
 ## [0.54.1](https://github.com/dropseed/plain/releases/plain@0.54.1) (2025-07-20)
 
 ### What's changed
