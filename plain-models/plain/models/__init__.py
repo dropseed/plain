@@ -69,6 +69,8 @@ from .base import DEFERRED, Model  # isort:skip
 from .fields.related import (  # isort:skip
     ForeignKey,
     ManyToManyField,
+)
+from .fields.reverse_related import (  # isort:skip
     ForeignObjectRel,
     ManyToOneRel,
     ManyToManyRel,

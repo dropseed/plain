@@ -23,9 +23,7 @@ from plain.models.db import (
 from plain.models.deletion import Collector
 from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED
-from plain.models.fields.related import (
-    ForeignObjectRel,
-)
+from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.manager import Manager
 from plain.models.options import Options
 from plain.models.query import F, Q

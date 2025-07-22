@@ -1,5 +1,3 @@
-import functools
-import inspect
 from functools import cached_property, partial
 
 from plain import exceptions, preflight
@@ -27,7 +25,7 @@ from .related_lookups import (
     RelatedLessThan,
     RelatedLessThanOrEqual,
 )
-from .reverse_related import ForeignObjectRel, ManyToManyRel, ManyToOneRel
+from .reverse_related import ManyToManyRel, ManyToOneRel
 
 RECURSIVE_RELATIONSHIP_CONSTANT = "self"
 
@@ -367,18 +365,12 @@ class RelatedField(FieldCacheMixin, Field):
         select all instances of self.related_field.model related through
         this field to obj. obj is an instance of self.model.
         """
-        base_q = Q.create(
+        return Q.create(
             [
                 (rh_field.attname, getattr(obj, lh_field.attname))
                 for lh_field, rh_field in self.related_fields
             ]
         )
-        descriptor_filter = self.get_extra_descriptor_filter(obj)
-        if isinstance(descriptor_filter, dict):
-            return base_q & Q(**descriptor_filter)
-        elif descriptor_filter:
-            return base_q & descriptor_filter
-        return base_q
 
     def set_attributes_from_rel(self):
         self.name = self.name or (self.remote_field.model._meta.model_name + "_" + "id")
@@ -437,15 +429,12 @@ class ForeignKey(RelatedField):
     """
 
     descriptor_class = ForeignKeyDeferredAttribute
-
-    # Field flags
-    many_to_many = False
-    many_to_one = True
-    one_to_many = False
-
     related_accessor_class = ReverseManyToOneDescriptor
     forward_related_accessor_class = ForwardManyToOneDescriptor
     rel_class = ManyToOneRel
+
+    # Field flags - ForeignKey is many-to-one
+    many_to_one = True
 
     empty_strings_allowed = False
     default_error_messages = {
@@ -494,9 +483,6 @@ class ForeignKey(RelatedField):
         self.db_index = db_index
         self.db_constraint = db_constraint
 
-    def __class_getitem__(cls, *args, **kwargs):
-        return cls
-
     def __copy__(self):
         obj = super().__copy__()
         # Remove any cached PathInfo values.
@@ -544,21 +530,6 @@ class ForeignKey(RelatedField):
 
     def get_reverse_joining_columns(self):
         return self.get_joining_columns(reverse_join=True)
-
-    def get_extra_descriptor_filter(self, instance):
-        """
-        Return an extra filter condition for related object fetching when
-        user does 'instance.fieldname', that is the extra filter is used in
-        the descriptor of the field.
-
-        The filter should be either a dict usable in .filter(**kwargs) call or
-        a Q-object. The condition will be ANDed together with the relation's
-        joining columns.
-
-        A parallel method is get_extra_restriction() which is used in
-        JOIN and subquery conditions.
-        """
-        return {}
 
     def get_extra_restriction(self, alias, related_alias):
         """
@@ -613,15 +584,6 @@ class ForeignKey(RelatedField):
     @cached_property
     def reverse_path_infos(self):
         return self.get_reverse_path_info()
-
-    @classmethod
-    @functools.cache
-    def get_class_lookups(cls):
-        bases = inspect.getmro(cls)
-        # Find ForeignKey in the MRO instead of ForeignObject
-        bases = bases[: bases.index(ForeignKey) + 1]
-        class_lookups = [parent.__dict__.get("class_lookups", {}) for parent in bases]
-        return cls.merge_dicts(class_lookups)
 
     def contribute_to_class(self, cls, name, private_only=False, **kwargs):
         super().contribute_to_class(cls, name, private_only=private_only, **kwargs)
@@ -791,15 +753,6 @@ class ForeignKey(RelatedField):
             "check": self.db_check(connection),
             "collation": target_db_parameters.get("collation"),
         }
-
-    def convert_empty_strings(self, value, expression, connection):
-        if (not value) and isinstance(value, str):
-            return None
-        return value
-
-    def get_db_converters(self, connection):
-        converters = super().get_db_converters(connection)
-        return converters
 
     def get_col(self, alias, output_field=None):
         if output_field is None:
