@@ -1,5 +1,16 @@
 # plain-flags changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-flags@0.21.0) (2025-07-22)
+
+### What's changed
+
+- Updated model migrations to use `PrimaryKeyField()` instead of `BigAutoField(auto_created=True, primary_key=True)` ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+- Model key coercion now uses `id` instead of deprecated `pk` alias when generating flag keys ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-flags@0.20.0) (2025-07-18)
 
 ### What's changed
