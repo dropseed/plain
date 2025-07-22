@@ -1,5 +1,4 @@
 import shlex
-import shutil
 import subprocess
 import sys
 import tomllib
@@ -145,8 +144,6 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
     for pkg, (before, after) in before_after.items():
         lines.append(f"- {pkg}: {before} -> {after}")
 
-    ast_grep_path = shutil.which("ast-grep")
-
     lines.extend(
         [
             "",
@@ -166,7 +163,6 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
             "   - Keep code changes minimal and focused - avoid unnecessary comments",
             "",
             "3. **Available tools:**",
-            f"   - ast-grep CLI for structural code search/replace: `{ast_grep_path}`",
             "   - Python shell: `uv run python`",
             "",
             "4. **Workflow:**",

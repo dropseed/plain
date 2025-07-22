@@ -33,7 +33,6 @@ dev-dependencies = [
     "plain-upgrade",
     "plain-vendor",
     "plain-worker",
-    "ast-grep-cli>=0.38.5",
 ]
 
 [tool.uv.sources]
