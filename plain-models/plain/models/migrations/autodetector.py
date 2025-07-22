@@ -940,24 +940,6 @@ class MigrationAutodetector:
                     if to_field_rename_key in self.renamed_fields:
                         # Repoint model name only
                         new_field.remote_field.model = old_field.remote_field.model
-                # Handle ForeignObjects which can have multiple from_fields/to_fields.
-                from_fields = getattr(new_field, "from_fields", None)
-                if from_fields:
-                    from_rename_key = (package_label, model_name)
-                    new_field.from_fields = tuple(
-                        [
-                            self.renamed_fields.get(
-                                from_rename_key + (from_field,), from_field
-                            )
-                            for from_field in from_fields
-                        ]
-                    )
-                    new_field.to_fields = tuple(
-                        [
-                            self.renamed_fields.get(rename_key + (to_field,), to_field)
-                            for to_field in new_field.to_fields
-                        ]
-                    )
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
                         package_label,

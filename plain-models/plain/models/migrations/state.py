@@ -281,31 +281,9 @@ class ProjectState:
                 f"{package_label}.{model_name} has no field named '{old_name}'"
             )
         fields[new_name] = found
-        for field in fields.values():
-            # Fix from_fields to refer to the new field.
-            from_fields = getattr(field, "from_fields", None)
-            if from_fields:
-                field.from_fields = tuple(
-                    [
-                        new_name if from_field_name == old_name else from_field_name
-                        for from_field_name in from_fields
-                    ]
-                )
-
-        # Fix to_fields to refer to the new field.
-        delay = True
+        # Check if there are any references to this field
         references = get_references(self, model_key, (old_name, found))
-        for *_, field, reference in references:
-            delay = False
-            if reference.to:
-                remote_field, to_fields = reference.to
-                if to_fields:
-                    field.to_fields = tuple(
-                        [
-                            new_name if to_field_name == old_name else to_field_name
-                            for to_field_name in to_fields
-                        ]
-                    )
+        delay = not bool(references)
         if self._relations is not None:
             old_name_lower = old_name.lower()
             new_name_lower = new_name.lower()

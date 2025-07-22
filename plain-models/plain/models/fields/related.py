@@ -438,7 +438,6 @@ class ForeignObject(RelatedField):
     many_to_one = True
     one_to_many = False
 
-    requires_unique_target = True
     related_accessor_class = ReverseManyToOneDescriptor
     forward_related_accessor_class = ForwardManyToOneDescriptor
     rel_class = ForeignObjectRel
@@ -447,8 +446,6 @@ class ForeignObject(RelatedField):
         self,
         to,
         on_delete,
-        from_fields,
-        to_fields,
         rel=None,
         related_name=None,
         related_query_name=None,
@@ -475,9 +472,6 @@ class ForeignObject(RelatedField):
             **kwargs,
         )
 
-        self.from_fields = from_fields
-        self.to_fields = to_fields
-
     def __copy__(self):
         obj = super().__copy__()
         # Remove any cached PathInfo values.
@@ -485,102 +479,9 @@ class ForeignObject(RelatedField):
         obj.__dict__.pop("reverse_path_infos", None)
         return obj
 
-    def check(self, **kwargs):
-        return [
-            *super().check(**kwargs),
-            *self._check_to_fields_exist(),
-            *self._check_unique_target(),
-        ]
-
-    def _check_to_fields_exist(self):
-        # Skip nonexistent models.
-        if isinstance(self.remote_field.model, str):
-            return []
-
-        errors = []
-        for to_field in self.to_fields:
-            if to_field:
-                try:
-                    self.remote_field.model._meta.get_field(to_field)
-                except exceptions.FieldDoesNotExist:
-                    errors.append(
-                        preflight.Error(
-                            f"The to_field '{to_field}' doesn't exist on the related "
-                            f"model '{self.remote_field.model._meta.label}'.",
-                            obj=self,
-                            id="fields.E312",
-                        )
-                    )
-        return errors
-
-    def _check_unique_target(self):
-        rel_is_string = isinstance(self.remote_field.model, str)
-        if rel_is_string or not self.requires_unique_target:
-            return []
-
-        try:
-            self.foreign_related_fields
-        except exceptions.FieldDoesNotExist:
-            return []
-
-        if not self.foreign_related_fields:
-            return []
-
-        unique_foreign_fields = {
-            frozenset([f.name])
-            for f in self.remote_field.model._meta.get_fields()
-            if getattr(f, "primary_key", False)
-        }
-        unique_foreign_fields.update(
-            {
-                frozenset(uc.fields)
-                for uc in self.remote_field.model._meta.total_unique_constraints
-            }
-        )
-        foreign_fields = {f.name for f in self.foreign_related_fields}
-        has_unique_constraint = any(u <= foreign_fields for u in unique_foreign_fields)
-
-        if not has_unique_constraint and len(self.foreign_related_fields) > 1:
-            field_combination = ", ".join(
-                f"'{rel_field.name}'" for rel_field in self.foreign_related_fields
-            )
-            model_name = self.remote_field.model.__name__
-            return [
-                preflight.Error(
-                    f"No subset of the fields {field_combination} on model '{model_name}' is unique.",
-                    hint=(
-                        "Add a set of "
-                        "fields to a unique constraint (via "
-                        "a UniqueConstraint (without condition) in the "
-                        "model Meta.constraints)."
-                    ),
-                    obj=self,
-                    id="fields.E310",
-                )
-            ]
-        elif not has_unique_constraint:
-            field_name = self.foreign_related_fields[0].name
-            model_name = self.remote_field.model.__name__
-            return [
-                preflight.Error(
-                    f"'{model_name}.{field_name}' must be unique because it is referenced by "
-                    "a foreign key.",
-                    hint=(
-                        "Add a UniqueConstraint (without condition) in the model "
-                        "Meta.constraints."
-                    ),
-                    obj=self,
-                    id="fields.E311",
-                )
-            ]
-        else:
-            return []
-
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         kwargs["on_delete"] = self.remote_field.on_delete
-        kwargs["from_fields"] = self.from_fields
-        kwargs["to_fields"] = self.to_fields
 
         if self.remote_field.parent_link:
             kwargs["parent_link"] = self.remote_field.parent_link
@@ -597,30 +498,13 @@ class ForeignObject(RelatedField):
         return name, path, args, kwargs
 
     def resolve_related_fields(self):
-        if not self.from_fields or len(self.from_fields) != len(self.to_fields):
-            raise ValueError(
-                "Foreign Object from and to fields must be the same non-zero length"
-            )
         if isinstance(self.remote_field.model, str):
             raise ValueError(
                 f"Related model {self.remote_field.model!r} cannot be resolved"
             )
-        related_fields = []
-        for index in range(len(self.from_fields)):
-            from_field_name = self.from_fields[index]
-            to_field_name = self.to_fields[index]
-            from_field = (
-                self
-                if from_field_name == RECURSIVE_RELATIONSHIP_CONSTANT
-                else self.opts.get_field(from_field_name)
-            )
-            to_field = (
-                self.remote_field.model._meta.get_field("id")
-                if to_field_name is None
-                else self.remote_field.model._meta.get_field(to_field_name)
-            )
-            related_fields.append((from_field, to_field))
-        return related_fields
+        from_field = self
+        to_field = self.remote_field.model._meta.get_field("id")
+        return [(from_field, to_field)]
 
     @cached_property
     def related_fields(self):
@@ -641,33 +525,28 @@ class ForeignObject(RelatedField):
         )
 
     def get_local_related_value(self, instance):
-        return self.get_instance_value_for_fields(instance, self.local_related_fields)
+        # Always returns the value of the single local field
+        field = self.local_related_fields[0]
+        if field.primary_key:
+            return (instance.id,)
+        return (getattr(instance, field.attname),)
 
     def get_foreign_related_value(self, instance):
-        return self.get_instance_value_for_fields(instance, self.foreign_related_fields)
-
-    @staticmethod
-    def get_instance_value_for_fields(instance, fields):
-        ret = []
-        for field in fields:
-            # Gotcha: in some cases (like fixture loading) a model can have
-            # different values in parent_ptr_id and parent's id. So, use
-            # instance.id when asked for instance.id.
-            if field.primary_key:
-                ret.append(instance.id)
-                continue
-            ret.append(getattr(instance, field.attname))
-        return tuple(ret)
+        # Always returns the id of the foreign instance
+        return (instance.id,)
 
     def get_attname_column(self):
         attname, column = super().get_attname_column()
         return attname, None
 
     def get_joining_columns(self, reverse_join=False):
-        source = self.reverse_related_fields if reverse_join else self.related_fields
-        return tuple(
-            (lhs_field.column, rhs_field.column) for lhs_field, rhs_field in source
-        )
+        # Always returns a single column pair
+        if reverse_join:
+            from_field, to_field = self.related_fields[0]
+            return ((to_field.column, from_field.column),)
+        else:
+            from_field, to_field = self.related_fields[0]
+            return ((from_field.column, to_field.column),)
 
     def get_reverse_joining_columns(self):
         return self.get_joining_columns(reverse_join=True)
@@ -840,8 +719,6 @@ class ForeignKey(ForeignObject):
             related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
-            from_fields=[RECURSIVE_RELATIONSHIP_CONSTANT],
-            to_fields=["id"],
             **kwargs,
         )
         self.db_index = db_index
@@ -884,8 +761,6 @@ class ForeignKey(ForeignObject):
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        del kwargs["to_fields"]
-        del kwargs["from_fields"]
 
         if self.db_index is not True:
             kwargs["db_index"] = self.db_index

@@ -49,12 +49,6 @@ class FieldOperation(Operation):
         if model_name_lower == self.model_name_lower:
             if name == self.name:
                 return True
-            elif (
-                self.field
-                and hasattr(self.field, "from_fields")
-                and name in self.field.from_fields
-            ):
-                return True
         # Check if this operation remotely references the field.
         if self.field is None:
             return False

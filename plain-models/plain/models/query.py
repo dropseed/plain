@@ -82,14 +82,7 @@ class ModelIterable(BaseIterable):
             (
                 field,
                 related_objs,
-                operator.attrgetter(
-                    *[
-                        field.attname
-                        if from_field == "self"
-                        else queryset.model._meta.get_field(from_field).attname
-                        for from_field in field.from_fields
-                    ]
-                ),
+                operator.attrgetter(field.attname),
             )
             for field, related_objs in queryset._known_related_objects.items()
         ]

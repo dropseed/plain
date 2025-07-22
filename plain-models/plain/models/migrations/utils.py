@@ -72,23 +72,13 @@ def field_references(
     references_to = None
     references_through = None
     if resolve_relation(remote_field.model, *model_tuple) == reference_model_tuple:
-        to_fields = getattr(field, "to_fields", None)
+        # ForeignObject always references 'id'
         if (
             reference_field_name is None
-            or
-            # Unspecified to_field(s).
-            to_fields is None
-            or
-            # Reference to primary key.
-            (
-                None in to_fields
-                and (reference_field is None or reference_field.primary_key)
-            )
-            or
-            # Reference to field.
-            reference_field_name in to_fields
+            or reference_field_name == "id"
+            or (reference_field is None or reference_field.primary_key)
         ):
-            references_to = (remote_field, to_fields)
+            references_to = (remote_field, ["id"])
     through = getattr(remote_field, "through", None)
     if through and resolve_relation(through, *model_tuple) == reference_model_tuple:
         through_fields = remote_field.through_fields
