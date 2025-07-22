@@ -1,5 +1,16 @@
 # plain-cache changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-cache@0.17.0) (2025-07-22)
+
+### What's changed
+
+- Database migrations updated to use new PrimaryKeyField instead of BigAutoField ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+- Admin interface now uses `id` instead of `pk` for queryset ordering
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-cache@0.16.0) (2025-07-18)
 
 ### What's changed
