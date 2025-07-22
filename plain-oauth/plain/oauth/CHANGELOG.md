@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-oauth@0.24.0) (2025-07-22)
+
+### What's changed
+
+- Migrations updated to use the new `PrimaryKeyField` instead of `BigAutoField` ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-oauth@0.23.0) (2025-07-18)
 
 ### What's changed
