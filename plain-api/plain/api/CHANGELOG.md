@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-api@0.12.0) (2025-07-22)
+
+### What's changed
+
+- The `APIKey` model now uses `PrimaryKeyField()` instead of `BigAutoField` for the primary key ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6aef126a15e48b5f85e0652adf841eb7b5c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-api@0.11.0) (2025-07-18)
 
 ### What's changed
