@@ -450,7 +450,6 @@ class ForeignObject(RelatedField):
         related_name=None,
         related_query_name=None,
         limit_choices_to=None,
-        parent_link=False,
         **kwargs,
     ):
         if rel is None:
@@ -460,7 +459,6 @@ class ForeignObject(RelatedField):
                 related_name=related_name,
                 related_query_name=related_query_name,
                 limit_choices_to=limit_choices_to,
-                parent_link=parent_link,
                 on_delete=on_delete,
             )
 
@@ -483,8 +481,6 @@ class ForeignObject(RelatedField):
         name, path, args, kwargs = super().deconstruct()
         kwargs["on_delete"] = self.remote_field.on_delete
 
-        if self.remote_field.parent_link:
-            kwargs["parent_link"] = self.remote_field.parent_link
         if isinstance(self.remote_field.model, SettingsReference):
             kwargs["to"] = self.remote_field.model
         elif isinstance(self.remote_field.model, str):
@@ -687,7 +683,6 @@ class ForeignKey(ForeignObject):
         related_name=None,
         related_query_name=None,
         limit_choices_to=None,
-        parent_link=False,
         db_index=True,
         db_constraint=True,
         **kwargs,
@@ -709,7 +704,6 @@ class ForeignKey(ForeignObject):
             related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
-            parent_link=parent_link,
             on_delete=on_delete,
         )
 
@@ -778,8 +772,6 @@ class ForeignKey(ForeignObject):
         return self.foreign_related_fields[0]
 
     def validate(self, value, model_instance):
-        if self.remote_field.parent_link:
-            return
         super().validate(value, model_instance)
         if value is None:
             return

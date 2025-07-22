@@ -536,7 +536,7 @@ class MigrationAutodetector:
                     if field.remote_field.model:
                         if field.primary_key:
                             primary_key_rel = field.remote_field.model
-                        elif not field.remote_field.parent_link:
+                        else:
                             related_fields[field_name] = field
                     if getattr(field.remote_field, "through", None):
                         related_fields[field_name] = field

@@ -313,8 +313,6 @@ def select_related_descend(field, restricted, requested, select_mask, reverse=Fa
     """
     if not field.remote_field:
         return False
-    if field.remote_field.parent_link and not reverse:
-        return False
     if restricted:
         if reverse and field.related_query_name() not in requested:
             return False
