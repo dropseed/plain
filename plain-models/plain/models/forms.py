@@ -318,17 +318,6 @@ class BaseModelForm(BaseForm):
 
         exclude = self._get_validation_exclusions()
 
-        # Foreign Keys being used to represent inline relationships
-        # are excluded from basic field value validation. This is for two
-        # reasons: firstly, the value may not be supplied (#12507; the
-        # case of providing new values to the admin); secondly the
-        # object being referred to may not yet fully exist (#12749).
-        # However, these fields *must* be included in uniqueness checks,
-        # so this can't be part of _get_validation_exclusions().
-        for name, field in self.fields.items():
-            if isinstance(field, InlineForeignKeyField):
-                exclude.add(name)
-
         try:
             self.instance = construct_instance(self, self.instance, opts.fields)
         except ValidationError as e:
@@ -399,42 +388,6 @@ class ModelForm(BaseModelForm, metaclass=ModelFormMetaclass):
 
 
 # Fields #####################################################################
-
-
-class InlineForeignKeyField(Field):
-    """
-    A basic integer field that deals with validating the given value to a
-    given parent instance in an inline.
-    """
-
-    default_error_messages = {
-        "invalid_choice": "The inline value did not match the parent instance.",
-    }
-
-    def __init__(self, parent_instance, *args, id_field=False, **kwargs):
-        self.parent_instance = parent_instance
-        self.id_field = id_field
-        if self.parent_instance is not None:
-            kwargs["initial"] = self.parent_instance.id
-        kwargs["required"] = False
-        super().__init__(*args, **kwargs)
-
-    def clean(self, value):
-        if value in self.empty_values:
-            if self.id_field:
-                return None
-            # if there is no value act as we did before.
-            return self.parent_instance
-        # ensure the we compare the values as equal types.
-        orig = self.parent_instance.id
-        if str(value) != str(orig):
-            raise ValidationError(
-                self.error_messages["invalid_choice"], code="invalid_choice"
-            )
-        return self.parent_instance
-
-    def has_changed(self, initial, data):
-        return False
 
 
 class ModelChoiceIteratorValue:
