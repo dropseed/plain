@@ -1,5 +1,7 @@
 # plain-models changelog
 
+`models.BigAutoField(auto_created=True, primary_key=True)` need to be replaced with `models.PrimaryKeyField()` in migrations
+
 ## [0.39.0](https://github.com/dropseed/plain/releases/plain-models@0.39.0) (2025-07-22)
 
 ### What's changed
