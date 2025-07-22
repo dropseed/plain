@@ -1,6 +1,15 @@
 # plain-models changelog
 
-`models.BigAutoField(auto_created=True, primary_key=True)` need to be replaced with `models.PrimaryKeyField()` in migrations
+## [0.39.1](https://github.com/dropseed/plain/releases/plain-models@0.39.1) (2025-07-22)
+
+### What's changed
+
+- Added documentation for sharing fields across models using Python class mixins ([cad3af01d2](https://github.com/dropseed/plain/commit/cad3af01d2))
+- Added note about `PrimaryKeyField()` replacement requirement for migrations ([70ea931660](https://github.com/dropseed/plain/commit/70ea931660))
+
+### Upgrade instructions
+
+- No changes required
 
 ## [0.39.0](https://github.com/dropseed/plain/releases/plain-models@0.39.0) (2025-07-22)
 
@@ -20,6 +29,7 @@
 - Remove any `to_field` arguments from ForeignKey definitions - they are no longer supported
 - Remove any `parent_link=True` arguments from ForeignKey definitions - they are no longer supported
 - Replace any usage of `InlineForeignKeyField` in forms with standard form fields
+- `models.BigAutoField(auto_created=True, primary_key=True)` need to be replaced with `models.PrimaryKeyField()` in migrations
 
 ## [0.38.0](https://github.com/dropseed/plain/releases/plain-models@0.38.0) (2025-07-21)
 
