@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-support@0.14.0) (2025-07-22)
+
+### What's changed
+
+- Database models now use the new `PrimaryKeyField` instead of `BigAutoField` for primary keys ([4b8fa6aef1](https://github.com/dropseed/plain/commit/4b8fa6aef1))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-support@0.13.0) (2025-07-18)
 
 ### What's changed
