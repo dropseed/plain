@@ -13,6 +13,7 @@ class CachedItemViewset(AdminViewset):
         nav_section = "Cache"
         model = CachedItem
         title = "Cached items"
+        nav_icon = "archive"
         fields = [
             "key",
             "created_at",

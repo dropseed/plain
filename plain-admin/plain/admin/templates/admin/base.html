@@ -74,13 +74,16 @@
             <div class="flex-grow pl-3.5 pr-5 pt-2">
                 <div>
                     {% for section, views in admin_registry.get_nav_sections().items() %}
-                    <div class="mt-4 text-xs tracking-wide uppercase text-stone-300/90">{{ section }}</div>
+                    <div class="mt-4 mb-1 text-sm text-stone-400/80">{{ section }}</div>
                     {% for view in views %}
                     {% set url = view.get_view_url() %}
                     <a
                         {% if url == request.path or view in parent_view_classes %}data-active{% endif %}
-                        class="data-[active]:bg-white/20 data-[active]:text-white flex items-center px-2 py-1 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-400/80 hover:bg-white/5"
+                        class="data-[active]:bg-white/20 data-[active]:text-white flex items-center px-2 py-1 mt-px -mx-2 text-sm rounded hover:text-stone-300 text-stone-300/90 hover:bg-white/5"
                         href="{{ url }}">
+                        <svg class="w-3.5 h-3.5 mr-1.5 flex-shrink-0" fill="currentColor">
+                            <use xlink:href="{{ asset('admin/bootstrap-icons.svg') }}#{{ view.get_nav_icon() }}"/>
+                        </svg>
                         {{ view.get_nav_title() }}
                     </a>
                     {% endfor %}

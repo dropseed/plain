@@ -32,6 +32,7 @@ class RedirectAdmin(AdminViewset):
         model = Redirect
         nav_section = "Redirection"
         title = "Redirects"
+        nav_icon = "arrow-right-circle"
         fields = ["from_pattern", "to_pattern", "http_status", "order", "enabled"]
         search_fields = ["from_pattern", "to_pattern"]
         allow_global_search = False
@@ -57,6 +58,7 @@ class RedirectLogAdmin(AdminViewset):
         model = RedirectLog
         nav_section = "Redirection"
         title = "Redirect logs"
+        nav_icon = "journal-text"
         fields = [
             "created_at",
             "from_url",
@@ -79,6 +81,7 @@ class NotFoundLogAdmin(AdminViewset):
         model = NotFoundLog
         nav_section = "Redirection"
         title = "404 logs"
+        nav_icon = "exclamation-triangle"
         fields = ["created_at", "url", "user_agent", "ip_address", "referrer"]
         search_fields = ["url", "user_agent", "ip_address", "referrer"]
         allow_global_search = False

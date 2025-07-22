@@ -35,6 +35,7 @@ class FlagAdmin(AdminViewset):
         search_fields = ["name", "description"]
         cards = [UnusedFlagsCard]
         nav_section = "Feature flags"
+        nav_icon = "flag"
 
     class DetailView(AdminModelDetailView):
         model = Flag
@@ -61,6 +62,7 @@ class FlagResultAdmin(AdminViewset):
         ]
         search_fields = ["flag__name", "key"]
         nav_section = "Feature flags"
+        nav_icon = "flag-fill"
 
         def get_initial_queryset(self):
             return self.model.objects.all().select_related("flag")

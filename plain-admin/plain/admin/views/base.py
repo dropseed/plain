@@ -32,6 +32,7 @@ class AdminView(AuthViewMixin, TemplateView):
     # so you can also use this for pages that can never be bookmarked
     nav_section = "App"
     nav_title = ""
+    nav_icon = "app"
 
     links: dict[str] = {}
 
@@ -114,6 +115,10 @@ class AdminView(AuthViewMixin, TemplateView):
         raise NotImplementedError(
             f"Please set a title or nav_title on the {cls} class or implement get_nav_title()."
         )
+
+    @classmethod
+    def get_nav_icon(cls) -> str:
+        return cls.nav_icon
 
     @classmethod
     def get_view_url(cls, obj=None) -> str:

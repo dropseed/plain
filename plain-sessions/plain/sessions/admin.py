@@ -22,6 +22,7 @@ class SessionAdmin(AdminViewset):
         fields = ["session_key", "expires_at", "created_at"]
         search_fields = ["session_key"]
         nav_section = "Sessions"
+        nav_icon = "person-badge"
         queryset_order = ["-created_at"]
 
     class DetailView(AdminModelDetailView):
