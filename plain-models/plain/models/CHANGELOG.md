@@ -1,5 +1,24 @@
 # plain-models changelog
 
+## [0.39.0](https://github.com/dropseed/plain/releases/plain-models@0.39.0) (2025-07-22)
+
+### What's changed
+
+- Models now use a single automatic `id` field as the primary key, replacing the previous `pk` alias and automatic field system ([4b8fa6a](https://github.com/dropseed/plain/commit/4b8fa6a))
+- Removed the `to_field` option for ForeignKey - foreign keys now always reference the primary key of the related model ([7fc3c88](https://github.com/dropseed/plain/commit/7fc3c88))
+- Removed the internal `from_fields` and `to_fields` system used for multi-column foreign keys ([0e9eda3](https://github.com/dropseed/plain/commit/0e9eda3))
+- Removed the `parent_link` parameter on ForeignKey and ForeignObject ([6658647](https://github.com/dropseed/plain/commit/6658647))
+- Removed `InlineForeignKeyField` from forms ([ede6265](https://github.com/dropseed/plain/commit/ede6265))
+- Merged ForeignObject functionality into ForeignKey, simplifying the foreign key implementation ([e6d9aaa](https://github.com/dropseed/plain/commit/e6d9aaa))
+- Cleaned up unused code in ForeignKey and fixed ForeignObjectRel imports ([b656ee6](https://github.com/dropseed/plain/commit/b656ee6))
+
+### Upgrade instructions
+
+- Replace any direct references to `pk` with `id` in your models and queries (e.g., `user.pk` becomes `user.id`)
+- Remove any `to_field` arguments from ForeignKey definitions - they are no longer supported
+- Remove any `parent_link=True` arguments from ForeignKey definitions - they are no longer supported
+- Replace any usage of `InlineForeignKeyField` in forms with standard form fields
+
 ## [0.38.0](https://github.com/dropseed/plain/releases/plain-models@0.38.0) (2025-07-21)
 
 ### What's changed
