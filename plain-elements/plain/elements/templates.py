@@ -40,7 +40,7 @@ class ElementsExtension(Extension):
         self._CAP_TAG = r"(?:[a-z_]+\.)?[A-Z][A-Za-z0-9_]*"
 
         self._SELF = re.compile(
-            rf"<(?P<name>{self._CAP_TAG})(?P<attrs>(?:\s+[^/>]*?)?)/>"
+            rf"<(?P<name>{self._CAP_TAG})(?P<attrs>(?:\s+(?:[^/>]|/(?!>))*?)?)/>"
         )
         self._CLOSED = re.compile(
             rf"<(?P<name>{self._CAP_TAG})(?P<attrs>(?:\s+[^>]*?)?)>"
@@ -83,8 +83,8 @@ class ElementsExtension(Extension):
             contents = self._SELF.sub(repl_self, contents)
             contents = self._CLOSED.sub(repl_closed, contents)
 
-        if re.search(rf"<{self._CAP_TAG}", contents):
-            raise ValueError("Found unmatched capitalized tag in template")
+        if matches := re.search(rf"<{self._CAP_TAG}", contents):
+            raise ValueError(f"Found unmatched capitalized tag in template: {matches.group(0)}")
 
         return contents
 
