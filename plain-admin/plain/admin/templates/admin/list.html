@@ -77,7 +77,15 @@
     <table class="text-sm table-auto">
         <thead>
             <tr class="bg-white/5 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
-                {% if table_style != "simple" and actions %}<th></th>{% endif %}
+                {% if table_style != "simple" and actions %}
+                <th class="p-0 pl-1">
+                    <input
+                        data-action-checkbox-all
+                        class="rounded bg-white/10 border-gray-200/20"
+                        type="checkbox"
+                    />
+                </th>
+                {% endif %}
 
                 {% for field in fields %}
                     {% if order_by_field is defined %}

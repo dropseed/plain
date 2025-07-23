@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from plain.htmx.views import HTMXViewMixin
 from plain.http import Response, ResponseRedirect
 from plain.models import Model
@@ -83,7 +85,11 @@ class AdminListView(HTMXViewMixin, AdminView):
         action_name = self.request.data.get("action_name")
         actions = self.get_actions()
         if action_name and action_name in actions:
-            target_ids = self.request.data["action_ids"].split(",")
+            action_ids_param = self.request.data["action_ids"]
+            if action_ids_param == "__all__":
+                target_ids = [self.get_object_id(obj) for obj in self.get_objects()]
+            else:
+                target_ids = action_ids_param.split(",") if action_ids_param else []
             response = self.perform_action(action_name, target_ids)
             if response:
                 return response
