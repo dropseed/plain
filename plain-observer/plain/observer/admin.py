@@ -26,12 +26,11 @@ class TraceViewset(AdminViewset):
             "start_time",
         ]
         allow_global_search = False
-        # Actually want a button to delete ALL! not possible yet
-        # actions = ["Delete"]
+        actions = ["Delete"]
 
-        # def perform_action(self, action: str, target_ids: list):
-        #     if action == "Delete":
-        #         Trace.objects.filter(id__in=target_ids).delete()
+        def perform_action(self, action: str, target_ids: list):
+            if action == "Delete":
+                Trace.objects.filter(id__in=target_ids).delete()
 
     class DetailView(AdminModelDetailView):
         model = Trace
@@ -55,6 +54,11 @@ class SpanViewset(AdminViewset):
         allow_global_search = False
         displays = ["Parents only"]
         search_fields = ["name", "span_id", "parent_id"]
+        actions = ["Delete"]
+
+        def perform_action(self, action: str, target_ids: list):
+            if action == "Delete":
+                Span.objects.filter(id__in=target_ids).delete()
 
         def get_objects(self):
             return (
