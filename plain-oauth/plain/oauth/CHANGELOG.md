@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.24.1](https://github.com/dropseed/plain/releases/plain-oauth@0.24.1) (2025-07-23)
+
+### What's changed
+
+- Added a nav icon to the OAuth admin interface ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0e2c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-oauth@0.24.0) (2025-07-22)
 
 ### What's changed
