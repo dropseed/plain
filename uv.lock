@@ -914,7 +914,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.14.0"
+version = "0.14.1"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
@@ -991,7 +991,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-worker"
-version = "0.25.0"
+version = "0.25.1"
 source = { editable = "plain-worker" }
 dependencies = [
     { name = "plain" },

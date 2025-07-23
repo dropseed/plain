@@ -1,5 +1,16 @@
 # plain-worker changelog
 
+## [0.25.1](https://github.com/dropseed/plain/releases/plain-worker@0.25.1) (2025-07-23)
+
+### What's changed
+
+- Added Bootstrap icons to admin interface for worker job views ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0e2ccc3174f05034e6e908bb26345e1a5c))
+- Removed the description field from admin views ([8d2352d](https://github.com/dropseed/plain/commit/8d2352db94277ddd87b6a480783c9f740b6e806f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-worker@0.25.0) (2025-07-22)
 
 ### What's changed
