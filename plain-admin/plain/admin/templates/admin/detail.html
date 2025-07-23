@@ -2,20 +2,12 @@
 
 {% block content %}
 
-<button
-    class="text-xs"
-    data-toggle=".raw-value, .pretty-value"
-    type="button">
-    Toggle raw values
-</button>
-
-<dl class="text-sm mt-3 grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8">
+<dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8">
     {% for field in fields %}
-    <dt class="font-medium mt-4 sm:mt-0"><code>{{ field }}</code></dt>
-    <dd class="flex items-center mt-1 sm:mt-0">
+    <dt class="mt-4 sm:mt-0 text-white/70"><code>{{ field }}</code></dt>
+    <dd class="mt-1 sm:mt-0 text-white/90">
         {% with value=get_field_value(object, field) %}
-        <div class="raw-value hidden"><code>{{ value }}</code></div>
-        <div class="pretty-value">{% include get_field_value_template(object, field, value) with context %}</div>
+        {% include get_field_value_template(object, field, value) with context %}
         {% endwith %}
     </dd>
     {% endfor %}
