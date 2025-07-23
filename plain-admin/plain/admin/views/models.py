@@ -158,6 +158,16 @@ class AdminModelDetailView(AdminDetailView):
         return str(self.object)
 
     @classmethod
+    def get_nav_title(cls) -> str:
+        if cls.nav_title:
+            return cls.nav_title
+
+        if cls.title:
+            return cls.title
+
+        return cls.model._meta.model_name.capitalize()
+
+    @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path

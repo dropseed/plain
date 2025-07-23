@@ -119,7 +119,8 @@ class AdminView(AuthViewMixin, TemplateView):
 
     @classmethod
     def get_view_url(cls, obj=None) -> str:
-        if obj:
+        # Check if this view's path expects an id parameter
+        if obj and "<int:id>" in cls.get_path():
             return reverse(f"{URL_NAMESPACE}:" + cls.view_name(), id=obj.id)
         else:
             return reverse(f"{URL_NAMESPACE}:" + cls.view_name())
