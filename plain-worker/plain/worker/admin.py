@@ -184,7 +184,6 @@ class JobResultViewset(AdminViewset):
         ]
         allow_global_search = False
 
-
         def get_initial_queryset(self):
             queryset = super().get_initial_queryset()
             queryset = queryset.annotate(

@@ -84,7 +84,9 @@ class ElementsExtension(Extension):
             contents = self._CLOSED.sub(repl_closed, contents)
 
         if matches := re.search(rf"<{self._CAP_TAG}", contents):
-            raise ValueError(f"Found unmatched capitalized tag in template: {matches.group(0)}")
+            raise ValueError(
+                f"Found unmatched capitalized tag in template: {matches.group(0)}"
+            )
 
         return contents
 
