@@ -227,9 +227,6 @@ class AdminDetailView(AdminView, DetailView):
             "admin/detail.html",  # A generic detail view for rendering any object
         ]
 
-    def get_description(self):
-        return repr(self.object)
-
     def get_field_value(self, obj, field: str):
         try:
             # Try basic dict lookup first
@@ -323,9 +320,6 @@ class AdminUpdateView(AdminView, UpdateView):
     def get_delete_url(self, obj) -> str:
         return ""
 
-    def get_description(self):
-        return repr(self.object)
-
     def get_links(self):
         links = super().get_links()
 
@@ -356,9 +350,6 @@ class AdminUpdateView(AdminView, UpdateView):
 class AdminDeleteView(AdminView, DeleteView):
     template_name = "admin/delete.html"
     nav_section = ""
-
-    def get_description(self):
-        return repr(self.object)
 
     def get_list_url(self) -> str:
         return ""

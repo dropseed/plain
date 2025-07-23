@@ -22,7 +22,6 @@ class AdminView(AuthViewMixin, TemplateView):
 
     title: str = ""
     path: str = ""
-    description: str = ""
     image: Img | None = None
 
     # Leave empty to hide from nav
@@ -53,7 +52,6 @@ class AdminView(AuthViewMixin, TemplateView):
         context["title"] = self.get_title()
         context["image"] = self.get_image()
         context["slug"] = self.get_slug()
-        context["description"] = self.get_description()
         context["links"] = self.get_links()
         context["parent_view_classes"] = self.get_parent_view_classes()
         context["admin_registry"] = registry
@@ -78,8 +76,6 @@ class AdminView(AuthViewMixin, TemplateView):
     def get_image(self) -> Img | None:
         return self.image
 
-    def get_description(self) -> str:
-        return self.description
 
     @classmethod
     def get_path(cls) -> str:

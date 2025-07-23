@@ -184,9 +184,6 @@ class JobResultViewset(AdminViewset):
         ]
         allow_global_search = False
 
-        def get_description(self):
-            delta = timedelta(seconds=settings.WORKER_JOBS_CLEARABLE_AFTER)
-            return f"Jobs are cleared after {_td_format(delta)}"
 
         def get_initial_queryset(self):
             queryset = super().get_initial_queryset()
