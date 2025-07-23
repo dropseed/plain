@@ -21,11 +21,13 @@ class AdminListView(HTMXViewMixin, AdminView):
     show_search = False
     allow_global_search = False
 
+    @cached_property
+    def display(self):
+        """Get the current display parameter from the request."""
+        return self.request.query_params.get("display", "")
+
     def get_template_context(self):
         context = super().get_template_context()
-
-        # Make this available on self for usage in get_objects and other methods
-        self.display = self.request.query_params.get("display", "")
 
         # Make this available to get_displays and stuff
         self.objects = self.get_objects()
