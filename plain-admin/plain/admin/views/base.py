@@ -59,6 +59,7 @@ class AdminView(AuthViewMixin, TemplateView):
         context["render_card"] = lambda card: card().render(self, self.request)
         context["time_zone"] = timezone.get_current_timezone_name()
         context["is_admin_view"] = True
+        context["view_class"] = self.__class__
         return context
 
     @classmethod
@@ -75,7 +76,6 @@ class AdminView(AuthViewMixin, TemplateView):
 
     def get_image(self) -> Img | None:
         return self.image
-
 
     @classmethod
     def get_path(cls) -> str:
