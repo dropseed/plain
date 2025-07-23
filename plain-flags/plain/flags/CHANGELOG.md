@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-flags@0.21.1) (2025-07-23)
+
+### What's changed
+
+- Admin navigation now includes Bootstrap icons for Flag and FlagResult sections ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0e2c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-flags@0.21.0) (2025-07-22)
 
 ### What's changed
