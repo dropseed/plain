@@ -543,7 +543,7 @@ def diagnose(trace_id, url, json_input, agent_command):
     prompt_lines = [
         "I have an OpenTelemetry trace data JSON from a Plain application. Analyze it for performance issues or improvements.",
         "",
-        "Focus on easy and obvious wins first and foremost. If there is nothing obvious, that's ok! Tell me that and ask whether there are specific things we should look deeper into.",
+        "Focus on easy and obvious wins first and foremost. You have access to the codebase, so make sure you look at it before suggesting anything! If there is nothing obvious, that's ok -- tell me that and ask whether there are specific things we should look deeper into.",
         "",
         "If potential code changes are found, briefly explain them and ask whether we should implement them.",
         "",
