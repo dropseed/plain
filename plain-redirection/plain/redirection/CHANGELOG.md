@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-redirection@0.19.0) (2025-07-23)
+
+### What's changed
+
+- Admin navigation now includes Bootstrap icons for redirect, log, and 404 log sections ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-redirection@0.18.0) (2025-07-22)
 
 ### What's changed
