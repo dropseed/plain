@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.3.1](https://github.com/dropseed/plain/releases/plain-observer@0.3.1) (2025-07-23)
+
+### What's changed
+
+- Added delete actions to the admin interface for both Traces and Spans, allowing bulk deletion of selected items ([0d85670](https://github.com/dropseed/plain/commit/0d85670412))
+- Added bootstrap icons to admin navigation (activity icon for Traces, diagram-3 icon for Spans) ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0e2c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-observer@0.3.0) (2025-07-22)
 
 ### What's changed
