@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.14.1](https://github.com/dropseed/plain/releases/plain-support@0.14.1) (2025-07-23)
+
+### What's changed
+
+- Admin interface now displays a headset icon for the Support navigation section ([9e9f8b0e2c](https://github.com/dropseed/plain/commit/9e9f8b0e2c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-support@0.14.0) (2025-07-22)
 
 ### What's changed
