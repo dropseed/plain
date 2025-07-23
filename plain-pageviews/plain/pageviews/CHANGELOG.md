@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.18.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.18.1) (2025-07-23)
+
+### What's changed
+
+- Added an "eye" icon to the pageviews navigation in admin interface ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.18.0) (2025-07-22)
 
 ### What's changed
