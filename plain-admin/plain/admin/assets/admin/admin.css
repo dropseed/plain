@@ -67,8 +67,8 @@ main button,
 .actions button,
 .actions a {
   display: inline-block;
-  padding: 8px 16px;
-  font-size: 14px;
+  padding: 4px 12px;
+  font-size: 13px;
   font-weight: 500;
   color: #ffffff;
   text-align: center;
