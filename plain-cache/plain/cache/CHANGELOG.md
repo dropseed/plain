@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.17.1](https://github.com/dropseed/plain/releases/plain-cache@0.17.1) (2025-07-23)
+
+### What's changed
+
+- Added archive icon to the cache admin interface navigation ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-cache@0.17.0) (2025-07-22)
 
 ### What's changed
