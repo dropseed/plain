@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.26.1](https://github.com/dropseed/plain/releases/plain-sessions@0.26.1) (2025-07-23)
+
+### What's changed
+
+- Added bootstrap icons to the Session admin interface with a "person-badge" icon ([9e9f8b0](https://github.com/dropseed/plain/commit/9e9f8b0e2c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.26.0](https://github.com/dropseed/plain/releases/plain-sessions@0.26.0) (2025-07-22)
 
 ### What's changed
