@@ -64,14 +64,15 @@ def install(
         "## Instructions",
         "",
         "For each package:",
-        "1. Run `uv run plain docs <package>` and follow any setup instructions",
-        "2. If the docs point out that it is a --dev tool, move it to dev dependencies: `uv remove <package> && uv add <package> --dev`",
+        "1. Run `uv run plain docs <package>` and read the installation instructions",
+        "2. If the docs point out that it is a --dev tool, move it to the dev dependencies in pyproject.toml: `uv remove <package> && uv add <package> --dev`",
+        "3. Go through the installation instructions and complete any code modifications that are needed",
         "",
         "DO NOT commit any changes",
         "",
         "Report back with:",
         "- Whether the setup completed successfully",
-        "- Any manual steps that still need to be completed",
+        "- Any manual steps that the user will need to complete",
         "- Any issues or errors encountered",
     ]
 
