@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.39.2](https://github.com/dropseed/plain/releases/plain-models@0.39.2) (2025-07-25)
+
+### What's changed
+
+- Fixed remaining `to_field_name` attribute usage in `ModelMultipleChoiceField` validation to use `id` directly ([26c80356d3](https://github.com/dropseed/plain/commit/26c80356d3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.39.1](https://github.com/dropseed/plain/releases/plain-models@0.39.1) (2025-07-22)
 
 ### What's changed
