@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.56.0](https://github.com/dropseed/plain/releases/plain@0.56.0) (2025-07-25)
+
+### What's changed
+
+- Added `plain install` command to install Plain packages with agent-assisted setup ([bf1873e](https://github.com/dropseed/plain/commit/bf1873eb81))
+- Added `--print` option to agent commands (`plain install` and `plain upgrade`) to print prompts without running the agent ([9721331](https://github.com/dropseed/plain/commit/9721331e40))
+- The `plain docs` command now automatically converts hyphens to dots in package names (e.g., `plain-models` → `plain.models`) ([1e3edc1](https://github.com/dropseed/plain/commit/1e3edc10f7))
+- Moved `plain-upgrade` functionality into plain core, eliminating the need for a separate package ([473f9bb](https://github.com/dropseed/plain/commit/473f9bb718))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.55.0](https://github.com/dropseed/plain/releases/plain@0.55.0) (2025-07-22)
 
 ### What's changed
