@@ -20,8 +20,17 @@ LOCK_FILE = Path("uv.lock")
     envvar="PLAIN_AGENT_COMMAND",
     help="Run command with generated prompt",
 )
+@click.option(
+    "--print",
+    "print_only",
+    is_flag=True,
+    help="Print the prompt without running the agent",
+)
 def upgrade(
-    packages: tuple[str, ...], diff: bool, agent_command: str | None = None
+    packages: tuple[str, ...],
+    diff: bool,
+    agent_command: str | None = None,
+    print_only: bool = False,
 ) -> None:
     """Upgrade Plain packages with the help of an agent."""
     if not packages:
@@ -55,7 +64,7 @@ def upgrade(
         return
 
     prompt = build_prompt(before_after)
-    success = prompt_agent(prompt, agent_command)
+    success = prompt_agent(prompt, agent_command, print_only)
     if not success:
         raise click.Abort()
 

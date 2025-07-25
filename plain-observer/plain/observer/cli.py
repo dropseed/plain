@@ -496,7 +496,13 @@ def format_trace_output(trace):
     envvar="PLAIN_AGENT_COMMAND",
     help="Run command with generated prompt",
 )
-def diagnose(trace_id, url, json_input, agent_command):
+@click.option(
+    "--print",
+    "print_only",
+    is_flag=True,
+    help="Print the prompt without running the agent",
+)
+def diagnose(trace_id, url, json_input, agent_command, print_only):
     """Generate a diagnostic prompt for analyzing a trace.
 
     By default, provide a trace ID from the database. Use --url for a shareable
@@ -555,6 +561,6 @@ def diagnose(trace_id, url, json_input, agent_command):
 
     prompt = "\n".join(prompt_lines)
 
-    success = prompt_agent(prompt, agent_command)
+    success = prompt_agent(prompt, agent_command, print_only)
     if not success:
         raise click.Abort()

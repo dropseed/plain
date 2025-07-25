@@ -13,7 +13,17 @@ from .agent import prompt_agent
     envvar="PLAIN_AGENT_COMMAND",
     help="Run command with generated prompt",
 )
-def install(packages: tuple[str, ...], agent_command: str | None = None) -> None:
+@click.option(
+    "--print",
+    "print_only",
+    is_flag=True,
+    help="Print the prompt without running the agent",
+)
+def install(
+    packages: tuple[str, ...],
+    agent_command: str | None = None,
+    print_only: bool = False,
+) -> None:
     """Install Plain packages with the help of an agent."""
     # Validate all package names
     invalid_packages = [pkg for pkg in packages if not pkg.startswith("plain")]
@@ -42,7 +52,9 @@ def install(packages: tuple[str, ...], agent_command: str | None = None) -> None
     if len(packages) == 1:
         click.secho(f"✓ {packages[0]} installed successfully", fg="green", err=True)
     else:
-        click.secho(f"✓ {len(packages)} packages installed successfully", fg="green", err=True)
+        click.secho(
+            f"✓ {len(packages)} packages installed successfully", fg="green", err=True
+        )
     click.echo(err=True)
 
     # Build the prompt for the agent to complete setup
@@ -64,6 +76,6 @@ def install(packages: tuple[str, ...], agent_command: str | None = None) -> None
     ]
 
     prompt = "\n".join(lines)
-    success = prompt_agent(prompt, agent_command)
+    success = prompt_agent(prompt, agent_command, print_only)
     if not success:
         raise click.Abort()

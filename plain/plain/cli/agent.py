@@ -4,7 +4,9 @@ import subprocess
 import click
 
 
-def prompt_agent(prompt: str, agent_command: str | None = None) -> bool:
+def prompt_agent(
+    prompt: str, agent_command: str | None = None, print_only: bool = False
+) -> bool:
     """
     Run an agent command with the given prompt, or display the prompt for manual copying.
 
@@ -12,12 +14,23 @@ def prompt_agent(prompt: str, agent_command: str | None = None) -> bool:
         prompt: The prompt to send to the agent
         agent_command: Optional command to run (e.g., "claude code"). If not provided,
                       will check the PLAIN_AGENT_COMMAND environment variable.
+        print_only: If True, always print the prompt instead of running the agent
 
     Returns:
         True if the agent command succeeded (or no agent command was provided),
         False if the agent command failed.
     """
-    if agent_command:
+    if print_only or not agent_command:
+        click.echo(prompt)
+        if not print_only:
+            click.secho(
+                "\nCopy the prompt above to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_AGENT_COMMAND environment variable.",
+                dim=True,
+                italic=True,
+                err=True,
+            )
+        return True
+    else:
         cmd = shlex.split(agent_command)
         cmd.append(prompt)
         result = subprocess.run(cmd, check=False)
@@ -28,13 +41,4 @@ def prompt_agent(prompt: str, agent_command: str | None = None) -> bool:
                 err=True,
             )
             return False
-        return True
-    else:
-        click.echo(prompt)
-        click.secho(
-            "\nCopy the prompt above to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_AGENT_COMMAND environment variable.",
-            dim=True,
-            italic=True,
-            err=True,
-        )
         return True
