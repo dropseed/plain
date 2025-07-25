@@ -1,10 +1,11 @@
-import shlex
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
 
 import click
+
+from .agent import prompt_agent
 
 LOCK_FILE = Path("uv.lock")
 
@@ -19,7 +20,7 @@ LOCK_FILE = Path("uv.lock")
     envvar="PLAIN_AGENT_COMMAND",
     help="Run command with generated prompt",
 )
-def cli(
+def upgrade(
     packages: tuple[str, ...], diff: bool, agent_command: str | None = None
 ) -> None:
     """Generate an upgrade prompt for plain packages."""
@@ -54,25 +55,9 @@ def cli(
         return
 
     prompt = build_prompt(before_after)
-
-    if agent_command:
-        cmd = shlex.split(agent_command)
-        cmd.append(prompt)
-        result = subprocess.run(cmd, check=False)
-        if result.returncode != 0:
-            click.secho(
-                f"Agent command failed with exit code {result.returncode}",
-                fg="red",
-                err=True,
-            )
-    else:
-        click.echo(prompt)
-        click.secho(
-            "\nCopy the prompt above to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_AGENT_COMMAND environment variable.",
-            dim=True,
-            italic=True,
-            err=True,
-        )
+    success = prompt_agent(prompt, agent_command)
+    if not success:
+        raise click.Abort()
 
 
 def get_installed_plain_packages() -> list[str]:

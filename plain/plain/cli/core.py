@@ -17,6 +17,7 @@ from .registry import cli_registry
 from .scaffold import create
 from .settings import setting
 from .shell import run, shell
+from .upgrade import upgrade
 from .urls import urls
 from .utils import utils
 
@@ -37,6 +38,7 @@ plain_cli.add_command(changelog)
 plain_cli.add_command(setting)
 plain_cli.add_command(shell)
 plain_cli.add_command(run)
+plain_cli.add_command(upgrade)
 plain_cli.add_command(help_cmd)
 
 

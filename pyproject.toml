@@ -30,7 +30,6 @@ dev-dependencies = [
     "plain-support",
     "plain-tailwind",
     "plain-tunnel",
-    "plain-upgrade",
     "plain-vendor",
     "plain-worker",
 ]
@@ -61,7 +60,6 @@ dev-dependencies = [
 "plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-tunnel" = { workspace = true }
-"plain-upgrade" = { workspace = true }
 "plain-vendor" = { workspace = true }
 "plain-worker" = { workspace = true }
 

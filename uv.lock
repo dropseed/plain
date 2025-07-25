@@ -30,7 +30,6 @@ members = [
     "plain-support",
     "plain-tailwind",
     "plain-tunnel",
-    "plain-upgrade",
     "plain-vendor",
     "plain-worker",
     "plain-workspace",
@@ -962,17 +961,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "plain-upgrade"
-version = "0.4.0"
-source = { editable = "plain-upgrade" }
-dependencies = [
-    { name = "click" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
-
-[[package]]
 name = "plain-vendor"
 version = "0.8.4"
 source = { editable = "plain-vendor" }
@@ -1044,7 +1032,6 @@ dev = [
     { name = "plain-support" },
     { name = "plain-tailwind" },
     { name = "plain-tunnel" },
-    { name = "plain-upgrade" },
     { name = "plain-vendor" },
     { name = "plain-worker" },
 ]
@@ -1078,7 +1065,6 @@ dev = [
     { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
-    { name = "plain-upgrade", editable = "plain-upgrade" },
     { name = "plain-vendor", editable = "plain-vendor" },
     { name = "plain-worker", editable = "plain-worker" },
 ]
