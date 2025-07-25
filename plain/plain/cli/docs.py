@@ -40,6 +40,9 @@ def docs(module, llm, open):
         return
 
     if module:
+        # Convert hyphens to dots (e.g., plain-models -> plain.models)
+        module = module.replace("-", ".")
+        
         # Automatically prefix if we need to
         if not module.startswith("plain"):
             module = f"plain.{module}"
