@@ -23,7 +23,7 @@ LOCK_FILE = Path("uv.lock")
 def upgrade(
     packages: tuple[str, ...], diff: bool, agent_command: str | None = None
 ) -> None:
-    """Generate an upgrade prompt for plain packages."""
+    """Upgrade Plain packages with the help of an agent."""
     if not packages:
         click.secho("Getting installed packages...", bold=True, err=True)
         packages = tuple(sorted(get_installed_plain_packages()))

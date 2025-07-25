@@ -12,6 +12,7 @@ from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
 from .help import help_cmd
+from .install import install
 from .preflight import preflight_checks
 from .registry import cli_registry
 from .scaffold import create
@@ -38,6 +39,7 @@ plain_cli.add_command(changelog)
 plain_cli.add_command(setting)
 plain_cli.add_command(shell)
 plain_cli.add_command(run)
+plain_cli.add_command(install)
 plain_cli.add_command(upgrade)
 plain_cli.add_command(help_cmd)
 
