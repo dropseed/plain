@@ -22,13 +22,14 @@ Include the observer URLs in your URL configuration:
 
 ```python
 # app/urls.py
+from plain.observer.urls import ObserverRouter
 from plain.urls import Router, include
 
 class AppRouter(Router):
     namespace = ""
     urls = [
         # ...
-        include("observer/", "plain.observer.urls"),
+        include("observer/", ObserverRouter),
     ]
 ```
 
