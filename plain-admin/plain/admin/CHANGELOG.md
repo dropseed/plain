@@ -1,5 +1,25 @@
 # plain-admin changelog
 
+## [0.37.2](https://github.com/dropseed/plain/releases/plain-admin@0.37.2) (2025-07-25)
+
+### What's changed
+
+- No user-facing changes in this release
+
+### Upgrade instructions
+
+- No changes required
+
+## [0.37.1](https://github.com/dropseed/plain/releases/plain-admin@0.37.1) (2025-07-25)
+
+### What's changed
+
+- Fixed breadcrumbs navigation in detail views to properly handle object context and URL generation ([38c9f12](https://github.com/dropseed/plain/commit/38c9f12ed473782b5edcbc79e52735513e6009d2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.0](https://github.com/dropseed/plain/releases/plain-admin@0.37.0) (2025-07-23)
 
 ### What's changed
