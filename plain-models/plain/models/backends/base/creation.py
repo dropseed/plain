@@ -53,7 +53,6 @@ class BaseDatabaseCreation:
             package_label=None,
             migration_name=None,
             fake=False,
-            fake_initial=False,
             plan=False,
             check_unapplied=False,
             backup=False,

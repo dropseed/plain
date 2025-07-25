@@ -326,11 +326,6 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
     "--fake", is_flag=True, help="Mark migrations as run without actually running them."
 )
 @click.option(
-    "--fake-initial",
-    is_flag=True,
-    help="Detect if tables already exist and fake-apply initial migrations if so. Make sure that the current database schema matches your initial migration before using this flag. Plain will only check for an existing table name.",
-)
-@click.option(
     "--plan",
     is_flag=True,
     help="Shows a list of the migration actions that will be performed.",
@@ -371,7 +366,6 @@ def migrate(
     package_label,
     migration_name,
     fake,
-    fake_initial,
     plan,
     check_unapplied,
     backup,
@@ -611,7 +605,6 @@ def migrate(
             plan=migration_plan,
             state=pre_migrate_state.clone(),
             fake=fake,
-            fake_initial=fake_initial,
         )
         # post_migrate signals have access to all models. Ensure that all models
         # are reloaded in case any are delayed.
