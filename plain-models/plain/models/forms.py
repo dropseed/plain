@@ -573,7 +573,6 @@ class ModelMultipleChoiceField(ModelChoiceField):
         corresponding objects. Raise a ValidationError if a given value is
         invalid (not a valid PK, not in the queryset, etc.)
         """
-        key = self.to_field_name or "id"
         # deduplicate given values to avoid creating many querysets or
         # requiring the database backend deduplicate efficiently.
         try:
@@ -586,15 +585,15 @@ class ModelMultipleChoiceField(ModelChoiceField):
             )
         for id_val in value:
             try:
-                self.queryset.filter(**{key: id_val})
+                self.queryset.filter(id=id_val)
             except (ValueError, TypeError):
                 raise ValidationError(
                     self.error_messages["invalid_id_value"],
                     code="invalid_id_value",
                     params={"id": id_val},
                 )
-        qs = self.queryset.filter(**{f"{key}__in": value})
-        ids = {str(getattr(o, key)) for o in qs}
+        qs = self.queryset.filter(id__in=value)
+        ids = {str(o.id) for o in qs}
         for val in value:
             if str(val) not in ids:
                 raise ValidationError(
