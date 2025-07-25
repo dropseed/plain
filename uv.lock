@@ -784,7 +784,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.3.2"
+version = "0.3.3"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },

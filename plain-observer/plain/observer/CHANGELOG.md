@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.3.3](https://github.com/dropseed/plain/releases/plain-observer@0.3.3) (2025-07-25)
+
+### What's changed
+
+- Added `--print` option to the `plain observer diagnose` command to print prompts without running agents ([9721331](https://github.com/dropseed/plain/commit/9721331e40))
+- The `plain observer diagnose` command now uses the shared `prompt_agent` utility for better consistency ([de1fa72](https://github.com/dropseed/plain/commit/de1fa7253a))
+- Added comprehensive installation instructions to the README including package installation, URL configuration, and migration steps ([950939b](https://github.com/dropseed/plain/commit/950939b619))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.2](https://github.com/dropseed/plain/releases/plain-observer@0.3.2) (2025-07-25)
 
 ### What's changed
