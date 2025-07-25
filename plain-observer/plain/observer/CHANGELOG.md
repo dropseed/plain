@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.3.2](https://github.com/dropseed/plain/releases/plain-observer@0.3.2) (2025-07-25)
+
+### What's changed
+
+- The diagnose agent command now instructs the AI to examine the codebase before making suggestions ([f5ae388](https://github.com/dropseed/plain/commit/f5ae388833))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.1](https://github.com/dropseed/plain/releases/plain-observer@0.3.1) (2025-07-23)
 
 ### What's changed
