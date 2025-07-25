@@ -1,12 +1,11 @@
 import json
-import shlex
-import subprocess
 import sys
 import urllib.request
 
 import click
 
 from plain.cli import register_cli
+from plain.cli.agent import prompt_agent
 from plain.observer.models import Span, Trace
 
 
@@ -556,21 +555,6 @@ def diagnose(trace_id, url, json_input, agent_command):
 
     prompt = "\n".join(prompt_lines)
 
-    if agent_command:
-        cmd = shlex.split(agent_command)
-        cmd.append(prompt)
-        result = subprocess.run(cmd, check=False)
-        if result.returncode != 0:
-            click.secho(
-                f"Agent command failed with exit code {result.returncode}",
-                fg="red",
-                err=True,
-            )
-    else:
-        click.echo(prompt)
-        click.secho(
-            "\nCopy the prompt above to a coding agent. To run an agent automatically, use --agent-command or set the PLAIN_AGENT_COMMAND environment variable.",
-            dim=True,
-            italic=True,
-            err=True,
-        )
+    success = prompt_agent(prompt, agent_command)
+    if not success:
+        raise click.Abort()
