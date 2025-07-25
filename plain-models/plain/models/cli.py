@@ -354,6 +354,13 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
     help="Delete nonexistent migrations from the plainmigrations table.",
 )
 @click.option(
+    "--no-input",
+    "--noinput",
+    "no_input",
+    is_flag=True,
+    help="Tells Plain to NOT prompt the user for input of any kind.",
+)
+@click.option(
     "-v",
     "--verbosity",
     type=int,
@@ -369,6 +376,7 @@ def migrate(
     check_unapplied,
     backup,
     prune,
+    no_input,
     verbosity,
 ):
     """Updates database schema. Manages both packages with migrations and those without."""
@@ -576,9 +584,12 @@ def migrate(
         if backup or (
             backup is None
             and settings.DEBUG
-            and click.confirm(
-                "\nYou are in DEBUG mode. Would you like to make a database backup before running migrations?",
-                default=True,
+            and (
+                no_input
+                or click.confirm(
+                    "\nYou are in DEBUG mode. Would you like to make a database backup before running migrations?",
+                    default=True,
+                )
             )
         ):
             backup_name = f"migrate_{time.strftime('%Y%m%d_%H%M%S')}"

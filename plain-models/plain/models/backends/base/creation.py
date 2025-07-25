@@ -58,6 +58,7 @@ class BaseDatabaseCreation:
             check_unapplied=False,
             backup=False,
             prune=False,
+            no_input=True,
             verbosity=max(verbosity - 1, 0),
         )
 
