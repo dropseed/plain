@@ -32,13 +32,18 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-In your `urls.py`, include `plain.oauth.urls`:
+In your `urls.py`, include the [`OAuthRouter`](urls.py#OAuthRouter):
 
 ```python
-urlpatterns = [
-    path("oauth/", include("plain.oauth.urls")),
-    ...
-]
+from plain.oauth.urls import OAuthRouter
+from plain.urls import Router, include
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        include("oauth/", OAuthRouter),
+        # ...
+    ]
 ```
 
 Then run migrations:
