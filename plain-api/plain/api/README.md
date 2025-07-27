@@ -2,7 +2,18 @@
 
 **Build APIs using class-based views.**
 
-This package includes lightweight view classes for building APIs using the same patterns as regular HTML views. It also provides an [`APIKey` model](#api-keys) and support for generating [OpenAPI](#openapi) documents.
+- [Overview](#overview)
+- [Authentication and authorization](#authentication-and-authorization)
+- [`PUT`, `POST`, and `PATCH`](#put-post-and-patch)
+- [`DELETE`](#delete)
+- [API keys](#api-keys)
+- [OpenAPI](#openapi)
+    - [Deploying](#deploying)
+- [Installation](#installation)
+
+## Overview
+
+This package includes lightweight view classes for building APIs using the same patterns as regular HTML views. It also provides an [`APIKey`](./models.py#APIKey) model and support for generating [OpenAPI](#openapi) documents.
 
 Because [Views](/plain/plain/views/README.md) can convert built-in types to responses, an API view can simply return a dict or list to send a JSON response back to the client. More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class.
 
@@ -179,7 +190,7 @@ class PullRequestView(BaseAPIView):
 
 ## API keys
 
-The provided [`APIKey` model](./models.py) includes randomly generated, unique API tokens that are automatically parsed by `APIKeyView`. The tokens can optionally be named and include an `expires_at` date.
+The provided [`APIKey`](./models.py#APIKey) model includes randomly generated, unique API tokens that are automatically parsed by `APIKeyView`. The tokens can optionally be named and include an `expires_at` date.
 
 Associating an `APIKey` with a user (or team, for example) is up to you. Most likely you will want to use a `ForeignKey` or a `ManyToManyField`.
 
@@ -218,7 +229,7 @@ user.api_key = APIKey.objects.create()
 user.save()
 ```
 
-To use API keys in your views, you can inherit from `APIKeyView` and customize the [`use_api_key` method](./views.py#use_api_key) to set the `request.user` attribute (or any other attribute) to the object associated with the API key.
+To use API keys in your views, you can inherit from `APIKeyView` and customize the [`use_api_key`](./views.py#use_api_key) method to set the `request.user` attribute (or any other attribute) to the object associated with the API key.
 
 ```python
 # app/api/views.py
@@ -378,5 +389,66 @@ class APIRouter(Router):
     urls = [
         # ...your API routes
         path("openapi.json", AssetView.as_view(asset_path="openapi.json")),
+    ]
+```
+
+## Installation
+
+Install the `plain.api` package from [PyPI](https://pypi.org/project/plain.api/):
+
+```console
+$ uv add plain.api
+```
+
+Typically you will want to create an `api` package to contain all of the views and URLs for your app's API.
+
+```console
+$ plain create api
+```
+
+The `app.api` package should be added to your app's `INSTALLED_APPS` setting in `app/settings.py`:
+
+```python
+# app/settings.py
+INSTALLED_APPS = [
+    # ...other apps
+    "app.api",
+]
+```
+
+Then create a your API URL router and your first API view.
+
+```python
+# app/api/urls.py
+from plain.urls import Router, path
+from plain.api.views import APIView
+
+
+class ExampleAPIView(APIView):
+    def get(self):
+        return {"message": "Hello, world!"}
+
+
+class APIRouter(Router):
+    namespace = "api"
+    urls = [
+        path("example/", ExampleAPIView),
+    ]
+```
+
+The `APIRouter` can then be included in your app's URLs.
+
+```python
+# app/urls.py
+from plain.urls import include, path
+
+from .api.urls import APIRouter
+
+
+class AppRouter(Router):
+    namespace = "app"
+    urls = [
+        # ...other routes
+        include("api/", APIRouter),
     ]
 ```

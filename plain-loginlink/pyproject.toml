@@ -1,7 +1,7 @@
 [project]
 name = "plain.loginlink"
 version = "0.11.0"
-description = "Emailed link-based login for Plain."
+description = "Link-based authentication for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

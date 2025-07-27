@@ -4,7 +4,7 @@ packages = [
     { include = "plain" },
 ]
 version = "0.17.1"
-description = "Database-backed cache for Plain."
+description = "A simple database-backed cache for storing JSON-serializable values with optional expiration."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

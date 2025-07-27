@@ -1,7 +1,7 @@
 [project]
 name = "plain.email"
 version = "0.10.2"
-description = "Email sending for Plain."
+description = "Everything you need to send email in Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"

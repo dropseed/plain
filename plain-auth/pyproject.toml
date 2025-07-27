@@ -1,7 +1,7 @@
 [project]
 name = "plain.auth"
 version = "0.15.0"
-description = "User authentication and authorization for Plain."
+description = "Add users to your app and decide what they can access."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

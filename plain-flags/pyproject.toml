@@ -1,7 +1,7 @@
 [project]
 name = "plain.flags"
 version = "0.21.1"
-description = "Feature flags for Plain."
+description = "Local feature flags via database models."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

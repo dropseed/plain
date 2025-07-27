@@ -2,7 +2,11 @@
 
 **On-page telemetry and observability tools for Plain.**
 
+- [Installation](#installation)
+
 ## Installation
+
+Install the `plain.observer` package from [PyPI](https://pypi.org/project/plain.observer/):
 
 ```bash
 uv add plain.observer
@@ -38,3 +42,5 @@ Run migrations to create the necessary database tables:
 ```bash
 plain migrate
 ```
+
+After installation, Observer will automatically integrate with your application's toolbar (if using `plain.admin`). You can access the web interface at `/observer/traces/` or use the CLI commands to analyze traces.

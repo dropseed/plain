@@ -1,7 +1,7 @@
 [project]
 name = "plain.dev"
 version = "0.33.1"
-description = "Local development tools for Plain."
+description = "A single command that runs everything you need for local development."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"

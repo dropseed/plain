@@ -1,7 +1,7 @@
 [project]
 name = "plain.support"
 version = "0.14.1"
-description = "Basic support tools for Plain."
+description = "Provides support forms for your application."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

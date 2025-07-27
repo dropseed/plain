@@ -1,7 +1,7 @@
 [project]
 name = "plain.worker"
 version = "0.25.1"
-description = "Background job processing for Plain."
+description = "Process background jobs with a database-driven worker."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

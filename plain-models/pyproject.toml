@@ -1,7 +1,7 @@
 [project]
 name = "plain.models"
 version = "0.39.2"
-description = "Database models for Plain."
+description = "Model your data and store it in a database."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

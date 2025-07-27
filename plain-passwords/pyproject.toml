@@ -1,7 +1,7 @@
 [project]
 name = "plain.passwords"
 version = "0.10.0"
-description = "Password-based login for Plain."
+description = "Password authentication for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

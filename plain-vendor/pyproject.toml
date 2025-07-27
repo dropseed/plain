@@ -1,7 +1,7 @@
 [project]
 name = "plain.vendor"
 version = "0.8.4"
-description = "Vendor JS/CSS assets in Plain."
+description = "Download CDN scripts and styles as vendored dependencies."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"

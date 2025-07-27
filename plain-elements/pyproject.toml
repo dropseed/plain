@@ -1,7 +1,7 @@
 [project]
 name = "plain.elements"
 version = "0.8.0"
-description = "HTML-style includes for Plain."
+description = "Use HTML tags to include HTML template components."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

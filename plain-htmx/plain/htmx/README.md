@@ -1,14 +1,28 @@
-# HTMX
+# plain.htmx
 
-Integrate HTMX with templates and views.
+**Integrate HTMX with templates and views.**
+
+- [Overview](#overview)
+- [Template Fragments](#template-fragments)
+    - [Lazy template fragments](#lazy-template-fragments)
+    - [How does it work?](#how-does-it-work)
+- [View Actions](#view-actions)
+- [Dedicated Templates](#dedicated-templates)
+- [Tailwind CSS variant](#tailwind-css-variant)
+- [CSRF tokens](#csrf-tokens)
+- [Error classes](#error-classes)
+- [CSP](#csp)
+- [Installation](#installation)
+
+## Overview
 
 The `plain-htmx` package adds a couple of unique features for working with HTMX.
 One is [template fragments](#template-fragments) and the other is [view actions](#view-actions).
 
 The combination of these features lets you build HTMX-powered views that focus on server-side rendering and avoid overly complicated URL structures or REST APIs that you may not otherwise need.
 
-The `HTMXViewMixin` is the starting point for the server-side HTMX behavior.
-To use these feaures on a view,
+The [`HTMXViewMixin`](./views.py#HTMXViewMixin) is the starting point for the server-side HTMX behavior.
+To use these features on a view,
 simply inherit from the class (yes, this is designed to work with class-based views).
 
 ```python
@@ -37,15 +51,6 @@ you can use the `{% htmx_js %}` template tag:
 <body>
     {% block content %}{% endblock %}
 </body>
-```
-
-## Installation
-
-```python
-INSTALLED_PACKAGES = [
-    # ...
-    "plain.htmx",
-]
 ```
 
 ## Template Fragments
@@ -118,7 +123,7 @@ class HomeView(HTMXViewMixin, TemplateView):
 {% endhtmxfragment %}
 ```
 
-### How does it work?
+#### How does it work?
 
 When you use the `{% htmxfragment %}` tag,
 a standard `div` is output that looks like this:
@@ -405,4 +410,21 @@ module.exports = {
 
 ```
 <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+```
+
+## Installation
+
+Install the `plain.htmx` package from [PyPI](https://pypi.org/project/plain.htmx/):
+
+```bash
+uv add plain.htmx
+```
+
+Configure your Plain application:
+
+```python
+INSTALLED_PACKAGES = [
+    # ...
+    "plain.htmx",
+]
 ```

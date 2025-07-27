@@ -1,7 +1,7 @@
 [project]
 name = "plain.pages"
 version = "0.10.4"
-description = "Simplified Markdown-based content for Plain."
+description = "Serve static pages, markdown, and assets from templates/pages directories."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

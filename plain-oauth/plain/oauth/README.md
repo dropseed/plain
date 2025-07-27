@@ -1,6 +1,18 @@
 # plain.oauth
 
-Let users log in with OAuth providers.
+**Let users log in with OAuth providers.**
+
+- [Overview](#overview)
+- [Usage](#usage)
+    - [Basic setup example](#basic-setup-example)
+    - [Handling OAuth errors](#handling-oauth-errors)
+    - [Connecting and disconnecting OAuth accounts](#connecting-and-disconnecting-oauth-accounts)
+    - [Using a saved access token](#using-a-saved-access-token)
+    - [Using the Django system check](#using-the-django-system-check)
+- [FAQs](#faqs)
+- [Installation](#installation)
+
+## Overview
 
 [Watch on YouTube (3 mins) →](https://www.youtube.com/watch?v=UxbxBa6AFsU)
 
@@ -17,11 +29,9 @@ There are three OAuth flows that it makes possible:
 
 ## Usage
 
-Install the package from PyPi:
+### Basic setup example
 
-```sh
-pip install plain-oauth
-```
+Here's a complete example showing how to set up OAuth login with GitHub:
 
 Add `plain.oauth` to your `INSTALLED_PACKAGES` in `settings.py`:
 
@@ -32,7 +42,7 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-In your `urls.py`, include the [`OAuthRouter`](urls.py#OAuthRouter):
+In your `urls.py`, include the [`OAuthRouter`](./urls.py#OAuthRouter):
 
 ```python
 from plain.oauth.urls import OAuthRouter
@@ -61,12 +71,12 @@ import requests
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 
-class ExampleOAuthProvider(OAuthProvider):
-    authorization_url = "https://example.com/login/oauth/authorize"
+class GitHubOAuthProvider(OAuthProvider):
+    authorization_url = "https://github.com/login/oauth/authorize"
 
     def get_oauth_token(self, *, code, request):
         response = requests.post(
-            "https://example.com/login/oauth/token",
+            "https://github.com/login/oauth/access_token",
             headers={
                 "Accept": "application/json",
             },
@@ -84,7 +94,7 @@ class ExampleOAuthProvider(OAuthProvider):
 
     def get_oauth_user(self, *, oauth_token):
         response = requests.get(
-            "https://example.com/api/user",
+            "https://api.github.com/user",
             headers={
                 "Accept": "application/json",
                 "Authorization": f"token {oauth_token.access_token}",
@@ -140,8 +150,6 @@ Depending on your URL and provider names,
 your OAuth callback will be something like `https://example.com/oauth/{provider}/callback/`.
 
 That's pretty much it!
-
-## Advanced usage
 
 ### Handling OAuth errors
 
@@ -207,7 +215,7 @@ Hello {{ request.user }}!
 {% endblock %}
 ```
 
-The `get_provider_keys` function can help populate the list of options:
+The [`get_provider_keys`](./providers.py#get_provider_keys) function can help populate the list of options:
 
 ```python
 from plain.oauth.providers import get_provider_keys
@@ -251,7 +259,7 @@ python manage.py check --database default
 
 ## FAQs
 
-### How is this different from [Django OAuth libraries](https://djangopackages.org/grids/g/oauth/)?
+#### How is this different from [Django OAuth libraries](https://djangopackages.org/grids/g/oauth/)?
 
 The short answer is that _it does less_.
 
@@ -270,7 +278,7 @@ and the implications for doing it one way or another.
 The other popular OAuth libraries have similar issues,
 and I think their _weight_ outweighs their usefulness for 80% of the use cases.
 
-### Why aren't providers included in the library itself?
+#### Why aren't providers included in the library itself?
 
 One thing you'll notice is that we don't have a long list of pre-configured providers in this library.
 Instead, we have some examples (which you can usually just copy, paste, and use) and otherwise encourage you to wire up the provider yourself.
@@ -293,7 +301,7 @@ You don't need to try to run changes through us or wait for an upstream update.
 You're welcome to contribute an example to this repo,
 and there won't be an expectation that it "works perfectly for every use case until the end of time".
 
-### Redirect/callback URL mismatch in local development?
+#### Redirect/callback URL mismatch in local development?
 
 If you're doing local development through a proxy/tunnel like [ngrok](https://ngrok.com/),
 then the callback URL might be automatically built as `http` instead of `https`.
@@ -303,3 +311,22 @@ This is the Django setting you're probably looking for:
 ```python
 HTTPS_PROXY_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 ```
+
+## Installation
+
+Install the `plain.oauth` package from [PyPI](https://pypi.org/project/plain.oauth/):
+
+```bash
+uv add plain.oauth
+```
+
+After installation, follow the basic setup example in the [Usage](#usage) section above to:
+
+1. Add `plain.oauth` to your `INSTALLED_PACKAGES`
+2. Include the OAuth router in your URLs
+3. Run migrations
+4. Create an OAuth provider class
+5. Configure OAuth settings
+6. Add login buttons to your templates
+
+For a complete working example, see the [Basic setup example](#basic-setup-example) which shows how to set up GitHub OAuth login.

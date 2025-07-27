@@ -1,11 +1,14 @@
-# Cache
+# plain.cache
 
-A simple cache using the database.
+**A simple database-backed cache for storing JSON-serializable values with optional expiration.**
 
-The Plain Cache stores JSON-serializable values in a `CachedItem` model.
+- [CLI](#cli)
+- [Installation](#installation)
+
+The Plain Cache stores JSON-serializable values in a [`CachedItem`](./models.py#CachedItem) model.
 Cached data can be set to expire after a certain amount of time.
 
-Access to the cache is provided through the `Cached` class.
+Access to the cache is provided through the [`Cached`](./core.py#Cached) class.
 
 ```python
 from plain.cache import Cached
@@ -26,7 +29,19 @@ cached.delete()
 
 Expired cache items can be cleared by [running chores](/plain/plain/chores/README.md).
 
+## CLI
+
+- `plain cache clear-expired` - Clear all expired cache items
+- `plain cache clear-all` - Clear all cache items
+- `plain cache stats` - Show cache statistics
+
 ## Installation
+
+Install the `plain.cache` package from [PyPI](https://pypi.org/project/plain.cache/):
+
+```bash
+uv add plain.cache
+```
 
 Add `plain.cache` to your `INSTALLED_PACKAGES`:
 
@@ -38,8 +53,8 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-## CLI
+Run migrations to create the cache tables:
 
-- `plain cache clear-expired` - Clear all expired cache items
-- `plain cache clear-all` - Clear all cache items
-- `plain cache stats` - Show cache statistics
+```bash
+plain migrate
+```

@@ -2,6 +2,13 @@
 
 **Use HTML tags to include HTML template components.**
 
+- [Overview](#overview)
+- [Element attributes](#element-attributes)
+- [Namespaced elements](#namespaced-elements)
+- [Installation](#installation)
+
+## Overview
+
 Elements are an alternative to Jinja [`{% include %}`](https://jinja.palletsprojects.com/en/stable/templates/#include) or [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros) and flow better with existing HTML by using a compatible syntax. They are distinguished from built-in HTML tags by using a capitalized tag name (so `<Button>` doesn't clash with `<button>`).
 
 To make a `<Submit>` element, for example, you would create a template named `templates/elements/Submit.html`.
@@ -13,7 +20,7 @@ To make a `<Submit>` element, for example, you would create a template named `te
 </button>
 ```
 
-An element can be used in any other template by enabling them with `{% use_elements %}` and then using the caplitalized tag name.
+An element can be used in any other template by enabling them with `{% use_elements %}` and then using the capitalized tag name.
 
 ```html
 {% extends "admin/base.html" %}
@@ -27,18 +34,6 @@ An element can be used in any other template by enabling them with `{% use_eleme
     <Submit>Save</Submit>
 </form>
 {% endblock %}
-```
-
-## Installation
-
-Install [`plain.elements` from PyPI](https://pypi.org/project/plain.elements/) and add it to your `INSTALLED_PACKAGES` setting. That's it! The Jinja extension will be enabled automatically.
-
-```python
-# settings.py
-INSTALLED_PACKAGES = [
-    # ...
-    "plain.elements",
-]
 ```
 
 ## Element attributes
@@ -91,4 +86,22 @@ For example, an element in `templates/elements/admin/Submit.html` would be used 
     <admin.Submit>Save</admin.Submit>
 </form>
 {% endblock %}
+```
+
+## Installation
+
+Install the `plain.elements` package from [PyPI](https://pypi.org/project/plain.elements/):
+
+```bash
+uv add plain.elements
+```
+
+Add it to your `INSTALLED_PACKAGES` setting. That's it! The Jinja extension will be enabled automatically.
+
+```python
+# settings.py
+INSTALLED_PACKAGES = [
+    # ...
+    "plain.elements",
+]
 ```

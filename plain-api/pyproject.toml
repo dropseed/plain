@@ -1,7 +1,7 @@
 [project]
 name = "plain.api"
 version = "0.12.0"
-description = "API for Plain."
+description = "Build APIs using class-based views."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

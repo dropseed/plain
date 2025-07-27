@@ -1,8 +1,16 @@
 # plain.flags
 
-Local feature flags via database models.
+**Local feature flags via database models.**
 
-Custom flags are written as subclasses of [`Flag`](./flags.py).
+- [Overview](#overview)
+- [Usage in templates](#usage-in-templates)
+- [Usage in Python](#usage-in-python)
+- [Advanced usage](#advanced-usage)
+- [Installation](#installation)
+
+## Overview
+
+Custom flags are written as subclasses of [`Flag`](./flags.py#Flag).
 You define the flag's "key" and initial value,
 and the results will be stored in the database for future reference.
 
@@ -24,6 +32,8 @@ class FooEnabled(Flag):
         return False
 ```
 
+## Usage in templates
+
 Use flags in HTML templates:
 
 ```html
@@ -34,7 +44,7 @@ Use flags in HTML templates:
 {% endif %}
 ```
 
-Or in Python:
+## Usage in Python
 
 ```python
 import flags
@@ -42,17 +52,6 @@ import flags
 
 print(flags.FooEnabled(user).value)
 ```
-
-## Installation
-
-```python
-INSTALLED_PACKAGES = [
-    ...
-    "plain.flags",
-]
-```
-
-Create a `flags.py` at the top of your `app` (or point `settings.FLAGS_MODULE` to a different location).
 
 ## Advanced usage
 
@@ -99,5 +98,23 @@ class OrganizationFeature(Flag):
 
 class AIEnabled(OrganizationFeature):
     pass
-
 ```
+
+## Installation
+
+Install the `plain.flags` package from [PyPI](https://pypi.org/project/plain.flags/):
+
+```bash
+uv add plain.flags
+```
+
+Add to your `INSTALLED_PACKAGES`:
+
+```python
+INSTALLED_PACKAGES = [
+    ...
+    "plain.flags",
+]
+```
+
+Create a `flags.py` at the top of your `app` (or point `settings.FLAGS_MODULE` to a different location).

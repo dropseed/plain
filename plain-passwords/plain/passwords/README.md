@@ -1,10 +1,14 @@
-# plain.password
+# plain.passwords
 
-Password authentication for Plain.
+**Password authentication for Plain.**
 
-## Usage
+- [Overview](#overview)
+- [FAQs](#faqs)
+- [Installation](#installation)
 
-To enable password authentication in your Plain application, add the `PasswordLoginView` to your `urls.py`:
+## Overview
+
+To enable password authentication in your Plain application, add the [`PasswordLoginView`](./views.py#PasswordLoginView) to your `urls.py`:
 
 ```python
 # app/urls.py
@@ -17,15 +21,15 @@ urlpatterns = [
 ]
 ```
 
-This sets up a basic login view where users can authenticate using their username and password.
+This sets up a basic login view where users can authenticate using their email and password.
 
-For password resets to work, you also need to install [plain.email](/plain-email/README.md).
+For password resets to work, you also need to install [plain.email](https://github.com/dropseed/plain/tree/main/plain-email).
 
 ## FAQs
 
-### How do I customize the login form?
+#### How do I customize the login form?
 
-To customize the login form, you can subclass `PasswordLoginForm` and override its fields or methods as needed. Then, set the `form_class` attribute in your `PasswordLoginView` to use your custom form.
+To customize the login form, you can subclass [`PasswordLoginForm`](./forms.py#PasswordLoginForm) and override its fields or methods as needed. Then, set the `form_class` attribute in your view to use your custom form.
 
 ```python
 # app/forms.py
@@ -34,9 +38,7 @@ from plain.passwords.forms import PasswordLoginForm
 class MyCustomLoginForm(PasswordLoginForm):
     # Add custom fields or override methods here
     pass
-```
 
-```python
 # app/views.py
 from plain.passwords.views import PasswordLoginView
 from .forms import MyCustomLoginForm
@@ -56,4 +58,12 @@ urlpatterns = [
     path('login/', MyPasswordLoginView, name='login'),
     # ...
 ]
+```
+
+## Installation
+
+Install the `plain.passwords` package from [PyPI](https://pypi.org/project/plain.passwords/):
+
+```bash
+uv add plain.passwords
 ```

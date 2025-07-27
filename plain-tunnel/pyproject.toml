@@ -1,7 +1,7 @@
 [project]
 name = "plain.tunnel"
 version = "0.5.5"
-description = ""
+description = "Connect to your local development server remotely."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"

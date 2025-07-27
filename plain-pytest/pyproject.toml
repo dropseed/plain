@@ -1,7 +1,7 @@
 [project]
 name = "plain.pytest"
 version = "0.10.0"
-description = "Pytest integration for Plain."
+description = "Test with pytest."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
 readme = "README.md"

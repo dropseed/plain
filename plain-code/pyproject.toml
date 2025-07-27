@@ -1,7 +1,7 @@
 [project]
 name = "plain.code"
 version = "0.9.1"
-description = "Code formatting and linting for Plain."
+description = "Preconfigured code formatting and linting."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
 requires-python = ">=3.11"

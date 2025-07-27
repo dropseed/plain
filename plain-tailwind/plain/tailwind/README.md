@@ -1,9 +1,52 @@
 # plain.tailwind
 
-Integrate Tailwind CSS without JavaScript or npm.
+**Integrate Tailwind CSS without JavaScript or npm.**
 
-Made possible by the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli),
-which is installed for you.
+- [Overview](#overview)
+- [Basic Usage](#basic-usage)
+    - [Commands](#commands)
+    - [Template Tag](#template-tag)
+- [Configuration](#configuration)
+    - [Updating Tailwind](#updating-tailwind)
+    - [Adding Custom CSS](#adding-custom-css)
+- [Deployment](#deployment)
+- [Installation](#installation)
+
+## Overview
+
+This package allows you to use Tailwind CSS in your Plain project without requiring Node.js or npm. It uses the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli), which is automatically downloaded and managed for you.
+
+First, initialize Tailwind in your project:
+
+```sh
+plain tailwind init
+```
+
+This creates a `tailwind.config.js` file in your project root and a source CSS file.
+
+Then compile your CSS:
+
+```sh
+plain tailwind build
+```
+
+For development, use watch mode to automatically recompile when files change:
+
+```sh
+plain tailwind build --watch
+```
+
+Include the compiled CSS in your templates:
+
+```html
+{% tailwind_css %}
+```
+
+## Basic Usage
+
+### Commands
+
+The `plain tailwind` command provides several subcommands:
 
 ```console
 $ plain tailwind
@@ -15,14 +58,97 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  build  Compile a Tailwind CSS file
-  init     Install Tailwind, create a tailwind.config.js...
+  build    Compile a Tailwind CSS file
+  init     Install Tailwind and create tailwind.css
+  install  Install the Tailwind standalone CLI
   update   Update the Tailwind CSS version
 ```
 
+- `init` - Sets up Tailwind in your project, creating necessary config files
+- `build` - Compiles your Tailwind CSS (use `--watch` for auto-compilation, `--minify` for production)
+- `update` - Updates to the latest version of Tailwind CSS
+- `install` - Manually install the Tailwind CLI (usually automatic)
+
+### Template Tag
+
+The [`tailwind_css`](./templates.py#TailwindCSSExtension) template tag includes the compiled CSS file in your templates. Place it in your base template's `<head>`:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    {% tailwind_css %}
+</head>
+<body>
+    <!-- Your content -->
+</body>
+</html>
+```
+
+## Configuration
+
+### Updating Tailwind
+
+The package tracks the Tailwind version in your `pyproject.toml`:
+
+```toml
+# pyproject.toml
+[tool.plain.tailwind]
+version = "3.4.1"
+```
+
+When you run `plain tailwind build`, it automatically checks if your local installation matches this version and updates if needed.
+
+To update to the latest version:
+
+```sh
+plain tailwind update
+```
+
+This downloads the latest version and updates your `pyproject.toml`.
+
+### Adding Custom CSS
+
+Custom CSS should be added to your source CSS file (by default at the root of your project as `tailwind.css`):
+
+```css
+@import "tailwindcss";
+@import "./.plain/tailwind.css";
+
+/* Add your custom styles here */
+.btn-primary {
+    @apply bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded;
+}
+
+.custom-gradient {
+    background: linear-gradient(to right, #4f46e5, #7c3aed);
+}
+```
+
+The `@import "./.plain/tailwind.css"` line includes styles from all your installed Plain packages.
+
+[Read the Tailwind docs for more about using custom styles →](https://tailwindcss.com/docs/adding-custom-styles)
+
+## Deployment
+
+For production deployments:
+
+1. Add `app/assets/tailwind.min.css` to your `.gitignore`
+2. Run `plain tailwind build --minify` as part of your deployment process
+
+The build command automatically installs the Tailwind CLI if it's not present, making deployments seamless.
+
+When using Plain on Heroku, the [Plain buildpack](https://github.com/plainpackages/heroku-buildpack-plain/blob/master/bin/files/post_compile) handles this automatically.
+
 ## Installation
 
-Add `plain.tailwind` to your `INSTALLED_PACKAGES`:
+Install the `plain.tailwind` package from [PyPI](https://pypi.org/project/plain.tailwind/):
+
+```bash
+uv add plain.tailwind
+```
+
+Then add to your `INSTALLED_PACKAGES`:
 
 ```python
 # settings.py
@@ -32,85 +158,8 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-Create a new `tailwind.config.js` file in your project root:
-
-```sh
-plain tailwind init
-```
-
-This will also create a `tailwind.css` file at at the root of your repo.
-
-The `tailwind.css` file is then compiled into `app/assets/tailwind.min.css` by running `tailwind build`:
-
-```sh
-plain tailwind build
-```
-
-When you're working locally, add `--watch` to automatically compile as changes are made:
-
-```sh
-plain tailwind build --watch
-```
-
-Then include the compiled CSS in your base template `<head>`:
-
-```html
-{% tailwind_css %}
-```
-
-In your repo you will notice a new `.plain` directory that contains `tailwind` (the standalone CLI binary) and `tailwind.version` (to track the version currently installed).
-You should add `.plain` to your `.gitignore` file.
-
-## Updating Tailwind
-
-This package manages the Tailwind versioning by comparing the value in your `pyproject.toml` to `.plain/tailwind.version`.
-
-```toml
-# pyproject.toml
-[tool.plain.tailwind]
-version = "3.4.1"
-```
-
-When you run `tailwind compile`,
-it will automatically check whether your local installation needs to be updated and will update it if necessary.
-
-You can use the `update` command to update your project to the latest version of Tailwind:
-
-```sh
-plain tailwind update
-```
-
-## Adding custom CSS
-
-If you need to actually write some CSS,
-it should be done in `app/static/src/tailwind.css`.
-
-```css
-@tailwind base;
-
-
-@tailwind components;
-
-/* Add your own "components" here */
-.btn {
-    @apply bg-blue-500 hover:bg-blue-700 text-white;
-}
-
-@tailwind utilities;
-
-/* Add your own "utilities" here */
-.bg-pattern-stars {
-    background-image: url("/static/images/stars.png");
-}
+The package stores the Tailwind CLI binary and version information in a `.plain` directory. Add this to your `.gitignore`:
 
 ```
-
-[Read the Tailwind docs for more about using custom styles →](https://tailwindcss.com/docs/adding-custom-styles)
-
-## Deployment
-
-If possible, you should add `app/assets/tailwind.min.css` to your `.gitignore` and run the `plain tailwind build --minify` command as a part of your deployment pipeline.
-
-When you run `plain tailwind build`, it will automatically check whether the Tailwind standalone CLI has been installed, and install it if it isn't.
-
-When using Plain on Heroku, we do this for you automatically in our [Plain buildpack](https://github.com/plainpackages/heroku-buildpack-plain/blob/master/bin/files/post_compile).
+.plain/
+```

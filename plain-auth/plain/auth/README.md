@@ -1,23 +1,53 @@
 # plain.auth
 
-Add users to your app and define which views they can access.
+**Add users to your app and decide what they can access.**
 
-To log a user in, you'll want to pair this package with:
+- [Overview](#overview)
+- [Authentication setup](#authentication-setup)
+    - [Settings configuration](#settings-configuration)
+    - [Creating a user model](#creating-a-user-model)
+    - [Login views](#login-views)
+- [Checking if a user is logged in](#checking-if-a-user-is-logged-in)
+- [Restricting views](#restricting-views)
+- [Installation](#installation)
 
-- `plain-passwords`
-- `plain-oauth`
-- `plain-passkeys` (TBD)
-- `plain-passlinks` (TBD)
+## Overview
 
-## Installation
+The `plain.auth` package provides user authentication and authorization for Plain applications. Here's a basic example of checking if a user is logged in:
 
 ```python
-# app/settings.py
+# In a view
+if request.user:
+    print(f"Hello, {request.user.email}!")
+else:
+    print("You are not logged in.")
+```
+
+And restricting a view to logged-in users:
+
+```python
+from plain.auth.views import AuthViewMixin
+from plain.views import View
+
+class ProfileView(AuthViewMixin, View):
+    login_required = True
+
+    def get(self):
+        return f"Welcome, {self.request.user.email}!"
+```
+
+## Authentication setup
+
+### Settings configuration
+
+Configure your authentication settings in `app/settings.py`:
+
+```python
 INSTALLED_PACKAGES = [
     # ...
     "plain.auth",
     "plain.sessions",
-    "plain.passwords",
+    "plain.passwords",  # Or another auth method
 ]
 
 MIDDLEWARE = [
@@ -29,7 +59,9 @@ AUTH_USER_MODEL = "users.User"
 AUTH_LOGIN_URL = "login"
 ```
 
-Create your own user model (`plain create users`).
+### Creating a user model
+
+Create your own user model using `plain create users` or manually:
 
 ```python
 # app/users/models.py
@@ -47,12 +79,21 @@ class User(models.Model):
         return self.email
 ```
 
-Define your URL/view where users can log in.
+### Login views
+
+To log users in, you'll need to pair this package with an authentication method:
+
+- `plain-passwords` - Username/password authentication
+- `plain-oauth` - OAuth provider authentication
+- `plain-passkeys` (TBD) - WebAuthn/passkey authentication
+- `plain-passlinks` (TBD) - Magic link authentication
+
+Example with password authentication:
 
 ```python
 # app/urls.py
-from plain.auth.views import LoginView, LogoutView
-from plain.urls import include, path
+from plain.auth.views import LogoutView
+from plain.urls import path
 from plain.passwords.views import PasswordLoginView
 
 
@@ -68,9 +109,9 @@ urlpatterns = [
 
 ## Checking if a user is logged in
 
-A `request.user` will either be `None` or point to an instance of a your `AUTH_USER_MODEL`.
+A `request.user` will either be `None` or point to an instance of your `AUTH_USER_MODEL`.
 
-So in templates you can do:
+In templates:
 
 ```html
 {% if request.user %}
@@ -80,7 +121,7 @@ So in templates you can do:
 {% endif %}
 ```
 
-Or in Python:
+In Python code:
 
 ```python
 if request.user:
@@ -91,7 +132,7 @@ else:
 
 ## Restricting views
 
-Use the `AuthViewMixin` to restrict views to logged in users, admin users, or custom logic.
+Use the [`AuthViewMixin`](./views.py#AuthViewMixin) to restrict views to logged-in users, admin users, or custom logic:
 
 ```python
 from plain.auth.views import AuthViewMixin
@@ -113,4 +154,18 @@ class CustomPermissionView(AuthViewMixin, View):
         super().check_auth()
         if not self.request.user.is_special:
             raise PermissionDenied("You're not special!")
+```
+
+The [`AuthViewMixin`](./views.py#AuthViewMixin) provides:
+
+- `login_required` - Requires a logged-in user
+- `admin_required` - Requires `user.is_admin` to be True
+- `check_auth()` - Override for custom authorization logic
+
+## Installation
+
+Install the `plain.auth` package from [PyPI](https://pypi.org/project/plain.auth/):
+
+```bash
+uv add plain.auth
 ```
