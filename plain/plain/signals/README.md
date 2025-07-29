@@ -2,6 +2,10 @@
 
 **Run code when certain events happen.**
 
+- [Overview](#overview)
+
+## Overview
+
 ```python
 from plain.signals import request_finished
 

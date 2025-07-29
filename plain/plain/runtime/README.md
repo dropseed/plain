@@ -2,6 +2,15 @@
 
 **Access app and package settings at runtime.**
 
+- [Overview](#overview)
+- [Environment variables](#environment-variables)
+    - [.env files](#env-files)
+- [Package settings](#package-settings)
+- [Custom app-wide settings](#custom-app-wide-settings)
+- [Using Plain in other environments](#using-plain-in-other-environments)
+
+## Overview
+
 Plain is configured by "settings", which are ultimately just Python variables. Most settings have default values which can be overidden either by your `app/settings.py` file or by environment variables.
 
 ```python

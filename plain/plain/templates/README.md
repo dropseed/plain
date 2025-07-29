@@ -2,6 +2,13 @@
 
 **Render HTML templates using Jinja.**
 
+- [Overview](#overview)
+- [Template files](#template-files)
+- [Extending Jinja](#extending-jinja)
+- [Rendering templates manually](#rendering-templates-manually)
+
+## Overview
+
 Plain uses Jinja2 for template rendering. You can refer to the [Jinja documentation](https://jinja.palletsprojects.com/en/stable/api/) for all of the features available.
 
 In general, templates are used in combination with `TemplateView` or a more specific subclass of it.
@@ -37,7 +44,7 @@ All template directories are "merged" together, allowing you to override templat
 
 ## Extending Jinja
 
-Plain includes a set of default [global variables](jinja/globals.py) and [filters](jinja/filters.py). You can register additional extensions, globals, or filters either in a package or in your app. Typically this will be in `app/templates.py` or `<pkg>/templates.py`, which are automatically imported.
+Plain includes a set of default [global variables](./jinja/globals.py) and [filters](./jinja/filters.py). You can register additional extensions, globals, or filters either in a package or in your app. Typically this will be in `app/templates.py` or `<pkg>/templates.py`, which are automatically imported.
 
 ```python
 # app/templates.py
@@ -71,7 +78,7 @@ class HTMXJSExtension(InclusionTagExtension):
 
 ## Rendering templates manually
 
-Templates can also be rendered manually using the [`Template` class](core.py#Template).
+Templates can also be rendered manually using the [`Template` class](./core.py#Template).
 
 ```python
 from plain.templates import Template

@@ -2,7 +2,12 @@
 
 **Cross-Site Request Forgery (CSRF) protection.**
 
-Plain protects against [CSRF attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery) through a [middleware](middleware.py) that compares the generated `csrftoken` cookie with the CSRF token from the request (either `_csrftoken` in form data or the `CSRF-Token` header).
+- [Overview](#overview)
+- [Usage](#usage)
+
+## Overview
+
+Plain protects against [CSRF attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery) through a [middleware](./middleware.py#CsrfViewMiddleware) that compares the generated `csrftoken` cookie with the CSRF token from the request (either `_csrftoken` in form data or the `CSRF-Token` header).
 
 ## Usage
 

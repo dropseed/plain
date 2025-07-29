@@ -2,7 +2,13 @@
 
 **Serve static assets (CSS, JS, images, etc.) directly or from a CDN.**
 
-## Usage
+- [Overview](#overview)
+- [Local development](#local-development)
+- [Production deployment](#production-deployment)
+- [Using `AssetView` directly](#using-assetview-directly)
+- [FAQs](#faqs)
+
+## Overview
 
 To serve assets, put them in `app/assets` or `app/{package}/assets`.
 
@@ -62,7 +68,7 @@ class AppRouter(Router):
 
 ## FAQs
 
-### How do you reference assets in Python code?
+#### How do you reference assets in Python code?
 
 There is a [`get_asset_url`](./urls.py#get_asset_url) function that you can use to get the URL of an asset in Python code. This is useful if you need to reference an asset in a non-template context, such as in a redirect or an API response.
 
@@ -72,7 +78,7 @@ from plain.assets.urls import get_asset_url
 url = get_asset_url("css/style.css")
 ```
 
-### What if I need the files in a different location?
+#### What if I need the files in a different location?
 
 The generated/copied files are stored in `{repo}/.plain/assets/compiled`. If you need them to be somewhere else, try simply moving them after compilation.
 
@@ -81,7 +87,7 @@ plain build
 mv .plain/assets/compiled /path/to/your/static
 ```
 
-### How do I upload the assets to a CDN?
+#### How do I upload the assets to a CDN?
 
 The steps for this will vary, but the general idea is to compile them, and then upload the compiled assets from their [compiled location](compile.py#get_compiled_path).
 
@@ -103,7 +109,7 @@ Use the [`ASSETS_BASE_URL`](../runtime/global_settings.py#ASSETS_BASE_URL) setti
 ASSETS_BASE_URL = "https://cdn.example.com/"
 ```
 
-### Why aren't the originals copied to the compiled directory?
+#### Why aren't the originals copied to the compiled directory?
 
 The default behavior is to fingerprint assets, which is an exact copy of the original file but with a different filename. The originals aren't copied over because you should generally always use this fingerprinted path (that automatically uses longer-lived caching).
 

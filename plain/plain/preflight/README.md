@@ -2,6 +2,14 @@
 
 **System checks for Plain applications.**
 
+- [Overview](#overview)
+- [Development](#development)
+- [Deployment](#deployment)
+- [Custom preflight checks](#custom-preflight-checks)
+- [Silencing preflight checks](#silencing-preflight-checks)
+
+## Overview
+
 Preflight checks help identify issues with your settings or environment before running your application.
 
 ```bash

@@ -2,6 +2,12 @@
 
 **Routine maintenance tasks.**
 
+- [Overview](#overview)
+- [Running chores](#running-chores)
+- [Writing chores](#writing-chores)
+
+## Overview
+
 Chores are registered functions that can be run at any time to keep an app in a desirable state.
 
 ![](https://assets.plainframework.com/docs/plain-chores-run.png)

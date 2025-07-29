@@ -2,6 +2,13 @@
 
 **Install Python modules as Plain packages.**
 
+- [Overview](#overview)
+- [Creating app packages](#creating-app-packages)
+- [Package settings](#package-settings)
+- [Package `ready()` method](#package-ready-method)
+
+## Overview
+
 Most Python modules that you use with Plain will need to be installed via `settings.INSTALLED_PACKAGES`. This is what enables template detection, per-package settings, database models, and other features.
 
 A package can either be a local module inside of your `app`, or a third-party package from PyPI.

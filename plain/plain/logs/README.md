@@ -2,6 +2,13 @@
 
 **Logging configuration and utilities.**
 
+- [Overview](#overview)
+- [`app_logger`](#app_logger)
+- [`app_logger.kv`](#app_loggerkv)
+- [Logging settings](#logging-settings)
+
+## Overview
+
 In Python, configuring logging can be surprisingly complex. For most use cases, Plain provides a [default configuration](./configure.py) that "just works".
 
 By default, both the `plain` and `app` loggers are set to the `INFO` level. You can quickly change this by using the `PLAIN_LOG_LEVEL` and `APP_LOG_LEVEL` environment variables.

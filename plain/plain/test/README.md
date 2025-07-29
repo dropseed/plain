@@ -2,7 +2,11 @@
 
 **Testing utilities for Plain.**
 
-This module provides a the [`Client`](client.py#Client) and [`RequestFactory`](client.py#RequestFactory) classes to facilitate testing requests and responses.
+- [Overview](#overview)
+
+## Overview
+
+This module provides the [`Client`](client.py#Client) and [`RequestFactory`](client.py#RequestFactory) classes to facilitate testing requests and responses.
 
 ```python
 from plain.test import Client

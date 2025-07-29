@@ -2,6 +2,19 @@
 
 **Take a request, return a response.**
 
+- [Overview](#overview)
+- [HTTP methods -> class methods](#http-methods---class-methods)
+- [Return types](#return-types)
+- [Template views](#template-views)
+- [Form views](#form-views)
+- [Object views](#object-views)
+- [Response exceptions](#response-exceptions)
+- [Error views](#error-views)
+- [Redirect views](#redirect-views)
+- [CSRF exempt views](#csrf-exempt-views)
+
+## Overview
+
 Plain views are written as classes,
 with a straightforward API that keeps simple views simple,
 but gives you the power of a full class to handle more complex cases.
@@ -17,7 +30,7 @@ class ExampleView(View):
 
 ## HTTP methods -> class methods
 
-The HTTP methd of the request will map to a class method of the same name on the view.
+The HTTP method of the request will map to a class method of the same name on the view.
 
 If a request comes in and there isn't a matching method on the view,
 Plain will return a `405 Method Not Allowed` response.
@@ -46,7 +59,7 @@ class ExampleView(View):
         pass
 ```
 
-The [base `View` class](./base.py) defines default `options` and `head` behavior,
+The [base `View` class](./base.py#View) defines default `options` and `head` behavior,
 but you can override these too.
 
 ## Return types
@@ -87,9 +100,9 @@ class ExampleView(TemplateView):
         return context
 ```
 
-The `TemplateView` is also the base class for _most_ of the other built-in view classes.
+The [`TemplateView`](./templates.py#TemplateView) is also the base class for _most_ of the other built-in view classes.
 
-Template views that don't need any custom context can use `TemplateView.as_view()` direcly in the URL route.
+Template views that don't need any custom context can use `TemplateView.as_view()` directly in the URL route.
 
 ```python
 from plain.views import TemplateView
@@ -104,7 +117,7 @@ class AppRouter(Router):
 
 ## Form views
 
-Standard [forms](../forms) can be rendered and processed by a `FormView`.
+Standard [forms](../forms) can be rendered and processed by a [`FormView`](./forms.py#FormView).
 
 ```python
 from plain.views import FormView
@@ -218,7 +231,7 @@ class ExampleListView(ListView):
 ## Response exceptions
 
 At any point in the request handling,
-a view can raise a `ResponseException` to immediately exit and return the wrapped response.
+a view can raise a [`ResponseException`](./exceptions.py#ResponseException) to immediately exit and return the wrapped response.
 
 This isn't always necessary, but can be useful for raising rate limits or authorization errors when you're a couple layers deep in the view handling or helper functions.
 
