@@ -25,10 +25,16 @@ def cli():
 @click.pass_context
 def install(ctx, force):
     """Install or update the Biome standalone per configuration."""
+    config = get_code_config()
+
+    if not config.get("biome", {}).get("enabled", True):
+        click.secho("Biome is disabled in configuration", fg="yellow")
+        return
+
     biome = Biome()
 
     if force or not biome.is_installed() or biome.needs_update():
-        version_to_install = get_code_config().get("biome", {}).get("version", "")
+        version_to_install = config.get("biome", {}).get("version", "")
         if version_to_install:
             click.secho(
                 f"Installing Biome standalone version {version_to_install}...",
@@ -46,6 +52,12 @@ def install(ctx, force):
 @cli.command()
 def update():
     """Update the Biome standalone binary to the latest release."""
+    config = get_code_config()
+
+    if not config.get("biome", {}).get("enabled", True):
+        click.secho("Biome is disabled in configuration", fg="yellow")
+        return
+
     biome = Biome()
     click.secho("Updating Biome standalone...", bold=True)
     version = biome.install()
