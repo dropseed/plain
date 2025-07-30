@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.3.5](https://github.com/dropseed/plain/releases/plain-observer@0.3.5) (2025-07-30)
+
+### What's changed
+
+- Improved observer toolbar button text clarity for empty states - "Recording" now shows as "Recording (no summary)" and "Summary" shows as "No summary" ([143c2a6](https://github.com/dropseed/plain/commit/143c2a61a7))
+- Fixed observer auto-enable functionality by adding POST handler for summary mode actions ([cc415e0](https://github.com/dropseed/plain/commit/cc415e0af7))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.4](https://github.com/dropseed/plain/releases/plain-observer@0.3.4) (2025-07-30)
 
 ### What's changed
