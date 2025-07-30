@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.37.3](https://github.com/dropseed/plain/releases/plain-admin@0.37.3) (2025-07-30)
+
+### What's changed
+
+- Fixed duplicate plainToolbar JavaScript objects that could occur on pages with multiple toolbar inclusions ([1747ca6](https://github.com/dropseed/plain/commit/1747ca6fa758d5176c0ab770177130ac5497cf29))
+- Improved README documentation with better structure and table of contents ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856f96afc09a2ad6887224ae94b1a7395))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.2](https://github.com/dropseed/plain/releases/plain-admin@0.37.2) (2025-07-25)
 
 ### What's changed
