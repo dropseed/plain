@@ -1,9 +1,8 @@
 <div class="px-6 py-4">
-    <div class="p-2 mb-5 border-amber-500 border rounded">
+    <div class="p-2 mb-5 border-amber-500 border rounded" data-exception-container>
         <div class="text-amber-500 text-lg flex justify-between items-center">
             <div>
                 <span class="font-bold">Exception</span>
-                {{ exception }}
             </div>
             <div class="flex items-center space-x-3">
                 <button onclick="copyException(this)" class="flex items-center space-x-1 px-2 py-0.5 text-sm rounded bg-amber-500/20 hover:bg-amber-500/30 transition-colors">
@@ -15,7 +14,10 @@
                 </button>
             </div>
         </div>
-        <div class="text-amber-400 text-xs mt-3 bg-white/5 p-2 rounded overflow-auto">
+        <div class="text-amber-500 mt-2" data-exception-message>
+            {{ exception }}
+        </div>
+        <div class="text-amber-400 text-xs mt-3 bg-white/5 p-2 rounded overflow-auto" data-exception-traceback>
             <pre><code>{{ exception._traceback_string }}</code></pre>
         </div>
     </div>
@@ -23,9 +25,9 @@
 
 <script>
 function copyException(button) {
-    const exceptionDiv = button.closest('.border-amber-500');
-    const exceptionText = exceptionDiv.querySelector('.font-bold').nextSibling.textContent.trim();
-    const traceback = exceptionDiv.querySelector('pre code').textContent;
+    const container = button.closest('[data-exception-container]');
+    const exceptionText = container.querySelector('[data-exception-message]').textContent.trim();
+    const traceback = container.querySelector('[data-exception-traceback] code').textContent;
     const fullText = `Exception: ${exceptionText}\n\n${traceback}`;
 
     navigator.clipboard.writeText(fullText).then(() => {
