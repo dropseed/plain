@@ -55,7 +55,7 @@ class AdminViewRegistry:
         # Sort sections alphabetically, but put empty string first
         def section_sort_key(item):
             section_name = item[0]
-            return ("" if section_name else "z", section_name)
+            return ("z" if section_name else "", section_name)
 
         return dict(sorted(sections.items(), key=section_sort_key))
 
