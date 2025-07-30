@@ -18,9 +18,9 @@
     {% if observer.get_current_trace_summary() %}
         {{ observer.get_current_trace_summary() }}
     {% elif observer.is_persisting() %}
-        Recording
+        Recording (no summary)
     {% elif observer.is_summarizing() %}
-        Summary
+        No summary
     {% elif observer.is_enabled() %}
         Observing
     {% else %}
