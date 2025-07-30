@@ -1,5 +1,5 @@
 // Make this available to the JS console for the user
-const plainToolbar = {
+window.plainToolbar = window.plainToolbar || {
   hide: function () {
     // Hide by inserting a style so it doesn't flash on page load
     const style = document.createElement("style");
@@ -90,19 +90,19 @@ const plainToolbar = {
 };
 
 // Render it hidden immediately if the user has hidden it before
-if (plainToolbar.shouldHide()) {
-  plainToolbar.hide();
+if (window.plainToolbar.shouldHide()) {
+  window.plainToolbar.hide();
 }
 
 window.addEventListener("load", () => {
   // Restore expanded/collapsed state
   const state = localStorage.getItem("plaintoolbar.expanded");
   if (state === "1") {
-    plainToolbar.expand();
+    window.plainToolbar.expand();
     // Restore last active tab
     const lastTab = localStorage.getItem("plaintoolbar.tab");
     if (lastTab) {
-      plainToolbar.showTab(lastTab);
+      window.plainToolbar.showTab(lastTab);
     }
     // Restore custom height if it was set
     const savedHeight = localStorage.getItem("plaintoolbar.height");
@@ -115,40 +115,40 @@ window.addEventListener("load", () => {
       }
     }
   } else if (state === "0") {
-    plainToolbar.collapse();
+    window.plainToolbar.collapse();
   }
   const toolbar = document.querySelector("#plaintoolbar");
   const hasException = toolbar.querySelector('[data-toolbar-tab="Exception"]');
 
   if (hasException) {
-    plainToolbar.show();
-    if (!plainToolbar.expanded) {
-      plainToolbar.expandTemporary();
+    window.plainToolbar.show();
+    if (!window.plainToolbar.expanded) {
+      window.plainToolbar.expandTemporary();
     }
   }
 
   for (const tab of toolbar.querySelectorAll("button[data-toolbar-tab]")) {
     tab.addEventListener("click", () => {
-      plainToolbar.showTab(tab.dataset.toolbarTab);
+      window.plainToolbar.showTab(tab.dataset.toolbarTab);
     });
   }
 
   for (const btn of toolbar.querySelectorAll("[data-plaintoolbar-hide]")) {
     btn.addEventListener("click", () => {
-      plainToolbar.hide();
+      window.plainToolbar.hide();
     });
   }
 
   for (const btn of toolbar.querySelectorAll("[data-plaintoolbar-hideuntil]")) {
     btn.addEventListener("click", () => {
       console.log("Hiding admin toolbar for 1 hour");
-      plainToolbar.hideUntil(Date.now() + 3600000);
+      window.plainToolbar.hideUntil(Date.now() + 3600000);
     });
   }
 
   for (const btn of toolbar.querySelectorAll("[data-plaintoolbar-expand]")) {
     btn.addEventListener("click", () => {
-      plainToolbar.toggleExpand();
+      window.plainToolbar.toggleExpand();
     });
   }
 
