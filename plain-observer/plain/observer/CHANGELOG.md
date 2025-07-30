@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.3.4](https://github.com/dropseed/plain/releases/plain-observer@0.3.4) (2025-07-30)
+
+### What's changed
+
+- Fixed URL configuration examples in installation documentation to use `ObserverRouter` instead of string path ([f55ac7d](https://github.com/dropseed/plain/commit/f55ac7d491))
+- Enhanced README with table of contents, PyPI installation link, and post-installation usage instructions ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.3](https://github.com/dropseed/plain/releases/plain-observer@0.3.3) (2025-07-25)
 
 ### What's changed
