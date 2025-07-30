@@ -115,6 +115,13 @@ class TestBrowser:
             if not response.url.startswith(self.base_url):
                 continue
 
+            # Get the current page's path for resolving relative URLs
+            current_page_url = response.url
+            if current_page_url.startswith(self.base_url):
+                current_page_path = current_page_url[len(self.base_url) :]
+            else:
+                current_page_path = "/"
+
             # Find all <a> links on the page
             for link in page.query_selector_all("a"):
                 if href := link.get_attribute("href"):
@@ -134,6 +141,10 @@ class TestBrowser:
                         self.base_url
                     ):
                         continue
+
+                    # Handle query-only URLs (e.g., "?stage=approved")
+                    if href.startswith("?"):
+                        href = current_page_path.split("?")[0] + href
 
                     visit_url = relative_url(href)
                     if visit_url not in visited:
