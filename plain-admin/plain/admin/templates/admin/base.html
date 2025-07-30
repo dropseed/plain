@@ -14,7 +14,7 @@
     {% tailwind_css %}
     {% htmx_js %}
     <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
-    <script src="{{ asset('admin/vendor/jquery-3.6.1.slim.min.js') }}"></script>
+    <script src="{{ asset('admin/vendor/jquery-3.7.1.min.js') }}"></script>
     <script src="{{ asset('admin/vendor/chart.js') }}" defer></script>
     <script src="{{ asset('admin/admin.js') }}" defer></script>
     <script src="{{ asset('admin/vendor/popper.min.js') }}" defer></script>
@@ -34,10 +34,14 @@
     </div>
 
     <div class="fixed top-14 lg:top-2 bottom-12 left-2 right-2">
-        <aside id="admin-sidebar" data-toggle-class="hidden" class="flex flex-col bg-stone-950 z-50 border-l lg:border-l-0 lg:border-r-0 border-white/10 justify-between flex-shrink-0 hidden w-52 overflow-auto lg:flex absolute top-0 bottom-0 right-0 lg:right-auto lg:left-0 shadow-2xl lg:shadow-none">
-            <div class="flex-grow pl-3.5 pr-5">
+        <aside
+            id="admin-sidebar"
+            data-toggle-class="hidden"
+            class="flex flex-col bg-stone-950 z-50 border-l lg:border-l-0 lg:border-r-0 border-white/10 justify-between flex-shrink-0 hidden w-52 overflow-auto lg:flex absolute top-0 bottom-0 right-0 lg:right-auto lg:left-0 shadow-2xl lg:shadow-none"
+            hx-preserve="true">
+            <div class="flex-grow pl-4 pr-2 lg:pl-2 lg:pr-4">
                 <a href="{{ url('admin:index') }}" class="hidden lg:flex items-center text-base text-stone-300 hover:text-white h-14">
-                    <span class="font-semibold">Plain</span> <span class="font-normal text-stone-400 ml-1">Admin</span>
+                    <span class="font-normal text-stone-400 ml-1">Admin</span>
                 </a>
                 <form method="GET" action="{{ url('admin:search') }}" class="mb-4">
                     <div class="relative">
@@ -46,7 +50,7 @@
                             type="text"
                             name="query"
                             id="sidebar-query"
-                            class="block w-full pr-8 pl-8 placeholder:text-white/30 text-sm border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1"
+                            class="block w-full pr-3 pl-8 placeholder:text-white/30 text-sm border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1"
                             placeholder="Search"
                             value="{{ global_search_query|default('') }}"
                             >
@@ -55,21 +59,74 @@
                         </div>
                     </div>
                 </form>
-                <div>
-                    {% for section, views in admin_registry.get_nav_sections().items() %}
-                    <div class="mt-4 mb-1 text-xs text-stone-400/80">{{ section }}</div>
-                    {% for view in views %}
-                    {% set url = view.get_view_url() %}
-                    <a
-                        {% if url == request.path or view in parent_view_classes %}data-active{% endif %}
-                        class="data-[active]:bg-white/20 data-[active]:text-white flex items-center px-2 py-1 mt-px -mx-1 text-sm rounded hover:text-stone-300 text-stone-300/90 hover:bg-white/5"
-                        href="{{ url }}">
-                        <admin.Icon name={view.get_nav_icon()} class="w-3.5 h-3.5 mr-3 flex-shrink-0" />
-                        {{ view.get_nav_title() }}
-                    </a>
-                    {% endfor %}
+
+                {% set app_sections = admin_registry.get_app_nav_sections() %}
+                {% if app_sections %}
+                <div class="mt-8">
+                    <div class="mt-4 mb-2 px-2 text-xs text-stone-400 uppercase tracking-wider">App</div>
+
+                    {% for section, views in app_sections.items() %}
+                    {% if section %}
+                    <button
+                        data-nav-toggle="app-section-{{ loop.index }}"
+                        class="flex items-center justify-between w-full px-2 py-1 mt-1 text-sm rounded hover:bg-white/5"
+                        title="Toggle {{ section }}">
+                        <span class="text-stone-300/90">{{ section }}</span>
+                        <admin.Icon name="chevron-down" class="w-3.5 h-3.5 transition-transform text-stone-500" data-nav-toggle-icon />
+                    </button>
+                    <div id="app-section-{{ loop.index }}" style="display: none;">
+                    {% else %}
+                    <div>
+                    {% endif %}
+                        {% for view in views %}
+                        {% set url = view.get_view_url() %}
+                        <a
+                            {% if url == request.path or view in parent_view_classes %}data-active{% endif %}
+                            class="data-[active]:bg-white/20 data-[active]:text-white flex items-center px-2 py-1 mt-px text-sm rounded hover:text-stone-300 text-stone-300/90 hover:bg-white/5"
+                            href="{{ url }}"
+                            hx-boost="true">
+                            <admin.Icon name={view.get_nav_icon()} class="w-3.5 h-3.5 mr-3 flex-shrink-0" />
+                            {{ view.get_nav_title() }}
+                        </a>
+                        {% endfor %}
+                    </div>
                     {% endfor %}
                 </div>
+                {% endif %}
+
+                {% set plain_sections = admin_registry.get_plain_nav_sections() %}
+                {% if plain_sections %}
+                <div class="mt-8">
+                    <div class="mb-2 px-2 text-xs text-stone-400 uppercase tracking-wider">Plain</div>
+
+                    {% for section, views in plain_sections.items() %}
+                    {% if section %}
+                    <button
+                        data-nav-toggle="plain-section-{{ loop.index }}"
+                        class="flex items-center justify-between w-full px-2 py-1 mt-1 text-sm rounded hover:bg-white/5"
+                        title="Toggle {{ section }}">
+                        <span class="text-stone-300/90">{{ section }}</span>
+                        <admin.Icon name="chevron-down" class="w-3.5 h-3.5 transition-transform text-stone-500" data-nav-toggle-icon />
+                    </button>
+                    <div id="plain-section-{{ loop.index }}" style="display: none;">
+                    {% else %}
+                    <div>
+                    {% endif %}
+                        {% for view in views %}
+                        {% set url = view.get_view_url() %}
+                        <a
+                            {% if url == request.path or view in parent_view_classes %}data-active{% endif %}
+                            class="data-[active]:bg-white/20 data-[active]:text-white flex items-center px-2 py-1 mt-px text-sm rounded hover:text-stone-300 text-stone-300/90 hover:bg-white/5"
+                            href="{{ url }}"
+                            hx-boost="true">
+                            <admin.Icon name={view.get_nav_icon()} class="w-3.5 h-3.5 mr-3 flex-shrink-0" />
+                            {{ view.get_nav_title() }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
 
                 <!-- <div class="mt-6">
                     <div class="text-xs tracking-wide text-stone-500">Pinned</div>

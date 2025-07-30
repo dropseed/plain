@@ -29,18 +29,21 @@ class AdminViewRegistry:
         else:
             return inner
 
-    def get_nav_sections(self):
-        # class NavItem:
-        #     def __init__(self, view, children):
-        #         self.view = view
-        #         self.children = children
-
+    def get_app_nav_sections(self):
+        """Returns nav sections for app/user packages only."""
         sections = {}
 
         for view in self.registered_views:
-            section = view.get_nav_section()
-            if not section:
+            # Skip plain package views
+            if view.__module__.startswith("plain."):
                 continue
+
+            section = view.get_nav_section()
+
+            # Skip views with nav_section = None (don't show in nav)
+            if section is None:
+                continue
+
             if section not in sections:
                 sections[section] = []
             sections[section].append(view)
@@ -49,20 +52,37 @@ class AdminViewRegistry:
         for section in sections.values():
             section.sort(key=lambda v: v.get_nav_title())
 
-        # Sort sections dictionary by key
-        sections = dict(sorted(sections.items()))
+        # Sort sections alphabetically, but put empty string first
+        def section_sort_key(item):
+            section_name = item[0]
+            return ("" if section_name else "z", section_name)
 
-        return sections
+        return dict(sorted(sections.items(), key=section_sort_key))
 
-        # root_nav_items = []
+    def get_plain_nav_sections(self):
+        """Returns nav sections for plain packages only."""
+        sections = {}
 
-        # for view in sorted_views:
-        #     if view.parent_view_class:
-        #         continue
-        #     children = [x for x in sorted_views if x.parent_view_class == view]
-        #     root_nav_items.append(NavItem(view, children))
+        for view in self.registered_views:
+            # Only include plain package views
+            if not view.__module__.startswith("plain."):
+                continue
 
-        # return root_nav_items
+            section = view.get_nav_section()
+            # Skip views with nav_section = None (don't show in nav)
+            if section is None:
+                continue
+
+            if section not in sections:
+                sections[section] = []
+            sections[section].append(view)
+
+        # Sort each section by nav_title
+        for section in sections.values():
+            section.sort(key=lambda v: v.get_nav_title())
+
+        # Sort sections alphabetically
+        return dict(sorted(sections.items()))
 
     def get_urls(self):
         urls = []

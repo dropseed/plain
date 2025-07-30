@@ -64,17 +64,15 @@ class AdminListView(HTMXViewMixin, AdminView):
 
     def get(self) -> Response:
         if self.is_htmx_request():
-            hx_from_this_page = self.request.path in self.request.headers.get(
-                "HX-Current-Url", ""
-            )
-            if not hx_from_this_page:
+            htmx_search = "/search/" in self.request.headers.get("HX-Current-Url", "")
+            if htmx_search:
                 self._table_style = "simple"
         else:
-            hx_from_this_page = False
+            htmx_search = False
 
         response = super().get()
 
-        if self.is_htmx_request() and not hx_from_this_page and not self._page:
+        if self.is_htmx_request() and htmx_search and not self._page:
             # Don't render anything
             return Response(status_code=204)
 
@@ -195,6 +193,7 @@ class AdminListView(HTMXViewMixin, AdminView):
 
 class AdminCreateView(AdminView, CreateView):
     template_name = None
+    nav_section = None
 
     def get_list_url(self) -> str:
         return ""
@@ -220,7 +219,7 @@ class AdminCreateView(AdminView, CreateView):
 
 class AdminDetailView(AdminView, DetailView):
     template_name = None
-    nav_section = ""
+    nav_section = None
     fields: list[str] = []
 
     def get_template_context(self):
@@ -311,7 +310,7 @@ class AdminDetailView(AdminView, DetailView):
 
 class AdminUpdateView(AdminView, UpdateView):
     template_name = None
-    nav_section = ""
+    nav_section = None
 
     def get_list_url(self) -> str:
         return ""
@@ -357,7 +356,7 @@ class AdminUpdateView(AdminView, UpdateView):
 
 class AdminDeleteView(AdminView, DeleteView):
     template_name = "admin/delete.html"
-    nav_section = ""
+    nav_section = None
 
     def get_list_url(self) -> str:
         return ""

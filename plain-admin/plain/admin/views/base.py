@@ -29,7 +29,7 @@ class AdminView(AuthViewMixin, TemplateView):
     # An explicit disabling of showing this url/page in the nav
     # which importantly effects the (future) recent pages list
     # so you can also use this for pages that can never be bookmarked
-    nav_section = "App"
+    nav_section = ""
     nav_title = ""
     nav_icon = "app"
 
@@ -91,13 +91,13 @@ class AdminView(AuthViewMixin, TemplateView):
         return parents
 
     @classmethod
-    def get_nav_section(cls) -> bool:
+    def get_nav_section(cls) -> str | None:
         if not cls.nav_section:
-            return ""
+            return cls.nav_section  # Could be None or ""
 
         if cls.parent_view_class:
             # Don't show child views by default
-            return ""
+            return None
 
         return cls.nav_section
 

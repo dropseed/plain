@@ -85,5 +85,29 @@ jQuery(($) => {
     createDropdowns(evt.detail.target);
     createTooltips(evt.detail.target);
     autolinkColumns(evt.detail.target);
+    updateActiveNav();
   });
+
+  // Simple navigation section toggle with slide animation
+  $(document).on("click", "[data-nav-toggle]", function (e) {
+    e.preventDefault();
+    const sectionId = $(this).data("nav-toggle");
+    const $section = $(`#${sectionId}`);
+    const $svg = $(this).find("svg").last();
+
+    $section.slideToggle(80);
+    $svg.toggleClass("rotate-180");
+  });
+
+  function updateActiveNav() {
+    const currentPath = window.location.pathname;
+
+    // Remove all active states
+    $("#admin-sidebar [data-active]").removeAttr("data-active");
+
+    // Add active state to matching link
+    $(`#admin-sidebar a[href="${currentPath}"]`).attr("data-active", "true");
+  }
+
+  window.addEventListener("popstate", updateActiveNav); // Update on browser back/forward
 });
