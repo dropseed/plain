@@ -1,5 +1,19 @@
 # plain-admin changelog
 
+## [0.38.0](https://github.com/dropseed/plain/releases/plain-admin@0.38.0) (2025-07-30)
+
+### What's changed
+
+- Navigation sidebar now uses app-only sections, hiding plain package views for a cleaner interface ([bfdc928](https://github.com/dropseed/plain/commit/bfdc928fe448174a4cafc5eac26f63193a705059))
+- Added HTMX navigation with collapsible sections and active state tracking ([bfdc928](https://github.com/dropseed/plain/commit/bfdc928fe448174a4cafc5eac26f63193a705059))
+- Updated jQuery from 3.6.1 to 3.7.1 for improved compatibility and security ([bfdc928](https://github.com/dropseed/plain/commit/bfdc928fe448174a4cafc5eac26f63193a705059))
+- Exception display in toolbar now shows exception message on its own line for better readability ([fe10d45](https://github.com/dropseed/plain/commit/fe10d45669557551c4a547172ed0fe2d81614b74))
+- Admin sidebar now preserves state during HTMX navigation with `hx-preserve="true"` ([bfdc928](https://github.com/dropseed/plain/commit/bfdc928fe448174a4cafc5eac26f63193a705059))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.3](https://github.com/dropseed/plain/releases/plain-admin@0.37.3) (2025-07-30)
 
 ### What's changed
