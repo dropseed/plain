@@ -1,5 +1,16 @@
 # plain-code changelog
 
+## [0.9.2](https://github.com/dropseed/plain/releases/plain-code@0.9.2) (2025-07-30)
+
+### What's changed
+
+- Skip Biome installation and updates when Biome is disabled in configuration ([b8beb5c](https://github.com/dropseed/plain/commit/b8beb5c))
+- Enhanced README with better structure, usage examples, and configuration documentation ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.1](https://github.com/dropseed/plain/releases/plain-code@0.9.1) (2025-07-18)
 
 ### What's changed
