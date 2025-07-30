@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.38.1](https://github.com/dropseed/plain/releases/plain-admin@0.38.1) (2025-07-30)
+
+### What's changed
+
+- Ungrouped admin items are now displayed at the top of the navigation sidebar for better organization ([0e04d5a](https://github.com/dropseed/plain/commit/0e04d5a33aa7ab5e9dfb7dcd3dd525a0b2a748ec))
+- Navigation styling improvements including cursor pointer on collapsible sections, better spacing, and text truncation for long titles ([0e04d5a](https://github.com/dropseed/plain/commit/0e04d5a33aa7ab5e9dfb7dcd3dd525a0b2a748ec))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.38.0](https://github.com/dropseed/plain/releases/plain-admin@0.38.0) (2025-07-30)
 
 ### What's changed
