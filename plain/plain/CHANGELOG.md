@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.56.1](https://github.com/dropseed/plain/releases/plain@0.56.1) (2025-07-30)
+
+### What's changed
+
+- Improved `plain install` command instructions to be more explicit about completing code modifications ([83292225db](https://github.com/dropseed/plain/commit/83292225db))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.56.0](https://github.com/dropseed/plain/releases/plain@0.56.0) (2025-07-25)
 
 ### What's changed
