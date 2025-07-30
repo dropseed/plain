@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.10.1](https://github.com/dropseed/plain/releases/plain-pytest@0.10.1) (2025-07-30)
+
+### What's changed
+
+- `TestBrowser.discover_urls` now handles query-parameter-only URLs (e.g., "?stage=approved") by resolving them relative to the current page path ([4651a7b](https://github.com/dropseed/plain/commit/4651a7b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-pytest@0.10.0) (2025-06-27)
 
 ### What's changed
