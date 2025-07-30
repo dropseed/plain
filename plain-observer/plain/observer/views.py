@@ -61,6 +61,16 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
         response.headers["HX-Refresh"] = "true"
         return response
 
+    def post(self):
+        """Handle POST requests to set observer mode."""
+        action = self.request.data.get("observe_action")
+        if action == "summary":
+            observer = Observer(self.request)
+            response = Response(status_code=204)
+            observer.enable_summary_mode(response)
+            return response
+        return Response("Invalid action", status_code=400)
+
 
 class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
     """Detail view for a specific trace."""
