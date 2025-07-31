@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.3.6](https://github.com/dropseed/plain/releases/plain-observer@0.3.6) (2025-07-31)
+
+### What's changed
+
+- Added database index on `span_id` field in the Span model for improved query performance ([f836542](https://github.com/dropseed/plain/commit/f836542df6))
+- Database tracing is now suppressed when querying for span links to prevent recursive tracing loops ([f836542](https://github.com/dropseed/plain/commit/f836542df6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.5](https://github.com/dropseed/plain/releases/plain-observer@0.3.5) (2025-07-30)
 
 ### What's changed
