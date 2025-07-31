@@ -258,6 +258,7 @@ class Span(models.Model):
             )
         ]
         indexes = [
+            models.Index(fields=["span_id"]),
             models.Index(fields=["trace", "span_id"]),
             models.Index(fields=["trace"]),
             models.Index(fields=["start_time"]),

@@ -361,10 +361,11 @@ class ObserverSpanProcessor(SpanProcessor):
             if link.context.is_valid and link.context.span_id:
                 from .models import Span
 
-                if Span.objects.filter(
-                    span_id=f"0x{format_span_id(link.context.span_id)}"
-                ).exists():
-                    return ObserverMode.PERSIST.value
+                with suppress_db_tracing():
+                    if Span.objects.filter(
+                        span_id=f"0x{format_span_id(link.context.span_id)}"
+                    ).exists():
+                        return ObserverMode.PERSIST.value
 
         if not (context := parent_context or context_api.get_current()):
             return None
