@@ -42,7 +42,7 @@ class PagesRegistry:
         return paths
 
     def discover_pages(self, pages_dir):
-        for root, _, files in os.walk(pages_dir):
+        for root, _, files in os.walk(pages_dir, followlinks=True):
             for file in files:
                 relative_path = os.path.relpath(os.path.join(root, file), pages_dir)
                 absolute_path = os.path.join(root, file)
