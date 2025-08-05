@@ -1,5 +1,17 @@
 # plain-oauth changelog
 
+## [0.24.2](https://github.com/dropseed/plain/releases/plain-oauth@0.24.2) (2025-08-05)
+
+### What's changed
+
+- Updated documentation to use `plain` commands instead of `python manage.py` references ([8071854](https://github.com/dropseed/plain/commit/8071854d61))
+- Improved README with better structure, table of contents, and more comprehensive examples ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+- Fixed router setup documentation in URLs section ([48caf10](https://github.com/dropseed/plain/commit/48caf105da))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.1](https://github.com/dropseed/plain/releases/plain-oauth@0.24.1) (2025-07-23)
 
 ### What's changed
