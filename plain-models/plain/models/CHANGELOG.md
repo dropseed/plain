@@ -1,5 +1,21 @@
 # plain-models changelog
 
+## [0.40.0](https://github.com/dropseed/plain/releases/plain-models@0.40.0) (2025-08-05)
+
+### What's changed
+
+- Foreign key fields now accept lazy objects (like `SimpleLazyObject` used for `request.user`) by automatically evaluating them ([eb78dcc76d](https://github.com/dropseed/plain/commit/eb78dcc76d))
+- Added `--no-input` option to `plain migrate` command to skip user prompts ([0bdaf0409e](https://github.com/dropseed/plain/commit/0bdaf0409e))
+- Removed the `plain models optimize-migration` command ([6e4131ab29](https://github.com/dropseed/plain/commit/6e4131ab29))
+- Removed the `--fake-initial` option from `plain migrate` command ([6506a8bfb9](https://github.com/dropseed/plain/commit/6506a8bfb9))
+- Fixed CLI help text to reference `plain` commands instead of `manage.py` ([8071854d61](https://github.com/dropseed/plain/commit/8071854d61))
+
+### Upgrade instructions
+
+- Remove any usage of `plain models optimize-migration` command - it is no longer available
+- Remove any usage of `--fake-initial` option from `plain migrate` commands - it is no longer supported
+- It is no longer necessary to do `user=request.user or None`, for example, when setting foreign key fields with a lazy object like `request.user`. These will now be automatically evaluated.
+
 ## [0.39.2](https://github.com/dropseed/plain/releases/plain-models@0.39.2) (2025-07-25)
 
 ### What's changed
