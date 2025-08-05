@@ -59,7 +59,7 @@ class AppRouter(Router):
 Then run migrations:
 
 ```sh
-python manage.py migrate plain.oauth
+plain migrate plain.oauth
 ```
 
 Create a new OAuth provider ([or copy one from our examples](https://github.com/forgepackages/plain-oauth/tree/master/provider_examples)):
@@ -254,7 +254,7 @@ This library comes with a Django system check to ensure you don't _remove_ a pro
 You do need to specify the `--database` for this to run when using the check command by itself:
 
 ```sh
-python manage.py check --database default
+plain check --database default
 ```
 
 ## FAQs

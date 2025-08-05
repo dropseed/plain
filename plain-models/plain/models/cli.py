@@ -502,7 +502,7 @@ def migrate(
                 click.echo(f"    {package}.{name}")
             click.echo(
                 click.style(
-                    "  Re-run 'manage.py migrate' if they are not marked as "
+                    "  Re-run `plain migrate` if they are not marked as "
                     "applied, and remove 'replaces' attributes in their "
                     "Migration classes.",
                     fg="yellow",
@@ -646,8 +646,8 @@ def migrate(
             )
             click.echo(
                 click.style(
-                    "  Run 'manage.py makemigrations' to make new "
-                    "migrations, and then re-run 'manage.py migrate' to "
+                    "  Run `plain makemigrations` to make new "
+                    "migrations, and then re-run `plain migrate` to "
                     "apply them.",
                     fg="yellow",
                 )
@@ -821,7 +821,7 @@ def show_migrations(package_labels, format, verbosity):
                             if plan_node in recorded_migrations:
                                 output = f" [X] {title}"
                             else:
-                                title += " Run 'manage.py migrate' to finish recording."
+                                title += " Run `plain migrate` to finish recording."
                                 output = f" [-] {title}"
                             if verbosity >= 2 and hasattr(applied_migration, "applied"):
                                 output += f" (applied at {applied_migration.applied.strftime('%Y-%m-%d %H:%M:%S')})"
@@ -1001,7 +1001,7 @@ def squash_migrations(
                 f"The migration '{start_migration}' cannot be found. Maybe it comes after "
                 f"the migration '{migration}'?\n"
                 f"Have a look at:\n"
-                f"  python manage.py showmigrations {package_label}\n"
+                f"  plain models show-migrations {package_label}\n"
                 f"to debug this issue."
             )
 

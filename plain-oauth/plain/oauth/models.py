@@ -160,7 +160,7 @@ class OAuthConnection(models.Model):
         A system check for ensuring that provider_keys in the database are also present in settings.
 
         Note that the --database flag is required for this to work:
-          python manage.py check --database default
+          plain check --database default
         """
         errors = super().check(**kwargs)
 
@@ -175,7 +175,7 @@ class OAuthConnection(models.Model):
                 cls.objects.values_list("provider_key", flat=True).distinct()
             )
         except (OperationalError, ProgrammingError):
-            # Check runs on manage.py migrate, and the table may not exist yet
+            # Check runs on plain migrate, and the table may not exist yet
             # or it may not be installed on the particular database intentionally
             return errors
 
