@@ -60,6 +60,7 @@ from plain.models.lookups import GreaterThan, LessThanOrEqual
 from plain.models.query import QuerySet
 from plain.models.query_utils import DeferredAttribute, Q
 from plain.models.utils import resolve_callables
+from plain.utils.functional import LazyObject
 
 
 class ForeignKeyDeferredAttribute(DeferredAttribute):
@@ -222,6 +223,14 @@ class ForwardManyToOneDescriptor:
         - ``instance`` is the ``child`` instance
         - ``value`` is the ``parent`` instance on the right of the equal sign
         """
+        # If value is a LazyObject (like SimpleLazyObject used for request.user),
+        # force its evaluation. For ForeignKey fields, the value should only be
+        # None or a model instance, never a boolean or other type.
+        if isinstance(value, LazyObject):
+            # This forces evaluation: if it's None, value becomes None;
+            # if it's a User instance, value becomes that instance.
+            value = value if value else None
+
         # An object must be an instance of the related class.
         if value is not None and not isinstance(
             value, self.field.remote_field.model._meta.concrete_model
