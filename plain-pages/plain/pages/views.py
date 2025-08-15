@@ -50,10 +50,8 @@ class PageRedirectView(PageViewMixin, View):
         if not url:
             raise RedirectPageError("Redirect page is missing a url")
 
-        if self.page.vars.get("temporary", True):
-            return ResponseRedirect(url)
-        else:
-            return ResponseRedirect(url, status_code=301)
+        status_code = self.page.vars.get("status_code", 302)
+        return ResponseRedirect(url, status_code=status_code)
 
 
 class PageAssetView(PageViewMixin, AssetView):
