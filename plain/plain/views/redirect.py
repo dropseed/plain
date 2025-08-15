@@ -1,7 +1,4 @@
-import logging
-
 from plain.http import (
-    ResponseGone,
     ResponsePermanentRedirect,
     ResponseRedirect,
 )
@@ -9,21 +6,27 @@ from plain.urls import reverse
 
 from .base import View
 
-logger = logging.getLogger("plain.request")
-
 
 class RedirectView(View):
     """Provide a redirect on any GET request."""
 
     permanent = False
     url: str | None = None
-    pattern_name: str | None = None
-    query_string = False
+    url_name: str | None = None
+    preserve_query_params = False
 
-    def __init__(self, url=None, permanent=None):
-        # Allow url and permanent to be set in RedirectView.as_view(url="...", permanent=True)
+    def __init__(
+        self, url=None, permanent=None, url_name=None, preserve_query_params=None
+    ):
+        # Allow attributes to be set in RedirectView.as_view(url="...", permanent=True, etc.)
         self.url = url or self.url
         self.permanent = permanent if permanent is not None else self.permanent
+        self.url_name = url_name or self.url_name
+        self.preserve_query_params = (
+            preserve_query_params
+            if preserve_query_params is not None
+            else self.preserve_query_params
+        )
 
     def get_redirect_url(self):
         """
@@ -33,30 +36,22 @@ class RedirectView(View):
         """
         if self.url:
             url = self.url % self.url_kwargs
-        elif self.pattern_name:
-            url = reverse(self.pattern_name, *self.url_args, **self.url_kwargs)
+        elif self.url_name:
+            url = reverse(self.url_name, *self.url_args, **self.url_kwargs)
         else:
-            return None
+            raise ValueError("RedirectView requires either url or url_name to be set")
 
         args = self.request.meta.get("QUERY_STRING", "")
-        if args and self.query_string:
+        if args and self.preserve_query_params:
             url = f"{url}?{args}"
         return url
 
     def get(self):
         url = self.get_redirect_url()
-        if url:
-            if self.permanent:
-                return ResponsePermanentRedirect(url)
-            else:
-                return ResponseRedirect(url)
+        if self.permanent:
+            return ResponsePermanentRedirect(url)
         else:
-            logger.warning(
-                "Gone: %s",
-                self.request.path,
-                extra={"status_code": 410, "request": self.request},
-            )
-            return ResponseGone()
+            return ResponseRedirect(url)
 
     def head(self):
         return self.get()
