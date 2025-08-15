@@ -1,6 +1,6 @@
 import re
 
-from plain.http import ResponsePermanentRedirect
+from plain.http import ResponseRedirect
 from plain.runtime import settings
 
 
@@ -33,4 +33,6 @@ class HttpsRedirectMiddleware:
             and not any(pattern.search(path) for pattern in self.https_redirect_exempt)
         ):
             host = self.https_redirect_host or request.get_host()
-            return ResponsePermanentRedirect(f"https://{host}{request.get_full_path()}")
+            return ResponseRedirect(
+                f"https://{host}{request.get_full_path()}", status_code=301
+            )

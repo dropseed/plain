@@ -1,4 +1,4 @@
-from plain.http import ResponsePermanentRedirect
+from plain.http import ResponseRedirect
 from plain.runtime import settings
 from plain.urls import Resolver404, get_resolver
 from plain.utils.http import escape_leading_slashes
@@ -22,7 +22,9 @@ class RedirectSlashMiddleware:
         # If the given URL is "Not Found", then check if we should redirect to
         # a path with a slash appended.
         if response.status_code == 404 and self.should_redirect_with_slash(request):
-            return ResponsePermanentRedirect(self.get_full_path_with_slash(request))
+            return ResponseRedirect(
+                self.get_full_path_with_slash(request), status_code=301
+            )
 
         return response
 

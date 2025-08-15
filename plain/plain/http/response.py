@@ -10,10 +10,8 @@ from email.header import Header
 from functools import cached_property
 from http.client import responses
 from http.cookies import SimpleCookie
-from urllib.parse import urlparse
 
 from plain import signals
-from plain.exceptions import DisallowedRedirect
 from plain.http.cookie import sign_cookie_value
 from plain.json import PlainJSONEncoder
 from plain.runtime import settings
@@ -566,19 +564,18 @@ class FileResponse(StreamingResponse):
             self.headers["Content-Disposition"] = content_disposition
 
 
-class ResponseRedirectBase(Response):
-    allowed_schemes = ["http", "https", "ftp"]
+class ResponseRedirect(Response):
+    """HTTP redirect response"""
+
+    status_code = 302
 
     def __init__(self, redirect_to, **kwargs):
         super().__init__(**kwargs)
         self.headers["Location"] = iri_to_uri(redirect_to)
-        parsed = urlparse(str(redirect_to))
-        if parsed.scheme and parsed.scheme not in self.allowed_schemes:
-            raise DisallowedRedirect(
-                f"Unsafe redirect to URL with protocol '{parsed.scheme}'"
-            )
 
-    url = property(lambda self: self.headers["Location"])
+    @property
+    def url(self):
+        return self.headers["Location"]
 
     def __repr__(self):
         return (
@@ -590,18 +587,6 @@ class ResponseRedirectBase(Response):
                 "url": self.url,
             }
         )
-
-
-class ResponseRedirect(ResponseRedirectBase):
-    """HTTP 302 response"""
-
-    status_code = 302
-
-
-class ResponsePermanentRedirect(ResponseRedirectBase):
-    """HTTP 301 response"""
-
-    status_code = 301
 
 
 class ResponseNotModified(Response):

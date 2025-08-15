@@ -4,7 +4,6 @@ from plain.assets.views import AssetView
 from plain.http import (
     Http404,
     Response,
-    ResponsePermanentRedirect,
     ResponseRedirect,
 )
 from plain.views import TemplateView, View
@@ -54,7 +53,7 @@ class PageRedirectView(PageViewMixin, View):
         if self.page.vars.get("temporary", True):
             return ResponseRedirect(url)
         else:
-            return ResponsePermanentRedirect(url)
+            return ResponseRedirect(url, status_code=301)
 
 
 class PageAssetView(PageViewMixin, AssetView):

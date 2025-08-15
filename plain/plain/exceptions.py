@@ -53,12 +53,6 @@ class DisallowedHost(SuspiciousOperation):
     pass
 
 
-class DisallowedRedirect(SuspiciousOperation):
-    """Redirect to scheme not in allowed list"""
-
-    pass
-
-
 class TooManyFieldsSent(SuspiciousOperation):
     """
     The number of fields in a GET or POST request exceeded
