@@ -1,5 +1,17 @@
 # plain-pages changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-pages@0.12.0) (2025-08-15)
+
+### What's changed
+
+- Redirect pages now use a `status_code` variable instead of the boolean `temporary` variable for greater control over redirect status codes ([ba79ce3](https://github.com/dropseed/plain/commit/ba79ce3d70))
+- Removed dependency on `ResponsePermanentRedirect` in favor of using `status_code` parameter in `ResponseRedirect` ([d5735ea](https://github.com/dropseed/plain/commit/d5735ea4f8))
+
+### Upgrade instructions
+
+- Replace any `temporary: false` variables in redirect pages with `status_code: 301` for permanent redirects
+- Replace any `temporary: true` variables in redirect pages with `status_code: 302` for temporary redirects (or simply remove the variable as 302 is now the default)
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-pages@0.11.0) (2025-08-15)
 
 ### What's changed
