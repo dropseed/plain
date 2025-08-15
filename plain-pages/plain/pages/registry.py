@@ -1,7 +1,6 @@
 import os
 
 from plain.internal import internalcode
-from plain.urls import path
 
 from .exceptions import PageNotFoundError
 from .pages import Page
@@ -15,8 +14,8 @@ class PagesRegistry:
     """
 
     def __init__(self):
-        # url path -> file path
-        self.registered_pages = {}
+        self._url_name_mappings = {}  # url_name -> relative_path
+        self._path_mappings = {}  # relative_path -> absolute_path
 
     def get_page_urls(self):
         """
@@ -26,18 +25,11 @@ class PagesRegistry:
         """
         paths = []
 
-        for url_name in self.registered_pages.keys():
-            page = self.get_page(url_name)
-            url = page.get_url_path()
-            view_class = page.get_view_class()
+        for relative_path in self._path_mappings.keys():
+            page = self.get_page_from_path(relative_path)
 
-            paths.append(
-                path(
-                    url,
-                    view_class,
-                    name=url_name,
-                )
-            )
+            # Get all URL path objects from the page
+            paths.extend(page.get_urls())
 
         return paths
 
@@ -47,23 +39,38 @@ class PagesRegistry:
                 relative_path = os.path.relpath(os.path.join(root, file), pages_dir)
                 absolute_path = os.path.join(root, file)
 
-                page_args = (relative_path, absolute_path)
-                url_name = Page(*page_args).get_url_name()
+                page = Page(relative_path=relative_path, absolute_path=absolute_path)
+                urls = page.get_urls()
 
-                # Some pages don't get a url (like templates)
-                if url_name is None:
+                # Some pages don't get any urls (like templates)
+                if not urls:
                     continue
 
-                self.registered_pages[url_name] = page_args
+                # Register the page by its file path
+                self._path_mappings[relative_path] = absolute_path
 
-    def get_page(self, url_name):
+                # Register all URL names to point back to this file path
+                for url_path_obj in urls:
+                    url_name = url_path_obj.name
+                    self._url_name_mappings[url_name] = relative_path
+
+    def get_page_from_name(self, url_name):
+        """Get a page by its URL name."""
         try:
-            page_args = self.registered_pages[url_name]
+            relative_path = self._url_name_mappings[url_name]
+            return self.get_page_from_path(relative_path)
+        except KeyError:
+            raise PageNotFoundError(f"Could not find a page for URL name {url_name}")
+
+    def get_page_from_path(self, relative_path):
+        """Get a page by its relative file path."""
+        try:
+            absolute_path = self._path_mappings[relative_path]
             # Instantiate the page here, so we don't store a ton of cached data over time
             # as we render all the pages
-            return Page(*page_args)
+            return Page(relative_path=relative_path, absolute_path=absolute_path)
         except KeyError:
-            raise PageNotFoundError(f"Could not find a page for {url_name}")
+            raise PageNotFoundError(f"Could not find a page for path {relative_path}")
 
 
 pages_registry = PagesRegistry()

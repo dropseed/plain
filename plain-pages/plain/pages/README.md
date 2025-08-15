@@ -9,6 +9,7 @@
     - [Redirect pages](#redirect-pages)
     - [Assets](#assets)
     - [Template pages](#template-pages)
+- [Markdown URLs](#markdown-urls)
 - [Frontmatter](#frontmatter)
 - [Custom views](#custom-views)
 - [Installation](#installation)
@@ -111,6 +112,43 @@ app/templates/pages/
 ├── base.template.html  # Not served
 └── index.html          # Served at /
 ```
+
+## Markdown URLs
+
+Optionally serve raw markdown content alongside rendered HTML pages. When enabled, each markdown file gets two URLs:
+
+```python
+# settings.py
+PAGES_MARKDOWN_URLS = True
+```
+
+With this setting enabled:
+
+- `/docs/guide/` → Rendered HTML page
+- `/docs/guide.md` → Raw markdown content (without frontmatter)
+
+The raw markdown URLs serve the content with `text/plain` content type, making them useful for:
+
+- External markdown processors
+- API consumers needing markdown source
+- Documentation tools that need raw content
+
+**Note**: This feature is disabled by default. Only enable it if you need to serve raw markdown content.
+
+### Linking to Markdown URLs
+
+When markdown URLs are enabled, you can link to the raw markdown version from templates:
+
+```html
+<!-- In your page template -->
+<a href="{{ page.get_markdown_url() }}">View Source</a>
+<a href="{{ page.get_markdown_url() }}">Download Markdown</a>
+```
+
+The `get_markdown_url()` method returns:
+
+- The markdown URL (e.g., `/docs/guide.md`) if the page is markdown and the feature is enabled
+- `None` if the page is not markdown or the feature is disabled
 
 ## Frontmatter
 

@@ -3,7 +3,9 @@ from functools import cached_property
 
 import frontmatter
 
+from plain.runtime import settings
 from plain.templates import Template
+from plain.urls import path, reverse
 
 from .markdown import render_markdown
 
@@ -53,7 +55,7 @@ class Page:
             _, content = frontmatter.parse(content)
 
         if self.is_markdown():
-            content = render_markdown(content)
+            content = render_markdown(content, current_page_path=self.relative_path)
 
         return content
 
@@ -78,7 +80,14 @@ class Page:
         extension = os.path.splitext(self.absolute_path)[1]
         return extension == ".redirect"
 
-    def get_url_path(self) -> str | None:
+    def get_template_name(self):
+        if template_name := self.vars.get("template_name"):
+            return template_name
+
+        return ""
+
+    def get_url_path(self):
+        """Generate the primary URL path for this page."""
         if self.is_template():
             return None
 
@@ -99,6 +108,7 @@ class Page:
         return url_path + "/"
 
     def get_url_name(self):
+        """Generate the URL name from the URL path."""
         url_path = self.get_url_path()
         if url_path is None:
             return None
@@ -108,13 +118,8 @@ class Page:
 
         return url_path.rstrip("/")
 
-    def get_template_name(self):
-        if template_name := self.vars.get("template_name"):
-            return template_name
-
-        return ""
-
     def get_view_class(self):
+        """Get the appropriate view class for this page."""
         from .views import PageAssetView, PageRedirectView, PageView
 
         if self.is_redirect():
@@ -124,3 +129,49 @@ class Page:
             return PageAssetView
 
         return PageView
+
+    def get_markdown_url(self):
+        """Get the markdown URL for this page if it exists."""
+        if not self.is_markdown():
+            return None
+
+        if not settings.PAGES_MARKDOWN_URLS:
+            return None
+
+        url_name = self.get_url_name()
+        if not url_name:
+            return None
+
+        return reverse(f"pages:{url_name}-md")
+
+    def get_urls(self):
+        """Get all URL path objects for this page."""
+        urls = []
+
+        # Generate primary URL
+        url_path = self.get_url_path()
+        url_name = self.get_url_name()
+        view_class = self.get_view_class()
+
+        if url_path is not None and url_name is not None:
+            urls.append(
+                path(
+                    url_path,
+                    view_class,
+                    name=url_name,
+                )
+            )
+
+            # For markdown files, optionally add .md URL
+            if self.is_markdown() and settings.PAGES_MARKDOWN_URLS:
+                from .views import PageMarkdownView
+
+                urls.append(
+                    path(
+                        self.relative_path,
+                        PageMarkdownView,
+                        name=f"{url_name}-md",
+                    )
+                )
+
+        return urls

@@ -1,7 +1,12 @@
 from functools import cached_property
 
 from plain.assets.views import AssetView
-from plain.http import Http404, ResponsePermanentRedirect, ResponseRedirect
+from plain.http import (
+    Http404,
+    Response,
+    ResponsePermanentRedirect,
+    ResponseRedirect,
+)
 from plain.views import TemplateView, View
 
 from .exceptions import PageNotFoundError, RedirectPageError
@@ -14,7 +19,7 @@ class PageViewMixin:
         url_name = self.request.resolver_match.url_name
 
         try:
-            return pages_registry.get_page(url_name)
+            return pages_registry.get_page_from_name(url_name)
         except PageNotFoundError:
             raise Http404()
 
@@ -61,3 +66,14 @@ class PageAssetView(PageViewMixin, AssetView):
 
     def get_debug_asset_path(self, path):
         return self.page.absolute_path
+
+
+class PageMarkdownView(PageViewMixin, View):
+    def get(self):
+        """Serve the markdown content without frontmatter."""
+        markdown_content = self.page._frontmatter.content
+        response = Response(markdown_content, content_type="text/plain; charset=utf-8")
+        response.headers["Vary"] = (
+            "Accept-Encoding"  # Set Vary header for proper caching
+        )
+        return response
