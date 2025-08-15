@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.12.1](https://github.com/dropseed/plain/releases/plain-pages@0.12.1) (2025-08-15)
+
+### What's changed
+
+- Improved relative markdown link conversion to handle links that don't use `./` or `../` prefixes, automatically converting plain filenames and paths to proper page URLs ([f98416e](https://github.com/dropseed/plain/commit/f98416e1e7))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-pages@0.12.0) (2025-08-15)
 
 ### What's changed
