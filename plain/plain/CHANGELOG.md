@@ -1,5 +1,20 @@
 # plain changelog
 
+## [0.57.0](https://github.com/dropseed/plain/releases/plain@0.57.0) (2025-08-15)
+
+### What's changed
+
+- The `ResponsePermanentRedirect` class has been removed; use `ResponseRedirect` with `status_code=301` instead ([d5735ea](https://github.com/dropseed/plain/commit/d5735ea4f8))
+- The `RedirectView.permanent` attribute has been replaced with `status_code` for more flexible redirect status codes ([12dda16](https://github.com/dropseed/plain/commit/12dda16731))
+- Updated `RedirectView` initialization parameters: `url_name` replaces `pattern_name`, `preserve_query_params` replaces `query_string`, and removed 410 Gone functionality ([3b9ca71](https://github.com/dropseed/plain/commit/3b9ca713bf))
+
+### Upgrade instructions
+
+- Replace `ResponsePermanentRedirect` imports with `ResponseRedirect` and pass `status_code=301` to the constructor
+- Update `RedirectView` subclasses to use `status_code=301` instead of `permanent=True`
+- Replace `pattern_name` with `url_name` in RedirectView usage
+- Replace `query_string=True` with `preserve_query_params=True` in RedirectView usage
+
 ## [0.56.1](https://github.com/dropseed/plain/releases/plain@0.56.1) (2025-07-30)
 
 ### What's changed
