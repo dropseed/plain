@@ -1,5 +1,17 @@
 # plain-pages changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-pages@0.11.0) (2025-08-15)
+
+### What's changed
+
+- Added raw markdown serving feature that allows markdown files to be served at `.md` URLs alongside rendered HTML pages ([b13a544](https://github.com/dropseed/plain/commit/b13a544679c5ffc172fb3e0ef53b97a2a6c50ccb))
+- Automatic markdown relative link conversion that resolves `./` and `../` links in markdown to proper page URLs ([b13a544](https://github.com/dropseed/plain/commit/b13a544679c5ffc172fb3e0ef53b97a2a6c50ccb))
+- Added `get_markdown_url()` method to pages for linking to raw markdown content ([b13a544](https://github.com/dropseed/plain/commit/b13a544679c5ffc172fb3e0ef53b97a2a6c50ccb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.5](https://github.com/dropseed/plain/releases/plain-pages@0.10.5) (2025-07-31)
 
 ### What's changed
