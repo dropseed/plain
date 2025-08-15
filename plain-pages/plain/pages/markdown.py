@@ -18,7 +18,12 @@ class PagesRenderer(mistune.HTMLRenderer):
 
     def link(self, text, url, title=None):
         """Convert relative markdown links to proper page URLs."""
-        if url.startswith(("./", "../")):
+        # Check if it's a relative link (starts with ./ or ../, or is just a filename)
+        is_relative = url.startswith(("./", "../")) or (
+            not url.startswith(("http://", "https://", "/", "#")) and ":" not in url
+        )
+
+        if is_relative:
             # Resolve relative to current page's directory
             current_dir = os.path.dirname(self.current_page_path)
             resolved_path = os.path.normpath(os.path.join(current_dir, url))
