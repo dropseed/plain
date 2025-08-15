@@ -1,7 +1,4 @@
-from plain.http import (
-    ResponsePermanentRedirect,
-    ResponseRedirect,
-)
+from plain.http import ResponseRedirect
 from plain.urls import reverse
 
 from .base import View
@@ -10,17 +7,17 @@ from .base import View
 class RedirectView(View):
     """Provide a redirect on any GET request."""
 
-    permanent = False
+    status_code = 302
     url: str | None = None
     url_name: str | None = None
     preserve_query_params = False
 
     def __init__(
-        self, url=None, permanent=None, url_name=None, preserve_query_params=None
+        self, url=None, status_code=None, url_name=None, preserve_query_params=None
     ):
-        # Allow attributes to be set in RedirectView.as_view(url="...", permanent=True, etc.)
+        # Allow attributes to be set in RedirectView.as_view(url="...", status_code=301, etc.)
         self.url = url or self.url
-        self.permanent = permanent if permanent is not None else self.permanent
+        self.status_code = status_code if status_code is not None else self.status_code
         self.url_name = url_name or self.url_name
         self.preserve_query_params = (
             preserve_query_params
@@ -48,10 +45,7 @@ class RedirectView(View):
 
     def get(self):
         url = self.get_redirect_url()
-        if self.permanent:
-            return ResponsePermanentRedirect(url)
-        else:
-            return ResponseRedirect(url)
+        return ResponseRedirect(url, status_code=self.status_code)
 
     def head(self):
         return self.get()
