@@ -6,6 +6,23 @@ import operator
 
 from plain.utils.hashable import make_hashable
 
+# MARK: Configuration and Registry
+
+
+class PackageRegistryNotReady(Exception):
+    """The plain.packages registry is not populated yet"""
+
+    pass
+
+
+class ImproperlyConfigured(Exception):
+    """Plain is somehow improperly configured"""
+
+    pass
+
+
+# MARK: Model and Field Errors
+
 
 class FieldDoesNotExist(Exception):
     """The requested model field does not exist"""
@@ -13,8 +30,8 @@ class FieldDoesNotExist(Exception):
     pass
 
 
-class PackageRegistryNotReady(Exception):
-    """The plain.packages registry is not populated yet"""
+class FieldError(Exception):
+    """Some kind of problem with a model field."""
 
     pass
 
@@ -29,6 +46,9 @@ class MultipleObjectsReturned(Exception):
     """The query returned multiple objects when only one was expected."""
 
     pass
+
+
+# MARK: Security and Suspicious Operations
 
 
 class SuspiciousOperation(Exception):
@@ -80,6 +100,9 @@ class RequestDataTooBig(SuspiciousOperation):
     pass
 
 
+# MARK: HTTP and Request Errors
+
+
 class BadRequest(Exception):
     """The request is malformed and cannot be processed."""
 
@@ -92,17 +115,7 @@ class PermissionDenied(Exception):
     pass
 
 
-class ImproperlyConfigured(Exception):
-    """Plain is somehow improperly configured"""
-
-    pass
-
-
-class FieldError(Exception):
-    """Some kind of problem with a model field."""
-
-    pass
-
+# MARK: Validation
 
 NON_FIELD_ERRORS = "__all__"
 
@@ -203,6 +216,9 @@ class ValidationError(Exception):
         if hasattr(self, "error_dict"):
             return hash(make_hashable(self.error_dict))
         return hash(tuple(sorted(self.error_list, key=operator.attrgetter("message"))))
+
+
+# MARK: Database
 
 
 class EmptyResultSet(Exception):
