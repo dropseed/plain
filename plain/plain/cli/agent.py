@@ -1,3 +1,4 @@
+import os
 import shlex
 import subprocess
 
@@ -20,6 +21,11 @@ def prompt_agent(
         True if the agent command succeeded (or no agent command was provided),
         False if the agent command failed.
     """
+    # Check if running inside an agent and just print the prompt if so
+    if os.environ.get("CLAUDECODE") or os.environ.get("CODEX_SANDBOX"):
+        click.echo(prompt)
+        return True
+
     if print_only or not agent_command:
         click.echo(prompt)
         if not print_only:
