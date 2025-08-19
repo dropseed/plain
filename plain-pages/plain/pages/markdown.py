@@ -1,5 +1,6 @@
 import os
 from html.parser import HTMLParser
+from urllib.parse import urlparse, urlunparse
 
 import mistune
 from pygments import highlight
@@ -24,15 +25,29 @@ class PagesRenderer(mistune.HTMLRenderer):
         )
 
         if is_relative:
-            # Resolve relative to current page's directory
+            # Parse URL to extract components
+            parsed_url = urlparse(url)
+
+            # Resolve relative to current page's directory using just the path component
             current_dir = os.path.dirname(self.current_page_path)
-            resolved_path = os.path.normpath(os.path.join(current_dir, url))
+            resolved_path = os.path.normpath(os.path.join(current_dir, parsed_url.path))
             page = self.pages_registry.get_page_from_path(resolved_path)
 
             # Get the primary URL name for link conversion
             url_name = page.get_url_name()
             if url_name:
-                url = reverse(f"pages:{url_name}")
+                base_url = reverse(f"pages:{url_name}")
+                # Reconstruct URL with preserved query params and fragment
+                url = urlunparse(
+                    (
+                        parsed_url.scheme,  # scheme (empty for relative)
+                        parsed_url.netloc,  # netloc (empty for relative)
+                        base_url,  # path (our converted URL)
+                        parsed_url.params,  # params
+                        parsed_url.query,  # query
+                        parsed_url.fragment,  # fragment
+                    )
+                )
 
         return super().link(text, url, title)
 
