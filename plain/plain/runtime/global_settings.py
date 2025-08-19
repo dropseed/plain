@@ -120,6 +120,10 @@ MIDDLEWARE: list[str] = []
 # Each origin should be a full origin like "https://example.com" or "https://sub.example.com:8080"
 CSRF_TRUSTED_ORIGINS: list[str] = []
 
+# Regex patterns for paths that should be exempt from CSRF protection
+# Examples: [r"^/api/", r"/webhooks/.*", r"/health$"]
+CSRF_EXEMPT_PATHS: list[str] = []
+
 # MARK: Logging
 
 # Custom logging configuration.

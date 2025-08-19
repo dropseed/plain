@@ -8,7 +8,6 @@ from plain.http import Http404, JsonResponse, Response
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
 from plain.views.base import View
-from plain.views.csrf import CsrfExemptViewMixin
 from plain.views.exceptions import ResponseException
 
 from . import openapi
@@ -113,7 +112,7 @@ class APIKeyView(View):
 @openapi.response_typed_dict(
     "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
 )
-class APIView(CsrfExemptViewMixin, View):
+class APIView(View):
     def get_response(self):
         try:
             return super().get_response()

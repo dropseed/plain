@@ -207,17 +207,103 @@ def test_sec_fetch_site_priority_over_origin_check():
     assert "Sec-Fetch-Site" in reason
 
 
-def test_csrf_exempt_request():
-    """CSRF exempt requests should always be allowed."""
-    rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+@pytest.mark.parametrize(
+    ("exempt_patterns", "test_path", "expected_allowed", "expected_reason_fragment"),
+    [
+        # Basic patterns
+        (
+            [r"^/api/", r"/webhooks/github/"],
+            "/api/users/",
+            True,
+            "matches exempt pattern ^/api/",
+        ),
+        (
+            [r"^/api/", r"/webhooks/github/"],
+            "/webhooks/github/push",
+            True,
+            "matches exempt pattern /webhooks/github/",
+        ),
+        (
+            [r"^/api/", r"/webhooks/github/"],
+            "/admin/users/",
+            False,
+            "does not match Host",
+        ),
+        # Advanced regex patterns
+        (
+            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+            "/api/v1/users/",
+            True,
+            "matches exempt pattern ^/api/v\\d+/",
+        ),
+        (
+            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+            "/api/v2/posts/",
+            True,
+            "matches exempt pattern ^/api/v\\d+/",
+        ),
+        (
+            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+            "/webhooks/github/push",
+            True,
+            "matches exempt pattern /webhooks/.*",
+        ),
+        (
+            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+            "/webhooks/stripe/payment",
+            True,
+            "matches exempt pattern /webhooks/.*",
+        ),
+        (
+            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+            "/health",
+            True,
+            "matches exempt pattern /health$",
+        ),
+        # Edge cases - exact match should not match with suffix
+        (
+            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+            "/health-check",
+            False,
+            "does not match Host",
+        ),
+        (
+            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+            "/admin/users/",
+            False,
+            "does not match Host",
+        ),
+        # Empty exempt paths list
+        ([], "/api/users/", False, "does not match Host"),
+    ],
+)
+def test_path_based_csrf_exemption(
+    exempt_patterns, test_path, expected_allowed, expected_reason_fragment
+):
+    """Path-based CSRF exemption with various regex patterns should work correctly."""
+    from plain.runtime import settings
 
-    request = rf.post("/test/")
-    request.csrf_exempt = True
+    # Save original setting
+    original_exempt_paths = settings.CSRF_EXEMPT_PATHS
 
-    allowed, reason = csrf_middleware.should_allow_request(request)
-    assert allowed is True
-    assert "Request marked as CSRF exempt" in reason
+    try:
+        # Set up exempt regex patterns
+        settings.CSRF_EXEMPT_PATHS = exempt_patterns
+
+        # Need to recreate middleware to compile new patterns
+        rf = RequestFactory()
+        csrf_middleware = CsrfViewMiddleware(lambda request: None)
+
+        # Test path with malicious origin to ensure exemption works
+        request = rf.post(test_path, headers={"Origin": "https://attacker.com"})
+        allowed, reason = csrf_middleware.should_allow_request(request)
+
+        assert allowed is expected_allowed
+        assert expected_reason_fragment in reason
+
+    finally:
+        # Restore original setting
+        settings.CSRF_EXEMPT_PATHS = original_exempt_paths
 
 
 def test_request_factory_naturally_bypasses_csrf():

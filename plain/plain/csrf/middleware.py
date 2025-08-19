@@ -1,4 +1,5 @@
 import logging
+import re
 from urllib.parse import urlparse
 
 from plain.exceptions import DisallowedHost
@@ -22,6 +23,9 @@ class CsrfViewMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
+        # Compile CSRF exempt patterns once for performance
+        self.csrf_exempt_patterns = [re.compile(r) for r in settings.CSRF_EXEMPT_PATHS]
+
     def __call__(self, request):
         allowed, reason = self.should_allow_request(request)
 
@@ -35,9 +39,13 @@ class CsrfViewMiddleware:
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return True, f"Safe HTTP method: {request.method}"
 
-        # 2. Allow manually exempted requests
-        if getattr(request, "csrf_exempt", False):
-            return True, "Request marked as CSRF exempt"
+        # 2. Path-based exemption (regex patterns)
+        for pattern in self.csrf_exempt_patterns:
+            if pattern.search(request.path_info):
+                return (
+                    True,
+                    f"Path {request.path_info} matches exempt pattern {pattern.pattern}",
+                )
 
         origin = request.headers.get("Origin")
         sec_fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()

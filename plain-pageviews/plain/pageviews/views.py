@@ -2,12 +2,11 @@ import json
 
 from plain.runtime import settings
 from plain.views import View
-from plain.views.csrf import CsrfExemptViewMixin
 
 from .models import Pageview
 
 
-class TrackView(CsrfExemptViewMixin, View):
+class TrackView(View):
     def post(self):
         if getattr(self.request, "impersonator", None):
             # Don't track page views if we're impersonating a user

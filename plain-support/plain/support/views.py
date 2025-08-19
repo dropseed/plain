@@ -3,7 +3,6 @@ from plain.http import ResponseRedirect
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views import FormView, View
-from plain.views.csrf import CsrfExemptViewMixin
 
 
 class SupportFormView(FormView):
@@ -40,7 +39,7 @@ class SupportFormView(FormView):
         return "?success=true"
 
 
-class SupportIFrameView(CsrfExemptViewMixin, SupportFormView):
+class SupportIFrameView(SupportFormView):
     template_name = "support/iframe.html"
 
     def get_response(self):
