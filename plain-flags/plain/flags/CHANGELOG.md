@@ -1,5 +1,16 @@
 # plain-flags changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-flags@0.22.0) (2025-08-19)
+
+### What's changed
+
+- Removed manual CSRF token from admin flag result form template, now handled automatically by Sec-Fetch-Site headers ([9551508](https://github.com/dropseed/plain/commit/955150800c))
+- Updated README with better structure, table of contents, and improved installation instructions ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.1](https://github.com/dropseed/plain/releases/plain-flags@0.21.1) (2025-07-23)
 
 ### What's changed
