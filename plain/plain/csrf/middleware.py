@@ -400,7 +400,7 @@ class CsrfViewMiddleware:
     def _get_csrf_response(self, request):
         # Wait until request.meta["CSRF_COOKIE"] has been manipulated before
         # bailing out, so that get_token still works
-        if getattr(request, "csrf_exempt", True):
+        if getattr(request, "csrf_exempt", False):
             return None
 
         # Assume that anything not defined as 'safe' by RFC 9110 needs protection
