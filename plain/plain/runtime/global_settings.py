@@ -31,7 +31,13 @@ DEFAULT_RESPONSE_HEADERS = {
 
 # Whether to redirect all non-HTTPS requests to HTTPS.
 HTTPS_REDIRECT_ENABLED = True
-HTTPS_REDIRECT_EXEMPT = []
+
+# Regex patterns for paths that should be exempt from HTTPS redirect
+# Examples: [r"^/health$", r"/api/internal/.*", r"/dev/.*"]
+HTTPS_REDIRECT_EXEMPT_PATHS: list[str] = []
+
+# Custom host to redirect to for HTTPS. If None, uses the same host as the request.
+# Useful for redirecting to a different domain (e.g., "secure.example.com")
 HTTPS_REDIRECT_HOST = None
 
 # If your Plain app is behind a proxy that sets a header to specify secure

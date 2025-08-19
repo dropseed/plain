@@ -12,7 +12,7 @@ class HttpsRedirectMiddleware:
         self.https_redirect_enabled = settings.HTTPS_REDIRECT_ENABLED
         self.https_redirect_host = settings.HTTPS_REDIRECT_HOST
         self.https_redirect_exempt = [
-            re.compile(r) for r in settings.HTTPS_REDIRECT_EXEMPT
+            re.compile(r) for r in settings.HTTPS_REDIRECT_EXEMPT_PATHS
         ]
 
     def __call__(self, request):
@@ -26,11 +26,13 @@ class HttpsRedirectMiddleware:
         return self.get_response(request)
 
     def maybe_https_redirect(self, request):
-        path = request.path.lstrip("/")
         if (
             self.https_redirect_enabled
             and not request.is_https()
-            and not any(pattern.search(path) for pattern in self.https_redirect_exempt)
+            and not any(
+                pattern.search(request.path_info)
+                for pattern in self.https_redirect_exempt
+            )
         ):
             host = self.https_redirect_host or request.get_host()
             return ResponseRedirect(
