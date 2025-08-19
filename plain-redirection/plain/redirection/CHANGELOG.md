@@ -1,5 +1,17 @@
 # plain-redirection changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-redirection@0.20.0) (2025-08-19)
+
+### What's changed
+
+- Added comprehensive README documentation with usage examples, API reference, and installation instructions ([4ebecd18](https://github.com/dropseed/plain/commit/4ebecd18))
+- Removed manual CSRF token requirement from admin forms as part of framework-wide CSRF improvements ([955150800c](https://github.com/dropseed/plain/commit/955150800c))
+- Updated package description in pyproject.toml to "A flexible URL redirection system with admin interface and logging" ([4ebecd18](https://github.com/dropseed/plain/commit/4ebecd18))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-redirection@0.19.0) (2025-07-23)
 
 ### What's changed
