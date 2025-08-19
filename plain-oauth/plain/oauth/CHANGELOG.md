@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-oauth@0.25.0) (2025-08-19)
+
+### What's changed
+
+- Removed requirement for manual `{{ csrf_input }}` in OAuth forms - CSRF protection now uses `Sec-Fetch-Site` headers automatically ([9551508](https://github.com/dropseed/plain/commit/955150800c))
+
+### Upgrade instructions
+
+- Remove `{{ csrf_input }}` from any OAuth forms in your templates (login, connect, disconnect forms) - CSRF protection is now handled automatically
+
 ## [0.24.2](https://github.com/dropseed/plain/releases/plain-oauth@0.24.2) (2025-08-05)
 
 ### What's changed
