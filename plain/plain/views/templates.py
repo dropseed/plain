@@ -1,25 +1,9 @@
-from plain.csrf.middleware import get_token
 from plain.exceptions import ImproperlyConfigured
 from plain.http import Response
 from plain.runtime import settings
 from plain.templates import Template, TemplateFileMissing
-from plain.utils.functional import lazy
-from plain.utils.html import format_html
-from plain.utils.safestring import SafeString
 
 from .base import View
-
-
-def csrf_input(request):
-    return format_html(
-        '<input type="hidden" name="{}" value="{}">',
-        settings.CSRF_FIELD_NAME,
-        get_token(request),
-    )
-
-
-csrf_input_lazy = lazy(csrf_input, SafeString, str)
-csrf_token_lazy = lazy(get_token, str)
 
 
 class TemplateView(View):
@@ -37,8 +21,6 @@ class TemplateView(View):
         return {
             "request": self.request,
             "template_names": self.get_template_names(),
-            "csrf_input": csrf_input_lazy(self.request),
-            "csrf_token": csrf_token_lazy(self.request),
             "DEBUG": settings.DEBUG,
         }
 

@@ -33,8 +33,6 @@ Then in your template, you can render the form fields.
 {% block content %}
 
 <form method="post">
-    {{ csrf_input }}
-
     <!-- Render general form errors -->
     {% for error in form.non_field_errors %}
     <div>{{ error }}</div>

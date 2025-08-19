@@ -114,8 +114,7 @@ class ClientHandler(BaseHandler):
     the originating WSGIRequest attached to its ``wsgi_request`` attribute.
     """
 
-    def __init__(self, enforce_csrf_checks=True, *args, **kwargs):
-        self.enforce_csrf_checks = enforce_csrf_checks
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def __call__(self, environ):
@@ -126,12 +125,6 @@ class ClientHandler(BaseHandler):
 
         request_started.send(sender=self.__class__, environ=environ)
         request = WSGIRequest(environ)
-        # sneaky little hack so that we can easily get round
-        # CsrfViewMiddleware.  This makes life easier, and is probably
-        # required for backwards compatibility with external tests against
-        # admin views.
-        if not self.enforce_csrf_checks:
-            request.csrf_exempt = True
 
         # Request goes through middleware.
         response = self.get_response(request)
@@ -420,14 +413,13 @@ class Client(RequestFactory):
 
     def __init__(
         self,
-        enforce_csrf_checks=False,
         raise_request_exception=True,
         *,
         headers=None,
         **defaults,
     ):
         super().__init__(headers=headers, **defaults)
-        self.handler = ClientHandler(enforce_csrf_checks)
+        self.handler = ClientHandler()
         self.raise_request_exception = raise_request_exception
         self.exc_info = None
         self.extra = None

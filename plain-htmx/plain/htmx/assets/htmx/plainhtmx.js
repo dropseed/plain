@@ -1,27 +1,4 @@
 (() => {
-  // Expect a data-csrftoken attribute on our own script tag
-  const { csrftoken: csrfToken, csrfheader: csrfHeader } =
-    document.currentScript.dataset;
-
-  htmx.defineExtension("plain-csrf", {
-    init() {
-      // Set or append this extension to the body hx-ext automatically
-      const body = document.querySelector("body");
-      if (body) {
-        const ext = body.getAttribute("hx-ext") || "";
-        if (!ext.includes("plain-csrf")) {
-          body.setAttribute("hx-ext", `${ext},plain-csrf`);
-        }
-      }
-    },
-    onEvent(name, evt) {
-      if (name === "htmx:configRequest") {
-        const { headers, method, verb } = evt.detail;
-        if (method !== "GET" && verb !== "get") headers[csrfHeader] = csrfToken;
-      }
-    },
-  });
-
   htmx.defineExtension("plain-views", {
     init() {
       // Set or append this extension to the body hx-ext automatically

@@ -1,23 +1,48 @@
 # CSRF
 
-**Cross-Site Request Forgery (CSRF) protection.**
+**Cross-Site Request Forgery (CSRF) protection using modern request headers.**
 
 - [Overview](#overview)
 - [Usage](#usage)
+- [CSRF Exempt Views](#csrf-exempt-views)
+- [Trusted Origins](#trusted-origins)
 
 ## Overview
 
-Plain protects against [CSRF attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery) through a [middleware](./middleware.py#CsrfViewMiddleware) that compares the generated `csrftoken` cookie with the CSRF token from the request (either `_csrftoken` in form data or the `CSRF-Token` header).
+Plain provides modern CSRF protection based on [Filippo Valsorda's 2025 research](https://words.filippo.io/csrf/) using `Sec-Fetch-Site` headers and origin validation.
 
 ## Usage
 
-The `CsrfViewMiddleware` is [automatically installed](../internal/handlers/base.py#BUILTIN_BEFORE_MIDDLEWARE), so you don't need to add it to your `settings.MIDDLEWARE`.
+The `CsrfViewMiddleware` is [automatically installed](../internal/handlers/base.py#BUILTIN_BEFORE_MIDDLEWARE) and works transparently. **No changes to your forms or templates are needed.**
 
-When you use HTML forms, you should include the CSRF token in the form data via a hidden input:
+## CSRF Exempt Views
 
-```html
-<form method="post">
-    {{ csrf_input }}
-    <!-- other form fields here -->
-</form>
+In some cases, you may need to disable CSRF protection for specific views (such as API endpoints or webhooks). Plain provides a mixin for class-based views.
+
+```python
+from plain.views import View
+from plain.views.csrf import CsrfExemptViewMixin
+
+
+class WebhookView(CsrfExemptViewMixin, View):
+    """API webhook that needs to accept POST requests without CSRF protection."""
+
+    def post(self):
+        # Process webhook data
+        return {"status": "received"}
 ```
+
+## Trusted Origins
+
+In some cases, you may need to allow requests from specific external origins (like API clients or mobile apps). You can configure trusted origins in your settings:
+
+```python
+# settings.py
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.example.com",
+    "https://mobile.example.com:8443",
+    "https://trusted-partner.com",
+]
+```
+
+**Important**: Trusted origins bypass **all** CSRF protection. Only add origins you completely trust, as they can make requests that appear to come from your users.

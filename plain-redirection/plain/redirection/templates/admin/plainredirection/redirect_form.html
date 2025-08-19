@@ -4,7 +4,6 @@
 
 {% block content %}
 <form method="post" class="space-y-4">
-    {{ csrf_input }}
     <admin.InputField label="From pattern" field={form.from_pattern} />
     <admin.InputField label="To pattern" field={form.to_pattern} />
     <admin.CheckboxField label="Use regular expressions" field={form.is_regex} />

@@ -28,7 +28,6 @@
         {% else %}
         {% if actions %}
         <form method="POST" data-actions-form>
-            {{ csrf_input }}
             <select name="action_name" class="text-sm border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1 pl-7 pr-3" style="background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 fill=%22%23999%22 viewBox=%220 0 16 16%22><path d=%22M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5h3Z%22/><path d=%22M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-12Z%22/><path d=%22M10.854 7.854a.5.5 0 0 0-.708-.708L7.5 9.793 6.354 8.646a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0l3-3Z%22/></svg>'); background-repeat: no-repeat; background-position: 0.5rem center; background-size: 14px;">
                 <option value="">Run action</option>
                 {% for action in actions %}

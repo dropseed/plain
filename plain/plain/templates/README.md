@@ -70,7 +70,6 @@ class HTMXJSExtension(InclusionTagExtension):
 
     def get_context(self, context, *args, **kwargs):
         return {
-            "csrf_token": context["csrf_token"],
             "DEBUG": settings.DEBUG,
             "extensions": kwargs.get("extensions", []),
         }

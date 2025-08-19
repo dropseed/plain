@@ -29,7 +29,6 @@ An element can be used in any other template by enabling them with `{% use_eleme
 
 {% block content %}
 <form method="post">
-    {{ csrf_input }}
     <!-- Form fields here -->
     <Submit>Save</Submit>
 </form>
@@ -47,7 +46,6 @@ Attributes will be passed through using regular strings or single braces `{}` fo
 
 {% block content %}
 <form method="post">
-    {{ csrf_input }}
     <FormInput field={form.username} placeholder="Username" label="Username" />
     <Submit>Save</Submit>
 </form>
@@ -82,7 +80,6 @@ For example, an element in `templates/elements/admin/Submit.html` would be used 
 
 {% block content %}
 <form method="post">
-    {{ csrf_input }}
     <admin.Submit>Save</admin.Submit>
 </form>
 {% endblock %}

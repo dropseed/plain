@@ -1,4 +1,3 @@
-from plain.csrf.middleware import rotate_token
 from plain.exceptions import ImproperlyConfigured
 from plain.models import models_registry
 from plain.runtime import settings
@@ -76,7 +75,6 @@ def login(request, user):
     request.session[USER_HASH_SESSION_KEY] = session_auth_hash
     if hasattr(request, "user"):
         request.user = user
-    rotate_token(request)
 
 
 def logout(request):

@@ -14,8 +14,6 @@ class HTMXJSExtension(InclusionTagExtension):
 
     def get_context(self, context, *args, **kwargs):
         return {
-            "csrf_header": settings.CSRF_HEADER_NAME,
-            "csrf_token": context["csrf_token"],
             "DEBUG": settings.DEBUG,
             "extensions": kwargs.get("extensions", []),
         }

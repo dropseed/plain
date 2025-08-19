@@ -141,7 +141,6 @@ Then add a login button (which is a form using POST rather than a basic link, fo
 ```html
 <h1>Login</h1>
 <form action="{% url 'oauth:login' 'github' %}" method="post">
-    {{ csrf_input }}
     <button type="submit">Login with GitHub</button>
 </form>
 ```
@@ -191,7 +190,6 @@ Hello {{ request.user }}!
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         <form action="{% url 'oauth:disconnect' connection.provider_key %}" method="post">
-            {{ csrf_input }}
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
         </form>
@@ -205,7 +203,6 @@ Hello {{ request.user }}!
     <li>
         {{ provider_key}}
         <form action="{% url 'oauth:connect' provider_key %}" method="post">
-            {{ csrf_input }}
             <button type="submit">Connect</button>
         </form>
     </li>
