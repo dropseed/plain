@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-api@0.13.0) (2025-08-19)
+
+### What's changed
+
+- API views no longer use `CsrfExemptViewMixin` ([2a50a91](https://github.com/dropseed/plain/commit/2a50a9154e7fb72ea0dad860954af1f96117143e))
+- Improved README documentation with better examples and installation instructions ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856f96afc09a2ad6887224ae94b1a7395))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-api@0.12.0) (2025-07-22)
 
 ### What's changed
