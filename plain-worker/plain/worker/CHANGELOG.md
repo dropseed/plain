@@ -1,5 +1,17 @@
 # plain-worker changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-worker@0.26.0) (2025-08-19)
+
+### What's changed
+
+- Improved CSRF token handling in admin forms by removing manual `csrf_input` in favor of automatic Sec-Fetch-Site header validation ([955150800c](https://github.com/dropseed/plain/commit/955150800c))
+- Enhanced README documentation with comprehensive examples, table of contents, and detailed sections covering job parameters, scheduling, monitoring, and FAQs ([4ebecd1856](https://github.com/dropseed/plain/commit/4ebecd1856))
+- Updated package description to be more descriptive: "Process background jobs with a database-driven worker" ([4ebecd1856](https://github.com/dropseed/plain/commit/4ebecd1856))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.1](https://github.com/dropseed/plain/releases/plain-worker@0.25.1) (2025-07-23)
 
 ### What's changed
