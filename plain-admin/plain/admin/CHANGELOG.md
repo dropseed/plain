@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.39.0](https://github.com/dropseed/plain/releases/plain-admin@0.39.0) (2025-08-19)
+
+### What's changed
+
+- CSRF protection has been improved to use Sec-Fetch-Site headers instead of manual token inputs in admin templates ([955150800c](https://github.com/dropseed/plain/commit/955150800c9ca9c7d00d27e9b2d0688aed252fad))
+- Manual `{{ csrf_input }}` tokens have been removed from admin delete and list action forms as they are no longer needed ([955150800c](https://github.com/dropseed/plain/commit/955150800c9ca9c7d00d27e9b2d0688aed252fad))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.38.1](https://github.com/dropseed/plain/releases/plain-admin@0.38.1) (2025-07-30)
 
 ### What's changed
