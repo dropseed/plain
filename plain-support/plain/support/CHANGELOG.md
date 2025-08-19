@@ -1,5 +1,17 @@
 # plain-support changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-support@0.15.0) (2025-08-19)
+
+### What's changed
+
+- Support forms now use Plain's new CSRF protection with `Sec-Fetch-Site` headers instead of CSRF tokens ([955150800c](https://github.com/dropseed/plain/commit/955150800c))
+- `SupportIFrameView` no longer inherits from `CsrfExemptViewMixin`, using path-based CSRF exemption instead ([2a50a9154e](https://github.com/dropseed/plain/commit/2a50a9154e))
+- Comprehensive README documentation updates with better structure, examples, and installation instructions ([4ebecd1856](https://github.com/dropseed/plain/commit/4ebecd1856))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.1](https://github.com/dropseed/plain/releases/plain-support@0.14.1) (2025-07-23)
 
 ### What's changed
