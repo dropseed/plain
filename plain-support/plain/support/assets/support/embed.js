@@ -55,8 +55,14 @@ if (!errorData) {
 }
 container.appendChild(error);
 
-// Keep track of whether the iframe has told us it is loaded
-let iframeLoaded = false;
+// Replace the simple boolean with timestamp tracking
+let iframeLoadStartTime = null;
+// Start the initial load attempt timer immediately
+// This catches both network hangs AND slow JS execution
+iframeLoadStartTime = Date.now();
+error.style.display = "none";
+loading.style.display = "flex";
+iframe.style.display = "none";
 
 // Listen for postMessage events from the iframe
 window.addEventListener("message", (event) => {
@@ -67,33 +73,34 @@ window.addEventListener("message", (event) => {
   if (event.data.type === "setHeight") {
     iframe.style.height = `${event.data.height}px`;
   } else if (event.data.type === "iframeLoaded") {
-    // The iframe has loaded, show it
-    iframe.style.display = "block";
-    loading.style.display = "none";
+    // Check if this message is for the current load attempt
+    if (iframeLoadStartTime && Date.now() - iframeLoadStartTime < 30000) {
+      // The iframe has loaded successfully within timeout window
+      iframe.style.display = "block";
+      loading.style.display = "none";
+      error.style.display = "none";
 
-    iframeLoaded = true;
-
-    error.style.display = "none";
-    loading.style.display = "none";
-    iframe.style.display = "block";
+      // Clear the load start time to indicate success
+      iframeLoadStartTime = null;
+    }
   }
 });
 
 iframe.onload = () => {
-  iframeLoaded = false; // Make sure subsequent loads are treated as new
-
-  error.style.display = "none";
-  loading.style.display = "flex";
-  iframe.style.display = "none";
-
-  // If the iframe hasn't send a loaded message after 10 seconds, render an error emssage
-  setTimeout(() => {
-    if (!iframeLoaded) {
-      error.style.display = "block";
-      loading.style.display = "none";
-      iframe.style.display = "none";
-    }
-  }, 10000);
+  // Reset timestamp when iframe loads successfully
+  iframeLoadStartTime = Date.now();
 };
 
 container.appendChild(iframe);
+
+// Set up timeout that runs regardless of iframe.onload
+const currentLoadTime = iframeLoadStartTime;
+setTimeout(() => {
+  // Only show error if this is still the current load attempt and it hasn't succeeded
+  if (iframeLoadStartTime === currentLoadTime) {
+    error.style.display = "block";
+    loading.style.display = "none";
+    iframe.style.display = "none";
+    iframeLoadStartTime = null; // Clear failed attempt
+  }
+}, 10000);
