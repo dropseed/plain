@@ -1,5 +1,16 @@
 # plain-pageviews changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.19.0) (2025-08-19)
+
+### What's changed
+
+- CSRF protection is no longer handled by `CsrfExemptViewMixin` ([2a50a91](https://github.com/dropseed/plain/commit/2a50a91))
+- Updated README documentation with improved formatting and installation instructions ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.18.1) (2025-07-23)
 
 ### What's changed
