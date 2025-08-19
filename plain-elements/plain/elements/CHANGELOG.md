@@ -1,5 +1,17 @@
 # plain-elements changelog
 
+## [0.9.0](https://github.com/dropseed/plain/releases/plain-elements@0.9.0) (2025-08-19)
+
+### What's changed
+
+- Updated package description from "HTML-style includes for Plain." to "Use HTML tags to include HTML template components." ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856f96afc09a2ad6887224ae94b1a7395))
+- Improved README structure with table of contents and better organization ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856f96afc09a2ad6887224ae94b1a7395))
+- Removed `{{ csrf_input }}` from form examples in documentation as CSRF protection is now handled automatically ([9551508](https://github.com/dropseed/plain/commit/955150800c9ca9c7d00d27e9b2d0688aed252fad))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.8.0](https://github.com/dropseed/plain/releases/plain-elements@0.8.0) (2025-07-23)
 
 ### What's changed

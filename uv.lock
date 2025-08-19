@@ -632,7 +632,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-elements"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "plain-elements" }
 dependencies = [
     { name = "plain" },
