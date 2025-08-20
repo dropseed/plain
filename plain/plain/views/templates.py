@@ -36,6 +36,12 @@ class TemplateView(View):
     def get_template(self) -> Template:
         template_names = self.get_template_names()
 
+        if isinstance(template_names, str):
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__}.get_template_names() must return a list of strings, "
+                f"not a string. Did you mean to return ['{template_names}']?"
+            )
+
         if not template_names:
             raise ImproperlyConfigured(
                 f"{self.__class__.__name__} requires a template_name or get_template_names()."
