@@ -8,6 +8,32 @@ from .forms import FormView
 from .templates import TemplateView
 
 
+class CreateView(FormView):
+    """
+    View for creating a new object, with a response rendered by a template.
+    """
+
+    # TODO? would rather you have to specify this...
+    def get_success_url(self, form):
+        """Return the URL to redirect to after processing a valid form."""
+        if self.success_url:
+            url = self.success_url.format(**self.object.__dict__)
+        else:
+            try:
+                url = self.object.get_absolute_url()
+            except AttributeError:
+                raise ImproperlyConfigured(
+                    "No URL to redirect to.  Either provide a url or define"
+                    " a get_absolute_url method on the Model."
+                )
+        return url
+
+    def form_valid(self, form):
+        """If the form is valid, save the associated model."""
+        self.object = form.save()
+        return super().form_valid(form)
+
+
 class ObjectTemplateViewMixin:
     context_object_name = ""
 
@@ -49,32 +75,6 @@ class DetailView(ObjectTemplateViewMixin, TemplateView):
     """
 
     pass
-
-
-class CreateView(FormView):
-    """
-    View for creating a new object, with a response rendered by a template.
-    """
-
-    # TODO? would rather you have to specify this...
-    def get_success_url(self, form):
-        """Return the URL to redirect to after processing a valid form."""
-        if self.success_url:
-            url = self.success_url.format(**self.object.__dict__)
-        else:
-            try:
-                url = self.object.get_absolute_url()
-            except AttributeError:
-                raise ImproperlyConfigured(
-                    "No URL to redirect to.  Either provide a url or define"
-                    " a get_absolute_url method on the Model."
-                )
-        return url
-
-    def form_valid(self, form):
-        """If the form is valid, save the associated model."""
-        self.object = form.save()
-        return super().form_valid(form)
 
 
 class UpdateView(ObjectTemplateViewMixin, FormView):
