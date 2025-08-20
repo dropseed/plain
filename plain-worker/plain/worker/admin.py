@@ -229,6 +229,5 @@ class JobResultViewset(AdminViewset):
         title = "Job result"
 
         def post(self):
-            self.load_object()
             self.object.retry_job(delay=0)
             return ResponseRedirect(".")

@@ -1,6 +1,8 @@
+from functools import cached_property
+
 from plain.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from plain.forms import Form
-from plain.http import Http404, Response
+from plain.http import Http404
 
 from .forms import FormView
 from .templates import TemplateView
@@ -9,19 +11,18 @@ from .templates import TemplateView
 class ObjectTemplateViewMixin:
     context_object_name = ""
 
-    def get(self) -> Response:
-        self.load_object()
-        return self.render_template()
-
-    def load_object(self) -> None:
+    @cached_property
+    def object(self):
         try:
-            self.object = self.get_object()
+            obj = self.get_object()
         except ObjectDoesNotExist:
             raise Http404
 
-        if not self.object:
+        if not obj:
             # Also raise 404 if the object is None
             raise Http404
+
+        return obj
 
     def get_object(self):  # Intentionally untyped... subclasses must override this.
         raise NotImplementedError(
@@ -50,22 +51,10 @@ class DetailView(ObjectTemplateViewMixin, TemplateView):
     pass
 
 
-class CreateView(ObjectTemplateViewMixin, FormView):
+class CreateView(FormView):
     """
     View for creating a new object, with a response rendered by a template.
     """
-
-    def post(self) -> Response:
-        """
-        Handle POST requests: instantiate a form instance with the passed
-        POST variables and then check if it's valid.
-        """
-        # Context expects self.object to exist
-        self.load_object()
-        return super().post()
-
-    def load_object(self) -> None:
-        self.object = None
 
     # TODO? would rather you have to specify this...
     def get_success_url(self, form):
@@ -91,14 +80,6 @@ class CreateView(ObjectTemplateViewMixin, FormView):
 class UpdateView(ObjectTemplateViewMixin, FormView):
     """View for updating an object, with a response rendered by a template."""
 
-    def post(self) -> Response:
-        """
-        Handle POST requests: instantiate a form instance with the passed
-        POST variables and then check if it's valid.
-        """
-        self.load_object()
-        return super().post()
-
     def get_success_url(self, form):
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
@@ -115,7 +96,7 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
 
     def form_valid(self, form):
         """If the form is valid, save the associated model."""
-        self.object = form.save()
+        form.save()
         return super().form_valid(form)
 
     def get_form_kwargs(self):
@@ -141,14 +122,6 @@ class DeleteView(ObjectTemplateViewMixin, FormView):
 
     form_class = EmptyDeleteForm
 
-    def post(self) -> Response:
-        """
-        Handle POST requests: instantiate a form instance with the passed
-        POST variables and then check if it's valid.
-        """
-        self.load_object()
-        return super().post()
-
     def get_form_kwargs(self):
         """Return the keyword arguments for instantiating the form."""
         kwargs = super().get_form_kwargs()
@@ -169,9 +142,9 @@ class ListView(TemplateView):
 
     context_object_name = ""
 
-    def get(self) -> Response:
-        self.objects = self.get_objects()
-        return super().get()
+    @cached_property
+    def objects(self):
+        return self.get_objects()
 
     def get_objects(self):
         raise NotImplementedError(
