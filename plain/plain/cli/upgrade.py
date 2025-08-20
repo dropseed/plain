@@ -158,6 +158,7 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
             "",
             "3. **Available tools:**",
             "   - Python shell: `uv run python`",
+            "   - If you have a subagents feature and there are more than three packages here, use subagents",
             "",
             "4. **Workflow:**",
             "   - Review changelog for each package → Apply changes → Move to next package",
