@@ -67,7 +67,7 @@
                 {% endfor %}
 
                 {% if is_admin_view|default(false) %}
-                <a href="/" class="hover:underline">Back to app</a>
+                <a href="/" class="hover:underline">Back to {{ app_name }}</a>
                 {% else %}
                 <a href="{{ url('admin:index') }}" class="hover:underline">Admin</a>
                 {% endif %}

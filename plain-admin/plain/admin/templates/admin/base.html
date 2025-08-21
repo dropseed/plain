@@ -166,15 +166,24 @@
             <div class="mt-8 flex flex-col text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-950/95 pl-3.5 pr-5">
                 <div class="flex items-center justify-between space-x-1.5">
                     <div class="flex items-center truncate">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-1.5 flex-shrink-0 bi bi-person-circle" viewBox="0 0 16 16">
-                            <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
-                            <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
-                        </svg>
+                        {% set gravatar_url = get_gravatar_url(request.user) %}
+                        {% if gravatar_url %}
+                            <img
+                                src="{{ gravatar_url }}"
+                                alt="{{ request.user }}"
+                                class="w-5 h-5 mr-1.5 flex-shrink-0 rounded-full"
+                            />
+                        {% else %}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 mr-1.5 flex-shrink-0 bi bi-person-circle" viewBox="0 0 16 16">
+                                <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                                <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                            </svg>
+                        {% endif %}
                         <span class="truncate">
                             {{ request.user }}
                         </span>
                     </div>
-                    <form method="POST" action="{{ url('logout') }}" class="flex items-center flex-shrink-0">
+                    <form method="POST" action="{{ url('logout') }}" class="flex items-center flex-shrink-0 ml-2">
                         <button type="submit" class="hover:text-white flex items-center" title="Log out">
                             <admin.Icon name="box-arrow-right" />
                         </button>

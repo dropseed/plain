@@ -17,6 +17,7 @@ class ToolbarExtension(InclusionTagExtension):
         else:
             cls = settings.ADMIN_TOOLBAR_CLASS
         context.vars["toolbar"] = cls(request=context["request"])
+        context.vars["app_name"] = settings.APP_NAME
         return context
 
 

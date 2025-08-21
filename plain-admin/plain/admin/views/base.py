@@ -8,6 +8,7 @@ from plain.views import (
     TemplateView,
 )
 
+from ..utils import get_gravatar_url
 from .registry import registry
 from .types import Img
 
@@ -62,6 +63,7 @@ class AdminView(AuthViewMixin, TemplateView):
         context["is_admin_view"] = True
         context["view_class"] = self.__class__
         context["app_name"] = settings.APP_NAME
+        context["get_gravatar_url"] = get_gravatar_url
         return context
 
     @classmethod
