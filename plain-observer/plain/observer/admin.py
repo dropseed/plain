@@ -16,8 +16,8 @@ from .models import Span, Trace
 class TraceViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Observer"
-        model = Trace
         nav_icon = "activity"
+        model = Trace
         fields = [
             "trace_id",
             "request_id",
@@ -40,8 +40,8 @@ class TraceViewset(AdminViewset):
 class SpanViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Observer"
-        model = Span
         nav_icon = "diagram-3"
+        model = Span
         fields = [
             "name",
             "kind",

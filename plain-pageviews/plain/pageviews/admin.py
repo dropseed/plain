@@ -21,8 +21,8 @@ class PageviewAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = Pageview
         nav_section = "Pageviews"
-        title = "Pageviews"
         nav_icon = "eye"
+        title = "Pageviews"
         fields = ["user_id", "url", "timestamp", "session_key"]
         search_fields = ["id", "user_id", "url", "session_key"]
         cards = [PageviewsTrendCard]

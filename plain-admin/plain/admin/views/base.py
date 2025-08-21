@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from plain.auth.views import AuthViewMixin
 from plain.urls import reverse
@@ -29,13 +29,13 @@ class AdminView(AuthViewMixin, TemplateView):
     # An explicit disabling of showing this url/page in the nav
     # which importantly effects the (future) recent pages list
     # so you can also use this for pages that can never be bookmarked
-    nav_section = ""
     nav_title = ""
+    nav_section = ""
     nav_icon = "app"
 
-    links: dict[str] = {}
+    links: dict[str, str] = {}
 
-    parent_view_class: "AdminView" = None
+    parent_view_class: Optional["AdminView"] = None
 
     template_name = "admin/page.html"
     cards: list["Card"] = []
@@ -91,17 +91,6 @@ class AdminView(AuthViewMixin, TemplateView):
         return parents
 
     @classmethod
-    def get_nav_section(cls) -> str | None:
-        if not cls.nav_section:
-            return cls.nav_section  # Could be None or ""
-
-        if cls.parent_view_class:
-            # Don't show child views by default
-            return None
-
-        return cls.nav_section
-
-    @classmethod
     def get_nav_title(cls) -> str:
         if cls.nav_title:
             return cls.nav_title
@@ -112,10 +101,6 @@ class AdminView(AuthViewMixin, TemplateView):
         raise NotImplementedError(
             f"Please set a title or nav_title on the {cls} class or implement get_nav_title()."
         )
-
-    @classmethod
-    def get_nav_icon(cls) -> str:
-        return cls.nav_icon
 
     @classmethod
     def get_view_url(cls, obj=None) -> str:

@@ -37,9 +37,9 @@ class ProvidersChartCard(ChartCard):
 class OAuthConnectionViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "OAuth"
+        nav_icon = "link-45deg"
         model = OAuthConnection
         title = "Connections"
-        nav_icon = "link-45deg"
         fields = ["id", "user", "provider_key", "provider_user_id"]
         cards = [ProvidersChartCard]
 

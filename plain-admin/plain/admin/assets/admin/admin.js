@@ -88,15 +88,35 @@ jQuery(($) => {
     updateActiveNav();
   });
 
-  // Simple navigation section toggle with slide animation
+  // Navigation section toggle with accordion behavior
   $(document).on("click", "[data-nav-toggle]", function (e) {
     e.preventDefault();
     const sectionId = $(this).data("nav-toggle");
     const $section = $(`#${sectionId}`);
     const $svg = $(this).find("svg").last();
+    const isCurrentlyOpen = $section.is(":visible");
 
-    $section.slideToggle(80);
-    $svg.toggleClass("rotate-180");
+    // Close all other sections in the same nav area
+    const navArea = $(this).closest("div").find("[data-nav-toggle]");
+    navArea.each(function () {
+      const otherSectionId = $(this).data("nav-toggle");
+      const $otherSection = $(`#${otherSectionId}`);
+      const $otherSvg = $(this).find("svg").last();
+
+      if (otherSectionId !== sectionId) {
+        $otherSection.slideUp(80);
+        $otherSvg.removeClass("rotate-180");
+      }
+    });
+
+    // Toggle the clicked section
+    if (isCurrentlyOpen) {
+      $section.slideUp(80);
+      $svg.removeClass("rotate-180");
+    } else {
+      $section.slideDown(80);
+      $svg.addClass("rotate-180");
+    }
   });
 
   function updateActiveNav() {

@@ -101,9 +101,9 @@ class RunningJobsCard(Card):
 class JobRequestViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
+        nav_icon = "gear"
         model = JobRequest
         title = "Job requests"
-        nav_icon = "clock-history"
         fields = ["id", "job_class", "priority", "created_at", "start_at", "unique_key"]
         actions = ["Delete"]
 
@@ -121,7 +121,6 @@ class JobViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
         model = Job
-        nav_icon = "play-circle"
         fields = [
             "id",
             "job_class",
@@ -150,7 +149,6 @@ class JobResultViewset(AdminViewset):
         nav_section = "Worker"
         model = JobResult
         title = "Job results"
-        nav_icon = "check-circle"
         fields = [
             "id",
             "job_class",

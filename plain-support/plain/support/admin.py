@@ -14,8 +14,8 @@ class SupportFormEntryAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = SupportFormEntry
         nav_section = "Support"
-        title = "Form entries"
         nav_icon = "headset"
+        title = "Form entries"
         fields = ["user", "email", "name", "form_slug", "created_at"]
 
     class DetailView(AdminModelDetailView):

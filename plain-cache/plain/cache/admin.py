@@ -11,9 +11,9 @@ from plain.cache.models import CachedItem
 class CachedItemViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Cache"
+        nav_icon = "archive"
         model = CachedItem
         title = "Cached items"
-        nav_icon = "archive"
         fields = [
             "key",
             "created_at",

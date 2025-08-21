@@ -1,6 +1,23 @@
 from plain.urls import path, reverse_lazy
 
 
+class NavSection:
+    def __init__(self, name: str, icon: str = "folder"):
+        self.name = name
+        self.icon = icon
+
+    def __str__(self):
+        return self.name
+
+    def __eq__(self, other):
+        if isinstance(other, NavSection):
+            return self.name == other.name
+        return self.name == other
+
+    def __hash__(self):
+        return hash(self.name)
+
+
 class AdminViewRegistry:
     def __init__(self):
         # View classes that will be added to the admin automatically
@@ -32,21 +49,31 @@ class AdminViewRegistry:
     def get_app_nav_sections(self):
         """Returns nav sections for app/user packages only."""
         sections = {}
+        section_icons = {}  # Track icons per section
 
         for view in self.registered_views:
             # Skip plain package views
             if view.__module__.startswith("plain."):
                 continue
 
-            section = view.get_nav_section()
+            section_name = view.nav_section
 
             # Skip views with nav_section = None (don't show in nav)
-            if section is None:
+            # But allow empty string "" for ungrouped items
+            if section_name is None:
                 continue
 
-            if section not in sections:
-                sections[section] = []
-            sections[section].append(view)
+            # Set section icon if this view defines one and we don't have one yet
+            if view.nav_icon and section_name not in section_icons:
+                section_icons[section_name] = view.nav_icon
+
+            # Create or get the NavSection
+            section_icon = section_icons.get(section_name, "folder")
+            nav_section = NavSection(section_name, section_icon)
+
+            if nav_section not in sections:
+                sections[nav_section] = []
+            sections[nav_section].append(view)
 
         # Sort each section by nav_title
         for section in sections.values():
@@ -54,7 +81,7 @@ class AdminViewRegistry:
 
         # Sort sections alphabetically, but put empty string first
         def section_sort_key(item):
-            section_name = item[0]
+            section_name = item[0].name
             return ("z" if section_name else "", section_name)
 
         return dict(sorted(sections.items(), key=section_sort_key))
@@ -62,27 +89,37 @@ class AdminViewRegistry:
     def get_plain_nav_sections(self):
         """Returns nav sections for plain packages only."""
         sections = {}
+        section_icons = {}  # Track icons per section
 
         for view in self.registered_views:
             # Only include plain package views
             if not view.__module__.startswith("plain."):
                 continue
 
-            section = view.get_nav_section()
+            section_name = view.nav_section
             # Skip views with nav_section = None (don't show in nav)
-            if section is None:
+            # But allow empty string "" for ungrouped items
+            if section_name is None:
                 continue
 
-            if section not in sections:
-                sections[section] = []
-            sections[section].append(view)
+            # Set section icon if this view defines one and we don't have one yet
+            if view.nav_icon and section_name not in section_icons:
+                section_icons[section_name] = view.nav_icon
+
+            # Create or get the NavSection
+            section_icon = section_icons.get(section_name, "folder")
+            nav_section = NavSection(section_name, section_icon)
+
+            if nav_section not in sections:
+                sections[nav_section] = []
+            sections[nav_section].append(view)
 
         # Sort each section by nav_title
         for section in sections.values():
             section.sort(key=lambda v: v.get_nav_title())
 
         # Sort sections alphabetically
-        return dict(sorted(sections.items()))
+        return dict(sorted(sections.items(), key=lambda item: item[0].name))
 
     def get_urls(self):
         urls = []
