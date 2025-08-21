@@ -40,7 +40,7 @@ class DevProcess(ProcessManager):
                         "name", project_name
                     )
 
-            hostname = f"{project_name}.localhost"
+            hostname = f"{project_name.lower()}.localhost"
 
         self.hostname = hostname
         self.log_level = log_level
