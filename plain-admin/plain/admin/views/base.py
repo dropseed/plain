@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Optional
 
 from plain.auth.views import AuthViewMixin
+from plain.runtime import settings
 from plain.urls import reverse
 from plain.utils import timezone
 from plain.views import (
@@ -60,6 +61,7 @@ class AdminView(AuthViewMixin, TemplateView):
         context["time_zone"] = timezone.get_current_timezone_name()
         context["is_admin_view"] = True
         context["view_class"] = self.__class__
+        context["app_name"] = settings.APP_NAME
         return context
 
     @classmethod

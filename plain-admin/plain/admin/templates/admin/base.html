@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
         {%- if title|default('') -%}
-            {{ title }} - Plain Admin
+            {{ title }} - {{ app_name }} Admin
         {%- else -%}
-            Plain Admin
+            {{ app_name }} Admin
         {%- endif -%}
     </title>
     {% tailwind_css %}
@@ -25,7 +25,7 @@
 
     <div class="lg:hidden fixed top-0 left-0 right-0 h-14 bg-stone-950 flex items-center justify-between px-3 z-40">
         <div class="flex items-center text-stone-400 text-sm">
-            <span class="font-semibold">Plain</span> <span class="font-normal ml-1">Admin</span>
+            <span class="font-semibold text-white">{{ app_name }}</span> <span class="font-normal ml-1">Admin</span>
         </div>
         <button type="button" data-toggle="#admin-sidebar,#admin-content" class="text-white/70">
             <admin.Icon name="list" class="w-6 h-6" />
@@ -41,7 +41,7 @@
             hx-preserve="true">
             <div class="flex-grow pl-4 pr-2 lg:pl-2 lg:pr-4">
                 <a href="{{ url('admin:index') }}" class="hidden lg:flex items-center text-base text-stone-300 hover:text-white h-14">
-                    <span class="font-normal text-stone-400 ml-1">Admin</span>
+                    <span class="font-semibold text-white">{{ app_name }}</span> <span class="font-normal text-stone-400 ml-1">Admin</span>
                 </a>
                 <form method="GET" action="{{ url('admin:search') }}" class="mb-4">
                     <div class="relative">
