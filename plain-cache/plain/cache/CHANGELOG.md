@@ -1,5 +1,16 @@
 # plain-cache changelog
 
+## [0.17.2](https://github.com/dropseed/plain/releases/plain-cache@0.17.2) (2025-08-22)
+
+### What's changed
+
+- Updated README.md with improved documentation structure and formatting ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+- Admin interface icon positioning updated to be on nav sections ([5a6479a](https://github.com/dropseed/plain/commit/5a6479ac79))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.1](https://github.com/dropseed/plain/releases/plain-cache@0.17.1) (2025-07-23)
 
 ### What's changed
