@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.3.7](https://github.com/dropseed/plain/releases/plain-observer@0.3.7) (2025-08-22)
+
+### What's changed
+
+- Improved admin interface code organization by reordering navigation icon and model field declarations ([5a6479a](https://github.com/dropseed/plain/commit/5a6479ac79))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.6](https://github.com/dropseed/plain/releases/plain-observer@0.3.6) (2025-07-31)
 
 ### What's changed
