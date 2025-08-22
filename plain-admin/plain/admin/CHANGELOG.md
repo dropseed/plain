@@ -1,5 +1,19 @@
 # plain-admin changelog
 
+## [0.40.0](https://github.com/dropseed/plain/releases/plain-admin@0.40.0) (2025-08-22)
+
+### What's changed
+
+- Navigation icons are now displayed on section headers instead of individual items, improving visual hierarchy and navigation organization ([5a6479ac79](https://github.com/dropseed/plain/commit/5a6479ac79b2a082a5d29a0b8cb0385401bad63b))
+- Admin interface now uses the configured `APP_NAME` setting instead of hard-coded "Plain" in titles and branding ([762c092652](https://github.com/dropseed/plain/commit/762c092652d53aa7922d03a3fcfb0d74a19ab8bd))
+- User avatars now display Gravatar images when available, falling back to the default person icon for users without email addresses ([b1303acf52](https://github.com/dropseed/plain/commit/b1303acf52934c121ec5390a050c192b55152a95))
+- Navigation sections now use accordion-style behavior, automatically closing other sections when one is opened ([5a6479ac79](https://github.com/dropseed/plain/commit/5a6479ac79b2a082a5d29a0b8cb0385401bad63b))
+- The toolbar "Back to app" link now dynamically shows the configured app name instead of a generic label ([b1303acf52](https://github.com/dropseed/plain/commit/b1303acf52934c121ec5390a050c192b55152a95))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.39.0](https://github.com/dropseed/plain/releases/plain-admin@0.39.0) (2025-08-19)
 
 ### What's changed
