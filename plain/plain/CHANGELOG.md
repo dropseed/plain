@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.59.0](https://github.com/dropseed/plain/releases/plain@0.59.0) (2025-08-22)
+
+### What's changed
+
+- Added new `APP_NAME` setting that defaults to the project name from `pyproject.toml` ([1a4d60e](https://github.com/dropseed/plain/commit/1a4d60e787))
+- Template views now validate that `get_template_names()` returns a list instead of a string ([428a64f](https://github.com/dropseed/plain/commit/428a64f8cc))
+- Object views now use cached properties for `.object` and `.objects` to improve performance ([bd0507a](https://github.com/dropseed/plain/commit/bd0507a72c))
+- Improved `plain upgrade` command to suggest using subagents when there are more than 3 package updates ([497c30d](https://github.com/dropseed/plain/commit/497c30d445))
+
+### Upgrade instructions
+
+- In object views, `self.load_object()` is no longer necessary as `self.object` is now a cached property.
+
 ## [0.58.0](https://github.com/dropseed/plain/releases/plain@0.58.0) (2025-08-19)
 
 ### What's changed
