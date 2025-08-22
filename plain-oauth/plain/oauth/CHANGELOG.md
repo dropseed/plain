@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.25.1](https://github.com/dropseed/plain/releases/plain-oauth@0.25.1) (2025-08-22)
+
+### What's changed
+
+- Updated admin navigation to place icons on sections rather than individual items ([5a6479a](https://github.com/dropseed/plain/commit/5a6479ac79))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-oauth@0.25.0) (2025-08-19)
 
 ### What's changed
