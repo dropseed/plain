@@ -198,6 +198,14 @@ class Job(metaclass=JobType):
         return "default"
 
     def get_priority(self) -> int:
+        """
+        Return the default priority for this job.
+
+        Higher numbers run first: 10 > 5 > 0 > -5 > -10
+        - Use positive numbers for high priority jobs
+        - Use negative numbers for low priority jobs
+        - Default is 0
+        """
         return 0
 
     def get_retries(self) -> int:

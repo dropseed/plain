@@ -72,7 +72,7 @@ When calling `run_in_worker()`, you can specify several parameters to control jo
 job.run_in_worker(
     queue="slow",  # Target a specific queue (default: "default")
     delay=60,  # Delay in seconds (or timedelta/datetime)
-    priority=10,  # Higher priority jobs run first (default: 0)
+    priority=10,  # Higher numbers run first (default: 0, use negatives for lower priority)
     retries=3,  # Number of retry attempts (default: 0)
     unique_key="user-123-welcome",  # Prevent duplicate jobs
 )
@@ -95,7 +95,9 @@ class MyJob(Job):
         return "default"
 
     def get_priority(self) -> int:
-        # Set the default priority (higher runs first)
+        # Set the default priority
+        # Higher numbers run first: 10 > 5 > 0 > -5 > -10
+        # Use positive numbers for high priority, negative for low priority
         return 0
 
     def get_retries(self) -> int:
