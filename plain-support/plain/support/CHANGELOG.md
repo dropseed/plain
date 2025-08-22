@@ -1,5 +1,16 @@
 # plain-support changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-support@0.16.0) (2025-08-22)
+
+### What's changed
+
+- Admin interface navigation icon is now properly positioned on the section when sections are present ([5a6479ac79](https://github.com/dropseed/plain/commit/5a6479ac79))
+- Improved iframe embed error state handling with better timeout logic and race condition prevention ([6bb1567a25](https://github.com/dropseed/plain/commit/6bb1567a25))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-support@0.15.0) (2025-08-19)
 
 ### What's changed
