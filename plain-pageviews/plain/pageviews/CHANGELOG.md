@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.19.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.19.1) (2025-08-22)
+
+### What's changed
+
+- Updated admin navigation to display icons on sections instead of individual items ([5a6479a](https://github.com/dropseed/plain/commit/5a6479a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.19.0) (2025-08-19)
 
 ### What's changed
