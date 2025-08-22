@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.12.2](https://github.com/dropseed/plain/releases/plain-pages@0.12.2) (2025-08-22)
+
+### What's changed
+
+- Enhanced markdown URL resolving to preserve query parameters and fragments when converting relative links to page URLs ([545b406](https://github.com/dropseed/plain/commit/545b406a22))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.1](https://github.com/dropseed/plain/releases/plain-pages@0.12.1) (2025-08-15)
 
 ### What's changed
