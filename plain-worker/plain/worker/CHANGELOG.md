@@ -1,5 +1,18 @@
 # plain-worker changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-worker@0.27.0) (2025-08-22)
+
+### What's changed
+
+- Added support for date and datetime job parameters with proper serialization/deserialization ([7bb5ab0911](https://github.com/dropseed/plain/commit/7bb5ab0911))
+- Improved job priority documentation to clarify that higher numbers run first ([73271b5bf0](https://github.com/dropseed/plain/commit/73271b5bf0))
+- Updated admin interface with consolidated navigation icons at the section level ([5a6479ac79](https://github.com/dropseed/plain/commit/5a6479ac79))
+- Enhanced admin views to use cached object properties for better performance ([bd0507a72c](https://github.com/dropseed/plain/commit/bd0507a72c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.26.0](https://github.com/dropseed/plain/releases/plain-worker@0.26.0) (2025-08-19)
 
 ### What's changed
