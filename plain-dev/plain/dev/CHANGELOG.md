@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.33.2](https://github.com/dropseed/plain/releases/plain-dev@0.33.2) (2025-08-22)
+
+### What's changed
+
+- The development localhost hostname is now automatically lowercased when generated from the pyproject.toml name ([4454f01](https://github.com/dropseed/plain/commit/4454f01787))
+- Updated README with improved structure, table of contents, and better installation instructions ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.33.1](https://github.com/dropseed/plain/releases/plain-dev@0.33.1) (2025-07-18)
 
 ### What's changed
