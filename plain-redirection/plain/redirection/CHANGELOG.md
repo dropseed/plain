@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-redirection@0.20.1) (2025-08-22)
+
+### What's changed
+
+- Admin navigation icons are now displayed on section headers instead of individual items for improved visual organization ([5a6479ac](https://github.com/dropseed/plain/commit/5a6479ac))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-redirection@0.20.0) (2025-08-19)
 
 ### What's changed
