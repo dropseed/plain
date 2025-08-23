@@ -1,8 +1,8 @@
 from plain.runtime import settings
 from plain.templates import register_template_extension, register_template_filter
 from plain.templates.jinja.extensions import InclusionTagExtension
-from plain.utils.module_loading import import_string
 
+from .toolbar import Toolbar
 from .views.registry import registry
 
 
@@ -12,11 +12,7 @@ class ToolbarExtension(InclusionTagExtension):
     template_name = "toolbar/toolbar.html"
 
     def get_context(self, context, *args, **kwargs):
-        if isinstance(settings.ADMIN_TOOLBAR_CLASS, str):
-            cls = import_string(settings.ADMIN_TOOLBAR_CLASS)
-        else:
-            cls = settings.ADMIN_TOOLBAR_CLASS
-        context.vars["toolbar"] = cls(request=context["request"])
+        context.vars["toolbar"] = Toolbar(request=context["request"])
         context.vars["app_name"] = settings.APP_NAME
         return context
 
