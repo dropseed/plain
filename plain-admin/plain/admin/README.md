@@ -178,23 +178,3 @@ class AppRouter(Router):
         # other urls...
     ]
 ```
-
-Typically you will also want to add the admin `{% toolbar %}` to the bottom of your base template. The toolbar will appear when `settings.DEBUG` or when `request.user.is_admin` (including in production!).
-
-```html
-<!-- app/templates/base.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,  initial-scale=1.0">
-    <title>{{ html_title|default("My App") }}</title>
-    {% tailwind_css %}
-</head>
-<body>
-    {% block content required %}{% endblock %}
-
-    {% toolbar %}
-</body>
-</html>
-```

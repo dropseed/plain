@@ -27,6 +27,7 @@ dependencies = [
     "plain-sessions",
     "plain-support",
     "plain-tailwind",
+    "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
     "plain-worker",

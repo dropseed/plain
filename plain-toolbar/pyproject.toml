@@ -1,0 +1,21 @@
+[project]
+name = "plain.toolbar"
+version = "0.0.0"
+description = "Debug toolbar for Plain applications"
+authors = [
+    {name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"},
+]
+license = "BSD-3-Clause"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "plain<1.0.0",
+    "plain.tailwind<1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

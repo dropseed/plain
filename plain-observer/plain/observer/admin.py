@@ -1,6 +1,3 @@
-from functools import cached_property
-
-from plain.admin.toolbar import ToolbarPanel, register_toolbar_panel
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -8,7 +5,6 @@ from plain.admin.views import (
     register_viewset,
 )
 
-from .core import Observer
 from .models import Span, Trace
 
 
@@ -81,20 +77,3 @@ class SpanViewset(AdminViewset):
 
     class DetailView(AdminModelDetailView):
         model = Span
-
-
-@register_toolbar_panel
-class ObserverToolbarPanel(ToolbarPanel):
-    name = "Observer"
-    template_name = "toolbar/observer.html"
-    button_template_name = "toolbar/observer_button.html"
-
-    @cached_property
-    def observer(self):
-        """Get the Observer instance for this request."""
-        return Observer(self.request)
-
-    def get_template_context(self):
-        context = super().get_template_context()
-        context["observer"] = self.observer
-        return context

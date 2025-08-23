@@ -29,6 +29,7 @@ members = [
     "plain-sessions",
     "plain-support",
     "plain-tailwind",
+    "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
     "plain-worker",
@@ -569,6 +570,7 @@ dependencies = [
     { name = "plain-sessions" },
     { name = "plain-support" },
     { name = "plain-tailwind" },
+    { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
     { name = "plain-worker" },
@@ -600,6 +602,7 @@ requires-dist = [
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
     { name = "plain-worker", editable = "plain-worker" },
@@ -946,6 +949,21 @@ requires-dist = [
 ]
 
 [[package]]
+name = "plain-toolbar"
+version = "0.0.0"
+source = { editable = "plain-toolbar" }
+dependencies = [
+    { name = "plain" },
+    { name = "plain-tailwind" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-tailwind", editable = "plain-tailwind" },
+]
+
+[[package]]
 name = "plain-tunnel"
 version = "0.5.5"
 source = { editable = "plain-tunnel" }
@@ -1031,6 +1049,7 @@ dev = [
     { name = "plain-sessions" },
     { name = "plain-support" },
     { name = "plain-tailwind" },
+    { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
     { name = "plain-worker" },
@@ -1064,6 +1083,7 @@ dev = [
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
     { name = "plain-worker", editable = "plain-worker" },

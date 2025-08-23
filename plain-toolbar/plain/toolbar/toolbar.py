@@ -6,6 +6,8 @@ from plain.templates import Template
 from plain.urls.exceptions import Resolver404
 from plain.utils.safestring import mark_safe
 
+from .registry import register_toolbar_panel, registry
+
 
 class Toolbar:
     def __init__(self, request):
@@ -19,7 +21,7 @@ class Toolbar:
         if hasattr(self.request, "impersonator"):
             return self.request.impersonator.is_admin
 
-        if self.request.user:
+        if hasattr(self.request, "user"):
             return self.request.user.is_admin
 
         return False
@@ -35,7 +37,7 @@ class Toolbar:
             return exception
 
     def get_panels(self):
-        panels = [panel(self.request) for panel in _toolbar_panel_registry.get_panels()]
+        panels = [panel(self.request) for panel in registry.get_panels()]
 
         if self.request_exception():
             exception = self.request_exception()
@@ -72,25 +74,6 @@ class ToolbarPanel:
         template = Template(self.button_template_name)
         context = self.get_template_context()
         return mark_safe(template.render(context))
-
-
-class _ToolbarPanelRegistry:
-    def __init__(self):
-        self._panels = {}
-
-    def register_panel(self, panel_class):
-        self._panels[panel_class.name] = panel_class
-
-    def get_panels(self):
-        return self._panels.values()
-
-
-_toolbar_panel_registry = _ToolbarPanelRegistry()
-
-
-def register_toolbar_panel(panel_class):
-    _toolbar_panel_registry.register_panel(panel_class)
-    return panel_class
 
 
 class _ExceptionToolbarPanel(ToolbarPanel):

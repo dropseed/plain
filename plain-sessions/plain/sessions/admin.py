@@ -1,4 +1,3 @@
-from plain.admin.toolbar import ToolbarPanel, register_toolbar_panel
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -7,12 +6,6 @@ from plain.admin.views import (
 )
 
 from .models import Session
-
-
-@register_toolbar_panel
-class SessionToolbarPanel(ToolbarPanel):
-    name = "Session"
-    template_name = "toolbar/session.html"
 
 
 @register_viewset

@@ -20,6 +20,7 @@ INSTALLED_PACKAGES = [
     "plain.sessions",
     "plain.support",
     "plain.tailwind",
+    "plain.toolbar",
     "plain.worker",
     "plain.redirection",
     "plain.observer",
