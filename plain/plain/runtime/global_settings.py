@@ -3,13 +3,15 @@ Default Plain settings. Override these with settings in the module pointed to
 by the PLAIN_SETTINGS_MODULE environment variable.
 """
 
-from .utils import get_app_name_from_pyproject
+from .utils import get_app_info_from_pyproject
 
 # MARK: Core Settings
 
 DEBUG: bool = False
 
-APP_NAME: str = get_app_name_from_pyproject()
+name, version = get_app_info_from_pyproject()
+APP_NAME: str = name
+APP_VERSION: str = version
 
 # List of strings representing installed packages.
 INSTALLED_PACKAGES: list[str] = []

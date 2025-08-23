@@ -10,7 +10,7 @@ from plain.utils.safestring import mark_safe
 class Toolbar:
     def __init__(self, request):
         self.request = request
-        self.version = settings.ADMIN_TOOLBAR_VERSION
+        self.version = settings.APP_VERSION
 
     def should_render(self):
         if settings.DEBUG:

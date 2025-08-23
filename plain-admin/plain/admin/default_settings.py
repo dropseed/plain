@@ -1,1 +1,0 @@
-ADMIN_TOOLBAR_VERSION: str = "dev"
