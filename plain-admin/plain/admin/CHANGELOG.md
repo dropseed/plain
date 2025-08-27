@@ -1,5 +1,21 @@
 # plain-admin changelog
 
+## [0.41.0](https://github.com/dropseed/plain/releases/plain-admin@0.41.0) (2025-08-27)
+
+### What's changed
+
+- Admin toolbar functionality has been moved to the new `plain-toolbar` package, separating concerns and allowing the toolbar to be used independently ([e49d54bf](https://github.com/dropseed/plain/commit/e49d54bfea162424c73e54bf7ed87e93442af899))
+- The `ADMIN_TOOLBAR_VERSION` setting has been replaced with the new global `APP_VERSION` setting ([57fb948d](https://github.com/dropseed/plain/commit/57fb948d465789a08c60b68ff71aa7edd671a571))
+- The `ADMIN_TOOLBAR_CLASS` setting has been removed in favor of direct toolbar class usage ([f6d8162c](https://github.com/dropseed/plain/commit/f6d8162c5bbc19172a8a4284b047251738f741c1))
+
+### Upgrade instructions
+
+- Install the new `plain-toolbar` package as a dependency: `uv add plain-toolbar`
+- Add `"plain.toolbar"` to your `INSTALLED_PACKAGES`
+- The `ADMIN_TOOLBAR_CLASS` setting has been removed
+- The `ADMIN_TOOLBAR_VERSION` setting has been replaced by `APP_VERSION`
+- Toolbar customizations should move from any `admin.py` files to `toolbar.py` files
+
 ## [0.40.0](https://github.com/dropseed/plain/releases/plain-admin@0.40.0) (2025-08-22)
 
 ### What's changed
