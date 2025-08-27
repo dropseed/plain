@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.60.0](https://github.com/dropseed/plain/releases/plain@0.60.0) (2025-08-27)
+
+### What's changed
+
+- Added new `APP_VERSION` setting that defaults to the project version from `pyproject.toml` ([57fb948d46](https://github.com/dropseed/plain/commit/57fb948d46))
+- Updated `get_app_name_from_pyproject()` to `get_app_info_from_pyproject()` to return both name and version ([57fb948d46](https://github.com/dropseed/plain/commit/57fb948d46))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.59.0](https://github.com/dropseed/plain/releases/plain@0.59.0) (2025-08-22)
 
 ### What's changed
