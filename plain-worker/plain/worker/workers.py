@@ -235,17 +235,25 @@ class Worker:
 def future_finished_callback(job_uuid: str, future: Future):
     if future.cancelled():
         logger.warning("Job cancelled job_uuid=%s", job_uuid)
-        job = Job.objects.get(uuid=job_uuid)
-        job.convert_to_result(status=JobResultStatuses.CANCELLED)
-    elif future.exception():
-        # This is an uncaught error in running process_job,
-        # which is likely an internal bug. Not sure if it should be marked as a failure and retried?
-        exception = future.exception()
-        logger.exception(
-            "process_job failed job_uuid=%s",
+        try:
+            job = Job.objects.get(uuid=job_uuid)
+            job.convert_to_result(status=JobResultStatuses.CANCELLED)
+        except Job.DoesNotExist:
+            # Job may have already been cleaned up
+            pass
+    elif exception := future.exception():
+        # Process pool may have been killed...
+        logger.warning(
+            "Job failed job_uuid=%s",
             job_uuid,
             exc_info=exception,
         )
+        try:
+            job = Job.objects.get(uuid=job_uuid)
+            job.convert_to_result(status=JobResultStatuses.CANCELLED)
+        except Job.DoesNotExist:
+            # Job may have already been cleaned up
+            pass
     else:
         logger.debug("Job finished job_uuid=%s", job_uuid)
 
