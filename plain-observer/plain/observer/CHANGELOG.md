@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-observer@0.4.0) (2025-08-27)
+
+### What's changed
+
+- Toolbar functionality has been moved to a new `plain.toolbar` package, with observer-specific toolbar code now in a dedicated `toolbar.py` file ([e49d54b](https://github.com/dropseed/plain/commit/e49d54bfea))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.7](https://github.com/dropseed/plain/releases/plain-observer@0.3.7) (2025-08-22)
 
 ### What's changed
