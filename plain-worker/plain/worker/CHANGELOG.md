@@ -1,5 +1,15 @@
 # plain-worker changelog
 
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-worker@0.27.1) (2025-08-27)
+
+### What's changed
+
+- Jobs are now marked as cancelled when the worker process is killed or fails unexpectedly ([e73ca53](https://github.com/dropseed/plain/commit/e73ca53c3d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-worker@0.27.0) (2025-08-22)
 
 ### What's changed
