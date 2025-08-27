@@ -1,5 +1,17 @@
 # plain-sessions changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-sessions@0.27.0) (2025-08-27)
+
+### What's changed
+
+- The toolbar panel for sessions has been moved to the new `plain.toolbar` package. A new `SessionToolbarPanel` is now available in `plain.sessions.toolbar` ([e49d54b](https://github.com/dropseed/plain/commit/e49d54bfea162424c73e54bf7ed87e93442af899))
+- The README has been significantly expanded with comprehensive documentation including usage examples, configuration options, and installation instructions ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856f96afc09a2ad6887224ae94b1a7395))
+- Updated the package description to "Database-backed sessions for managing user state across requests" ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856f96afc09a2ad6887224ae94b1a7395))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.26.1](https://github.com/dropseed/plain/releases/plain-sessions@0.26.1) (2025-07-23)
 
 ### What's changed
