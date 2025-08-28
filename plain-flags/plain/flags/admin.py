@@ -62,7 +62,7 @@ class FlagResultAdmin(AdminViewset):
         ]
         search_fields = ["flag__name", "key"]
         nav_section = "Feature flags"
-        nav_icon = "flag-fill"
+        nav_icon = "flag"
 
         def get_initial_queryset(self):
             return self.model.objects.all().select_related("flag")

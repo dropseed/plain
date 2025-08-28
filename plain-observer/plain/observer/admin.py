@@ -36,7 +36,7 @@ class TraceViewset(AdminViewset):
 class SpanViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Observer"
-        nav_icon = "diagram-3"
+        nav_icon = "activity"
         model = Span
         fields = [
             "name",

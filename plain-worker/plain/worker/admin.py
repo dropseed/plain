@@ -120,6 +120,7 @@ class JobRequestViewset(AdminViewset):
 class JobViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
+        nav_icon = "gear"
         model = Job
         fields = [
             "id",
@@ -147,6 +148,7 @@ class JobViewset(AdminViewset):
 class JobResultViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
+        nav_icon = "gear"
         model = JobResult
         title = "Job results"
         fields = [
