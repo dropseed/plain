@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.1.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.1.1) (2025-08-28)
+
+### What's changed
+
+- Improved null safety when checking user and impersonator attributes in toolbar rendering ([90568bd](https://github.com/dropseed/plain/commit/90568bdfa4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.1.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.1.0) (2025-08-27)
 
 ### What's changed
