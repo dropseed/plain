@@ -18,11 +18,11 @@ class Toolbar:
         if settings.DEBUG:
             return True
 
-        if hasattr(self.request, "impersonator"):
-            return self.request.impersonator.is_admin
+        if impersonator := getattr(self.request, "impersonator", None):
+            return getattr(impersonator, "is_admin", False)
 
-        if hasattr(self.request, "user"):
-            return self.request.user.is_admin
+        if user := getattr(self.request, "user", None):
+            return getattr(user, "is_admin", False)
 
         return False
 
