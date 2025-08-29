@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Any
 
 from plain.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from plain.forms import Form
@@ -38,19 +39,19 @@ class ObjectTemplateViewMixin:
     context_object_name = ""
 
     @cached_property
-    def object(self):
+    def object(self) -> Any:
         try:
             obj = self.get_object()
         except ObjectDoesNotExist:
             raise Http404
 
+        # Also raise 404 if get_object() returns None
         if not obj:
-            # Also raise 404 if the object is None
             raise Http404
 
         return obj
 
-    def get_object(self):  # Intentionally untyped... subclasses must override this.
+    def get_object(self) -> Any:
         raise NotImplementedError(
             f"get_object() is not implemented on {self.__class__.__name__}"
         )
