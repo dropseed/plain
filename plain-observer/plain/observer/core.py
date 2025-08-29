@@ -13,7 +13,8 @@ class Observer:
     """Central class for managing observer state and operations."""
 
     COOKIE_NAME = "observer"
-    COOKIE_DURATION = 60 * 60 * 24  # 1 day in seconds
+    SUMMARY_COOKIE_DURATION = 60 * 60 * 24 * 7  # 1 week in seconds
+    PERSIST_COOKIE_DURATION = 60 * 60 * 24  # 1 day in seconds
 
     def __init__(self, request):
         self.request = request
@@ -41,19 +42,25 @@ class Observer:
     def enable_summary_mode(self, response):
         """Enable summary mode (real-time monitoring, no DB export)."""
         response.set_signed_cookie(
-            self.COOKIE_NAME, ObserverMode.SUMMARY.value, max_age=self.COOKIE_DURATION
+            self.COOKIE_NAME,
+            ObserverMode.SUMMARY.value,
+            max_age=self.SUMMARY_COOKIE_DURATION,
         )
 
     def enable_persist_mode(self, response):
         """Enable full persist mode (real-time monitoring + DB export)."""
         response.set_signed_cookie(
-            self.COOKIE_NAME, ObserverMode.PERSIST.value, max_age=self.COOKIE_DURATION
+            self.COOKIE_NAME,
+            ObserverMode.PERSIST.value,
+            max_age=self.PERSIST_COOKIE_DURATION,
         )
 
     def disable(self, response):
         """Disable observer by setting cookie to disabled."""
         response.set_signed_cookie(
-            self.COOKIE_NAME, ObserverMode.DISABLED.value, max_age=self.COOKIE_DURATION
+            self.COOKIE_NAME,
+            ObserverMode.DISABLED.value,
+            max_age=self.PERSIST_COOKIE_DURATION,
         )
 
     def get_current_trace_summary(self):
