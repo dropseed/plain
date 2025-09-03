@@ -58,9 +58,14 @@ class DevGroup(click.Group):
             stderr=subprocess.DEVNULL,
         )
 
-        time.sleep(0.5)  # Give it a moment to start
+        # Give services time to start and retry the check
+        wait_times = [0.5, 1, 1]  # First check at 0.5s, then 1s intervals
+        for wait_time in wait_times:
+            time.sleep(wait_time)
+            if ServicesProcess.running_pid():
+                return  # Services started successfully
 
-        # If it's already dead, show the output and quit
+        # Only show error after multiple attempts
         if not ServicesProcess.running_pid():
             click.secho(
                 "Failed to start dev services. Here are the logs:",
