@@ -12,11 +12,25 @@ import click
     type=click.Choice(["ipython", "bpython", "python"]),
     help="Specify an interactive interpreter interface.",
 )
-def shell(interface):
+@click.option(
+    "-c",
+    "--command",
+    help="Execute the given command and exit.",
+)
+def shell(interface, command):
     """
     Runs a Python interactive interpreter. Tries to use IPython or
     bpython, if one of them is available.
     """
+
+    if command:
+        # Execute the command and exit
+        before_script = "import plain.runtime; plain.runtime.setup()"
+        full_command = f"{before_script}; {command}"
+        result = subprocess.run(["python", "-c", full_command])
+        if result.returncode:
+            sys.exit(result.returncode)
+        return
 
     if interface:
         interface = [interface]
