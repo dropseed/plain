@@ -1,5 +1,16 @@
 # plain-tailwind changelog
 
+## [0.13.3](https://github.com/dropseed/plain/releases/plain-tailwind@0.13.3) (2025-09-03)
+
+### What's changed
+
+- Comprehensive README update with improved documentation structure, table of contents, and detailed usage examples ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+- Added AGENTS.md file with guidance for conditional Tailwind styling using `data-` attributes ([df3edbf](https://github.com/dropseed/plain/commit/df3edbf0bd))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.13.2) (2025-07-07)
 
 ### What's changed
