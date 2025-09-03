@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-observer@0.5.0) (2025-09-03)
+
+### What's changed
+
+- Extended observer summary mode cookie duration from 1 day to 1 week for improved user experience ([bbe8a8a](https://github.com/dropseed/plain/commit/bbe8a8ad54))
+- Changed admin navigation icon for Spans from "diagram-3" to "activity" ([2aac07d](https://github.com/dropseed/plain/commit/2aac07de4e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-observer@0.4.0) (2025-08-27)
 
 ### What's changed
