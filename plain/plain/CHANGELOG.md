@@ -1,5 +1,19 @@
 # plain changelog
 
+## [0.61.0](https://github.com/dropseed/plain/releases/plain@0.61.0) (2025-09-03)
+
+### What's changed
+
+- Added new `plain agent` command with subcommands for coding agents including `docs`, `md`, and `request` ([df3edbf](https://github.com/dropseed/plain/commit/df3edbf0bd))
+- Added `-c` option to `plain shell` to execute commands and exit, similar to `python -c` ([5e67f0b](https://github.com/dropseed/plain/commit/5e67f0bcd8))
+- The `plain docs --llm` functionality has been moved to `plain agent docs` command ([df3edbf](https://github.com/dropseed/plain/commit/df3edbf0bd))
+- Removed the `plain help` command in favor of standard `plain --help` ([df3edbf](https://github.com/dropseed/plain/commit/df3edbf0bd))
+
+### Upgrade instructions
+
+- Replace `plain docs --llm` usage with `plain agent docs` command
+- Use `plain --help` instead of `plain help` command
+
 ## [0.60.0](https://github.com/dropseed/plain/releases/plain@0.60.0) (2025-08-27)
 
 ### What's changed
