@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.33.3](https://github.com/dropseed/plain/releases/plain-dev@0.33.3) (2025-09-03)
+
+### What's changed
+
+- Added retries to background service startup to improve reliability when services take longer to initialize ([e2b3a42](https://github.com/dropseed/plain/commit/e2b3a42313))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.33.2](https://github.com/dropseed/plain/releases/plain-dev@0.33.2) (2025-08-22)
 
 ### What's changed
