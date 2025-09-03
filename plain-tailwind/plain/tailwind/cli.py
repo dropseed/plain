@@ -95,5 +95,20 @@ def build(ctx, watch, minify):
     tailwind.invoke(*args, cwd=os.path.dirname(APP_PATH))
 
 
+@cli.command()
+def version():
+    """Show the installed Tailwind CSS version"""
+    tailwind = Tailwind()
+
+    if not tailwind.is_installed():
+        click.secho("Tailwind CSS is not installed", fg="red")
+        return
+
+    if installed_version := tailwind.get_installed_version():
+        click.echo(installed_version)
+    else:
+        click.secho("Could not determine Tailwind CSS version", fg="red")
+
+
 if __name__ == "__main__":
     cli()

@@ -68,16 +68,22 @@ class Tailwind:
             f.write("""@import "tailwindcss";\n@import "./.plain/tailwind.css";\n""")
 
     def needs_update(self) -> bool:
-        if not os.path.exists(self.version_lockfile_path):
+        locked_version = self.get_installed_version()
+        if not locked_version:
             return True
-
-        with open(self.version_lockfile_path) as f:
-            locked_version = f.read().strip()
 
         if locked_version != self.get_version_from_config():
             return True
 
         return False
+
+    def get_installed_version(self) -> str:
+        """Get the currently installed Tailwind version"""
+        if not os.path.exists(self.version_lockfile_path):
+            return ""
+
+        with open(self.version_lockfile_path) as f:
+            return f.read().strip()
 
     def get_version_from_config(self) -> str:
         pyproject_path = os.path.join(
