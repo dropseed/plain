@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.40.1](https://github.com/dropseed/plain/releases/plain-models@0.40.1) (2025-09-03)
+
+### What's changed
+
+- Internal documentation updates for agent commands ([df3edbf0bd](https://github.com/dropseed/plain/commit/df3edbf0bd))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.40.0](https://github.com/dropseed/plain/releases/plain-models@0.40.0) (2025-08-05)
 
 ### What's changed
