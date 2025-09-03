@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from .agent import prompt_agent
+from .agent.prompt import prompt_agent
 
 LOCK_FILE = Path("uv.lock")
 

@@ -6,12 +6,12 @@ from click.core import Command, Context
 import plain.runtime
 from plain.exceptions import ImproperlyConfigured
 
+from .agent import agent
 from .build import build
 from .changelog import changelog
 from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
-from .help import help_cmd
 from .install import install
 from .preflight import preflight_checks
 from .registry import cli_registry
@@ -28,6 +28,7 @@ def plain_cli():
     pass
 
 
+plain_cli.add_command(agent)
 plain_cli.add_command(docs)
 plain_cli.add_command(preflight_checks)
 plain_cli.add_command(create)
@@ -41,7 +42,6 @@ plain_cli.add_command(shell)
 plain_cli.add_command(run)
 plain_cli.add_command(install)
 plain_cli.add_command(upgrade)
-plain_cli.add_command(help_cmd)
 
 
 class CLIRegistryGroup(click.Group):

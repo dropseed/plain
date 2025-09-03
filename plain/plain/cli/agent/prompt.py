@@ -5,24 +5,19 @@ import subprocess
 import click
 
 
+def is_agent_environment():
+    """Check if we're running inside a coding agent."""
+    return bool(
+        os.environ.get("CLAUDECODE")
+        or os.environ.get("CODEX_SANDBOX")
+        or os.environ.get("CURSOR_ENVIRONMENT")
+    )
+
+
 def prompt_agent(
     prompt: str, agent_command: str | None = None, print_only: bool = False
 ) -> bool:
-    """
-    Run an agent command with the given prompt, or display the prompt for manual copying.
-
-    Args:
-        prompt: The prompt to send to the agent
-        agent_command: Optional command to run (e.g., "claude code"). If not provided,
-                      will check the PLAIN_AGENT_COMMAND environment variable.
-        print_only: If True, always print the prompt instead of running the agent
-
-    Returns:
-        True if the agent command succeeded (or no agent command was provided),
-        False if the agent command failed.
-    """
-    # Check if running inside an agent and just print the prompt if so
-    if os.environ.get("CLAUDECODE") or os.environ.get("CODEX_SANDBOX"):
+    if is_agent_environment():
         click.echo(prompt)
         return True
 

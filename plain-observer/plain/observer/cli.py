@@ -5,7 +5,7 @@ import urllib.request
 import click
 
 from plain.cli import register_cli
-from plain.cli.agent import prompt_agent
+from plain.cli.agent.prompt import prompt_agent
 from plain.observer.models import Span, Trace
 
 
