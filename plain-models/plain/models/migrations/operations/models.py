@@ -450,7 +450,6 @@ class AlterModelOptions(ModelOptionOperation):
         "base_manager_name",
         "default_manager_name",
         "default_related_name",
-        "get_latest_by",
         "ordering",
     ]
 

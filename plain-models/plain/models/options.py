@@ -25,7 +25,6 @@ DEFAULT_NAMES = (
     "db_table",
     "db_table_comment",
     "ordering",
-    "get_latest_by",
     "package_label",
     "models_registry",
     "default_related_name",
@@ -74,7 +73,6 @@ class Options:
         self.constraints = []
         self.object_name = None
         self.package_label = package_label
-        self.get_latest_by = None
         self.required_db_features = []
         self.required_db_vendor = None
         self.meta = meta
