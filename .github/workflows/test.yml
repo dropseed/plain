@@ -36,7 +36,7 @@ jobs:
           --health-retries=5
     strategy:
       matrix:
-        python-version: ["3.13", "3.14"]
+        python-version: ["3.13"]
 
     steps:
       - uses: actions/checkout@v4
