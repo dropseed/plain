@@ -4,7 +4,7 @@ version = "0.27.0"
 description = "Database-backed sessions for managing user state across requests."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "plain<1.0.0",
 ]

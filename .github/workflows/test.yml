@@ -36,42 +36,42 @@ jobs:
           --health-retries=5
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.13", "3.14"]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Install uv
-      uses: astral-sh/setup-uv@v2
-    - name: Set up Python
-      run: uv python install ${{ matrix.python-version }}
-    - name: Install system libraries for MySQL client build
-      run: |
-        sudo apt-get update -y
-        sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+      - name: Install system libraries for MySQL client build
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
 
-    - name: Test (SQLite)
-      run: ./scripts/test
-      env:
-        DATABASE_URL: "sqlite://:memory:"
+      - name: Test (SQLite)
+        run: ./scripts/test
+        env:
+          DATABASE_URL: "sqlite://:memory:"
 
-    - name: Test (PostgreSQL)
-      run: ./scripts/test
-      env:
-        DATABASE_URL: postgres://postgres:postgres@localhost:5432/plain
+      - name: Test (PostgreSQL)
+        run: ./scripts/test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/plain
 
-    - name: Test (MySQL)
-      run: ./scripts/test
-      env:
-        DATABASE_URL: mysql://root:mysql@127.0.0.1:3306/plain
+      - name: Test (MySQL)
+        run: ./scripts/test
+        env:
+          DATABASE_URL: mysql://root:mysql@127.0.0.1:3306/plain
 
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Install uv
-      uses: astral-sh/setup-uv@v2
-    - name: Set up Python
-      run: uv python install
-    - working-directory: plain-code
-      run: uv sync
-    - run: uv run --package plain-code --isolated plain-code check .
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+      - name: Set up Python
+        run: uv python install
+      - working-directory: plain-code
+        run: uv sync
+      - run: uv run --package plain-code --isolated plain-code check .

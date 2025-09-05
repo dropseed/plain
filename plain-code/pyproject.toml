@@ -4,7 +4,7 @@ version = "0.9.2"
 description = "Preconfigured code formatting and linting."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "plain<1.0.0",
     "ruff>=0.1.0",
