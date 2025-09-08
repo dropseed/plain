@@ -1,5 +1,6 @@
 import json
 import secrets
+from collections import Counter
 from datetime import UTC, datetime
 from functools import cached_property
 
@@ -81,31 +82,22 @@ class Trace(models.Model):
         return (self.end_time - self.start_time).total_seconds() * 1000
 
     def get_trace_summary(self, spans):
-        """Get a concise summary string for toolbar display.
-
-        Args:
-            spans: Optional list of span objects. If not provided, will query from database.
-        """
-
-        # Count database queries and track duplicates
-        query_counts = {}
-        db_queries = 0
-
+        # Count database queries with query text and track duplicates
+        query_texts = []
         for span in spans:
-            if span.attributes.get(db_attributes.DB_SYSTEM_NAME):
-                db_queries += 1
-                if query_text := span.attributes.get(db_attributes.DB_QUERY_TEXT):
-                    query_counts[query_text] = query_counts.get(query_text, 0) + 1
+            if query_text := span.attributes.get(db_attributes.DB_QUERY_TEXT):
+                query_texts.append(query_text)
 
-        # Count duplicate queries (queries that appear more than once)
-        duplicate_count = sum(count - 1 for count in query_counts.values() if count > 1)
+        query_counts = Counter(query_texts)
+        query_total = len(query_texts)
+        duplicate_count = sum(query_counts.values()) - len(query_counts)
 
         # Build summary: "n spans, n queries (n duplicates), Xms"
         parts = []
 
         # Queries count with duplicates
-        if db_queries > 0:
-            query_part = f"{db_queries} quer{'y' if db_queries == 1 else 'ies'}"
+        if query_total > 0:
+            query_part = f"{query_total} quer{'y' if query_total == 1 else 'ies'}"
             if duplicate_count > 0:
                 query_part += f" ({duplicate_count} duplicate{'' if duplicate_count == 1 else 's'})"
             parts.append(query_part)
