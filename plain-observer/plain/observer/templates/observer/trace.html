@@ -68,48 +68,55 @@
     </div>
 </header>
 <div class="space-y-2">
-    {% if trace.summary %}
-    <div>
+    <div class="flex items-center justify-between">
+        {% if trace.summary %}
         <span class="text-xs inline-flex items-center px-2 py-0.5 bg-white/10 text-white/80 rounded-md border border-white/10">
             {{ trace.summary }}
         </span>
+        {% else %}
+        <div></div>
+        {% endif %}
+        <div class="text-xs text-white/40">
+            <span class="text-white/30">Trace ID:</span> <span class="font-mono">{{ trace.trace_id }}</span>
+        </div>
+    </div>
+
+    {% if trace.request_id or trace.user_id or trace.session_id or trace.app_version %}
+    <div class="bg-white/5 rounded-lg border border-white/10 p-3">
+        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/70">
+            {% if trace.request_id %}
+            <div>
+                <span class="text-white/50">Request:</span> {{ trace.request_id }}
+            </div>
+            {% endif %}
+            {% if trace.user_id %}
+            <div>
+                <span class="text-white/50">User:</span> {{ trace.user_id }}
+            </div>
+            {% endif %}
+            {% if trace.session_id %}
+            <div>
+                <span class="text-white/50">Session:</span> {{ trace.session_id }}
+            </div>
+            {% endif %}
+            {% if trace.app_version %}
+            <div>
+                <span class="text-white/50">App Version:</span> {{ trace.app_version }}
+            </div>
+            {% endif %}
+        </div>
     </div>
     {% endif %}
-    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
-        <div>
-            <span class="text-white/50">Trace ID:</span> {{ trace.trace_id }}
-        </div>
-        <div>
-            <span class="text-white/50">Started:</span> {{ trace.start_time|localtime|strftime("%b %-d, %-I:%M %p") }}
-        </div>
-        <div>
-            <span class="text-white/50">Duration:</span> {{ "%.1f"|format(trace.duration_ms() or 0) }}ms
-        </div>
-        <div>
-            <span class="text-white/50">Spans:</span> {{ trace.spans.count() }}
-        </div>
-    </div>
-    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
-        {% if trace.request_id %}
-        <div>
-            <span class="text-white/50">Request:</span> {{ trace.request_id }}
-        </div>
-        {% endif %}
-        {% if trace.user_id %}
-        <div>
-            <span class="text-white/50">User:</span> {{ trace.user_id }}
-        </div>
-        {% endif %}
-        {% if trace.session_id %}
-        <div>
-            <span class="text-white/50">Session:</span> {{ trace.session_id }}
-        </div>
-        {% endif %}
-    </div>
 </div>
 
-<!-- Spans waterfall visualization -->
-<div class="mt-4 space-y-1 text-xs">
+<div class="mt-6">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-medium text-white/80">Spans ({{ trace.spans.count() }})</h3>
+        <div class="text-xs text-white/60">
+            <span class="text-white/50">Started:</span> {{ trace.start_time|localtime|strftime("%b %-d, %-I:%M %p") }}
+        </div>
+    </div>
+    <div class="space-y-1 text-xs">
     {% for span in trace.spans.all().annotate_spans() %}
 
     <!-- Calculate relative positioning for waterfall -->
@@ -379,6 +386,7 @@
     {% else %}
     <div>No spans...</div>
     {% endfor %}
+    </div>
 </div>
 
 <style>

@@ -1,7 +1,10 @@
 from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.semconv.attributes import service_attributes
 
 from plain.packages import PackageConfig, register_config
+from plain.runtime import settings
 
 from .otel import (
     ObserverCombinedSampler,
@@ -29,7 +32,13 @@ class Config(PackageConfig):
                 provider.add_span_processor(span_processor)
         else:
             # Start our own provider, new sampler, and span processor
-            provider = TracerProvider(sampler=sampler)
+            resource = Resource.create(
+                {
+                    service_attributes.SERVICE_NAME: settings.APP_NAME,
+                    service_attributes.SERVICE_VERSION: settings.APP_VERSION,
+                }
+            )
+            provider = TracerProvider(sampler=sampler, resource=resource)
             provider.add_span_processor(span_processor)
             trace.set_tracer_provider(provider)
 

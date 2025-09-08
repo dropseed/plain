@@ -12,10 +12,11 @@ from opentelemetry.semconv._incubating.attributes import (
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
 )
-from opentelemetry.semconv.attributes import db_attributes
+from opentelemetry.semconv.attributes import db_attributes, service_attributes
 from opentelemetry.trace import format_trace_id
 
 from plain import models
+from plain.runtime import settings
 from plain.urls import reverse
 from plain.utils import timezone
 
@@ -33,6 +34,8 @@ class Trace(models.Model):
     request_id = models.CharField(max_length=255, default="", required=False)
     session_id = models.CharField(max_length=255, default="", required=False)
     user_id = models.CharField(max_length=255, default="", required=False)
+    app_name = models.CharField(max_length=255, default="", required=False)
+    app_version = models.CharField(max_length=255, default="", required=False)
 
     # Shareable URL fields
     share_id = models.CharField(max_length=32, default="", required=False)
@@ -127,6 +130,8 @@ class Trace(models.Model):
         request_id = ""
         user_id = ""
         session_id = ""
+        app_name = ""
+        app_version = ""
 
         for span in spans:
             if not span.parent:
@@ -145,6 +150,15 @@ class Trace(models.Model):
             request_id = request_id or span_attrs.get("plain.request.id", "")
             user_id = user_id or span_attrs.get(user_attributes.USER_ID, "")
             session_id = session_id or span_attrs.get(session_attributes.SESSION_ID, "")
+
+            # Access Resource attributes if not found in span attributes
+            if resource := getattr(span, "resource", None):
+                app_name = app_name or resource.attributes.get(
+                    service_attributes.SERVICE_NAME, ""
+                )
+                app_version = app_version or resource.attributes.get(
+                    service_attributes.SERVICE_VERSION, ""
+                )
 
         # Convert timestamps
         start_time = (
@@ -166,6 +180,8 @@ class Trace(models.Model):
             request_id=request_id,
             user_id=user_id,
             session_id=session_id,
+            app_name=app_name or getattr(settings, "APP_NAME", ""),
+            app_version=app_version or getattr(settings, "APP_VERSION", ""),
             root_span_name=root_span.name if root_span else "",
         )
 
@@ -182,6 +198,8 @@ class Trace(models.Model):
             "request_id": self.request_id,
             "user_id": self.user_id,
             "session_id": self.session_id,
+            "app_name": self.app_name,
+            "app_version": self.app_version,
             "spans": spans,
         }
 
