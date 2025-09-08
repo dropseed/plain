@@ -207,8 +207,6 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
     # Action handling methods follow this format:
     # htmx_{method}_{action}
     def htmx_post_open(self):
-        self.object = self.get_object()
-
         if self.object.state != "closed":
             raise ValueError("Only a closed pull request can be opened")
 
@@ -221,8 +219,6 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         return self.render_to_response(context)
 
     def htmx_post_close(self):
-        self.object = self.get_object()
-
         if self.object.state != "open":
             raise ValueError("Only a open pull request can be closed")
 
@@ -233,8 +229,6 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         return self.render_to_response(context)
 
     def htmx_post_merge(self):
-        self.object = self.get_object()
-
         if self.object.state != "open":
             raise ValueError("Only a open pull request can be merged")
 
@@ -261,8 +255,6 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
 
     # You can also leave off the "plain-hx-action" attribute and just handle the HTTP method
     def htmx_delete(self):
-        self.object = self.get_object()
-
         self.object.delete()
 
         # Tell HTMX to do a client-side redirect when it receives the response
@@ -336,8 +328,6 @@ urlpatterns = [
 # views.py
 class PullRequestDetailView(HTMXViewMixin, DetailView):
   def htmx_post_update(self):
-      self.object = self.get_object()
-
       self.object.update()
 
       context = self.get_context(object=self.object)
