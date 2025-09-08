@@ -85,6 +85,9 @@
         <div>
             <span class="text-white/50">Duration:</span> {{ "%.1f"|format(trace.duration_ms() or 0) }}ms
         </div>
+        <div>
+            <span class="text-white/50">Spans:</span> {{ trace.spans.count() }}
+        </div>
     </div>
     <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
         {% if trace.request_id %}
