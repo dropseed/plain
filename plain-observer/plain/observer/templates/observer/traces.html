@@ -89,7 +89,7 @@
                                         {% endif %}
                                     </div>
                                     <div class="flex items-center gap-1.5 flex-shrink-0">
-                                        <span class="text-white/40 text-xs">{{ trace_item.start_time|localtime|strftime("%-I:%M %p") }}</span>
+                                        <span class="text-white/40 text-xs" title="{{ trace_item.start_time|localtime }}">{{ trace_item.start_time|timesince }} ago</span>
                                     </div>
                                 </div>
                                 <div class="mt-1 space-y-1">
