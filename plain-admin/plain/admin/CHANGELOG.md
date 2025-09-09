@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.41.1](https://github.com/dropseed/plain/releases/plain-admin@0.41.1) (2025-09-09)
+
+### What's changed
+
+- Admin list columns now truncate at a maximum width with proper text overflow handling for better readability on wide tables ([c0b8eab](https://github.com/dropseed/plain/commit/c0b8eabc29a5cffa8e2d7aaa1c90fe6c82fdc52b))
+- Fixed extra spacing at the bottom of admin pages from the old toolbar implementation ([d2c2c65](https://github.com/dropseed/plain/commit/d2c2c65ffe4fece15f01bab8b32eeaffacc37b1b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.0](https://github.com/dropseed/plain/releases/plain-admin@0.41.0) (2025-08-27)
 
 ### What's changed
