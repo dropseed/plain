@@ -11,4 +11,8 @@ The `plain` CLI is the main entrypoint for the framework. If `plain` is not avai
 - `plain agent docs <package>`: Show README.md and symbolicated source files for a specific package.
 - `plain agent docs --list`: List packages with docs available.
 - `plain agent request <path> --user <user_id>`: Make an authenticated request to the application and inspect the output.
-- `plain --help`: List all available commands (including those from installed packages)
+- `plain --help`: List all available commands (including those from installed packages).
+
+## Code style
+
+- Imports should be at the top of the file, unless there is a specific reason to import later (e.g. to avoid circular imports).
