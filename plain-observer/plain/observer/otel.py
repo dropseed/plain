@@ -10,6 +10,7 @@ from opentelemetry.semconv.attributes import url_attributes
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
 from plain.http.cookie import unsign_cookie_value
+from plain.logs.loggers import app_logger
 from plain.models.otel import suppress_db_tracing
 from plain.runtime import settings
 
@@ -233,6 +234,10 @@ class ObserverSpanProcessor(SpanProcessor):
 
             span_id = f"0x{format_span_id(span.get_span_context().span_id)}"
 
+            # Enable DEBUG logging only for PERSIST mode (when logs are captured)
+            if trace_info["mode"] == ObserverMode.PERSIST.value:
+                app_logger.debug_mode.start()
+
             # Store span (we know mode is truthy if we get here)
             trace_info["active_otel_spans"][span_id] = span
 
@@ -251,6 +256,10 @@ class ObserverSpanProcessor(SpanProcessor):
                 return
 
             trace_info = self._traces[trace_id]
+
+            # Disable DEBUG logging only for PERSIST mode spans
+            if trace_info["mode"] == ObserverMode.PERSIST.value:
+                app_logger.debug_mode.end()
 
             # Move span from active to completed
             if trace_info["active_otel_spans"].pop(span_id, None):
