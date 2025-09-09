@@ -3,10 +3,11 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.semconv.attributes import service_attributes
 
+from plain.logs.loggers import app_logger
 from plain.packages import PackageConfig, register_config
 from plain.runtime import settings
 
-from .logging import install_observer_log_handler
+from .logging import observer_log_handler
 from .otel import (
     ObserverCombinedSampler,
     ObserverSampler,
@@ -44,7 +45,8 @@ class Config(PackageConfig):
             trace.set_tracer_provider(provider)
 
         # Install the logging handler to capture logs during traces
-        install_observer_log_handler()
+        if observer_log_handler not in app_logger.handlers:
+            app_logger.addHandler(observer_log_handler)
 
     @staticmethod
     def get_existing_trace_provider():

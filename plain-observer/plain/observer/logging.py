@@ -15,7 +15,6 @@ class ObserverLogHandler(logging.Handler):
     def __init__(self, level=logging.NOTSET):
         super().__init__(level)
         self._logs_lock = threading.Lock()
-        # Store logs per trace_id
         self._trace_logs = {}  # trace_id -> list of log records
 
     def emit(self, record):
@@ -65,49 +64,11 @@ class ObserverLogHandler(logging.Handler):
             # Don't let logging errors break the application
             pass
 
-    def get_logs_for_trace(self, trace_id):
-        """Get all logs for a specific trace."""
+    def pop_logs_for_trace(self, trace_id):
+        """Get and remove all logs for a specific trace in one operation."""
         with self._logs_lock:
-            return self._trace_logs.get(trace_id, []).copy()
-
-    def clear_trace_logs(self, trace_id):
-        """Clear logs for a specific trace (called when trace completes)."""
-        with self._logs_lock:
-            self._trace_logs.pop(trace_id, None)
+            return self._trace_logs.pop(trace_id, []).copy()
 
 
 # Global instance of the log handler
-_observer_log_handler = None
-
-
-def get_observer_log_handler():
-    """Get the global observer log handler instance."""
-    global _observer_log_handler
-    if _observer_log_handler is None:
-        _observer_log_handler = ObserverLogHandler()
-    return _observer_log_handler
-
-
-def install_observer_log_handler():
-    """Install the observer log handler to the root logger."""
-    handler = get_observer_log_handler()
-
-    # Don't add if already installed
-    root_logger = logging.getLogger()
-    if handler not in root_logger.handlers:
-        root_logger.addHandler(handler)
-
-        # Also install on common app loggers
-        for logger_name in ["app", "plain"]:
-            logger_obj = logging.getLogger(logger_name)
-            if handler not in logger_obj.handlers:
-                logger_obj.addHandler(handler)
-
-
-def uninstall_observer_log_handler():
-    """Remove the observer log handler from the root logger."""
-    global _observer_log_handler
-    if _observer_log_handler:
-        root_logger = logging.getLogger()
-        if _observer_log_handler in root_logger.handlers:
-            root_logger.removeHandler(_observer_log_handler)
+observer_log_handler = ObserverLogHandler()

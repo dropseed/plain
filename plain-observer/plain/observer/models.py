@@ -193,7 +193,6 @@ class Trace(models.Model):
             {
                 "timestamp": log.timestamp.isoformat(),
                 "level": log.level,
-                "logger": log.logger,
                 "message": log.message,
                 "span_id": log.span_id,
             }
@@ -491,7 +490,6 @@ class Log(models.Model):
 
     timestamp = models.DateTimeField()
     level = models.CharField(max_length=20)
-    logger = models.CharField(max_length=255)
     message = models.TextField()
 
     class Meta:
@@ -510,7 +508,6 @@ class Log(models.Model):
             trace=trace,
             timestamp=datetime.fromtimestamp(record.created, tz=UTC),
             level=record.levelname,
-            logger=record.name,
             message=record.getMessage(),
             span=span,
         )

@@ -6,7 +6,6 @@
             </svg>
         </div>
         <span class="text-white/40 whitespace-nowrap tabular-nums" title="{{ log.timestamp|localtime }}">{{ log.timestamp|localtime|strftime("%-I:%M:%S %p") }}</span>
-        {% if log.logger != "app" %}<span class="font-mono text-white/60 whitespace-nowrap flex-shrink-0">{{ log.logger }}</span>{% endif %}
         <span class="font-mono px-1 py-0 text-xs font-medium rounded
                     data-[level='DEBUG']:text-stone-400
                     data-[level='INFO']:text-blue-400

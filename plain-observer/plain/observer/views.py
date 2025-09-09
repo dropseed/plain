@@ -101,9 +101,7 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
             log_lines = []
             for log in logs:
                 timestamp = log.timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")
-                log_lines.append(
-                    f"{timestamp} [{log.level}] {log.logger}: {log.message}"
-                )
+                log_lines.append(f"{timestamp} [{log.level}]: {log.message}")
 
             return Response("\n".join(log_lines), content_type="text/plain")
 

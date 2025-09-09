@@ -266,11 +266,13 @@ class ObserverSpanProcessor(SpanProcessor):
 
                 # Export if in persist mode
                 if trace_info["mode"] == ObserverMode.PERSIST.value:
-                    # Get logs for this trace
-                    from .logging import get_observer_log_handler
+                    # Get and remove logs for this trace
+                    from .logging import observer_log_handler
 
-                    log_handler = get_observer_log_handler()
-                    logs = log_handler.get_logs_for_trace(trace_id)
+                    if observer_log_handler:
+                        logs = observer_log_handler.pop_logs_for_trace(trace_id)
+                    else:
+                        logs = []
 
                     logger.debug(
                         "Exporting %d spans and %d logs for trace %s",
@@ -287,9 +289,6 @@ class ObserverSpanProcessor(SpanProcessor):
                         spans=trace_info["span_models"],
                         logs=logs,
                     )
-
-                    # Clean up logs for this trace
-                    log_handler.clear_trace_logs(trace_id)
 
                 # Clean up trace
                 del self._traces[trace_id]
