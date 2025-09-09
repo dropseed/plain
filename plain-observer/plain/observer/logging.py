@@ -75,16 +75,6 @@ class ObserverLogHandler(logging.Handler):
         with self._logs_lock:
             self._trace_logs.pop(trace_id, None)
 
-    def cleanup_old_traces(self, active_trace_ids):
-        """Remove logs for traces that are no longer active."""
-        with self._logs_lock:
-            # Keep only logs for active traces
-            self._trace_logs = {
-                trace_id: logs
-                for trace_id, logs in self._trace_logs.items()
-                if trace_id in active_trace_ids
-            }
-
 
 # Global instance of the log handler
 _observer_log_handler = None

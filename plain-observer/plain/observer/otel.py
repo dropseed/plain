@@ -219,19 +219,6 @@ class ObserverSpanProcessor(SpanProcessor):
                 trace_info = self._traces[trace_id]
                 trace_info["mode"] = mode
 
-                # Clean up old traces if too many
-                if len(self._traces) > 1000:
-                    # Remove oldest 100 traces
-                    oldest_ids = sorted(self._traces.keys())[:100]
-                    for old_id in oldest_ids:
-                        del self._traces[old_id]
-
-                    # Clean up logs for removed traces
-                    from .logging import get_observer_log_handler
-
-                    log_handler = get_observer_log_handler()
-                    log_handler.cleanup_old_traces(set(self._traces.keys()))
-
             span_id = f"0x{format_span_id(span.get_span_context().span_id)}"
 
             # Enable DEBUG logging only for PERSIST mode (when logs are captured)
