@@ -1,5 +1,23 @@
 # plain-observer changelog
 
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-observer@0.6.0) (2025-09-09)
+
+### What's changed
+
+- Added comprehensive log capture and display during trace recording, with logs shown in a unified timeline alongside spans ([9bfe938](https://github.com/dropseed/plain/commit/9bfe938f64))
+- Added new Log model with admin interface for managing captured log entries ([9bfe938](https://github.com/dropseed/plain/commit/9bfe938f64))
+- Observer now automatically enables debug logging during trace recording to capture more detailed information ([731196](https://github.com/dropseed/plain/commit/731196086f))
+- Added app_name and app_version fields to trace records for better application identification ([2870636](https://github.com/dropseed/plain/commit/2870636944))
+- Added span count display in trace detail views ([4d22c10](https://github.com/dropseed/plain/commit/4d22c1058d))
+- Enhanced database query counting to only include queries with actual query text, providing more accurate metrics ([3d102d3](https://github.com/dropseed/plain/commit/3d102d3796))
+- Improved trace limit cleanup logic to properly maintain the configured trace limit ([e9d124b](https://github.com/dropseed/plain/commit/e9d124bccd))
+- Added source code location attributes support for spans with file path, line number, and function information ([da36a17](https://github.com/dropseed/plain/commit/da36a17dab))
+- Updated Python version requirement to 3.13 minimum ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.5.0](https://github.com/dropseed/plain/releases/plain-observer@0.5.0) (2025-09-03)
 
 ### What's changed
