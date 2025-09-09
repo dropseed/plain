@@ -1,5 +1,16 @@
 # plain-htmx changelog
 
+## [0.10.1](https://github.com/dropseed/plain/releases/plain-htmx@0.10.1) (2025-09-09)
+
+### What's changed
+
+- Fixed documentation examples to remove unnecessary `self.object = self.get_object()` calls in HTMX action methods ([aa67cae](https://github.com/dropseed/plain/commit/aa67cae65c))
+- Updated minimum Python version requirement to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-htmx@0.10.0) (2025-08-19)
 
 ### What's changed
