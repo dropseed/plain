@@ -1,4 +1,5 @@
 import re
+import traceback
 from contextlib import contextmanager
 from typing import Any
 
@@ -7,6 +8,13 @@ from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
     DB_USER,
+)
+from opentelemetry.semconv.attributes.code_attributes import (
+    CODE_COLUMN_NUMBER,
+    CODE_FILE_PATH,
+    CODE_FUNCTION_NAME,
+    CODE_LINE_NUMBER,
+    CODE_STACKTRACE,
 )
 from opentelemetry.semconv.attributes.db_attributes import (
     DB_COLLECTION_NAME,
@@ -126,6 +134,8 @@ def db_span(db, sql: Any, *, many: bool = False, params=None):
         DB_OPERATION_NAME: operation,
     }
 
+    attrs.update(_get_code_attributes())
+
     # Add collection name if detected
     if collection_name:
         attrs[DB_COLLECTION_NAME] = collection_name
@@ -173,3 +183,43 @@ def suppress_db_tracing():
         yield
     finally:
         otel_context.detach(token)
+
+
+def _get_code_attributes():
+    """Extract code context attributes for the current database query.
+
+    Returns a dict of OpenTelemetry code attributes.
+    """
+    stack = traceback.extract_stack()
+
+    # Find the user code frame
+    for frame in reversed(stack):
+        filepath = frame.filename
+        if not filepath:
+            continue
+
+        if "/plain/models/" in filepath:
+            continue
+
+        if filepath.endswith("contextlib.py"):
+            continue
+
+        # Found user code - build attributes dict
+        attrs = {}
+
+        if filepath:
+            attrs[CODE_FILE_PATH] = filepath
+        if frame.lineno:
+            attrs[CODE_LINE_NUMBER] = frame.lineno
+        if frame.name:
+            attrs[CODE_FUNCTION_NAME] = frame.name
+        if frame.colno:
+            attrs[CODE_COLUMN_NUMBER] = frame.colno
+
+        # Add full stack trace only in DEBUG mode (expensive)
+        if settings.DEBUG:
+            attrs[CODE_STACKTRACE] = "".join(traceback.format_stack())
+
+        return attrs
+
+    return {}
