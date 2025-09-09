@@ -89,12 +89,23 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
         super().check_auth()
 
     def get(self):
-        """Return trace data as HTML or JSON based on content negotiation."""
+        """Return trace data as HTML, JSON, or logs based on content negotiation."""
         if (
             "application/json" in self.request.headers.get("Accept", "")
             or self.request.query_params.get("format") == "json"
         ):
-            return self.get_object().as_dict()
+            return self.object.as_dict()
+
+        if self.request.query_params.get("logs") == "true":
+            logs = self.object.logs.all().order_by("timestamp")
+            log_lines = []
+            for log in logs:
+                timestamp = log.timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")
+                log_lines.append(
+                    f"{timestamp} [{log.level}] {log.logger}: {log.message}"
+                )
+
+            return Response("\n".join(log_lines), content_type="text/plain")
 
         return super().get()
 
@@ -105,8 +116,7 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
         return super().get_template_names()
 
     def htmx_delete(self):
-        trace = self.get_object()
-        trace.delete()
+        self.object.delete()
 
         # Redirect to traces list after deletion
         response = Response(status_code=204)
@@ -114,13 +124,11 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
         return response
 
     def htmx_post_share(self):
-        trace = self.get_object()
-        trace.generate_share_id()
+        self.object.generate_share_id()
         return super().get()
 
     def htmx_delete_share(self):
-        trace = self.get_object()
-        trace.remove_share_id()
+        self.object.remove_share_id()
         return super().get()
 
 
@@ -144,6 +152,6 @@ class ObserverTraceSharedView(DetailView):
             "application/json" in self.request.headers.get("Accept", "")
             or self.request.query_params.get("format") == "json"
         ):
-            return JsonResponse(self.get_object().as_dict())
+            return JsonResponse(self.object.as_dict())
 
         return super().get()

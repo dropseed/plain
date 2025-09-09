@@ -22,11 +22,13 @@
             <aside class="fixed left-0 top-0 bottom-0 w-80 border-r border-white/10 flex flex-col">
                 <div class="flex-shrink-0 p-3 border-b border-white/10 z-10">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm text-white/90">Traces ({{ traces|length }})</h3>
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm text-white/90">Traces ({{ traces|length }})</h3>
                             {% if observer.is_persisting() %}
                             <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Recording"></div>
                             {% endif %}
+                        </div>
+                        <div class="flex items-center gap-2">
                             <select
                                 hx-put="."
                                 hx-trigger="change"
@@ -40,29 +42,42 @@
                                 <option disabled>───────</option>
                                 <option value="disable" {% if observer.is_disabled() %}selected{% endif %} class="text-white/50">Disabled</option>
                             </select>
-                            <button
-                                hx-get="."
-                                hx-swap="morph:innerHTML"
-                                hx-target="#main-content"
-                                class="h-8 w-8 flex items-center justify-center rounded-sm bg-white/10 text-white/70 hover:bg-white/20 cursor-pointer transition-colors"
-                                title="Refresh traces">
-                                <svg class="htmx-request:animate-spin w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-                                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                                    <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                                </svg>
-                            </button>
-                            <button
-                                hx-delete="."
-                                plain-hx-action="traces"
-                                hx-swap="morph:innerHTML"
-                                hx-target="#main-content"
-                                class="h-8 w-8 flex items-center justify-center rounded-sm bg-white/10 text-white/70 hover:bg-red-600 hover:text-white cursor-pointer transition-colors"
-                                title="Clear all traces">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
-                                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
-                                </svg>
-                            </button>
+                            <div class="relative group">
+                                <div class="flex items-center gap-2 hover:bg-white/10 rounded-lg p-1 transition-colors cursor-pointer">
+                                    <svg class="w-4 h-4 text-white/70" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                                    </svg>
+                                </div>
+                                <div class="absolute right-0 mt-3 w-48 bg-black rounded-lg shadow-lg border border-white/10 py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                                    <div class="py-1">
+                                        <button
+                                            hx-get="."
+                                            hx-swap="morph:innerHTML"
+                                            hx-target="#main-content"
+                                            class="cursor-pointer w-full text-left px-4 py-3 text-sm text-white/70 hover:bg-white/5 transition-colors flex items-center gap-3">
+                                            <svg class="htmx-request:animate-spin w-4 h-4 text-white/50" fill="currentColor" viewBox="0 0 16 16">
+                                                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                                                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                                            </svg>
+                                            <span class="htmx-request:hidden">Refresh Traces</span>
+                                            <span class="hidden htmx-request:inline">Refreshing...</span>
+                                        </button>
+                                        <button
+                                            hx-delete="."
+                                            plain-hx-action="traces"
+                                            hx-swap="morph:innerHTML"
+                                            hx-target="#main-content"
+                                            hx-confirm="Clear all traces?"
+                                            class="cursor-pointer w-full text-left px-4 py-3 text-sm text-red-200 hover:bg-red-900/20 transition-colors flex items-center gap-3">
+                                            <svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 16 16">
+                                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                                                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                                            </svg>
+                                            Clear All Traces
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

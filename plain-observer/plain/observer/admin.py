@@ -5,7 +5,7 @@ from plain.admin.views import (
     register_viewset,
 )
 
-from .models import Span, Trace
+from .models import Log, Span, Trace
 
 
 @register_viewset
@@ -77,3 +77,48 @@ class SpanViewset(AdminViewset):
 
     class DetailView(AdminModelDetailView):
         model = Span
+
+
+@register_viewset
+class LogViewset(AdminViewset):
+    class ListView(AdminModelListView):
+        nav_section = "Observer"
+        nav_icon = "activity"
+        model = Log
+        fields = [
+            "timestamp",
+            "level",
+            "logger",
+            "message",
+            "trace",
+            "span",
+        ]
+        queryset_order = ["-timestamp"]
+        allow_global_search = False
+        search_fields = ["logger", "message", "level"]
+        filters = ["level", "logger"]
+        actions = ["Delete selected", "Delete all"]
+
+        def perform_action(self, action: str, target_ids: list):
+            if action == "Delete selected":
+                Log.objects.filter(id__in=target_ids).delete()
+            elif action == "Delete all":
+                Log.objects.all().delete()
+
+        def get_objects(self):
+            return (
+                super()
+                .get_objects()
+                .select_related("trace", "span")
+                .only(
+                    "timestamp",
+                    "level",
+                    "logger",
+                    "message",
+                    "span__span_id",
+                    "trace__trace_id",
+                )
+            )
+
+    class DetailView(AdminModelDetailView):
+        model = Log

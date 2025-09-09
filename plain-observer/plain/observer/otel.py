@@ -225,6 +225,12 @@ class ObserverSpanProcessor(SpanProcessor):
                     for old_id in oldest_ids:
                         del self._traces[old_id]
 
+                    # Clean up logs for removed traces
+                    from .logging import get_observer_log_handler
+
+                    log_handler = get_observer_log_handler()
+                    log_handler.cleanup_old_traces(set(self._traces.keys()))
+
             span_id = f"0x{format_span_id(span.get_span_context().span_id)}"
 
             # Store span (we know mode is truthy if we get here)
@@ -264,16 +270,30 @@ class ObserverSpanProcessor(SpanProcessor):
 
                 # Export if in persist mode
                 if trace_info["mode"] == ObserverMode.PERSIST.value:
+                    # Get logs for this trace
+                    from .logging import get_observer_log_handler
+
+                    log_handler = get_observer_log_handler()
+                    logs = log_handler.get_logs_for_trace(trace_id)
+
                     logger.debug(
-                        "Exporting %d spans for trace %s",
+                        "Exporting %d spans and %d logs for trace %s",
                         len(trace_info["span_models"]),
+                        len(logs),
                         trace_id,
                     )
                     # The trace is done now, so we can get a more accurate summary
                     trace_info["trace"].summary = trace_info["trace"].get_trace_summary(
                         trace_info["span_models"]
                     )
-                    self._export_trace(trace_info["trace"], trace_info["span_models"])
+                    self._export_trace(
+                        trace=trace_info["trace"],
+                        spans=trace_info["span_models"],
+                        logs=logs,
+                    )
+
+                    # Clean up logs for this trace
+                    log_handler.clear_trace_logs(trace_id)
 
                 # Clean up trace
                 del self._traces[trace_id]
@@ -315,19 +335,38 @@ class ObserverSpanProcessor(SpanProcessor):
 
             return trace_info["trace"].get_trace_summary(span_models)
 
-    def _export_trace(self, trace, span_models):
-        """Export trace and spans to the database."""
-        from .models import Span, Trace
+    def _export_trace(self, *, trace, spans, logs):
+        """Export trace, spans, and logs to the database."""
+        from .models import Log, Span, Trace
 
         with suppress_db_tracing():
             try:
                 trace.save()
 
-                for span_model in span_models:
-                    span_model.trace = trace
+                for span in spans:
+                    span.trace = trace
 
                 # Bulk create spans
-                Span.objects.bulk_create(span_models)
+                Span.objects.bulk_create(spans)
+
+                # Create log models if we have logs
+                if logs:
+                    # Create a mapping of span_id to span_model
+                    span_id_to_model = {
+                        span_model.span_id: span_model for span_model in spans
+                    }
+
+                    log_models = []
+                    for log_entry in logs:
+                        log_model = Log.from_log_record(
+                            record=log_entry["record"],
+                            trace=trace,
+                            span=span_id_to_model.get(log_entry["span_id"]),
+                        )
+                        log_models.append(log_model)
+
+                    Log.objects.bulk_create(log_models)
+
             except Exception as e:
                 logger.warning(
                     "Failed to export trace to database: %s",

@@ -6,6 +6,7 @@ from opentelemetry.semconv.attributes import service_attributes
 from plain.packages import PackageConfig, register_config
 from plain.runtime import settings
 
+from .logging import install_observer_log_handler
 from .otel import (
     ObserverCombinedSampler,
     ObserverSampler,
@@ -41,6 +42,9 @@ class Config(PackageConfig):
             provider = TracerProvider(sampler=sampler, resource=resource)
             provider.add_span_processor(span_processor)
             trace.set_tracer_provider(provider)
+
+        # Install the logging handler to capture logs during traces
+        install_observer_log_handler()
 
     @staticmethod
     def get_existing_trace_provider():

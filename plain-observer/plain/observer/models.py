@@ -10,10 +10,20 @@ from opentelemetry.semconv._incubating.attributes import (
     session_attributes,
     user_attributes,
 )
+from opentelemetry.semconv._incubating.attributes.code_attributes import (
+    CODE_NAMESPACE,
+)
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
 )
 from opentelemetry.semconv.attributes import db_attributes, service_attributes
+from opentelemetry.semconv.attributes.code_attributes import (
+    CODE_COLUMN_NUMBER,
+    CODE_FILE_PATH,
+    CODE_FUNCTION_NAME,
+    CODE_LINE_NUMBER,
+    CODE_STACKTRACE,
+)
 from opentelemetry.trace import format_trace_id
 
 from plain import models
@@ -179,6 +189,16 @@ class Trace(models.Model):
 
     def as_dict(self):
         spans = [span.span_data for span in self.spans.all().order_by("start_time")]
+        logs = [
+            {
+                "timestamp": log.timestamp.isoformat(),
+                "level": log.level,
+                "logger": log.logger,
+                "message": log.message,
+                "span_id": log.span_id,
+            }
+            for log in self.logs.all().order_by("timestamp")
+        ]
 
         return {
             "trace_id": self.trace_id,
@@ -193,7 +213,47 @@ class Trace(models.Model):
             "app_name": self.app_name,
             "app_version": self.app_version,
             "spans": spans,
+            "logs": logs,
         }
+
+    def get_timeline_events(self):
+        """Get chronological list of spans and logs for unified timeline display."""
+        events = []
+
+        for span in self.spans.all().annotate_spans():
+            events.append(
+                {
+                    "type": "span",
+                    "timestamp": span.start_time,
+                    "instance": span,
+                    "span_level": span.level,
+                }
+            )
+
+            # Add logs for this span
+            for log in self.logs.filter(span=span):
+                events.append(
+                    {
+                        "type": "log",
+                        "timestamp": log.timestamp,
+                        "instance": log,
+                        "span_level": span.level + 1,
+                    }
+                )
+
+        # Add unlinked logs (logs without span)
+        for log in self.logs.filter(span__isnull=True):
+            events.append(
+                {
+                    "type": "log",
+                    "timestamp": log.timestamp,
+                    "instance": log,
+                    "span_level": 0,
+                }
+            )
+
+        # Sort by timestamp
+        return sorted(events, key=lambda x: x["timestamp"])
 
 
 class SpanQuerySet(models.QuerySet):
@@ -349,6 +409,29 @@ class Span(models.Model):
 
         return query_params
 
+    @cached_property
+    def source_code_location(self):
+        """Get the source code location attributes from this span."""
+        if not self.attributes:
+            return None
+
+        # Look for common semantic convention code attributes
+        code_attrs = {}
+        code_attribute_mappings = {
+            CODE_FILE_PATH: "File",
+            CODE_LINE_NUMBER: "Line",
+            CODE_FUNCTION_NAME: "Function",
+            CODE_NAMESPACE: "Namespace",
+            CODE_COLUMN_NUMBER: "Column",
+            CODE_STACKTRACE: "Stacktrace",
+        }
+
+        for attr_key, display_name in code_attribute_mappings.items():
+            if attr_key in self.attributes:
+                code_attrs[display_name] = self.attributes[attr_key]
+
+        return code_attrs if code_attrs else None
+
     def get_formatted_sql(self):
         """Get the pretty-formatted SQL query if this span contains one."""
         sql = self.sql_query
@@ -393,3 +476,41 @@ class Span(models.Model):
                     exception_attributes.EXCEPTION_STACKTRACE
                 )
         return None
+
+
+@models.register_model
+class Log(models.Model):
+    trace = models.ForeignKey(Trace, on_delete=models.CASCADE, related_name="logs")
+    span = models.ForeignKey(
+        Span,
+        on_delete=models.SET_NULL,
+        allow_null=True,
+        required=False,
+        related_name="logs",
+    )
+
+    timestamp = models.DateTimeField()
+    level = models.CharField(max_length=20)
+    logger = models.CharField(max_length=255)
+    message = models.TextField()
+
+    class Meta:
+        ordering = ["timestamp"]
+        indexes = [
+            models.Index(fields=["trace", "timestamp"]),
+            models.Index(fields=["trace", "span"]),
+            models.Index(fields=["timestamp"]),
+            models.Index(fields=["trace"]),
+        ]
+
+    @classmethod
+    def from_log_record(cls, *, record, trace, span):
+        """Create a Log instance from a Python log record."""
+        return cls(
+            trace=trace,
+            timestamp=datetime.fromtimestamp(record.created, tz=UTC),
+            level=record.levelname,
+            logger=record.name,
+            message=record.getMessage(),
+            span=span,
+        )
