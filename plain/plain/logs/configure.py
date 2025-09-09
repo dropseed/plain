@@ -15,12 +15,12 @@ def configure_logging(logging_settings):
         },
         "handlers": {
             "plain_console": {
-                "level": environ.get("PLAIN_LOG_LEVEL", "INFO"),
+                "level": "DEBUG",
                 "class": "logging.StreamHandler",
                 "formatter": "simple",
             },
             "app_console": {
-                "level": environ.get("APP_LOG_LEVEL", "INFO"),
+                "level": "DEBUG",
                 "class": "logging.StreamHandler",
                 "formatter": "simple",
             },
