@@ -1,5 +1,17 @@
 # plain-worker changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-worker@0.28.0) (2025-09-09)
+
+### What's changed
+
+- Improved logging middleware to use context manager pattern for cleaner job context handling ([ea7c953](https://github.com/dropseed/plain/commit/ea7c9537e3))
+- Updated minimum Python requirement to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+- Added explicit nav_icon definitions to admin views to ensure consistent icon display ([2aac07d](https://github.com/dropseed/plain/commit/2aac07de4e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.1](https://github.com/dropseed/plain/releases/plain-worker@0.27.1) (2025-08-27)
 
 ### What's changed
