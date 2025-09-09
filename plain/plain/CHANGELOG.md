@@ -7,14 +7,10 @@
 - Complete rewrite of logging settings and AppLogger with improved formatters and debug capabilities ([ea7c953](https://github.com/dropseed/plain/commit/ea7c9537e3))
 - Added `app_logger.debug_mode()` context manager to temporarily change log level ([f535459](https://github.com/dropseed/plain/commit/f53545f9fa))
 - Minimum Python version updated to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
-- Removed `earliest()`, `latest()`, and `get_latest_by()` methods from querysets ([b6093a8](https://github.com/dropseed/plain/commit/b6093a8e5d))
-- Removed automatic ordering in `first()` and `last()` queryset methods for improved performance ([adc19a6](https://github.com/dropseed/plain/commit/adc19a69e6))
 
 ### Upgrade instructions
 
 - Make sure you are using Python 3.13 or higher
-- Replace usage of `earliest()`, `latest()`, and model `Meta` `get_latest_by` queryset methods with equivalent `order_by().first()` or `order_by().last()` calls
-- The `first()` and `last()` methods no longer automatically add ordering by `id` - explicitly add `.order_by()` to your querysets or `ordering` to your models `Meta` class if needed
 
 ## [0.61.0](https://github.com/dropseed/plain/releases/plain@0.61.0) (2025-09-03)
 

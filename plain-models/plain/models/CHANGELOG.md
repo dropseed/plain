@@ -1,5 +1,19 @@
 # plain-models changelog
 
+## [0.41.0](https://github.com/dropseed/plain/releases/plain-models@0.41.0) (2025-09-09)
+
+### What's changed
+
+- Python 3.13 is now the minimum required version ([d86e307](https://github.com/dropseed/plain/commit/d86e307))
+- Removed the `earliest()`, `latest()`, and `get_latest_by` model meta option - use `order_by().first()` and `order_by().last()` instead ([b6093a8](https://github.com/dropseed/plain/commit/b6093a8))
+- Removed automatic ordering in `first()` and `last()` queryset methods - they now respect the existing queryset ordering without adding default ordering ([adc19a6](https://github.com/dropseed/plain/commit/adc19a6))
+- Added code location attributes to database operation tracing, showing the source file, line number, and function where the query originated ([da36a17](https://github.com/dropseed/plain/commit/da36a17))
+
+### Upgrade instructions
+
+- Replace usage of `earliest()`, `latest()`, and model `Meta` `get_latest_by` queryset methods with equivalent `order_by().first()` or `order_by().last()` calls
+- The `first()` and `last()` methods no longer automatically add ordering by `id` - explicitly add `.order_by()` to your querysets or `ordering` to your models `Meta` class if needed
+
 ## [0.40.1](https://github.com/dropseed/plain/releases/plain-models@0.40.1) (2025-09-03)
 
 ### What's changed
