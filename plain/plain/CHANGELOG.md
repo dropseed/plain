@@ -7,10 +7,12 @@
 - Complete rewrite of logging settings and AppLogger with improved formatters and debug capabilities ([ea7c953](https://github.com/dropseed/plain/commit/ea7c9537e3))
 - Added `app_logger.debug_mode()` context manager to temporarily change log level ([f535459](https://github.com/dropseed/plain/commit/f53545f9fa))
 - Minimum Python version updated to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+- Removed `app_logger.kv` in favor of context kwargs ([ea7c953](https://github.com/dropseed/plain/commit/ea7c9537e3))
 
 ### Upgrade instructions
 
 - Make sure you are using Python 3.13 or higher
+- Replace any `app_logger.kv.info("message", key=value)` calls with `app_logger.info("message", key=value)` or appropriate log level
 
 ## [0.61.0](https://github.com/dropseed/plain/releases/plain@0.61.0) (2025-09-03)
 
