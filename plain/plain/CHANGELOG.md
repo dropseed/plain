@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.62.1](https://github.com/dropseed/plain/releases/plain@0.62.1) (2025-09-09)
+
+### What's changed
+
+- Added clarification about `app_logger.kv` removal to 0.62.0 changelog ([106636f](https://github.com/dropseed/plain/commit/106636fca6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.62.0](https://github.com/dropseed/plain/releases/plain@0.62.0) (2025-09-09)
 
 ### What's changed
