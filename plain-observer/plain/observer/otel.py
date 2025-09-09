@@ -387,8 +387,11 @@ class ObserverSpanProcessor(SpanProcessor):
             if settings.OBSERVER_TRACE_LIMIT > 0:
                 try:
                     if Trace.objects.count() > settings.OBSERVER_TRACE_LIMIT:
+                        excess_count = (
+                            Trace.objects.count() - settings.OBSERVER_TRACE_LIMIT
+                        )
                         delete_ids = Trace.objects.order_by("start_time")[
-                            : settings.OBSERVER_TRACE_LIMIT
+                            :excess_count
                         ].values_list("id", flat=True)
                         Trace.objects.filter(id__in=delete_ids).delete()
                 except Exception as e:
