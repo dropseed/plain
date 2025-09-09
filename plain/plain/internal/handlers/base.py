@@ -5,7 +5,7 @@ from opentelemetry import baggage, trace
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
 
 from plain.exceptions import ImproperlyConfigured
-from plain.logs import log_response
+from plain.logs.utils import log_response
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string

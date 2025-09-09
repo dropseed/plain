@@ -3,7 +3,7 @@ import re
 from urllib.parse import urlparse
 
 from plain.exceptions import DisallowedHost
-from plain.logs import log_response
+from plain.logs.utils import log_response
 from plain.runtime import settings
 
 from .views import CsrfFailureView

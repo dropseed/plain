@@ -1,44 +1,36 @@
 import logging
-import logging.config
-from os import environ
+
+from .formatters import JSONFormatter, KeyValueFormatter
 
 
-def configure_logging(logging_settings):
-    # Load the defaults
-    default_logging = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "simple": {
-                "format": "[%(levelname)s] %(message)s",
-            },
-        },
-        "handlers": {
-            "plain_console": {
-                "level": "DEBUG",
-                "class": "logging.StreamHandler",
-                "formatter": "simple",
-            },
-            "app_console": {
-                "level": "DEBUG",
-                "class": "logging.StreamHandler",
-                "formatter": "simple",
-            },
-        },
-        "loggers": {
-            "plain": {
-                "handlers": ["plain_console"],
-                "level": environ.get("PLAIN_LOG_LEVEL", "INFO"),
-            },
-            "app": {
-                "handlers": ["app_console"],
-                "level": environ.get("APP_LOG_LEVEL", "INFO"),
-                "propagate": False,
-            },
-        },
-    }
-    logging.config.dictConfig(default_logging)
+def configure_logging(*, plain_log_level, app_log_level, app_log_format):
+    # Create and configure the plain logger (uses standard Logger, not AppLogger)
+    plain_logger = logging.Logger("plain")
+    plain_logger.setLevel(plain_log_level)
+    plain_handler = logging.StreamHandler()
+    plain_handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+    plain_logger.addHandler(plain_handler)
+    plain_logger.propagate = False
+    logging.root.manager.loggerDict["plain"] = plain_logger
 
-    # Then customize it from settings
-    if logging_settings:
-        logging.config.dictConfig(logging_settings)
+    # Configure the existing app_logger
+    from .loggers import app_logger
+
+    app_logger.setLevel(app_log_level)
+    app_logger.propagate = False
+
+    app_handler = logging.StreamHandler()
+    match app_log_format:
+        case "json":
+            app_handler.setFormatter(JSONFormatter("%(json)s"))
+        case "keyvalue":
+            app_handler.setFormatter(
+                KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s")
+            )
+        case _:
+            app_handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+
+    app_logger.addHandler(app_handler)
+
+    # Register the app_logger in the logging system so getLogger("app") returns it
+    logging.root.manager.loggerDict["app"] = app_logger

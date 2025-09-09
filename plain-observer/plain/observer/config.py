@@ -3,7 +3,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.semconv.attributes import service_attributes
 
-from plain.logs.loggers import app_logger
+from plain.logs import app_logger
 from plain.packages import PackageConfig, register_config
 from plain.runtime import settings
 

@@ -12,7 +12,7 @@ from plain.exceptions import (
 )
 from plain.http import Http404, ResponseServerError
 from plain.http.multipartparser import MultiPartParserError
-from plain.logs import log_response
+from plain.logs.utils import log_response
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views.errors import ErrorView

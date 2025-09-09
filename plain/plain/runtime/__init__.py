@@ -3,6 +3,9 @@ import sys
 from importlib.metadata import entry_points
 from pathlib import Path
 
+from plain.logs.configure import configure_logging
+from plain.packages import packages_registry
+
 from .user_settings import Settings
 
 try:
@@ -48,9 +51,6 @@ def setup():
     for entry_point in entry_points().select(group="plain.setup"):
         entry_point.load()()
 
-    from plain.logs import configure_logging
-    from plain.packages import packages_registry
-
     if not APP_PATH.exists():
         raise AppPathNotFound(
             "No app directory found. Are you sure you're in a Plain project?"
@@ -62,7 +62,11 @@ def setup():
     if APP_PATH.parent.as_posix() not in sys.path:
         sys.path.insert(0, APP_PATH.parent.as_posix())
 
-    configure_logging(settings.LOGGING)
+    configure_logging(
+        plain_log_level=settings.PLAIN_LOG_LEVEL,
+        app_log_level=settings.APP_LOG_LEVEL,
+        app_log_format=settings.APP_LOG_FORMAT,
+    )
 
     packages_registry.populate(settings.INSTALLED_PACKAGES)
 

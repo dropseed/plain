@@ -10,7 +10,7 @@ from opentelemetry.semconv.attributes import url_attributes
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
 from plain.http.cookie import unsign_cookie_value
-from plain.logs.loggers import app_logger
+from plain.logs import app_logger
 from plain.models.otel import suppress_db_tracing
 from plain.runtime import settings
 
