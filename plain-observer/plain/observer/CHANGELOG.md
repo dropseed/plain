@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.6.2](https://github.com/dropseed/plain/releases/plain-observer@0.6.2) (2025-09-09)
+
+### What's changed
+
+- Improved traces sidebar layout by simplifying the display structure and making better use of space ([da789d19](https://github.com/dropseed/plain/commit/da789d1926))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.6.1](https://github.com/dropseed/plain/releases/plain-observer@0.6.1) (2025-09-09)
 
 ### What's changed
