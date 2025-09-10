@@ -353,9 +353,11 @@ class ObserverSpanProcessor(SpanProcessor):
 
                     log_models = []
                     for log_entry in logs:
-                        log_model = Log.from_log_record(
-                            record=log_entry["record"],
+                        log_model = Log(
                             trace=trace,
+                            timestamp=log_entry["timestamp"],
+                            level=log_entry["level"],
+                            message=log_entry["message"],
                             span=span_id_to_model.get(log_entry["span_id"]),
                         )
                         log_models.append(log_model)

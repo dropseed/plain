@@ -500,14 +500,3 @@ class Log(models.Model):
             models.Index(fields=["timestamp"]),
             models.Index(fields=["trace"]),
         ]
-
-    @classmethod
-    def from_log_record(cls, *, record, trace, span):
-        """Create a Log instance from a Python log record."""
-        return cls(
-            trace=trace,
-            timestamp=datetime.fromtimestamp(record.created, tz=UTC),
-            level=record.levelname,
-            message=record.getMessage(),
-            span=span,
-        )

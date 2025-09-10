@@ -44,9 +44,10 @@ class ObserverLogHandler(logging.Handler):
                 if trace_info["mode"] != ObserverMode.PERSIST.value:
                     return
 
-            # Store the log record with span context
+            # Store the formatted message with span context
             log_entry = {
-                "record": record,
+                "message": self.format(record),
+                "level": record.levelname,
                 "span_id": span_id,
                 "timestamp": datetime.fromtimestamp(record.created, tz=UTC),
             }

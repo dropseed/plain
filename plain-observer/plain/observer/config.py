@@ -46,6 +46,12 @@ class Config(PackageConfig):
 
         # Install the logging handler to capture logs during traces
         if observer_log_handler not in app_logger.handlers:
+            # Copy formatter from existing app_logger handler to match log formatting
+            for handler in app_logger.handlers:
+                if handler.formatter:
+                    observer_log_handler.setFormatter(handler.formatter)
+                    break
+
             app_logger.addHandler(observer_log_handler)
 
     @staticmethod
