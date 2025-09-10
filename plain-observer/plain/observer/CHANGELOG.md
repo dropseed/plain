@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.6.1](https://github.com/dropseed/plain/releases/plain-observer@0.6.1) (2025-09-09)
+
+### What's changed
+
+- Log messages are now stored in their formatted form instead of as raw log records, improving display consistency and performance ([b646699](https://github.com/dropseed/plain/commit/b646699e46))
+- Observer log handler now copies the formatter from the app logger to ensure consistent log formatting ([b646699](https://github.com/dropseed/plain/commit/b646699e46))
+- Simplified log display template by removing redundant level display element ([b646699](https://github.com/dropseed/plain/commit/b646699e46))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-observer@0.6.0) (2025-09-09)
 
 ### What's changed
