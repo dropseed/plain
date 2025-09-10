@@ -1,5 +1,16 @@
 # plain-pageviews changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.20.0) (2025-09-09)
+
+### What's changed
+
+- Pageviews now use session ID instead of session key for tracking ([a58e2a9](https://github.com/dropseed/plain/commit/a58e2a9))
+- Python 3.13 is now the minimum required version ([d86e307](https://github.com/dropseed/plain/commit/d86e307))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.19.1) (2025-08-22)
 
 ### What's changed
