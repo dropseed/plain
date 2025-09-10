@@ -270,7 +270,6 @@ class Options:
         manager = Manager()
         manager.name = "_base_manager"
         manager.model = self.model
-        manager.auto_created = True
         return manager
 
     @cached_property
