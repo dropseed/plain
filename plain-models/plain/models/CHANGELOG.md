@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.41.1](https://github.com/dropseed/plain/releases/plain-models@0.41.1) (2025-09-09)
+
+### What's changed
+
+- Improved stack trace filtering in OpenTelemetry spans to exclude internal plain/models frames, making debugging traces cleaner and more focused on user code ([5771dd5](https://github.com/dropseed/plain/commit/5771dd5))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.0](https://github.com/dropseed/plain/releases/plain-models@0.41.0) (2025-09-09)
 
 ### What's changed
