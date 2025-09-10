@@ -27,7 +27,6 @@ DEFAULT_NAMES = (
     "ordering",
     "package_label",
     "models_registry",
-    "default_related_name",
     "required_db_features",
     "required_db_vendor",
     "default_manager_name",
@@ -86,8 +85,6 @@ class Options:
 
         # A custom app registry to use, if you're making a separate model set.
         self.models_registry = self.default_models_registry
-
-        self.default_related_name = None
 
     @property
     def label(self):

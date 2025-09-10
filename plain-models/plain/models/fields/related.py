@@ -310,9 +310,6 @@ class RelatedField(FieldCacheMixin, Field):
 
         if self.remote_field.related_name:
             related_name = self.remote_field.related_name
-        else:
-            related_name = self.opts.default_related_name
-        if related_name:
             related_name %= {
                 "class": cls.__name__.lower(),
                 "model_name": cls._meta.model_name.lower(),
