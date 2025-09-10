@@ -1,5 +1,15 @@
 # plain-worker changelog
 
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-worker@0.28.1) (2025-09-10)
+
+### What's changed
+
+- Fixed log context method in worker middleware to use `include_context` instead of `with_context` ([755f873](https://github.com/dropseed/plain/commit/755f873986))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-worker@0.28.0) (2025-09-09)
 
 ### What's changed
