@@ -17,7 +17,6 @@ class TraceViewset(AdminViewset):
         fields = [
             "trace_id",
             "request_id",
-            "session_id",
             "user_id",
             "start_time",
         ]

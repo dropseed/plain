@@ -7,7 +7,6 @@ from functools import cached_property
 import sqlparse
 from opentelemetry.semconv._incubating.attributes import (
     exception_attributes,
-    session_attributes,
     user_attributes,
 )
 from opentelemetry.semconv._incubating.attributes.code_attributes import (
@@ -43,7 +42,6 @@ class Trace(models.Model):
 
     # Plain fields
     request_id = models.CharField(max_length=255, default="", required=False)
-    session_id = models.CharField(max_length=255, default="", required=False)
     user_id = models.CharField(max_length=255, default="", required=False)
     app_name = models.CharField(max_length=255, default="", required=False)
     app_version = models.CharField(max_length=255, default="", required=False)
@@ -65,7 +63,6 @@ class Trace(models.Model):
             models.Index(fields=["start_time"]),
             models.Index(fields=["request_id"]),
             models.Index(fields=["share_id"]),
-            models.Index(fields=["session_id"]),
         ]
 
     def __str__(self):
@@ -131,7 +128,6 @@ class Trace(models.Model):
         root_span = None
         request_id = ""
         user_id = ""
-        session_id = ""
         app_name = ""
         app_version = ""
 
@@ -151,7 +147,6 @@ class Trace(models.Model):
             span_attrs = getattr(span, "attributes", {})
             request_id = request_id or span_attrs.get("plain.request.id", "")
             user_id = user_id or span_attrs.get(user_attributes.USER_ID, "")
-            session_id = session_id or span_attrs.get(session_attributes.SESSION_ID, "")
 
             # Access Resource attributes if not found in span attributes
             if resource := getattr(span, "resource", None):
@@ -181,7 +176,6 @@ class Trace(models.Model):
             or start_time,  # Use start_time as fallback for active traces
             request_id=request_id,
             user_id=user_id,
-            session_id=session_id,
             app_name=app_name or getattr(settings, "APP_NAME", ""),
             app_version=app_version or getattr(settings, "APP_VERSION", ""),
             root_span_name=root_span.name if root_span else "",
@@ -208,7 +202,6 @@ class Trace(models.Model):
             "root_span_name": self.root_span_name,
             "request_id": self.request_id,
             "user_id": self.user_id,
-            "session_id": self.session_id,
             "app_name": self.app_name,
             "app_version": self.app_version,
             "spans": spans,

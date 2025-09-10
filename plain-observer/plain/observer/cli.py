@@ -38,9 +38,8 @@ def clear(force: bool):
 @click.option("--limit", default=20, help="Number of traces to show (default: 20)")
 @click.option("--user-id", help="Filter by user ID")
 @click.option("--request-id", help="Filter by request ID")
-@click.option("--session-id", help="Filter by session ID")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def trace_list(limit, user_id, request_id, session_id, output_json):
+def trace_list(limit, user_id, request_id, output_json):
     """List recent traces."""
     # Build query
     query = Trace.objects.all()
@@ -49,8 +48,6 @@ def trace_list(limit, user_id, request_id, session_id, output_json):
         query = query.filter(user_id=user_id)
     if request_id:
         query = query.filter(request_id=request_id)
-    if session_id:
-        query = query.filter(session_id=session_id)
 
     # Limit results
     traces = list(query[:limit])
@@ -71,7 +68,6 @@ def trace_list(limit, user_id, request_id, session_id, output_json):
                     "duration_ms": trace.duration_ms(),
                     "request_id": trace.request_id,
                     "user_id": trace.user_id,
-                    "session_id": trace.session_id,
                     "root_span_name": trace.root_span_name,
                     "summary": trace.summary,
                 }
@@ -94,9 +90,8 @@ def trace_list(limit, user_id, request_id, session_id, output_json):
             "Root Span",
             "Request ID",
             "User ID",
-            "Session ID",
         ]
-        col_widths = [41, 21, 31, 31, 22, 11, 22]
+        col_widths = [41, 21, 31, 31, 22, 11]
 
         # Print headers
         header_line = ""
@@ -122,9 +117,6 @@ def trace_list(limit, user_id, request_id, session_id, output_json):
                 if len(trace.request_id) > 20
                 else trace.request_id,
                 trace.user_id[:10],
-                trace.session_id[:18] + "..."
-                if len(trace.session_id) > 20
-                else trace.session_id,
             ]
 
             row_line = ""
@@ -380,8 +372,6 @@ def format_trace_output(trace):
         output_lines.append(f"{'Request ID:':<{label_width}} {trace.request_id}")
     if trace.user_id:
         output_lines.append(f"{'User ID:':<{label_width}} {trace.user_id}")
-    if trace.session_id:
-        output_lines.append(f"{'Session ID:':<{label_width}} {trace.session_id}")
 
     output_lines.append("")
     output_lines.append(click.style("Spans:", fg="bright_blue", bold=True))

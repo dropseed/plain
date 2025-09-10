@@ -96,7 +96,7 @@
         </div>
     </div>
 
-    {% if trace.request_id or trace.user_id or trace.session_id or trace.app_version %}
+    {% if trace.request_id or trace.user_id or trace.app_version %}
     <div class="bg-white/5 rounded-lg border border-white/10 p-3">
         <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/70">
             {% if trace.request_id %}
@@ -107,11 +107,6 @@
             {% if trace.user_id %}
             <div>
                 <span class="text-white/50">User:</span> {{ trace.user_id }}
-            </div>
-            {% endif %}
-            {% if trace.session_id %}
-            <div>
-                <span class="text-white/50">Session:</span> {{ trace.session_id }}
             </div>
             {% endif %}
             {% if trace.app_version %}

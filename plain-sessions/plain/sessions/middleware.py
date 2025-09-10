@@ -1,8 +1,5 @@
 import time
 
-from opentelemetry import trace
-from opentelemetry.semconv._incubating.attributes.session_attributes import SESSION_ID
-
 from plain.runtime import settings
 from plain.utils.cache import patch_vary_headers
 from plain.utils.http import http_date
@@ -16,9 +13,6 @@ class SessionMiddleware:
 
     def __call__(self, request):
         session_key = request.cookies.get(settings.SESSION_COOKIE_NAME)
-
-        if session_key:
-            trace.get_current_span().set_attribute(SESSION_ID, session_key)
 
         request.session = SessionStore(session_key)
 
