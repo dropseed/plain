@@ -30,7 +30,6 @@ DEFAULT_NAMES = (
     "default_related_name",
     "required_db_features",
     "required_db_vendor",
-    "base_manager_name",
     "default_manager_name",
     "indexes",
     "constraints",
@@ -63,7 +62,6 @@ class Options:
         self.local_fields = []
         self.local_many_to_many = []
         self.local_managers = []
-        self.base_manager_name = None
         self.default_manager_name = None
         self.model_name = None
         self.db_table = ""
@@ -250,23 +248,16 @@ class Options:
 
     @cached_property
     def base_manager(self):
-        base_manager_name = self.base_manager_name
-        if not base_manager_name:
-            # Get the first parent's base_manager_name if there's one.
-            for parent in self.model.mro()[1:]:
-                if hasattr(parent, "_meta"):
-                    if parent._base_manager.name != "_base_manager":
-                        base_manager_name = parent._base_manager.name
-                    break
+        """
+        The base manager is used by Plain's internal operations like cascading
+        deletes, migrations, and related object lookups. It provides access to
+        all objects in the database without any filtering, ensuring Django can
+        always see the complete dataset when performing framework operations.
 
-        if base_manager_name:
-            try:
-                return self.managers_map[base_manager_name]
-            except KeyError:
-                raise ValueError(
-                    f"{self.object_name} has no manager named {base_manager_name!r}"
-                )
-
+        Unlike user-defined managers which may filter results (e.g. only active
+        objects), the base manager must never filter out rows to prevent
+        incomplete results in related queries.
+        """
         manager = Manager()
         manager.name = "_base_manager"
         manager.model = self.model
