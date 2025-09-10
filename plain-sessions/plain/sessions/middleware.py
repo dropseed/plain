@@ -17,10 +17,12 @@ class SessionMiddleware:
     def __call__(self, request):
         session_key = request.cookies.get(settings.SESSION_COOKIE_NAME)
 
-        if session_key:
-            trace.get_current_span().set_attribute(SESSION_ID, session_key)
-
         request.session = SessionStore(session_key)
+
+        if request.session.model_instance:
+            trace.get_current_span().set_attribute(
+                SESSION_ID, request.session.model_instance.id
+            )
 
         response = self.get_response(request)
 
