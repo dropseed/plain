@@ -575,25 +575,19 @@ def migrate(
     # pprint(sql)
 
     if migration_plan:
-        if backup or (
-            backup is None
-            and settings.DEBUG
-            and (
-                no_input
-                or click.confirm(
-                    "\nYou are in DEBUG mode. Would you like to make a database backup before running migrations?",
-                    default=True,
-                )
-            )
-        ):
+        if backup or (backup is None and settings.DEBUG):
             backup_name = f"migrate_{time.strftime('%Y%m%d_%H%M%S')}"
+            click.secho(
+                f"Creating backup before applying migrations: {backup_name}",
+                bold=True,
+            )
             # Can't use ctx.invoke because this is called by the test db creation currently,
             # which doesn't have a context.
             create_backup.callback(
                 backup_name=backup_name,
                 pg_dump=os.environ.get(
                     "PG_DUMP", "pg_dump"
-                ),  # Have to this again manually
+                ),  # Have to pass this in manually
             )
             print()
 
