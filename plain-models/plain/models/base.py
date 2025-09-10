@@ -205,6 +205,8 @@ class ModelState:
 
 class Model(metaclass=ModelBase):
     objects = Manager()
+    DoesNotExist: type[ObjectDoesNotExist]
+    MultipleObjectsReturned: type[MultipleObjectsReturned]
 
     def __init__(self, *args, **kwargs):
         # Alias some things as locals to avoid repeat global lookups
