@@ -114,7 +114,7 @@
                                         <div class="text-xs text-white/30 font-mono truncate">{{ trace_item.trace_id }}</div>
                                     </div>
                                     {% endif %}
-                                    {% if trace_item.user_id or trace_item.app_version %}
+                                    {% if trace_item.user_id or trace_item.session_id or trace_item.app_version %}
                                     <div class="flex items-center gap-3 text-xs text-white/50">
                                         {% if trace_item.user_id %}
                                         <span class="flex items-center gap-1 flex-shrink-0">
@@ -122,6 +122,14 @@
                                                 <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
                                             </svg>
                                             {{ trace_item.user_id }}
+                                        </span>
+                                        {% endif %}
+                                        {% if trace_item.session_id %}
+                                        <span class="flex items-center gap-1 min-w-0 flex-shrink">
+                                            <svg class="w-3 h-3 text-white/70 flex-shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                                                <path d="M13.5 3a.5.5 0 0 1 .5.5V11H2V3.5a.5.5 0 0 1 .5-.5zm-11-1A1.5 1.5 0 0 0 1 3.5V12h14V3.5A1.5 1.5 0 0 0 13.5 2zM0 12.5h16a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5"/>
+                                            </svg>
+                                            <span class="truncate" title="{{ trace_item.session_id }}">{{ trace_item.session_id }}</span>
                                         </span>
                                         {% endif %}
                                         {% if trace_item.app_version %}

@@ -15,3 +15,6 @@ class Session(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["session_key"], name="unique_session_key")
         ]
+
+    def __str__(self):
+        return self.session_key
