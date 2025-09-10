@@ -2,7 +2,6 @@ from .fields import AddField, AlterField, RemoveField, RenameField
 from .models import (
     AddConstraint,
     AddIndex,
-    AlterModelManagers,
     AlterModelOptions,
     AlterModelTable,
     AlterModelTableComment,
@@ -34,5 +33,4 @@ __all__ = [
     "SeparateDatabaseAndState",
     "RunSQL",
     "RunPython",
-    "AlterModelManagers",
 ]

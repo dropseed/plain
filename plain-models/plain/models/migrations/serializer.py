@@ -215,16 +215,6 @@ class ModelFieldSerializer(DeconstructableSerializer):
         return self.serialize_deconstructed(path, args, kwargs)
 
 
-class ModelManagerSerializer(DeconstructableSerializer):
-    def serialize(self):
-        as_manager, manager_path, qs_path, args, kwargs = self.value.deconstruct()
-        if as_manager:
-            name, imports = self._serialize_path(qs_path)
-            return f"{name}.as_manager()", imports
-        else:
-            return self.serialize_deconstructed(manager_path, args, kwargs)
-
-
 class OperationSerializer(BaseSerializer):
     def serialize(self):
         from plain.models.migrations.writer import OperationWriter
@@ -359,8 +349,6 @@ def serializer_factory(value):
 
     if isinstance(value, models.Field):
         return ModelFieldSerializer(value)
-    if isinstance(value, models.manager.BaseManager):
-        return ModelManagerSerializer(value)
     if isinstance(value, Operation):
         return OperationSerializer(value)
     if isinstance(value, type):

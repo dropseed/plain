@@ -12,7 +12,6 @@ from plain.models.options import DEFAULT_NAMES
 from plain.models.registry import ModelsRegistry
 from plain.models.registry import models_registry as global_models
 from plain.packages import packages_registry
-from plain.utils.module_loading import import_string
 
 from .exceptions import InvalidBasesError
 from .utils import resolve_relation
@@ -174,11 +173,6 @@ class ProjectState:
             for key in option_keys:
                 if key not in options:
                     model_state.options.pop(key, False)
-        self.reload_model(package_label, model_name, delay=True)
-
-    def alter_model_managers(self, package_label, model_name, managers):
-        model_state = self.models[package_label, model_name]
-        model_state.managers = list(managers)
         self.reload_model(package_label, model_name, delay=True)
 
     def _append_option(self, package_label, model_name, option_name, obj):
@@ -598,9 +592,7 @@ class ModelState:
     assign new ones, as these are not detached during a clone.
     """
 
-    def __init__(
-        self, package_label, name, fields, options=None, bases=None, managers=None
-    ):
+    def __init__(self, package_label, name, fields, options=None, bases=None):
         self.package_label = package_label
         self.name = name
         self.fields = dict(fields)
@@ -608,7 +600,6 @@ class ModelState:
         self.options.setdefault("indexes", [])
         self.options.setdefault("constraints", [])
         self.bases = bases or (models.Model,)
-        self.managers = managers or []
         for name, field in self.fields.items():
             # Sanity-check that fields are NOT already bound to a model.
             if hasattr(field, "model"):
@@ -711,29 +702,6 @@ class ModelState:
         ):
             bases = (models.Model,)
 
-        managers = []
-        manager_names = set()
-        default_manager_shim = None
-        for manager in model._meta.managers:
-            if manager.name in manager_names:
-                # Skip overridden managers.
-                continue
-            elif manager is model._base_manager or manager is model._default_manager:
-                # Shim custom managers used as default and base managers.
-                new_manager = models.Manager()
-                new_manager.model = manager.model
-                new_manager.name = manager.name
-                if manager is model._default_manager:
-                    default_manager_shim = new_manager
-            else:
-                continue
-            manager_names.add(manager.name)
-            managers.append((manager.name, new_manager))
-
-        # Ignore a shimmed default manager called objects if it's the only one.
-        if managers == [("objects", default_manager_shim)]:
-            managers = []
-
         # Construct the new ModelState
         return cls(
             model._meta.package_label,
@@ -741,20 +709,7 @@ class ModelState:
             fields,
             options,
             bases,
-            managers,
         )
-
-    def construct_managers(self):
-        """Deep-clone the managers using deconstruction."""
-        # Iterate managers in declaration order
-        for mgr_name, manager in self.managers:
-            as_manager, manager_path, qs_path, args, kwargs = manager.deconstruct()
-            if as_manager:
-                qs_class = import_string(qs_path)
-                yield mgr_name, qs_class.as_manager()
-            else:
-                manager_class = import_string(manager_path)
-                yield mgr_name, manager_class(*args, **kwargs)
 
     def clone(self):
         """Return an exact copy of this ModelState."""
@@ -767,7 +722,6 @@ class ModelState:
             # than mutating it.
             options=dict(self.options),
             bases=self.bases,
-            managers=list(self.managers),
         )
 
     def render(self, models_registry):
@@ -794,8 +748,6 @@ class ModelState:
         body["Meta"] = meta
         body["__module__"] = "__fake__"
 
-        # Restore managers
-        body.update(self.construct_managers())
         # Then, make a Model object (models_registry.register_model is called in __new__)
         model_class = type(self.name, bases, body)
         from plain.models import register_model
@@ -835,5 +787,4 @@ class ModelState:
             )
             and (self.options == other.options)
             and (self.bases == other.bases)
-            and (self.managers == other.managers)
         )

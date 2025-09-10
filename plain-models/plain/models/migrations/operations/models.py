@@ -41,16 +41,14 @@ class ModelOperation(Operation):
 class CreateModel(ModelOperation):
     """Create a model's table."""
 
-    serialization_expand_args = ["fields", "options", "managers"]
+    serialization_expand_args = ["fields", "options"]
 
-    def __init__(self, name, fields, options=None, bases=None, managers=None):
+    def __init__(self, name, fields, options=None, bases=None):
         self.fields = fields
         self.options = options or {}
         self.bases = bases or (models.Model,)
-        self.managers = managers or []
         super().__init__(name)
-        # Sanity-check that there are no duplicated field names, bases, or
-        # manager names
+        # Sanity-check that there are no duplicated field names or bases
         _check_for_duplicates("fields", (name for name, _ in self.fields))
         _check_for_duplicates(
             "bases",
@@ -63,7 +61,6 @@ class CreateModel(ModelOperation):
                 for base in self.bases
             ),
         )
-        _check_for_duplicates("managers", (name for name, _ in self.managers))
 
     def deconstruct(self):
         kwargs = {
@@ -74,8 +71,6 @@ class CreateModel(ModelOperation):
             kwargs["options"] = self.options
         if self.bases and self.bases != (models.Model,):
             kwargs["bases"] = self.bases
-        if self.managers and self.managers != [("objects", models.Manager())]:
-            kwargs["managers"] = self.managers
         return (self.__class__.__qualname__, [], kwargs)
 
     def state_forwards(self, package_label, state):
@@ -86,7 +81,6 @@ class CreateModel(ModelOperation):
                 list(self.fields),
                 dict(self.options),
                 tuple(self.bases),
-                list(self.managers),
             )
         )
 
@@ -141,7 +135,6 @@ class CreateModel(ModelOperation):
                     fields=self.fields,
                     options=self.options,
                     bases=self.bases,
-                    managers=self.managers,
                 ),
             ]
         elif (
@@ -158,20 +151,6 @@ class CreateModel(ModelOperation):
                     fields=self.fields,
                     options=options,
                     bases=self.bases,
-                    managers=self.managers,
-                ),
-            ]
-        elif (
-            isinstance(operation, AlterModelManagers)
-            and self.name_lower == operation.name_lower
-        ):
-            return [
-                CreateModel(
-                    self.name,
-                    fields=self.fields,
-                    options=self.options,
-                    bases=self.bases,
-                    managers=operation.managers,
                 ),
             ]
         elif (
@@ -185,7 +164,6 @@ class CreateModel(ModelOperation):
                         fields=self.fields + [(operation.name, operation.field)],
                         options=self.options,
                         bases=self.bases,
-                        managers=self.managers,
                     ),
                 ]
             elif isinstance(operation, AlterField):
@@ -198,7 +176,6 @@ class CreateModel(ModelOperation):
                         ],
                         options=self.options,
                         bases=self.bases,
-                        managers=self.managers,
                     ),
                 ]
             elif isinstance(operation, RemoveField):
@@ -214,7 +191,6 @@ class CreateModel(ModelOperation):
                         ],
                         options=options,
                         bases=self.bases,
-                        managers=self.managers,
                     ),
                 ]
             elif isinstance(operation, RenameField):
@@ -229,7 +205,6 @@ class CreateModel(ModelOperation):
                         ],
                         options=options,
                         bases=self.bases,
-                        managers=self.managers,
                     ),
                 ]
         return super().reduce(operation, package_label)
@@ -479,32 +454,6 @@ class AlterModelOptions(ModelOptionOperation):
     @property
     def migration_name_fragment(self):
         return f"alter_{self.name_lower}_options"
-
-
-class AlterModelManagers(ModelOptionOperation):
-    """Alter the model's managers."""
-
-    serialization_expand_args = ["managers"]
-
-    def __init__(self, name, managers):
-        self.managers = managers
-        super().__init__(name)
-
-    def deconstruct(self):
-        return (self.__class__.__qualname__, [self.name, self.managers], {})
-
-    def state_forwards(self, package_label, state):
-        state.alter_model_managers(package_label, self.name_lower, self.managers)
-
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        pass
-
-    def describe(self):
-        return f"Change managers on {self.name}"
-
-    @property
-    def migration_name_fragment(self):
-        return f"alter_{self.name_lower}_managers"
 
 
 class IndexOperation(Operation):

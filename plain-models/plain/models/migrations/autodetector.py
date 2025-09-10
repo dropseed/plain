@@ -152,7 +152,6 @@ class MigrationAutodetector:
         self.generate_deleted_models()
         self.generate_created_models()
         self.generate_altered_options()
-        self.generate_altered_managers()
         self.generate_altered_db_table_comment()
 
         # Create the renamed fields and store them in self.renamed_fields.
@@ -600,7 +599,6 @@ class MigrationAutodetector:
                     ],
                     options=model_state.options,
                     bases=model_state.bases,
-                    managers=model_state.managers,
                 ),
                 dependencies=dependencies,
                 beginning=True,
@@ -1255,22 +1253,6 @@ class MigrationAutodetector:
                     operations.AlterModelOptions(
                         name=model_name,
                         options=new_options,
-                    ),
-                )
-
-    def generate_altered_managers(self):
-        for package_label, model_name in sorted(self.kept_model_keys):
-            old_model_name = self.renamed_models.get(
-                (package_label, model_name), model_name
-            )
-            old_model_state = self.from_state.models[package_label, old_model_name]
-            new_model_state = self.to_state.models[package_label, model_name]
-            if old_model_state.managers != new_model_state.managers:
-                self.add_operation(
-                    package_label,
-                    operations.AlterModelManagers(
-                        name=model_name,
-                        managers=new_model_state.managers,
                     ),
                 )
 
