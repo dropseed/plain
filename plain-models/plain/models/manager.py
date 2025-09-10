@@ -6,9 +6,6 @@ from plain.models.query import QuerySet
 
 
 class BaseManager:
-    # To retain order, track each time a Manager instance is created.
-    creation_counter = 0
-
     def __new__(cls, *args, **kwargs):
         # Capture the arguments to make returning them trivial.
         obj = super().__new__(cls)
@@ -17,7 +14,6 @@ class BaseManager:
 
     def __init__(self):
         super().__init__()
-        self._set_creation_counter()
         self.model = None
         self.name = None
 
@@ -112,14 +108,6 @@ class BaseManager:
         setattr(cls, name, ManagerDescriptor(self))
 
         cls._meta.add_manager(self)
-
-    def _set_creation_counter(self):
-        """
-        Set the creation counter value for this instance and increment the
-        class-level copy.
-        """
-        self.creation_counter = BaseManager.creation_counter
-        BaseManager.creation_counter += 1
 
     #######################
     # PROXIES TO QUERYSET #

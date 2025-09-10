@@ -230,14 +230,14 @@ class Options:
         seen_managers = set()
         bases = (b for b in self.model.mro() if hasattr(b, "_meta"))
         for depth, base in enumerate(bases):
-            for manager in base._meta.local_managers:
+            for index, manager in enumerate(base._meta.local_managers):
                 if manager.name in seen_managers:
                     continue
 
                 manager = copy.copy(manager)
                 manager.model = self.model
                 seen_managers.add(manager.name)
-                managers.append((depth, manager.creation_counter, manager))
+                managers.append((depth, index, manager))
 
         return make_immutable_fields_list(
             "managers",
