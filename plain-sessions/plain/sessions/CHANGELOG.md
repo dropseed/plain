@@ -1,5 +1,19 @@
 # plain-sessions changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-sessions@0.28.0) (2025-09-09)
+
+### What's changed
+
+- The `SessionStore` now exposes a `model_instance` property that returns the underlying `Session` model instance, making it easier to access session metadata like the ID ([f374290](https://github.com/dropseed/plain/commit/f37429052d7380f3984dd824e285d9029455ada9))
+- Session admin interface now displays the numeric session ID instead of session keys for better readability ([b3dca07](https://github.com/dropseed/plain/commit/b3dca0777fc9a409ef84bcfd58daf6a56b7b1c81))
+- OpenTelemetry tracing now uses the session ID instead of the session key for better observability ([9cc458e](https://github.com/dropseed/plain/commit/9cc458ef056b783abb1ec20129f1e6dc71eaed23))
+- Session toolbar display has been simplified by removing the session key display ([e1fa569](https://github.com/dropseed/plain/commit/e1fa5699edddbc2814e0fad80c9fdf6f6f5e89dc))
+- Minimum Python version is now 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb0d5e8f5001efccede4d58d0e26bfea))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-sessions@0.27.0) (2025-08-27)
 
 ### What's changed
