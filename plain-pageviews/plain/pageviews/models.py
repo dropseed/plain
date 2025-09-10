@@ -21,14 +21,14 @@ class Pageview(models.Model):
     referrer = models.CharField(max_length=1024, required=False)
 
     user_id = models.CharField(max_length=255, required=False)
-    session_key = models.CharField(max_length=255, required=False)
+    session_id = models.CharField(max_length=255, required=False)
 
     class Meta:
         ordering = ["-timestamp"]
         indexes = [
             models.Index(fields=["timestamp"]),
             models.Index(fields=["user_id"]),
-            models.Index(fields=["session_key"]),
+            models.Index(fields=["session_id"]),
             models.Index(fields=["url"]),
         ]
         constraints = [
