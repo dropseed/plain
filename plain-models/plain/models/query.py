@@ -255,9 +255,8 @@ class FlatValuesListIterable(BaseIterable):
 class QuerySet:
     """Represent a lazy database lookup for a set of objects."""
 
-    def __init__(self, model=None, query=None, hints=None):
+    def __init__(self, model=None, query=None):
         self.model = model
-        self._hints = hints or {}
         self._query = query or sql.Query(self.model)
         self._result_cache = None
         self._sticky_filter = False
@@ -1622,7 +1621,6 @@ class QuerySet:
         c = self.__class__(
             model=self.model,
             query=self.query.chain(),
-            hints=self._hints,
         )
         c._sticky_filter = self._sticky_filter
         c._for_write = self._for_write
@@ -1679,13 +1677,6 @@ class QuerySet:
         return query
 
     resolve_expression.queryset_only = True
-
-    def _add_hints(self, **hints):
-        """
-        Update hinting information for use by routers. Add new key/values or
-        overwrite existing key/values.
-        """
-        self._hints.update(hints)
 
     def _has_filters(self):
         """
@@ -1747,11 +1738,9 @@ class RawQuerySet:
         query=None,
         params=(),
         translations=None,
-        hints=None,
     ):
         self.raw_query = raw_query
         self.model = model
-        self._hints = hints or {}
         self.query = query or sql.RawQuery(sql=raw_query, params=params)
         self.params = params
         self.translations = translations or {}
@@ -1797,7 +1786,6 @@ class RawQuerySet:
             query=self.query,
             params=self.params,
             translations=self.translations,
-            hints=self._hints,
         )
         c._prefetch_related_lookups = self._prefetch_related_lookups[:]
         return c

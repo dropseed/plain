@@ -27,7 +27,6 @@ class BaseManager:
         self._set_creation_counter()
         self.model = None
         self.name = None
-        self._hints = {}
 
     def __str__(self):
         """Return "package_label.model_label.manager_name"."""
@@ -138,7 +137,7 @@ class BaseManager:
         Return a new QuerySet object. Subclasses can override this method to
         customize the behavior of the Manager.
         """
-        return self._queryset_class(model=self.model, hints=self._hints)
+        return self._queryset_class(model=self.model)
 
     def all(self):
         # We can't proxy this method through the `QuerySet` like we do for the

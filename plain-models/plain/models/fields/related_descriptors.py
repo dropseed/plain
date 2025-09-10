@@ -122,15 +122,13 @@ class ForwardManyToOneDescriptor:
     def is_cached(self, instance):
         return self.field.is_cached(instance)
 
-    def get_queryset(self, **hints):
+    def get_queryset(self):
         qs = self.field.remote_field.model._base_manager.get_queryset()
-        qs._add_hints(**hints)
         return qs.all()
 
     def get_prefetch_queryset(self, instances, queryset=None):
         if queryset is None:
             queryset = self.get_queryset()
-        queryset._add_hints(instance=instances[0])
 
         rel_obj_attr = self.field.get_foreign_related_value
         instance_attr = self.field.get_local_related_value
@@ -170,7 +168,7 @@ class ForwardManyToOneDescriptor:
         )
 
     def get_object(self, instance):
-        qs = self.get_queryset(instance=instance)
+        qs = self.get_queryset()
         # Assuming the database enforces foreign keys, this won't fail.
         return qs.get(self.field.get_reverse_related_filter(instance))
 
@@ -378,7 +376,6 @@ def create_reverse_many_to_one_manager(superclass, rel):
             """
             Filter the queryset for the instance this manager is bound to.
             """
-            queryset._add_hints(instance=self.instance)
             queryset._defer_next_filter = True
             queryset = queryset.filter(**self.core_filters)
             for field in self.field.foreign_related_fields:
@@ -436,8 +433,6 @@ def create_reverse_many_to_one_manager(superclass, rel):
         def get_prefetch_queryset(self, instances, queryset=None):
             if queryset is None:
                 queryset = super().get_queryset()
-
-            queryset._add_hints(instance=instances[0])
 
             rel_obj_attr = self.field.get_local_related_value
             instance_attr = self.field.get_foreign_related_value
@@ -702,7 +697,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             """
             Filter the queryset for the instance this manager is bound to.
             """
-            queryset._add_hints(instance=self.instance)
             queryset._defer_next_filter = True
             return queryset._next_is_sticky().filter(**self.core_filters)
 
@@ -723,7 +717,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             if queryset is None:
                 queryset = super().get_queryset()
 
-            queryset._add_hints(instance=instances[0])
             queryset = _filter_prefetch_queryset(
                 queryset._next_is_sticky(), self.query_field_name, instances
             )

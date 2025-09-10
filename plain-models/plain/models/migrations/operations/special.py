@@ -49,10 +49,9 @@ class RunSQL(Operation):
     by this SQL change, in case it's custom column/table creation/deletion.
     """
 
-    def __init__(self, sql, *, state_operations=None, hints=None, elidable=False):
+    def __init__(self, sql, *, state_operations=None, elidable=False):
         self.sql = sql
         self.state_operations = state_operations or []
-        self.hints = hints or {}
         self.elidable = elidable
 
     def deconstruct(self):
@@ -61,8 +60,6 @@ class RunSQL(Operation):
         }
         if self.state_operations:
             kwargs["state_operations"] = self.state_operations
-        if self.hints:
-            kwargs["hints"] = self.hints
         return (self.__class__.__qualname__, [], kwargs)
 
     def state_forwards(self, package_label, state):
@@ -99,13 +96,12 @@ class RunPython(Operation):
 
     reduces_to_sql = False
 
-    def __init__(self, code, *, atomic=None, hints=None, elidable=False):
+    def __init__(self, code, *, atomic=None, elidable=False):
         self.atomic = atomic
         # Forwards code
         if not callable(code):
             raise ValueError("RunPython must be supplied with a callable")
         self.code = code
-        self.hints = hints or {}
         self.elidable = elidable
 
     def deconstruct(self):
@@ -114,8 +110,6 @@ class RunPython(Operation):
         }
         if self.atomic is not None:
             kwargs["atomic"] = self.atomic
-        if self.hints:
-            kwargs["hints"] = self.hints
         return (self.__class__.__qualname__, [], kwargs)
 
     def state_forwards(self, package_label, state):
