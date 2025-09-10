@@ -19,6 +19,7 @@ class SessionStore(MutableMapping):
         self.accessed = False
         self.modified = False
         self._session_cache: dict | None = None
+        self._session_instance = None
 
         # Lazy import
         from .models import Session
@@ -50,6 +51,7 @@ class SessionStore(MutableMapping):
         # internals directly (loading data wastes time, since we are going to
         # set it to an empty dict anyway).
         self._session_cache = {}
+        self._session_instance = None
         self.accessed = True
         self.modified = True
 
@@ -87,10 +89,12 @@ class SessionStore(MutableMapping):
             session = self._model.objects.get(
                 session_key=self.session_key, expires_at__gt=timezone.now()
             )
+            self._session_instance = session
             self._session_cache = session.session_data
             return self._session_cache
         except self._model.DoesNotExist:
             self.session_key = None
+            self._session_instance = None
             self._session_cache = {}
             return self._session_cache
 
@@ -100,6 +104,18 @@ class SessionStore(MutableMapping):
         Property to access the session data, ensuring it is loaded.
         """
         return self._get_session_data()
+
+    @property
+    def model_instance(self):
+        """
+        Return the underlying Session model instance, or None if no session exists.
+        """
+        if self._session_instance is not None:
+            return self._session_instance
+
+        # Trigger loading of session data which will populate _session_instance
+        self._get_session_data()
+        return self._session_instance
 
     def flush(self):
         """
@@ -112,6 +128,7 @@ class SessionStore(MutableMapping):
         except self._model.DoesNotExist:
             pass
         self.session_key = None
+        self._session_instance = None
 
     def cycle_key(self):
         """
@@ -131,7 +148,7 @@ class SessionStore(MutableMapping):
         self.session_key = self._get_new_session_key()
         data = self._get_session_data(no_load=True)
         with transaction.atomic():
-            self._model.objects.create(
+            self._session_instance = self._model.objects.create(
                 session_key=self.session_key,
                 session_data=data,
                 expires_at=timezone.now()
@@ -149,7 +166,7 @@ class SessionStore(MutableMapping):
             if self.session_key is None:
                 self.session_key = self._get_new_session_key()
 
-            _, created = self._model.objects.update_or_create(
+            self._session_instance, created = self._model.objects.update_or_create(
                 session_key=self.session_key,
                 defaults={
                     "session_data": data,
