@@ -284,6 +284,7 @@ class QuerySet:
             self._iterable_class = ValuesIterable
         self._query = value
 
+    @classmethod
     def as_manager(cls):
         # Address the circular dependency between `Queryset` and `Manager`.
         from plain.models.manager import Manager
@@ -293,7 +294,6 @@ class QuerySet:
         return manager
 
     as_manager.queryset_only = True
-    as_manager = classmethod(as_manager)
 
     ########################
     # PYTHON MAGIC METHODS #
