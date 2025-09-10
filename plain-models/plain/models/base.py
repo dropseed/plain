@@ -24,7 +24,7 @@ from plain.models.deletion import Collector
 from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.reverse_related import ForeignObjectRel
-from plain.models.manager import Manager
+from plain.models.manager import BaseManager, Manager
 from plain.models.options import Options
 from plain.models.query import F, Q
 from plain.packages import packages_registry
@@ -154,22 +154,19 @@ class ModelBase(type):
         opts = cls._meta
         opts._prepare(cls)
 
+        # Validate that 'objects' is either None or a Manager
+        if cls.objects is not None and not isinstance(cls.objects, BaseManager):
+            raise TypeError(
+                f"Model {cls.__name__} attribute 'objects' must be either None "
+                f"or a Manager instance, got {type(cls.objects).__name__}"
+            )
+
         # Give the class a docstring -- its definition.
         if cls.__doc__ is None:
             cls.__doc__ = "{}({})".format(
                 cls.__name__,
                 ", ".join(f.name for f in opts.fields),
             )
-
-        if not opts.managers:
-            if any(f.name == "objects" for f in opts.fields):
-                raise ValueError(
-                    f"Model {cls.__name__} must specify a custom Manager, because it has a "
-                    "field named 'objects'."
-                )
-            manager = Manager()
-            manager.auto_created = True
-            cls.add_to_class("objects", manager)
 
         # Set the name of _meta.indexes. This can't be done in
         # Options.contribute_to_class() because fields haven't been added to
@@ -207,6 +204,8 @@ class ModelState:
 
 
 class Model(metaclass=ModelBase):
+    objects = Manager()
+
     def __init__(self, *args, **kwargs):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__

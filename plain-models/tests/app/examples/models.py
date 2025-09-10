@@ -60,3 +60,32 @@ class ChildSetDefault(models.Model):
 @models.register_model
 class ChildDoNothing(models.Model):
     parent = models.ForeignKey(DeleteParent, on_delete=models.DO_NOTHING)
+
+
+# Models for testing manager assignment behavior
+@models.register_model
+class DefaultManagerModel(models.Model):
+    """Model that uses the default objects manager."""
+
+    name = models.CharField(max_length=100)
+
+
+@models.register_model
+class NoObjectsModel(models.Model):
+    """Model that explicitly sets objects = None."""
+
+    objects = None
+    name = models.CharField(max_length=100)
+
+
+class CustomManager(models.Manager):
+    def get_custom(self):
+        return self.filter(name__startswith="custom")
+
+
+@models.register_model
+class CustomManagerModel(models.Model):
+    """Model with a custom manager."""
+
+    objects = CustomManager()
+    name = models.CharField(max_length=100)
