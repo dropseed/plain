@@ -218,7 +218,19 @@ def _get_code_attributes():
 
         # Add full stack trace only in DEBUG mode (expensive)
         if settings.DEBUG:
-            attrs[CODE_STACKTRACE] = "".join(traceback.format_stack())
+            # Filter out internal frames from the stack trace
+            filtered_stack = []
+            for frame in stack:
+                filepath = frame.filename
+                if not filepath:
+                    continue
+                if "/plain/models/" in filepath:
+                    continue
+                if filepath.endswith("contextlib.py"):
+                    continue
+                filtered_stack.append(frame)
+
+            attrs[CODE_STACKTRACE] = "".join(traceback.format_list(filtered_stack))
 
         return attrs
 
