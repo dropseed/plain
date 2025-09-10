@@ -996,9 +996,7 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def check(cls, **kwargs):
-        errors = [
-            *cls._check_managers(**kwargs),
-        ]
+        errors = []
 
         database = kwargs.get("database", False)
         errors += [
@@ -1046,13 +1044,6 @@ class Model(metaclass=ModelBase):
             )
         return errors
 
-    @classmethod
-    def _check_managers(cls, **kwargs):
-        """Perform all manager checks."""
-        errors = []
-        for manager in cls._meta.managers:
-            errors.extend(manager.check(**kwargs))
-        return errors
 
     @classmethod
     def _check_fields(cls, **kwargs):
