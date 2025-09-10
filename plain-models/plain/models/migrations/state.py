@@ -718,10 +718,6 @@ class ModelState:
             if manager.name in manager_names:
                 # Skip overridden managers.
                 continue
-            elif manager.use_in_migrations:
-                # Copy managers usable in migrations.
-                new_manager = copy.copy(manager)
-                new_manager._set_creation_counter()
             elif manager is model._base_manager or manager is model._default_manager:
                 # Shim custom managers used as default and base managers.
                 new_manager = models.Manager()
