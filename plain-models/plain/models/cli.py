@@ -479,7 +479,7 @@ def migrate(
                 "Migrations can be pruned only when a package is specified."
             )
         if verbosity > 0:
-            click.echo("Pruning migrations:", color="cyan")
+            click.secho("Pruning migrations:", fg="cyan")
         to_prune = set(executor.loader.applied_migrations) - set(
             executor.loader.disk_migrations
         )
@@ -529,16 +529,16 @@ def migrate(
     migration_plan = executor.migration_plan(targets)
 
     if plan:
-        click.echo("Planned operations:", color="cyan")
+        click.secho("Planned operations:", fg="cyan")
         if not migration_plan:
             click.echo("  No planned migration operations.")
         else:
             for migration in migration_plan:
-                click.echo(str(migration), color="cyan")
+                click.secho(str(migration), fg="cyan")
                 for operation in migration.operations:
                     message, is_error = describe_operation(operation)
                     if is_error:
-                        click.echo("    " + message, fg="yellow")
+                        click.secho("    " + message, fg="yellow")
                     else:
                         click.echo("    " + message)
         if check_unapplied:
@@ -555,18 +555,18 @@ def migrate(
 
     # Print some useful info
     if verbosity >= 1:
-        click.echo("Operations to perform:", color="cyan")
+        click.secho("Operations to perform:", fg="cyan")
 
         if target_package_labels_only:
-            click.echo(
+            click.secho(
                 "  Apply all migrations: "
                 + (", ".join(sorted({a for a, n in targets})) or "(none)"),
-                color="yellow",
+                fg="yellow",
             )
         else:
-            click.echo(
+            click.secho(
                 f"  Target specific migration: {targets[0][1]}, from {targets[0][0]}",
-                color="yellow",
+                fg="yellow",
             )
 
     pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
@@ -592,7 +592,7 @@ def migrate(
             print()
 
         if verbosity >= 1:
-            click.echo("Running migrations:", color="cyan")
+            click.secho("Running migrations:", fg="cyan")
 
         post_migrate_state = executor.migrate(
             targets,
