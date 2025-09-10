@@ -37,16 +37,10 @@ DEFAULT_RESPONSE_HEADERS = {
     "X-Frame-Options": "DENY",
 }
 
-# Whether to redirect all non-HTTPS requests to HTTPS.
+# Whether to redirect all non-HTTPS requests to HTTPS (blanket redirect).
+# For anything more advanced (custom host, path exemptions, etc.), write
+# your own middleware.
 HTTPS_REDIRECT_ENABLED = True
-
-# Regex patterns for paths that should be exempt from HTTPS redirect
-# Examples: [r"^/health$", r"/api/internal/.*", r"/dev/.*"]
-HTTPS_REDIRECT_EXEMPT_PATHS: list[str] = []
-
-# Custom host to redirect to for HTTPS. If None, uses the same host as the request.
-# Useful for redirecting to a different domain (e.g., "secure.example.com")
-HTTPS_REDIRECT_HOST = None
 
 # If your Plain app is behind a proxy that sets a header to specify secure
 # connections, AND that proxy ensures that user-submitted headers with the
