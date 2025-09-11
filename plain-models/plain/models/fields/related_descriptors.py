@@ -123,7 +123,7 @@ class ForwardManyToOneDescriptor:
         return self.field.is_cached(instance)
 
     def get_queryset(self):
-        qs = self.field.remote_field.model._base_manager.get_queryset()
+        qs = self.field.remote_field.model._meta.base_manager.get_queryset()
         return qs.all()
 
     def get_prefetch_queryset(self, instances, queryset=None):
@@ -308,7 +308,7 @@ class ReverseManyToOneDescriptor:
         related_model = self.rel.related_model
 
         return create_reverse_many_to_one_manager(
-            related_model._default_manager.__class__,
+            related_model.objects.__class__,
             self.rel,
         )
 
@@ -351,10 +351,9 @@ def create_reverse_many_to_one_manager(superclass, rel):
 
     class RelatedManager(superclass):
         def __init__(self, instance):
-            super().__init__()
-
+            super().__init__(model=rel.related_model)
             self.instance = instance
-            self.model = rel.related_model
+
             self.field = rel.field
 
             self.core_filters = {self.field.name: instance}
@@ -469,7 +468,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
                             "the object first."
                         )
                     ids.append(obj.id)
-                self.model._base_manager.filter(id__in=ids).update(
+                self.model._meta.base_manager.filter(id__in=ids).update(
                     **{
                         self.field.name: self.instance,
                     }
@@ -596,7 +595,7 @@ class ManyToManyDescriptor(ReverseManyToOneDescriptor):
         related_model = self.rel.related_model if self.reverse else self.rel.model
 
         return create_forward_many_to_many_manager(
-            related_model._default_manager.__class__,
+            related_model.objects.__class__,
             self.rel,
             reverse=self.reverse,
         )
@@ -619,24 +618,24 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
 
     class ManyRelatedManager(superclass):
         def __init__(self, instance=None):
-            super().__init__()
-
             self.instance = instance
 
             if not reverse:
-                self.model = rel.model
+                model = rel.model
                 self.query_field_name = rel.field.related_query_name()
                 self.prefetch_cache_name = rel.field.name
                 self.source_field_name = rel.field.m2m_field_name()
                 self.target_field_name = rel.field.m2m_reverse_field_name()
                 self.symmetrical = rel.symmetrical
             else:
-                self.model = rel.related_model
+                model = rel.related_model
                 self.query_field_name = rel.field.name
                 self.prefetch_cache_name = rel.field.related_query_name()
                 self.source_field_name = rel.field.m2m_reverse_field_name()
                 self.target_field_name = rel.field.m2m_field_name()
                 self.symmetrical = False
+
+            super().__init__(model=model)
 
             self.through = rel.through
             self.reverse = reverse
@@ -779,7 +778,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             with transaction.atomic(savepoint=False):
                 self._remove_prefetched_objects()
                 filters = self._build_remove_filters(super().get_queryset())
-                self.through._default_manager.filter(filters).delete()
+                self.through.objects.filter(filters).delete()
 
         def set(self, objs, *, clear=False, through_defaults=None):
             # Force evaluation of `objs` in case it's a queryset whose value
@@ -864,7 +863,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             Return the subset of ids of `objs` that aren't already assigned to
             this relationship.
             """
-            vals = self.through._default_manager.values_list(
+            vals = self.through.objects.values_list(
                 target_field_name, flat=True
             ).filter(
                 **{
@@ -892,7 +891,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             )
             with transaction.atomic(savepoint=False):
                 # Add the ones that aren't there already.
-                self.through._default_manager.bulk_create(
+                self.through.objects.bulk_create(
                     [
                         self.through(
                             **through_defaults,
@@ -931,6 +930,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 else:
                     old_vals = old_ids
                 filters = self._build_remove_filters(old_vals)
-                self.through._default_manager.filter(filters).delete()
+                self.through.objects.filter(filters).delete()
 
     return ManyRelatedManager

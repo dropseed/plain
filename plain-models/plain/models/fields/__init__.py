@@ -901,7 +901,7 @@ class Field(RegisterLookupMixin):
             if hasattr(self.remote_field, "get_related_field")
             else "id"
         )
-        qs = rel_model._default_manager.complex_filter(limit_choices_to)
+        qs = rel_model.objects.complex_filter(limit_choices_to)
         if ordering:
             qs = qs.order_by(*ordering)
         return (blank_choice if include_blank else []) + [

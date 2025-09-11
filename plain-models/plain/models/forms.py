@@ -721,7 +721,7 @@ def modelfield_to_formfield(
 
     if isinstance(modelfield, models.ForeignKey):
         return ModelChoiceField(
-            queryset=modelfield.remote_field.model._default_manager,
+            queryset=modelfield.remote_field.model.objects,
             **defaults,
         )
 

@@ -1,8 +1,8 @@
 from app.examples.models import (
     CustomManager,
     CustomManagerModel,
+    CustomQuerySetModel,
     DefaultManagerModel,
-    NoObjectsModel,
 )
 
 from plain.models.manager import Manager
@@ -11,30 +11,15 @@ from plain.models.manager import Manager
 def test_model_has_default_objects_manager():
     """Test that models get objects manager by default."""
 
-    # Should have objects manager
+    # Should have objects property
     assert hasattr(DefaultManagerModel, "objects")
     assert isinstance(DefaultManagerModel.objects, Manager)
 
-    # objects should be the default manager
-    assert DefaultManagerModel._default_manager is DefaultManagerModel.objects
+    # manager should be a Manager instance
+    assert isinstance(DefaultManagerModel._meta.manager, Manager)
     # base_manager may be different - it's used for internal operations
-    assert DefaultManagerModel._base_manager is not None
-    assert isinstance(DefaultManagerModel._base_manager, Manager)
-
-
-def test_model_with_objects_none():
-    """Test that setting objects = None removes the manager."""
-
-    # Should not have objects manager
-    assert not hasattr(NoObjectsModel, "objects") or NoObjectsModel.objects is None
-
-    # Should still have base_manager and default_manager
-    assert hasattr(NoObjectsModel, "_base_manager")
-    assert hasattr(NoObjectsModel, "_default_manager")
-
-    # These should be different Manager instances
-    assert NoObjectsModel._base_manager is not None
-    assert isinstance(NoObjectsModel._base_manager, Manager)
+    assert DefaultManagerModel._meta.base_manager is not None
+    assert isinstance(DefaultManagerModel._meta.base_manager, Manager)
 
 
 def test_model_with_custom_manager():
@@ -45,49 +30,51 @@ def test_model_with_custom_manager():
     assert isinstance(CustomManagerModel.objects, CustomManager)
     assert hasattr(CustomManagerModel.objects, "get_custom")
 
-    # Custom manager should be the default manager
-    assert CustomManagerModel._default_manager is CustomManagerModel.objects
+    # Custom manager should be the manager
+    assert isinstance(CustomManagerModel._meta.manager, CustomManager)
     # base_manager may be different - it's used for internal operations
-    assert CustomManagerModel._base_manager is not None
-    assert isinstance(CustomManagerModel._base_manager, Manager)
+    assert CustomManagerModel._meta.base_manager is not None
+    assert isinstance(CustomManagerModel._meta.base_manager, Manager)
 
 
 def test_field_named_objects_validation():
-    """Test that defining a field named 'objects' raises a validation error."""
-    import pytest
-
+    """Test that objects is always a manager property, fields can't override it."""
     from plain import models
 
-    # This should fail - objects cannot be a field
-    with pytest.raises(
-        TypeError, match="attribute 'objects' must be either None or a Manager instance"
-    ):
+    # Even if we define a field named objects, the property takes precedence
+    @models.register_model
+    class FieldObjectsModel(models.Model):
+        objects = models.CharField(
+            max_length=100
+        )  # This field exists but won't override objects property
+        name = models.CharField(max_length=100)
 
-        @models.register_model
-        class FieldObjectsModel(models.Model):
-            objects = models.CharField(max_length=100)  # This should cause a TypeError
-            name = models.CharField(max_length=100)
+        class Meta:
+            package_label = "test_app"
 
-            class Meta:
-                package_label = "test_app"
+    # The objects property takes precedence over the field
+    assert hasattr(FieldObjectsModel, "objects")
+    assert isinstance(FieldObjectsModel.objects, Manager)
 
 
-def test_base_manager_default_manager_without_objects():
-    """Test that base_manager and default_manager work even without objects."""
+def test_base_manager_manager_consistency():
+    """Test that base_manager and manager work consistently."""
 
-    # Should have working base and default managers
-    base_manager = NoObjectsModel._base_manager
+    # Should have working base and manager
+    base_manager = DefaultManagerModel._meta.base_manager
+    manager = DefaultManagerModel._meta.manager
 
     assert base_manager is not None
     assert isinstance(base_manager, Manager)
+    assert manager is not None
+    assert isinstance(manager, Manager)
 
-    # default_manager might be None if no managers are defined
-    # but base_manager should always exist for internal operations
+    # base_manager should always exist for internal operations
     assert hasattr(base_manager, "get_queryset")
 
     # These managers should be usable for basic operations
     qs = base_manager.get_queryset()
-    assert qs.model is NoObjectsModel
+    assert qs.model is DefaultManagerModel
 
 
 def test_objects_manager_contributes_to_class():
@@ -95,28 +82,47 @@ def test_objects_manager_contributes_to_class():
 
     # The manager should be properly set up with the model
     assert DefaultManagerModel.objects.model is DefaultManagerModel
-    assert DefaultManagerModel.objects.name == "objects"
 
-    # Should be in the model's meta managers
-    manager_names = [m.name for m in DefaultManagerModel._meta.managers]
-    assert "objects" in manager_names
+
+def test_model_with_custom_queryset_manager():
+    """Test that QuerySet classes work as manager_class via Manager.from_queryset()."""
+
+    # Should have manager created from Manager.from_queryset(CustomQuerySet)
+    assert hasattr(CustomQuerySetModel, "objects")
+    assert isinstance(CustomQuerySetModel.objects, Manager)
+    assert hasattr(CustomQuerySetModel.objects, "get_custom_qs")
+
+    # The manager should be created from Manager.from_queryset(CustomQuerySet)
+    assert isinstance(CustomQuerySetModel._meta.manager, Manager)
+    assert hasattr(CustomQuerySetModel._meta.manager, "get_custom_qs")
 
 
 def test_objects_validation():
-    """Test that objects attribute is validated to be None or Manager."""
-    import pytest
-
+    """Test that objects property always returns a manager regardless of class attributes."""
     from plain import models
 
-    # This should fail - objects is not None or a Manager
-    with pytest.raises(
-        TypeError, match="attribute 'objects' must be either None or a Manager instance"
-    ):
+    # Even if we set objects to something else, the property takes precedence
+    @models.register_model
+    class BadObjectsModel(models.Model):
+        objects = "not a manager"  # This won't affect the objects property
+        name = models.CharField(max_length=100)
 
-        @models.register_model
-        class BadObjectsModel(models.Model):
-            objects = "not a manager"  # This should cause a TypeError
-            name = models.CharField(max_length=100)
+        class Meta:
+            package_label = "test_app"
 
-            class Meta:
-                package_label = "test_app"
+    # Should have the default manager, not the string
+    assert isinstance(BadObjectsModel.objects, Manager)
+
+
+def test_instance_cannot_access_objects():
+    """Test that model instances don't have .objects attribute (should raise AttributeError)."""
+    import pytest
+
+    # Test accessing .objects on class (should work)
+    assert hasattr(DefaultManagerModel, "objects")
+    assert isinstance(DefaultManagerModel.objects, Manager)
+
+    # Test accessing .objects on instance (should raise AttributeError)
+    instance = DefaultManagerModel(name="test")
+    with pytest.raises(AttributeError):
+        _ = instance.objects

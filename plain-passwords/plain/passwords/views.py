@@ -67,7 +67,7 @@ class PasswordResetView(FormView):
 
         UserModel = get_user_model()
         try:
-            user = UserModel._default_manager.get(id=data["id"])
+            user = UserModel.objects.get(id=data["id"])
         except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
             return
 

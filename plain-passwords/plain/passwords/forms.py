@@ -40,7 +40,7 @@ class PasswordResetForm(forms.Form):
         that prevent inactive users and users with unusable passwords from
         resetting their password.
         """
-        active_users = get_user_model()._default_manager.filter(email__iexact=email)
+        active_users = get_user_model().objects.filter(email__iexact=email)
         return (u for u in active_users if unicode_ci_compare(email, u.email))
 
     def save(

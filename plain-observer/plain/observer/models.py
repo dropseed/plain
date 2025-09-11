@@ -316,9 +316,8 @@ class Span(models.Model):
     status = models.CharField(max_length=50, default="", required=False)
     span_data = models.JSONField(default=dict, required=False)
 
-    objects = SpanQuerySet.as_manager()
-
     class Meta:
+        manager_class = SpanQuerySet
         ordering = ["-start_time"]
         constraints = [
             models.UniqueConstraint(

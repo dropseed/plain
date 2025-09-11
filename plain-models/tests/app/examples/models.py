@@ -70,16 +70,13 @@ class DefaultManagerModel(models.Model):
     name = models.CharField(max_length=100)
 
 
-@models.register_model
-class NoObjectsModel(models.Model):
-    """Model that explicitly sets objects = None."""
-
-    objects = None
-    name = models.CharField(max_length=100)
-
-
 class CustomManager(models.Manager):
     def get_custom(self):
+        return self.filter(name__startswith="custom")
+
+
+class CustomQuerySet(models.QuerySet):
+    def get_custom_qs(self):
         return self.filter(name__startswith="custom")
 
 
@@ -87,5 +84,17 @@ class CustomManager(models.Manager):
 class CustomManagerModel(models.Model):
     """Model with a custom manager."""
 
-    objects = CustomManager()
     name = models.CharField(max_length=100)
+
+    class Meta:
+        manager_class = CustomManager
+
+
+@models.register_model
+class CustomQuerySetModel(models.Model):
+    """Model with a custom QuerySet as manager."""
+
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        manager_class = CustomQuerySet

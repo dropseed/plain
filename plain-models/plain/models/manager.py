@@ -1,30 +1,15 @@
 import inspect
 from functools import wraps
-from importlib import import_module
 
 from plain.models.query import QuerySet
 
 
 class BaseManager:
-    def __new__(cls, *args, **kwargs):
-        # Capture the arguments to make returning them trivial.
-        obj = super().__new__(cls)
-        obj._constructor_args = (args, kwargs)
-        return obj
-
-    def __init__(self):
-        super().__init__()
-        self.model = None
-        self.name = None
-
-    def __str__(self):
-        """Return "package_label.model_label.manager_name"."""
-        return f"{self.model._meta.label}.{self.name}"
+    def __init__(self, model):
+        self.model = model
 
     def __class_getitem__(cls, *args, **kwargs):
         return cls
-
-
 
     @classmethod
     def _get_queryset_methods(cls, queryset_class):
@@ -64,14 +49,6 @@ class BaseManager:
             },
         )
 
-    def contribute_to_class(self, cls, name):
-        self.name = self.name or name
-        self.model = cls
-
-        setattr(cls, name, ManagerDescriptor(self))
-
-        cls._meta.add_manager(self)
-
     #######################
     # PROXIES TO QUERYSET #
     #######################
@@ -104,16 +81,3 @@ class BaseManager:
 
 class Manager(BaseManager.from_queryset(QuerySet)):
     pass
-
-
-class ManagerDescriptor:
-    def __init__(self, manager):
-        self.manager = manager
-
-    def __get__(self, instance, cls=None):
-        if instance is not None:
-            raise AttributeError(
-                f"Manager isn't accessible via {cls.__name__} instances"
-            )
-
-        return cls._meta.managers_map[self.manager.name]

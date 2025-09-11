@@ -21,9 +21,8 @@ class CachedItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    objects = CachedItemQuerySet.as_manager()
-
     class Meta:
+        manager_class = CachedItemQuerySet
         indexes = [
             models.Index(fields=["expires_at"]),
         ]

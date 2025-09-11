@@ -283,17 +283,6 @@ class QuerySet:
             self._iterable_class = ValuesIterable
         self._query = value
 
-    @classmethod
-    def as_manager(cls):
-        # Address the circular dependency between `Queryset` and `Manager`.
-        from plain.models.manager import Manager
-
-        manager = Manager.from_queryset(cls)()
-        manager._built_with_as_manager = True
-        return manager
-
-    as_manager.queryset_only = True
-
     ########################
     # PYTHON MAGIC METHODS #
     ########################
@@ -424,12 +413,12 @@ class QuerySet:
         query = (
             self
             if self.query.can_filter()
-            else self.model._base_manager.filter(id__in=self.values("id"))
+            else self.model._meta.base_manager.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.query.can_filter():
-            other = other.model._base_manager.filter(id__in=other.values("id"))
+            other = other.model._meta.base_manager.filter(id__in=other.values("id"))
         combined.query.combine(other.query, sql.OR)
         return combined
 
@@ -443,12 +432,12 @@ class QuerySet:
         query = (
             self
             if self.query.can_filter()
-            else self.model._base_manager.filter(id__in=self.values("id"))
+            else self.model._meta.base_manager.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.query.can_filter():
-            other = other.model._base_manager.filter(id__in=other.values("id"))
+            other = other.model._meta.base_manager.filter(id__in=other.values("id"))
         combined.query.combine(other.query, sql.XOR)
         return combined
 

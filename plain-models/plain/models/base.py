@@ -24,7 +24,6 @@ from plain.models.deletion import Collector
 from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.reverse_related import ForeignObjectRel
-from plain.models.manager import BaseManager, Manager
 from plain.models.options import Options
 from plain.models.query import F, Q
 from plain.packages import packages_registry
@@ -75,7 +74,7 @@ class ModelBase(type):
         new_class._add_exceptions()
 
         # Now go back over all the attrs on this class see if they have a contribute_to_class() method.
-        # Attributes with contribute_to_class are fields, meta options, and managers.
+        # Attributes with contribute_to_class are fields and meta options.
         for attr_name, attr_value in inspect.getmembers(new_class):
             if attr_name.startswith("_"):
                 continue
@@ -154,13 +153,6 @@ class ModelBase(type):
         opts = cls._meta
         opts._prepare(cls)
 
-        # Validate that 'objects' is either None or a Manager
-        if cls.objects is not None and not isinstance(cls.objects, BaseManager):
-            raise TypeError(
-                f"Model {cls.__name__} attribute 'objects' must be either None "
-                f"or a Manager instance, got {type(cls.objects).__name__}"
-            )
-
         # Give the class a docstring -- its definition.
         if cls.__doc__ is None:
             cls.__doc__ = "{}({})".format(
@@ -176,12 +168,8 @@ class ModelBase(type):
                 index.set_name_with_model(cls)
 
     @property
-    def _base_manager(cls):
-        return cls._meta.base_manager
-
-    @property
-    def _default_manager(cls):
-        return cls._meta.default_manager
+    def objects(cls):
+        return cls._meta.manager
 
 
 class ModelStateFieldsCacheDescriptor:
@@ -204,7 +192,6 @@ class ModelState:
 
 
 class Model(metaclass=ModelBase):
-    objects = Manager()
     DoesNotExist: type[ObjectDoesNotExist]
     MultipleObjectsReturned: type[MultipleObjectsReturned]
 
@@ -435,7 +422,9 @@ class Model(metaclass=ModelBase):
                     "are not allowed in fields."
                 )
 
-        db_instance_qs = self.__class__._base_manager.get_queryset().filter(id=self.id)
+        db_instance_qs = self.__class__._meta.base_manager.get_queryset().filter(
+            id=self.id
+        )
 
         # Use provided fields, if not set then reload all non-deferred fields.
         deferred_fields = self.get_deferred_fields()
@@ -618,7 +607,7 @@ class Model(metaclass=ModelBase):
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
         if id_set and not force_insert:
-            base_qs = cls._base_manager
+            base_qs = meta.base_manager
             values = [
                 (
                     f,
@@ -642,7 +631,7 @@ class Model(metaclass=ModelBase):
                 fields = [f for f in fields if f is not id_field]
 
             returning_fields = meta.db_returning_fields
-            results = self._do_insert(cls._base_manager, fields, returning_fields, raw)
+            results = self._do_insert(meta.base_manager, fields, returning_fields, raw)
             if results:
                 for value, field in zip(results[0], returning_fields):
                     setattr(self, field.attname, value)
@@ -739,7 +728,7 @@ class Model(metaclass=ModelBase):
         q = Q.create([(field.name, param), (f"id__{op}", self.id)], connector=Q.AND)
         q = Q.create([q, (f"{field.name}__{op}", param)], connector=Q.OR)
         qs = (
-            self.__class__._default_manager.filter(**kwargs)
+            self.__class__.objects.filter(**kwargs)
             .filter(q)
             .order_by(f"{order}{field.name}", f"{order}id")
         )
@@ -837,7 +826,7 @@ class Model(metaclass=ModelBase):
             if len(unique_check) != len(lookup_kwargs):
                 continue
 
-            qs = model_class._default_manager.filter(**lookup_kwargs)
+            qs = model_class.objects.filter(**lookup_kwargs)
 
             # Exclude the current object from the query if we are editing an
             # instance (as opposed to creating a new one)
@@ -1043,7 +1032,6 @@ class Model(metaclass=ModelBase):
                 )
             )
         return errors
-
 
     @classmethod
     def _check_fields(cls, **kwargs):

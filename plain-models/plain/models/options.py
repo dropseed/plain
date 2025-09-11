@@ -1,5 +1,4 @@
 import bisect
-import copy
 import inspect
 from collections import defaultdict
 from functools import cached_property
@@ -24,12 +23,12 @@ IMMUTABLE_WARNING = (
 DEFAULT_NAMES = (
     "db_table",
     "db_table_comment",
+    "manager_class",
     "ordering",
     "package_label",
     "models_registry",
     "required_db_features",
     "required_db_vendor",
-    "default_manager_name",
     "indexes",
     "constraints",
 )
@@ -47,10 +46,8 @@ class Options:
         "local_concrete_fields",
         "_non_pk_concrete_field_names",
         "_forward_fields_map",
-        "managers",
-        "managers_map",
         "base_manager",
-        "default_manager",
+        "manager",
     }
     REVERSE_PROPERTIES = {"related_objects", "fields_map", "_relation_tree"}
 
@@ -60,8 +57,7 @@ class Options:
         self._get_fields_cache = {}
         self.local_fields = []
         self.local_many_to_many = []
-        self.local_managers = []
-        self.default_manager_name = None
+        self.manager_class = None
         self.model_name = None
         self.db_table = ""
         self.db_table_comment = ""
@@ -164,10 +160,6 @@ class Options:
         if not any(f.name == "id" for f in self.local_fields):
             model.add_to_class("id", PrimaryKeyField())
 
-    def add_manager(self, manager):
-        self.local_managers.append(manager)
-        self._expire_cache()
-
     def add_field(self, field, private=False):
         # Insert the given field in the order in which it was created, using
         # the "creation_counter" attribute of the field.
@@ -220,30 +212,6 @@ class Options:
         return True
 
     @cached_property
-    def managers(self):
-        managers = []
-        seen_managers = set()
-        bases = (b for b in self.model.mro() if hasattr(b, "_meta"))
-        for depth, base in enumerate(bases):
-            for index, manager in enumerate(base._meta.local_managers):
-                if manager.name in seen_managers:
-                    continue
-
-                manager = copy.copy(manager)
-                manager.model = self.model
-                seen_managers.add(manager.name)
-                managers.append((depth, index, manager))
-
-        return make_immutable_fields_list(
-            "managers",
-            (m[2] for m in sorted(managers)),
-        )
-
-    @cached_property
-    def managers_map(self):
-        return {manager.name: manager for manager in self.managers}
-
-    @cached_property
     def base_manager(self):
         """
         The base manager is used by Plain's internal operations like cascading
@@ -255,31 +223,20 @@ class Options:
         objects), the base manager must never filter out rows to prevent
         incomplete results in related queries.
         """
-        manager = Manager()
-        manager.name = "_base_manager"
-        manager.model = self.model
-        return manager
+        return Manager(model=self.model)
 
     @cached_property
-    def default_manager(self):
-        default_manager_name = self.default_manager_name
-        if not default_manager_name and not self.local_managers:
-            # Get the first parent's default_manager_name if there's one.
-            for parent in self.model.mro()[1:]:
-                if hasattr(parent, "_meta"):
-                    default_manager_name = parent._meta.default_manager_name
-                    break
+    def manager(self):
+        if self.manager_class:
+            from plain.models.query import QuerySet
 
-        if default_manager_name:
-            try:
-                return self.managers_map[default_manager_name]
-            except KeyError:
-                raise ValueError(
-                    f"{self.object_name} has no manager named {default_manager_name!r}"
-                )
-
-        if self.managers:
-            return self.managers[0]
+            # It's a QuerySet class, convert it to a Manager class
+            if issubclass(self.manager_class, QuerySet):
+                manager_class = Manager.from_queryset(self.manager_class)
+                return manager_class(model=self.model)
+            else:
+                return self.manager_class(model=self.model)
+        return Manager(model=self.model)
 
     @cached_property
     def fields(self):

@@ -422,7 +422,6 @@ class AlterModelOptions(ModelOptionOperation):
 
     # Model options we want to compare and preserve in an AlterModelOptions op
     ALTER_OPTION_KEYS = [
-        "default_manager_name",
         "ordering",
     ]
 

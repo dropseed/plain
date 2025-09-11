@@ -164,9 +164,8 @@ class Job(models.Model):
     trace_id = models.CharField(max_length=34, required=False, allow_null=True)
     span_id = models.CharField(max_length=18, required=False, allow_null=True)
 
-    objects = JobQuerySet.as_manager()
-
     class Meta:
+        manager_class = JobQuerySet
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),
@@ -387,9 +386,8 @@ class JobResult(models.Model):
     trace_id = models.CharField(max_length=34, required=False, allow_null=True)
     span_id = models.CharField(max_length=18, required=False, allow_null=True)
 
-    objects = JobResultQuerySet.as_manager()
-
     class Meta:
+        manager_class = JobResultQuerySet
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),
