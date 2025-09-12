@@ -90,7 +90,7 @@ def test_dummy_signup(db, settings):
     user = response.user
     assert user.username == "dummy_username"
     assert user.email == "dummy@example.com"
-    connections = user.oauth_connections.all()
+    connections = user.oauth_connections.objects.all()
     assert len(connections) == 1
     assert connections[0].provider_key == "dummy"
     assert connections[0].provider_user_id == "dummy_id"
@@ -172,7 +172,7 @@ def test_dummy_login_connection(db, settings):
     user = response.user
     assert user.username == "dummy_username"
     assert user.email == "dummy@example.com"
-    connections = user.oauth_connections.all()
+    connections = user.oauth_connections.objects.all()
     assert len(connections) == 1
     assert connections[0].provider_key == "dummy"
     assert connections[0].provider_user_id == "dummy_id"
@@ -277,7 +277,7 @@ def test_dummy_connect(db, settings):
 
     # Check the user and connection that was created
     user = response.user
-    connections = user.oauth_connections.all()
+    connections = user.oauth_connections.objects.all()
     assert len(connections) == 1
     assert connections[0].provider_key == "dummy"
     assert connections[0].provider_user_id == "dummy_id"

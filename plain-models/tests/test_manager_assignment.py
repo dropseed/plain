@@ -1,44 +1,44 @@
 from app.examples.models import (
-    CustomManager,
-    CustomManagerModel,
+    CustomQuerySet,
     CustomQuerySetModel,
-    DefaultManagerModel,
+    CustomSpecialQuerySetModel,
+    DefaultQuerySetModel,
 )
 
-from plain.models.manager import Manager
+from plain.models.query import QuerySet
 
 
-def test_model_has_default_objects_manager():
-    """Test that models get objects manager by default."""
+def test_model_has_default_objects_queryset():
+    """Test that models get objects QuerySet by default."""
 
     # Should have objects property
-    assert hasattr(DefaultManagerModel, "objects")
-    assert isinstance(DefaultManagerModel.objects, Manager)
+    assert hasattr(DefaultQuerySetModel, "objects")
+    assert isinstance(DefaultQuerySetModel.objects, QuerySet)
 
-    # manager should be a Manager instance
-    assert isinstance(DefaultManagerModel._meta.manager, Manager)
-    # base_manager may be different - it's used for internal operations
-    assert DefaultManagerModel._meta.base_manager is not None
-    assert isinstance(DefaultManagerModel._meta.base_manager, Manager)
+    # objects should be a QuerySet instance
+    assert isinstance(DefaultQuerySetModel._meta.queryset, QuerySet)
+    # base_queryset may be different - it's used for internal operations
+    assert DefaultQuerySetModel._meta.base_queryset is not None
+    assert isinstance(DefaultQuerySetModel._meta.base_queryset, QuerySet)
 
 
-def test_model_with_custom_manager():
-    """Test that custom managers work correctly."""
+def test_model_with_custom_queryset():
+    """Test that custom QuerySets work correctly."""
 
     # Should have custom manager as objects
-    assert hasattr(CustomManagerModel, "objects")
-    assert isinstance(CustomManagerModel.objects, CustomManager)
-    assert hasattr(CustomManagerModel.objects, "get_custom")
+    assert hasattr(CustomQuerySetModel, "objects")
+    assert isinstance(CustomQuerySetModel.objects, CustomQuerySet)
+    assert hasattr(CustomQuerySetModel.objects, "get_custom")
 
-    # Custom manager should be the manager
-    assert isinstance(CustomManagerModel._meta.manager, CustomManager)
-    # base_manager may be different - it's used for internal operations
-    assert CustomManagerModel._meta.base_manager is not None
-    assert isinstance(CustomManagerModel._meta.base_manager, Manager)
+    # Custom QuerySet should be the manager
+    assert isinstance(CustomQuerySetModel._meta.queryset, CustomQuerySet)
+    # base_queryset may be different - it's used for internal operations
+    assert CustomQuerySetModel._meta.base_queryset is not None
+    assert isinstance(CustomQuerySetModel._meta.base_queryset, QuerySet)
 
 
 def test_field_named_objects_validation():
-    """Test that objects is always a manager property, fields can't override it."""
+    """Test that objects is always a QuerySet property, fields can't override it."""
     from plain import models
 
     # Even if we define a field named objects, the property takes precedence
@@ -54,51 +54,44 @@ def test_field_named_objects_validation():
 
     # The objects property takes precedence over the field
     assert hasattr(FieldObjectsModel, "objects")
-    assert isinstance(FieldObjectsModel.objects, Manager)
+    assert isinstance(FieldObjectsModel.objects, QuerySet)
 
 
-def test_base_manager_manager_consistency():
-    """Test that base_manager and manager work consistently."""
+def test_base_queryset_consistency():
+    """Test that base_queryset and queryset work consistently."""
 
-    # Should have working base and manager
-    base_manager = DefaultManagerModel._meta.base_manager
-    manager = DefaultManagerModel._meta.manager
+    # Should have working base and queryset
+    base_queryset = DefaultQuerySetModel._meta.base_queryset
+    queryset = DefaultQuerySetModel._meta.queryset
 
-    assert base_manager is not None
-    assert isinstance(base_manager, Manager)
-    assert manager is not None
-    assert isinstance(manager, Manager)
-
-    # base_manager should always exist for internal operations
-    assert hasattr(base_manager, "get_queryset")
-
-    # These managers should be usable for basic operations
-    qs = base_manager.get_queryset()
-    assert qs.model is DefaultManagerModel
+    assert base_queryset is not None
+    assert isinstance(base_queryset, QuerySet)
+    assert queryset is not None
+    assert isinstance(queryset, QuerySet)
 
 
-def test_objects_manager_contributes_to_class():
-    """Test that objects manager properly contributes to the class."""
+def test_objects_queryset_contributes_to_class():
+    """Test that objects QuerySet properly contributes to the class."""
 
-    # The manager should be properly set up with the model
-    assert DefaultManagerModel.objects.model is DefaultManagerModel
+    # The QuerySet should be properly set up with the model
+    assert DefaultQuerySetModel.objects.model is DefaultQuerySetModel
 
 
-def test_model_with_custom_queryset_manager():
-    """Test that QuerySet classes work as manager_class via Manager.from_queryset()."""
+def test_model_with_custom_special_queryset():
+    """Test that QuerySet classes work as queryset_class directly."""
 
-    # Should have manager created from Manager.from_queryset(CustomQuerySet)
-    assert hasattr(CustomQuerySetModel, "objects")
-    assert isinstance(CustomQuerySetModel.objects, Manager)
-    assert hasattr(CustomQuerySetModel.objects, "get_custom_qs")
+    # Should have QuerySet with custom methods
+    assert hasattr(CustomSpecialQuerySetModel, "objects")
+    assert isinstance(CustomSpecialQuerySetModel.objects, QuerySet)
+    assert hasattr(CustomSpecialQuerySetModel.objects, "get_custom_qs")
 
-    # The manager should be created from Manager.from_queryset(CustomQuerySet)
-    assert isinstance(CustomQuerySetModel._meta.manager, Manager)
-    assert hasattr(CustomQuerySetModel._meta.manager, "get_custom_qs")
+    # The manager should be the custom QuerySet
+    assert isinstance(CustomSpecialQuerySetModel._meta.queryset, QuerySet)
+    assert hasattr(CustomSpecialQuerySetModel._meta.queryset, "get_custom_qs")
 
 
 def test_objects_validation():
-    """Test that objects property always returns a manager regardless of class attributes."""
+    """Test that objects property always returns a QuerySet regardless of class attributes."""
     from plain import models
 
     # Even if we set objects to something else, the property takes precedence
@@ -110,8 +103,8 @@ def test_objects_validation():
         class Meta:
             package_label = "test_app"
 
-    # Should have the default manager, not the string
-    assert isinstance(BadObjectsModel.objects, Manager)
+    # Should have the default QuerySet, not the string
+    assert isinstance(BadObjectsModel.objects, QuerySet)
 
 
 def test_instance_cannot_access_objects():
@@ -119,10 +112,10 @@ def test_instance_cannot_access_objects():
     import pytest
 
     # Test accessing .objects on class (should work)
-    assert hasattr(DefaultManagerModel, "objects")
-    assert isinstance(DefaultManagerModel.objects, Manager)
+    assert hasattr(DefaultQuerySetModel, "objects")
+    assert isinstance(DefaultQuerySetModel.objects, QuerySet)
 
     # Test accessing .objects on instance (should raise AttributeError)
-    instance = DefaultManagerModel(name="test")
+    instance = DefaultQuerySetModel(name="test")
     with pytest.raises(AttributeError):
         _ = instance.objects

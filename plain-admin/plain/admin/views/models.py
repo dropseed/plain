@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from plain import models
 from plain.exceptions import FieldError
-from plain.models import Manager, Q
+from plain.models import Q, QuerySet
 
 from .objects import (
     AdminCreateView,
@@ -35,8 +35,8 @@ def get_model_field(instance, field):
 
     attr = getattr(instance, field)
 
-    if isinstance(attr, Manager):
-        # Automatically get .all() of related managers
+    if isinstance(attr, QuerySet):
+        # Automatically get .all() of related querysets
         return attr.all()
 
     return attr

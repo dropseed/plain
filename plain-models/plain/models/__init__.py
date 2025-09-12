@@ -59,7 +59,6 @@ from .fields.json import JSONField
 from .indexes import *  # NOQA
 from .indexes import __all__ as indexes_all
 from .lookups import Lookup, Transform
-from .manager import Manager
 from .query import Prefetch, QuerySet, prefetch_related_objects
 from .query_utils import FilteredRelation, Q
 from .registry import models_registry, register_model
@@ -108,7 +107,6 @@ __all__ += [
     "JSONField",
     "Lookup",
     "Transform",
-    "Manager",
     "Prefetch",
     "Q",
     "QuerySet",

@@ -669,7 +669,7 @@ class ForeignKey(RelatedField):
         if value is None:
             return
 
-        qs = self.remote_field.model._meta.base_manager.filter(
+        qs = self.remote_field.model._meta.base_queryset.filter(
             **{self.remote_field.field_name: value}
         )
         qs = qs.complex_filter(self.get_limit_choices_to())

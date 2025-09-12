@@ -165,7 +165,7 @@ class Job(models.Model):
     span_id = models.CharField(max_length=18, required=False, allow_null=True)
 
     class Meta:
-        manager_class = JobQuerySet
+        queryset_class = JobQuerySet
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),
@@ -387,7 +387,7 @@ class JobResult(models.Model):
     span_id = models.CharField(max_length=18, required=False, allow_null=True)
 
     class Meta:
-        manager_class = JobResultQuerySet
+        queryset_class = JobResultQuerySet
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),

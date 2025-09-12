@@ -62,7 +62,7 @@ def test_github_provider(db, settings):
     user = response.user
     assert user.username == "userone"
     assert user.email == "user@example.com"
-    connections = user.oauth_connections.all()
+    connections = user.oauth_connections.objects.all()
     assert len(connections) == 1
     assert connections[0].provider_key == "github"
     assert connections[0].provider_user_id == "99"

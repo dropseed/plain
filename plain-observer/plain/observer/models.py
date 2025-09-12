@@ -188,7 +188,9 @@ class Trace(models.Model):
         )
 
     def as_dict(self):
-        spans = [span.span_data for span in self.spans.all().order_by("start_time")]
+        spans = [
+            span.span_data for span in self.spans.objects.all().order_by("start_time")
+        ]
         logs = [
             {
                 "timestamp": log.timestamp.isoformat(),
@@ -196,7 +198,7 @@ class Trace(models.Model):
                 "message": log.message,
                 "span_id": log.span_id,
             }
-            for log in self.logs.all().order_by("timestamp")
+            for log in self.logs.objects.all().order_by("timestamp")
         ]
 
         return {
@@ -219,7 +221,7 @@ class Trace(models.Model):
         """Get chronological list of spans and logs for unified timeline display."""
         events = []
 
-        for span in self.spans.all().annotate_spans():
+        for span in self.spans.objects.all().annotate_spans():
             events.append(
                 {
                     "type": "span",
@@ -230,7 +232,7 @@ class Trace(models.Model):
             )
 
             # Add logs for this span
-            for log in self.logs.filter(span=span):
+            for log in self.logs.objects.filter(span=span):
                 events.append(
                     {
                         "type": "log",
@@ -241,7 +243,7 @@ class Trace(models.Model):
                 )
 
         # Add unlinked logs (logs without span)
-        for log in self.logs.filter(span__isnull=True):
+        for log in self.logs.objects.filter(span__isnull=True):
             events.append(
                 {
                     "type": "log",
@@ -317,7 +319,7 @@ class Span(models.Model):
     span_data = models.JSONField(default=dict, required=False)
 
     class Meta:
-        manager_class = SpanQuerySet
+        queryset_class = SpanQuerySet
         ordering = ["-start_time"]
         constraints = [
             models.UniqueConstraint(

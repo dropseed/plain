@@ -12,7 +12,7 @@ def test_create_unique_constraint(db):
 
     assert (
         str(e)
-        == "<ExceptionInfo ValidationError({'__all__': ['A car with this make and model already exists.']}) tblen=5>"
+        == "<ExceptionInfo ValidationError({'__all__': ['A car with this make and model already exists.']}) tblen=4>"
     )
 
     assert Car.objects.count() == 1

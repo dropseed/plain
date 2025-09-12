@@ -123,7 +123,7 @@ class ForwardManyToOneDescriptor:
         return self.field.is_cached(instance)
 
     def get_queryset(self):
-        qs = self.field.remote_field.model._meta.base_manager.get_queryset()
+        qs = self.field.remote_field.model._meta.base_queryset
         return qs.all()
 
     def get_prefetch_queryset(self, instances, queryset=None):
@@ -345,23 +345,27 @@ def create_reverse_many_to_one_manager(superclass, rel):
     """
     Create a manager for the reverse side of a many-to-one relation.
 
-    This manager subclasses another manager, generally the default manager of
-    the related model, and adds behaviors specific to many-to-one relations.
+    This manager adds behaviors specific to many-to-one relations.
     """
 
-    class RelatedManager(superclass):
+    class RelatedManager:
         def __init__(self, instance):
-            super().__init__(model=rel.related_model)
+            self.model = rel.related_model
             self.instance = instance
-
             self.field = rel.field
-
             self.core_filters = {self.field.name: instance}
+            # Store the base queryset class for this model
+            self.base_queryset_class = rel.related_model._meta.queryset.__class__
 
-        def __call__(self, *, manager):
-            manager = getattr(self.model, manager)
-            manager_class = create_reverse_many_to_one_manager(manager.__class__, rel)
-            return manager_class(self.instance)
+        @property
+        def objects(self):
+            """
+            Access the QuerySet for this relationship.
+
+            Example:
+                parent.children.objects.filter(active=True)
+            """
+            return self.get_queryset()
 
         def _check_fk_val(self):
             for field in self.field.foreign_related_fields:
@@ -426,12 +430,13 @@ def create_reverse_many_to_one_manager(superclass, rel):
                     self.field.remote_field.get_cache_name()
                 ]
             except (AttributeError, KeyError):
-                queryset = super().get_queryset()
+                # Use the base queryset class for this model
+                queryset = self.base_queryset_class(model=self.model)
                 return self._apply_rel_filters(queryset)
 
         def get_prefetch_queryset(self, instances, queryset=None):
             if queryset is None:
-                queryset = super().get_queryset()
+                queryset = self.base_queryset_class(model=self.model)
 
             rel_obj_attr = self.field.get_local_related_value
             instance_attr = self.field.get_foreign_related_value
@@ -468,7 +473,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
                             "the object first."
                         )
                     ids.append(obj.id)
-                self.model._meta.base_manager.filter(id__in=ids).update(
+                self.model._meta.base_queryset.filter(id__in=ids).update(
                     **{
                         self.field.name: self.instance,
                     }
@@ -482,17 +487,17 @@ def create_reverse_many_to_one_manager(superclass, rel):
         def create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
-            return super().create(**kwargs)
+            return self.base_queryset_class(model=self.model).create(**kwargs)
 
         def get_or_create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
-            return super().get_or_create(**kwargs)
+            return self.base_queryset_class(model=self.model).get_or_create(**kwargs)
 
         def update_or_create(self, **kwargs):
             self._check_fk_val()
             kwargs[self.field.name] = self.instance
-            return super().update_or_create(**kwargs)
+            return self.base_queryset_class(model=self.model).update_or_create(**kwargs)
 
         # remove() and clear() are only provided if the ForeignKey can have a
         # value of null.
@@ -612,30 +617,30 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
     """
     Create a manager for the either side of a many-to-many relation.
 
-    This manager subclasses another manager, generally the default manager of
-    the related model, and adds behaviors specific to many-to-many relations.
+    This manager adds behaviors specific to many-to-many relations.
     """
 
-    class ManyRelatedManager(superclass):
+    class ManyRelatedManager:
         def __init__(self, instance=None):
             self.instance = instance
 
             if not reverse:
-                model = rel.model
+                self.model = rel.model
                 self.query_field_name = rel.field.related_query_name()
                 self.prefetch_cache_name = rel.field.name
                 self.source_field_name = rel.field.m2m_field_name()
                 self.target_field_name = rel.field.m2m_reverse_field_name()
                 self.symmetrical = rel.symmetrical
             else:
-                model = rel.related_model
+                self.model = rel.related_model
                 self.query_field_name = rel.field.name
                 self.prefetch_cache_name = rel.field.related_query_name()
                 self.source_field_name = rel.field.m2m_reverse_field_name()
                 self.target_field_name = rel.field.m2m_field_name()
                 self.symmetrical = False
 
-            super().__init__(model=model)
+            # Store the base queryset class for this model
+            self.base_queryset_class = self.model._meta.queryset.__class__
 
             self.through = rel.through
             self.reverse = reverse
@@ -665,12 +670,15 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     "a many-to-many relationship can be used."
                 )
 
-        def __call__(self, *, manager):
-            manager = getattr(self.model, manager)
-            manager_class = create_forward_many_to_many_manager(
-                manager.__class__, rel, reverse
-            )
-            return manager_class(instance=self.instance)
+        @property
+        def objects(self):
+            """
+            Access the QuerySet for this relationship.
+
+            Example:
+                book.authors.objects.filter(active=True)
+            """
+            return self.get_queryset()
 
         def _build_remove_filters(self, removed_vals):
             filters = Q.create([(self.source_field_name, self.related_val)])
@@ -709,12 +717,12 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             try:
                 return self.instance._prefetched_objects_cache[self.prefetch_cache_name]
             except (AttributeError, KeyError):
-                queryset = super().get_queryset()
+                queryset = self.base_queryset_class(model=self.model)
                 return self._apply_rel_filters(queryset)
 
         def get_prefetch_queryset(self, instances, queryset=None):
             if queryset is None:
-                queryset = super().get_queryset()
+                queryset = self.base_queryset_class(model=self.model)
 
             queryset = _filter_prefetch_queryset(
                 queryset._next_is_sticky(), self.query_field_name, instances
@@ -777,7 +785,9 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
         def clear(self):
             with transaction.atomic(savepoint=False):
                 self._remove_prefetched_objects()
-                filters = self._build_remove_filters(super().get_queryset())
+                filters = self._build_remove_filters(
+                    self.base_queryset_class(model=self.model)
+                )
                 self.through.objects.filter(filters).delete()
 
         def set(self, objs, *, clear=False, through_defaults=None):
@@ -812,12 +822,14 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     self.add(*new_objs, through_defaults=through_defaults)
 
         def create(self, *, through_defaults=None, **kwargs):
-            new_obj = super().create(**kwargs)
+            new_obj = self.base_queryset_class(model=self.model).create(**kwargs)
             self.add(new_obj, through_defaults=through_defaults)
             return new_obj
 
         def get_or_create(self, *, through_defaults=None, **kwargs):
-            obj, created = super().get_or_create(**kwargs)
+            obj, created = self.base_queryset_class(model=self.model).get_or_create(
+                **kwargs
+            )
             # We only need to add() if created because if we got an object back
             # from get() then the relationship already exists.
             if created:
@@ -825,7 +837,9 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             return obj, created
 
         def update_or_create(self, *, through_defaults=None, **kwargs):
-            obj, created = super().update_or_create(**kwargs)
+            obj, created = self.base_queryset_class(model=self.model).update_or_create(
+                **kwargs
+            )
             # We only need to add() if created because if we got an object back
             # from get() then the relationship already exists.
             if created:
@@ -922,7 +936,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     old_ids.add(obj)
 
             with transaction.atomic(savepoint=False):
-                target_model_qs = super().get_queryset()
+                target_model_qs = self.base_queryset_class(model=self.model)
                 if target_model_qs._has_filters():
                     old_vals = target_model_qs.filter(
                         **{f"{self.target_field.target_field.attname}__in": old_ids}

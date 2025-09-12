@@ -169,7 +169,7 @@ class ModelBase(type):
 
     @property
     def objects(cls):
-        return cls._meta.manager
+        return cls._meta.queryset
 
 
 class ModelStateFieldsCacheDescriptor:
@@ -422,9 +422,7 @@ class Model(metaclass=ModelBase):
                     "are not allowed in fields."
                 )
 
-        db_instance_qs = self.__class__._meta.base_manager.get_queryset().filter(
-            id=self.id
-        )
+        db_instance_qs = self.__class__._meta.base_queryset.filter(id=self.id)
 
         # Use provided fields, if not set then reload all non-deferred fields.
         deferred_fields = self.get_deferred_fields()
@@ -607,7 +605,7 @@ class Model(metaclass=ModelBase):
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
         if id_set and not force_insert:
-            base_qs = meta.base_manager
+            base_qs = meta.base_queryset
             values = [
                 (
                     f,
@@ -631,7 +629,7 @@ class Model(metaclass=ModelBase):
                 fields = [f for f in fields if f is not id_field]
 
             returning_fields = meta.db_returning_fields
-            results = self._do_insert(meta.base_manager, fields, returning_fields, raw)
+            results = self._do_insert(meta.base_queryset, fields, returning_fields, raw)
             if results:
                 for value, field in zip(results[0], returning_fields):
                     setattr(self, field.attname, value)

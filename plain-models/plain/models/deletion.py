@@ -352,7 +352,7 @@ class Collector:
             [(f"{related_field.name}__in", objs) for related_field in related_fields],
             connector=query_utils.Q.OR,
         )
-        return related_model._meta.base_manager.filter(predicate)
+        return related_model._meta.base_queryset.filter(predicate)
 
     def sort(self):
         sorted_models = []

@@ -97,7 +97,7 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
             return self.object.as_dict()
 
         if self.request.query_params.get("logs") == "true":
-            logs = self.object.logs.all().order_by("timestamp")
+            logs = self.object.logs.objects.all().order_by("timestamp")
             log_lines = []
             for log in logs:
                 timestamp = log.timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")

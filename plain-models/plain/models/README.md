@@ -9,7 +9,7 @@
 - [Fields](#fields)
 - [Validation](#validation)
 - [Indexes and constraints](#indexes-and-constraints)
-- [Managers](#managers)
+- [Custom QuerySets](#custom-querysets)
 - [Forms](#forms)
 - [Sharing fields across models](#sharing-fields-across-models)
 - [Installation](#installation)
@@ -85,7 +85,7 @@ Multiple backends are supported, including Postgres, MySQL, and SQLite.
 
 ## Querying
 
-Models come with a powerful query API through their [`Manager`](./manager.py#Manager) interface:
+Models come with a powerful query API through their [`QuerySet`](./query.py#QuerySet) interface:
 
 ```python
 # Get all users
@@ -211,28 +211,71 @@ class User(models.Model):
         ]
 ```
 
-## Managers
+## Custom QuerySets
 
-[`Manager`](./manager.py#Manager) objects provide the interface for querying models:
+With the Manager functionality now merged into QuerySet, you can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. There are several ways to use custom QuerySets:
+
+### Setting a default QuerySet for a model
+
+Use `Meta.queryset_class` to set a custom QuerySet that will be used by `Model.objects`:
 
 ```python
-class PublishedManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset().filter(status="published")
+class PublishedQuerySet(models.QuerySet):
+    def published_only(self):
+        return self.filter(status="published")
 
+    def draft_only(self):
+        return self.filter(status="draft")
+
+@models.register_model
 class Article(models.Model):
     title = models.CharField(max_length=200)
     status = models.CharField(max_length=20)
 
-    # Default manager
-    objects = models.Manager()
+    class Meta:
+        queryset_class = PublishedQuerySet
 
-    # Custom manager
-    published = PublishedManager()
+# Usage - all methods available on Article.objects
+all_articles = Article.objects.all()
+published_articles = Article.objects.published_only()
+draft_articles = Article.objects.draft_only()
+```
+
+### Using custom QuerySets without formal attachment
+
+You can also use custom QuerySets manually without setting them as the default:
+
+```python
+class SpecialQuerySet(models.QuerySet):
+    def special_filter(self):
+        return self.filter(special=True)
+
+# Create and use the QuerySet manually
+special_qs = SpecialQuerySet(model=Article)
+special_articles = special_qs.special_filter()
+```
+
+### Using classmethods for convenience
+
+For even cleaner API, add classmethods to your model:
+
+```python
+@models.register_model
+class Article(models.Model):
+    title = models.CharField(max_length=200)
+    status = models.CharField(max_length=20)
+
+    @classmethod
+    def published(cls):
+        return PublishedQuerySet(model=cls).published_only()
+
+    @classmethod
+    def drafts(cls):
+        return PublishedQuerySet(model=cls).draft_only()
 
 # Usage
-all_articles = Article.objects.all()
-published_articles = Article.published.all()
+published_articles = Article.published()
+draft_articles = Article.drafts()
 ```
 
 ## Forms

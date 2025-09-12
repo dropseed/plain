@@ -387,7 +387,7 @@ def format_trace_output(trace):
     output_lines.append(click.style("Spans:", fg="bright_blue", bold=True))
 
     # Get annotated spans with nesting levels
-    spans = trace.spans.all().annotate_spans()
+    spans = trace.spans.objects.all().annotate_spans()
 
     # Build parent-child relationships
     span_dict = {span.span_id: span for span in spans}

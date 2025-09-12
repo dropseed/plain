@@ -255,7 +255,7 @@ class FlatValuesListIterable(BaseIterable):
 class QuerySet:
     """Represent a lazy database lookup for a set of objects."""
 
-    def __init__(self, model=None, query=None):
+    def __init__(self, *, model=None, query=None):
         self.model = model
         self._query = query or sql.Query(self.model)
         self._result_cache = None
@@ -413,12 +413,12 @@ class QuerySet:
         query = (
             self
             if self.query.can_filter()
-            else self.model._meta.base_manager.filter(id__in=self.values("id"))
+            else self.model._meta.base_queryset.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.query.can_filter():
-            other = other.model._meta.base_manager.filter(id__in=other.values("id"))
+            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))
         combined.query.combine(other.query, sql.OR)
         return combined
 
@@ -432,12 +432,12 @@ class QuerySet:
         query = (
             self
             if self.query.can_filter()
-            else self.model._meta.base_manager.filter(id__in=self.values("id"))
+            else self.model._meta.base_queryset.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.query.can_filter():
-            other = other.model._meta.base_manager.filter(id__in=other.values("id"))
+            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))
         combined.query.combine(other.query, sql.XOR)
         return combined
 
@@ -945,8 +945,6 @@ class QuerySet:
         self._result_cache = None
         return deleted, _rows_count
 
-    delete.queryset_only = True
-
     def _raw_delete(self):
         """
         Delete objects found from the given queryset in single direct SQL
@@ -1014,8 +1012,6 @@ class QuerySet:
         query.annotations = {}
         self._result_cache = None
         return query.get_compiler().execute_sql(CURSOR)
-
-    _update.queryset_only = False
 
     def exists(self):
         """
@@ -1189,7 +1185,7 @@ class QuerySet:
     def all(self):
         """
         Return a new QuerySet that is a copy of the current one. This allows a
-        QuerySet to proxy for a model manager in some cases.
+        QuerySet to proxy for a model queryset in some cases.
         """
         return self._chain()
 
@@ -1553,8 +1549,6 @@ class QuerySet:
         query.insert_values(fields, objs, raw=raw)
         return query.get_compiler().execute_sql(returning_fields)
 
-    _insert.queryset_only = False
-
     def _batched_insert(
         self,
         objs,
@@ -1664,8 +1658,6 @@ class QuerySet:
             raise TypeError("Cannot use multi-field values as a filter value.")
         query = self.query.resolve_expression(*args, **kwargs)
         return query
-
-    resolve_expression.queryset_only = True
 
     def _has_filters(self):
         """
@@ -2157,7 +2149,7 @@ def prefetch_one_level(instances, prefetcher, lookup, level):
         for additional_lookup in getattr(rel_qs, "_prefetch_related_lookups", ())
     ]
     if additional_lookups:
-        # Don't need to clone because the manager should have given us a fresh
+        # Don't need to clone because the queryset should have given us a fresh
         # instance, so we access an internal instead of using public interface
         # for performance reasons.
         rel_qs._prefetch_related_lookups = ()
@@ -2208,11 +2200,11 @@ def prefetch_one_level(instances, prefetcher, lookup, level):
             if as_attr:
                 setattr(obj, to_attr, vals)
             else:
-                manager = getattr(obj, to_attr)
+                queryset = getattr(obj, to_attr)
                 if leaf and lookup.queryset is not None:
-                    qs = manager._apply_rel_filters(lookup.queryset)
+                    qs = queryset._apply_rel_filters(lookup.queryset)
                 else:
-                    qs = manager.get_queryset()
+                    qs = queryset.__class__(model=queryset.model)
                 qs._result_cache = vals
                 # We don't want the individual qs doing prefetch_related now,
                 # since we have merged this into the current work.

@@ -8,7 +8,7 @@ from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import db_connection
 from plain.models.fields import PrimaryKeyField
-from plain.models.manager import Manager
+from plain.models.query import QuerySet
 from plain.utils.datastructures import ImmutableList
 
 PROXY_PARENTS = object()
@@ -23,7 +23,7 @@ IMMUTABLE_WARNING = (
 DEFAULT_NAMES = (
     "db_table",
     "db_table_comment",
-    "manager_class",
+    "queryset_class",
     "ordering",
     "package_label",
     "models_registry",
@@ -46,8 +46,8 @@ class Options:
         "local_concrete_fields",
         "_non_pk_concrete_field_names",
         "_forward_fields_map",
-        "base_manager",
-        "manager",
+        "base_queryset",
+        "queryset",
     }
     REVERSE_PROPERTIES = {"related_objects", "fields_map", "_relation_tree"}
 
@@ -57,7 +57,7 @@ class Options:
         self._get_fields_cache = {}
         self.local_fields = []
         self.local_many_to_many = []
-        self.manager_class = None
+        self.queryset_class = None
         self.model_name = None
         self.db_table = ""
         self.db_table_comment = ""
@@ -211,32 +211,25 @@ class Options:
             )
         return True
 
-    @cached_property
-    def base_manager(self):
+    @property
+    def base_queryset(self):
         """
-        The base manager is used by Plain's internal operations like cascading
+        The base queryset is used by Plain's internal operations like cascading
         deletes, migrations, and related object lookups. It provides access to
-        all objects in the database without any filtering, ensuring Django can
+        all objects in the database without any filtering, ensuring Plain can
         always see the complete dataset when performing framework operations.
 
-        Unlike user-defined managers which may filter results (e.g. only active
-        objects), the base manager must never filter out rows to prevent
+        Unlike user-defined querysets which may filter results (e.g. only active
+        objects), the base queryset must never filter out rows to prevent
         incomplete results in related queries.
         """
-        return Manager(model=self.model)
+        return QuerySet(model=self.model)
 
-    @cached_property
-    def manager(self):
-        if self.manager_class:
-            from plain.models.query import QuerySet
-
-            # It's a QuerySet class, convert it to a Manager class
-            if issubclass(self.manager_class, QuerySet):
-                manager_class = Manager.from_queryset(self.manager_class)
-                return manager_class(model=self.model)
-            else:
-                return self.manager_class(model=self.model)
-        return Manager(model=self.model)
+    @property
+    def queryset(self):
+        if self.queryset_class:
+            return self.queryset_class(model=self.model)
+        return QuerySet(model=self.model)
 
     @cached_property
     def fields(self):

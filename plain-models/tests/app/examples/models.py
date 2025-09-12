@@ -62,39 +62,39 @@ class ChildDoNothing(models.Model):
     parent = models.ForeignKey(DeleteParent, on_delete=models.DO_NOTHING)
 
 
-# Models for testing manager assignment behavior
+# Models for testing QuerySet assignment behavior
 @models.register_model
-class DefaultManagerModel(models.Model):
-    """Model that uses the default objects manager."""
+class DefaultQuerySetModel(models.Model):
+    """Model that uses the default objects QuerySet."""
 
     name = models.CharField(max_length=100)
 
 
-class CustomManager(models.Manager):
+class CustomQuerySet(models.QuerySet):
     def get_custom(self):
         return self.filter(name__startswith="custom")
 
 
-class CustomQuerySet(models.QuerySet):
+class CustomSpecialQuerySet(models.QuerySet):
     def get_custom_qs(self):
         return self.filter(name__startswith="custom")
 
 
 @models.register_model
-class CustomManagerModel(models.Model):
-    """Model with a custom manager."""
+class CustomQuerySetModel(models.Model):
+    """Model with a custom QuerySet."""
 
     name = models.CharField(max_length=100)
 
     class Meta:
-        manager_class = CustomManager
+        queryset_class = CustomQuerySet
 
 
 @models.register_model
-class CustomQuerySetModel(models.Model):
-    """Model with a custom QuerySet as manager."""
+class CustomSpecialQuerySetModel(models.Model):
+    """Model with a custom special QuerySet."""
 
     name = models.CharField(max_length=100)
 
     class Meta:
-        manager_class = CustomQuerySet
+        queryset_class = CustomSpecialQuerySet
