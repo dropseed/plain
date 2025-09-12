@@ -1,5 +1,16 @@
 # plain-support changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-support@0.17.0) (2025-09-12)
+
+### What's changed
+
+- Model managers have been renamed from `.objects` to `.query` throughout the codebase ([037a239](https://github.com/dropseed/plain/commit/037a239ef4))
+- Python 3.13 is now the minimum required version ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- Replace any usage of `.objects` with `.query` when working with Plain models (e.g., `SupportFormEntry.objects.all()` becomes `SupportFormEntry.query.all()`)
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-support@0.16.0) (2025-08-22)
 
 ### What's changed

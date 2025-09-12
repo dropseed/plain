@@ -840,7 +840,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
