@@ -40,7 +40,7 @@ class PasswordResetForm(forms.Form):
         that prevent inactive users and users with unusable passwords from
         resetting their password.
         """
-        active_users = get_user_model().objects.filter(email__iexact=email)
+        active_users = get_user_model().query.filter(email__iexact=email)
         return (u for u in active_users if unicode_ci_compare(email, u.email))
 
     def save(
@@ -139,7 +139,7 @@ class PasswordLoginForm(forms.Form):
         if email and password:
             try:
                 # The vast majority of users won't have a case-sensitive email, so we act that way
-                user = User.objects.get(email__iexact=email)
+                user = User.query.get(email__iexact=email)
             except User.DoesNotExist:
                 # Run the default password hasher once to reduce the timing
                 # difference between an existing and a nonexistent user (django #20760).

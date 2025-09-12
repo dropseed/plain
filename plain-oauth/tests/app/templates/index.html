@@ -5,7 +5,7 @@ Hello {{ request.user }}!
 
 <h2>Existing connections</h2>
 <ul>
-    {% for connection in request.user.oauth_connections.objects.all() %}
+    {% for connection in request.user.oauth_connections.query.all() %}
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         <form action="{{ url('oauth:disconnect', connection.provider_key) }}" method="post">

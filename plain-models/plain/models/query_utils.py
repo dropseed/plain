@@ -361,7 +361,7 @@ def check_rel_lookup_compatibility(model, target_opts, field):
     # model is ok, too. Consider the case:
     # class Restaurant(models.Model):
     #     place = OneToOneField(Place, primary_key=True):
-    # Restaurant.objects.filter(id__in=Restaurant.objects.all()).
+    # Restaurant.query.filter(id__in=Restaurant.query.all()).
     # If we didn't have the primary key check, then id__in (== place__in) would
     # give Place's opts as the target opts, but Restaurant isn't compatible
     # with that. This logic applies only to primary keys, as when doing __in=qs,

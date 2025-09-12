@@ -48,7 +48,7 @@ class ChildSetNull(models.Model):
 @models.register_model
 class ChildSetDefault(models.Model):
     def default_parent_id():
-        return DeleteParent.objects.get(name="default").id
+        return DeleteParent.query.get(name="default").id
 
     parent = models.ForeignKey(
         DeleteParent,

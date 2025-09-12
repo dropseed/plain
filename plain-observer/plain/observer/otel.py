@@ -342,7 +342,7 @@ class ObserverSpanProcessor(SpanProcessor):
                     span.trace = trace
 
                 # Bulk create spans
-                Span.objects.bulk_create(spans)
+                Span.query.bulk_create(spans)
 
                 # Create log models if we have logs
                 if logs:
@@ -362,7 +362,7 @@ class ObserverSpanProcessor(SpanProcessor):
                         )
                         log_models.append(log_model)
 
-                    Log.objects.bulk_create(log_models)
+                    Log.query.bulk_create(log_models)
 
             except Exception as e:
                 logger.warning(
@@ -374,14 +374,14 @@ class ObserverSpanProcessor(SpanProcessor):
             # Delete oldest traces if we exceed the limit
             if settings.OBSERVER_TRACE_LIMIT > 0:
                 try:
-                    if Trace.objects.count() > settings.OBSERVER_TRACE_LIMIT:
+                    if Trace.query.count() > settings.OBSERVER_TRACE_LIMIT:
                         excess_count = (
-                            Trace.objects.count() - settings.OBSERVER_TRACE_LIMIT
+                            Trace.query.count() - settings.OBSERVER_TRACE_LIMIT
                         )
-                        delete_ids = Trace.objects.order_by("start_time")[
+                        delete_ids = Trace.query.order_by("start_time")[
                             :excess_count
                         ].values_list("id", flat=True)
-                        Trace.objects.filter(id__in=delete_ids).delete()
+                        Trace.query.filter(id__in=delete_ids).delete()
                 except Exception as e:
                     logger.warning(
                         "Failed to clean up old observer traces: %s", e, exc_info=True
@@ -401,7 +401,7 @@ class ObserverSpanProcessor(SpanProcessor):
                 from .models import Span
 
                 with suppress_db_tracing():
-                    if Span.objects.filter(
+                    if Span.query.filter(
                         span_id=f"0x{format_span_id(link.context.span_id)}"
                     ).exists():
                         return ObserverMode.PERSIST.value

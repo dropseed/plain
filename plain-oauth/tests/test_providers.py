@@ -60,8 +60,8 @@ def test_dummy_signup(db, settings):
 
     client = Client()
 
-    assert get_user_model().objects.count() == 0
-    assert OAuthConnection.objects.count() == 0
+    assert get_user_model().query.count() == 0
+    assert OAuthConnection.query.count() == 0
 
     # Login required for this view
     response = client.get("/")
@@ -90,7 +90,7 @@ def test_dummy_signup(db, settings):
     user = response.user
     assert user.username == "dummy_username"
     assert user.email == "dummy@example.com"
-    connections = user.oauth_connections.objects.all()
+    connections = user.oauth_connections.query.all()
     assert len(connections) == 1
     assert connections[0].provider_key == "dummy"
     assert connections[0].provider_user_id == "dummy_id"
@@ -103,8 +103,8 @@ def test_dummy_signup(db, settings):
         2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
-    assert get_user_model().objects.count() == 1
-    assert OAuthConnection.objects.count() == 1
+    assert get_user_model().query.count() == 1
+    assert OAuthConnection.query.count() == 1
 
 
 def test_dummy_login_connection(db, settings):
@@ -121,14 +121,14 @@ def test_dummy_login_connection(db, settings):
 
     client = Client()
 
-    assert get_user_model().objects.count() == 0
-    assert OAuthConnection.objects.count() == 0
+    assert get_user_model().query.count() == 0
+    assert OAuthConnection.query.count() == 0
 
     # Create a user
-    user = get_user_model().objects.create(
+    user = get_user_model().query.create(
         username="dummy_username", email="dummy@example.com"
     )
-    OAuthConnection.objects.create(
+    OAuthConnection.query.create(
         user=user,
         provider_key="dummy",
         provider_user_id="dummy_id",
@@ -142,8 +142,8 @@ def test_dummy_login_connection(db, settings):
         ),
     )
 
-    assert get_user_model().objects.count() == 1
-    assert OAuthConnection.objects.count() == 1
+    assert get_user_model().query.count() == 1
+    assert OAuthConnection.query.count() == 1
 
     # Login required for this view
     response = client.get("/")
@@ -172,7 +172,7 @@ def test_dummy_login_connection(db, settings):
     user = response.user
     assert user.username == "dummy_username"
     assert user.email == "dummy@example.com"
-    connections = user.oauth_connections.objects.all()
+    connections = user.oauth_connections.query.all()
     assert len(connections) == 1
     assert connections[0].provider_key == "dummy"
     assert connections[0].provider_user_id == "dummy_id"
@@ -185,8 +185,8 @@ def test_dummy_login_connection(db, settings):
         2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
-    assert get_user_model().objects.count() == 1
-    assert OAuthConnection.objects.count() == 1
+    assert get_user_model().query.count() == 1
+    assert OAuthConnection.query.count() == 1
 
 
 def test_dummy_login_without_connection(db, settings):
@@ -203,16 +203,14 @@ def test_dummy_login_without_connection(db, settings):
 
     client = Client()
 
-    assert get_user_model().objects.count() == 0
-    assert OAuthConnection.objects.count() == 0
+    assert get_user_model().query.count() == 0
+    assert OAuthConnection.query.count() == 0
 
     # Create a user
-    get_user_model().objects.create(
-        username="dummy_username", email="dummy@example.com"
-    )
+    get_user_model().query.create(username="dummy_username", email="dummy@example.com")
 
-    assert get_user_model().objects.count() == 1
-    assert OAuthConnection.objects.count() == 0
+    assert get_user_model().query.count() == 1
+    assert OAuthConnection.query.count() == 0
 
     # Login required for this view
     response = client.get("/")
@@ -247,16 +245,16 @@ def test_dummy_connect(db, settings):
 
     client = Client()
 
-    assert get_user_model().objects.count() == 0
-    assert OAuthConnection.objects.count() == 0
+    assert get_user_model().query.count() == 0
+    assert OAuthConnection.query.count() == 0
 
     # Create a user
-    user = get_user_model().objects.create(
+    user = get_user_model().query.create(
         username="dummy_username", email="dummy@example.com"
     )
 
-    assert get_user_model().objects.count() == 1
-    assert OAuthConnection.objects.count() == 0
+    assert get_user_model().query.count() == 1
+    assert OAuthConnection.query.count() == 0
 
     client.force_login(user)
 
@@ -277,7 +275,7 @@ def test_dummy_connect(db, settings):
 
     # Check the user and connection that was created
     user = response.user
-    connections = user.oauth_connections.objects.all()
+    connections = user.oauth_connections.query.all()
     assert len(connections) == 1
     assert connections[0].provider_key == "dummy"
     assert connections[0].provider_user_id == "dummy_id"
@@ -290,8 +288,8 @@ def test_dummy_connect(db, settings):
         2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
-    assert get_user_model().objects.count() == 1
-    assert OAuthConnection.objects.count() == 1
+    assert get_user_model().query.count() == 1
+    assert OAuthConnection.query.count() == 1
 
 
 # def test_dummy_disconnect_to_password(db, client, settings):
@@ -306,14 +304,14 @@ def test_dummy_connect(db, settings):
 #         }
 #     }
 
-#     assert get_user_model().objects.count() == 0
-#     assert OAuthConnection.objects.count() == 0
+#     assert get_user_model().query.count() == 0
+#     assert OAuthConnection.query.count() == 0
 
 #     # Create a user
-#     user = get_user_model().objects.create(
+#     user = get_user_model().query.create(
 #         username="dummy_username", email="dummy@example.com", password="dummy_password"
 #     )
-#     OAuthConnection.objects.create(
+#     OAuthConnection.query.create(
 #         user=user,
 #         provider_key="dummy",
 #         provider_user_id="dummy_id",
@@ -327,8 +325,8 @@ def test_dummy_connect(db, settings):
 #         ),
 #     )
 
-#     assert get_user_model().objects.count() == 1
-#     assert OAuthConnection.objects.count() == 1
+#     assert get_user_model().query.count() == 1
+#     assert OAuthConnection.query.count() == 1
 
 #     client.force_login(user)
 
@@ -339,8 +337,8 @@ def test_dummy_connect(db, settings):
 #     assert response.status_code == 302
 #     assert response.url == "/"
 
-#     assert get_user_model().objects.count() == 1
-#     assert OAuthConnection.objects.count() == 0
+#     assert get_user_model().query.count() == 1
+#     assert OAuthConnection.query.count() == 0
 
 
 # def test_dummy_disconnect_to_connection(db, client, settings):
@@ -355,14 +353,14 @@ def test_dummy_connect(db, settings):
 #         }
 #     }
 
-#     assert get_user_model().objects.count() == 0
-#     assert OAuthConnection.objects.count() == 0
+#     assert get_user_model().query.count() == 0
+#     assert OAuthConnection.query.count() == 0
 
 #     # Create a user
-#     user = get_user_model().objects.create(
+#     user = get_user_model().query.create(
 #         username="dummy_username", email="dummy@example.com"
 #     )
-#     OAuthConnection.objects.create(
+#     OAuthConnection.query.create(
 #         user=user,
 #         provider_key="dummy",
 #         provider_user_id="dummy_id",
@@ -375,7 +373,7 @@ def test_dummy_connect(db, settings):
 #             2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
 #         ),
 #     )
-#     OAuthConnection.objects.create(
+#     OAuthConnection.query.create(
 #         user=user,
 #         provider_key="dummy",
 #         provider_user_id="dummy_id2",
@@ -389,8 +387,8 @@ def test_dummy_connect(db, settings):
 #         ),
 #     )
 
-#     assert get_user_model().objects.count() == 1
-#     assert OAuthConnection.objects.count() == 2
+#     assert get_user_model().query.count() == 1
+#     assert OAuthConnection.query.count() == 2
 
 #     client.force_login(user)
 
@@ -401,8 +399,8 @@ def test_dummy_connect(db, settings):
 #     assert response.status_code == 302
 #     assert response.url == "/"
 
-#     assert get_user_model().objects.count() == 1
-#     assert OAuthConnection.objects.count() == 1
+#     assert get_user_model().query.count() == 1
+#     assert OAuthConnection.query.count() == 1
 
 
 # def test_dummy_disconnect_last(db, client, settings):
@@ -417,14 +415,14 @@ def test_dummy_connect(db, settings):
 #         }
 #     }
 
-#     assert get_user_model().objects.count() == 0
-#     assert OAuthConnection.objects.count() == 0
+#     assert get_user_model().query.count() == 0
+#     assert OAuthConnection.query.count() == 0
 
 #     # Create a user
-#     user = get_user_model().objects.create(
+#     user = get_user_model().query.create(
 #         username="dummy_username", email="dummy@example.com"
 #     )
-#     OAuthConnection.objects.create(
+#     OAuthConnection.query.create(
 #         user=user,
 #         provider_key="dummy",
 #         provider_user_id="dummy_id",
@@ -438,8 +436,8 @@ def test_dummy_connect(db, settings):
 #         ),
 #     )
 
-#     assert get_user_model().objects.count() == 1
-#     assert OAuthConnection.objects.count() == 1
+#     assert get_user_model().query.count() == 1
+#     assert OAuthConnection.query.count() == 1
 
 #     client.force_login(user)
 
@@ -450,8 +448,8 @@ def test_dummy_connect(db, settings):
 #     assert response.status_code == 400
 #     assert response.templates[0].name == "oauth/error.html"
 
-#     assert get_user_model().objects.count() == 1
-#     assert OAuthConnection.objects.count() == 1
+#     assert get_user_model().query.count() == 1
+#     assert OAuthConnection.query.count() == 1
 
 
 def test_dummy_refresh(db, settings, monkeypatch):
@@ -466,10 +464,10 @@ def test_dummy_refresh(db, settings, monkeypatch):
         }
     }
 
-    user = get_user_model().objects.create(
+    user = get_user_model().query.create(
         username="dummy_username", email="dummy@example.com"
     )
-    connection = OAuthConnection.objects.create(
+    connection = OAuthConnection.query.create(
         user=user,
         provider_key="dummy",
         provider_user_id="dummy_id",

@@ -24,7 +24,7 @@ def test_client_example():
     assert client.session["example"] == "value"
 
     # Logging in
-    user = User.objects.first()
+    user = User.query.first()
     client.force_login(user)
     response = client.get("/protected/")
     assert response.status_code == 200

@@ -64,7 +64,7 @@ def request(path, method, data, user_id, follow, content_type, headers):
 
                     # Get the user
                     try:
-                        user = User.objects.get(id=user_id)
+                        user = User.query.get(id=user_id)
                         client.force_login(user)
                         click.secho(
                             f"Authenticated as user {user_id}", fg="green", dim=True

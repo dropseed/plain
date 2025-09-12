@@ -100,7 +100,7 @@ class AdminModelListView(AdminListView):
     def get_initial_queryset(self):
         # Separate override for the initial queryset
         # so that annotations can be added BEFORE order_by, etc.
-        return self.model.objects.all()
+        return self.model.query.all()
 
     def order_queryset(self, queryset):
         if order_by := self.request.query_params.get("order_by"):
@@ -187,7 +187,7 @@ class AdminModelDetailView(AdminDetailView):
             return get_model_field(obj, field)
 
     def get_object(self):
-        return self.model.objects.get(id=self.url_kwargs["id"])
+        return self.model.query.get(id=self.url_kwargs["id"])
 
 
 class AdminModelCreateView(AdminCreateView):
@@ -227,7 +227,7 @@ class AdminModelUpdateView(AdminUpdateView):
         return f"{cls.model._meta.model_name}/<int:id>/update/"
 
     def get_object(self):
-        return self.model.objects.get(id=self.url_kwargs["id"])
+        return self.model.query.get(id=self.url_kwargs["id"])
 
 
 class AdminModelDeleteView(AdminDeleteView):
@@ -244,4 +244,4 @@ class AdminModelDeleteView(AdminDeleteView):
         return f"{cls.model._meta.model_name}/<int:id>/delete/"
 
     def get_object(self):
-        return self.model.objects.get(id=self.url_kwargs["id"])
+        return self.model.query.get(id=self.url_kwargs["id"])

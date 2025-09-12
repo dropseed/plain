@@ -47,7 +47,7 @@ class ModelParameter(JobParameter):
                 if len(parts) == 3 and all(parts):
                     package, model_name, obj_id = parts
                     model = models_registry.get_model(package, model_name)
-                    return model.objects.get(id=obj_id)
+                    return model.query.get(id=obj_id)
             except (ValueError, Exception):
                 pass
         return None
@@ -113,7 +113,7 @@ class LegacyModelParameter(JobParameter):
             try:
                 package, model, obj_id = value_part.split("/")
                 model = models_registry.get_model(package, model)
-                return model.objects.get(id=obj_id)
+                return model.query.get(id=obj_id)
             except (ValueError, Exception):
                 pass
         return None

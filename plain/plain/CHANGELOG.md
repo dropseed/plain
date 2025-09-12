@@ -126,7 +126,7 @@
 
 - Update your URL patterns from `<int:pk>` to `<int:id>` in your URLconf
 - Update view code that accesses `self.url_kwargs["pk"]` to use `self.url_kwargs["id"]` instead
-- Replace any QuerySet filters using `pk` with `id` (e.g., `Model.objects.get(pk=1)` becomes `Model.objects.get(id=1)`)
+- Replace any QuerySet filters using `pk` with `id` (e.g., `Model.query.get(pk=1)` becomes `Model.query.get(id=1)`)
 
 ## [0.54.1](https://github.com/dropseed/plain/releases/plain@0.54.1) (2025-07-20)
 

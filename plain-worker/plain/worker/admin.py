@@ -40,7 +40,7 @@ class SuccessfulJobsCard(Card):
     text = "View"
 
     def get_number(self):
-        return JobResult.objects.successful().count()
+        return JobResult.query.successful().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_view_url() + "?display=Successful"
@@ -51,7 +51,7 @@ class ErroredJobsCard(Card):
     text = "View"
 
     def get_number(self):
-        return JobResult.objects.errored().count()
+        return JobResult.query.errored().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_view_url() + "?display=Errored"
@@ -66,7 +66,7 @@ class LostJobsCard(Card):
         return f"Jobs are considered lost after {_td_format(delta)}"
 
     def get_number(self):
-        return JobResult.objects.lost().count()
+        return JobResult.query.lost().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_view_url() + "?display=Lost"
@@ -77,7 +77,7 @@ class RetriedJobsCard(Card):
     text = "View"  # TODO make not required - just an icon?
 
     def get_number(self):
-        return JobResult.objects.retried().count()
+        return JobResult.query.retried().count()
 
     def get_link(self):
         return JobResultViewset.ListView.get_view_url() + "?display=Retried"
@@ -87,14 +87,14 @@ class WaitingJobsCard(Card):
     title = "Waiting Jobs"
 
     def get_number(self):
-        return Job.objects.waiting().count()
+        return Job.query.waiting().count()
 
 
 class RunningJobsCard(Card):
     title = "Running Jobs"
 
     def get_number(self):
-        return Job.objects.running().count()
+        return Job.query.running().count()
 
 
 @register_viewset
@@ -109,7 +109,7 @@ class JobRequestViewset(AdminViewset):
 
         def perform_action(self, action: str, target_ids: list):
             if action == "Delete":
-                JobRequest.objects.filter(id__in=target_ids).delete()
+                JobRequest.query.filter(id__in=target_ids).delete()
 
     class DetailView(AdminModelDetailView):
         model = JobRequest
@@ -138,7 +138,7 @@ class JobViewset(AdminViewset):
 
         def perform_action(self, action: str, target_ids: list):
             if action == "Delete":
-                Job.objects.filter(id__in=target_ids).delete()
+                Job.query.filter(id__in=target_ids).delete()
 
     class DetailView(AdminModelDetailView):
         model = Job
@@ -219,7 +219,7 @@ class JobResultViewset(AdminViewset):
 
         def perform_action(self, action: str, target_ids: list):
             if action == "Retry":
-                for result in JobResult.objects.filter(id__in=target_ids):
+                for result in JobResult.query.filter(id__in=target_ids):
                     result.retry_job(delay=0)
             else:
                 raise ValueError("Invalid action")

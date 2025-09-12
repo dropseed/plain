@@ -15,7 +15,7 @@ class ProvidersChartCard(ChartCard):
 
     def get_chart_data(self) -> dict:
         results = (
-            OAuthConnection.objects.all()
+            OAuthConnection.query.all()
             .values("provider_key")
             .annotate(count=Count("id"))
         )

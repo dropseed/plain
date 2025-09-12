@@ -166,7 +166,7 @@ class ForeignObjectRel(FieldCacheMixin):
         initially for utilization by RelatedFieldListFilter.
         """
         limit_choices_to = limit_choices_to or self.limit_choices_to
-        qs = self.related_model.objects.complex_filter(limit_choices_to)
+        qs = self.related_model.query.complex_filter(limit_choices_to)
         if ordering:
             qs = qs.order_by(*ordering)
         return (blank_choice if include_blank else []) + [(x.id, str(x)) for x in qs]

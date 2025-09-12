@@ -36,7 +36,7 @@ class SupportForm(ModelForm):
             return None
         UserModel = get_user_model()
         try:
-            return UserModel.objects.get(email=email)
+            return UserModel.query.get(email=email)
         except UserModel.DoesNotExist:
             return
 

@@ -308,7 +308,7 @@ class ReverseManyToOneDescriptor:
         related_model = self.rel.related_model
 
         return create_reverse_many_to_one_manager(
-            related_model.objects.__class__,
+            related_model.query.__class__,
             self.rel,
         )
 
@@ -358,12 +358,12 @@ def create_reverse_many_to_one_manager(superclass, rel):
             self.base_queryset_class = rel.related_model._meta.queryset.__class__
 
         @property
-        def objects(self):
+        def query(self):
             """
             Access the QuerySet for this relationship.
 
             Example:
-                parent.children.objects.filter(active=True)
+                parent.children.query.filter(active=True)
             """
             return self.get_queryset()
 
@@ -600,7 +600,7 @@ class ManyToManyDescriptor(ReverseManyToOneDescriptor):
         related_model = self.rel.related_model if self.reverse else self.rel.model
 
         return create_forward_many_to_many_manager(
-            related_model.objects.__class__,
+            related_model.query.__class__,
             self.rel,
             reverse=self.reverse,
         )
@@ -671,12 +671,12 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 )
 
         @property
-        def objects(self):
+        def query(self):
             """
             Access the QuerySet for this relationship.
 
             Example:
-                book.authors.objects.filter(active=True)
+                book.authors.query.filter(active=True)
             """
             return self.get_queryset()
 
@@ -788,7 +788,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 filters = self._build_remove_filters(
                     self.base_queryset_class(model=self.model)
                 )
-                self.through.objects.filter(filters).delete()
+                self.through.query.filter(filters).delete()
 
         def set(self, objs, *, clear=False, through_defaults=None):
             # Force evaluation of `objs` in case it's a queryset whose value
@@ -877,9 +877,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             Return the subset of ids of `objs` that aren't already assigned to
             this relationship.
             """
-            vals = self.through.objects.values_list(
-                target_field_name, flat=True
-            ).filter(
+            vals = self.through.query.values_list(target_field_name, flat=True).filter(
                 **{
                     source_field_name: self.related_val[0],
                     f"{target_field_name}__in": target_ids,
@@ -905,7 +903,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             )
             with transaction.atomic(savepoint=False):
                 # Add the ones that aren't there already.
-                self.through.objects.bulk_create(
+                self.through.query.bulk_create(
                     [
                         self.through(
                             **through_defaults,
@@ -944,6 +942,6 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 else:
                     old_vals = old_ids
                 filters = self._build_remove_filters(old_vals)
-                self.through.objects.filter(filters).delete()
+                self.through.query.filter(filters).delete()
 
     return ManyRelatedManager

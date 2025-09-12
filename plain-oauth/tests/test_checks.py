@@ -14,11 +14,9 @@ def test_oauth_provider_keys_check_pass(db, settings):
         },
     }
 
-    user = get_user_model().objects.create(
-        username="test_user", email="test@example.com"
-    )
+    user = get_user_model().query.create(username="test_user", email="test@example.com")
 
-    OAuthConnection.objects.create(
+    OAuthConnection.query.create(
         user=user,
         provider_key="google",
         provider_user_id="test_provider_user_id",
@@ -41,17 +39,15 @@ def test_oauth_provider_keys_check_fail(db, settings):
         },
     }
 
-    user = get_user_model().objects.create(
-        username="test_user", email="test@example.com"
-    )
+    user = get_user_model().query.create(username="test_user", email="test@example.com")
 
-    OAuthConnection.objects.create(
+    OAuthConnection.query.create(
         user=user,
         provider_key="google",
         provider_user_id="test_provider_user_id",
         access_token="test",
     )
-    OAuthConnection.objects.create(
+    OAuthConnection.query.create(
         user=user,
         provider_key="bar",
         provider_user_id="test_provider_user_id",

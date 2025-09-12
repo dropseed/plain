@@ -92,19 +92,19 @@ def clear_completed():
         seconds=settings.WORKER_JOBS_CLEARABLE_AFTER
     )
     click.echo(f"Clearing job results created before {cutoff}")
-    results = JobResult.objects.filter(created_at__lt=cutoff).delete()
+    results = JobResult.query.filter(created_at__lt=cutoff).delete()
     click.echo(f"Deleted {results[0]} jobs")
 
 
 @cli.command()
 def stats():
     """Stats across all queues."""
-    pending = JobRequest.objects.count()
-    processing = Job.objects.count()
+    pending = JobRequest.query.count()
+    processing = Job.query.count()
 
-    successful = JobResult.objects.successful().count()
-    errored = JobResult.objects.errored().count()
-    lost = JobResult.objects.lost().count()
+    successful = JobResult.query.successful().count()
+    errored = JobResult.query.errored().count()
+    lost = JobResult.query.lost().count()
 
     click.secho(f"Pending: {pending}", bold=True)
     click.secho(f"Processing: {processing}", bold=True)
@@ -121,10 +121,10 @@ def purge_processing():
     ):
         return
 
-    deleted = JobRequest.objects.all().delete()[0]
+    deleted = JobRequest.query.all().delete()[0]
     click.echo(f"Deleted {deleted} job requests")
 
-    deleted = Job.objects.all().delete()[0]
+    deleted = Job.query.all().delete()[0]
     click.echo(f"Deleted {deleted} jobs")
 
 

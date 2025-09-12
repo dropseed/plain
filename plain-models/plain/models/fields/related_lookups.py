@@ -53,7 +53,7 @@ def get_normalized_value(value, lhs):
             try:
                 value_list.append(getattr(value, source.attname))
             except AttributeError:
-                # A case like Restaurant.objects.filter(place=restaurant_instance),
+                # A case like Restaurant.query.filter(place=restaurant_instance),
                 # where place is a OneToOneField and the primary key of Restaurant.
                 return (value.id,)
         return tuple(value_list)
@@ -88,7 +88,7 @@ class RelatedIn(In):
                     and self.lhs.output_field.model == self.rhs.model
                 ):
                     # A case like
-                    # Restaurant.objects.filter(place__in=restaurant_qs), where
+                    # Restaurant.query.filter(place__in=restaurant_qs), where
                     # place is a OneToOneField and the primary key of
                     # Restaurant.
                     target_field = self.lhs.field.name

@@ -29,6 +29,6 @@ class UserSupportFormEntriesCard(Card):
     def get_template_context(self):
         context = super().get_template_context()
 
-        context["entries"] = SupportFormEntry.objects.filter(user=self.view.object)
+        context["entries"] = SupportFormEntry.query.filter(user=self.view.object)
 
         return context

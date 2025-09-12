@@ -98,20 +98,20 @@ class SQLCompiler:
         then it is correct".
         """
         # Some examples:
-        #     SomeModel.objects.annotate(Count('somecol'))
+        #     SomeModel.query.annotate(Count('somecol'))
         #     GROUP BY: all fields of the model
         #
-        #    SomeModel.objects.values('name').annotate(Count('somecol'))
+        #    SomeModel.query.values('name').annotate(Count('somecol'))
         #    GROUP BY: name
         #
-        #    SomeModel.objects.annotate(Count('somecol')).values('name')
+        #    SomeModel.query.annotate(Count('somecol')).values('name')
         #    GROUP BY: all cols of the model
         #
-        #    SomeModel.objects.values('name', 'id')
+        #    SomeModel.query.values('name', 'id')
         #    .annotate(Count('somecol')).values('id')
         #    GROUP BY: name, id
         #
-        #    SomeModel.objects.values('name').annotate(Count('somecol')).values('id')
+        #    SomeModel.query.values('name').annotate(Count('somecol')).values('id')
         #    GROUP BY: name, id
         #
         # In fact, the self.query.group_by is the minimal set to GROUP BY. It

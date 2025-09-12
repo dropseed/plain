@@ -168,7 +168,7 @@ class ModelBase(type):
                 index.set_name_with_model(cls)
 
     @property
-    def objects(cls):
+    def query(cls):
         return cls._meta.queryset
 
 
@@ -726,7 +726,7 @@ class Model(metaclass=ModelBase):
         q = Q.create([(field.name, param), (f"id__{op}", self.id)], connector=Q.AND)
         q = Q.create([q, (f"{field.name}__{op}", param)], connector=Q.OR)
         qs = (
-            self.__class__.objects.filter(**kwargs)
+            self.__class__.query.filter(**kwargs)
             .filter(q)
             .order_by(f"{order}{field.name}", f"{order}id")
         )
@@ -824,7 +824,7 @@ class Model(metaclass=ModelBase):
             if len(unique_check) != len(lookup_kwargs):
                 continue
 
-            qs = model_class.objects.filter(**lookup_kwargs)
+            qs = model_class.query.filter(**lookup_kwargs)
 
             # Exclude the current object from the query if we are editing an
             # instance (as opposed to creating a new one)

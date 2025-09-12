@@ -4,13 +4,13 @@ from plain.test import Client
 
 
 def test_session_created(db):
-    assert Session.objects.count() == 0
+    assert Session.query.count() == 0
 
     response = Client().get("/")
 
     assert response.status_code == 200
 
-    assert Session.objects.count() == 1
+    assert Session.query.count() == 1
 
 
 def test_mapping_attributes(db):

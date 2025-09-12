@@ -12,10 +12,10 @@ def delete_logs():
     """
     cutoff = timezone.now() - settings.REDIRECTION_LOG_RETENTION_TIMEDELTA
 
-    result = RedirectLog.objects.filter(created_at__lt=cutoff).delete()
+    result = RedirectLog.query.filter(created_at__lt=cutoff).delete()
     output = f"{result[0]} redirect logs deleted"
 
-    result = NotFoundLog.objects.filter(created_at__lt=cutoff).delete()
+    result = NotFoundLog.query.filter(created_at__lt=cutoff).delete()
     output += f", {result[0]} not found logs deleted"
 
     return output

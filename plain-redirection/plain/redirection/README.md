@@ -45,14 +45,14 @@ You can create redirects programmatically using the [`Redirect`](./models.py#Red
 from plain.redirection.models import Redirect
 
 # Simple path redirect
-Redirect.objects.create(
+Redirect.query.create(
     from_pattern="/old-page/",
     to_pattern="/new-page/",
     http_status=301  # Permanent redirect
 )
 
 # Redirect with different status code
-Redirect.objects.create(
+Redirect.query.create(
     from_pattern="/temporary-page/",
     to_pattern="/replacement-page/",
     http_status=302  # Temporary redirect
@@ -67,7 +67,7 @@ For more complex URL patterns, you can use regex redirects:
 
 ```python
 # Redirect all blog posts to a new URL structure
-Redirect.objects.create(
+Redirect.query.create(
     from_pattern=r"^/blog/(\d{4})/(\d{2})/(.+)/$",
     to_pattern=r"/posts/\1-\2-\3/",
     is_regex=True,
@@ -81,14 +81,14 @@ When multiple redirects might match a URL, you can control which one takes prece
 
 ```python
 # This redirect will be checked first (lower order = higher priority)
-Redirect.objects.create(
+Redirect.query.create(
     from_pattern="/special-case/",
     to_pattern="/handled-specially/",
     order=10
 )
 
 # This more general redirect will be checked later
-Redirect.objects.create(
+Redirect.query.create(
     from_pattern=r"^/special-.*/$",
     to_pattern="/general-handler/",
     is_regex=True,
@@ -109,10 +109,10 @@ Access logs programmatically:
 from plain.redirection.models import RedirectLog, NotFoundLog
 
 # Recent redirects
-recent_redirects = RedirectLog.objects.all()[:10]
+recent_redirects = RedirectLog.query.all()[:10]
 
 # 404s from a specific IP
-not_founds = NotFoundLog.objects.filter(ip_address="192.168.1.1")
+not_founds = NotFoundLog.query.filter(ip_address="192.168.1.1")
 ```
 
 ## Admin Interface

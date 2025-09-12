@@ -144,7 +144,7 @@ class OAuthProvider:
 
     def handle_disconnect_request(self, *, request: HttpRequest) -> Response:
         provider_user_id = request.data["provider_user_id"]
-        connection = OAuthConnection.objects.get(
+        connection = OAuthConnection.query.get(
             provider_key=self.provider_key, provider_user_id=provider_user_id
         )
         connection.delete()

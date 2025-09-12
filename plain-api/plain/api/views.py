@@ -79,7 +79,7 @@ class APIKeyView(View):
                 )
 
             try:
-                api_key = APIKey.objects.get(token=header_token)
+                api_key = APIKey.query.get(token=header_token)
             except APIKey.DoesNotExist:
                 raise ResponseException(
                     JsonResponse(

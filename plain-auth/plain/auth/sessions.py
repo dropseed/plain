@@ -115,7 +115,7 @@ def get_user(request):
 
     UserModel = get_user_model()
     try:
-        user = UserModel.objects.get(id=request.session[USER_ID_SESSION_KEY])
+        user = UserModel.query.get(id=request.session[USER_ID_SESSION_KEY])
     except UserModel.DoesNotExist:
         return None
 

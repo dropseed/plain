@@ -22,7 +22,7 @@ def test_admin_required(db):
     # login required first
     assert client.get("/admin/").status_code == 302
 
-    user = get_user_model().objects.create(username="user")
+    user = get_user_model().query.create(username="user")
     client.force_login(user)
     # not admin -> 404
     assert client.get("/admin/").status_code == 404

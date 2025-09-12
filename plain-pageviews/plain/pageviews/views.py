@@ -51,7 +51,7 @@ class TrackView(View):
                     session["pageviews_anonymous_session_id"] = session_id
                 elif user_id and "pageviews_anonymous_session_id" in session:
                     # Associate the previously anonymous pageviews with the user
-                    Pageview.objects.filter(
+                    Pageview.query.filter(
                         user_id="",
                         session_id=session["pageviews_anonymous_session_id"],
                     ).update(user_id=user_id)
@@ -61,7 +61,7 @@ class TrackView(View):
         else:
             session_id = ""
 
-        Pageview.objects.create(
+        Pageview.query.create(
             user_id=user_id,
             session_id=session_id,
             url=url,

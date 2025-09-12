@@ -53,7 +53,7 @@ class MigrationRecorder:
 
     @property
     def migration_qs(self):
-        return self.Migration.objects.all()
+        return self.Migration.query.all()
 
     def has_table(self):
         """Return True if the plainmigrations table exists."""

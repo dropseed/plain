@@ -95,7 +95,7 @@ class JobRequest(models.Model):
         We immediately convert them to JobResults when they are picked up.
         """
         with transaction.atomic():
-            result = Job.objects.create(
+            result = Job.query.create(
                 job_request_uuid=self.uuid,
                 job_class=self.job_class,
                 parameters=self.parameters,
@@ -243,7 +243,7 @@ class Job(models.Model):
         Convert this Job to a JobResult.
         """
         with transaction.atomic():
-            result = JobResult.objects.create(
+            result = JobResult.query.create(
                 ended_at=timezone.now(),
                 error=error,
                 status=status,

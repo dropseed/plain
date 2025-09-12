@@ -15,7 +15,7 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
     admin_required = True
 
     def get_objects(self):
-        return Trace.objects.all()
+        return Trace.query.all()
 
     def check_auth(self):
         # Allow the view if we're in DEBUG
@@ -56,7 +56,7 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
 
     def htmx_delete_traces(self):
         """Clear all traces via HTMX DELETE."""
-        Trace.objects.filter(share_id="").delete()
+        Trace.query.filter(share_id="").delete()
         response = Response(status_code=204)
         response.headers["HX-Refresh"] = "true"
         return response
@@ -80,7 +80,7 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
     admin_required = True
 
     def get_object(self):
-        return Trace.objects.get_or_none(trace_id=self.url_kwargs.get("trace_id"))
+        return Trace.query.get_or_none(trace_id=self.url_kwargs.get("trace_id"))
 
     def check_auth(self):
         # Allow the view if we're in DEBUG
@@ -97,7 +97,7 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
             return self.object.as_dict()
 
         if self.request.query_params.get("logs") == "true":
-            logs = self.object.logs.objects.all().order_by("timestamp")
+            logs = self.object.logs.query.all().order_by("timestamp")
             log_lines = []
             for log in logs:
                 timestamp = log.timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -137,7 +137,7 @@ class ObserverTraceSharedView(DetailView):
     context_object_name = "trace"
 
     def get_object(self):
-        return Trace.objects.get_or_none(share_id=self.url_kwargs["share_id"])
+        return Trace.query.get_or_none(share_id=self.url_kwargs["share_id"])
 
     def get_template_context(self):
         context = super().get_template_context()

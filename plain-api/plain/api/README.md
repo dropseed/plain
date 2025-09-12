@@ -58,7 +58,7 @@ class PullRequestView(BaseAPIView):
     def get(self):
         try:
             pull = (
-                PullRequest.objects.all()
+                PullRequest.query.all()
                 .visible_to_user(self.request.user)
                 .get(uuid=self.url_kwargs["uuid"])
             )
@@ -124,7 +124,7 @@ class PullRequestView(BaseAPIView):
     def get(self):
         try:
             pull = (
-                PullRequest.objects.all()
+                PullRequest.query.all()
                 .visible_to_user(self.request.user)
                 .get(uuid=self.url_kwargs["uuid"])
             )
@@ -176,7 +176,7 @@ class PullRequestView(BaseAPIView):
     def delete(self):
         try:
             pull = (
-                PullRequest.objects.all()
+                PullRequest.query.all()
                 .visible_to_user(self.request.user)
                 .get(uuid=self.url_kwargs["uuid"])
             )
@@ -224,8 +224,8 @@ class User(models.Model):
 Generating API keys is something you will need to do in your own code, wherever it makes sense to do so.
 
 ```python
-user = User.objects.first()
-user.api_key = APIKey.objects.create()
+user = User.query.first()
+user.api_key = APIKey.query.create()
 user.save()
 ```
 
@@ -321,12 +321,12 @@ class TeamAccountAPIView(BaseAPIView):
     def team_account(self):
         try:
             if self.organization:
-                return TeamAccount.objects.get(
+                return TeamAccount.query.get(
                     team__organization=self.organization, uuid=self.url_kwargs["uuid"]
                 )
 
             if self.request.user:
-                return TeamAccount.objects.get(
+                return TeamAccount.query.get(
                     team__organization__in=self.request.user.organizations.all(),
                     uuid=self.url_kwargs["uuid"],
                 )

@@ -19,7 +19,7 @@ def observer_cli():
 @click.option("--force", is_flag=True, help="Skip confirmation prompt.")
 def clear(force: bool):
     """Clear all observer data."""
-    query = Trace.objects.all()
+    query = Trace.query.all()
     trace_count = query.count()
 
     if trace_count == 0:
@@ -43,7 +43,7 @@ def clear(force: bool):
 def trace_list(limit, user_id, request_id, session_id, output_json):
     """List recent traces."""
     # Build query
-    query = Trace.objects.all()
+    query = Trace.query.all()
 
     if user_id:
         query = query.filter(user_id=user_id)
@@ -139,7 +139,7 @@ def trace_list(limit, user_id, request_id, session_id, output_json):
 def trace_detail(trace_id, output_json):
     """Display detailed information about a specific trace."""
     try:
-        trace = Trace.objects.get(trace_id=trace_id)
+        trace = Trace.query.get(trace_id=trace_id)
     except Trace.DoesNotExist:
         click.secho(f"Error: Trace with ID '{trace_id}' not found", fg="red", err=True)
         raise click.Abort()
@@ -157,7 +157,7 @@ def trace_detail(trace_id, output_json):
 def span_list(trace_id, limit, output_json):
     """List recent spans."""
     # Build query
-    query = Span.objects.all()
+    query = Span.query.all()
 
     if trace_id:
         query = query.filter(trace__trace_id=trace_id)
@@ -259,7 +259,7 @@ def span_list(trace_id, limit, output_json):
 def span_detail(span_id, output_json):
     """Display detailed information about a specific span."""
     try:
-        span = Span.objects.select_related("trace").get(span_id=span_id)
+        span = Span.query.select_related("trace").get(span_id=span_id)
     except Span.DoesNotExist:
         click.secho(f"Error: Span with ID '{span_id}' not found", fg="red", err=True)
         raise click.Abort()
@@ -387,7 +387,7 @@ def format_trace_output(trace):
     output_lines.append(click.style("Spans:", fg="bright_blue", bold=True))
 
     # Get annotated spans with nesting levels
-    spans = trace.spans.objects.all().annotate_spans()
+    spans = trace.spans.query.all().annotate_spans()
 
     # Build parent-child relationships
     span_dict = {span.span_id: span for span in spans}
@@ -540,7 +540,7 @@ def diagnose(trace_id, url, json_input, agent_command, print_only):
             raise click.ClickException(f"Error fetching trace from URL: {e}")
     else:
         try:
-            trace = Trace.objects.get(trace_id=trace_id)
+            trace = Trace.query.get(trace_id=trace_id)
             trace_data = trace.as_dict()
         except Trace.DoesNotExist:
             raise click.ClickException(f"Trace with ID '{trace_id}' not found")

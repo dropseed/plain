@@ -13,5 +13,5 @@ def clear_completed():
     cutoff = timezone.now() - datetime.timedelta(
         seconds=settings.WORKER_JOBS_CLEARABLE_AFTER
     )
-    results = JobResult.objects.filter(created_at__lt=cutoff).delete()
+    results = JobResult.query.filter(created_at__lt=cutoff).delete()
     return f"{results[0]} jobs deleted"

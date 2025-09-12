@@ -107,7 +107,7 @@ class RedirectLog(models.Model):
         if from_url == to_url:
             raise ValueError("Redirecting to the same URL")
 
-        return cls.objects.create(
+        return cls.query.create(
             redirect=redirect,
             from_url=from_url,
             to_url=to_url,
@@ -137,7 +137,7 @@ class NotFoundLog(models.Model):
 
     @classmethod
     def from_request(cls, request):
-        return cls.objects.create(
+        return cls.query.create(
             url=request.build_absolute_uri(),
             ip_address=_get_client_ip(request),
             user_agent=request.headers.get("User-Agent", ""),

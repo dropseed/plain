@@ -347,7 +347,7 @@ class UniqueConstraint(BaseConstraint):
         return path, self.expressions, kwargs
 
     def validate(self, model, instance, exclude=None):
-        queryset = model.objects
+        queryset = model.query
         if self.fields:
             lookup_kwargs = {}
             for field_name in self.fields:

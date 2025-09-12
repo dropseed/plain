@@ -9,5 +9,5 @@ def clear_expired():
     """
     Delete sessions that have expired.
     """
-    result = Session.objects.filter(expires_at__lt=timezone.now()).delete()
+    result = Session.query.filter(expires_at__lt=timezone.now()).delete()
     return f"{result[0]} expired sessions deleted"

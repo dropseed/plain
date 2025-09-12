@@ -1174,9 +1174,9 @@ class Query(BaseExpression):
         """Check the type of object passed to query relations."""
         if field.is_relation:
             # Check that the field and the queryset use the same model in a
-            # query like .filter(author=Author.objects.all()). For example, the
+            # query like .filter(author=Author.query.all()). For example, the
             # opts would be Author's (from the author field) and value.model
-            # would be Author.objects.all() queryset's .model (Author also).
+            # would be Author.query.all() queryset's .model (Author also).
             # The field is the related field on the lhs side.
             if (
                 isinstance(value, Query)

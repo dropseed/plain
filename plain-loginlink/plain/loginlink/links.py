@@ -43,6 +43,6 @@ def get_link_token_user(token):
     email = signed_data["email"]
 
     try:
-        return user_model.objects.get(id=user_id, email__iexact=email)
+        return user_model.query.get(id=user_id, email__iexact=email)
     except user_model.DoesNotExist:
         raise LoginLinkChanged()

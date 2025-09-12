@@ -9,7 +9,7 @@ def test_admin_login_required(db):
     # Login required
     assert client.get("/admin/").status_code == 302
 
-    user = User.objects.create(username="test")
+    user = User.query.create(username="test")
     client.force_login(user)
 
     # Not admin yet

@@ -61,7 +61,7 @@ class TrendCard(ChartCard):
             iterator = datetime_range.iter_months
 
         counts_by_date = (
-            self.model.objects.filter(**filter_kwargs)
+            self.model.query.filter(**filter_kwargs)
             .annotate(chart_date=truncator(self.datetime_field))
             .values("chart_date")
             .annotate(chart_date_count=Count("id"))

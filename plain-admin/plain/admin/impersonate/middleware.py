@@ -9,7 +9,7 @@ def get_user_by_id(id):
     UserModel = get_user_model()
 
     try:
-        return UserModel.objects.get(id=id)
+        return UserModel.query.get(id=id)
     except UserModel.DoesNotExist:
         return None
 

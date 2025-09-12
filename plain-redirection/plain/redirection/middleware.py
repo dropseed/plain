@@ -11,7 +11,7 @@ class RedirectionMiddleware:
         if response.status_code == 404:
             from .models import NotFoundLog, Redirect, RedirectLog
 
-            redirects = Redirect.objects.filter(enabled=True).only(
+            redirects = Redirect.query.filter(enabled=True).only(
                 "id", "from_pattern", "to_pattern", "http_status", "is_regex"
             )
             for redirect in redirects:

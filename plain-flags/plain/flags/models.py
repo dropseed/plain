@@ -83,7 +83,7 @@ class Flag(models.Model):
         if not database:
             return errors
 
-        flag_names = cls.objects.all().values_list("name", flat=True)
+        flag_names = cls.query.all().values_list("name", flat=True)
 
         try:
             flag_names = set(flag_names)

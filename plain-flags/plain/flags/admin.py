@@ -65,7 +65,7 @@ class FlagResultAdmin(AdminViewset):
         nav_icon = "flag"
 
         def get_initial_queryset(self):
-            return self.model.objects.all().select_related("flag")
+            return self.model.query.all().select_related("flag")
 
     class DetailView(AdminModelDetailView):
         model = FlagResult

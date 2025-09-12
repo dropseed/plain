@@ -14,7 +14,7 @@ def cli():
 @cli.command()
 def clear_expired():
     click.echo("Clearing expired cache items...")
-    result = CachedItem.objects.expired().delete()
+    result = CachedItem.query.expired().delete()
     click.echo(f"Deleted {result[0]} expired cache items.")
 
 
@@ -26,16 +26,16 @@ def clear_all(force):
     ):
         return
     click.echo("Clearing all cache items...")
-    result = CachedItem.objects.all().delete()
+    result = CachedItem.query.all().delete()
     click.echo(f"Deleted {result[0]} cache items.")
 
 
 @cli.command()
 def stats():
-    total = CachedItem.objects.count()
-    expired = CachedItem.objects.expired().count()
-    unexpired = CachedItem.objects.unexpired().count()
-    forever = CachedItem.objects.forever().count()
+    total = CachedItem.query.count()
+    expired = CachedItem.query.expired().count()
+    unexpired = CachedItem.query.unexpired().count()
+    forever = CachedItem.query.forever().count()
 
     click.echo(f"Total: {click.style(total, bold=True)}")
     click.echo(f"Expired: {click.style(expired, bold=True)}")

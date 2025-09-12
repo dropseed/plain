@@ -88,7 +88,7 @@ class Worker:
 
             with transaction.atomic():
                 job_request = (
-                    JobRequest.objects.select_for_update(skip_locked=True)
+                    JobRequest.query.select_for_update(skip_locked=True)
                     .filter(
                         queue__in=self.queues,
                     )
@@ -212,8 +212,8 @@ class Worker:
             # Depending on shutdown timing and internal behavior, this might not work
             num_proccesses = 0
 
-        jobs_requested = JobRequest.objects.filter(queue__in=self.queues).count()
-        jobs_processing = Job.objects.filter(queue__in=self.queues).count()
+        jobs_requested = JobRequest.query.filter(queue__in=self.queues).count()
+        jobs_processing = Job.query.filter(queue__in=self.queues).count()
 
         logger.info(
             'Job worker stats worker_processes=%s worker_queues="%s" jobs_requested=%s jobs_processing=%s worker_max_processes=%s worker_max_jobs_per_process=%s',
@@ -228,15 +228,15 @@ class Worker:
     def rescue_job_results(self):
         """Find any lost or failed jobs on this worker's queues and handle them."""
         # TODO return results and log them if there are any?
-        Job.objects.filter(queue__in=self.queues).mark_lost_jobs()
-        JobResult.objects.filter(queue__in=self.queues).retry_failed_jobs()
+        Job.query.filter(queue__in=self.queues).mark_lost_jobs()
+        JobResult.query.filter(queue__in=self.queues).retry_failed_jobs()
 
 
 def future_finished_callback(job_uuid: str, future: Future):
     if future.cancelled():
         logger.warning("Job cancelled job_uuid=%s", job_uuid)
         try:
-            job = Job.objects.get(uuid=job_uuid)
+            job = Job.query.get(uuid=job_uuid)
             job.convert_to_result(status=JobResultStatuses.CANCELLED)
         except Job.DoesNotExist:
             # Job may have already been cleaned up
@@ -249,7 +249,7 @@ def future_finished_callback(job_uuid: str, future: Future):
             exc_info=exception,
         )
         try:
-            job = Job.objects.get(uuid=job_uuid)
+            job = Job.query.get(uuid=job_uuid)
             job.convert_to_result(status=JobResultStatuses.CANCELLED)
         except Job.DoesNotExist:
             # Job may have already been cleaned up
@@ -264,7 +264,7 @@ def process_job(job_uuid):
 
         request_started.send(sender=None)
 
-        job = Job.objects.get(uuid=job_uuid)
+        job = Job.query.get(uuid=job_uuid)
 
         logger.info(
             'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queue="%s"',

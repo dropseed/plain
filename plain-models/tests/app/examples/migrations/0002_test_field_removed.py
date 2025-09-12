@@ -6,7 +6,7 @@ from plain.models import migrations
 
 def set_uuids(models, schema_editor):
     Car = models.get_model("examples", "Car")
-    for sq in Car.objects.filter(uuid__isnull=True):
+    for sq in Car.query.filter(uuid__isnull=True):
         sq.uuid = uuid.uuid4()
         sq.save(clean_and_validate=False)
 

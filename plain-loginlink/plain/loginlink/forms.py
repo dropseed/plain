@@ -13,7 +13,7 @@ class LoginLinkForm(forms.Form):
         user_model = get_user_model()
         email = self.cleaned_data["email"]
         try:
-            user = user_model.objects.get(email__iexact=email)
+            user = user_model.query.get(email__iexact=email)
         except user_model.DoesNotExist:
             user = None
 

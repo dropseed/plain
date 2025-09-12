@@ -69,7 +69,7 @@ class Flag:
         ) as span:
             # Create an associated DB Flag that we can use to enable/disable
             # and tie the results to
-            flag_obj, _ = Flag.objects.update_or_create(
+            flag_obj, _ = Flag.query.update_or_create(
                 name=flag_name,
                 defaults={"used_at": timezone.now()},
             )
@@ -106,7 +106,7 @@ class Flag:
             span.set_attribute(FEATURE_FLAG_KEY, key)
 
             try:
-                flag_result = FlagResult.objects.get(flag=flag_obj, key=key)
+                flag_result = FlagResult.query.get(flag=flag_obj, key=key)
 
                 span.set_attribute(
                     FEATURE_FLAG_RESULT_REASON,
@@ -117,7 +117,7 @@ class Flag:
                 return flag_result.value
             except FlagResult.DoesNotExist:
                 value = self.get_value()
-                flag_result = FlagResult.objects.create(
+                flag_result = FlagResult.query.create(
                     flag=flag_obj, key=key, value=value
                 )
 

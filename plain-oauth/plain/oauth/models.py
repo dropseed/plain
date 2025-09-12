@@ -95,7 +95,7 @@ class OAuthConnection(models.Model):
         cls, *, provider_key: str, oauth_token: "OAuthToken", oauth_user: "OAuthUser"
     ) -> "OAuthConnection":
         try:
-            connection = cls.objects.get(
+            connection = cls.query.get(
                 provider_key=provider_key,
                 provider_user_id=oauth_user.provider_id,
             )
@@ -134,7 +134,7 @@ class OAuthConnection(models.Model):
         Connect will either create a new connection or update an existing connection
         """
         try:
-            connection = cls.objects.get(
+            connection = cls.query.get(
                 user=user,
                 provider_key=provider_key,
                 provider_user_id=oauth_user.provider_id,
@@ -172,7 +172,7 @@ class OAuthConnection(models.Model):
 
         try:
             keys_in_db = set(
-                cls.objects.values_list("provider_key", flat=True).distinct()
+                cls.query.values_list("provider_key", flat=True).distinct()
             )
         except (OperationalError, ProgrammingError):
             # Check runs on plain migrate, and the table may not exist yet

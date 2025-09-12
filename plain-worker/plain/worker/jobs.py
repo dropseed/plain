@@ -171,12 +171,12 @@ class Job(metaclass=JobType):
 
         job_class_name = jobs_registry.get_job_class_name(self.__class__)
 
-        job_requests = JobRequest.objects.filter(
+        job_requests = JobRequest.query.filter(
             job_class=job_class_name,
             unique_key=unique_key,
         )
 
-        jobs = Job.objects.filter(
+        jobs = Job.query.filter(
             job_class=job_class_name,
             unique_key=unique_key,
         )

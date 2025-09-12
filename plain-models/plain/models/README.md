@@ -43,7 +43,7 @@ from .models import User
 
 
 # Create a new user
-user = User.objects.create(
+user = User.query.create(
     email="test@example.com",
     password="password",
 )
@@ -56,7 +56,7 @@ user.save()
 user.delete()
 
 # Query for users
-admin_users = User.objects.filter(is_admin=True)
+admin_users = User.query.filter(is_admin=True)
 ```
 
 ## Database connection
@@ -89,26 +89,26 @@ Models come with a powerful query API through their [`QuerySet`](./query.py#Quer
 
 ```python
 # Get all users
-all_users = User.objects.all()
+all_users = User.query.all()
 
 # Filter users
-admin_users = User.objects.filter(is_admin=True)
-recent_users = User.objects.filter(created_at__gte=datetime.now() - timedelta(days=7))
+admin_users = User.query.filter(is_admin=True)
+recent_users = User.query.filter(created_at__gte=datetime.now() - timedelta(days=7))
 
 # Get a single user
-user = User.objects.get(email="test@example.com")
+user = User.query.get(email="test@example.com")
 
 # Complex queries with Q objects
 from plain.models import Q
-users = User.objects.filter(
+users = User.query.filter(
     Q(is_admin=True) | Q(email__endswith="@example.com")
 )
 
 # Ordering
-users = User.objects.order_by("-created_at")
+users = User.query.order_by("-created_at")
 
 # Limiting results
-first_10_users = User.objects.all()[:10]
+first_10_users = User.query.all()[:10]
 ```
 
 For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) class.
@@ -217,7 +217,7 @@ With the Manager functionality now merged into QuerySet, you can customize [`Que
 
 ### Setting a default QuerySet for a model
 
-Use `Meta.queryset_class` to set a custom QuerySet that will be used by `Model.objects`:
+Use `Meta.queryset_class` to set a custom QuerySet that will be used by `Model.query`:
 
 ```python
 class PublishedQuerySet(models.QuerySet):
@@ -236,9 +236,9 @@ class Article(models.Model):
         queryset_class = PublishedQuerySet
 
 # Usage - all methods available on Article.objects
-all_articles = Article.objects.all()
-published_articles = Article.objects.published_only()
-draft_articles = Article.objects.draft_only()
+all_articles = Article.query.all()
+published_articles = Article.query.published_only()
+draft_articles = Article.query.draft_only()
 ```
 
 ### Using custom QuerySets without formal attachment

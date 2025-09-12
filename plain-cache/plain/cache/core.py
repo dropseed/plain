@@ -30,7 +30,7 @@ class Cached:
     @cached_property
     def _model_instance(self):
         try:
-            return self._model_class.objects.get(key=self.key)
+            return self._model_class.query.get(key=self.key)
         except self._model_class.DoesNotExist:
             return None
 
@@ -129,13 +129,13 @@ class Cached:
                 span.set_attribute("cache.item.expires_at", expires_at.isoformat())
 
             try:
-                item, _ = self._model_class.objects.update_or_create(
+                item, _ = self._model_class.query.update_or_create(
                     key=self.key, defaults=defaults
                 )
             except IntegrityError:
                 # Most likely a race condition in creating the item,
                 # so trying again should do an update
-                item, _ = self._model_class.objects.update_or_create(
+                item, _ = self._model_class.query.update_or_create(
                     key=self.key, defaults=defaults
                 )
 

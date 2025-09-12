@@ -26,7 +26,7 @@ class TraceViewset(AdminViewset):
 
         def perform_action(self, action: str, target_ids: list):
             if action == "Delete":
-                Trace.objects.filter(id__in=target_ids).delete()
+                Trace.query.filter(id__in=target_ids).delete()
 
     class DetailView(AdminModelDetailView):
         model = Trace
@@ -54,7 +54,7 @@ class SpanViewset(AdminViewset):
 
         def perform_action(self, action: str, target_ids: list):
             if action == "Delete":
-                Span.objects.filter(id__in=target_ids).delete()
+                Span.query.filter(id__in=target_ids).delete()
 
         def get_objects(self):
             return (
@@ -101,9 +101,9 @@ class LogViewset(AdminViewset):
 
         def perform_action(self, action: str, target_ids: list):
             if action == "Delete selected":
-                Log.objects.filter(id__in=target_ids).delete()
+                Log.query.filter(id__in=target_ids).delete()
             elif action == "Delete all":
-                Log.objects.all().delete()
+                Log.query.all().delete()
 
         def get_objects(self):
             return (

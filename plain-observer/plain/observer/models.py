@@ -189,7 +189,7 @@ class Trace(models.Model):
 
     def as_dict(self):
         spans = [
-            span.span_data for span in self.spans.objects.all().order_by("start_time")
+            span.span_data for span in self.spans.query.all().order_by("start_time")
         ]
         logs = [
             {
@@ -198,7 +198,7 @@ class Trace(models.Model):
                 "message": log.message,
                 "span_id": log.span_id,
             }
-            for log in self.logs.objects.all().order_by("timestamp")
+            for log in self.logs.query.all().order_by("timestamp")
         ]
 
         return {
@@ -221,7 +221,7 @@ class Trace(models.Model):
         """Get chronological list of spans and logs for unified timeline display."""
         events = []
 
-        for span in self.spans.objects.all().annotate_spans():
+        for span in self.spans.query.all().annotate_spans():
             events.append(
                 {
                     "type": "span",
@@ -232,7 +232,7 @@ class Trace(models.Model):
             )
 
             # Add logs for this span
-            for log in self.logs.objects.filter(span=span):
+            for log in self.logs.query.filter(span=span):
                 events.append(
                     {
                         "type": "log",
@@ -243,7 +243,7 @@ class Trace(models.Model):
                 )
 
         # Add unlinked logs (logs without span)
-        for log in self.logs.objects.filter(span__isnull=True):
+        for log in self.logs.query.filter(span__isnull=True):
             events.append(
                 {
                     "type": "log",

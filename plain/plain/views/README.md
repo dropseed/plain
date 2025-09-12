@@ -179,7 +179,7 @@ class ExampleDetailView(DetailView):
     template_name = "detail.html"
 
     def get_object(self):
-        return MyObjectClass.objects.get(
+        return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
             user=self.request.user,  # Limit access
         )
@@ -197,7 +197,7 @@ class ExampleUpdateView(UpdateView):
     success_url = "."
 
     def get_object(self):
-        return MyObjectClass.objects.get(
+        return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
             user=self.request.user,  # Limit access
         )
@@ -211,7 +211,7 @@ class ExampleDeleteView(DeleteView):
     # Just POST to this view to delete the object.
 
     def get_object(self):
-        return MyObjectClass.objects.get(
+        return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
             user=self.request.user,  # Limit access
         )
@@ -221,7 +221,7 @@ class ExampleListView(ListView):
     template_name = "list.html"
 
     def get_objects(self):
-        return MyObjectClass.objects.filter(
+        return MyObjectClass.query.filter(
             user=self.request.user,  # Limit access
         )
 ```

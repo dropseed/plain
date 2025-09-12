@@ -8,5 +8,5 @@ def clear_expired():
     """
     Delete cache items that have expired.
     """
-    result = CachedItem.objects.expired().delete()
+    result = CachedItem.query.expired().delete()
     return f"{result[0]} expired cache items deleted"
