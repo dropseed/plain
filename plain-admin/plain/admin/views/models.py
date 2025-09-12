@@ -2,7 +2,8 @@ from typing import TYPE_CHECKING
 
 from plain import models
 from plain.exceptions import FieldError
-from plain.models import Q, QuerySet
+from plain.models import Q
+from plain.models.fields.related_managers import BaseRelatedManager
 
 from .objects import (
     AdminCreateView,
@@ -33,13 +34,7 @@ def get_model_field(instance, field):
 
         return result
 
-    attr = getattr(instance, field)
-
-    if isinstance(attr, QuerySet):
-        # Automatically get .all() of related querysets
-        return attr.all()
-
-    return attr
+    return getattr(instance, field)
 
 
 class AdminModelListView(AdminListView):
@@ -138,7 +133,11 @@ class AdminModelListView(AdminListView):
 
     def get_field_value(self, obj, field: str):
         try:
-            return super().get_field_value(obj, field)
+            value = super().get_field_value(obj, field)
+            # Check if we got a related manager back and need to get its queryset
+            if isinstance(value, BaseRelatedManager):
+                return value.query.all()
+            return value
         except (AttributeError, TypeError):
             return get_model_field(obj, field)
 
@@ -182,7 +181,11 @@ class AdminModelDetailView(AdminDetailView):
 
     def get_field_value(self, obj, field: str):
         try:
-            return super().get_field_value(obj, field)
+            value = super().get_field_value(obj, field)
+            # Check if we got a related manager back and need to get its queryset
+            if isinstance(value, BaseRelatedManager):
+                return value.query.all()
+            return value
         except (AttributeError, TypeError):
             return get_model_field(obj, field)
 

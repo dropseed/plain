@@ -12,8 +12,9 @@ from . import Field
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForeignKeyDeferredAttribute,
+    ForwardManyToManyDescriptor,
     ForwardManyToOneDescriptor,
-    ManyToManyDescriptor,
+    ReverseManyToManyDescriptor,
     ReverseManyToOneDescriptor,
 )
 from .related_lookups import (
@@ -1266,7 +1267,7 @@ class ManyToManyField(RelatedField):
         )
 
         # Add the descriptor for the m2m relation.
-        setattr(cls, self.name, ManyToManyDescriptor(self.remote_field, reverse=False))
+        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))
 
         # Set up the accessor for the m2m table name for the relation.
         self.m2m_db_table = self._get_m2m_db_table
@@ -1278,7 +1279,7 @@ class ManyToManyField(RelatedField):
             setattr(
                 cls,
                 related.get_accessor_name(),
-                ManyToManyDescriptor(self.remote_field, reverse=True),
+                ReverseManyToManyDescriptor(self.remote_field),
             )
 
         # Set up the accessors for the column names on the m2m table.
