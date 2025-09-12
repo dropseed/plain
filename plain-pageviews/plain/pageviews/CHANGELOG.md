@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.21.0) (2025-09-12)
+
+### What's changed
+
+- Model manager has been renamed from `objects` to `query` for consistency with the broader Plain framework ([037a239](https://github.com/dropseed/plain/commit/037a239ef4711c4477a211d63c57ad8414096301))
+
+### Upgrade instructions
+
+- Replace any usage of `Pageview.objects` with `Pageview.query` in your code (e.g., `Pageview.objects.filter()` becomes `Pageview.query.filter()`)
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.20.0) (2025-09-09)
 
 ### What's changed
