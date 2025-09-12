@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-sessions@0.29.0) (2025-09-12)
+
+### What's changed
+
+- Model manager API has been renamed from `.objects` to `.query` throughout the codebase ([037a239](https://github.com/dropseed/plain/commit/037a239ef4711c4477a211d63c57ad8414096301))
+
+### Upgrade instructions
+
+- Replace any usage of `Session.objects` with `Session.query` in your code (e.g., `Session.objects.filter()` becomes `Session.query.filter()`)
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-sessions@0.28.0) (2025-09-09)
 
 ### What's changed
