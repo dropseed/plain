@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-api@0.14.0) (2025-09-12)
+
+### What's changed
+
+- Model and related manager objects renamed from `objects` to `query` ([037a239](https://github.com/dropseed/plain/commit/037a239ef4711c4477a211d63c57ad8414096301))
+- Minimum Python version updated to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb0d5e8f5001efccede4d58d0e26bfea))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-api@0.13.0) (2025-08-19)
 
 ### What's changed
