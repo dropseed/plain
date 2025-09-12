@@ -1,5 +1,20 @@
 # plain-models changelog
 
+## [0.43.0](https://github.com/dropseed/plain/releases/plain-models@0.43.0) (2025-09-12)
+
+### What's changed
+
+- The `related_name` parameter is now required for ForeignKey and ManyToManyField relationships if you want a reverse accessor. The `"+"` suffix to disable reverse relations has been removed, and automatic `_set` suffixes are no longer generated ([89fa03979f](https://github.com/dropseed/plain/commit/89fa03979f))
+- Refactored related descriptors and managers for better internal organization and type safety ([9f0b03957a](https://github.com/dropseed/plain/commit/9f0b03957a))
+- Added docstrings and return type annotations to model `query` property and related manager methods for improved developer experience ([544d85b60b](https://github.com/dropseed/plain/commit/544d85b60b))
+
+### Upgrade instructions
+
+- Remove any `related_name="+"` usage - if you don't want a reverse accessor, simply omit the `related_name` parameter entirely
+- Update any code that relied on automatic `_set` suffixes - these are no longer generated, so you must use explicit `related_name` values
+- Add explicit `related_name` arguments to all ForeignKey and ManyToManyField definitions where you want reverse access (e.g., `models.ForeignKey(User, on_delete=models.CASCADE, related_name="articles")`)
+- Consider removing `related_name` arguments that are not used in practice
+
 ## [0.42.0](https://github.com/dropseed/plain/releases/plain-models@0.42.0) (2025-09-12)
 
 ### What's changed
