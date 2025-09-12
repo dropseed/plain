@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.42.0](https://github.com/dropseed/plain/releases/plain-admin@0.42.0) (2025-09-12)
+
+### What's changed
+
+- Model manager access has been renamed from `.objects` to `.query` throughout the admin interface ([037a239](https://github.com/dropseed/plain/commit/037a239ef4711c4477a211d63c57ad8414096301))
+- Related manager objects are now returned as QuerySet instances instead of Manager instances in admin model field processing ([bbaee93](https://github.com/dropseed/plain/commit/bbaee93839c731d2b1308981c1aac6c9d62a12a3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.1](https://github.com/dropseed/plain/releases/plain-admin@0.41.1) (2025-09-09)
 
 ### What's changed
