@@ -122,7 +122,7 @@ class ForwardManyToOneDescriptor:
     def is_cached(self, instance):
         return self.field.is_cached(instance)
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         qs = self.field.remote_field.model._meta.base_queryset
         return qs.all()
 
@@ -358,7 +358,7 @@ def create_reverse_many_to_one_manager(superclass, rel):
             self.base_queryset_class = rel.related_model._meta.queryset.__class__
 
         @property
-        def query(self):
+        def query(self) -> QuerySet:
             """
             Access the QuerySet for this relationship.
 
@@ -671,7 +671,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                 )
 
         @property
-        def query(self):
+        def query(self) -> QuerySet:
             """
             Access the QuerySet for this relationship.
 
@@ -713,7 +713,7 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             except (AttributeError, KeyError):
                 pass  # nothing to clear from cache
 
-        def get_queryset(self):
+        def get_queryset(self) -> QuerySet:
             try:
                 return self.instance._prefetched_objects_cache[self.prefetch_cache_name]
             except (AttributeError, KeyError):

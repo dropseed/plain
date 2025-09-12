@@ -25,7 +25,7 @@ from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.options import Options
-from plain.models.query import F, Q
+from plain.models.query import F, Q, QuerySet
 from plain.packages import packages_registry
 from plain.utils.encoding import force_str
 from plain.utils.hashable import make_hashable
@@ -168,7 +168,8 @@ class ModelBase(type):
                 index.set_name_with_model(cls)
 
     @property
-    def query(cls):
+    def query(cls) -> QuerySet:
+        """Create a new QuerySet for this model."""
         return cls._meta.queryset
 
 
