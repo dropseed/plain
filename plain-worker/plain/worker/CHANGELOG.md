@@ -1,5 +1,17 @@
 # plain-worker changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-worker@0.29.0) (2025-09-12)
+
+### What's changed
+
+- Model managers have been renamed from `.objects` to `.query` ([037a239](https://github.com/dropseed/plain/commit/037a239ef4))
+- Manager functionality has been merged into QuerySet classes ([bbaee93](https://github.com/dropseed/plain/commit/bbaee93839))
+- Models now use `Meta.queryset_class` instead of separate manager configuration ([6b60a00](https://github.com/dropseed/plain/commit/6b60a00731))
+
+### Upgrade instructions
+
+- Update all model queries to use `.query` instead of `.objects` (e.g., `Job.query.all()` becomes `Job.query.all()`)
+
 ## [0.28.1](https://github.com/dropseed/plain/releases/plain-worker@0.28.1) (2025-09-10)
 
 ### What's changed
