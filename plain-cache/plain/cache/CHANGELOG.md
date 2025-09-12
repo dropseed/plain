@@ -1,5 +1,16 @@
 # plain-cache changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-cache@0.18.0) (2025-09-12)
+
+### What's changed
+
+- Model manager API has been updated from `.objects` to `.query` ([037a239](https://github.com/dropseed/plain/commit/037a239ef4))
+- Minimum Python version requirement raised to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- Update any custom code that references `CachedItem.objects` to use `CachedItem.query` instead
+
 ## [0.17.2](https://github.com/dropseed/plain/releases/plain-cache@0.17.2) (2025-08-22)
 
 ### What's changed
