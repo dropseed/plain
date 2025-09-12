@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.63.0](https://github.com/dropseed/plain/releases/plain@0.63.0) (2025-09-12)
+
+### What's changed
+
+- Model manager attribute renamed from `objects` to `query` throughout codebase ([037a239](https://github.com/dropseed/plain/commit/037a239ef4))
+- Simplified HTTPS redirect middleware by removing `HTTPS_REDIRECT_EXEMPT_PATHS` and `HTTPS_REDIRECT_HOST` settings ([d264cd3](https://github.com/dropseed/plain/commit/d264cd306b))
+- Database backups are now created automatically during migrations when `DEBUG=True` unless explicitly disabled ([c802307](https://github.com/dropseed/plain/commit/c8023074e9))
+
+### Upgrade instructions
+
+- Remove any `HTTPS_REDIRECT_EXEMPT_PATHS` and `HTTPS_REDIRECT_HOST` settings from your configuration - the HTTPS redirect middleware now performs a blanket redirect. For advanced redirect logic, write custom middleware.
+
 ## [0.62.1](https://github.com/dropseed/plain/releases/plain@0.62.1) (2025-09-09)
 
 ### What's changed
