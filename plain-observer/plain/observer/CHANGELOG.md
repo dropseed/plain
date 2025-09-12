@@ -1,5 +1,19 @@
 # plain-observer changelog
 
+## [0.7.0](https://github.com/dropseed/plain/releases/plain-observer@0.7.0) (2025-09-12)
+
+### What's changed
+
+- Model manager renamed from `objects` to `query` throughout the codebase for consistency with Plain framework conventions ([037a239](https://github.com/dropseed/plain/commit/037a239ef4))
+- Updated internal QuerySet configuration to use `queryset_class` instead of `manager_class` in model Meta ([bbaee93](https://github.com/dropseed/plain/commit/bbaee93839))
+- Simplified manager initialization by removing explicit `objects` assignment in favor of Meta configuration ([6b60a00](https://github.com/dropseed/plain/commit/6b60a00731))
+
+### Upgrade instructions
+
+- Replace any direct usage of `Trace.objects` with `Trace.query` in your code
+- Replace any direct usage of `Span.objects` with `Span.query` in your code
+- Replace any direct usage of `Log.objects` with `Log.query` in your code
+
 ## [0.6.2](https://github.com/dropseed/plain/releases/plain-observer@0.6.2) (2025-09-09)
 
 ### What's changed
