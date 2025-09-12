@@ -1,5 +1,17 @@
 # plain-redirection changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-redirection@0.21.0) (2025-09-12)
+
+### What's changed
+
+- Database manager `objects` attribute renamed to `query` for all models ([037a239e](https://github.com/dropseed/plain/commit/037a239e))
+- Admin navigation icons updated to use consistent `arrow-right-circle` icon ([2aac07de](https://github.com/dropseed/plain/commit/2aac07de))
+- Python 3.13 minimum requirement ([d86e307e](https://github.com/dropseed/plain/commit/d86e307e))
+
+### Upgrade instructions
+
+- Update all model queries from `.objects` to `.query` (e.g., `Redirect.objects.create()` becomes `Redirect.query.create()`, `RedirectLog.objects.all()` becomes `RedirectLog.query.all()`)
+
 ## [0.20.1](https://github.com/dropseed/plain/releases/plain-redirection@0.20.1) (2025-08-22)
 
 ### What's changed
