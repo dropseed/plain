@@ -1,5 +1,22 @@
 # plain-models changelog
 
+## [0.42.0](https://github.com/dropseed/plain/releases/plain-models@0.42.0) (2025-09-12)
+
+### What's changed
+
+- The model manager interface has been renamed from `.objects` to `.query` ([037a239](https://github.com/dropseed/plain/commit/037a239ef4))
+- Manager functionality has been merged into QuerySet, simplifying the architecture - custom QuerySets can now be set directly via `Meta.queryset_class` ([bbaee93](https://github.com/dropseed/plain/commit/bbaee93839))
+- The `objects` manager is now set directly on the Model class for better type checking ([fccc5be](https://github.com/dropseed/plain/commit/fccc5be13e))
+- Database backups are now created automatically during migrations when in DEBUG mode ([c8023074](https://github.com/dropseed/plain/commit/c8023074e9))
+- Removed several legacy manager features: `default_related_name`, `base_manager_name`, `creation_counter`, `use_in_migrations`, `auto_created`, and routing hints ([multiple commits](https://github.com/dropseed/plain/compare/plain-models@0.41.1...037a239ef4))
+
+### Upgrade instructions
+
+- Replace all usage of `Model.objects` with `Model.query` in your codebase (e.g., `User.objects.filter()` becomes `User.query.filter()`)
+- If you have custom managers, convert them to custom QuerySets and set them using `Meta.queryset_class` instead of assigning to class attributes (if there is more than one custom manager on a class, invoke the new QuerySet class directly or add a shortcut on the Model using `@classmethod`)
+- Remove any usage of the removed manager features: `default_related_name`, `base_manager_name`, manager `creation_counter`, `use_in_migrations`, `auto_created`, and database routing hints
+- Any reverse accessors (typically `<related_model>_set` or defined by `related_name`) will now return a manager class for the additional `add()`, `remove()`, `clear()`, etc. methods and the regular queryset methods will be available via `.query` (e.g., `user.articles.first()` becomes `user.articles.query.first()`)
+
 ## [0.41.1](https://github.com/dropseed/plain/releases/plain-models@0.41.1) (2025-09-09)
 
 ### What's changed
