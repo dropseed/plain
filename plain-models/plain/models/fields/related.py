@@ -124,14 +124,11 @@ class RelatedField(FieldCacheMixin, Field):
         is_valid_id = (
             not keyword.iskeyword(related_name) and related_name.isidentifier()
         )
-        if not (is_valid_id or related_name.endswith("+")):
+        if not is_valid_id:
             return [
                 preflight.Error(
                     f"The name '{self.remote_field.related_name}' is invalid related_name for field {self.model._meta.object_name}.{self.name}",
-                    hint=(
-                        "Related name must be a valid Python identifier or end with a "
-                        "'+'"
-                    ),
+                    hint="Related name must be a valid Python identifier.",
                     obj=self,
                     id="fields.E306",
                 )
@@ -1237,26 +1234,6 @@ class ManyToManyField(RelatedField):
         return getattr(self, cache_attr)
 
     def contribute_to_class(self, cls, name, **kwargs):
-        # To support multiple relations to self, it's useful to have a non-None
-        # related name on symmetrical relations for internal reasons. The
-        # concept doesn't make a lot of sense externally ("you want me to
-        # specify *what* on my non-reversible relation?!"), so we set it up
-        # automatically. The funky name reduces the chance of an accidental
-        # clash.
-        if self.remote_field.symmetrical and (
-            self.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT
-            or self.remote_field.model == cls._meta.object_name
-        ):
-            self.remote_field.related_name = f"{name}_rel_+"
-        elif self.remote_field.is_hidden():
-            # If the backwards relation is disabled, replace the original
-            # related_name with one generated from the m2m field name. Plain
-            # still uses backwards relations internally and we need to avoid
-            # clashes between multiple m2m fields with related_name == '+'.
-            self.remote_field.related_name = (
-                f"_{cls._meta.package_label}_{cls.__name__.lower()}_{name}_+"
-            )
-
         super().contribute_to_class(cls, name, **kwargs)
 
         def resolve_through_model(_, model, field):

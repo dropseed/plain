@@ -23,7 +23,9 @@ class DeleteParent(models.Model):
 
 @models.register_model
 class ChildCascade(models.Model):
-    parent = models.ForeignKey(DeleteParent, on_delete=models.CASCADE)
+    parent = models.ForeignKey(
+        DeleteParent, on_delete=models.CASCADE, related_name="childcascade_set"
+    )
 
 
 @models.register_model
