@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.43.0](https://github.com/dropseed/plain/releases/plain-admin@0.43.0) (2025-09-12)
+
+### What's changed
+
+- Related manager handling has been improved to use the updated `BaseRelatedManager` interface from plain-models refactoring ([9f0b039](https://github.com/dropseed/plain/commit/9f0b03957a6f103b93c9b44f0e7861596f4d2efa))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.42.0](https://github.com/dropseed/plain/releases/plain-admin@0.42.0) (2025-09-12)
 
 ### What's changed
