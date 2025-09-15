@@ -193,6 +193,7 @@ class ModelState:
 
 
 class Model(metaclass=ModelBase):
+    _meta: Options
     DoesNotExist: type[ObjectDoesNotExist]
     MultipleObjectsReturned: type[MultipleObjectsReturned]
 
