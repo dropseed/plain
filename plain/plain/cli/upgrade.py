@@ -153,7 +153,6 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
             "   - Process ALL packages before testing or validation",
             "   - After all packages are updated, run `uv run plain fix --unsafe-fixes` and `uv run plain pre-commit` to check results",
             "   - DO NOT commit any changes",
-            "   - DO NOT run `plain migrate` with the `--no-backup` option",
             "   - Keep code changes minimal and focused - avoid unnecessary comments",
             "",
             "3. **Available tools:**",
