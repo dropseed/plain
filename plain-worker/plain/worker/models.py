@@ -89,13 +89,13 @@ class JobRequest(models.Model):
     def __str__(self):
         return f"{self.job_class} [{self.uuid}]"
 
-    def convert_to_job(self):
+    def convert_to_job_process(self):
         """
         JobRequests are the pending jobs that are waiting to be executed.
-        We immediately convert them to JobResults when they are picked up.
+        We immediately convert them to JobProcess when they are picked up.
         """
         with transaction.atomic():
-            result = Job.query.create(
+            result = JobProcess.query.create(
                 job_request_uuid=self.uuid,
                 job_class=self.job_class,
                 parameters=self.parameters,
@@ -140,7 +140,7 @@ class JobQuerySet(models.QuerySet):
 
 
 @models.register_model
-class Job(models.Model):
+class JobProcess(models.Model):
     """
     All active jobs are stored in this table.
     """
@@ -240,15 +240,15 @@ class Job(models.Model):
 
     def convert_to_result(self, *, status, error=""):
         """
-        Convert this Job to a JobResult.
+        Convert this JobProcess to a JobResult.
         """
         with transaction.atomic():
             result = JobResult.query.create(
                 ended_at=timezone.now(),
                 error=error,
                 status=status,
-                # From the Job
-                job_uuid=self.uuid,
+                # From the JobProcess
+                job_process_uuid=self.uuid,
                 started_at=self.started_at,
                 # From the JobRequest
                 job_request_uuid=self.job_request_uuid,
@@ -264,7 +264,7 @@ class Job(models.Model):
                 span_id=self.span_id,
             )
 
-            # Delete the Job now
+            # Delete the JobProcess now
             self.delete()
 
         return result
@@ -359,7 +359,7 @@ class JobResult(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # From the Job
-    job_uuid = models.UUIDField()
+    job_process_uuid = models.UUIDField()
     started_at = models.DateTimeField(required=False, allow_null=True)
     ended_at = models.DateTimeField(required=False, allow_null=True)
     error = models.TextField(required=False)
@@ -391,7 +391,7 @@ class JobResult(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),
-            models.Index(fields=["job_uuid"]),
+            models.Index(fields=["job_process_uuid"]),
             models.Index(fields=["started_at"]),
             models.Index(fields=["ended_at"]),
             models.Index(fields=["status"]),

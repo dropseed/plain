@@ -166,8 +166,8 @@ class Job(metaclass=JobType):
                 return self._in_progress(unique_key)
 
     def _in_progress(self, unique_key):
-        """Get all JobRequests and Jobs that are currently in progress, regardless of queue."""
-        from .models import Job, JobRequest
+        """Get all JobRequests and JobProcess that are currently in progress, regardless of queue."""
+        from .models import JobProcess, JobRequest
 
         job_class_name = jobs_registry.get_job_class_name(self.__class__)
 
@@ -176,7 +176,7 @@ class Job(metaclass=JobType):
             unique_key=unique_key,
         )
 
-        jobs = Job.query.filter(
+        jobs = JobProcess.query.filter(
             job_class=job_class_name,
             unique_key=unique_key,
         )

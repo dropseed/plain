@@ -13,7 +13,7 @@ from plain.signals import request_finished, request_started
 from plain.utils import timezone
 from plain.utils.module_loading import import_string
 
-from .models import Job, JobRequest, JobResult, JobResultStatuses
+from .models import JobProcess, JobRequest, JobResult, JobResultStatuses
 from .registry import jobs_registry
 
 logger = logging.getLogger("plain.worker")
@@ -114,16 +114,18 @@ class Worker:
                     job_request.queue,
                 )
 
-                job = job_request.convert_to_job()
+                job = job_request.convert_to_job_process()
 
-            job_uuid = str(job.uuid)  # Make a str copy
+            job_process_uuid = str(job.uuid)  # Make a str copy
 
             # Release these now
             del job_request
             del job
 
-            future = self.executor.submit(process_job, job_uuid)
-            future.add_done_callback(partial(future_finished_callback, job_uuid))
+            future = self.executor.submit(process_job, job_process_uuid)
+            future.add_done_callback(
+                partial(future_finished_callback, job_process_uuid)
+            )
 
             # Do a quick sleep regardless to see if it
             # gives processes a chance to start up
@@ -213,7 +215,7 @@ class Worker:
             num_proccesses = 0
 
         jobs_requested = JobRequest.query.filter(queue__in=self.queues).count()
-        jobs_processing = Job.query.filter(queue__in=self.queues).count()
+        jobs_processing = JobProcess.query.filter(queue__in=self.queues).count()
 
         logger.info(
             'Job worker stats worker_processes=%s worker_queues="%s" jobs_requested=%s jobs_processing=%s worker_max_processes=%s worker_max_jobs_per_process=%s',
@@ -228,52 +230,52 @@ class Worker:
     def rescue_job_results(self):
         """Find any lost or failed jobs on this worker's queues and handle them."""
         # TODO return results and log them if there are any?
-        Job.query.filter(queue__in=self.queues).mark_lost_jobs()
+        JobProcess.query.filter(queue__in=self.queues).mark_lost_jobs()
         JobResult.query.filter(queue__in=self.queues).retry_failed_jobs()
 
 
-def future_finished_callback(job_uuid: str, future: Future):
+def future_finished_callback(job_process_uuid: str, future: Future):
     if future.cancelled():
-        logger.warning("Job cancelled job_uuid=%s", job_uuid)
+        logger.warning("Job cancelled job_process_uuid=%s", job_process_uuid)
         try:
-            job = Job.query.get(uuid=job_uuid)
+            job = JobProcess.query.get(uuid=job_process_uuid)
             job.convert_to_result(status=JobResultStatuses.CANCELLED)
-        except Job.DoesNotExist:
+        except JobProcess.DoesNotExist:
             # Job may have already been cleaned up
             pass
     elif exception := future.exception():
         # Process pool may have been killed...
         logger.warning(
-            "Job failed job_uuid=%s",
-            job_uuid,
+            "Job failed job_process_uuid=%s",
+            job_process_uuid,
             exc_info=exception,
         )
         try:
-            job = Job.query.get(uuid=job_uuid)
+            job = JobProcess.query.get(uuid=job_process_uuid)
             job.convert_to_result(status=JobResultStatuses.CANCELLED)
-        except Job.DoesNotExist:
+        except JobProcess.DoesNotExist:
             # Job may have already been cleaned up
             pass
     else:
-        logger.debug("Job finished job_uuid=%s", job_uuid)
+        logger.debug("Job finished job_process_uuid=%s", job_process_uuid)
 
 
-def process_job(job_uuid):
+def process_job(job_process_uuid):
     try:
         worker_pid = os.getpid()
 
         request_started.send(sender=None)
 
-        job = Job.query.get(uuid=job_uuid)
+        job_process = JobProcess.query.get(uuid=job_process_uuid)
 
         logger.info(
             'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queue="%s"',
             worker_pid,
-            job.job_class,
-            job.job_request_uuid,
-            job.priority,
-            job.source,
-            job.queue,
+            job_process.job_class,
+            job_process.job_request_uuid,
+            job_process.priority,
+            job_process.source,
+            job_process.queue,
         )
 
         def middleware_chain(job):
@@ -284,19 +286,19 @@ def process_job(job_uuid):
             middleware_instance = middleware_class(middleware_chain)
             middleware_chain = middleware_instance
 
-        job_result = middleware_chain(job)
+        job_result = middleware_chain(job_process)
 
         # Release it now
-        del job
+        del job_process
 
         duration = job_result.ended_at - job_result.started_at
         duration = duration.total_seconds()
 
         logger.info(
-            'Completed job worker_pid=%s job_class=%s job_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s',
+            'Completed job worker_pid=%s job_class=%s job_process_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s',
             worker_pid,
             job_result.job_class,
-            job_result.job_uuid,
+            job_result.job_process_uuid,
             job_result.job_request_uuid,
             job_result.uuid,
             job_result.priority,

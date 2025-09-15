@@ -8,7 +8,7 @@ from plain.cli import register_cli
 from plain.runtime import settings
 from plain.utils import timezone
 
-from .models import Job, JobRequest, JobResult
+from .models import JobProcess, JobRequest, JobResult
 from .registry import jobs_registry
 from .scheduling import load_schedule
 from .workers import Worker
@@ -100,7 +100,7 @@ def clear_completed():
 def stats():
     """Stats across all queues."""
     pending = JobRequest.query.count()
-    processing = Job.query.count()
+    processing = JobProcess.query.count()
 
     successful = JobResult.query.successful().count()
     errored = JobResult.query.errored().count()
@@ -124,7 +124,7 @@ def purge_processing():
     deleted = JobRequest.query.all().delete()[0]
     click.echo(f"Deleted {deleted} job requests")
 
-    deleted = Job.query.all().delete()[0]
+    deleted = JobProcess.query.all().delete()[0]
     click.echo(f"Deleted {deleted} jobs")
 
 

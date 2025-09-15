@@ -11,7 +11,7 @@ from plain.admin.views import (
 from plain.http import ResponseRedirect
 from plain.runtime import settings
 
-from .models import Job, JobRequest, JobResult
+from .models import JobProcess, JobRequest, JobResult
 
 
 def _td_format(td_object):
@@ -87,14 +87,14 @@ class WaitingJobsCard(Card):
     title = "Waiting Jobs"
 
     def get_number(self):
-        return Job.query.waiting().count()
+        return JobProcess.query.waiting().count()
 
 
 class RunningJobsCard(Card):
     title = "Running Jobs"
 
     def get_number(self):
-        return Job.query.running().count()
+        return JobProcess.query.running().count()
 
 
 @register_viewset
@@ -117,11 +117,12 @@ class JobRequestViewset(AdminViewset):
 
 
 @register_viewset
-class JobViewset(AdminViewset):
+class JobProcessViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Worker"
         nav_icon = "gear"
-        model = Job
+        model = JobProcess
+        title = "Job processes"
         fields = [
             "id",
             "job_class",
@@ -138,10 +139,10 @@ class JobViewset(AdminViewset):
 
         def perform_action(self, action: str, target_ids: list):
             if action == "Delete":
-                Job.query.filter(id__in=target_ids).delete()
+                JobProcess.query.filter(id__in=target_ids).delete()
 
     class DetailView(AdminModelDetailView):
-        model = Job
+        model = JobProcess
 
 
 @register_viewset
@@ -162,7 +163,7 @@ class JobResultViewset(AdminViewset):
         ]
         search_fields = [
             "uuid",
-            "job_uuid",
+            "job_process_uuid",
             "job_request_uuid",
             "job_class",
         ]
