@@ -1,3 +1,4 @@
+import hmac
 from datetime import datetime
 
 from plain import signing
@@ -10,7 +11,7 @@ from plain.http import (
 )
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
-from plain.utils.crypto import constant_time_compare
+from plain.utils.encoding import force_bytes
 from plain.views import CreateView, FormView
 
 from .forms import (
@@ -73,11 +74,13 @@ class PasswordResetView(FormView):
 
         # If the password has changed since the token was generated, the token is invalid.
         # (These are the hashed passwords, not the raw passwords.)
-        if not constant_time_compare(user.password, data["password"]):
+        if not hmac.compare_digest(
+            force_bytes(user.password), force_bytes(data["password"])
+        ):
             return
 
         # If the email has changed since the token was generated, the token is invalid.
-        if not constant_time_compare(user.email, data["email"]):
+        if not hmac.compare_digest(force_bytes(user.email), force_bytes(data["email"])):
             return
 
         return user

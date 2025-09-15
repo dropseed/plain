@@ -62,11 +62,6 @@ def get_random_string(length, allowed_chars=RANDOM_STRING_CHARS):
     return "".join(secrets.choice(allowed_chars) for i in range(length))
 
 
-def constant_time_compare(val1, val2):
-    """Return True if the two strings are equal, False otherwise."""
-    return secrets.compare_digest(force_bytes(val1), force_bytes(val2))
-
-
 def pbkdf2(password, salt, iterations, dklen=0, digest=None):
     """Return the hash of password using pbkdf2."""
     if digest is None:

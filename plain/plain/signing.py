@@ -35,12 +35,14 @@ These functions make use of all of them.
 
 import base64
 import datetime
+import hmac
 import json
 import time
 import zlib
 
 from plain.runtime import settings
-from plain.utils.crypto import constant_time_compare, salted_hmac
+from plain.utils.crypto import salted_hmac
+from plain.utils.encoding import force_bytes
 from plain.utils.regex_helper import _lazy_re_compile
 
 _SEP_UNSAFE = _lazy_re_compile(r"^[A-z0-9-_=]*$")
@@ -196,7 +198,9 @@ class Signer:
             raise BadSignature(f'No "{self.sep}" found in value')
         value, sig = signed_value.rsplit(self.sep, 1)
         for key in [self.key, *self.fallback_keys]:
-            if constant_time_compare(sig, self.signature(value, key)):
+            if hmac.compare_digest(
+                force_bytes(sig), force_bytes(self.signature(value, key))
+            ):
                 return value
         raise BadSignature(f'Signature "{sig}" does not match')
 

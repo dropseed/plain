@@ -2,6 +2,7 @@ import base64
 import binascii
 import functools
 import hashlib
+import hmac
 import importlib
 import math
 import warnings
@@ -10,10 +11,10 @@ from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 from plain.utils.crypto import (
     RANDOM_STRING_CHARS,
-    constant_time_compare,
     get_random_string,
     pbkdf2,
 )
+from plain.utils.encoding import force_bytes
 from plain.utils.module_loading import import_string
 
 
@@ -289,7 +290,7 @@ class PBKDF2PasswordHasher(BasePasswordHasher):
     def verify(self, password, encoded):
         decoded = self.decode(encoded)
         encoded_2 = self.encode(password, decoded["salt"], decoded["iterations"])
-        return constant_time_compare(encoded, encoded_2)
+        return hmac.compare_digest(force_bytes(encoded), force_bytes(encoded_2))
 
     def safe_summary(self, encoded):
         decoded = self.decode(encoded)
@@ -472,7 +473,7 @@ class BCryptSHA256PasswordHasher(BasePasswordHasher):
         algorithm, data = encoded.split("$", 1)
         assert algorithm == self.algorithm
         encoded_2 = self.encode(password, data.encode("ascii"))
-        return constant_time_compare(encoded, encoded_2)
+        return hmac.compare_digest(force_bytes(encoded), force_bytes(encoded_2))
 
     def safe_summary(self, encoded):
         decoded = self.decode(encoded)
@@ -567,7 +568,7 @@ class ScryptPasswordHasher(BasePasswordHasher):
             decoded["block_size"],
             decoded["parallelism"],
         )
-        return constant_time_compare(encoded, encoded_2)
+        return hmac.compare_digest(force_bytes(encoded), force_bytes(encoded_2))
 
     def safe_summary(self, encoded):
         decoded = self.decode(encoded)

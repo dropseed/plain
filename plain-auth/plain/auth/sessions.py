@@ -1,7 +1,10 @@
+import hmac
+
 from plain.exceptions import ImproperlyConfigured
 from plain.models import models_registry
 from plain.runtime import settings
-from plain.utils.crypto import constant_time_compare, salted_hmac
+from plain.utils.crypto import salted_hmac
+from plain.utils.encoding import force_bytes
 
 USER_ID_SESSION_KEY = "_auth_user_id"
 USER_HASH_SESSION_KEY = "_auth_user_hash"
@@ -60,8 +63,9 @@ def login(request, user):
             # session if the existing session corresponds to a different
             # authenticated user.
             request.session.flush()
-        elif session_auth_hash and not constant_time_compare(
-            request.session.get(USER_HASH_SESSION_KEY, ""), session_auth_hash
+        elif session_auth_hash and not hmac.compare_digest(
+            force_bytes(request.session.get(USER_HASH_SESSION_KEY, "")),
+            force_bytes(session_auth_hash),
         ):
             # If the session hash does not match the current hash, reset the
             # session. Most likely this means the password was changed.
@@ -131,15 +135,17 @@ def get_user(request):
             session_hash_verified = False
         else:
             session_auth_hash = get_session_auth_hash(user)
-            session_hash_verified = constant_time_compare(
-                session_hash, session_auth_hash
+            session_hash_verified = hmac.compare_digest(
+                force_bytes(session_hash), force_bytes(session_auth_hash)
             )
         if not session_hash_verified:
             # If the current secret does not verify the session, try
             # with the fallback secrets and stop when a matching one is
             # found.
             if session_hash and any(
-                constant_time_compare(session_hash, fallback_auth_hash)
+                hmac.compare_digest(
+                    force_bytes(session_hash), force_bytes(fallback_auth_hash)
+                )
                 for fallback_auth_hash in get_session_auth_fallback_hash(user)
             ):
                 request.session.cycle_key()
