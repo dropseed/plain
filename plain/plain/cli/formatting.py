@@ -69,5 +69,5 @@ class PlainContext(click.Context):
         if any(
             os.getenv(var)
             for var in ["CI", "FORCE_COLOR", "GITHUB_ACTIONS", "GITLAB_CI"]
-        ):
+        ) and not any(os.getenv(var) for var in ["NO_COLOR", "PYTEST_CURRENT_TEST"]):
             self.color = True
