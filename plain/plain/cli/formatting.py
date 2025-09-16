@@ -1,3 +1,5 @@
+import os
+
 import click
 from click.formatting import iter_rows, measure_table, term_len, wrap_text
 
@@ -59,3 +61,13 @@ class PlainHelpFormatter(click.HelpFormatter):
 
 class PlainContext(click.Context):
     formatter_class = PlainHelpFormatter
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Force colors in CI environments
+        if any(
+            os.getenv(var)
+            for var in ["CI", "FORCE_COLOR", "GITHUB_ACTIONS", "GITLAB_CI"]
+        ):
+            self.color = True
