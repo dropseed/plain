@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-code@0.10.0) (2025-09-19)
+
+### What's changed
+
+- Minimum Python version increased from 3.11 to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307))
+
+### Upgrade instructions
+
+- Ensure your Python environment is running Python 3.13 or later before upgrading
+
 ## [0.9.2](https://github.com/dropseed/plain/releases/plain-code@0.9.2) (2025-07-30)
 
 ### What's changed
