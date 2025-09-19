@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.64.0](https://github.com/dropseed/plain/releases/plain@0.64.0) (2025-09-19)
+
+### What's changed
+
+- Added `plain-build` command as a standalone executable ([4b39ca4](https://github.com/dropseed/plain/commit/4b39ca4599))
+- Removed `constant_time_compare` utility function in favor of `hmac.compare_digest` ([55f3f55](https://github.com/dropseed/plain/commit/55f3f5596d))
+- CLI now forces colors in CI environments (GitHub Actions, GitLab CI, etc.) for better output visibility ([56f7d2b](https://github.com/dropseed/plain/commit/56f7d2b312))
+
+### Upgrade instructions
+
+- Replace any usage of `plain.utils.crypto.constant_time_compare` with `hmac.compare_digest` or `secrets.compare_digest`
+
 ## [0.63.0](https://github.com/dropseed/plain/releases/plain@0.63.0) (2025-09-12)
 
 ### What's changed
