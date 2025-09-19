@@ -589,7 +589,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-esbuild"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "plain-esbuild" }
 dependencies = [
     { name = "plain" },
