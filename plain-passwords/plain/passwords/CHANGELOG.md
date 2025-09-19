@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-passwords@0.12.0) (2025-09-19)
+
+### What's changed
+
+- Replaced custom `constant_time_compare` utility with Python's built-in `hmac.compare_digest` for better security and performance ([55f3f55](https://github.com/dropseed/plain/commit/55f3f5596d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-passwords@0.11.0) (2025-09-12)
 
 ### What's changed
