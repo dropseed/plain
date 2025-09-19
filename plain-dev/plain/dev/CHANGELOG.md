@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.34.0](https://github.com/dropseed/plain/releases/plain-dev@0.34.0) (2025-09-19)
+
+### What's changed
+
+- Minimum Python version requirement increased from 3.11 to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- Upgrade your Python environment to Python 3.13 or later
+
 ## [0.33.3](https://github.com/dropseed/plain/releases/plain-dev@0.33.3) (2025-09-03)
 
 ### What's changed
