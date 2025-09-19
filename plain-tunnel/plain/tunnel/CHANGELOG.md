@@ -1,5 +1,17 @@
 # plain-tunnel changelog
 
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.6.0) (2025-09-19)
+
+### What's changed
+
+- Updated minimum Python version requirement from 3.11 to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+- Enhanced README documentation with improved structure, table of contents, and detailed usage examples ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+- Added proper project description to pyproject.toml ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+
+### Upgrade instructions
+
+- Update your Python environment to Python 3.13 or higher
+
 ## [0.5.5](https://github.com/dropseed/plain/releases/plain-tunnel@0.5.5) (2025-07-07)
 
 ### What's changed
