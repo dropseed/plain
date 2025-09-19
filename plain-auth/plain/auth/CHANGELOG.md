@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-auth@0.18.0) (2025-09-19)
+
+### What's changed
+
+- Removed deprecated `constant_time_compare` utility function, replaced with Python's built-in `hmac.compare_digest()` for improved security in session management ([55f3f55](https://github.com/dropseed/plain/commit/55f3f5596d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-auth@0.17.0) (2025-09-12)
 
 ### What's changed
