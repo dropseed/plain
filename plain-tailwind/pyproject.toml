@@ -12,6 +12,11 @@ dependencies = [
     "tomlkit>=0.12.1",
 ]
 
+[project.scripts]
+# Make this directly available without loading Plain,
+# so tailwind install can be separated.
+plain-tailwind = "plain.tailwind.cli:cli"
+
 [project.entry-points."plain.dev"]
 "tailwind" = "plain.tailwind.entrypoints:run_dev_build"
 
