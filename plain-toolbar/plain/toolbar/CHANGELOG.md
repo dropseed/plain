@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.2.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.2.0) (2025-09-19)
+
+### What's changed
+
+- Minimum Python version raised to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- Upgrade your Python environment to Python 3.13 or later
+
 ## [0.1.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.1.1) (2025-08-28)
 
 ### What's changed
