@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-pages@0.13.0) (2025-09-19)
+
+### What's changed
+
+- Updated minimum Python requirement from 3.11 to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- Update your Python environment to version 3.13 or higher
+
 ## [0.12.2](https://github.com/dropseed/plain/releases/plain-pages@0.12.2) (2025-08-22)
 
 ### What's changed
