@@ -11,8 +11,6 @@ plain*/tests/.plain
 # Ottobot
 .aider*
 
-/llms-full.txt
-
 # Plain temp dirs
 .plain
 
