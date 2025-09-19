@@ -1,5 +1,16 @@
 # plain-pytest changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-pytest@0.11.0) (2025-09-19)
+
+### What's changed
+
+- Minimum Python version increased to 3.13 ([d86e307e](https://github.com/dropseed/plain/commit/d86e307e))
+- Color output is now properly disabled during pytest runs to prevent formatting issues ([88f1bac6](https://github.com/dropseed/plain/commit/88f1bac6))
+
+### Upgrade instructions
+
+- Upgrade your Python environment to 3.13 or later
+
 ## [0.10.1](https://github.com/dropseed/plain/releases/plain-pytest@0.10.1) (2025-07-30)
 
 ### What's changed
