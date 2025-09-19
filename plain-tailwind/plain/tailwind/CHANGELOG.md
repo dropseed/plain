@@ -1,5 +1,16 @@
 # plain-tailwind changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.14.0) (2025-09-19)
+
+### What's changed
+
+- Added new `plain tailwind version` command to display the currently installed Tailwind CSS version ([4679a42](https://github.com/dropseed/plain/commit/4679a423b6))
+- Minimum Python version requirement updated from 3.11 to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+
+### Upgrade instructions
+
+- Update your Python environment to Python 3.13 or later
+
 ## [0.13.3](https://github.com/dropseed/plain/releases/plain-tailwind@0.13.3) (2025-09-03)
 
 ### What's changed
