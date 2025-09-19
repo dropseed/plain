@@ -1,5 +1,16 @@
 # plain-vendor changelog
 
+## [0.9.0](https://github.com/dropseed/plain/releases/plain-vendor@0.9.0) (2025-09-19)
+
+### What's changed
+
+- Updated minimum Python requirement to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb))
+- Enhanced documentation with improved formatting, table of contents, and installation instructions ([4ebecd1](https://github.com/dropseed/plain/commit/4ebecd1856))
+
+### Upgrade instructions
+
+- Ensure your environment is running Python 3.13 or higher
+
 ## [0.8.4](https://github.com/dropseed/plain/releases/plain-vendor@0.8.4) (2025-07-18)
 
 ### What's changed
