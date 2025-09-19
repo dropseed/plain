@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-elements@0.10.0) (2025-09-19)
+
+### What's changed
+
+- Updated minimum Python requirement from 3.11 to 3.13 ([d86e307](https://github.com/dropseed/plain/commit/d86e307efb0d5e8f5001efccede4d58d0e26bfea))
+
+### Upgrade instructions
+
+- Ensure your project is running Python 3.13 or later
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-elements@0.9.0) (2025-08-19)
 
 ### What's changed
