@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.44.0](https://github.com/dropseed/plain/releases/plain-models@0.44.0) (2025-09-19)
+
+### What's changed
+
+- PostgreSQL backup restoration now drops and recreates the database instead of using `pg_restore --clean`, providing more reliable restoration by terminating active connections and ensuring a completely clean database state ([a8865fe](https://github.com/dropseed/plain/commit/a8865fe5d6))
+- Added `_meta` type annotation to the `Model` class for improved type checking and IDE support ([387b92e](https://github.com/dropseed/plain/commit/387b92e08b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.43.0](https://github.com/dropseed/plain/releases/plain-models@0.43.0) (2025-09-12)
 
 ### What's changed
