@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.15.0) (2025-09-19)
+
+### What's changed
+
+- Added `plain-tailwind` standalone script for running Tailwind installation separately from Plain ([a9d1ab6](https://github.com/dropseed/plain/commit/a9d1ab6c18))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.14.0) (2025-09-19)
 
 ### What's changed
