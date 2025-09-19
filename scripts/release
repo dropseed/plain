@@ -34,16 +34,20 @@ def get_commits_since_version_change(repo_path: Path, package_path: Path):
     current_version = None
 
     for commit in commits:
-        file_at_commit = run(f'git show {commit}:{rel_pyproject}', repo_path)
-        version = None
-        for line in file_at_commit.splitlines():
-            if line.strip().startswith("version"):
-                version = line.split("=")[1].strip().strip('"').strip("'")
+        # Check if this commit actually changed the version line
+        diff_cmd = f'git show --no-merges --format="" {commit} -- {rel_pyproject}'
+        diff_output = run(diff_cmd, repo_path)
+
+        # Look for actual changes to the version line (+ or - prefix)
+        version_changed = False
+        for line in diff_output.splitlines():
+            if (line.startswith('+') or line.startswith('-')) and 'version' in line and '=' in line:
+                version_changed = True
                 break
-        if version != current_version:
+
+        if version_changed:
             last_version_commit = commit
             break
-        current_version = version
 
     if last_version_commit is None:
         last_version_commit = commits[-1] if commits else None
