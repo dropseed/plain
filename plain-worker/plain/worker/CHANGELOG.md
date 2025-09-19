@@ -1,5 +1,19 @@
 # plain-worker changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-worker@0.30.0) (2025-09-19)
+
+### What's changed
+
+- The `Job` model has been renamed to `JobProcess` for better clarity ([986c914](https://github.com/dropseed/plain/commit/986c914))
+- The `job_uuid` field in JobResult has been renamed to `job_process_uuid` to match the model rename ([986c914](https://github.com/dropseed/plain/commit/986c914))
+- Admin interface now shows "Job processes" as the section title instead of "Jobs" ([986c914](https://github.com/dropseed/plain/commit/986c914))
+
+### Upgrade instructions
+
+- Run `plain migrate` to apply the database migration that renames the Job model to JobProcess
+- If you have any custom code that directly references the `Job` model (different than the `Job` base class for job type definitions), update it to use `JobProcess` instead
+- If you have any code that accesses the `job_uuid` field on JobResult instances, update it to use `job_process_uuid`
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-worker@0.29.0) (2025-09-12)
 
 ### What's changed
