@@ -39,6 +39,12 @@ def adapt_datetime(val):
     return val.isoformat(" ")
 
 
+def _get_varchar_column(data):
+    if data["max_length"] is None:
+        return "varchar"
+    return "varchar({max_length})".format(**data)
+
+
 Database.register_converter("bool", b"1".__eq__)
 Database.register_converter("date", decoder(parse_date))
 Database.register_converter("time", decoder(parse_time))
@@ -60,7 +66,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "PrimaryKeyField": "integer",
         "BinaryField": "BLOB",
         "BooleanField": "bool",
-        "CharField": "varchar(%(max_length)s)",
+        "CharField": _get_varchar_column,
         "DateField": "date",
         "DateTimeField": "datetime",
         "DecimalField": "decimal",
