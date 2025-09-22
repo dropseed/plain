@@ -27,12 +27,9 @@ from plain.utils.datastructures import (
     MultiValueDict,
 )
 from plain.utils.encoding import iri_to_uri
-from plain.utils.http import is_same_domain, parse_header_parameters
-from plain.utils.regex_helper import _lazy_re_compile
+from plain.utils.http import parse_header_parameters
 
-host_validation_re = _lazy_re_compile(
-    r"^([a-z0-9.-]+|\[[a-f0-9]*:[a-f0-9\.:]+\])(:[0-9]+)?$"
-)
+from .hosts import split_domain_port, validate_host
 
 
 class UnreadablePostError(OSError):
@@ -700,48 +697,6 @@ def bytes_to_text(s, encoding):
         return str(s, encoding, "replace")
     else:
         return s
-
-
-def split_domain_port(host):
-    """
-    Return a (domain, port) tuple from a given host.
-
-    Returned domain is lowercased. If the host is invalid, the domain will be
-    empty.
-    """
-    host = host.lower()
-
-    if not host_validation_re.match(host):
-        return "", ""
-
-    if host[-1] == "]":
-        # It's an IPv6 address without a port.
-        return host, ""
-    bits = host.rsplit(":", 1)
-    domain, port = bits if len(bits) == 2 else (bits[0], "")
-    # Remove a trailing dot (if present) from the domain.
-    domain = domain.removesuffix(".")
-    return domain, port
-
-
-def validate_host(host, allowed_hosts):
-    """
-    Validate the given host for this site.
-
-    Check that the host looks valid and matches a host or host pattern in the
-    given list of ``allowed_hosts``. Any pattern beginning with a period
-    matches a domain and all its subdomains (e.g. ``.example.com`` matches
-    ``example.com`` and any subdomain), ``*`` matches anything, and anything
-    else must match exactly.
-
-    Note: This function assumes that the given host is lowercased and has
-    already had the port, if any, stripped off.
-
-    Return ``True`` for a valid host, ``False`` otherwise.
-    """
-    return any(
-        pattern == "*" or is_same_domain(host, pattern) for pattern in allowed_hosts
-    )
 
 
 def parse_accept_header(header):

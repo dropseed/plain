@@ -1,6 +1,6 @@
 import pytest
 
-from plain.http.request import split_domain_port, validate_host
+from plain.http.hosts import split_domain_port, validate_host
 
 
 @pytest.mark.parametrize(
@@ -145,4 +145,70 @@ def test_split_domain_port(host, expected_domain, expected_port):
 )
 def test_validate_host(host, allowed_hosts, expected):
     """Test validate_host function with various inputs."""
+    assert validate_host(host, allowed_hosts) is expected
+
+
+@pytest.mark.parametrize(
+    ("host", "allowed_hosts", "expected"),
+    [
+        # IPv4 CIDR tests
+        ("192.168.1.100", ["192.168.1.0/24"], True),
+        ("192.168.1.1", ["192.168.1.0/24"], True),
+        ("192.168.1.254", ["192.168.1.0/24"], True),
+        ("192.168.2.100", ["192.168.1.0/24"], False),
+        ("10.0.5.1", ["10.0.0.0/8"], True),
+        ("172.16.0.1", ["10.0.0.0/8"], False),
+        # IPv4 single IP as CIDR
+        ("192.168.1.1", ["192.168.1.1/32"], True),
+        ("192.168.1.2", ["192.168.1.1/32"], False),
+        # IPv4 larger networks
+        ("172.16.5.10", ["172.16.0.0/12"], True),
+        ("172.32.5.10", ["172.16.0.0/12"], False),
+        ("127.0.0.1", ["127.0.0.0/8"], True),
+        # IPv6 CIDR tests
+        ("[2001:db8::1]", ["[2001:db8::]/32"], True),
+        ("[2001:db8:1::1]", ["[2001:db8::]/32"], True),
+        ("[2001:db9::1]", ["[2001:db8::]/32"], False),
+        ("[::1]", ["[::]/0"], True),  # Match everything IPv6
+        ("[2001:db8::1]", ["[fe80::]/10"], False),
+        # IPv6 without brackets in pattern (should still work)
+        ("[2001:db8::1]", ["2001:db8::/32"], True),
+        ("[2001:db9::1]", ["2001:db8::/32"], False),
+        # IPv6 single address as CIDR
+        ("[::1]", ["[::1]/128"], True),
+        ("[::2]", ["[::1]/128"], False),
+        # Mixed CIDR and domain patterns
+        ("192.168.1.50", ["192.168.1.0/24", ".example.com"], True),
+        ("sub.example.com", ["192.168.1.0/24", ".example.com"], True),
+        ("192.168.2.50", ["192.168.1.0/24", ".example.com"], False),
+        ("other.com", ["192.168.1.0/24", ".example.com"], False),
+        # Multiple CIDR patterns
+        ("192.168.1.50", ["10.0.0.0/8", "192.168.0.0/16"], True),
+        ("10.5.0.1", ["10.0.0.0/8", "192.168.0.0/16"], True),
+        ("172.16.0.1", ["10.0.0.0/8", "192.168.0.0/16"], False),
+        # Domain names should not match CIDR patterns
+        ("example.com", ["192.168.1.0/24"], False),
+        ("192.168.1.com", ["192.168.1.0/24"], False),
+        # Non-IP strings should not match CIDR
+        ("not-an-ip", ["192.168.1.0/24"], False),
+        ("192.168.1", ["192.168.1.0/24"], False),  # Incomplete IP
+        # Invalid CIDR patterns should be ignored (treated as literal)
+        ("192.168.1.0/24", ["192.168.1.0/24"], False),  # Literal match of CIDR string
+        ("192.168.1.100", ["192.168.1.0/999"], False),  # Invalid CIDR
+        ("192.168.1.100", ["192.168.1.0/"], False),  # Invalid CIDR
+        # CIDR with wildcard - wildcard should take precedence
+        ("anything.com", ["*", "192.168.1.0/24"], True),
+        ("172.16.0.1", ["*", "192.168.1.0/24"], True),
+        # Edge cases
+        ("0.0.0.0", ["0.0.0.0/0"], True),  # Match all IPv4
+        ("255.255.255.255", ["0.0.0.0/0"], True),
+        (
+            "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]",
+            ["[::]/0"],
+            True,
+        ),  # Match all IPv6
+    ],
+)
+def test_validate_host_cidr(host, allowed_hosts, expected):
+    """Test validate_host function with CIDR notation patterns."""
     assert validate_host(host, allowed_hosts) is expected
