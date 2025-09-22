@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.65.1](https://github.com/dropseed/plain/releases/plain@0.65.1) (2025-09-22)
+
+### What's changed
+
+- Fixed DisallowedHost exception handling in request span attributes to prevent telemetry errors ([bcc0005](https://github.com/dropseed/plain/commit/bcc000575b))
+- Removed cached property optimization for scheme/host to improve request processing reliability ([3a52690](https://github.com/dropseed/plain/commit/3a52690d47))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.65.0](https://github.com/dropseed/plain/releases/plain@0.65.0) (2025-09-22)
 
 ### What's changed
