@@ -220,6 +220,8 @@ class HttpRequest:
             location = str(location)
         bits = urlsplit(location)
         if not (bits.scheme and bits.netloc):
+            current_scheme_host = f"{self.scheme}://{self.get_host()}"
+
             # Handle the simple, most common case. If the location is absolute
             # and a scheme or host (netloc) isn't provided, skip an expensive
             # urljoin() as long as no path segments are '.' or '..'.
@@ -233,17 +235,14 @@ class HttpRequest:
                 # If location starts with '//' but has no netloc, reuse the
                 # schema and netloc from the current request. Strip the double
                 # slashes and continue as if it wasn't specified.
-                location = self._current_scheme_host + location.removeprefix("//")
+                location = current_scheme_host + location.removeprefix("//")
             else:
                 # Join the constructed URL with the provided location, which
                 # allows the provided location to apply query strings to the
                 # base path.
-                location = urljoin(self._current_scheme_host + self.path, location)
-        return iri_to_uri(location)
+                location = urljoin(current_scheme_host + self.path, location)
 
-    @cached_property
-    def _current_scheme_host(self):
-        return f"{self.scheme}://{self.get_host()}"
+        return iri_to_uri(location)
 
     def _get_scheme(self):
         """
