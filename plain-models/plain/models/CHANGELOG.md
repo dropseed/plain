@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.45.0](https://github.com/dropseed/plain/releases/plain-models@0.45.0) (2025-09-21)
+
+### What's changed
+
+- Added unlimited varchar support to SQLite - CharField fields without a max_length now generate `varchar` columns instead of `varchar()` with no length specified ([c5c0c3a](https://github.com/dropseed/plain/commit/c5c0c3a743))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.44.0](https://github.com/dropseed/plain/releases/plain-models@0.44.0) (2025-09-19)
 
 ### What's changed
