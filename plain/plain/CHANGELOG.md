@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.65.0](https://github.com/dropseed/plain/releases/plain@0.65.0) (2025-09-22)
+
+### What's changed
+
+- Added CIDR notation support to `ALLOWED_HOSTS` for IP address range validation ([c485d21](https://github.com/dropseed/plain/commit/c485d21a8b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.64.0](https://github.com/dropseed/plain/releases/plain@0.64.0) (2025-09-19)
 
 ### What's changed
