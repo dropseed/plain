@@ -4,7 +4,7 @@ import types
 from opentelemetry import baggage, trace
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
 
-from plain.exceptions import ImproperlyConfigured
+from plain.exceptions import DisallowedHost, ImproperlyConfigured
 from plain.logs.utils import log_response
 from plain.runtime import settings
 from plain.urls import get_resolver
@@ -77,6 +77,10 @@ class BaseHandler:
             span_attributes[url_attributes.URL_FULL] = request.build_absolute_uri()
         except KeyError:
             # Missing required WSGI environment variables (e.g. in tests)
+            pass
+        except DisallowedHost:
+            # Invalid host header - skip URL_FULL for telemetry but let the
+            # exception be handled normally by middleware for proper 400 response
             pass
 
         # Add query string if present
