@@ -57,12 +57,6 @@ def test_split_domain_port(host, expected_domain, expected_port):
 @pytest.mark.parametrize(
     ("host", "allowed_hosts", "expected"),
     [
-        # Wildcard matching
-        ("example.com", ["*"], True),
-        ("sub.example.com", ["*"], True),
-        ("127.0.0.1", ["*"], True),
-        ("[::1]", ["*"], True),
-        ("anything.at.all", ["*"], True),
         # Subdomain pattern matching
         ("example.com", [".example.com"], True),
         ("sub.example.com", [".example.com"], True),
@@ -84,7 +78,7 @@ def test_split_domain_port(host, expected_domain, expected_port):
         ("127.0.0.1", ["example.com", ".api.example.com", "127.0.0.1"], True),
         ("sub.example.com", ["example.com", ".api.example.com", "127.0.0.1"], False),
         ("other.com", ["example.com", ".api.example.com", "127.0.0.1"], False),
-        # Literal asterisk pattern (not treated as wildcard)
+        # Literal asterisk pattern (treated as literal string, not wildcard)
         ("*.test.com", ["*.test.com"], True),
         ("anything.test.com", ["*.test.com"], False),
         ("api.test.com", ["*.test.com"], False),
@@ -121,22 +115,6 @@ def test_split_domain_port(host, expected_domain, expected_port):
         ),
         ("example.com", [".api.example.com", ".staging.example.com"], False),
         ("www.example.com", [".api.example.com", ".staging.example.com"], False),
-        # Wildcard overrides other patterns
-        (
-            "anything.com",
-            ["*", "exact.com", ".subdomain.com", "127.0.0.1", "[::1]"],
-            True,
-        ),
-        (
-            "random.domain.org",
-            ["*", "exact.com", ".subdomain.com", "127.0.0.1", "[::1]"],
-            True,
-        ),
-        (
-            "192.168.1.100",
-            ["*", "exact.com", ".subdomain.com", "127.0.0.1", "[::1]"],
-            True,
-        ),
         # Edge cases
         ("", ["example.com"], False),
         ("example .com", ["example.com"], False),
@@ -196,9 +174,6 @@ def test_validate_host(host, allowed_hosts, expected):
         ("192.168.1.0/24", ["192.168.1.0/24"], False),  # Literal match of CIDR string
         ("192.168.1.100", ["192.168.1.0/999"], False),  # Invalid CIDR
         ("192.168.1.100", ["192.168.1.0/"], False),  # Invalid CIDR
-        # CIDR with wildcard - wildcard should take precedence
-        ("anything.com", ["*", "192.168.1.0/24"], True),
-        ("172.16.0.1", ["*", "192.168.1.0/24"], True),
         # Edge cases
         ("0.0.0.0", ["0.0.0.0/0"], True),  # Match all IPv4
         ("255.255.255.255", ["0.0.0.0/0"], True),

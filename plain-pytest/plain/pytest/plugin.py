@@ -10,12 +10,6 @@ def pytest_configure(config):
     setup()
 
 
-@pytest.fixture(autouse=True, scope="session")
-def _allowed_hosts_testserver():
-    # Add testserver to ALLOWED_HOSTS so the test client can make requests
-    plain_settings.ALLOWED_HOSTS = [*plain_settings.ALLOWED_HOSTS, "testserver"]
-
-
 @pytest.fixture
 def settings():
     class SettingsProxy:

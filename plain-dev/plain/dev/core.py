@@ -1,4 +1,3 @@
-import json
 import os
 import platform
 import socket
@@ -136,7 +135,6 @@ class DevProcess(ProcessManager):
 
         self.symlink_plain_src()
         self.modify_hosts_file()
-        self.set_allowed_hosts()
 
         click.secho("→ Running preflight checks... ", dim=True, nl=False)
         self.run_preflight()
@@ -260,19 +258,6 @@ class DevProcess(ProcessManager):
                     fg="red",
                 )
                 sys.exit(1)
-
-    def set_allowed_hosts(self):
-        if "PLAIN_ALLOWED_HOSTS" not in os.environ:
-            hostnames = [self.hostname]
-            if self.tunnel_url:
-                # Add the tunnel URL to the allowed hosts
-                hostnames.append(self.tunnel_url.split("://")[1])
-            allowed_hosts = json.dumps(hostnames)
-            self.plain_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
-            self.custom_process_env["PLAIN_ALLOWED_HOSTS"] = allowed_hosts
-            click.secho(
-                f"Automatically set PLAIN_ALLOWED_HOSTS={allowed_hosts}", dim=True
-            )
 
     def run_preflight(self):
         if subprocess.run(["plain", "preflight"], env=self.plain_env).returncode:

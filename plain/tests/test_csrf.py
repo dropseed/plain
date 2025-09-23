@@ -115,67 +115,50 @@ def test_old_browser_fallback(headers):
 
 
 @pytest.mark.parametrize(
-    ("origin", "expected_allowed", "expected_reason_contains", "setup_allowed_hosts"),
+    ("origin", "expected_allowed", "expected_reason_contains"),
     [
         # Origin matches host - should be allowed
         (
             "https://testserver",
             True,
             "Same-origin request - Origin https://testserver matches Host testserver",
-            True,
         ),
         (
             "https://testserver:443",
             True,
             "Same-origin request - Origin https://testserver:443 matches Host testserver",
-            True,
         ),
         # Various rejection cases
-        ("null", False, "Cross-origin request detected - null Origin header", False),
-        ("https://attacker.com", False, "does not match Host", False),
-        ("https://sub.testserver", False, "does not match Host", False),
-        ("https://example.com:8080", False, "does not match Host", False),
-        ("http://example.com", False, "does not match Host", False),
+        ("null", False, "Cross-origin request detected - null Origin header"),
+        ("https://attacker.com", False, "does not match Host"),
+        ("https://sub.testserver", False, "does not match Host"),
+        ("https://example.com:8080", False, "does not match Host"),
+        ("http://example.com", False, "does not match Host"),
     ],
 )
-def test_origin_host_comparison(
-    origin, expected_allowed, expected_reason_contains, setup_allowed_hosts
-):
+def test_origin_host_comparison(origin, expected_allowed, expected_reason_contains):
     """Test Origin vs Host header comparison scenarios."""
-    from plain.runtime import settings
+    rf = RequestFactory()
+    csrf_middleware = CsrfViewMiddleware(lambda request: None)
 
-    original_allowed_hosts = None
-    if setup_allowed_hosts:
-        # Temporarily modify ALLOWED_HOSTS to include testserver
-        original_allowed_hosts = settings.ALLOWED_HOSTS
-        settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, "testserver"]
+    # Configure request based on the origin
+    request_kwargs = {"headers": {"Origin": origin}}
+    if origin == "https://testserver:443":
+        request_kwargs.update(
+            {
+                "SERVER_NAME": "testserver",
+                "SERVER_PORT": "443",
+                "secure": True,
+            }
+        )
+    elif origin == "https://testserver":
+        request_kwargs["secure"] = True
 
-    try:
-        rf = RequestFactory()
-        csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    request = rf.post("/test/", **request_kwargs)
+    allowed, reason = csrf_middleware.should_allow_request(request)
 
-        # Configure request based on the origin
-        request_kwargs = {"headers": {"Origin": origin}}
-        if origin == "https://testserver:443":
-            request_kwargs.update(
-                {
-                    "SERVER_NAME": "testserver",
-                    "SERVER_PORT": "443",
-                    "secure": True,
-                }
-            )
-        elif origin == "https://testserver":
-            request_kwargs["secure"] = True
-
-        request = rf.post("/test/", **request_kwargs)
-        allowed, reason = csrf_middleware.should_allow_request(request)
-
-        assert allowed is expected_allowed
-        assert expected_reason_contains in reason
-    finally:
-        if original_allowed_hosts is not None:
-            # Restore original ALLOWED_HOSTS
-            settings.ALLOWED_HOSTS = original_allowed_hosts
+    assert allowed is expected_allowed
+    assert expected_reason_contains in reason
 
 
 def test_invalid_origin_url():

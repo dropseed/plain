@@ -51,11 +51,11 @@ def custom_deploy_check(package_configs, **kwargs):
 
 ## Silencing preflight checks
 
-The `settings.PREFLIGHT_SILENCED_CHECKS` setting can be used to silence individual checks by their ID (ex. `security.W020`).
+The `settings.PREFLIGHT_SILENCED_CHECKS` setting can be used to silence individual checks by their ID (ex. `security.E020`).
 
 ```python
 # app/settings.py
 PREFLIGHT_SILENCED_CHECKS = [
-    "security.W020",
+    "security.E020",  # Allow empty ALLOWED_HOSTS in deployment
 ]
 ```

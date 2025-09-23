@@ -1,7 +1,7 @@
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 
-from .messages import Warning
+from .messages import Error, Warning
 from .registry import register_check
 
 SECRET_KEY_MIN_LENGTH = 50
@@ -81,9 +81,9 @@ def check_allowed_hosts(package_configs, **kwargs):
         []
         if settings.ALLOWED_HOSTS
         else [
-            Warning(
+            Error(
                 "ALLOWED_HOSTS must not be empty in deployment.",
-                id="security.W020",
+                id="security.E020",
             )
         ]
     )

@@ -159,7 +159,6 @@ def validate_host(host: str, allowed_hosts: list[str]) -> bool:
     Check that the host looks valid and matches a host or host pattern in the
     given list of ``allowed_hosts``. Supported patterns:
 
-    - ``*`` matches anything
     - ``.example.com`` matches a domain and all its subdomains
       (e.g. ``example.com`` and ``sub.example.com``)
     - ``example.com`` matches exactly that domain
@@ -176,10 +175,6 @@ def validate_host(host: str, allowed_hosts: list[str]) -> bool:
     host_ip = parse_ip_address(host)
 
     for pattern in allowed_hosts:
-        # Wildcard matches everything
-        if pattern == "*":
-            return True
-
         # Check CIDR notation patterns using walrus operator
         if network := parse_cidr_pattern(pattern):
             if host_ip and host_ip in network:

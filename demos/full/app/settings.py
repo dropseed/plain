@@ -1,5 +1,4 @@
 SECRET_KEY = "test"
-ALLOWED_HOSTS = []
 DEBUG = True
 URLS_ROUTER = "app.urls.AppRouter"
 

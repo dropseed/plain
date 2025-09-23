@@ -81,21 +81,6 @@ The tunnel can be configured using environment variables:
 - `PLAIN_TUNNEL_SUBDOMAIN`: Default subdomain to use
 - `PLAIN_TUNNEL_HOST`: Tunnel host (defaults to plaintunnel.com)
 
-### ALLOWED_HOSTS
-
-Depending on your setup, you may need to add your tunnel to the `settings.ALLOWED_HOSTS`. This can be done in `settings.py` or in your dev `.env`:
-
-```bash
-PLAIN_ALLOWED_HOSTS='["*"]'
-```
-
-Or more specifically:
-
-```python
-# settings.py
-ALLOWED_HOSTS = ["myappname.plaintunnel.com"]
-```
-
 ## Installation
 
 Install the `plain.tunnel` package from [PyPI](https://pypi.org/project/plain.tunnel/):
