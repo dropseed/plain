@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.67.0](https://github.com/dropseed/plain/releases/plain@0.67.0) (2025-09-22)
+
+### What's changed
+
+- `ALLOWED_HOSTS` now defaults to `[]` (empty list) which allows all hosts, making it easier for development setups ([d3cb7712b9](https://github.com/dropseed/plain/commit/d3cb7712b9))
+- Empty `ALLOWED_HOSTS` in production now triggers a preflight error instead of a warning to ensure proper security configuration ([d3cb7712b9](https://github.com/dropseed/plain/commit/d3cb7712b9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.66.0](https://github.com/dropseed/plain/releases/plain@0.66.0) (2025-09-22)
 
 ### What's changed
