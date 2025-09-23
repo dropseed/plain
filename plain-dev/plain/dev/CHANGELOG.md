@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-dev@0.35.0) (2025-09-22)
+
+### What's changed
+
+- Removed automatic `PLAIN_ALLOWED_HOSTS` configuration from the dev server as this is now handled by the core Plain framework ([d3cb771](https://github.com/dropseed/plain/commit/d3cb7712b9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-dev@0.34.0) (2025-09-19)
 
 ### What's changed
