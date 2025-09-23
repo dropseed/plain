@@ -1,5 +1,19 @@
 # plain changelog
 
+## [0.66.0](https://github.com/dropseed/plain/releases/plain@0.66.0) (2025-09-22)
+
+### What's changed
+
+- Host validation moved to dedicated middleware and `ALLOWED_HOSTS` setting is now required ([6a4b7be](https://github.com/dropseed/plain/commit/6a4b7be220))
+- Changed `request.get_port()` method to `request.port` cached property ([544f3e1](https://github.com/dropseed/plain/commit/544f3e19f8))
+- Removed internal `request._get_full_path()` method ([50cdb58](https://github.com/dropseed/plain/commit/50cdb58d4e))
+
+### Upgrade instructions
+
+- Add `ALLOWED_HOSTS` setting to your configuration if not already present (required for host validation)
+- Replace any usage of `request.get_host()` with `request.host`
+- Replace any usage of `request.get_port()` with `request.port`
+
 ## [0.65.1](https://github.com/dropseed/plain/releases/plain@0.65.1) (2025-09-22)
 
 ### What's changed
