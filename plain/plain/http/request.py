@@ -151,9 +151,12 @@ class HttpRequest:
         return str(port)
 
     def get_full_path(self, force_append_slash=False):
-        return self._get_full_path(self.path, force_append_slash)
+        """
+        Return the full path for the request, including query string.
 
-    def _get_full_path(self, path, force_append_slash):
+        If force_append_slash is True, append a trailing slash if the path
+        doesn't already end with one.
+        """
         # RFC 3986 requires query string arguments to be in the ASCII range.
         # Rather than crash if this doesn't happen, we encode defensively.
 
@@ -174,8 +177,8 @@ class HttpRequest:
             return quote(path, safe="/:@&+$,-_.!~*'()")
 
         return "{}{}{}".format(
-            escape_uri_path(path),
-            "/" if force_append_slash and not path.endswith("/") else "",
+            escape_uri_path(self.path),
+            "/" if force_append_slash and not self.path.endswith("/") else "",
             ("?" + iri_to_uri(self.meta.get("QUERY_STRING", "")))
             if self.meta.get("QUERY_STRING", "")
             else "",
