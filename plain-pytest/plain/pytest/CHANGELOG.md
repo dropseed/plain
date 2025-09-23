@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-pytest@0.12.0) (2025-09-22)
+
+### What's changed
+
+- Removed automatic addition of "testserver" to `ALLOWED_HOSTS` during pytest runs, as Plain now defaults `ALLOWED_HOSTS` to an empty list with better host validation ([d3cb7712](https://github.com/dropseed/plain/commit/d3cb7712))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-pytest@0.11.0) (2025-09-19)
 
 ### What's changed
