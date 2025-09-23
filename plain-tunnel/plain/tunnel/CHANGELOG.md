@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.7.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.7.0) (2025-09-22)
+
+### What's changed
+
+- Removed manual ALLOWED_HOSTS configuration documentation from README as it's now handled automatically by the Plain framework ([d3cb771](https://github.com/dropseed/plain/commit/d3cb7712b9))
+
+### Upgrade instructions
+
+- Changed ALLOWED_HOSTS default to `[]` with a deploy-only preflight check to ensure it's set in production environments
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.6.0) (2025-09-19)
 
 ### What's changed
