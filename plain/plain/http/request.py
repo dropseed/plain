@@ -136,12 +136,13 @@ class HttpRequest:
         else:
             # Reconstruct the host using the algorithm from PEP 333.
             host = self.meta["SERVER_NAME"]
-            server_port = self.get_port()
+            server_port = self.port
             if server_port != ("443" if self.is_https() else "80"):
                 host = f"{host}:{server_port}"
         return host
 
-    def get_port(self):
+    @cached_property
+    def port(self):
         """Return the port number for the request as a string."""
         if settings.USE_X_FORWARDED_PORT and "HTTP_X_FORWARDED_PORT" in self.meta:
             port = self.meta["HTTP_X_FORWARDED_PORT"]

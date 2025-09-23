@@ -96,7 +96,7 @@ class CsrfViewMiddleware:
                 # Use a fake scheme since we only care about host parsing
                 parsed_host = urlparse(f"http://{host}")
                 request_host = parsed_host.hostname or host
-                request_port = request.get_port()
+                request_port = request.port
 
                 # Compare hostname and port (scheme-agnostic)
                 # Both origin_host and request_host are normalized by urlparse (IPv6 brackets stripped)
