@@ -8,7 +8,6 @@ from itertools import chain
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 from plain.exceptions import (
-    DisallowedHost,
     ImproperlyConfigured,
     RequestDataTooBig,
     TooManyFieldsSent,
@@ -28,8 +27,6 @@ from plain.utils.datastructures import (
 )
 from plain.utils.encoding import iri_to_uri
 from plain.utils.http import parse_header_parameters
-
-from .hosts import split_domain_port, validate_host
 
 
 class UnreadablePostError(OSError):
@@ -123,10 +120,13 @@ class HttpRequest:
             else:
                 self.encoding = self.content_params["charset"]
 
-    def _get_raw_host(self):
+    @cached_property
+    def host(self):
         """
-        Return the HTTP host using the environment or request headers. Skip
-        allowed hosts protection, so may return an insecure host.
+        Return the HTTP host using the environment or request headers.
+
+        Host validation is performed by HostValidationMiddleware, so this
+        property can safely return the host without any validation.
         """
         # We try three options, in order of decreasing preference.
         if settings.USE_X_FORWARDED_HOST and ("HTTP_X_FORWARDED_HOST" in self.meta):
@@ -140,28 +140,6 @@ class HttpRequest:
             if server_port != ("443" if self.is_https() else "80"):
                 host = f"{host}:{server_port}"
         return host
-
-    def get_host(self):
-        """Return the HTTP host using the environment or request headers."""
-        host = self._get_raw_host()
-
-        # Allow variants of localhost if ALLOWED_HOSTS is empty and DEBUG=True.
-        allowed_hosts = settings.ALLOWED_HOSTS
-        if settings.DEBUG and not allowed_hosts:
-            allowed_hosts = [".localhost", "127.0.0.1", "[::1]"]
-
-        domain, port = split_domain_port(host)
-        if domain and validate_host(domain, allowed_hosts):
-            return host
-        else:
-            msg = f"Invalid HTTP_HOST header: {host!r}."
-            if domain:
-                msg += f" You may need to add {domain!r} to ALLOWED_HOSTS."
-            else:
-                msg += (
-                    " The domain name provided is not valid according to RFC 1034/1035."
-                )
-            raise DisallowedHost(msg)
 
     def get_port(self):
         """Return the port number for the request as a string."""
@@ -220,7 +198,7 @@ class HttpRequest:
             location = str(location)
         bits = urlsplit(location)
         if not (bits.scheme and bits.netloc):
-            current_scheme_host = f"{self.scheme}://{self.get_host()}"
+            current_scheme_host = f"{self.scheme}://{self.host}"
 
             # Handle the simple, most common case. If the location is absolute
             # and a scheme or host (netloc) isn't provided, skip an expensive

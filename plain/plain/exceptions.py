@@ -67,12 +67,6 @@ class SuspiciousFileOperation(SuspiciousOperation):
     pass
 
 
-class DisallowedHost(SuspiciousOperation):
-    """HTTP_HOST header contains invalid value"""
-
-    pass
-
-
 class TooManyFieldsSent(SuspiciousOperation):
     """
     The number of fields in a GET or POST request exceeded

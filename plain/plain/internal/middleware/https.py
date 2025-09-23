@@ -21,7 +21,6 @@ class HttpsRedirectMiddleware:
 
     def maybe_https_redirect(self, request):
         if self.https_redirect_enabled and not request.is_https():
-            host = request.get_host()
             return ResponseRedirect(
-                f"https://{host}{request.get_full_path()}", status_code=301
+                f"https://{request.host}{request.get_full_path()}", status_code=301
             )

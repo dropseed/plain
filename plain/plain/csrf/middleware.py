@@ -2,7 +2,6 @@ import logging
 import re
 from urllib.parse import urlparse
 
-from plain.exceptions import DisallowedHost
 from plain.logs.utils import log_response
 from plain.runtime import settings
 
@@ -81,8 +80,8 @@ class CsrfViewMiddleware:
         if origin == "null":
             return False, "Cross-origin request detected - null Origin header"
 
-        try:
-            if (parsed_origin := urlparse(origin)) and (host := request.get_host()):
+        if (parsed_origin := urlparse(origin)) and (host := request.host):
+            try:
                 # Scheme-agnostic host:port comparison
                 origin_host = parsed_origin.hostname
                 origin_port = parsed_origin.port or (
@@ -110,8 +109,8 @@ class CsrfViewMiddleware:
                             True,
                             f"Same-origin request - Origin {origin} matches Host {host}",
                         )
-        except (ValueError, DisallowedHost):
-            pass
+            except ValueError:
+                pass
 
         # Origin present but doesn't match host
         return (

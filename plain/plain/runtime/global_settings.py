@@ -25,7 +25,7 @@ URLS_ROUTER: str
 # Hosts/domain names that are valid for this site.
 # "*" matches anything, ".example.com" matches example.com and all subdomains
 # "192.168.1.0/24" matches IP addresses in that CIDR range
-ALLOWED_HOSTS: list[str] = []
+ALLOWED_HOSTS: list[str]
 
 # Default headers for all responses.
 DEFAULT_RESPONSE_HEADERS = {

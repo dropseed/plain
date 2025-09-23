@@ -1,6 +1,6 @@
 import pytest
 
-from plain.http.hosts import split_domain_port, validate_host
+from plain.internal.middleware.hosts import split_domain_port, validate_host
 
 
 @pytest.mark.parametrize(

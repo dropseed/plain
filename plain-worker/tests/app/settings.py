@@ -1,1 +1,2 @@
 SECRET_KEY = "test"
+ALLOWED_HOSTS = []

@@ -8,7 +8,6 @@ def test_wsgi_handler():
     Test the default plain.wsgi.app import and
     basic behavior with minimal environ input.
     """
-
     wsgi = WSGIHandler()
     response = wsgi(
         {
