@@ -18,7 +18,7 @@ class UnusedFlagsCard(Card):
 
     @cached_property
     def flag_errors(self):
-        return Flag.check(database=True)
+        return Flag.preflight()
 
     def get_number(self):
         return len(self.flag_errors)

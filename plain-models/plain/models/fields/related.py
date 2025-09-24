@@ -1,10 +1,11 @@
 from functools import cached_property, partial
 
-from plain import exceptions, preflight
+from plain import exceptions
 from plain.models.constants import LOOKUP_SEP
 from plain.models.deletion import SET_DEFAULT, SET_NULL
 from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
+from plain.preflight import PreflightResult
 from plain.runtime import SettingsReference
 
 from ..registry import models_registry
@@ -106,9 +107,9 @@ class RelatedField(FieldCacheMixin, Field):
         models_registry.check_ready()
         return self.remote_field.model
 
-    def check(self, **kwargs):
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
+            *super().preflight(**kwargs),
             *self._check_related_name_is_valid(),
             *self._check_related_query_name_is_valid(),
             *self._check_relation_model_exists(),
@@ -126,7 +127,7 @@ class RelatedField(FieldCacheMixin, Field):
         )
         if not is_valid_id:
             return [
-                preflight.Error(
+                PreflightResult(
                     f"The name '{self.remote_field.related_name}' is invalid related_name for field {self.model._meta.object_name}.{self.name}",
                     hint="Related name must be a valid Python identifier.",
                     obj=self,
@@ -142,7 +143,7 @@ class RelatedField(FieldCacheMixin, Field):
         errors = []
         if rel_query_name.endswith("_"):
             errors.append(
-                preflight.Error(
+                PreflightResult(
                     f"Reverse query name '{rel_query_name}' must not end with an underscore.",
                     hint=(
                         "Add or change a related_name or related_query_name "
@@ -154,7 +155,7 @@ class RelatedField(FieldCacheMixin, Field):
             )
         if LOOKUP_SEP in rel_query_name:
             errors.append(
-                preflight.Error(
+                PreflightResult(
                     f"Reverse query name '{rel_query_name}' must not contain '{LOOKUP_SEP}'.",
                     hint=(
                         "Add or change a related_name or related_query_name "
@@ -178,7 +179,7 @@ class RelatedField(FieldCacheMixin, Field):
         )
         if rel_is_missing and rel_is_string:
             return [
-                preflight.Error(
+                PreflightResult(
                     f"Field defines a relation with model '{model_name}', which is either "
                     "not installed, or is abstract.",
                     obj=self,
@@ -230,7 +231,7 @@ class RelatedField(FieldCacheMixin, Field):
             clash_name = f"{rel_opts.label}.{clash_field.name}"
             if not rel_is_hidden and clash_field.name == rel_name:
                 errors.append(
-                    preflight.Error(
+                    PreflightResult(
                         f"Reverse accessor '{rel_opts.object_name}.{rel_name}' "
                         f"for '{field_name}' clashes with field name "
                         f"'{clash_name}'.",
@@ -245,7 +246,7 @@ class RelatedField(FieldCacheMixin, Field):
 
             if clash_field.name == rel_query_name:
                 errors.append(
-                    preflight.Error(
+                    PreflightResult(
                         f"Reverse query name for '{field_name}' clashes with field name '{clash_name}'.",
                         hint=(
                             f"Rename field '{clash_name}', or add/change a related_name "
@@ -267,7 +268,7 @@ class RelatedField(FieldCacheMixin, Field):
             )
             if not rel_is_hidden and clash_field.get_accessor_name() == rel_name:
                 errors.append(
-                    preflight.Error(
+                    PreflightResult(
                         f"Reverse accessor '{rel_opts.object_name}.{rel_name}' "
                         f"for '{field_name}' clashes with reverse accessor for "
                         f"'{clash_name}'.",
@@ -282,7 +283,7 @@ class RelatedField(FieldCacheMixin, Field):
 
             if clash_field.get_accessor_name() == rel_query_name:
                 errors.append(
-                    preflight.Error(
+                    PreflightResult(
                         f"Reverse query name for '{field_name}' clashes with reverse query name "
                         f"for '{clash_name}'.",
                         hint=(
@@ -600,9 +601,9 @@ class ForeignKey(RelatedField):
                     self.remote_field.limit_choices_to
                 )
 
-    def check(self, **kwargs):
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
+            *super().preflight(**kwargs),
             *self._check_on_delete(),
         ]
 
@@ -610,7 +611,7 @@ class ForeignKey(RelatedField):
         on_delete = getattr(self.remote_field, "on_delete", None)
         if on_delete == SET_NULL and not self.allow_null:
             return [
-                preflight.Error(
+                PreflightResult(
                     "Field specifies on_delete=SET_NULL, but cannot be null.",
                     hint=(
                         "Set allow_null=True argument on the field, or change the on_delete "
@@ -622,7 +623,7 @@ class ForeignKey(RelatedField):
             ]
         elif on_delete == SET_DEFAULT and not self.has_default():
             return [
-                preflight.Error(
+                PreflightResult(
                     "Field specifies on_delete=SET_DEFAULT, but has no default value.",
                     hint="Set a default value, or change the on_delete rule.",
                     obj=self,
@@ -834,9 +835,9 @@ class ManyToManyField(RelatedField):
             **kwargs,
         )
 
-    def check(self, **kwargs):
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
+            *super().preflight(**kwargs),
             *self._check_relationship_model(**kwargs),
             *self._check_ignored_options(**kwargs),
             *self._check_table_uniqueness(**kwargs),
@@ -847,36 +848,40 @@ class ManyToManyField(RelatedField):
 
         if self.has_null_arg:
             warnings.append(
-                preflight.Warning(
+                PreflightResult(
                     "null has no effect on ManyToManyField.",
                     obj=self,
                     id="fields.W340",
+                    warning=True,
                 )
             )
 
         if self._validators:
             warnings.append(
-                preflight.Warning(
+                PreflightResult(
                     "ManyToManyField does not support validators.",
                     obj=self,
                     id="fields.W341",
+                    warning=True,
                 )
             )
         if self.remote_field.symmetrical and self._related_name:
             warnings.append(
-                preflight.Warning(
+                PreflightResult(
                     "related_name has no effect on ManyToManyField "
                     'with a symmetrical relationship, e.g. to "self".',
                     obj=self,
                     id="fields.W345",
+                    warning=True,
                 )
             )
         if self.db_comment:
             warnings.append(
-                preflight.Warning(
+                PreflightResult(
                     "db_comment has no effect on ManyToManyField.",
                     obj=self,
                     id="fields.W346",
+                    warning=True,
                 )
             )
 
@@ -893,7 +898,7 @@ class ManyToManyField(RelatedField):
         if self.remote_field.through not in self.opts.models_registry.get_models():
             # The relationship model is not installed.
             errors.append(
-                preflight.Error(
+                PreflightResult(
                     "Field specifies a many-to-many relation through model "
                     f"'{qualified_model_name}', which has not been installed.",
                     obj=self,
@@ -925,7 +930,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_self > 2 and not self.remote_field.through_fields:
                     errors.append(
-                        preflight.Error(
+                        PreflightResult(
                             "The model is used as an intermediate model by "
                             f"'{self}', but it has more than two foreign keys "
                             f"to '{from_model_name}', which is ambiguous. You must specify "
@@ -953,7 +958,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_from > 1 and not self.remote_field.through_fields:
                     errors.append(
-                        preflight.Error(
+                        PreflightResult(
                             (
                                 "The model is used as an intermediate model by "
                                 f"'{self}', but it has more than one foreign key "
@@ -972,7 +977,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_to > 1 and not self.remote_field.through_fields:
                     errors.append(
-                        preflight.Error(
+                        PreflightResult(
                             "The model is used as an intermediate model by "
                             f"'{self}', but it has more than one foreign key "
                             f"to '{to_model_name}', which is ambiguous. You must specify "
@@ -989,7 +994,7 @@ class ManyToManyField(RelatedField):
 
                 if seen_from == 0 or seen_to == 0:
                     errors.append(
-                        preflight.Error(
+                        PreflightResult(
                             "The model is used as an intermediate model by "
                             f"'{self}', but it does not have a foreign key to '{from_model_name}' or '{to_model_name}'.",
                             obj=self.remote_field.through,
@@ -1007,7 +1012,7 @@ class ManyToManyField(RelatedField):
                 and self.remote_field.through_fields[1]
             ):
                 errors.append(
-                    preflight.Error(
+                    PreflightResult(
                         "Field specifies 'through_fields' but does not provide "
                         "the names of the two link fields that should be used "
                         f"for the relation through model '{qualified_model_name}'.",
@@ -1065,7 +1070,7 @@ class ManyToManyField(RelatedField):
                         field = through._meta.get_field(field_name)
                     except exceptions.FieldDoesNotExist:
                         errors.append(
-                            preflight.Error(
+                            PreflightResult(
                                 f"The intermediary model '{qualified_model_name}' has no field '{field_name}'.",
                                 hint=hint,
                                 obj=self,
@@ -1079,7 +1084,7 @@ class ManyToManyField(RelatedField):
                             == related_model
                         ):
                             errors.append(
-                                preflight.Error(
+                                PreflightResult(
                                     f"'{through._meta.object_name}.{field_name}' is not a foreign key to '{related_model._meta.object_name}'.",
                                     hint=hint,
                                     obj=self,
@@ -1108,7 +1113,7 @@ class ManyToManyField(RelatedField):
         ):
             clashing_obj = model._meta.label
             return [
-                preflight.Error(
+                PreflightResult(
                     f"The field's intermediary table '{m2m_db_table}' clashes with the "
                     f"table name of '{clashing_obj}'.",
                     obj=self,

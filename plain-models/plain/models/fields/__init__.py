@@ -9,11 +9,12 @@ import warnings
 from base64 import b64decode, b64encode
 from functools import cached_property, partialmethod, total_ordering
 
-from plain import exceptions, preflight, validators
+from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import db_connection
 from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import DeferredAttribute, RegisterLookupMixin
+from plain.preflight import PreflightResult
 from plain.utils import timezone
 from plain.utils.datastructures import DictWrapper
 from plain.utils.dateparse import (
@@ -218,13 +219,13 @@ class Field(RegisterLookupMixin):
             return f"<{path}: {name}>"
         return f"<{path}>"
 
-    def check(self, **kwargs):
+    def preflight(self, **kwargs):
         return [
             *self._check_field_name(),
             *self._check_choices(),
-            *self._check_db_comment(**kwargs),
+            *self._check_db_comment(),
             *self._check_null_allowed_for_primary_keys(),
-            *self._check_backend_specific_checks(**kwargs),
+            *self._check_backend_specific_checks(),
             *self._check_validators(),
             *self._check_deprecation_details(),
         ]
@@ -236,7 +237,7 @@ class Field(RegisterLookupMixin):
         """
         if self.name.endswith("_"):
             return [
-                preflight.Error(
+                PreflightResult(
                     "Field names must not end with an underscore.",
                     obj=self,
                     id="fields.E001",
@@ -244,7 +245,7 @@ class Field(RegisterLookupMixin):
             ]
         elif LOOKUP_SEP in self.name:
             return [
-                preflight.Error(
+                PreflightResult(
                     f'Field names must not contain "{LOOKUP_SEP}".',
                     obj=self,
                     id="fields.E002",
@@ -252,7 +253,7 @@ class Field(RegisterLookupMixin):
             ]
         elif self.name == "id":
             return [
-                preflight.Error(
+                PreflightResult(
                     "'id' is a reserved word that cannot be used as a field name.",
                     obj=self,
                     id="fields.E003",
@@ -271,7 +272,7 @@ class Field(RegisterLookupMixin):
 
         if not is_iterable(self.choices) or isinstance(self.choices, str):
             return [
-                preflight.Error(
+                PreflightResult(
                     "'choices' must be an iterable (e.g., a list or tuple).",
                     obj=self,
                     id="fields.E004",
@@ -319,7 +320,7 @@ class Field(RegisterLookupMixin):
         else:
             if self.max_length is not None and choice_max_length > self.max_length:
                 return [
-                    preflight.Error(
+                    PreflightResult(
                         "'max_length' is too small to fit the longest value "  # noqa: UP031
                         "in 'choices' (%d characters)." % choice_max_length,
                         obj=self,
@@ -329,7 +330,7 @@ class Field(RegisterLookupMixin):
             return []
 
         return [
-            preflight.Error(
+            PreflightResult(
                 "'choices' must be an iterable containing "
                 "(actual value, human readable name) tuples.",
                 obj=self,
@@ -337,8 +338,8 @@ class Field(RegisterLookupMixin):
             )
         ]
 
-    def _check_db_comment(self, database=False, **kwargs):
-        if not self.db_comment or not database:
+    def _check_db_comment(self):
+        if not self.db_comment:
             return []
         errors = []
         if not (
@@ -346,11 +347,12 @@ class Field(RegisterLookupMixin):
             or "supports_comments" in self.model._meta.required_db_features
         ):
             errors.append(
-                preflight.Warning(
+                PreflightResult(
                     f"{db_connection.display_name} does not support comments on "
                     f"columns (db_comment).",
                     obj=self,
                     id="fields.W163",
+                    warning=True,
                 )
             )
         return errors
@@ -361,7 +363,7 @@ class Field(RegisterLookupMixin):
             # consider NULL and '' to be equal (and thus set up
             # character-based fields a little differently).
             return [
-                preflight.Error(
+                PreflightResult(
                     "Primary keys must not have allow_null=True.",
                     hint=(
                         "Set allow_null=False on the field, or "
@@ -374,11 +376,9 @@ class Field(RegisterLookupMixin):
         else:
             return []
 
-    def _check_backend_specific_checks(self, database=False, **kwargs):
-        if not database:
-            return []
+    def _check_backend_specific_checks(self):
         errors = []
-        errors.extend(db_connection.validation.check_field(self, **kwargs))
+        errors.extend(db_connection.validation.check_field(self))
         return errors
 
     def _check_validators(self):
@@ -386,7 +386,7 @@ class Field(RegisterLookupMixin):
         for i, validator in enumerate(self.validators):
             if not callable(validator):
                 errors.append(
-                    preflight.Error(
+                    PreflightResult(
                         "All 'validators' must be callable.",
                         hint=(
                             f"validators[{i}] ({repr(validator)}) isn't a function or "
@@ -401,7 +401,7 @@ class Field(RegisterLookupMixin):
     def _check_deprecation_details(self):
         if self.system_check_removed_details is not None:
             return [
-                preflight.Error(
+                PreflightResult(
                     self.system_check_removed_details.get(
                         "msg",
                         f"{self.__class__.__name__} has been removed except for support in historical "
@@ -414,12 +414,13 @@ class Field(RegisterLookupMixin):
             ]
         elif self.system_check_deprecated_details is not None:
             return [
-                preflight.Warning(
+                PreflightResult(
                     self.system_check_deprecated_details.get(
                         "msg", f"{self.__class__.__name__} has been deprecated."
                     ),
                     hint=self.system_check_deprecated_details.get("hint"),
                     obj=self,
+                    warning=True,
                     id=self.system_check_deprecated_details.get("id", "fields.WXXX"),
                 )
             ]
@@ -985,12 +986,11 @@ class CharField(Field):
         else:
             return "String (unlimited)"
 
-    def check(self, **kwargs):
-        database = kwargs.get("database", False)
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
-            *self._check_db_collation(database),
-            *self._check_max_length_attribute(**kwargs),
+            *super().preflight(**kwargs),
+            *self._check_db_collation(),
+            *self._check_max_length_attribute(),
         ]
 
     def _check_max_length_attribute(self, **kwargs):
@@ -1002,7 +1002,7 @@ class CharField(Field):
             ):
                 return []
             return [
-                preflight.Error(
+                PreflightResult(
                     "CharFields must define a 'max_length' attribute.",
                     obj=self,
                     id="fields.E120",
@@ -1014,7 +1014,7 @@ class CharField(Field):
             or self.max_length <= 0
         ):
             return [
-                preflight.Error(
+                PreflightResult(
                     "'max_length' must be a positive integer.",
                     obj=self,
                     id="fields.E121",
@@ -1023,16 +1023,16 @@ class CharField(Field):
         else:
             return []
 
-    def _check_db_collation(self, database):
+    def _check_db_collation(self):
         errors = []
-        if database and not (
+        if not (
             self.db_collation is None
             or "supports_collation_on_charfield"
             in self.model._meta.required_db_features
             or db_connection.features.supports_collation_on_charfield
         ):
             errors.append(
-                preflight.Error(
+                PreflightResult(
                     f"{db_connection.display_name} does not support a database collation on "
                     "CharFields.",
                     obj=self,
@@ -1096,9 +1096,9 @@ def _get_naive_now():
 
 
 class DateTimeCheckMixin:
-    def check(self, **kwargs):
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
+            *super().preflight(**kwargs),
             *self._check_mutually_exclusive_options(),
             *self._check_fix_default_value(),
         ]
@@ -1117,7 +1117,7 @@ class DateTimeCheckMixin:
         ].count(True)
         if enabled_options > 1:
             return [
-                preflight.Error(
+                PreflightResult(
                     "The options auto_now, auto_now_add, and default "
                     "are mutually exclusive. Only one of these options "
                     "may be present.",
@@ -1153,7 +1153,7 @@ class DateTimeCheckMixin:
             upper = upper.date()
         if lower <= value <= upper:
             return [
-                preflight.Warning(
+                PreflightResult(
                     "Fixed default value provided.",
                     hint=(
                         "It seems you set a fixed date / time / datetime "
@@ -1163,6 +1163,7 @@ class DateTimeCheckMixin:
                     ),
                     obj=self,
                     id="fields.W161",
+                    warning=True,
                 )
             ]
         return []
@@ -1422,15 +1423,15 @@ class DecimalField(Field):
         self.max_digits, self.decimal_places = max_digits, decimal_places
         super().__init__(**kwargs)
 
-    def check(self, **kwargs):
-        errors = super().check(**kwargs)
+    def preflight(self, **kwargs):
+        errors = super().preflight(**kwargs)
 
         digits_errors = [
             *self._check_decimal_places(),
             *self._check_max_digits(),
         ]
         if not digits_errors:
-            errors.extend(self._check_decimal_places_and_max_digits(**kwargs))
+            errors.extend(self._check_decimal_places_and_max_digits())
         else:
             errors.extend(digits_errors)
         return errors
@@ -1442,7 +1443,7 @@ class DecimalField(Field):
                 raise ValueError()
         except TypeError:
             return [
-                preflight.Error(
+                PreflightResult(
                     "DecimalFields must define a 'decimal_places' attribute.",
                     obj=self,
                     id="fields.E130",
@@ -1450,7 +1451,7 @@ class DecimalField(Field):
             ]
         except ValueError:
             return [
-                preflight.Error(
+                PreflightResult(
                     "'decimal_places' must be a non-negative integer.",
                     obj=self,
                     id="fields.E131",
@@ -1466,7 +1467,7 @@ class DecimalField(Field):
                 raise ValueError()
         except TypeError:
             return [
-                preflight.Error(
+                PreflightResult(
                     "DecimalFields must define a 'max_digits' attribute.",
                     obj=self,
                     id="fields.E132",
@@ -1474,7 +1475,7 @@ class DecimalField(Field):
             ]
         except ValueError:
             return [
-                preflight.Error(
+                PreflightResult(
                     "'max_digits' must be a positive integer.",
                     obj=self,
                     id="fields.E133",
@@ -1483,10 +1484,10 @@ class DecimalField(Field):
         else:
             return []
 
-    def _check_decimal_places_and_max_digits(self, **kwargs):
+    def _check_decimal_places_and_max_digits(self):
         if int(self.decimal_places) > int(self.max_digits):
             return [
-                preflight.Error(
+                PreflightResult(
                     "'max_digits' must be greater or equal to 'decimal_places'.",
                     obj=self,
                     id="fields.E134",
@@ -1662,20 +1663,21 @@ class IntegerField(Field):
     }
     description = "Integer"
 
-    def check(self, **kwargs):
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
+            *super().preflight(**kwargs),
             *self._check_max_length_warning(),
         ]
 
     def _check_max_length_warning(self):
         if self.max_length is not None:
             return [
-                preflight.Warning(
+                PreflightResult(
                     f"'max_length' is ignored when used with {self.__class__.__name__}.",
                     hint="Remove 'max_length' from field",
                     obj=self,
                     id="fields.W122",
+                    warning=True,
                 )
             ]
         return []
@@ -1813,18 +1815,18 @@ class GenericIPAddressField(Field):
         kwargs["max_length"] = 39
         super().__init__(**kwargs)
 
-    def check(self, **kwargs):
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
-            *self._check_required_and_null_values(**kwargs),
+            *super().preflight(**kwargs),
+            *self._check_required_and_null_values(),
         ]
 
-    def _check_required_and_null_values(self, **kwargs):
+    def _check_required_and_null_values(self):
         if not getattr(self, "allow_null", False) and not getattr(
             self, "required", True
         ):
             return [
-                preflight.Error(
+                PreflightResult(
                     "GenericIPAddressFields cannot have required=False if allow_null=False, "
                     "as blank values are stored as nulls.",
                     obj=self,
@@ -1957,23 +1959,22 @@ class TextField(Field):
         super().__init__(**kwargs)
         self.db_collation = db_collation
 
-    def check(self, **kwargs):
-        database = kwargs.get("database", False)
+    def preflight(self, **kwargs):
         return [
-            *super().check(**kwargs),
-            *self._check_db_collation(database),
+            *super().preflight(**kwargs),
+            *self._check_db_collation(),
         ]
 
-    def _check_db_collation(self, database):
+    def _check_db_collation(self):
         errors = []
-        if database and not (
+        if not (
             self.db_collation is None
             or "supports_collation_on_textfield"
             in self.model._meta.required_db_features
             or db_connection.features.supports_collation_on_textfield
         ):
             errors.append(
-                preflight.Error(
+                PreflightResult(
                     f"{db_connection.display_name} does not support a database collation on "
                     "TextFields.",
                     obj=self,
@@ -2130,13 +2131,13 @@ class BinaryField(Field):
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
 
-    def check(self, **kwargs):
-        return [*super().check(**kwargs), *self._check_str_default_value()]
+    def preflight(self, **kwargs):
+        return [*super().preflight(**kwargs), *self._check_str_default_value()]
 
     def _check_str_default_value(self):
         if self.has_default() and isinstance(self.default, str):
             return [
-                preflight.Error(
+                PreflightResult(
                     "BinaryField's default cannot be a string. Use bytes "
                     "content instead.",
                     obj=self,
@@ -2236,8 +2237,8 @@ class PrimaryKeyField(BigIntegerField):
         self.creation_counter = Field.auto_creation_counter
         Field.auto_creation_counter -= 1
 
-    def check(self, **kwargs):
-        errors = super().check(**kwargs)
+    def preflight(self, **kwargs):
+        errors = super().preflight(**kwargs)
         # Remove the E003 error for 'id' field name since PrimaryKeyField is allowed to use it
         errors = [e for e in errors if e.id != "fields.E003"]
         return errors

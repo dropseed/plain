@@ -3,25 +3,26 @@ from plain.models.backends.base.validation import BaseDatabaseValidation
 
 
 class DatabaseValidation(BaseDatabaseValidation):
-    def check(self, **kwargs):
-        issues = super().check(**kwargs)
-        issues.extend(self._check_sql_mode(**kwargs))
+    def preflight(self):
+        issues = super().preflight()
+        issues.extend(self._check_sql_mode())
         return issues
 
-    def _check_sql_mode(self, **kwargs):
+    def _check_sql_mode(self):
         if not (
             self.connection.sql_mode & {"STRICT_TRANS_TABLES", "STRICT_ALL_TABLES"}
         ):
             return [
-                preflight.Warning(
+                preflight.PreflightResult(
                     f"{self.connection.display_name} Strict Mode is not set for the database connection",
                     hint=(
                         f"{self.connection.display_name}'s Strict Mode fixes many data integrity problems in "
                         f"{self.connection.display_name}, such as data truncation upon insertion, by "
                         "escalating warnings into errors. It is strongly "
-                        "recommended you activate it.",
+                        "recommended you activate it."
                     ),
                     id="mysql.W002",
+                    warning=True,
                 )
             ]
         return []
@@ -40,11 +41,12 @@ class DatabaseValidation(BaseDatabaseValidation):
             and (field.max_length is None or int(field.max_length) > 255)
         ):
             errors.append(
-                preflight.Warning(
+                preflight.PreflightResult(
                     f"{self.connection.display_name} may not allow unique CharFields to have a max_length "
                     "> 255.",
                     obj=field,
                     id="mysql.W003",
+                    warning=True,
                 )
             )
 

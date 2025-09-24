@@ -4,7 +4,7 @@ class BaseDatabaseValidation:
     def __init__(self, connection):
         self.connection = connection
 
-    def check(self, **kwargs):
+    def preflight(self):
         return []
 
     def check_field(self, field, **kwargs):

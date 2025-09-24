@@ -13,7 +13,7 @@
 Preflight checks help identify issues with your settings or environment before running your application.
 
 ```bash
-plain preflight
+plain preflight check
 ```
 
 ## Development
@@ -22,10 +22,10 @@ If you use [`plain.dev`](/plain-dev/README.md) for local development, the Plain 
 
 ## Deployment
 
-The `plain preflight` command should often be part of your deployment process. Make sure to add the `--deploy` flag to the command to run checks that are only relevant in a production environment.
+The `plain preflight check` command should often be part of your deployment process. Make sure to add the `--deploy` flag to the command to run checks that are only relevant in a production environment.
 
 ```bash
-plain preflight --deploy
+plain preflight check --deploy
 ```
 
 ## Custom preflight checks

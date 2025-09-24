@@ -2,6 +2,7 @@ import sys
 import threading
 from collections import Counter
 from importlib import import_module
+from importlib.util import find_spec
 
 from plain.exceptions import ImproperlyConfigured, PackageRegistryNotReady
 
@@ -187,6 +188,19 @@ class PackagesRegistry:
         package_config.packages = self
 
         return package_config
+
+    def autodiscover_modules(self, module_name: str, *, include_app: bool) -> None:
+        def _import_if_exists(name):
+            if find_spec(name):
+                import_module(name)
+
+        # Load from all packages
+        for package_config in self.get_package_configs():
+            _import_if_exists(f"{package_config.name}.{module_name}")
+
+        # Load from app if requested
+        if include_app:
+            _import_if_exists(f"app.{module_name}")
 
 
 packages_registry = PackagesRegistry(installed_packages=None)

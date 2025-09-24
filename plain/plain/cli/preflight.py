@@ -1,126 +1,249 @@
+import json
+
 import click
 
 from plain import preflight
 from plain.packages import packages_registry
+from plain.preflight.registry import checks_registry
+from plain.runtime import settings
 
 
-@click.command("preflight")
-@click.argument("package_label", nargs=-1)
+@click.group("preflight")
+def preflight_cli():
+    """Run or manage preflight checks."""
+    pass
+
+
+@preflight_cli.command("check")
 @click.option(
     "--deploy",
     is_flag=True,
     help="Check deployment settings.",
 )
 @click.option(
-    "--fail-level",
-    default="ERROR",
-    type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]),
-    help="Message level that will cause the command to exit with a non-zero status. Default is ERROR.",
+    "--format",
+    default="text",
+    type=click.Choice(["text", "json"]),
+    help="Output format (default: text)",
 )
 @click.option(
-    "--database",
+    "--quiet",
     is_flag=True,
-    help="Run database related checks as part of preflight.",
+    help="Hide progress output and warnings, only show errors.",
 )
-def preflight_checks(package_label, deploy, fail_level, database):
+def check_command(deploy, format, quiet):
     """
     Use the system check framework to validate entire Plain project.
-    Raise CommandError for any serious message (error or critical errors).
-    If there are only light messages (like warnings), print them to stderr
-    and don't raise an exception.
+    Exit with error code if any errors are found. Warnings do not cause failure.
     """
-    include_deployment_checks = deploy
+    # Auto-discover and load preflight checks
+    packages_registry.autodiscover_modules("preflight", include_app=True)
 
-    if package_label:
-        package_configs = [
-            packages_registry.get_package_config(label) for label in package_label
-        ]
-    else:
-        package_configs = None
+    if not quiet:
+        click.secho("Running preflight checks...", dim=True, italic=True, err=True)
 
-    all_issues = preflight.run_checks(
-        package_configs=package_configs,
-        include_deployment_checks=include_deployment_checks,
-        database=database,
+    total_checks = 0
+    passed_checks = 0
+    check_results = []
+
+    # Run checks and collect results
+    for check_class, check_name, issues in preflight.run_checks(
+        include_deploy_checks=deploy,
+    ):
+        total_checks += 1
+
+        # Filter out silenced issues
+        visible_issues = [issue for issue in issues if not issue.is_silenced()]
+
+        # For text format, show real-time progress
+        if format == "text":
+            if not quiet:
+                # Print check name without newline
+                click.secho(f"{check_name} ", nl=False, err=True, bold=True)
+
+            # Determine status icon based on issue severity
+            if not visible_issues:
+                # No issues - passed
+                if not quiet:
+                    click.secho("✔", fg="green", err=True)
+                passed_checks += 1
+            else:
+                # Has issues - determine icon based on highest severity
+                has_errors = any(not issue.warning for issue in visible_issues)
+                if not quiet:
+                    if has_errors:
+                        click.secho("✗", fg="red", err=True)
+                    else:
+                        click.secho("⚠", fg="yellow", err=True)
+
+                # Print issues with tree structure
+                issues_to_show = (
+                    visible_issues
+                    if not quiet
+                    else [issue for issue in visible_issues if not issue.warning]
+                )
+                for i, issue in enumerate(issues_to_show):
+                    is_last = i == len(issues_to_show) - 1
+                    tree_char = "└─" if is_last else "├─"
+                    issue_color = "red" if not issue.warning else "yellow"
+                    if quiet:
+                        # In quiet mode, show check name with the issue (errors only)
+                        prefix = f"{check_name}: " if i == 0 else "  "
+                        click.secho(
+                            f"{prefix}{issue.id}: {issue.msg}",
+                            fg=issue_color,
+                            err=True,
+                        )
+                    else:
+                        # In normal mode, use tree structure
+                        click.secho(
+                            f"  {tree_char} {issue.id}: {issue.msg}",
+                            fg=issue_color,
+                            err=True,
+                        )
+                    if issue.hint:
+                        hint_prefix = "  HINT: " if quiet else "     HINT: "
+                        click.secho(f"{hint_prefix}{issue.hint}", fg="cyan", err=True)
+        else:
+            # For JSON format, just count passed checks
+            if not visible_issues:
+                passed_checks += 1
+
+        check_results.append((check_class, check_name, issues))
+
+    # Output results based on format
+
+    # Get all issues from check_results instead of maintaining separate list
+    all_issues = [issue for _, _, issues in check_results for issue in issues]
+    visible_issue_count = len(
+        [issue for issue in all_issues if not issue.is_silenced()]
+    )
+    # Errors (non-warnings) cause preflight to fail
+    has_errors = any(
+        not issue.warning and not issue.is_silenced() for issue in all_issues
     )
 
-    header, body, footer = "", "", ""
-    visible_issue_count = 0  # excludes silenced warnings
+    if format == "json":
+        # Build JSON output
+        results = {"passed": not has_errors, "checks": []}
 
-    if all_issues:
-        debugs = [
-            e for e in all_issues if e.level < preflight.INFO and not e.is_silenced()
-        ]
-        infos = [
-            e
-            for e in all_issues
-            if preflight.INFO <= e.level < preflight.WARNING and not e.is_silenced()
-        ]
-        warnings = [
-            e
-            for e in all_issues
-            if preflight.WARNING <= e.level < preflight.ERROR and not e.is_silenced()
-        ]
-        errors = [
-            e
-            for e in all_issues
-            if preflight.ERROR <= e.level < preflight.CRITICAL and not e.is_silenced()
-        ]
-        criticals = [
-            e
-            for e in all_issues
-            if preflight.CRITICAL <= e.level and not e.is_silenced()
-        ]
-        sorted_issues = [
-            (criticals, "CRITICALS"),
-            (errors, "ERRORS"),
-            (warnings, "WARNINGS"),
-            (infos, "INFOS"),
-            (debugs, "DEBUGS"),
-        ]
+        for check_class, check_name, issues in check_results:
+            visible_issues = [issue for issue in issues if not issue.is_silenced()]
 
-        for issues, group_name in sorted_issues:
-            if issues:
-                visible_issue_count += len(issues)
-                formatted = (
-                    click.style(str(e), fg="red")
-                    if e.is_serious()
-                    else click.style(str(e), fg="yellow")
-                    for e in issues
-                )
-                formatted = "\n".join(sorted(formatted))
-                body += f"\n{group_name}:\n{formatted}\n"
+            check_result = {
+                "name": check_name,
+                "passed": len(visible_issues) == 0,
+                "issues": [],
+            }
 
-    if visible_issue_count:
-        header = "Preflight check identified some issues:\n"
+            for issue in visible_issues:
+                issue_data = {
+                    "id": issue.id,
+                    "warning": issue.warning,
+                    "message": issue.msg,
+                    "hint": issue.hint,
+                    "obj": str(issue.obj) if issue.obj is not None else None,
+                }
+                check_result["issues"].append(issue_data)
 
-    if any(
-        e.is_serious(getattr(preflight, fail_level)) and not e.is_silenced()
-        for e in all_issues
-    ):
-        footer += "\n"
-        footer += "Preflight check identified {} ({} silenced).".format(
-            "no issues"
-            if visible_issue_count == 0
-            else "1 issue"
-            if visible_issue_count == 1
-            else f"{visible_issue_count} issues",
-            len(all_issues) - visible_issue_count,
-        )
-        msg = click.style(f"SystemCheckError: {header}", fg="red") + body + footer
-        raise click.ClickException(msg)
+            results["checks"].append(check_result)
+
+        click.echo(json.dumps(results, indent=2))
     else:
-        if visible_issue_count:
-            footer += "\n"
-            footer += "Preflight check identified {} ({} silenced).".format(
-                "no issues"
-                if visible_issue_count == 0
-                else "1 issue"
-                if visible_issue_count == 1
-                else f"{visible_issue_count} issues",
-                len(all_issues) - visible_issue_count,
+        # Text format summary
+        if not quiet:
+            click.echo()
+
+        # Calculate warning and error counts
+        warning_count = sum(
+            1
+            for _, _, issues in check_results
+            if issues
+            and not any(
+                not issue.warning for issue in issues if not issue.is_silenced()
             )
-            msg = header + body + footer
-            click.echo(msg, err=True)
+        )
+        error_count = sum(
+            1
+            for _, _, issues in check_results
+            if issues
+            and any(not issue.warning for issue in issues if not issue.is_silenced())
+        )
+
+        # Build colored summary parts
+        summary_parts = []
+
+        if passed_checks > 0:
+            summary_parts.append(click.style(f"{passed_checks} passed", fg="green"))
+
+        if warning_count > 0:
+            summary_parts.append(click.style(f"{warning_count} warnings", fg="yellow"))
+
+        if error_count > 0:
+            summary_parts.append(click.style(f"{error_count} errors", fg="red"))
+
+        # Show checkmark if successful (no errors)
+        if not has_errors:
+            icon = click.style("✔ ", fg="green")
+            summary_color = "green"
         else:
-            click.secho("✔ Checks passed", err=True, fg="green")
+            icon = ""
+            summary_color = None
+
+        summary_text = ", ".join(summary_parts) if summary_parts else "no issues"
+
+        click.secho(f"{icon}{summary_text}", fg=summary_color, err=True)
+
+    # Exit with error if there are any errors (not warnings)
+    if has_errors:
+        if format == "text":
+            raise click.ClickException(
+                f"Preflight check failed with {visible_issue_count} issues"
+            )
+        else:
+            raise click.ClickException("Preflight check failed")
+
+
+@preflight_cli.command("list")
+def list_checks():
+    """List all available preflight checks."""
+    packages_registry.autodiscover_modules("preflight", include_app=True)
+
+    regular = []
+    deployment = []
+    silenced_checks = settings.PREFLIGHT_SILENCED_CHECKS
+
+    for name, (check_class, deploy) in sorted(checks_registry.checks.items()):
+        # Use class docstring as description
+        description = check_class.__doc__ or "No description"
+        # Get first line of docstring
+        description = description.strip().split("\n")[0]
+
+        is_silenced = name in silenced_checks
+        if deploy:
+            deployment.append((name, description, is_silenced))
+        else:
+            regular.append((name, description, is_silenced))
+
+    if regular:
+        click.echo("Regular checks:")
+        for name, description, is_silenced in regular:
+            silenced_text = (
+                click.style(" (silenced)", fg="red", dim=True) if is_silenced else ""
+            )
+            click.echo(
+                f"  {click.style(name, bold=True)}: {click.style(description, dim=True)}{silenced_text}"
+            )
+
+    if deployment:
+        click.echo("\nDeployment checks:")
+        for name, description, is_silenced in deployment:
+            silenced_text = (
+                click.style(" (silenced)", fg="red", dim=True) if is_silenced else ""
+            )
+            click.echo(
+                f"  {click.style(name, bold=True)}: {click.style(description, dim=True)}{silenced_text}"
+            )
+
+    if not regular and not deployment:
+        click.echo("No preflight checks found.")

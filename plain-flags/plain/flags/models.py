@@ -3,8 +3,8 @@ import uuid
 
 from plain import models
 from plain.exceptions import ValidationError
-from plain.models import ProgrammingError
-from plain.preflight import Info
+from plain.models import OperationalError, ProgrammingError
+from plain.preflight import PreflightResult
 from plain.runtime import settings
 
 from .bridge import get_flag_class
@@ -70,24 +70,20 @@ class Flag(models.Model):
         return self.name
 
     @classmethod
-    def check(cls, **kwargs):
+    def preflight(cls):
         """
         Check for flags that are in the database, but no longer defined in code.
 
         Only returns Info errors because it is valid to leave them if you're worried about
         putting the flag back, but they should probably be deleted eventually.
         """
-        errors = super().check(**kwargs)
-
-        database = kwargs.get("database", False)
-        if not database:
-            return errors
+        errors = super().preflight()
 
         flag_names = cls.query.all().values_list("name", flat=True)
 
         try:
             flag_names = set(flag_names)
-        except ProgrammingError:
+        except (ProgrammingError, OperationalError):
             # The table doesn't exist yet
             # (migrations probably haven't run yet),
             # so we can't check it.
@@ -98,9 +94,10 @@ class Flag(models.Model):
                 get_flag_class(flag_name)
             except FlagImportError:
                 errors.append(
-                    Info(
+                    PreflightResult(
                         f"Flag {flag_name} is not used.",
                         hint=f"Remove the flag from the database or define it in the {settings.FLAGS_MODULE} module.",
+                        warning=True,
                         id="plain.flags.I001",
                     )
                 )

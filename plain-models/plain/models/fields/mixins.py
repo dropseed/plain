@@ -1,4 +1,4 @@
-from plain import preflight
+from plain.preflight import PreflightResult
 
 NOT_PROVIDED = object()
 
@@ -38,7 +38,7 @@ class CheckFieldDefaultMixin:
             and not callable(self.default)
         ):
             return [
-                preflight.Warning(
+                PreflightResult(
                     f"{self.__class__.__name__} default should be a callable instead of an instance "
                     "so that it's not shared between all field instances.",
                     hint=(
@@ -47,12 +47,13 @@ class CheckFieldDefaultMixin:
                     ),
                     obj=self,
                     id="fields.E010",
+                    warning=True,
                 )
             ]
         else:
             return []
 
-    def check(self, **kwargs):
-        errors = super().check(**kwargs)
+    def preflight(self, **kwargs):
+        errors = super().preflight(**kwargs)
         errors.extend(self._check_default())
         return errors

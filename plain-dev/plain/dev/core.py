@@ -260,7 +260,9 @@ class DevProcess(ProcessManager):
                 sys.exit(1)
 
     def run_preflight(self):
-        if subprocess.run(["plain", "preflight"], env=self.plain_env).returncode:
+        if subprocess.run(
+            ["plain", "preflight", "check", "--quiet"], env=self.plain_env
+        ).returncode:
             click.secho("Preflight check failed!", fg="red")
             sys.exit(1)
 

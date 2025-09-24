@@ -11,7 +11,6 @@ import re
 from threading import local
 from urllib.parse import quote
 
-from plain.preflight.urls import check_resolver
 from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
 from plain.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
@@ -114,11 +113,12 @@ class URLResolver:
     def __repr__(self):
         return f"<{self.__class__.__name__} {repr(self.router)} ({self.namespace}) {self.pattern.describe()}>"
 
-    def check(self):
+    def preflight(self):
         messages = []
+        messages.extend(self.pattern.preflight())
         for pattern in self.url_patterns:
-            messages.extend(check_resolver(pattern))
-        return messages or self.pattern.check()
+            messages.extend(pattern.preflight())
+        return messages
 
     def _populate(self):
         # Short-circuit if called recursively in this thread to prevent

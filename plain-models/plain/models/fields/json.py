@@ -40,31 +40,31 @@ class JSONField(CheckFieldDefaultMixin, Field):
         self.decoder = decoder
         super().__init__(**kwargs)
 
-    def check(self, **kwargs):
-        errors = super().check(**kwargs)
-        database = kwargs.get("database", False)
-        errors.extend(self._check_supported(database))
+    def preflight(self, **kwargs):
+        errors = super().preflight(**kwargs)
+        errors.extend(self._check_supported())
         return errors
 
-    def _check_supported(self, database):
+    def _check_supported(self):
         errors = []
-        if database:
-            if (
-                self.model._meta.required_db_vendor
-                and self.model._meta.required_db_vendor != db_connection.vendor
-            ):
-                return errors
-            if not (
-                "supports_json_field" in self.model._meta.required_db_features
-                or db_connection.features.supports_json_field
-            ):
-                errors.append(
-                    preflight.Error(
-                        f"{db_connection.display_name} does not support JSONFields.",
-                        obj=self.model,
-                        id="fields.E180",
-                    )
+
+        if (
+            self.model._meta.required_db_vendor
+            and self.model._meta.required_db_vendor != db_connection.vendor
+        ):
+            return errors
+
+        if not (
+            "supports_json_field" in self.model._meta.required_db_features
+            or db_connection.features.supports_json_field
+        ):
+            errors.append(
+                preflight.PreflightResult(
+                    f"{db_connection.display_name} does not support JSONFields.",
+                    obj=self.model,
+                    id="fields.E180",
                 )
+            )
         return errors
 
     def deconstruct(self):

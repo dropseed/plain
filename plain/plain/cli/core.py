@@ -13,7 +13,7 @@ from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
 from .install import install
-from .preflight import preflight_checks
+from .preflight import preflight_cli
 from .registry import cli_registry
 from .scaffold import create
 from .settings import setting
@@ -30,7 +30,7 @@ def plain_cli():
 
 plain_cli.add_command(agent)
 plain_cli.add_command(docs)
-plain_cli.add_command(preflight_checks)
+plain_cli.add_command(preflight_cli)
 plain_cli.add_command(create)
 plain_cli.add_command(chores)
 plain_cli.add_command(build)

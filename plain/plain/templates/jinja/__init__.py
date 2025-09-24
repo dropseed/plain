@@ -1,6 +1,3 @@
-import importlib.util
-from importlib import import_module
-
 from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils.functional import LazyObject
@@ -10,10 +7,6 @@ from .environments import DefaultEnvironment, get_template_dirs
 
 
 class JinjaEnvironment(LazyObject):
-    def __init__(self, *args, **kwargs):
-        self.__dict__["_imported_modules"] = set()
-        super().__init__(*args, **kwargs)
-
     def _setup(self):
         environment_setting = settings.TEMPLATES_JINJA_ENVIRONMENT
 
@@ -25,22 +18,8 @@ class JinjaEnvironment(LazyObject):
         # We have to set _wrapped before we trigger the autoloading of "register" commands
         self._wrapped = env
 
-        for package_config in packages_registry.get_package_configs():
-            # Autoload template helpers if the package provides a ``templates`` module
-            import_name = f"{package_config.name}.templates"
-            if import_name in self._imported_modules:
-                continue
-            if importlib.util.find_spec(import_name) is None:
-                continue
-            import_module(import_name)
-            self._imported_modules.add(import_name)
-
-        # Autoload template helpers from the local ``app`` package if present
-        import_name = "app.templates"
-        if import_name not in self._imported_modules:
-            if importlib.util.find_spec(import_name) is not None:
-                import_module(import_name)
-                self._imported_modules.add(import_name)
+        # Autoload template helpers using the registry method
+        packages_registry.autodiscover_modules("templates", include_app=True)
 
 
 environment = JinjaEnvironment()

@@ -3,7 +3,7 @@ import string
 
 from plain.exceptions import ImproperlyConfigured
 from plain.internal import internalcode
-from plain.preflight import Warning
+from plain.preflight import PreflightResult
 from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -33,10 +33,11 @@ class CheckURLMixin:
         if regex_pattern.startswith(("/", "^/", "^\\/")) and not regex_pattern.endswith(
             "/"
         ):
-            warning = Warning(
+            warning = PreflightResult(
                 f"Your URL pattern {self.describe()} has a route beginning with a '/'. Remove this "
                 "slash as it is unnecessary. If this pattern is targeted in an "
                 "include(), ensure the include() pattern has a trailing '/'.",
+                warning=True,
                 id="urls.W002",
             )
             return [warning]
@@ -68,7 +69,7 @@ class RegexPattern(CheckURLMixin):
             return path[match.end() :], args, kwargs
         return None
 
-    def check(self):
+    def preflight(self):
         warnings = []
         warnings.extend(self._check_pattern_startswith_slash())
         if not self._is_endpoint:
@@ -79,10 +80,11 @@ class RegexPattern(CheckURLMixin):
         regex_pattern = self.regex.pattern
         if regex_pattern.endswith("$") and not regex_pattern.endswith(r"\$"):
             return [
-                Warning(
+                PreflightResult(
                     f"Your URL pattern {self.describe()} uses include with a route ending with a '$'. "
                     "Remove the dollar from the route to avoid problems including "
                     "URLs.",
+                    warning=True,
                     id="urls.W001",
                 )
             ]
@@ -174,15 +176,16 @@ class RoutePattern(CheckURLMixin):
             return path[match.end() :], (), kwargs
         return None
 
-    def check(self):
+    def preflight(self):
         warnings = self._check_pattern_startswith_slash()
         route = self._route
         if "(?P<" in route or route.startswith("^") or route.endswith("$"):
             warnings.append(
-                Warning(
+                PreflightResult(
                     f"Your URL pattern {self.describe()} has a route that contains '(?P<', begins "
                     "with a '^', or ends with a '$'. This was likely an oversight "
                     "when migrating to plain.urls.path().",
+                    warning=True,
                     id="2_0.W001",
                 )
             )
@@ -204,9 +207,9 @@ class URLPattern:
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.pattern.describe()}>"
 
-    def check(self):
+    def preflight(self):
         warnings = self._check_pattern_name()
-        warnings.extend(self.pattern.check())
+        warnings.extend(self.pattern.preflight())
         return warnings
 
     def _check_pattern_name(self):
@@ -214,9 +217,10 @@ class URLPattern:
         Check that the pattern name does not contain a colon.
         """
         if self.pattern.name is not None and ":" in self.pattern.name:
-            warning = Warning(
+            warning = PreflightResult(
                 f"Your URL pattern {self.pattern.describe()} has a name including a ':'. Remove the colon, to "
                 "avoid ambiguous namespace references.",
+                warning=True,
                 id="urls.W003",
             )
             return [warning]

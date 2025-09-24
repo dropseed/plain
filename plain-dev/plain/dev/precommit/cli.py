@@ -63,7 +63,8 @@ def cli(install):
             "Running preflight checks",
             "plain",
             "preflight",
-            "--database",
+            "check",
+            "--quiet",
         )
         check_short("Checking Plain migrations", "plain", "migrate", "--check")
         check_short(
@@ -74,7 +75,13 @@ def cli(install):
             "--check",
         )
     else:
-        check_short("Running Plain checks (without database)", "plain", "preflight")
+        check_short(
+            "Running Plain checks (without database)",
+            "plain",
+            "preflight",
+            "check",
+            "--quiet",
+        )
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
     print_event("Running plain build")

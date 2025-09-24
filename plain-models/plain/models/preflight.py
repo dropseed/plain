@@ -1,88 +1,83 @@
 import inspect
 from collections import defaultdict
-from itertools import chain
 
+from plain.models.db import db_connection
 from plain.models.registry import models_registry
 from plain.packages import packages_registry
-from plain.preflight import Error, Warning, register_check
+from plain.preflight import PreflightCheck, PreflightResult, register_check
 
 
-@register_check
-def check_database_backends(database=False, **kwargs):
-    if not database:
-        return []
+@register_check("models.database_backends")
+class CheckDatabaseBackends(PreflightCheck):
+    """Validates database backend configuration when plain.models is available."""
 
-    from plain.models.db import db_connection
-
-    return db_connection.validation.check(**kwargs)
+    def run(self):
+        return db_connection.validation.preflight()
 
 
-@register_check
-def check_all_models(package_configs=None, **kwargs):
-    db_table_models = defaultdict(list)
-    indexes = defaultdict(list)
-    constraints = defaultdict(list)
-    errors = []
-    if package_configs is None:
+@register_check("models.all_models")
+class CheckAllModels(PreflightCheck):
+    """Validates all model definitions for common issues."""
+
+    def run(self):
+        db_table_models = defaultdict(list)
+        indexes = defaultdict(list)
+        constraints = defaultdict(list)
+        errors = []
         models = models_registry.get_models()
-    else:
-        models = chain.from_iterable(
-            models_registry.get_models(package_label=package_config.package_label)
-            for package_config in package_configs
-        )
-    for model in models:
-        db_table_models[model._meta.db_table].append(model._meta.label)
-        if not inspect.ismethod(model.check):
-            errors.append(
-                Error(
-                    f"The '{model.__name__}.check()' class method is currently overridden by {model.check!r}.",
-                    obj=model,
-                    id="models.E020",
+        for model in models:
+            db_table_models[model._meta.db_table].append(model._meta.label)
+            if not inspect.ismethod(model.preflight):
+                errors.append(
+                    PreflightResult(
+                        f"The '{model.__name__}.preflight()' class method is currently overridden by {model.preflight!r}.",
+                        obj=model,
+                        id="models.E020",
+                    )
                 )
-            )
-        else:
-            errors.extend(model.check(**kwargs))
-        for model_index in model._meta.indexes:
-            indexes[model_index.name].append(model._meta.label)
-        for model_constraint in model._meta.constraints:
-            constraints[model_constraint.name].append(model._meta.label)
-    for db_table, model_labels in db_table_models.items():
-        if len(model_labels) != 1:
-            model_labels_str = ", ".join(model_labels)
-            errors.append(
-                Error(
-                    f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
-                    obj=db_table,
-                    id="models.E028",
+            else:
+                errors.extend(model.preflight())
+            for model_index in model._meta.indexes:
+                indexes[model_index.name].append(model._meta.label)
+            for model_constraint in model._meta.constraints:
+                constraints[model_constraint.name].append(model._meta.label)
+        for db_table, model_labels in db_table_models.items():
+            if len(model_labels) != 1:
+                model_labels_str = ", ".join(model_labels)
+                errors.append(
+                    PreflightResult(
+                        f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
+                        obj=db_table,
+                        id="models.E028",
+                    )
                 )
-            )
-    for index_name, model_labels in indexes.items():
-        if len(model_labels) > 1:
-            model_labels = set(model_labels)
-            errors.append(
-                Error(
-                    "index name '{}' is not unique {} {}.".format(
-                        index_name,
-                        "for model" if len(model_labels) == 1 else "among models:",
-                        ", ".join(sorted(model_labels)),
+        for index_name, model_labels in indexes.items():
+            if len(model_labels) > 1:
+                model_labels = set(model_labels)
+                errors.append(
+                    PreflightResult(
+                        "index name '{}' is not unique {} {}.".format(
+                            index_name,
+                            "for model" if len(model_labels) == 1 else "among models:",
+                            ", ".join(sorted(model_labels)),
+                        ),
+                        id="models.E029" if len(model_labels) == 1 else "models.E030",
                     ),
-                    id="models.E029" if len(model_labels) == 1 else "models.E030",
-                ),
-            )
-    for constraint_name, model_labels in constraints.items():
-        if len(model_labels) > 1:
-            model_labels = set(model_labels)
-            errors.append(
-                Error(
-                    "constraint name '{}' is not unique {} {}.".format(
-                        constraint_name,
-                        "for model" if len(model_labels) == 1 else "among models:",
-                        ", ".join(sorted(model_labels)),
+                )
+        for constraint_name, model_labels in constraints.items():
+            if len(model_labels) > 1:
+                model_labels = set(model_labels)
+                errors.append(
+                    PreflightResult(
+                        "constraint name '{}' is not unique {} {}.".format(
+                            constraint_name,
+                            "for model" if len(model_labels) == 1 else "among models:",
+                            ", ".join(sorted(model_labels)),
+                        ),
+                        id="models.E031" if len(model_labels) == 1 else "models.E032",
                     ),
-                    id="models.E031" if len(model_labels) == 1 else "models.E032",
-                ),
-            )
-    return errors
+                )
+        return errors
 
 
 def _check_lazy_references(models_registry, packages_registry):
@@ -140,7 +135,9 @@ def _check_lazy_references(models_registry, packages_registry):
             "field": keywords["field"],
             "model_error": app_model_error(model_key),
         }
-        return Error(error_msg % params, obj=keywords["field"], id="fields.E307")
+        return PreflightResult(
+            error_msg % params, obj=keywords["field"], id="fields.E307"
+        )
 
     def default_error(model_key, func, args, keywords):
         error_msg = (
@@ -151,7 +148,7 @@ def _check_lazy_references(models_registry, packages_registry):
             "model": ".".join(model_key),
             "model_error": app_model_error(model_key),
         }
-        return Error(error_msg % params, obj=func, id="models.E022")
+        return PreflightResult(error_msg % params, obj=func, id="models.E022")
 
     # Maps common uses of lazy operations to corresponding error functions
     # defined above. If a key maps to None, no error will be produced.
@@ -178,37 +175,39 @@ def _check_lazy_references(models_registry, packages_registry):
     )
 
 
-@register_check
-def check_lazy_references(package_configs=None, **kwargs):
-    return _check_lazy_references(models_registry, packages_registry)
+@register_check("models.lazy_references")
+class CheckLazyReferences(PreflightCheck):
+    """Ensures all lazy (string) model references have been resolved."""
+
+    def run(self):
+        return _check_lazy_references(models_registry, packages_registry)
 
 
-@register_check
-def check_database_tables(package_configs, **kwargs):
-    from plain.models.db import db_connection
+@register_check("models.database_tables")
+class CheckDatabaseTables(PreflightCheck):
+    """Checks for unknown tables in the database when plain.models is available."""
 
-    if not kwargs.get("database", False):
-        return []
+    def run(self):
+        errors = []
 
-    errors = []
-
-    db_tables = db_connection.introspection.table_names()
-    model_tables = db_connection.introspection.plain_table_names()
-    unknown_tables = set(db_tables) - set(model_tables)
-    unknown_tables.discard("plainmigrations")  # Know this could be there
-    if unknown_tables:
-        table_names = ", ".join(unknown_tables)
-        specific_hint = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
-        errors.append(
-            Warning(
-                f"Unknown tables in default database: {table_names}",
-                hint=(
-                    "Tables may be from packages/models that have been uninstalled. "
-                    "Make sure you have a backup and delete the tables manually "
-                    f"(ex. `{specific_hint}`)."
-                ),
-                id="plain.models.W001",
+        db_tables = db_connection.introspection.table_names()
+        model_tables = db_connection.introspection.plain_table_names()
+        unknown_tables = set(db_tables) - set(model_tables)
+        unknown_tables.discard("plainmigrations")  # Know this could be there
+        if unknown_tables:
+            table_names = ", ".join(unknown_tables)
+            specific_hint = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
+            errors.append(
+                PreflightResult(
+                    f"Unknown tables in default database: {table_names}",
+                    hint=(
+                        "Tables may be from packages/models that have been uninstalled. "
+                        "Make sure you have a backup and delete the tables manually "
+                        f"(ex. `{specific_hint}`)."
+                    ),
+                    id="plain.models.W001",
+                    warning=True,
+                )
             )
-        )
 
-    return errors
+        return errors

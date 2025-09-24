@@ -1,6 +1,3 @@
-from importlib import import_module
-from importlib.util import find_spec
-
 from plain.packages import packages_registry
 
 
@@ -35,21 +32,7 @@ class ChoresRegistry:
         """
         Import modules from installed packages and app to trigger registration.
         """
-        # Import from installed packages
-        for package_config in packages_registry.get_package_configs():
-            import_name = f"{package_config.name}.chores"
-            try:
-                import_module(import_name)
-            except ModuleNotFoundError:
-                pass
-
-        # Import from app
-        import_name = "app.chores"
-        if find_spec(import_name):
-            try:
-                import_module(import_name)
-            except ModuleNotFoundError:
-                pass
+        packages_registry.autodiscover_modules("chores", include_app=True)
 
     def get_chores(self):
         """

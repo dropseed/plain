@@ -5,7 +5,7 @@ from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.models import transaction
 from plain.models.db import IntegrityError, OperationalError, ProgrammingError
-from plain.preflight import Error
+from plain.preflight import PreflightResult
 from plain.runtime import SettingsReference
 from plain.utils import timezone
 
@@ -155,18 +155,11 @@ class OAuthConnection(models.Model):
         return connection
 
     @classmethod
-    def check(cls, **kwargs):
+    def preflight(cls):
         """
         A system check for ensuring that provider_keys in the database are also present in settings.
-
-        Note that the --database flag is required for this to work:
-          plain check --database default
         """
-        errors = super().check(**kwargs)
-
-        database = kwargs.get("database", False)
-        if not database:
-            return errors
+        errors = super().preflight()
 
         from .providers import get_provider_keys
 
@@ -183,7 +176,7 @@ class OAuthConnection(models.Model):
 
         if keys_in_db - keys_in_settings:
             errors.append(
-                Error(
+                PreflightResult(
                     "The following OAuth providers are in the database but not in the settings: {}".format(
                         ", ".join(keys_in_db - keys_in_settings)
                     ),
