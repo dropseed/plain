@@ -121,11 +121,11 @@ class Biome:
                     label="Downloading Biome",
                     width=0,
                 ) as bar:
-                    for chunk in resp.iter_content(chunk_size=8192):
+                    for chunk in resp.iter_content(chunk_size=1024 * 1024):
                         f.write(chunk)
                         bar.update(len(chunk))
             else:
-                for chunk in resp.iter_content(chunk_size=8192):
+                for chunk in resp.iter_content(chunk_size=1024 * 1024):
                     f.write(chunk)
         os.chmod(self.standalone_path, 0o755)
 

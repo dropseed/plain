@@ -125,22 +125,40 @@ class Tailwind:
         else:
             url = f"https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-{self.detect_platform_slug()}"
 
-        with requests.get(url, stream=True) as response:
+        # Optimized requests session with better connection pooling and headers
+        session = requests.Session()
+
+        # Better connection pooling
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=1, pool_maxsize=10, max_retries=3, pool_block=True
+        )
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+
+        # Optimized headers for better performance
+        headers = {
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "User-Agent": "plain-tailwind/1.0",
+        }
+
+        with session.get(url, stream=True, headers=headers, timeout=300) as response:
             response.raise_for_status()
             total = int(response.headers.get("Content-Length", 0))
+
             with open(self.standalone_path, "wb") as f:
-                if total:
-                    with click.progressbar(
-                        length=total,
-                        label="Downloading Tailwind",
-                        width=0,
-                    ) as bar:
-                        for chunk in response.iter_content(chunk_size=8192):
+                with click.progressbar(
+                    length=total,
+                    label="Downloading Tailwind",
+                    width=0,
+                ) as bar:
+                    # Use 8MB chunks for maximum performance
+                    for chunk in response.iter_content(
+                        chunk_size=1024 * 1024, decode_unicode=False
+                    ):
+                        if chunk:
                             f.write(chunk)
                             bar.update(len(chunk))
-                else:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
 
         os.chmod(self.standalone_path, 0o755)
 
