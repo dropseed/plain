@@ -126,7 +126,6 @@ class Field(RegisterLookupMixin):
         "required": "This field is be required.",
         "unique": "A %(model_name)s with this %(field_label)s already exists.",
     }
-    system_check_deprecated_details = None
     system_check_removed_details = None
 
     # Attributes that don't affect a column definition.
@@ -410,18 +409,6 @@ class Field(RegisterLookupMixin):
                     hint=self.system_check_removed_details.get("hint"),
                     obj=self,
                     id=self.system_check_removed_details.get("id", "fields.EXXX"),
-                )
-            ]
-        elif self.system_check_deprecated_details is not None:
-            return [
-                PreflightResult(
-                    self.system_check_deprecated_details.get(
-                        "msg", f"{self.__class__.__name__} has been deprecated."
-                    ),
-                    hint=self.system_check_deprecated_details.get("hint"),
-                    obj=self,
-                    warning=True,
-                    id=self.system_check_deprecated_details.get("id", "fields.WXXX"),
                 )
             ]
         return []
