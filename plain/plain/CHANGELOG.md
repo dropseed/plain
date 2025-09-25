@@ -11,7 +11,7 @@
 
 ### Upgrade instructions
 
-- Use `plain preflight check` instead of `plain preflight` to run all checks
+- Update any uses of the `plain preflight` command to `plain preflight check`, and remove the `--database` and `--fail-level` options which no longer exist
 - Custom preflight checks should be class based, extending `PreflightCheck` and implementing the `run()` method
 - Preflight checks need to be registered with a custom name (ex. `@register_check("app.my_custom_check")`) and optionally with `deploy=True` if it should run in only in deploy mode
 - Preflight results should use `PreflightResult` (optionally with `warning=True`) instead of `preflight.Warning` or `preflight.Error`
