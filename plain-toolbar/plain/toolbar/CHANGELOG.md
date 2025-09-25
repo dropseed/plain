@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.3.0) (2025-09-25)
+
+### What's changed
+
+- Updated toolbar module autodiscovery to use the new `packages_registry.autodiscover_modules()` method ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.2.0) (2025-09-19)
 
 ### What's changed
