@@ -1,5 +1,23 @@
 # plain changelog
 
+## [0.68.0](https://github.com/dropseed/plain/releases/plain@0.68.0) (2025-09-25)
+
+### What's changed
+
+- Major refactor of the preflight check system with new CLI commands and improved output ([b0b610d461](https://github.com/dropseed/plain/commit/b0b610d461))
+- Preflight checks now use descriptive IDs instead of numeric codes ([cd96c97b25](https://github.com/dropseed/plain/commit/cd96c97b25))
+- Unified preflight error messages and hints into a single `fix` field ([c7cde12149](https://github.com/dropseed/plain/commit/c7cde12149))
+- Added `plain-upgrade` as a standalone command for upgrading Plain packages ([42f2eed80c](https://github.com/dropseed/plain/commit/42f2eed80c))
+
+### Upgrade instructions
+
+- Use `plain preflight check` instead of `plain preflight` to run all checks
+- Custom preflight checks should be class based, extending `PreflightCheck` and implementing the `run()` method
+- Preflight checks need to be registered with a custom name (ex. `@register_check("app.my_custom_check")`) and optionally with `deploy=True` if it should run in only in deploy mode
+- Preflight results should use `PreflightResult` (optionally with `warning=True`) instead of `preflight.Warning` or `preflight.Error`
+- Preflight result IDs should be descriptive strings (e.g., `models.lazy_reference_resolution_failed`) instead of numeric codes
+- `PREFLIGHT_SILENCED_CHECKS` setting has been replaced with `PREFLIGHT_SILENCED_RESULTS` which should contain a list of result IDs to silence. `PREFLIGHT_SILENCED_CHECKS` now silences entire checks by name.
+
 ## [0.67.0](https://github.com/dropseed/plain/releases/plain@0.67.0) (2025-09-22)
 
 ### What's changed
