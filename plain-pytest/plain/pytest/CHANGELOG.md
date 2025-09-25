@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.12.1](https://github.com/dropseed/plain/releases/plain-pytest@0.12.1) (2025-09-25)
+
+### What's changed
+
+- The CLI output when loading `.env.test` is now dimmed and italicized for a cleaner test output ([6166ab78](https://github.com/dropseed/plain/commit/6166ab78))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-pytest@0.12.0) (2025-09-22)
 
 ### What's changed
