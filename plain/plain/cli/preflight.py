@@ -59,7 +59,7 @@ def check_command(deploy, format, quiet):
         if format == "text":
             if not quiet:
                 # Print check name without newline
-                click.secho(f"{check_name} ", nl=False, err=True, bold=True)
+                click.secho(f"{check_name} ", nl=False, err=True)
 
             # Determine status icon based on issue severity
             if not visible_issues:
@@ -232,7 +232,7 @@ def list_checks():
                 click.style(" (silenced)", fg="red", dim=True) if is_silenced else ""
             )
             click.echo(
-                f"  {click.style(name, bold=True)}: {click.style(description, dim=True)}{silenced_text}"
+                f"  {click.style(name)}: {click.style(description, dim=True)}{silenced_text}"
             )
 
     if deployment:
@@ -242,7 +242,7 @@ def list_checks():
                 click.style(" (silenced)", fg="red", dim=True) if is_silenced else ""
             )
             click.echo(
-                f"  {click.style(name, bold=True)}: {click.style(description, dim=True)}{silenced_text}"
+                f"  {click.style(name)}: {click.style(description, dim=True)}{silenced_text}"
             )
 
     if not regular and not deployment:
