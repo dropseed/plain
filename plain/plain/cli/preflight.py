@@ -1,4 +1,5 @@
 import json
+import sys
 
 import click
 
@@ -121,9 +122,6 @@ def check_command(deploy, format, quiet):
 
     # Get all issues from check_results instead of maintaining separate list
     all_issues = [issue for _, _, issues in check_results for issue in issues]
-    visible_issue_count = len(
-        [issue for issue in all_issues if not issue.is_silenced()]
-    )
     # Errors (non-warnings) cause preflight to fail
     has_errors = any(
         not issue.warning and not issue.is_silenced() for issue in all_issues
@@ -201,12 +199,7 @@ def check_command(deploy, format, quiet):
 
     # Exit with error if there are any errors (not warnings)
     if has_errors:
-        if format == "text":
-            raise click.ClickException(
-                f"Preflight check failed with {visible_issue_count} issues"
-            )
-        else:
-            raise click.ClickException("Preflight check failed")
+        sys.exit(1)
 
 
 @preflight_cli.command("list")
