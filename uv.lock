@@ -684,7 +684,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.26.0"
+version = "0.27.0"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
