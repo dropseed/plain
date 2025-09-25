@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.68.1](https://github.com/dropseed/plain/releases/plain@0.68.1) (2025-09-25)
+
+### What's changed
+
+- Preflight checks are now sorted by name for consistent ordering ([cb8e160](https://github.com/dropseed/plain/commit/cb8e160934))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.68.0](https://github.com/dropseed/plain/releases/plain@0.68.0) (2025-09-25)
 
 ### What's changed
