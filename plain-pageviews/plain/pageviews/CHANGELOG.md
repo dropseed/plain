@@ -1,5 +1,19 @@
 # plain-pageviews changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.22.0) (2025-09-25)
+
+### What's changed
+
+- Added UTM parameter tracking with automatic extraction of `utm_source`, `utm_medium`, and `utm_campaign` from URLs ([15547a7](https://github.com/dropseed/plain/commit/15547a7697f3298c0c2e71f488e56aec83ba4717))
+- Added support for simple `ref` parameter as an alternative to UTM tracking ([15547a7](https://github.com/dropseed/plain/commit/15547a7697f3298c0c2e71f488e56aec83ba4717))
+- Added auto-detection of tracking IDs from major ad platforms (Google Ads `gclid`, Facebook `fbclid`, Microsoft `msclkid`, TikTok `ttclid`, Twitter `twclid`) ([15547a7](https://github.com/dropseed/plain/commit/15547a7697f3298c0c2e71f488e56aec83ba4717))
+- Added server-side pageview tracking via `Pageview.create_from_request()` method ([1944ff7](https://github.com/dropseed/plain/commit/1944ff7bbafba9ca046892b242bf4d6660b832c7))
+- Added new `source`, `medium`, and `campaign` fields to the Pageview model with database indexes ([15547a7](https://github.com/dropseed/plain/commit/15547a7697f3298c0c2e71f488e56aec83ba4717))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.21.0) (2025-09-12)
 
 ### What's changed
