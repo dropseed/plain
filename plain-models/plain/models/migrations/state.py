@@ -521,7 +521,7 @@ class StateModelsRegistry(ModelsRegistry):
         from plain.models.preflight import _check_lazy_references
 
         if errors := _check_lazy_references(self, packages_registry):
-            raise ValueError("\n".join(error.msg for error in errors))
+            raise ValueError("\n".join(error.message for error in errors))
 
     @contextmanager
     def bulk_update(self):

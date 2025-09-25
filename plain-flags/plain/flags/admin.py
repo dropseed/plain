@@ -24,7 +24,7 @@ class UnusedFlagsCard(Card):
         return len(self.flag_errors)
 
     def get_text(self):
-        return "\n".join(str(e.msg) for e in self.flag_errors)
+        return "\n".join(str(e.message) for e in self.flag_errors)
 
 
 @register_viewset

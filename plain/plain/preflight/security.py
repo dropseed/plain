@@ -23,10 +23,9 @@ class CheckSecretKey(PreflightCheck):
         if not _check_secret_key(settings.SECRET_KEY):
             return [
                 PreflightResult(
-                    f"Your SECRET_KEY has less than {SECRET_KEY_MIN_LENGTH} characters or less than "
-                    f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS} unique characters. Please generate "
-                    f"a long and random value, otherwise many of Plain's security-critical "
-                    f"features will be vulnerable to attack.",
+                    fix=f"SECRET_KEY is too weak (needs {SECRET_KEY_MIN_LENGTH}+ characters, "
+                    f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS}+ unique). Generate a new long random value or "
+                    f"Plain's security features will be vulnerable to attack.",
                     id="security.secret_key_weak",
                 )
             ]
@@ -43,10 +42,9 @@ class CheckSecretKeyFallbacks(PreflightCheck):
             if not _check_secret_key(key):
                 errors.append(
                     PreflightResult(
-                        f"Your SECRET_KEY_FALLBACKS[{index}] has less than {SECRET_KEY_MIN_LENGTH} characters or less than "
-                        f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS} unique characters. Please generate "
-                        f"a long and random value, otherwise many of Plain's security-critical "
-                        f"features will be vulnerable to attack.",
+                        fix=f"SECRET_KEY_FALLBACKS[{index}] is too weak (needs {SECRET_KEY_MIN_LENGTH}+ characters, "
+                        f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS}+ unique). Generate a new long random value or "
+                        f"Plain's security features will be vulnerable to attack.",
                         id="security.secret_key_fallback_weak",
                     )
                 )
@@ -61,7 +59,7 @@ class CheckDebug(PreflightCheck):
         if settings.DEBUG:
             return [
                 PreflightResult(
-                    "You should not have DEBUG set to True in deployment.",
+                    fix="DEBUG is True in deployment. Set DEBUG=False to prevent exposing sensitive information.",
                     id="security.debug_enabled_in_production",
                 )
             ]
@@ -76,7 +74,7 @@ class CheckAllowedHosts(PreflightCheck):
         if not settings.ALLOWED_HOSTS:
             return [
                 PreflightResult(
-                    "ALLOWED_HOSTS must not be empty in deployment.",
+                    fix="ALLOWED_HOSTS is empty in deployment. Add your domain(s) to prevent host header attacks.",
                     id="security.allowed_hosts_empty",
                 )
             ]

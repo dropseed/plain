@@ -29,7 +29,7 @@ class FieldCacheMixin:
 
 
 class CheckFieldDefaultMixin:
-    _default_hint = ("<valid default>", "<invalid default>")
+    _default_fix = ("<valid default>", "<invalid default>")
 
     def _check_default(self):
         if (
@@ -39,11 +39,11 @@ class CheckFieldDefaultMixin:
         ):
             return [
                 PreflightResult(
-                    f"{self.__class__.__name__} default should be a callable instead of an instance "
-                    "so that it's not shared between all field instances.",
-                    hint=(
+                    fix=(
+                        f"{self.__class__.__name__} default should be a callable instead of an instance "
+                        "so that it's not shared between all field instances. "
                         "Use a callable instead, e.g., use `{}` instead of "
-                        "`{}`.".format(*self._default_hint)
+                        "`{}`.".format(*self._default_fix)
                     ),
                     obj=self,
                     id="fields.invalid_choice_mixin_default",

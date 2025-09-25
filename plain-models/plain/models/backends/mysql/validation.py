@@ -14,13 +14,11 @@ class DatabaseValidation(BaseDatabaseValidation):
         ):
             return [
                 preflight.PreflightResult(
-                    f"{self.connection.display_name} Strict Mode is not set for the database connection",
-                    hint=(
-                        f"{self.connection.display_name}'s Strict Mode fixes many data integrity problems in "
-                        f"{self.connection.display_name}, such as data truncation upon insertion, by "
-                        "escalating warnings into errors. It is strongly "
-                        "recommended you activate it."
-                    ),
+                    fix=f"{self.connection.display_name} Strict Mode is not set for the database connection. "
+                    f"{self.connection.display_name}'s Strict Mode fixes many data integrity problems in "
+                    f"{self.connection.display_name}, such as data truncation upon insertion, by "
+                    "escalating warnings into errors. It is strongly "
+                    "recommended you activate it.",
                     id="mysql.strict_mode_not_enabled",
                     warning=True,
                 )
@@ -42,7 +40,7 @@ class DatabaseValidation(BaseDatabaseValidation):
         ):
             errors.append(
                 preflight.PreflightResult(
-                    f"{self.connection.display_name} may not allow unique CharFields to have a max_length "
+                    fix=f"{self.connection.display_name} may not allow unique CharFields to have a max_length "
                     "> 255.",
                     obj=field,
                     id="mysql.unique_charfield_max_length_too_long",

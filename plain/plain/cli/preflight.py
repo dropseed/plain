@@ -59,7 +59,8 @@ def check_command(deploy, format, quiet):
         if format == "text":
             if not quiet:
                 # Print check name without newline
-                click.secho(f"{check_name} ", nl=False, err=True)
+                click.echo("Check:", nl=False, err=True)
+                click.secho(f"{check_name} ", bold=True, nl=False, err=True)
 
             # Determine status icon based on issue severity
             if not visible_issues:
@@ -76,34 +77,39 @@ def check_command(deploy, format, quiet):
                     else:
                         click.secho("⚠", fg="yellow", err=True)
 
-                # Print issues with tree structure
+                # Print issues with simple indentation
                 issues_to_show = (
                     visible_issues
                     if not quiet
                     else [issue for issue in visible_issues if not issue.warning]
                 )
                 for i, issue in enumerate(issues_to_show):
-                    is_last = i == len(issues_to_show) - 1
-                    tree_char = "└─" if is_last else "├─"
                     issue_color = "red" if not issue.warning else "yellow"
+                    issue_type = "ERROR" if not issue.warning else "WARNING"
+
                     if quiet:
-                        # In quiet mode, show check name with the issue (errors only)
-                        prefix = f"{check_name}: " if i == 0 else "  "
+                        # In quiet mode, show check name once, then issues
+                        if i == 0:
+                            click.secho(f"{check_name}:", err=True)
+                        # Show ID and fix on separate lines with same indentation
                         click.secho(
-                            f"{prefix}{issue.id}: {issue.msg}",
+                            f"  [{issue_type}] {issue.id}:",
                             fg=issue_color,
+                            bold=True,
                             err=True,
+                            nl=False,
                         )
+                        click.secho(f" {issue.fix}", err=True, dim=True)
                     else:
-                        # In normal mode, use tree structure
+                        # Show ID and fix on separate lines with same indentation
                         click.secho(
-                            f"  {tree_char} {issue.id}: {issue.msg}",
+                            f"    [{issue_type}] {issue.id}: ",
                             fg=issue_color,
+                            bold=True,
                             err=True,
+                            nl=False,
                         )
-                    if issue.hint:
-                        hint_prefix = "  HINT: " if quiet else "     HINT: "
-                        click.secho(f"{hint_prefix}{issue.hint}", fg="cyan", err=True)
+                        click.secho(f"{issue.fix}", err=True, dim=True)
         else:
             # For JSON format, just count passed checks
             if not visible_issues:
@@ -140,8 +146,7 @@ def check_command(deploy, format, quiet):
                 issue_data = {
                     "id": issue.id,
                     "warning": issue.warning,
-                    "message": issue.msg,
-                    "hint": issue.hint,
+                    "fix": issue.fix,
                     "obj": str(issue.obj) if issue.obj is not None else None,
                 }
                 check_result["issues"].append(issue_data)

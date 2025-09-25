@@ -57,6 +57,6 @@ def test_oauth_provider_keys_check_fail(db, settings):
     errors = OAuthConnection.preflight()
     assert len(errors) == 1
     assert (
-        errors[0].msg
-        == "The following OAuth providers are in the database but not in the settings: bar"
+        errors[0].fix
+        == "The following OAuth providers are in the database but not in the settings: bar. Add these providers to your OAUTH_LOGIN_PROVIDERS setting or remove the corresponding OAuthConnection records."
     )

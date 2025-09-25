@@ -34,9 +34,7 @@ class CheckURLMixin:
             "/"
         ):
             warning = PreflightResult(
-                f"Your URL pattern {self.describe()} has a route beginning with a '/'. Remove this "
-                "slash as it is unnecessary. If this pattern is targeted in an "
-                "include(), ensure the include() pattern has a trailing '/'.",
+                fix=f"URL pattern {self.describe()} starts with unnecessary '/'. Remove the leading slash.",
                 warning=True,
                 id="urls.pattern_starts_with_slash",
             )
@@ -81,9 +79,7 @@ class RegexPattern(CheckURLMixin):
         if regex_pattern.endswith("$") and not regex_pattern.endswith(r"\$"):
             return [
                 PreflightResult(
-                    f"Your URL pattern {self.describe()} uses include with a route ending with a '$'. "
-                    "Remove the dollar from the route to avoid problems including "
-                    "URLs.",
+                    fix=f"Include pattern {self.describe()} ends with '$' which prevents URL inclusion. Remove the dollar sign.",
                     warning=True,
                     id="urls.include_pattern_ends_with_dollar",
                 )
@@ -182,7 +178,7 @@ class RoutePattern(CheckURLMixin):
         if "(?P<" in route or route.startswith("^") or route.endswith("$"):
             warnings.append(
                 PreflightResult(
-                    f"Your URL pattern {self.describe()} has a route that contains '(?P<', begins "
+                    fix=f"Your URL pattern {self.describe()} has a route that contains '(?P<', begins "
                     "with a '^', or ends with a '$'. This was likely an oversight "
                     "when migrating to plain.urls.path().",
                     warning=True,
@@ -218,7 +214,7 @@ class URLPattern:
         """
         if self.pattern.name is not None and ":" in self.pattern.name:
             warning = PreflightResult(
-                f"Your URL pattern {self.pattern.describe()} has a name including a ':'. Remove the colon, to "
+                fix=f"Your URL pattern {self.pattern.describe()} has a name including a ':'. Remove the colon, to "
                 "avoid ambiguous namespace references.",
                 warning=True,
                 id="urls.pattern_name_contains_colon",

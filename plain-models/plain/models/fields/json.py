@@ -23,7 +23,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
     default_error_messages = {
         "invalid": "Value must be valid JSON.",
     }
-    _default_hint = ("dict", "{}")
+    _default_fix = ("dict", "{}")
 
     def __init__(
         self,
@@ -60,7 +60,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
         ):
             errors.append(
                 preflight.PreflightResult(
-                    f"{db_connection.display_name} does not support JSONFields.",
+                    fix=f"{db_connection.display_name} does not support JSONFields. Consider using a TextField with JSON serialization or upgrade to a database that supports JSON fields.",
                     obj=self.model,
                     id="fields.json_field_unsupported",
                 )

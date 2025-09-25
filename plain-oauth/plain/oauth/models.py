@@ -177,7 +177,7 @@ class OAuthConnection(models.Model):
         if keys_in_db - keys_in_settings:
             errors.append(
                 PreflightResult(
-                    "The following OAuth providers are in the database but not in the settings: {}".format(
+                    fix="The following OAuth providers are in the database but not in the settings: {}. Add these providers to your OAUTH_LOGIN_PROVIDERS setting or remove the corresponding OAuthConnection records.".format(
                         ", ".join(keys_in_db - keys_in_settings)
                     ),
                     id="oauth.provider_in_db_not_in_settings",

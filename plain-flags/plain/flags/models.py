@@ -95,10 +95,9 @@ class Flag(models.Model):
             except FlagImportError:
                 errors.append(
                     PreflightResult(
-                        f"Flag {flag_name} is not used.",
-                        hint=f"Remove the flag from the database or define it in the {settings.FLAGS_MODULE} module.",
+                        fix=f"Flag {flag_name} is not used. Remove the flag from the database or define it in the {settings.FLAGS_MODULE} module.",
                         warning=True,
-                        id="plain.flags.I001",
+                        id="flags.unused_flags",
                     )
                 )
 

@@ -30,7 +30,7 @@ class CheckAllModels(PreflightCheck):
             if not inspect.ismethod(model.preflight):
                 errors.append(
                     PreflightResult(
-                        f"The '{model.__name__}.preflight()' class method is currently overridden by {model.preflight!r}.",
+                        fix=f"The '{model.__name__}.preflight()' class method is currently overridden by {model.preflight!r}.",
                         obj=model,
                         id="models.preflight_method_overridden",
                     )
@@ -46,7 +46,7 @@ class CheckAllModels(PreflightCheck):
                 model_labels_str = ", ".join(model_labels)
                 errors.append(
                     PreflightResult(
-                        f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
+                        fix=f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
                         obj=db_table,
                         id="models.duplicate_db_table",
                     )
@@ -56,7 +56,7 @@ class CheckAllModels(PreflightCheck):
                 model_labels = set(model_labels)
                 errors.append(
                     PreflightResult(
-                        "index name '{}' is not unique {} {}.".format(
+                        fix="index name '{}' is not unique {} {}.".format(
                             index_name,
                             "for model" if len(model_labels) == 1 else "among models:",
                             ", ".join(sorted(model_labels)),
@@ -71,7 +71,7 @@ class CheckAllModels(PreflightCheck):
                 model_labels = set(model_labels)
                 errors.append(
                     PreflightResult(
-                        "constraint name '{}' is not unique {} {}.".format(
+                        fix="constraint name '{}' is not unique {} {}.".format(
                             constraint_name,
                             "for model" if len(model_labels) == 1 else "among models:",
                             ", ".join(sorted(model_labels)),
@@ -140,7 +140,7 @@ def _check_lazy_references(models_registry, packages_registry):
             "model_error": app_model_error(model_key),
         }
         return PreflightResult(
-            error_msg % params,
+            fix=error_msg % params,
             obj=keywords["field"],
             id="fields.lazy_reference_not_resolvable",
         )
@@ -155,7 +155,9 @@ def _check_lazy_references(models_registry, packages_registry):
             "model_error": app_model_error(model_key),
         }
         return PreflightResult(
-            error_msg % params, obj=func, id="models.lazy_reference_resolution_failed"
+            fix=error_msg % params,
+            obj=func,
+            id="models.lazy_reference_resolution_failed",
         )
 
     # Maps common uses of lazy operations to corresponding error functions
@@ -179,7 +181,7 @@ def _check_lazy_references(models_registry, packages_registry):
                 for func in models_registry._pending_operations[model_key]
             ),
         ),
-        key=lambda error: error.msg,
+        key=lambda error: error.message,
     )
 
 
@@ -204,15 +206,13 @@ class CheckDatabaseTables(PreflightCheck):
         unknown_tables.discard("plainmigrations")  # Know this could be there
         if unknown_tables:
             table_names = ", ".join(unknown_tables)
-            specific_hint = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
+            specific_fix = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
             errors.append(
                 PreflightResult(
-                    f"Unknown tables in default database: {table_names}",
-                    hint=(
-                        "Tables may be from packages/models that have been uninstalled. "
-                        "Make sure you have a backup and delete the tables manually "
-                        f"(ex. `{specific_hint}`)."
-                    ),
+                    fix=f"Unknown tables in default database: {table_names}. "
+                    "Tables may be from packages/models that have been uninstalled. "
+                    "Make sure you have a backup and delete the tables manually "
+                    f"(ex. `{specific_fix}`).",
                     id="models.unknown_database_tables",
                     warning=True,
                 )

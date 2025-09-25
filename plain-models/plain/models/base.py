@@ -1024,7 +1024,7 @@ class Model(metaclass=ModelBase):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support comments on "
+                    fix=f"{db_connection.display_name} does not support comments on "
                     f"tables (db_table_comment).",
                     obj=cls,
                     id="models.db_table_comment_unsupported",
@@ -1068,7 +1068,7 @@ class Model(metaclass=ModelBase):
             if signature in seen_intermediary_signatures:
                 errors.append(
                     PreflightResult(
-                        "The model has two identical many-to-many relations "
+                        fix="The model has two identical many-to-many relations "
                         f"through the intermediate model '{f.remote_field.through._meta.label}'.",
                         obj=cls,
                         id="models.duplicate_many_to_many_relations",
@@ -1086,7 +1086,7 @@ class Model(metaclass=ModelBase):
         ):
             return [
                 PreflightResult(
-                    "'id' is a reserved word that cannot be used as a field name.",
+                    fix="'id' is a reserved word that cannot be used as a field name.",
                     obj=cls,
                     id="models.reserved_field_name_id",
                 )
@@ -1111,7 +1111,7 @@ class Model(metaclass=ModelBase):
             if clash and not id_conflict:
                 errors.append(
                     PreflightResult(
-                        f"The field '{f.name}' clashes with the field '{clash.name}' "
+                        fix=f"The field '{f.name}' clashes with the field '{clash.name}' "
                         f"from model '{clash.model._meta}'.",
                         obj=f,
                         id="models.field_name_clash",
@@ -1135,9 +1135,8 @@ class Model(metaclass=ModelBase):
             if column_name and column_name in used_column_names:
                 errors.append(
                     PreflightResult(
-                        f"Field '{f.name}' has column name '{column_name}' that is used by "
-                        "another field.",
-                        hint="Specify a 'db_column' for the field.",
+                        fix=f"Field '{f.name}' has column name '{column_name}' that is used by "
+                        "another field. Specify a 'db_column' for the field.",
                         obj=cls,
                         id="models.db_column_clash",
                     )
@@ -1154,7 +1153,7 @@ class Model(metaclass=ModelBase):
         if model_name.startswith("_") or model_name.endswith("_"):
             errors.append(
                 PreflightResult(
-                    f"The model name '{model_name}' cannot start or end with an underscore "
+                    fix=f"The model name '{model_name}' cannot start or end with an underscore "
                     "as it collides with the query lookup syntax.",
                     obj=cls,
                     id="models.model_name_underscore_bounds",
@@ -1163,7 +1162,7 @@ class Model(metaclass=ModelBase):
         elif LOOKUP_SEP in model_name:
             errors.append(
                 PreflightResult(
-                    f"The model name '{model_name}' cannot contain double underscores as "
+                    fix=f"The model name '{model_name}' cannot contain double underscores as "
                     "it collides with the query lookup syntax.",
                     obj=cls,
                     id="models.model_name_double_underscore",
@@ -1184,7 +1183,7 @@ class Model(metaclass=ModelBase):
             if accessor in property_names:
                 errors.append(
                     PreflightResult(
-                        f"The property '{accessor}' clashes with a related field "
+                        fix=f"The property '{accessor}' clashes with a related field "
                         "accessor.",
                         obj=cls,
                         id="models.property_related_field_clash",
@@ -1198,7 +1197,7 @@ class Model(metaclass=ModelBase):
         if sum(1 for f in cls._meta.local_fields if f.primary_key) > 1:
             errors.append(
                 PreflightResult(
-                    "The model cannot have more than one field with "
+                    fix="The model cannot have more than one field with "
                     "'primary_key=True'.",
                     obj=cls,
                     id="models.multiple_primary_keys",
@@ -1217,7 +1216,7 @@ class Model(metaclass=ModelBase):
             if index.name[0] == "_" or index.name[0].isdigit():
                 errors.append(
                     PreflightResult(
-                        f"The index name '{index.name}' cannot start with an underscore "
+                        fix=f"The index name '{index.name}' cannot start with an underscore "
                         "or a number.",
                         obj=cls,
                         id="models.index_name_invalid_start",
@@ -1226,7 +1225,7 @@ class Model(metaclass=ModelBase):
             if len(index.name) > index.max_name_length:
                 errors.append(
                     PreflightResult(
-                        "The index name '%s' cannot be longer than %d "  # noqa: UP031
+                        fix="The index name '%s' cannot be longer than %d "  # noqa: UP031
                         "characters." % (index.name, index.max_name_length),
                         obj=cls,
                         id="models.index_name_too_long",
@@ -1243,11 +1242,9 @@ class Model(metaclass=ModelBase):
         ) and any(index.condition is not None for index in cls._meta.indexes):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support indexes with conditions.",
-                    hint=(
-                        "Conditions will be ignored. Silence this warning "
-                        "if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support indexes with conditions. "
+                    "Conditions will be ignored. Silence this warning "
+                    "if you don't care about it.",
                     warning=True,
                     obj=cls,
                     id="models.index_conditions_ignored",
@@ -1259,11 +1256,9 @@ class Model(metaclass=ModelBase):
         ) and any(index.include for index in cls._meta.indexes):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support indexes with non-key columns.",
-                    hint=(
-                        "Non-key columns will be ignored. Silence this "
-                        "warning if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support indexes with non-key columns. "
+                    "Non-key columns will be ignored. Silence this "
+                    "warning if you don't care about it.",
                     warning=True,
                     obj=cls,
                     id="models.index_non_key_columns_ignored",
@@ -1275,11 +1270,9 @@ class Model(metaclass=ModelBase):
         ) and any(index.contains_expressions for index in cls._meta.indexes):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support indexes on expressions.",
-                    hint=(
-                        "An index won't be created. Silence this warning "
-                        "if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support indexes on expressions. "
+                    "An index won't be created. Silence this warning "
+                    "if you don't care about it.",
                     warning=True,
                     obj=cls,
                     id="models.index_on_foreign_key",
@@ -1312,7 +1305,7 @@ class Model(metaclass=ModelBase):
             except KeyError:
                 errors.append(
                     PreflightResult(
-                        f"'{option}' refers to the nonexistent field '{field_name}'.",
+                        fix=f"'{option}' refers to the nonexistent field '{field_name}'.",
                         obj=cls,
                         id="models.nonexistent_field_reference",
                     )
@@ -1321,7 +1314,7 @@ class Model(metaclass=ModelBase):
                 if isinstance(field.remote_field, models.ManyToManyRel):
                     errors.append(
                         PreflightResult(
-                            f"'{option}' refers to a ManyToManyField '{field_name}', but "
+                            fix=f"'{option}' refers to a ManyToManyField '{field_name}', but "
                             f"ManyToManyFields are not permitted in '{option}'.",
                             obj=cls,
                             id="models.m2m_field_in_meta_option",
@@ -1330,9 +1323,8 @@ class Model(metaclass=ModelBase):
                 elif field not in cls._meta.local_fields:
                     errors.append(
                         PreflightResult(
-                            f"'{option}' refers to field '{field_name}' which is not local to model "
-                            f"'{cls._meta.object_name}'.",
-                            hint="This issue may be caused by multi-table inheritance.",
+                            fix=f"'{option}' refers to field '{field_name}' which is not local to model "
+                            f"'{cls._meta.object_name}'. This issue may be caused by multi-table inheritance.",
                             obj=cls,
                             id="models.non_local_field_reference",
                         )
@@ -1352,7 +1344,7 @@ class Model(metaclass=ModelBase):
         if not isinstance(cls._meta.ordering, list | tuple):
             return [
                 PreflightResult(
-                    "'ordering' must be a tuple or list (even if you want to order by "
+                    fix="'ordering' must be a tuple or list (even if you want to order by "
                     "only one field).",
                     obj=cls,
                     id="models.ordering_not_tuple_or_list",
@@ -1395,7 +1387,7 @@ class Model(metaclass=ModelBase):
                     ):
                         errors.append(
                             PreflightResult(
-                                "'ordering' refers to the nonexistent field, "
+                                fix="'ordering' refers to the nonexistent field, "
                                 f"related field, or lookup '{field}'.",
                                 obj=cls,
                                 id="models.ordering_nonexistent_field",
@@ -1422,7 +1414,7 @@ class Model(metaclass=ModelBase):
         for invalid_field in invalid_fields:
             errors.append(
                 PreflightResult(
-                    "'ordering' refers to the nonexistent field, related "
+                    fix="'ordering' refers to the nonexistent field, related "
                     f"field, or lookup '{invalid_field}'.",
                     obj=cls,
                     id="models.ordering_nonexistent_field",
@@ -1458,9 +1450,9 @@ class Model(metaclass=ModelBase):
             ):
                 errors.append(
                     PreflightResult(
-                        f'Autogenerated column name too long for field "{column_name}". '
-                        f'Maximum length is "{allowed_len}" for the database.',
-                        hint="Set the column name manually using 'db_column'.",
+                        fix=f'Autogenerated column name too long for field "{column_name}". '
+                        f'Maximum length is "{allowed_len}" for the database. '
+                        "Set the column name manually using 'db_column'.",
                         obj=cls,
                         id="models.autogenerated_column_name_too_long",
                     )
@@ -1482,12 +1474,10 @@ class Model(metaclass=ModelBase):
                 ):
                     errors.append(
                         PreflightResult(
-                            "Autogenerated column name too long for M2M field "
-                            f'"{rel_name}". Maximum length is "{allowed_len}" for the database.',
-                            hint=(
-                                "Use 'through' to create a separate model for "
-                                "M2M and then set column_name using 'db_column'."
-                            ),
+                            fix="Autogenerated column name too long for M2M field "
+                            f'"{rel_name}". Maximum length is "{allowed_len}" for the database. '
+                            "Use 'through' to create a separate model for "
+                            "M2M and then set column_name using 'db_column'.",
                             obj=cls,
                             id="models.m2m_column_name_too_long",
                         )
@@ -1523,11 +1513,9 @@ class Model(metaclass=ModelBase):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support check constraints.",
-                    hint=(
-                        "A constraint won't be created. Silence this "
-                        "warning if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support check constraints. "
+                    "A constraint won't be created. Silence this "
+                    "warning if you don't care about it.",
                     obj=cls,
                     id="models.constraint_on_non_db_field",
                     warning=True,
@@ -1544,12 +1532,9 @@ class Model(metaclass=ModelBase):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support unique constraints with "
-                    "conditions.",
-                    hint=(
-                        "A constraint won't be created. Silence this "
-                        "warning if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support unique constraints with "
+                    "conditions. A constraint won't be created. Silence this "
+                    "warning if you don't care about it.",
                     obj=cls,
                     id="models.constraint_on_virtual_field",
                     warning=True,
@@ -1567,11 +1552,9 @@ class Model(metaclass=ModelBase):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support deferrable unique constraints.",
-                    hint=(
-                        "A constraint won't be created. Silence this "
-                        "warning if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support deferrable unique constraints. "
+                    "A constraint won't be created. Silence this "
+                    "warning if you don't care about it.",
                     obj=cls,
                     id="models.constraint_on_foreign_key",
                     warning=True,
@@ -1587,12 +1570,9 @@ class Model(metaclass=ModelBase):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support unique constraints with non-key "
-                    "columns.",
-                    hint=(
-                        "A constraint won't be created. Silence this "
-                        "warning if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support unique constraints with non-key "
+                    "columns. A constraint won't be created. Silence this "
+                    "warning if you don't care about it.",
                     obj=cls,
                     id="models.constraint_on_m2m_field",
                     warning=True,
@@ -1608,12 +1588,9 @@ class Model(metaclass=ModelBase):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support unique constraints on "
-                    "expressions.",
-                    hint=(
-                        "A constraint won't be created. Silence this "
-                        "warning if you don't care about it."
-                    ),
+                    fix=f"{db_connection.display_name} does not support unique constraints on "
+                    "expressions. A constraint won't be created. Silence this "
+                    "warning if you don't care about it.",
                     obj=cls,
                     id="models.constraint_on_self_referencing_fk",
                     warning=True,
@@ -1654,12 +1631,10 @@ class Model(metaclass=ModelBase):
                     ):
                         errors.append(
                             PreflightResult(
-                                f"Check constraint {constraint.name!r} contains "
+                                fix=f"Check constraint {constraint.name!r} contains "
                                 f"RawSQL() expression and won't be validated "
-                                f"during the model full_clean().",
-                                hint=(
-                                    "Silence this warning if you don't care about it."
-                                ),
+                                f"during the model full_clean(). "
+                                "Silence this warning if you don't care about it.",
                                 warning=True,
                                 obj=cls,
                                 id="models.constraint_name_collision_autogenerated",
@@ -1686,7 +1661,7 @@ class Model(metaclass=ModelBase):
             ):
                 errors.append(
                     PreflightResult(
-                        f"'constraints' refers to the joined field '{LOOKUP_SEP.join([field_name] + lookups)}'.",
+                        fix=f"'constraints' refers to the joined field '{LOOKUP_SEP.join([field_name] + lookups)}'.",
                         obj=cls,
                         id="models.constraint_refers_to_joined_field",
                     )

@@ -2,11 +2,8 @@ from plain.runtime import settings
 
 
 class PreflightResult:
-    def __init__(
-        self, msg: str, *, id: str, hint: str = "", obj=None, warning: bool = False
-    ):
-        self.msg = msg
-        self.hint = hint
+    def __init__(self, *, fix: str, id: str, obj=None, warning: bool = False):
+        self.fix = fix
         self.obj = obj
         self.id = id
         self.warning = warning
@@ -14,7 +11,7 @@ class PreflightResult:
     def __eq__(self, other):
         return isinstance(other, self.__class__) and all(
             getattr(self, attr) == getattr(other, attr)
-            for attr in ["msg", "hint", "obj", "id", "warning"]
+            for attr in ["fix", "obj", "id", "warning"]
         )
 
     def __str__(self):
@@ -26,8 +23,7 @@ class PreflightResult:
         else:
             obj = str(self.obj)
         id_part = f"({self.id}) " if self.id else ""
-        hint_part = f"\n\tHINT: {self.hint}" if self.hint else ""
-        return f"{obj}: {id_part}{self.msg}{hint_part}"
+        return f"{obj}: {id_part}{self.fix}"
 
     def is_silenced(self):
         return self.id and self.id in settings.PREFLIGHT_SILENCED_RESULTS

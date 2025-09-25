@@ -2,20 +2,6 @@ from plain.preflight import PreflightCheck, PreflightResult, register_check
 from plain.runtime import settings
 
 
-def add_session_cookie_message(message):
-    return message + (
-        " Using a secure-only session cookie makes it more difficult for "
-        "network traffic sniffers to hijack user sessions."
-    )
-
-
-def add_httponly_message(message):
-    return message + (
-        " Using an HttpOnly session cookie makes it more difficult for "
-        "cross-site scripting attacks to hijack user sessions."
-    )
-
-
 def _session_middleware():
     return "plain.sessions.middleware.SessionMiddleware" in settings.MIDDLEWARE
 
@@ -36,10 +22,7 @@ class CheckSessionCookieSecure(PreflightCheck):
         if _session_app():
             warnings.append(
                 PreflightResult(
-                    add_session_cookie_message(
-                        "You have 'plain.sessions' in your INSTALLED_PACKAGES, "
-                        "but you have not set SESSION_COOKIE_SECURE to True."
-                    ),
+                    fix="You have 'plain.sessions' in your INSTALLED_PACKAGES, but SESSION_COOKIE_SECURE is not set to True. Set SESSION_COOKIE_SECURE=True to prevent session hijacking as using a secure-only session cookie makes it more difficult for network traffic sniffers to hijack user sessions.",
                     id="security.session_cookie_not_secure_app",
                     warning=True,
                 )
@@ -47,11 +30,7 @@ class CheckSessionCookieSecure(PreflightCheck):
         if _session_middleware():
             warnings.append(
                 PreflightResult(
-                    add_session_cookie_message(
-                        "You have 'plain.sessions.middleware.SessionMiddleware' "
-                        "in your MIDDLEWARE, but you have not set "
-                        "SESSION_COOKIE_SECURE to True."
-                    ),
+                    fix="You have 'plain.sessions.middleware.SessionMiddleware' in your MIDDLEWARE, but SESSION_COOKIE_SECURE is not set to True. Set SESSION_COOKIE_SECURE=True to prevent session hijacking as using a secure-only session cookie makes it more difficult for network traffic sniffers to hijack user sessions.",
                     id="security.session_cookie_not_secure_middleware",
                     warning=True,
                 )
@@ -59,9 +38,7 @@ class CheckSessionCookieSecure(PreflightCheck):
         if len(warnings) > 1:
             warnings = [
                 PreflightResult(
-                    add_session_cookie_message(
-                        "SESSION_COOKIE_SECURE is not set to True."
-                    ),
+                    fix="SESSION_COOKIE_SECURE is not set to True. Set SESSION_COOKIE_SECURE=True to prevent session hijacking as using a secure-only session cookie makes it more difficult for network traffic sniffers to hijack user sessions.",
                     id="security.session_cookie_not_secure",
                     warning=True,
                 )
@@ -81,10 +58,7 @@ class CheckSessionCookieHttpOnly(PreflightCheck):
         if _session_app():
             warnings.append(
                 PreflightResult(
-                    add_httponly_message(
-                        "You have 'plain.sessions' in your INSTALLED_PACKAGES, "
-                        "but you have not set SESSION_COOKIE_HTTPONLY to True.",
-                    ),
+                    fix="You have 'plain.sessions' in your INSTALLED_PACKAGES, but SESSION_COOKIE_HTTPONLY is not set to True. Set SESSION_COOKIE_HTTPONLY=True to prevent cross-site scripting attacks as using an HttpOnly session cookie makes it more difficult for cross-site scripting attacks to hijack user sessions.",
                     id="security.session_cookie_not_httponly_app",
                     warning=True,
                 )
@@ -92,11 +66,7 @@ class CheckSessionCookieHttpOnly(PreflightCheck):
         if _session_middleware():
             warnings.append(
                 PreflightResult(
-                    add_httponly_message(
-                        "You have 'plain.sessions.middleware.SessionMiddleware' "
-                        "in your MIDDLEWARE, but you have not set "
-                        "SESSION_COOKIE_HTTPONLY to True."
-                    ),
+                    fix="You have 'plain.sessions.middleware.SessionMiddleware' in your MIDDLEWARE, but SESSION_COOKIE_HTTPONLY is not set to True. Set SESSION_COOKIE_HTTPONLY=True to prevent cross-site scripting attacks as using an HttpOnly session cookie makes it more difficult for cross-site scripting attacks to hijack user sessions.",
                     id="security.session_cookie_not_httponly_middleware",
                     warning=True,
                 )
@@ -104,7 +74,7 @@ class CheckSessionCookieHttpOnly(PreflightCheck):
         if len(warnings) > 1:
             warnings = [
                 PreflightResult(
-                    add_httponly_message("SESSION_COOKIE_HTTPONLY is not set to True."),
+                    fix="SESSION_COOKIE_HTTPONLY is not set to True. Set SESSION_COOKIE_HTTPONLY=True to prevent cross-site scripting attacks as using an HttpOnly session cookie makes it more difficult for cross-site scripting attacks to hijack user sessions.",
                     id="security.session_cookie_not_httponly",
                     warning=True,
                 )

@@ -232,7 +232,7 @@ class Field(RegisterLookupMixin):
         if self.name.endswith("_"):
             return [
                 PreflightResult(
-                    "Field names must not end with an underscore.",
+                    fix="Field names must not end with an underscore.",
                     obj=self,
                     id="fields.name_ends_with_underscore",
                 )
@@ -240,7 +240,7 @@ class Field(RegisterLookupMixin):
         elif LOOKUP_SEP in self.name:
             return [
                 PreflightResult(
-                    f'Field names must not contain "{LOOKUP_SEP}".',
+                    fix=f'Field names must not contain "{LOOKUP_SEP}".',
                     obj=self,
                     id="fields.name_contains_lookup_separator",
                 )
@@ -248,7 +248,7 @@ class Field(RegisterLookupMixin):
         elif self.name == "id":
             return [
                 PreflightResult(
-                    "'id' is a reserved word that cannot be used as a field name.",
+                    fix="'id' is a reserved word that cannot be used as a field name.",
                     obj=self,
                     id="fields.reserved_field_name_id",
                 )
@@ -267,7 +267,7 @@ class Field(RegisterLookupMixin):
         if not is_iterable(self.choices) or isinstance(self.choices, str):
             return [
                 PreflightResult(
-                    "'choices' must be an iterable (e.g., a list or tuple).",
+                    fix="'choices' must be an iterable (e.g., a list or tuple).",
                     obj=self,
                     id="fields.choices_not_iterable",
                 )
@@ -315,7 +315,7 @@ class Field(RegisterLookupMixin):
             if self.max_length is not None and choice_max_length > self.max_length:
                 return [
                     PreflightResult(
-                        "'max_length' is too small to fit the longest value "  # noqa: UP031
+                        fix="'max_length' is too small to fit the longest value "  # noqa: UP031
                         "in 'choices' (%d characters)." % choice_max_length,
                         obj=self,
                         id="fields.max_length_too_small_for_choices",
@@ -325,7 +325,7 @@ class Field(RegisterLookupMixin):
 
         return [
             PreflightResult(
-                "'choices' must be an iterable containing "
+                fix="'choices' must be an iterable containing "
                 "(actual value, human readable name) tuples.",
                 obj=self,
                 id="fields.choices_invalid_format",
@@ -342,7 +342,7 @@ class Field(RegisterLookupMixin):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support comments on "
+                    fix=f"{db_connection.display_name} does not support comments on "
                     f"columns (db_comment).",
                     obj=self,
                     id="fields.db_comment_unsupported",
@@ -358,11 +358,9 @@ class Field(RegisterLookupMixin):
             # character-based fields a little differently).
             return [
                 PreflightResult(
-                    "Primary keys must not have allow_null=True.",
-                    hint=(
-                        "Set allow_null=False on the field, or "
-                        "remove primary_key=True argument."
-                    ),
+                    fix="Primary keys must not have allow_null=True. "
+                    "Set allow_null=False on the field, or "
+                    "remove primary_key=True argument.",
                     obj=self,
                     id="fields.primary_key_allows_null",
                 )
@@ -381,8 +379,8 @@ class Field(RegisterLookupMixin):
             if not callable(validator):
                 errors.append(
                     PreflightResult(
-                        "All 'validators' must be callable.",
-                        hint=(
+                        fix=(
+                            "All 'validators' must be callable. "
                             f"validators[{i}] ({repr(validator)}) isn't a function or "
                             "instance of a validator class."
                         ),
@@ -969,7 +967,7 @@ class CharField(Field):
                 return []
             return [
                 PreflightResult(
-                    "CharFields must define a 'max_length' attribute.",
+                    fix="CharFields must define a 'max_length' attribute.",
                     obj=self,
                     id="fields.charfield_missing_max_length",
                 )
@@ -981,7 +979,7 @@ class CharField(Field):
         ):
             return [
                 PreflightResult(
-                    "'max_length' must be a positive integer.",
+                    fix="'max_length' must be a positive integer.",
                     obj=self,
                     id="fields.charfield_invalid_max_length",
                 )
@@ -999,7 +997,7 @@ class CharField(Field):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support a database collation on "
+                    fix=f"{db_connection.display_name} does not support a database collation on "
                     "CharFields.",
                     obj=self,
                     id="fields.db_collation_unsupported",
@@ -1069,7 +1067,7 @@ class DateTimeCheckMixin:
         if enabled_options > 1:
             return [
                 PreflightResult(
-                    "The options auto_now, auto_now_add, and default "
+                    fix="The options auto_now, auto_now_add, and default "
                     "are mutually exclusive. Only one of these options "
                     "may be present.",
                     obj=self,
@@ -1105,13 +1103,11 @@ class DateTimeCheckMixin:
         if lower <= value <= upper:
             return [
                 PreflightResult(
-                    "Fixed default value provided.",
-                    hint=(
-                        "It seems you set a fixed date / time / datetime "
-                        "value as default for this field. This may not be "
-                        "what you want. If you want to have the current date "
-                        "as default, use `plain.utils.timezone.now`"
-                    ),
+                    fix="Fixed default value provided. "
+                    "It seems you set a fixed date / time / datetime "
+                    "value as default for this field. This may not be "
+                    "what you want. If you want to have the current date "
+                    "as default, use `plain.utils.timezone.now`",
                     obj=self,
                     id="fields.datetime_naive_default_value",
                     warning=True,
@@ -1395,7 +1391,7 @@ class DecimalField(Field):
         except TypeError:
             return [
                 PreflightResult(
-                    "DecimalFields must define a 'decimal_places' attribute.",
+                    fix="DecimalFields must define a 'decimal_places' attribute.",
                     obj=self,
                     id="fields.decimalfield_missing_decimal_places",
                 )
@@ -1403,7 +1399,7 @@ class DecimalField(Field):
         except ValueError:
             return [
                 PreflightResult(
-                    "'decimal_places' must be a non-negative integer.",
+                    fix="'decimal_places' must be a non-negative integer.",
                     obj=self,
                     id="fields.decimalfield_invalid_decimal_places",
                 )
@@ -1419,7 +1415,7 @@ class DecimalField(Field):
         except TypeError:
             return [
                 PreflightResult(
-                    "DecimalFields must define a 'max_digits' attribute.",
+                    fix="DecimalFields must define a 'max_digits' attribute.",
                     obj=self,
                     id="fields.decimalfield_missing_max_digits",
                 )
@@ -1427,7 +1423,7 @@ class DecimalField(Field):
         except ValueError:
             return [
                 PreflightResult(
-                    "'max_digits' must be a positive integer.",
+                    fix="'max_digits' must be a positive integer.",
                     obj=self,
                     id="fields.decimalfield_invalid_max_digits",
                 )
@@ -1439,7 +1435,7 @@ class DecimalField(Field):
         if int(self.decimal_places) > int(self.max_digits):
             return [
                 PreflightResult(
-                    "'max_digits' must be greater or equal to 'decimal_places'.",
+                    fix="'max_digits' must be greater or equal to 'decimal_places'.",
                     obj=self,
                     id="fields.decimalfield_decimal_places_exceeds_max_digits",
                 )
@@ -1624,8 +1620,7 @@ class IntegerField(Field):
         if self.max_length is not None:
             return [
                 PreflightResult(
-                    f"'max_length' is ignored when used with {self.__class__.__name__}.",
-                    hint="Remove 'max_length' from field",
+                    fix=f"'max_length' is ignored when used with {self.__class__.__name__}. Remove 'max_length' from field.",
                     obj=self,
                     id="fields.max_length_ignored",
                     warning=True,
@@ -1747,7 +1742,7 @@ class GenericIPAddressField(Field):
         ):
             return [
                 PreflightResult(
-                    "GenericIPAddressFields cannot have required=False if allow_null=False, "
+                    fix="GenericIPAddressFields cannot have required=False if allow_null=False, "
                     "as blank values are stored as nulls.",
                     obj=self,
                     id="fields.generic_ip_field_null_blank_config",
@@ -1869,7 +1864,7 @@ class TextField(Field):
         ):
             errors.append(
                 PreflightResult(
-                    f"{db_connection.display_name} does not support a database collation on "
+                    fix=f"{db_connection.display_name} does not support a database collation on "
                     "TextFields.",
                     obj=self,
                     id="fields.db_collation_unsupported",
@@ -2032,7 +2027,7 @@ class BinaryField(Field):
         if self.has_default() and isinstance(self.default, str):
             return [
                 PreflightResult(
-                    "BinaryField's default cannot be a string. Use bytes "
+                    fix="BinaryField's default cannot be a string. Use bytes "
                     "content instead.",
                     obj=self,
                     id="fields.filefield_upload_to_not_callable",

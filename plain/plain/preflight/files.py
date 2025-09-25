@@ -16,8 +16,7 @@ class CheckSettingFileUploadTempDir(PreflightCheck):
         if setting and not Path(setting).is_dir():
             return [
                 PreflightResult(
-                    f"The FILE_UPLOAD_TEMP_DIR setting refers to the nonexistent "
-                    f"directory '{setting}'.",
+                    fix=f"FILE_UPLOAD_TEMP_DIR points to nonexistent directory '{setting}'. Create the directory or update the setting.",
                     id="files.upload_temp_dir_nonexistent",
                 )
             ]
