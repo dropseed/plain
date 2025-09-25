@@ -51,7 +51,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         internal_type = output_field.get_internal_type()
         if internal_type in (
             "GenericIPAddressField",
-            "IPAddressField",
             "TimeField",
             "UUIDField",
         ):
@@ -165,7 +164,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             "regex",
             "iregex",
         ):
-            if internal_type in ("IPAddressField", "GenericIPAddressField"):
+            if internal_type == "GenericIPAddressField":
                 lookup = "HOST(%s)"
             else:
                 lookup = "%s::text"

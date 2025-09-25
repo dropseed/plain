@@ -125,10 +125,6 @@ def request_form(form_class: BaseForm):
             fields.BooleanField: {
                 "type": "boolean",
             },
-            fields.NullBooleanField: {
-                "type": "boolean",
-                "nullable": True,
-            },
             fields.CharField: {
                 "type": "string",
             },

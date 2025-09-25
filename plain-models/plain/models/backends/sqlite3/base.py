@@ -74,7 +74,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "FloatField": "real",
         "IntegerField": "integer",
         "BigIntegerField": "bigint",
-        "IPAddressField": "char(15)",
         "GenericIPAddressField": "char(39)",
         "JSONField": "text",
         "PositiveBigIntegerField": "bigint unsigned",

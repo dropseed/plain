@@ -100,7 +100,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "FloatField": "double precision",
         "IntegerField": "integer",
         "BigIntegerField": "bigint",
-        "IPAddressField": "inet",
         "GenericIPAddressField": "inet",
         "JSONField": "jsonb",
         "PositiveBigIntegerField": "bigint",
