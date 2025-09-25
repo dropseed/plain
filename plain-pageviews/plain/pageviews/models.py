@@ -7,6 +7,8 @@ from plain import models
 from plain.runtime import settings
 from plain.utils import timezone
 
+from .params import extract_tracking_params
+
 
 @models.register_model
 class Pageview(models.Model):
@@ -28,6 +30,11 @@ class Pageview(models.Model):
     user_id = models.CharField(max_length=255, required=False)
     session_id = models.CharField(max_length=255, required=False)
 
+    # Attribution tracking
+    source = models.CharField(max_length=200, required=False)
+    medium = models.CharField(max_length=200, required=False)
+    campaign = models.CharField(max_length=200, required=False)
+
     class Meta:
         ordering = ["-timestamp"]
         indexes = [
@@ -35,6 +42,8 @@ class Pageview(models.Model):
             models.Index(fields=["user_id"]),
             models.Index(fields=["session_id"]),
             models.Index(fields=["url"]),
+            models.Index(fields=["source"]),
+            models.Index(fields=["medium"]),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -54,6 +63,9 @@ class Pageview(models.Model):
         title: str | None = None,
         referrer: str | None = None,
         timestamp: datetime | None = None,
+        source: str | None = None,
+        medium: str | None = None,
+        campaign: str | None = None,
     ) -> Pageview | None:
         """Create a pageview from a request object.
 
@@ -63,6 +75,9 @@ class Pageview(models.Model):
             title: Page title (defaults to empty string)
             referrer: Referring URL (defaults to Referer header)
             timestamp: Page visit time (defaults to current server time)
+            source: Traffic source (auto-extracted from URL if not provided)
+            medium: Traffic medium (auto-extracted from URL if not provided)
+            campaign: Campaign name (auto-extracted from URL if not provided)
 
         Returns:
             Pageview instance or None if user is being impersonated
@@ -81,6 +96,18 @@ class Pageview(models.Model):
 
         if timestamp is None:
             timestamp = timezone.now()
+
+        # Extract tracking parameters if not provided
+        if source is None or medium is None or campaign is None:
+            extracted_source, extracted_medium, extracted_campaign = (
+                extract_tracking_params(url)
+            )
+            if source is None:
+                source = extracted_source
+            if medium is None:
+                medium = extracted_medium
+            if campaign is None:
+                campaign = extracted_campaign
 
         if user := getattr(request, "user", None):
             user_id = user.id
@@ -125,4 +152,7 @@ class Pageview(models.Model):
             title=title,
             referrer=referrer,
             timestamp=timestamp,
+            source=source,
+            medium=medium,
+            campaign=campaign,
         )

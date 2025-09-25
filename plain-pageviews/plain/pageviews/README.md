@@ -4,6 +4,7 @@
 
 - [Overview](#overview)
 - [Server-side tracking](#server-side-tracking)
+- [Attribution tracking](#attribution-tracking)
 - [Admin integration](#admin-integration)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -37,6 +38,48 @@ Server-side tracking differs from client-side tracking in that:
 - The referrer is extracted from the request headers (`HTTP_REFERER`)
 - The URL uses the request's full path
 - Impersonation is automatically detected and ignored
+
+## Attribution tracking
+
+Pageviews automatically tracks traffic sources and campaigns from URL parameters. Three fields are captured:
+
+- **Source**: Where the traffic came from
+- **Medium**: How the traffic arrived
+- **Campaign**: Which campaign generated the traffic
+
+### Supported parameters
+
+**UTM parameters** (standard marketing tracking):
+
+```
+?utm_source=newsletter&utm_medium=email&utm_campaign=welcome_series
+```
+
+**Simple ref parameter** (developer-friendly alternative):
+
+```
+?ref=newsletter
+```
+
+**Auto-detected tracking IDs** (no configuration needed):
+
+- `?gclid=...` → source="google", medium="cpc" (Google Ads)
+- `?fbclid=...` → source="facebook", medium="social" (Facebook/Meta)
+- `?msclkid=...` → source="bing", medium="cpc" (Microsoft/Bing Ads)
+- `?ttclid=...` → source="tiktok", medium="cpc" (TikTok Ads)
+- `?twclid=...` → source="twitter", medium="cpc" (Twitter/X Ads)
+
+### Priority order
+
+Parameters are processed in this order:
+
+1. `utm_source` takes priority over `ref`
+2. Auto-detected tracking IDs (gclid, fbclid, etc.)
+3. All values are normalized to lowercase
+
+### Server-side extraction
+
+Attribution parameters are automatically extracted server-side from the URL when using either tracking method. No client-side changes are needed.
 
 ## Admin integration
 

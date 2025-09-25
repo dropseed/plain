@@ -23,8 +23,8 @@ class PageviewAdmin(AdminViewset):
         nav_section = "Pageviews"
         nav_icon = "eye"
         title = "Pageviews"
-        fields = ["user_id", "url", "timestamp", "session_id"]
-        search_fields = ["id", "user_id", "url", "session_id"]
+        fields = ["user_id", "url", "source", "timestamp", "session_id"]
+        search_fields = ["id", "user_id", "url", "session_id", "source", "medium"]
         cards = [PageviewsTrendCard]
 
     class DetailView(AdminModelDetailView):
