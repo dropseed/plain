@@ -1,5 +1,16 @@
 # plain-sessions changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-sessions@0.30.0) (2025-09-25)
+
+### What's changed
+
+- Preflight checks have been migrated to use the new class-based `PreflightCheck` API with unified `fix` messages instead of separate `msg` and `hint` fields ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461), [c7cde12](https://github.com/dropseed/plain/commit/c7cde12149))
+- Preflight check IDs have been renamed to use descriptive names instead of numbered codes (e.g., `security.W010` → `security.session_cookie_not_secure_app`) ([cd96c97](https://github.com/dropseed/plain/commit/cd96c97b25))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-sessions@0.29.0) (2025-09-12)
 
 ### What's changed
