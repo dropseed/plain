@@ -1,5 +1,15 @@
 # plain-worker changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-worker@0.31.0) (2025-09-25)
+
+### What's changed
+
+- The jobs autodiscovery now includes `app.jobs` modules in addition to package jobs modules ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-worker@0.30.0) (2025-09-19)
 
 ### What's changed
