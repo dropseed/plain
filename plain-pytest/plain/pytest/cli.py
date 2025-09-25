@@ -19,7 +19,9 @@ def cli(pytest_args):
     """Run pytest with .env.test loaded"""
 
     if os.path.exists(".env.test"):
-        click.secho("Loading environment variables from .env.test", fg="yellow")
+        click.secho(
+            "Loading environment variables from .env.test...", dim=True, italic=True
+        )
         # plain.dev may load .env files first, so make sure we override any existing variables
         load_dotenv(".env.test", override=True)
 
