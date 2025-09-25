@@ -38,7 +38,7 @@ class CheckURLMixin:
                 "slash as it is unnecessary. If this pattern is targeted in an "
                 "include(), ensure the include() pattern has a trailing '/'.",
                 warning=True,
-                id="urls.W002",
+                id="urls.pattern_starts_with_slash",
             )
             return [warning]
         else:
@@ -85,7 +85,7 @@ class RegexPattern(CheckURLMixin):
                     "Remove the dollar from the route to avoid problems including "
                     "URLs.",
                     warning=True,
-                    id="urls.W001",
+                    id="urls.include_pattern_ends_with_dollar",
                 )
             ]
         else:
@@ -186,7 +186,7 @@ class RoutePattern(CheckURLMixin):
                     "with a '^', or ends with a '$'. This was likely an oversight "
                     "when migrating to plain.urls.path().",
                     warning=True,
-                    id="2_0.W001",
+                    id="urls.path_migration_warning",
                 )
             )
         return warnings
@@ -221,7 +221,7 @@ class URLPattern:
                 f"Your URL pattern {self.pattern.describe()} has a name including a ':'. Remove the colon, to "
                 "avoid ambiguous namespace references.",
                 warning=True,
-                id="urls.W003",
+                id="urls.pattern_name_contains_colon",
             )
             return [warning]
         else:

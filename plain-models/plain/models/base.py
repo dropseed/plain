@@ -1027,7 +1027,7 @@ class Model(metaclass=ModelBase):
                     f"{db_connection.display_name} does not support comments on "
                     f"tables (db_table_comment).",
                     obj=cls,
-                    id="models.W046",
+                    id="models.db_table_comment_unsupported",
                     warning=True,
                 )
             )
@@ -1071,7 +1071,7 @@ class Model(metaclass=ModelBase):
                         "The model has two identical many-to-many relations "
                         f"through the intermediate model '{f.remote_field.through._meta.label}'.",
                         obj=cls,
-                        id="models.E003",
+                        id="models.duplicate_many_to_many_relations",
                     )
                 )
             else:
@@ -1088,7 +1088,7 @@ class Model(metaclass=ModelBase):
                 PreflightResult(
                     "'id' is a reserved word that cannot be used as a field name.",
                     obj=cls,
-                    id="models.E004",
+                    id="models.reserved_field_name_id",
                 )
             ]
         return []
@@ -1114,7 +1114,7 @@ class Model(metaclass=ModelBase):
                         f"The field '{f.name}' clashes with the field '{clash.name}' "
                         f"from model '{clash.model._meta}'.",
                         obj=f,
-                        id="models.E006",
+                        id="models.field_name_clash",
                     )
                 )
             used_fields[f.name] = f
@@ -1139,7 +1139,7 @@ class Model(metaclass=ModelBase):
                         "another field.",
                         hint="Specify a 'db_column' for the field.",
                         obj=cls,
-                        id="models.E007",
+                        id="models.db_column_clash",
                     )
                 )
             else:
@@ -1157,7 +1157,7 @@ class Model(metaclass=ModelBase):
                     f"The model name '{model_name}' cannot start or end with an underscore "
                     "as it collides with the query lookup syntax.",
                     obj=cls,
-                    id="models.E023",
+                    id="models.model_name_underscore_bounds",
                 )
             )
         elif LOOKUP_SEP in model_name:
@@ -1166,7 +1166,7 @@ class Model(metaclass=ModelBase):
                     f"The model name '{model_name}' cannot contain double underscores as "
                     "it collides with the query lookup syntax.",
                     obj=cls,
-                    id="models.E024",
+                    id="models.model_name_double_underscore",
                 )
             )
         return errors
@@ -1187,7 +1187,7 @@ class Model(metaclass=ModelBase):
                         f"The property '{accessor}' clashes with a related field "
                         "accessor.",
                         obj=cls,
-                        id="models.E025",
+                        id="models.property_related_field_clash",
                     )
                 )
         return errors
@@ -1201,7 +1201,7 @@ class Model(metaclass=ModelBase):
                     "The model cannot have more than one field with "
                     "'primary_key=True'.",
                     obj=cls,
-                    id="models.E026",
+                    id="models.multiple_primary_keys",
                 )
             )
         return errors
@@ -1220,7 +1220,7 @@ class Model(metaclass=ModelBase):
                         f"The index name '{index.name}' cannot start with an underscore "
                         "or a number.",
                         obj=cls,
-                        id="models.E033",
+                        id="models.index_name_invalid_start",
                     ),
                 )
             if len(index.name) > index.max_name_length:
@@ -1229,7 +1229,7 @@ class Model(metaclass=ModelBase):
                         "The index name '%s' cannot be longer than %d "  # noqa: UP031
                         "characters." % (index.name, index.max_name_length),
                         obj=cls,
-                        id="models.E034",
+                        id="models.index_name_too_long",
                     ),
                 )
             if index.contains_expressions:
@@ -1250,7 +1250,7 @@ class Model(metaclass=ModelBase):
                     ),
                     warning=True,
                     obj=cls,
-                    id="models.W037",
+                    id="models.index_conditions_ignored",
                 )
             )
         if not (
@@ -1266,7 +1266,7 @@ class Model(metaclass=ModelBase):
                     ),
                     warning=True,
                     obj=cls,
-                    id="models.W040",
+                    id="models.index_non_key_columns_ignored",
                 )
             )
         if not (
@@ -1282,7 +1282,7 @@ class Model(metaclass=ModelBase):
                     ),
                     warning=True,
                     obj=cls,
-                    id="models.W043",
+                    id="models.index_on_foreign_key",
                 )
             )
         fields = [
@@ -1314,7 +1314,7 @@ class Model(metaclass=ModelBase):
                     PreflightResult(
                         f"'{option}' refers to the nonexistent field '{field_name}'.",
                         obj=cls,
-                        id="models.E012",
+                        id="models.nonexistent_field_reference",
                     )
                 )
             else:
@@ -1324,7 +1324,7 @@ class Model(metaclass=ModelBase):
                             f"'{option}' refers to a ManyToManyField '{field_name}', but "
                             f"ManyToManyFields are not permitted in '{option}'.",
                             obj=cls,
-                            id="models.E013",
+                            id="models.m2m_field_in_meta_option",
                         )
                     )
                 elif field not in cls._meta.local_fields:
@@ -1334,7 +1334,7 @@ class Model(metaclass=ModelBase):
                             f"'{cls._meta.object_name}'.",
                             hint="This issue may be caused by multi-table inheritance.",
                             obj=cls,
-                            id="models.E016",
+                            id="models.non_local_field_reference",
                         )
                     )
         return errors
@@ -1355,7 +1355,7 @@ class Model(metaclass=ModelBase):
                     "'ordering' must be a tuple or list (even if you want to order by "
                     "only one field).",
                     obj=cls,
-                    id="models.E014",
+                    id="models.ordering_not_tuple_or_list",
                 )
             ]
 
@@ -1398,7 +1398,7 @@ class Model(metaclass=ModelBase):
                                 "'ordering' refers to the nonexistent field, "
                                 f"related field, or lookup '{field}'.",
                                 obj=cls,
-                                id="models.E015",
+                                id="models.ordering_nonexistent_field",
                             )
                         )
 
@@ -1425,7 +1425,7 @@ class Model(metaclass=ModelBase):
                     "'ordering' refers to the nonexistent field, related "
                     f"field, or lookup '{invalid_field}'.",
                     obj=cls,
-                    id="models.E015",
+                    id="models.ordering_nonexistent_field",
                 )
             )
         return errors
@@ -1462,7 +1462,7 @@ class Model(metaclass=ModelBase):
                         f'Maximum length is "{allowed_len}" for the database.',
                         hint="Set the column name manually using 'db_column'.",
                         obj=cls,
-                        id="models.E018",
+                        id="models.autogenerated_column_name_too_long",
                     )
                 )
 
@@ -1489,7 +1489,7 @@ class Model(metaclass=ModelBase):
                                 "M2M and then set column_name using 'db_column'."
                             ),
                             obj=cls,
-                            id="models.E019",
+                            id="models.m2m_column_name_too_long",
                         )
                     )
 
@@ -1529,7 +1529,7 @@ class Model(metaclass=ModelBase):
                         "warning if you don't care about it."
                     ),
                     obj=cls,
-                    id="models.W027",
+                    id="models.constraint_on_non_db_field",
                     warning=True,
                 )
             )
@@ -1551,7 +1551,7 @@ class Model(metaclass=ModelBase):
                         "warning if you don't care about it."
                     ),
                     obj=cls,
-                    id="models.W036",
+                    id="models.constraint_on_virtual_field",
                     warning=True,
                 )
             )
@@ -1573,7 +1573,7 @@ class Model(metaclass=ModelBase):
                         "warning if you don't care about it."
                     ),
                     obj=cls,
-                    id="models.W038",
+                    id="models.constraint_on_foreign_key",
                     warning=True,
                 )
             )
@@ -1594,7 +1594,7 @@ class Model(metaclass=ModelBase):
                         "warning if you don't care about it."
                     ),
                     obj=cls,
-                    id="models.W039",
+                    id="models.constraint_on_m2m_field",
                     warning=True,
                 )
             )
@@ -1615,7 +1615,7 @@ class Model(metaclass=ModelBase):
                         "warning if you don't care about it."
                     ),
                     obj=cls,
-                    id="models.W044",
+                    id="models.constraint_on_self_referencing_fk",
                     warning=True,
                 )
             )
@@ -1662,7 +1662,7 @@ class Model(metaclass=ModelBase):
                                 ),
                                 warning=True,
                                 obj=cls,
-                                id="models.W045",
+                                id="models.constraint_name_collision_autogenerated",
                             ),
                         )
         for field_name, *lookups in references:
@@ -1688,7 +1688,7 @@ class Model(metaclass=ModelBase):
                     PreflightResult(
                         f"'constraints' refers to the joined field '{LOOKUP_SEP.join([field_name] + lookups)}'.",
                         obj=cls,
-                        id="models.E041",
+                        id="models.constraint_refers_to_joined_field",
                     )
                 )
         errors.extend(cls._check_local_fields(fields, "constraints"))

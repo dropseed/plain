@@ -40,7 +40,7 @@ class CheckSessionCookieSecure(PreflightCheck):
                         "You have 'plain.sessions' in your INSTALLED_PACKAGES, "
                         "but you have not set SESSION_COOKIE_SECURE to True."
                     ),
-                    id="security.W010",
+                    id="security.session_cookie_not_secure_app",
                     warning=True,
                 )
             )
@@ -52,7 +52,7 @@ class CheckSessionCookieSecure(PreflightCheck):
                         "in your MIDDLEWARE, but you have not set "
                         "SESSION_COOKIE_SECURE to True."
                     ),
-                    id="security.W011",
+                    id="security.session_cookie_not_secure_middleware",
                     warning=True,
                 )
             )
@@ -62,7 +62,7 @@ class CheckSessionCookieSecure(PreflightCheck):
                     add_session_cookie_message(
                         "SESSION_COOKIE_SECURE is not set to True."
                     ),
-                    id="security.W012",
+                    id="security.session_cookie_not_secure",
                     warning=True,
                 )
             ]
@@ -85,7 +85,7 @@ class CheckSessionCookieHttpOnly(PreflightCheck):
                         "You have 'plain.sessions' in your INSTALLED_PACKAGES, "
                         "but you have not set SESSION_COOKIE_HTTPONLY to True.",
                     ),
-                    id="security.W013",
+                    id="security.session_cookie_not_httponly_app",
                     warning=True,
                 )
             )
@@ -97,7 +97,7 @@ class CheckSessionCookieHttpOnly(PreflightCheck):
                         "in your MIDDLEWARE, but you have not set "
                         "SESSION_COOKIE_HTTPONLY to True."
                     ),
-                    id="security.W014",
+                    id="security.session_cookie_not_httponly_middleware",
                     warning=True,
                 )
             )
@@ -105,7 +105,7 @@ class CheckSessionCookieHttpOnly(PreflightCheck):
             warnings = [
                 PreflightResult(
                     add_httponly_message("SESSION_COOKIE_HTTPONLY is not set to True."),
-                    id="security.W015",
+                    id="security.session_cookie_not_httponly",
                     warning=True,
                 )
             ]

@@ -234,7 +234,7 @@ class Field(RegisterLookupMixin):
                 PreflightResult(
                     "Field names must not end with an underscore.",
                     obj=self,
-                    id="fields.E001",
+                    id="fields.name_ends_with_underscore",
                 )
             ]
         elif LOOKUP_SEP in self.name:
@@ -242,7 +242,7 @@ class Field(RegisterLookupMixin):
                 PreflightResult(
                     f'Field names must not contain "{LOOKUP_SEP}".',
                     obj=self,
-                    id="fields.E002",
+                    id="fields.name_contains_lookup_separator",
                 )
             ]
         elif self.name == "id":
@@ -250,7 +250,7 @@ class Field(RegisterLookupMixin):
                 PreflightResult(
                     "'id' is a reserved word that cannot be used as a field name.",
                     obj=self,
-                    id="fields.E003",
+                    id="fields.reserved_field_name_id",
                 )
             ]
         else:
@@ -269,7 +269,7 @@ class Field(RegisterLookupMixin):
                 PreflightResult(
                     "'choices' must be an iterable (e.g., a list or tuple).",
                     obj=self,
-                    id="fields.E004",
+                    id="fields.choices_not_iterable",
                 )
             ]
 
@@ -318,7 +318,7 @@ class Field(RegisterLookupMixin):
                         "'max_length' is too small to fit the longest value "  # noqa: UP031
                         "in 'choices' (%d characters)." % choice_max_length,
                         obj=self,
-                        id="fields.E009",
+                        id="fields.max_length_too_small_for_choices",
                     ),
                 ]
             return []
@@ -328,7 +328,7 @@ class Field(RegisterLookupMixin):
                 "'choices' must be an iterable containing "
                 "(actual value, human readable name) tuples.",
                 obj=self,
-                id="fields.E005",
+                id="fields.choices_invalid_format",
             )
         ]
 
@@ -345,7 +345,7 @@ class Field(RegisterLookupMixin):
                     f"{db_connection.display_name} does not support comments on "
                     f"columns (db_comment).",
                     obj=self,
-                    id="fields.W163",
+                    id="fields.db_comment_unsupported",
                     warning=True,
                 )
             )
@@ -364,7 +364,7 @@ class Field(RegisterLookupMixin):
                         "remove primary_key=True argument."
                     ),
                     obj=self,
-                    id="fields.E007",
+                    id="fields.primary_key_allows_null",
                 )
             ]
         else:
@@ -387,7 +387,7 @@ class Field(RegisterLookupMixin):
                             "instance of a validator class."
                         ),
                         obj=self,
-                        id="fields.E008",
+                        id="fields.invalid_validator",
                     )
                 )
         return errors
@@ -971,7 +971,7 @@ class CharField(Field):
                 PreflightResult(
                     "CharFields must define a 'max_length' attribute.",
                     obj=self,
-                    id="fields.E120",
+                    id="fields.charfield_missing_max_length",
                 )
             ]
         elif (
@@ -983,7 +983,7 @@ class CharField(Field):
                 PreflightResult(
                     "'max_length' must be a positive integer.",
                     obj=self,
-                    id="fields.E121",
+                    id="fields.charfield_invalid_max_length",
                 )
             ]
         else:
@@ -1002,7 +1002,7 @@ class CharField(Field):
                     f"{db_connection.display_name} does not support a database collation on "
                     "CharFields.",
                     obj=self,
-                    id="fields.E190",
+                    id="fields.db_collation_unsupported",
                 ),
             )
         return errors
@@ -1073,7 +1073,7 @@ class DateTimeCheckMixin:
                     "are mutually exclusive. Only one of these options "
                     "may be present.",
                     obj=self,
-                    id="fields.E160",
+                    id="fields.datetime_auto_options_mutually_exclusive",
                 )
             ]
         else:
@@ -1113,7 +1113,7 @@ class DateTimeCheckMixin:
                         "as default, use `plain.utils.timezone.now`"
                     ),
                     obj=self,
-                    id="fields.W161",
+                    id="fields.datetime_naive_default_value",
                     warning=True,
                 )
             ]
@@ -1397,7 +1397,7 @@ class DecimalField(Field):
                 PreflightResult(
                     "DecimalFields must define a 'decimal_places' attribute.",
                     obj=self,
-                    id="fields.E130",
+                    id="fields.decimalfield_missing_decimal_places",
                 )
             ]
         except ValueError:
@@ -1405,7 +1405,7 @@ class DecimalField(Field):
                 PreflightResult(
                     "'decimal_places' must be a non-negative integer.",
                     obj=self,
-                    id="fields.E131",
+                    id="fields.decimalfield_invalid_decimal_places",
                 )
             ]
         else:
@@ -1421,7 +1421,7 @@ class DecimalField(Field):
                 PreflightResult(
                     "DecimalFields must define a 'max_digits' attribute.",
                     obj=self,
-                    id="fields.E132",
+                    id="fields.decimalfield_missing_max_digits",
                 )
             ]
         except ValueError:
@@ -1429,7 +1429,7 @@ class DecimalField(Field):
                 PreflightResult(
                     "'max_digits' must be a positive integer.",
                     obj=self,
-                    id="fields.E133",
+                    id="fields.decimalfield_invalid_max_digits",
                 )
             ]
         else:
@@ -1441,7 +1441,7 @@ class DecimalField(Field):
                 PreflightResult(
                     "'max_digits' must be greater or equal to 'decimal_places'.",
                     obj=self,
-                    id="fields.E134",
+                    id="fields.decimalfield_decimal_places_exceeds_max_digits",
                 )
             ]
         return []
@@ -1627,7 +1627,7 @@ class IntegerField(Field):
                     f"'max_length' is ignored when used with {self.__class__.__name__}.",
                     hint="Remove 'max_length' from field",
                     obj=self,
-                    id="fields.W122",
+                    id="fields.max_length_ignored",
                     warning=True,
                 )
             ]
@@ -1750,7 +1750,7 @@ class GenericIPAddressField(Field):
                     "GenericIPAddressFields cannot have required=False if allow_null=False, "
                     "as blank values are stored as nulls.",
                     obj=self,
-                    id="fields.E150",
+                    id="fields.generic_ip_field_null_blank_config",
                 )
             ]
         return []
@@ -1872,7 +1872,7 @@ class TextField(Field):
                     f"{db_connection.display_name} does not support a database collation on "
                     "TextFields.",
                     obj=self,
-                    id="fields.E190",
+                    id="fields.db_collation_unsupported",
                 ),
             )
         return errors
@@ -2035,7 +2035,7 @@ class BinaryField(Field):
                     "BinaryField's default cannot be a string. Use bytes "
                     "content instead.",
                     obj=self,
-                    id="fields.E170",
+                    id="fields.filefield_upload_to_not_callable",
                 )
             ]
         return []
@@ -2133,8 +2133,8 @@ class PrimaryKeyField(BigIntegerField):
 
     def preflight(self, **kwargs):
         errors = super().preflight(**kwargs)
-        # Remove the E003 error for 'id' field name since PrimaryKeyField is allowed to use it
-        errors = [e for e in errors if e.id != "fields.E003"]
+        # Remove the reserved_field_name_id error for 'id' field name since PrimaryKeyField is allowed to use it
+        errors = [e for e in errors if e.id != "fields.reserved_field_name_id"]
         return errors
 
     def deconstruct(self):

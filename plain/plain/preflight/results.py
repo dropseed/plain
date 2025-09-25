@@ -3,7 +3,7 @@ from plain.runtime import settings
 
 class PreflightResult:
     def __init__(
-        self, msg: str, *, hint: str = "", obj=None, id: str = "", warning: bool = False
+        self, msg: str, *, id: str, hint: str = "", obj=None, warning: bool = False
     ):
         self.msg = msg
         self.hint = hint

@@ -46,7 +46,7 @@ class CheckFieldDefaultMixin:
                         "`{}`.".format(*self._default_hint)
                     ),
                     obj=self,
-                    id="fields.E010",
+                    id="fields.invalid_choice_mixin_default",
                     warning=True,
                 )
             ]

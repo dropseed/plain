@@ -18,7 +18,7 @@ class CheckSettingFileUploadTempDir(PreflightCheck):
                 PreflightResult(
                     f"The FILE_UPLOAD_TEMP_DIR setting refers to the nonexistent "
                     f"directory '{setting}'.",
-                    id="files.E001",
+                    id="files.upload_temp_dir_nonexistent",
                 )
             ]
         return []

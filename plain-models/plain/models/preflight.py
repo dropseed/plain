@@ -32,7 +32,7 @@ class CheckAllModels(PreflightCheck):
                     PreflightResult(
                         f"The '{model.__name__}.preflight()' class method is currently overridden by {model.preflight!r}.",
                         obj=model,
-                        id="models.E020",
+                        id="models.preflight_method_overridden",
                     )
                 )
             else:
@@ -48,7 +48,7 @@ class CheckAllModels(PreflightCheck):
                     PreflightResult(
                         f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
                         obj=db_table,
-                        id="models.E028",
+                        id="models.duplicate_db_table",
                     )
                 )
         for index_name, model_labels in indexes.items():
@@ -61,7 +61,9 @@ class CheckAllModels(PreflightCheck):
                             "for model" if len(model_labels) == 1 else "among models:",
                             ", ".join(sorted(model_labels)),
                         ),
-                        id="models.E029" if len(model_labels) == 1 else "models.E030",
+                        id="models.index_name_not_unique_single"
+                        if len(model_labels) == 1
+                        else "models.index_name_not_unique_multiple",
                     ),
                 )
         for constraint_name, model_labels in constraints.items():
@@ -74,7 +76,9 @@ class CheckAllModels(PreflightCheck):
                             "for model" if len(model_labels) == 1 else "among models:",
                             ", ".join(sorted(model_labels)),
                         ),
-                        id="models.E031" if len(model_labels) == 1 else "models.E032",
+                        id="models.constraint_name_not_unique_single"
+                        if len(model_labels) == 1
+                        else "models.constraint_name_not_unique_multiple",
                     ),
                 )
         return errors
@@ -136,7 +140,9 @@ def _check_lazy_references(models_registry, packages_registry):
             "model_error": app_model_error(model_key),
         }
         return PreflightResult(
-            error_msg % params, obj=keywords["field"], id="fields.E307"
+            error_msg % params,
+            obj=keywords["field"],
+            id="fields.lazy_reference_not_resolvable",
         )
 
     def default_error(model_key, func, args, keywords):
@@ -148,7 +154,9 @@ def _check_lazy_references(models_registry, packages_registry):
             "model": ".".join(model_key),
             "model_error": app_model_error(model_key),
         }
-        return PreflightResult(error_msg % params, obj=func, id="models.E022")
+        return PreflightResult(
+            error_msg % params, obj=func, id="models.lazy_reference_resolution_failed"
+        )
 
     # Maps common uses of lazy operations to corresponding error functions
     # defined above. If a key maps to None, no error will be produced.
@@ -205,7 +213,7 @@ class CheckDatabaseTables(PreflightCheck):
                         "Make sure you have a backup and delete the tables manually "
                         f"(ex. `{specific_hint}`)."
                     ),
-                    id="plain.models.W001",
+                    id="models.unknown_database_tables",
                     warning=True,
                 )
             )

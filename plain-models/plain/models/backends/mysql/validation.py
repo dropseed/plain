@@ -21,7 +21,7 @@ class DatabaseValidation(BaseDatabaseValidation):
                         "escalating warnings into errors. It is strongly "
                         "recommended you activate it."
                     ),
-                    id="mysql.W002",
+                    id="mysql.strict_mode_not_enabled",
                     warning=True,
                 )
             ]
@@ -45,7 +45,7 @@ class DatabaseValidation(BaseDatabaseValidation):
                     f"{self.connection.display_name} may not allow unique CharFields to have a max_length "
                     "> 255.",
                     obj=field,
-                    id="mysql.W003",
+                    id="mysql.unique_charfield_max_length_too_long",
                     warning=True,
                 )
             )

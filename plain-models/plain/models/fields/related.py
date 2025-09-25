@@ -131,7 +131,7 @@ class RelatedField(FieldCacheMixin, Field):
                     f"The name '{self.remote_field.related_name}' is invalid related_name for field {self.model._meta.object_name}.{self.name}",
                     hint="Related name must be a valid Python identifier.",
                     obj=self,
-                    id="fields.E306",
+                    id="fields.invalid_related_name",
                 )
             ]
         return []
@@ -150,7 +150,7 @@ class RelatedField(FieldCacheMixin, Field):
                         "argument for this field."
                     ),
                     obj=self,
-                    id="fields.E308",
+                    id="fields.related_field_accessor_clash",
                 )
             )
         if LOOKUP_SEP in rel_query_name:
@@ -162,7 +162,7 @@ class RelatedField(FieldCacheMixin, Field):
                         "argument for this field."
                     ),
                     obj=self,
-                    id="fields.E309",
+                    id="fields.related_field_query_name_clash",
                 )
             )
         return errors
@@ -183,7 +183,7 @@ class RelatedField(FieldCacheMixin, Field):
                     f"Field defines a relation with model '{model_name}', which is either "
                     "not installed, or is abstract.",
                     obj=self,
-                    id="fields.E300",
+                    id="fields.related_model_not_installed",
                 )
             ]
         return []
@@ -240,7 +240,7 @@ class RelatedField(FieldCacheMixin, Field):
                             f"argument to the definition for field '{field_name}'."
                         ),
                         obj=self,
-                        id="fields.E302",
+                        id="fields.related_accessor_clash_field",
                     )
                 )
 
@@ -253,7 +253,7 @@ class RelatedField(FieldCacheMixin, Field):
                             f"argument to the definition for field '{field_name}'."
                         ),
                         obj=self,
-                        id="fields.E303",
+                        id="fields.related_accessor_clash_manager",
                     )
                 )
 
@@ -277,7 +277,7 @@ class RelatedField(FieldCacheMixin, Field):
                             f"to the definition for '{field_name}' or '{clash_name}'."
                         ),
                         obj=self,
-                        id="fields.E304",
+                        id="fields.related_name_clash",
                     )
                 )
 
@@ -291,7 +291,7 @@ class RelatedField(FieldCacheMixin, Field):
                             f"to the definition for '{field_name}' or '{clash_name}'."
                         ),
                         obj=self,
-                        id="fields.E305",
+                        id="fields.related_query_name_clash",
                     )
                 )
 
@@ -618,7 +618,7 @@ class ForeignKey(RelatedField):
                         "rule."
                     ),
                     obj=self,
-                    id="fields.E320",
+                    id="fields.foreign_key_null_constraint_violation",
                 )
             ]
         elif on_delete == SET_DEFAULT and not self.has_default():
@@ -627,7 +627,7 @@ class ForeignKey(RelatedField):
                     "Field specifies on_delete=SET_DEFAULT, but has no default value.",
                     hint="Set a default value, or change the on_delete rule.",
                     obj=self,
-                    id="fields.E321",
+                    id="fields.foreign_key_set_default_no_default",
                 )
             ]
         else:
@@ -851,7 +851,7 @@ class ManyToManyField(RelatedField):
                 PreflightResult(
                     "null has no effect on ManyToManyField.",
                     obj=self,
-                    id="fields.W340",
+                    id="fields.m2m_null_has_no_effect",
                     warning=True,
                 )
             )
@@ -861,7 +861,7 @@ class ManyToManyField(RelatedField):
                 PreflightResult(
                     "ManyToManyField does not support validators.",
                     obj=self,
-                    id="fields.W341",
+                    id="fields.m2m_validators_not_supported",
                     warning=True,
                 )
             )
@@ -871,7 +871,7 @@ class ManyToManyField(RelatedField):
                     "related_name has no effect on ManyToManyField "
                     'with a symmetrical relationship, e.g. to "self".',
                     obj=self,
-                    id="fields.W345",
+                    id="fields.m2m_related_name_no_effect_symmetrical",
                     warning=True,
                 )
             )
@@ -880,7 +880,7 @@ class ManyToManyField(RelatedField):
                 PreflightResult(
                     "db_comment has no effect on ManyToManyField.",
                     obj=self,
-                    id="fields.W346",
+                    id="fields.m2m_db_comment_has_no_effect",
                     warning=True,
                 )
             )
@@ -902,7 +902,7 @@ class ManyToManyField(RelatedField):
                     "Field specifies a many-to-many relation through model "
                     f"'{qualified_model_name}', which has not been installed.",
                     obj=self,
-                    id="fields.E331",
+                    id="fields.m2m_through_model_not_installed",
                 )
             )
 
@@ -941,7 +941,7 @@ class ManyToManyField(RelatedField):
                                 "Plain should use."
                             ),
                             obj=self.remote_field.through,
-                            id="fields.E333",
+                            id="fields.m2m_through_model_ambiguous_fks",
                         )
                     )
 
@@ -971,7 +971,7 @@ class ManyToManyField(RelatedField):
                                 f'use ManyToManyField("{RECURSIVE_RELATIONSHIP_CONSTANT}", through="{relationship_model_name}").'
                             ),
                             obj=self,
-                            id="fields.E334",
+                            id="fields.m2m_through_model_invalid_recursive_from",
                         )
                     )
 
@@ -988,7 +988,7 @@ class ManyToManyField(RelatedField):
                                 f'use ManyToManyField("{RECURSIVE_RELATIONSHIP_CONSTANT}", through="{relationship_model_name}").'
                             ),
                             obj=self,
-                            id="fields.E335",
+                            id="fields.m2m_through_model_invalid_recursive_to",
                         )
                     )
 
@@ -998,7 +998,7 @@ class ManyToManyField(RelatedField):
                             "The model is used as an intermediate model by "
                             f"'{self}', but it does not have a foreign key to '{from_model_name}' or '{to_model_name}'.",
                             obj=self.remote_field.through,
-                            id="fields.E336",
+                            id="fields.m2m_through_model_missing_fk",
                         )
                     )
 
@@ -1021,7 +1021,7 @@ class ManyToManyField(RelatedField):
                             "through_fields=('field1', 'field2')"
                         ),
                         obj=self,
-                        id="fields.E337",
+                        id="fields.m2m_through_fields_wrong_length",
                     )
                 )
 
@@ -1074,7 +1074,7 @@ class ManyToManyField(RelatedField):
                                 f"The intermediary model '{qualified_model_name}' has no field '{field_name}'.",
                                 hint=hint,
                                 obj=self,
-                                id="fields.E338",
+                                id="fields.m2m_through_field_not_found",
                             )
                         )
                     else:
@@ -1088,7 +1088,7 @@ class ManyToManyField(RelatedField):
                                     f"'{through._meta.object_name}.{field_name}' is not a foreign key to '{related_model._meta.object_name}'.",
                                     hint=hint,
                                     obj=self,
-                                    id="fields.E339",
+                                    id="fields.m2m_through_field_not_fk_to_model",
                                 )
                             )
 
@@ -1117,8 +1117,7 @@ class ManyToManyField(RelatedField):
                     f"The field's intermediary table '{m2m_db_table}' clashes with the "
                     f"table name of '{clashing_obj}'.",
                     obj=self,
-                    hint=None,
-                    id="fields.E340",
+                    id="fields.m2m_table_name_clash",
                 )
             ]
         return []

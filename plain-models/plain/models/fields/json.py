@@ -62,7 +62,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
                 preflight.PreflightResult(
                     f"{db_connection.display_name} does not support JSONFields.",
                     obj=self.model,
-                    id="fields.E180",
+                    id="fields.json_field_unsupported",
                 )
             )
         return errors

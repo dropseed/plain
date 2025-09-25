@@ -27,7 +27,7 @@ class CheckSecretKey(PreflightCheck):
                     f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS} unique characters. Please generate "
                     f"a long and random value, otherwise many of Plain's security-critical "
                     f"features will be vulnerable to attack.",
-                    id="security.E009",
+                    id="security.secret_key_weak",
                 )
             ]
         return []
@@ -47,7 +47,7 @@ class CheckSecretKeyFallbacks(PreflightCheck):
                         f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS} unique characters. Please generate "
                         f"a long and random value, otherwise many of Plain's security-critical "
                         f"features will be vulnerable to attack.",
-                        id="security.E025",
+                        id="security.secret_key_fallback_weak",
                     )
                 )
         return errors
@@ -62,7 +62,7 @@ class CheckDebug(PreflightCheck):
             return [
                 PreflightResult(
                     "You should not have DEBUG set to True in deployment.",
-                    id="security.E018",
+                    id="security.debug_enabled_in_production",
                 )
             ]
         return []
@@ -77,7 +77,7 @@ class CheckAllowedHosts(PreflightCheck):
             return [
                 PreflightResult(
                     "ALLOWED_HOSTS must not be empty in deployment.",
-                    id="security.E020",
+                    id="security.allowed_hosts_empty",
                 )
             ]
         return []

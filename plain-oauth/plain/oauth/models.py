@@ -180,7 +180,7 @@ class OAuthConnection(models.Model):
                     "The following OAuth providers are in the database but not in the settings: {}".format(
                         ", ".join(keys_in_db - keys_in_settings)
                     ),
-                    id="plain.oauth.E001",
+                    id="oauth.provider_in_db_not_in_settings",
                 )
             )
 
