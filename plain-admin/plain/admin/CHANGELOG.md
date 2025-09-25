@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.44.1](https://github.com/dropseed/plain/releases/plain-admin@0.44.1) (2025-09-25)
+
+### What's changed
+
+- Fixed admin card col-span class detection for Tailwind CSS by using explicit class names instead of dynamic string interpolation ([7a7a394](https://github.com/dropseed/plain/commit/7a7a394e8e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.44.0](https://github.com/dropseed/plain/releases/plain-admin@0.44.0) (2025-09-25)
 
 ### What's changed
