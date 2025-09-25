@@ -28,7 +28,7 @@ class CheckRegistry:
                 "Check for typos or remove outdated check names."
             )
 
-        for name, (check_class, deploy) in self.checks.items():
+        for name, (check_class, deploy) in sorted(self.checks.items()):
             # Skip silenced checks
             if name in silenced_checks:
                 continue
