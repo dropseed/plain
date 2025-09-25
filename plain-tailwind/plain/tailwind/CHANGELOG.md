@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.15.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.15.1) (2025-09-25)
+
+### What's changed
+
+- Improved Tailwind download performance by using larger chunk sizes (8MB) and optimized HTTP connection pooling ([9bf4eca](https://github.com/dropseed/plain/commit/9bf4eca61e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.15.0) (2025-09-19)
 
 ### What's changed
