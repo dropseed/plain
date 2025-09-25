@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.10.1](https://github.com/dropseed/plain/releases/plain-code@0.10.1) (2025-09-25)
+
+### What's changed
+
+- Improved Biome download performance by using larger chunk sizes (1MB instead of 8KB) for faster binary downloads ([9bf4eca](https://github.com/dropseed/plain/commit/9bf4eca))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-code@0.10.0) (2025-09-19)
 
 ### What's changed
