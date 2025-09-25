@@ -1,5 +1,18 @@
 # plain-flags changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-flags@0.24.0) (2025-09-25)
+
+### What's changed
+
+- The `Flag.check()` method has been renamed to `Flag.preflight()` to align with the new preflight system ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+- Preflight results now use the new `PreflightResult` class instead of `Info` ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+- Database connection errors are now handled more gracefully during preflight checks by catching both `ProgrammingError` and `OperationalError` ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+- Preflight result messages and hints have been unified into a single `fix` field ([c7cde12](https://github.com/dropseed/plain/commit/c7cde12149))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-flags@0.23.0) (2025-09-12)
 
 ### What's changed
