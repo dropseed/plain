@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.44.0](https://github.com/dropseed/plain/releases/plain-admin@0.44.0) (2025-09-25)
+
+### What's changed
+
+- Admin module autodiscovery now uses the new `packages_registry.autodiscover_modules()` API for cleaner and more consistent module loading ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.43.0](https://github.com/dropseed/plain/releases/plain-admin@0.43.0) (2025-09-12)
 
 ### What's changed
