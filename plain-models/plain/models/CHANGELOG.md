@@ -1,5 +1,18 @@
 # plain-models changelog
 
+## [0.46.0](https://github.com/dropseed/plain/releases/plain-models@0.46.0) (2025-09-25)
+
+### What's changed
+
+- The preflight system has been completely reworked with a new `PreflightResult` class that unifies messages and hints into a single `fix` field, providing clearer and more actionable error messages ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461), [c7cde12](https://github.com/dropseed/plain/commit/c7cde12149))
+- Preflight check IDs have been renamed to use descriptive names instead of numbers for better clarity (e.g., `models.E003` becomes `models.duplicate_many_to_many_relations`) ([cd96c97](https://github.com/dropseed/plain/commit/cd96c97b25))
+- Removed deprecated field types: `CommaSeparatedIntegerField`, `IPAddressField`, and `NullBooleanField` ([345295dc](https://github.com/dropseed/plain/commit/345295dc8a))
+- Removed `system_check_deprecated_details` and `system_check_removed_details` from fields ([e3a7d2dd](https://github.com/dropseed/plain/commit/e3a7d2dd10))
+
+### Upgrade instructions
+
+- Remove any usage of the deprecated field types `CommaSeparatedIntegerField`, `IPAddressField`, and `NullBooleanField` - use `CharField`, `GenericIPAddressField`, and `BooleanField(null=True)` respectively
+
 ## [0.45.0](https://github.com/dropseed/plain/releases/plain-models@0.45.0) (2025-09-21)
 
 ### What's changed
