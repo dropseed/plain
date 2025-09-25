@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-api@0.15.0) (2025-09-25)
+
+### What's changed
+
+- Removed deprecated field types: `NullBooleanField` from OpenAPI schema generation ([345295d](https://github.com/dropseed/plain/commit/345295dc8a))
+
+### Upgrade instructions
+
+- If you were using `NullBooleanField` in your API forms, replace it with `BooleanField` with `required=False` and/or `allow_null=True` as appropriate
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-api@0.14.0) (2025-09-12)
 
 ### What's changed
