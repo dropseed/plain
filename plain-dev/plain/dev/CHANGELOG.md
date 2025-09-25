@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-dev@0.36.0) (2025-09-25)
+
+### What's changed
+
+- The `plain preflight` command has been updated to use `plain preflight check` with a `--quiet` flag for cleaner output in development workflows ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+- Pre-commit hooks now use the updated preflight check syntax ([b0b610d](https://github.com/dropseed/plain/commit/b0b610d461))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-dev@0.35.0) (2025-09-22)
 
 ### What's changed
