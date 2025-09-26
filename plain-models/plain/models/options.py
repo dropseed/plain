@@ -7,7 +7,6 @@ from plain.exceptions import FieldDoesNotExist
 from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import db_connection
-from plain.models.fields import PrimaryKeyField
 from plain.models.query import QuerySet
 from plain.utils.datastructures import ImmutableList
 
@@ -150,10 +149,6 @@ class Options:
             }
             new_objs.append(obj)
         return new_objs
-
-    def _prepare(self, model):
-        if not any(f.name == "id" for f in self.local_fields):
-            PrimaryKeyField().contribute_to_class(model, "id")
 
     def add_field(self, field, private=False):
         # Insert the given field in the order in which it was created, using

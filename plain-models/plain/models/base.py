@@ -21,7 +21,7 @@ from plain.models.db import (
 )
 from plain.models.deletion import Collector
 from plain.models.expressions import RawSQL, Value
-from plain.models.fields import NOT_PROVIDED
+from plain.models.fields import NOT_PROVIDED, PrimaryKeyField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.options import Options
 from plain.models.query import F, Q, QuerySet
@@ -134,9 +134,6 @@ class ModelBase(type):
 
     def _prepare(cls):
         """Create some methods once self._meta has been populated."""
-        opts = cls._meta
-        opts._prepare(cls)
-
         # Set the name of _meta.indexes. This can't be done in
         # Options.contribute_to_class() because fields haven't been added to
         # the model at that point.
@@ -173,6 +170,9 @@ class Model(metaclass=ModelBase):
     _meta: Options
     DoesNotExist: type[ObjectDoesNotExist]
     MultipleObjectsReturned: type[MultipleObjectsReturned]
+
+    # Every model gets an automatic id field
+    id = PrimaryKeyField()
 
     def __init__(self, *args, **kwargs):
         # Alias some things as locals to avoid repeat global lookups
