@@ -684,10 +684,16 @@ class Model(metaclass=ModelBase):
         collector.collect([self])
         return collector.delete()
 
-    def _get_FIELD_display(self, field):
+    def get_field_display(self, field):
+        """Get the display value for a field, especially useful for fields with choices."""
         value = getattr(self, field.attname)
+
+        # If field has no choices, just return the value as string
+        if not hasattr(field, "flatchoices") or not field.flatchoices:
+            return force_str(value, strings_only=True)
+
+        # For fields with choices, look up the display value
         choices_dict = dict(make_hashable(field.flatchoices))
-        # force_str() to coerce lazy strings.
         return force_str(
             choices_dict.get(make_hashable(value), value), strings_only=True
         )
