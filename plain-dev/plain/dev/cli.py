@@ -19,7 +19,6 @@ class DevGroup(click.Group):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        AliasManager().check_and_prompt()
         self._auto_start_services()
 
     @staticmethod
@@ -121,7 +120,6 @@ class DevGroup(click.Group):
 )
 def cli(ctx, port, hostname, log_level, start, stop):
     """Start local development"""
-
     if ctx.invoked_subcommand:
         return
 
@@ -171,6 +169,9 @@ def cli(ctx, port, hostname, log_level, start, stop):
             fg="green",
         )
         return
+
+    # Check and prompt for alias setup
+    AliasManager().check_and_prompt()
 
     dev.setup(port=port, hostname=hostname, log_level=log_level)
     returncode = dev.run()
