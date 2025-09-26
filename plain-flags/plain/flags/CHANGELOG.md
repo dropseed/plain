@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-flags@0.25.0) (2025-09-26)
+
+### What's changed
+
+- Removed unused `uuid` fields from `Flag` and `FlagResult` models along with their associated unique constraints ([331ce37](https://github.com/dropseed/plain/commit/331ce37992))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-flags@0.24.0) (2025-09-25)
 
 ### What's changed
