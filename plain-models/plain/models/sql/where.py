@@ -5,7 +5,7 @@ Code to manage the creation and SQL rendering of 'where' constraints.
 import operator
 from functools import cached_property, reduce
 
-from plain.exceptions import EmptyResultSet, FullResultSet
+from plain.models.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Case, When
 from plain.models.lookups import Exact
 from plain.utils import tree

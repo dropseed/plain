@@ -4,9 +4,9 @@ import re
 from functools import cached_property, partial
 from itertools import chain
 
-from plain.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, NotSupportedError
+from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import F, OrderBy, RawSQL, Ref, Value
 from plain.models.functions import Cast, Random
 from plain.models.lookups import Lookup

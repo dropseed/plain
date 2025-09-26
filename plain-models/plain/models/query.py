@@ -9,7 +9,6 @@ from functools import cached_property
 from itertools import chain, islice
 
 import plain.runtime
-from plain import exceptions
 from plain.exceptions import ValidationError
 from plain.models import (
     sql,
@@ -21,6 +20,11 @@ from plain.models.db import (
     IntegrityError,
     NotSupportedError,
     db_connection,
+)
+from plain.models.exceptions import (
+    FieldDoesNotExist,
+    FieldError,
+    ObjectDoesNotExist,
 )
 from plain.models.expressions import Case, F, Value, When
 from plain.models.fields import (
@@ -129,9 +133,7 @@ class RawModelIterable(BaseIterable):
             ) = self.queryset.resolve_model_init_order()
             model_cls = self.queryset.model
             if "id" not in model_init_names:
-                raise exceptions.FieldDoesNotExist(
-                    "Raw query must include the primary key"
-                )
+                raise FieldDoesNotExist("Raw query must include the primary key")
             fields = [self.queryset.model_fields.get(c) for c in self.queryset.columns]
             converters = compiler.get_converters(
                 [f.get_col(f.model._meta.db_table) if f else None for f in fields]
@@ -850,12 +852,12 @@ class QuerySet:
         for param in params:
             try:
                 self.model._meta.get_field(param)
-            except exceptions.FieldDoesNotExist:
+            except FieldDoesNotExist:
                 # It's okay to use a model's property if it has a setter.
                 if not (param in property_names and getattr(self.model, param).fset):
                     invalid_params.append(param)
         if invalid_params:
-            raise exceptions.FieldError(
+            raise FieldError(
                 "Invalid field name(s) for model {}: '{}'.".format(
                     self.model._meta.object_name,
                     "', '".join(sorted(invalid_params)),
@@ -982,7 +984,7 @@ class QuerySet:
                 descending = True
             if annotation := query.annotations.get(alias):
                 if getattr(annotation, "contains_aggregate", False):
-                    raise exceptions.FieldError(
+                    raise FieldError(
                         f"Cannot update when ordering by an aggregate: {annotation}"
                     )
                 if descending:
@@ -2039,7 +2041,7 @@ def prefetch_related_objects(model_instances, *related_lookups):
                     else:
                         try:
                             new_obj = getattr(obj, through_attr)
-                        except exceptions.ObjectDoesNotExist:
+                        except ObjectDoesNotExist:
                             continue
                     if new_obj is None:
                         continue
@@ -2174,7 +2176,7 @@ def prefetch_one_level(instances, prefetcher, lookup, level):
         model = instances[0].__class__
         try:
             model._meta.get_field(to_attr)
-        except exceptions.FieldDoesNotExist:
+        except FieldDoesNotExist:
             pass
         else:
             msg = "to_attr={} conflicts with a field on the {} model."

@@ -1,4 +1,4 @@
-from plain.exceptions import FieldError, FullResultSet
+from plain.models.exceptions import FieldError, FullResultSet
 from plain.models.expressions import Col
 from plain.models.sql import compiler
 

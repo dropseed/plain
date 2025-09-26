@@ -3,6 +3,7 @@ from functools import cached_property, partial
 from plain import exceptions
 from plain.models.constants import LOOKUP_SEP
 from plain.models.deletion import SET_DEFAULT, SET_NULL
+from plain.models.exceptions import FieldDoesNotExist, FieldError
 from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
 from plain.preflight import PreflightResult
@@ -407,7 +408,7 @@ class RelatedField(FieldCacheMixin, Field):
         """
         target_fields = self.path_infos[-1].target_fields
         if len(target_fields) > 1:
-            raise exceptions.FieldError(
+            raise FieldError(
                 "The relation has multiple target fields, but only single target field "
                 "was asked for"
             )
@@ -697,7 +698,7 @@ class ForeignKey(RelatedField):
 
         for from_field, to_field in related_fields:
             if to_field and to_field.model != self.remote_field.model:
-                raise exceptions.FieldError(
+                raise FieldError(
                     f"'{self.model._meta.label}.{self.name}' refers to field '{to_field.name}' which is not local to model "
                     f"'{self.remote_field.model._meta.label}'."
                 )
@@ -1072,7 +1073,7 @@ class ManyToManyField(RelatedField):
 
                     try:
                         field = through._meta.get_field(field_name)
-                    except exceptions.FieldDoesNotExist:
+                    except FieldDoesNotExist:
                         errors.append(
                             PreflightResult(
                                 fix=f"The intermediary model '{qualified_model_name}' has no field '{field_name}'. {fix}",

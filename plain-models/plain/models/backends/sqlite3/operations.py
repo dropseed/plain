@@ -4,10 +4,10 @@ import uuid
 from functools import cached_property, lru_cache
 
 from plain import models
-from plain.exceptions import FieldError
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.constants import OnConflict
 from plain.models.db import DatabaseError, NotSupportedError
+from plain.models.exceptions import FieldError
 from plain.models.expressions import Col
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time

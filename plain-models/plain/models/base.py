@@ -2,16 +2,9 @@ import copy
 import inspect
 import warnings
 from itertools import chain
-from typing import Any
 
 import plain.runtime
-from plain.exceptions import (
-    NON_FIELD_ERRORS,
-    FieldDoesNotExist,
-    MultipleObjectsReturned,
-    ObjectDoesNotExist,
-    ValidationError,
-)
+from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.models import models_registry, transaction
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import CheckConstraint, UniqueConstraint
@@ -21,6 +14,11 @@ from plain.models.db import (
     db_connection,
 )
 from plain.models.deletion import Collector
+from plain.models.exceptions import (
+    DoesNotExistDescriptor,
+    FieldDoesNotExist,
+    MultipleObjectsReturnedDescriptor,
+)
 from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED, PrimaryKeyField
 from plain.models.fields.reverse_related import ForeignObjectRel
@@ -41,64 +39,6 @@ class Deferred:
 
 
 DEFERRED = Deferred()
-
-
-class DoesNotExistDescriptor:
-    """Descriptor that creates a unique DoesNotExist exception class per model."""
-
-    def __init__(self) -> None:
-        self._exceptions_by_class: dict[type, type[ObjectDoesNotExist]] = {}
-
-    def __get__(self, instance: Any, owner: type | None) -> type[ObjectDoesNotExist]:
-        if owner is None:
-            return ObjectDoesNotExist  # Return base class as fallback
-
-        # Create a unique exception class for this model if we haven't already
-        if owner not in self._exceptions_by_class:
-            exc_class = type(
-                "DoesNotExist",
-                (ObjectDoesNotExist,),
-                {
-                    "__module__": owner.__module__,
-                    "__qualname__": f"{owner.__qualname__}.DoesNotExist",
-                },
-            )
-            self._exceptions_by_class[owner] = exc_class
-
-        return self._exceptions_by_class[owner]
-
-    def __set__(self, instance: Any, value: Any) -> None:
-        raise AttributeError("Cannot set DoesNotExist")
-
-
-class MultipleObjectsReturnedDescriptor:
-    """Descriptor that creates a unique MultipleObjectsReturned exception class per model."""
-
-    def __init__(self) -> None:
-        self._exceptions_by_class: dict[type, type[MultipleObjectsReturned]] = {}
-
-    def __get__(
-        self, instance: Any, owner: type | None
-    ) -> type[MultipleObjectsReturned]:
-        if owner is None:
-            return MultipleObjectsReturned  # Return base class as fallback
-
-        # Create a unique exception class for this model if we haven't already
-        if owner not in self._exceptions_by_class:
-            exc_class = type(
-                "MultipleObjectsReturned",
-                (MultipleObjectsReturned,),
-                {
-                    "__module__": owner.__module__,
-                    "__qualname__": f"{owner.__qualname__}.MultipleObjectsReturned",
-                },
-            )
-            self._exceptions_by_class[owner] = exc_class
-
-        return self._exceptions_by_class[owner]
-
-    def __set__(self, instance: Any, value: Any) -> None:
-        raise AttributeError("Cannot set MultipleObjectsReturned")
 
 
 class ModelBase(type):

@@ -11,9 +11,9 @@ import inspect
 import logging
 from collections import namedtuple
 
-from plain.exceptions import FieldError
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, db_connection
+from plain.models.exceptions import FieldError
 from plain.utils import tree
 
 logger = logging.getLogger("plain.models")

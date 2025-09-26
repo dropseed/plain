@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
 from plain import models
-from plain.exceptions import FieldError
 from plain.models import Q
+from plain.models.exceptions import FieldError
 from plain.models.fields.related_managers import BaseRelatedManager
 
 from .objects import (

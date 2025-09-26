@@ -2,7 +2,7 @@
 Query subclasses which provide extra functionality beyond simple data retrieval.
 """
 
-from plain.exceptions import FieldError
+from plain.models.exceptions import FieldError
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
 from plain.models.sql.query import Query
 

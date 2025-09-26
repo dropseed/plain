@@ -2,7 +2,7 @@ import itertools
 import math
 from functools import cached_property
 
-from plain.exceptions import EmptyResultSet, FullResultSet
+from plain.models.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Expression, Func, Value
 from plain.models.fields import (
     BooleanField,

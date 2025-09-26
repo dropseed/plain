@@ -17,10 +17,10 @@ from functools import cached_property
 from itertools import chain, count, product
 from string import ascii_uppercase
 
-from plain.exceptions import FieldDoesNotExist, FieldError
 from plain.models.aggregates import Count
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import NotSupportedError, db_connection
+from plain.models.exceptions import FieldDoesNotExist, FieldError
 from plain.models.expressions import (
     BaseExpression,
     Col,

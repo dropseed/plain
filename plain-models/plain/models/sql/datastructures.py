@@ -3,7 +3,7 @@ Useful auxiliary data structures for query construction. Not useful outside
 the SQL domain.
 """
 
-from plain.exceptions import FullResultSet
+from plain.models.exceptions import FullResultSet
 from plain.models.sql.constants import INNER, LOUTER
 
 

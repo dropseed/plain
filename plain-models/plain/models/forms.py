@@ -7,13 +7,13 @@ from itertools import chain
 
 from plain.exceptions import (
     NON_FIELD_ERRORS,
-    FieldError,
     ImproperlyConfigured,
     ValidationError,
 )
 from plain.forms import fields
 from plain.forms.fields import ChoiceField, Field
 from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
+from plain.models.exceptions import FieldError
 
 __all__ = (
     "ModelForm",

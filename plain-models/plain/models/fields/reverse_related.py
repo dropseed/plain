@@ -11,7 +11,7 @@ they're the closest concept currently available.
 
 from functools import cached_property
 
-from plain import exceptions
+from plain.models.exceptions import FieldDoesNotExist, FieldError
 from plain.utils.hashable import make_hashable
 
 from . import BLANK_CHOICE_DASH
@@ -79,9 +79,7 @@ class ForeignObjectRel(FieldCacheMixin):
         """
         target_fields = self.path_infos[-1].target_fields
         if len(target_fields) > 1:
-            raise exceptions.FieldError(
-                "Can't use target_field for multicolumn relations."
-            )
+            raise FieldError("Can't use target_field for multicolumn relations.")
         return target_fields[0]
 
     @cached_property
@@ -274,7 +272,7 @@ class ManyToOneRel(ForeignObjectRel):
         """
         field = self.model._meta.get_field("id")
         if not field.concrete:
-            raise exceptions.FieldDoesNotExist("No related field named 'id'")
+            raise FieldDoesNotExist("No related field named 'id'")
         return field
 
     def set_field_name(self):

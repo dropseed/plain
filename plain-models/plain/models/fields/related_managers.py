@@ -80,7 +80,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
         """
         Filter the queryset for the instance this manager is bound to.
         """
-        from plain.exceptions import FieldError
+        from plain.models.exceptions import FieldError
 
         queryset._defer_next_filter = True
         queryset = queryset.filter(**self.core_filters)

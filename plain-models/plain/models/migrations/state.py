@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from functools import cached_property, partial
 
 from plain import models
-from plain.exceptions import FieldDoesNotExist
+from plain.models.exceptions import FieldDoesNotExist
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from plain.models.migrations.utils import field_is_referenced, get_references

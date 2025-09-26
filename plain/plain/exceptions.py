@@ -6,7 +6,7 @@ import operator
 
 from plain.utils.hashable import make_hashable
 
-# MARK: Configuration and Registry
+# MARK: Configuration and Package Registry
 
 
 class PackageRegistryNotReady(Exception):
@@ -17,33 +17,6 @@ class PackageRegistryNotReady(Exception):
 
 class ImproperlyConfigured(Exception):
     """Plain is somehow improperly configured"""
-
-    pass
-
-
-# MARK: Model and Field Errors
-
-
-class FieldDoesNotExist(Exception):
-    """The requested model field does not exist"""
-
-    pass
-
-
-class FieldError(Exception):
-    """Some kind of problem with a model field."""
-
-    pass
-
-
-class ObjectDoesNotExist(Exception):
-    """The requested object does not exist"""
-
-    pass
-
-
-class MultipleObjectsReturned(Exception):
-    """The query returned multiple objects when only one was expected."""
 
     pass
 
@@ -210,18 +183,3 @@ class ValidationError(Exception):
         if hasattr(self, "error_dict"):
             return hash(make_hashable(self.error_dict))
         return hash(tuple(sorted(self.error_list, key=operator.attrgetter("message"))))
-
-
-# MARK: Database
-
-
-class EmptyResultSet(Exception):
-    """A database query predicate is impossible."""
-
-    pass
-
-
-class FullResultSet(Exception):
-    """A database query predicate is matches everything."""
-
-    pass

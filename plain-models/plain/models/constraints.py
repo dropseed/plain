@@ -1,7 +1,8 @@
 from enum import Enum
 from types import NoneType
 
-from plain.exceptions import FieldError, ValidationError
+from plain.exceptions import ValidationError
+from plain.models.exceptions import FieldError
 from plain.models.expressions import Exists, ExpressionList, F, OrderBy
 from plain.models.indexes import IndexExpression
 from plain.models.lookups import Exact

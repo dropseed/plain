@@ -3,10 +3,10 @@ import inspect
 from collections import defaultdict
 from functools import cached_property
 
-from plain.exceptions import FieldDoesNotExist
 from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import db_connection
+from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet
 from plain.utils.datastructures import ImmutableList
 

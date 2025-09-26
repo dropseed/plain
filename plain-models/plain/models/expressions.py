@@ -8,7 +8,6 @@ from functools import cached_property
 from types import NoneType
 from uuid import UUID
 
-from plain.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models import fields
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import (
@@ -16,6 +15,7 @@ from plain.models.db import (
     NotSupportedError,
     db_connection,
 )
+from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable

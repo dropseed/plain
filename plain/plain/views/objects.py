@@ -1,7 +1,13 @@
 from functools import cached_property
 from typing import Any
 
-from plain.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from plain.exceptions import ImproperlyConfigured
+
+try:
+    from plain.models.exceptions import ObjectDoesNotExist
+except ImportError:
+    ObjectDoesNotExist = None
+
 from plain.forms import Form
 from plain.http import Http404
 
@@ -42,8 +48,12 @@ class ObjectTemplateViewMixin:
     def object(self) -> Any:
         try:
             obj = self.get_object()
-        except ObjectDoesNotExist:
-            raise Http404
+        except Exception as e:
+            # If ObjectDoesNotExist is available and this is that exception, raise 404
+            if ObjectDoesNotExist and isinstance(e, ObjectDoesNotExist):
+                raise Http404
+            # Otherwise, let other exceptions bubble up
+            raise
 
         # Also raise 404 if get_object() returns None
         if not obj:

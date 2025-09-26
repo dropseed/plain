@@ -2,7 +2,7 @@
 Classes to represent the definitions of aggregate functions.
 """
 
-from plain.exceptions import FieldError, FullResultSet
+from plain.models.exceptions import FieldError, FullResultSet
 from plain.models.expressions import Case, Func, Star, Value, When
 from plain.models.fields import IntegerField
 from plain.models.functions.comparison import Coalesce

@@ -1,5 +1,3 @@
-from plain.exceptions import ObjectDoesNotExist
-
 from . import (
     preflight,  # noqa
 )
@@ -78,7 +76,6 @@ from .fields.reverse_related import (  # isort:skip
 
 __all__ = aggregates_all + constraints_all + enums_all + fields_all + indexes_all
 __all__ += [
-    "ObjectDoesNotExist",
     "CASCADE",
     "DO_NOTHING",
     "PROTECT",

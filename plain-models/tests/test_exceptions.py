@@ -3,7 +3,7 @@
 import pytest
 from app.examples.models import Car, DeleteParent
 
-from plain.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
+from plain.models.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 
 
 def test_exception_classes_work_correctly():
