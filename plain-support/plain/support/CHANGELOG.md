@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-support@0.18.0) (2025-09-26)
+
+### What's changed
+
+- Removed unused `uuid` field from `SupportFormEntry` model ([331ce37](https://github.com/dropseed/plain/commit/331ce37992))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-support@0.17.0) (2025-09-12)
 
 ### What's changed
