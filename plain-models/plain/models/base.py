@@ -692,26 +692,6 @@ class Model(metaclass=ModelBase):
             choices_dict.get(make_hashable(value), value), strings_only=True
         )
 
-    def _get_next_or_previous_by_FIELD(self, field, is_next, **kwargs):
-        if not self.id:
-            raise ValueError("get_next/get_previous cannot be used on unsaved objects.")
-        op = "gt" if is_next else "lt"
-        order = "" if is_next else "-"
-        param = getattr(self, field.attname)
-        q = Q.create([(field.name, param), (f"id__{op}", self.id)], connector=Q.AND)
-        q = Q.create([q, (f"{field.name}__{op}", param)], connector=Q.OR)
-        qs = (
-            self.__class__.query.filter(**kwargs)
-            .filter(q)
-            .order_by(f"{order}{field.name}", f"{order}id")
-        )
-        try:
-            return qs[0]
-        except IndexError:
-            raise self.DoesNotExist(
-                f"{self.__class__._meta.object_name} matching query does not exist."
-            )
-
     def _get_field_value_map(self, meta, exclude=None):
         if exclude is None:
             exclude = set()

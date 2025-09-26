@@ -1200,24 +1200,6 @@ class DateField(DateTimeCheckMixin, Field):
         else:
             return super().pre_save(model_instance, add)
 
-    def contribute_to_class(self, cls, name, **kwargs):
-        super().contribute_to_class(cls, name, **kwargs)
-        if not self.allow_null:
-            setattr(
-                cls,
-                f"get_next_by_{self.name}",
-                partialmethod(
-                    cls._get_next_or_previous_by_FIELD, field=self, is_next=True
-                ),
-            )
-            setattr(
-                cls,
-                f"get_previous_by_{self.name}",
-                partialmethod(
-                    cls._get_next_or_previous_by_FIELD, field=self, is_next=False
-                ),
-            )
-
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
         return self.to_python(value)
@@ -1318,9 +1300,6 @@ class DateTimeField(DateField):
             return value
         else:
             return super().pre_save(model_instance, add)
-
-    # contribute_to_class is inherited from DateField, it registers
-    # get_next_by_FOO and get_prev_by_FOO
 
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
@@ -2144,9 +2123,6 @@ class PrimaryKeyField(BigIntegerField):
             value = self.get_prep_value(value)
             value = connection.ops.validate_autopk_value(value)
         return value
-
-    def contribute_to_class(self, cls, name, **kwargs):
-        super().contribute_to_class(cls, name, **kwargs)
 
     def get_internal_type(self):
         return "PrimaryKeyField"
