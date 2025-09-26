@@ -362,6 +362,11 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
+@click.option(
+    "--atomic-batch/--no-atomic-batch",
+    default=None,
+    help="Run migrations in a single transaction (auto-detected by default)",
+)
 def migrate(
     package_label,
     migration_name,
@@ -372,6 +377,7 @@ def migrate(
     prune,
     no_input,
     verbosity,
+    atomic_batch,
 ):
     """Updates database schema. Manages both packages with migrations and those without."""
 
@@ -575,6 +581,65 @@ def migrate(
     # pprint(sql)
 
     if migration_plan:
+        # Determine whether to use atomic batch
+        use_atomic_batch = False
+        if len(migration_plan) > 1:
+            # Check database capabilities
+            can_rollback_ddl = db_connection.features.can_rollback_ddl
+
+            # Check if all migrations support atomic
+            non_atomic_migrations = [m for m in migration_plan if not m.atomic]
+
+            if atomic_batch is True:
+                # User explicitly requested atomic batch
+                if not can_rollback_ddl:
+                    raise click.UsageError(
+                        f"--atomic-batch not supported on {db_connection.vendor}. "
+                        "Remove the flag or use a database that supports transactional DDL."
+                    )
+                if non_atomic_migrations:
+                    names = ", ".join(
+                        f"{m.package_label}.{m.name}" for m in non_atomic_migrations[:3]
+                    )
+                    if len(non_atomic_migrations) > 3:
+                        names += f", and {len(non_atomic_migrations) - 3} more"
+                    raise click.UsageError(
+                        f"--atomic-batch requested but these migrations have atomic=False: {names}"
+                    )
+                use_atomic_batch = True
+                if verbosity >= 1:
+                    click.echo(
+                        f"  Running {len(migration_plan)} migrations in atomic batch (all-or-nothing)"
+                    )
+            elif atomic_batch is False:
+                # User explicitly disabled atomic batch
+                use_atomic_batch = False
+                if verbosity >= 1:
+                    click.echo(f"  Running {len(migration_plan)} migrations separately")
+            else:
+                # Auto-detect (atomic_batch is None)
+                if can_rollback_ddl and not non_atomic_migrations:
+                    use_atomic_batch = True
+                    if verbosity >= 1:
+                        click.echo(
+                            f"  Running {len(migration_plan)} migrations in atomic batch (all-or-nothing)"
+                        )
+                else:
+                    use_atomic_batch = False
+                    if verbosity >= 1:
+                        if not can_rollback_ddl:
+                            click.echo(
+                                f"  Running {len(migration_plan)} migrations separately ({db_connection.vendor} doesn't support batch transactions)"
+                            )
+                        elif non_atomic_migrations:
+                            click.echo(
+                                f"  Running {len(migration_plan)} migrations separately (some migrations have atomic=False)"
+                            )
+                        else:
+                            click.echo(
+                                f"  Running {len(migration_plan)} migrations separately"
+                            )
+
         if backup or (backup is None and settings.DEBUG):
             backup_name = f"migrate_{time.strftime('%Y%m%d_%H%M%S')}"
             click.secho(
@@ -599,6 +664,7 @@ def migrate(
             plan=migration_plan,
             state=pre_migrate_state.clone(),
             fake=fake,
+            atomic_batch=use_atomic_batch,
         )
         # post_migrate signals have access to all models. Ensure that all models
         # are reloaded in case any are delayed.

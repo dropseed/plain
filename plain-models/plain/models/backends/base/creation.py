@@ -59,6 +59,7 @@ class BaseDatabaseCreation:
             prune=False,
             no_input=True,
             verbosity=max(verbosity - 1, 0),
+            atomic_batch=False,  # No need for atomic batch when creating test database
         )
 
         # Ensure a connection for the side effect of initializing the test database.

@@ -1,3 +1,6 @@
+from contextlib import nullcontext
+
+from ..transaction import atomic
 from .loader import MigrationLoader
 from .recorder import MigrationRecorder
 from .state import ProjectState
@@ -52,12 +55,14 @@ class MigrationExecutor:
                     migration.mutate_state(state, preserve=False)
         return state
 
-    def migrate(self, targets, plan=None, state=None, fake=False):
+    def migrate(self, targets, plan=None, state=None, fake=False, atomic_batch=False):
         """
         Migrate the database up to the given targets.
 
         Plain first needs to create all project states before a migration is
         (un)applied and in a second step run all the database operations.
+
+        atomic_batch: Whether to run all migrations in a single transaction.
         """
         # The plain_migrations table must be present to record applied
         # migrations, but don't create it if there are no migrations to apply.
@@ -82,34 +87,43 @@ class MigrationExecutor:
             if state is None:
                 # The resulting state should still include applied migrations.
                 state = self._create_project_state(with_applied_migrations=True)
-            state = self._migrate_all_forwards(state, plan, full_plan, fake=fake)
+            state = self._migrate_all_forwards(
+                state, plan, full_plan, fake=fake, atomic_batch=atomic_batch
+            )
 
         self.check_replacements()
 
         return state
 
-    def _migrate_all_forwards(self, state, plan, full_plan, fake):
+    def _migrate_all_forwards(self, state, plan, full_plan, fake, atomic_batch=False):
         """
         Take a list of 2-tuples of the form (migration instance, False) and
         apply them in the order they occur in the full_plan.
+
+        atomic_batch: Whether to run all migrations in a single transaction.
         """
         migrations_to_run = set(plan)
-        for migration in full_plan:
-            if not migrations_to_run:
-                # We remove every migration that we applied from these sets so
-                # that we can bail out once the last migration has been applied
-                # and don't always run until the very end of the migration
-                # process.
-                break
-            if migration in migrations_to_run:
-                if "models_registry" not in state.__dict__:
-                    if self.progress_callback:
-                        self.progress_callback("render_start")
-                    state.models_registry  # Render all -- performance critical
-                    if self.progress_callback:
-                        self.progress_callback("render_success")
-                state = self.apply_migration(state, migration, fake=fake)
-                migrations_to_run.remove(migration)
+
+        # Choose context manager based on atomic_batch
+        batch_context = atomic if (atomic_batch and len(plan) > 1) else nullcontext
+
+        with batch_context():
+            for migration in full_plan:
+                if not migrations_to_run:
+                    # We remove every migration that we applied from these sets so
+                    # that we can bail out once the last migration has been applied
+                    # and don't always run until the very end of the migration
+                    # process.
+                    break
+                if migration in migrations_to_run:
+                    if "models_registry" not in state.__dict__:
+                        if self.progress_callback:
+                            self.progress_callback("render_start")
+                        state.models_registry  # Render all -- performance critical
+                        if self.progress_callback:
+                            self.progress_callback("render_success")
+                    state = self.apply_migration(state, migration, fake=fake)
+                    migrations_to_run.remove(migration)
 
         return state
 
