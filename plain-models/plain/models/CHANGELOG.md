@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.46.1](https://github.com/dropseed/plain/releases/plain-models@0.46.1) (2025-09-25)
+
+### What's changed
+
+- Fixed `prefetch_related` for reverse foreign key relationships by correctly handling related managers in the prefetch query process ([2c04e80](https://github.com/dropseed/plain/commit/2c04e80dcd))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.46.0](https://github.com/dropseed/plain/releases/plain-models@0.46.0) (2025-09-25)
 
 ### What's changed
