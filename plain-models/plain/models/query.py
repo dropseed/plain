@@ -2204,7 +2204,15 @@ def prefetch_one_level(instances, prefetcher, lookup, level):
                 if leaf and lookup.queryset is not None:
                     qs = queryset._apply_rel_filters(lookup.queryset)
                 else:
-                    qs = queryset.__class__(model=queryset.model)
+                    # Check if queryset is a QuerySet or a related manager
+                    # We need a QuerySet instance to cache the prefetched values
+                    if isinstance(queryset, QuerySet):
+                        # It's already a QuerySet, create a new instance
+                        qs = queryset.__class__(model=queryset.model)
+                    else:
+                        # It's a related manager, get its QuerySet
+                        # The manager's query property returns a properly filtered QuerySet
+                        qs = queryset.query
                 qs._result_cache = vals
                 # We don't want the individual qs doing prefetch_related now,
                 # since we have merged this into the current work.

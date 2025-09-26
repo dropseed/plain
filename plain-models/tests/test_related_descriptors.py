@@ -117,8 +117,87 @@ class TestReverseManyToOneDescriptor:
 class TestPrefetchRelated:
     """Test prefetch_related functionality"""
 
-    # Note: prefetch_related testing requires more complex setup
-    # Core functionality works as demonstrated by basic relationship access
+    def test_prefetch_related_basic(self, db):
+        """Test basic prefetch_related functionality with reverse FK"""
+        # Create test data
+        parent1 = DeleteParent.query.create(name="Parent 1")
+        parent2 = DeleteParent.query.create(name="Parent 2")
+        DeleteParent.query.create(name="Parent 3")
+
+        child1 = ChildCascade.query.create(parent=parent1)
+        child2 = ChildCascade.query.create(parent=parent1)
+        child3 = ChildCascade.query.create(parent=parent2)
+
+        # Test prefetch_related on reverse FK
+        parents = DeleteParent.query.prefetch_related("childcascade_set").all()
+
+        # Should be able to access related objects without additional queries
+        assert len(parents) == 3
+
+        # Check if prefetch cache exists
+        parent1_from_query = next(p for p in parents if p.name == "Parent 1")
+
+        # Check if _prefetched_objects_cache is set
+        assert hasattr(parent1_from_query, "_prefetched_objects_cache"), (
+            "Prefetch cache not set"
+        )
+
+        # If prefetch worked, this should come from cache
+        parent1_children = list(parent1_from_query.childcascade_set.query.all())
+        assert len(parent1_children) == 2
+        assert child1 in parent1_children
+        assert child2 in parent1_children
+
+        parent2_from_query = next(p for p in parents if p.name == "Parent 2")
+        parent2_children = list(parent2_from_query.childcascade_set.query.all())
+        assert len(parent2_children) == 1
+        assert child3 in parent2_children
+
+        parent3_from_query = next(p for p in parents if p.name == "Parent 3")
+        parent3_children = list(parent3_from_query.childcascade_set.query.all())
+        assert len(parent3_children) == 0
+
+    def test_prefetch_related_forward_fk(self, db):
+        """Test prefetch_related functionality with forward FK"""
+        # Create test data
+        parent1 = DeleteParent.query.create(name="Parent 1")
+        parent2 = DeleteParent.query.create(name="Parent 2")
+
+        child1 = ChildCascade.query.create(parent=parent1)
+        child2 = ChildCascade.query.create(parent=parent1)
+        child3 = ChildCascade.query.create(parent=parent2)
+
+        # Test prefetch_related on forward FK
+        children = ChildCascade.query.prefetch_related("parent").all()
+
+        assert len(children) == 3
+
+        # Access related parent objects through prefetched relation
+        for child in children:
+            assert child.parent is not None
+            if child in [child1, child2]:
+                assert child.parent.name == "Parent 1"
+            elif child == child3:
+                assert child.parent.name == "Parent 2"
+
+    def test_prefetch_related_empty_result(self, db):
+        """Test prefetch_related works correctly with empty results"""
+        # Create parent with no children
+        DeleteParent.query.create(name="Lonely Parent")
+
+        parents = DeleteParent.query.prefetch_related("childcascade_set").all()
+        assert len(parents) == 1
+
+        parent_children = list(parents[0].childcascade_set.query.all())
+        assert len(parent_children) == 0
+
+    def test_prefetch_related_nonexistent_relation(self, db):
+        """Test that prefetch_related raises appropriate error for nonexistent relations"""
+        # Create at least one parent so we have something to prefetch on
+        DeleteParent.query.create(name="Test Parent")
+
+        with pytest.raises((AttributeError, ValueError)):
+            list(DeleteParent.query.prefetch_related("nonexistent_relation").all())
 
 
 class TestCustomQuerySetInheritance:
