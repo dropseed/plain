@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.48.0](https://github.com/dropseed/plain/releases/plain-models@0.48.0) (2025-09-26)
+
+### What's changed
+
+- Migrations now run in a single transaction by default for databases that support transactional DDL, providing all-or-nothing migration batches for better safety and consistency ([6d0c105](https://github.com/dropseed/plain/commit/6d0c105fa9))
+- Added `--atomic-batch/--no-atomic-batch` options to `plain migrate` to explicitly control whether migrations are run in a single transaction ([6d0c105](https://github.com/dropseed/plain/commit/6d0c105fa9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.47.0](https://github.com/dropseed/plain/releases/plain-models@0.47.0) (2025-09-25)
 
 ### What's changed
