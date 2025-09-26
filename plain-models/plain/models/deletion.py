@@ -288,7 +288,7 @@ class Collector:
                 # relationships are select_related as interactions between both
                 # features are hard to get right. This should only happen in
                 # the rare cases where .related_objects is overridden anyway.
-                if not sub_objs.query.select_related:
+                if not sub_objs.sql_query.select_related:
                     referenced_fields = set(
                         chain.from_iterable(
                             (rf.attname for rf in rel.field.foreign_related_fields)
