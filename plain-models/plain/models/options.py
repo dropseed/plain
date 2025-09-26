@@ -153,7 +153,7 @@ class Options:
 
     def _prepare(self, model):
         if not any(f.name == "id" for f in self.local_fields):
-            model.add_to_class("id", PrimaryKeyField())
+            PrimaryKeyField().contribute_to_class(model, "id")
 
     def add_field(self, field, private=False):
         # Insert the given field in the order in which it was created, using

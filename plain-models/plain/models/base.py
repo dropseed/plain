@@ -42,11 +42,6 @@ class Deferred:
 DEFERRED = Deferred()
 
 
-def _has_contribute_to_class(value):
-    # Only call contribute_to_class() if it's bound.
-    return not inspect.isclass(value) and hasattr(value, "contribute_to_class")
-
-
 class ModelBase(type):
     """Metaclass for all models."""
 
@@ -79,7 +74,9 @@ class ModelBase(type):
             if attr_name.startswith("_"):
                 continue
 
-            if _has_contribute_to_class(attr_value):
+            if not inspect.isclass(attr_value) and hasattr(
+                attr_value, "contribute_to_class"
+            ):
                 if attr_name not in attrs:
                     # If the field came from an inherited class/mixin,
                     # we need to make a copy of it to avoid altering the
@@ -87,17 +84,11 @@ class ModelBase(type):
                     field = copy.deepcopy(attr_value)
                 else:
                     field = attr_value
-                new_class.add_to_class(attr_name, field)
+                field.contribute_to_class(new_class, attr_name)
 
         new_class._prepare()
 
         return new_class
-
-    def add_to_class(cls, name, value):
-        if _has_contribute_to_class(value):
-            value.contribute_to_class(cls, name)
-        else:
-            setattr(cls, name, value)
 
     def _setup_meta(cls):
         name = cls.__name__
@@ -120,7 +111,7 @@ class ModelBase(type):
             else:
                 package_label = package_config.package_label
 
-        cls.add_to_class("_meta", Options(meta, package_label))
+        Options(meta, package_label).contribute_to_class(cls, "_meta")
 
     def _add_exceptions(cls):
         cls.DoesNotExist = type(
