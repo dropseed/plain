@@ -9,6 +9,7 @@ import click
 from plain.cli import register_cli
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
+from .alias import AliasManager
 from .core import ENTRYPOINT_GROUP, DevProcess
 from .services import ServicesProcess
 
@@ -18,6 +19,7 @@ class DevGroup(click.Group):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        AliasManager().check_and_prompt()
         self._auto_start_services()
 
     @staticmethod
