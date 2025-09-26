@@ -1,12 +1,9 @@
-import uuid
-
 from plain import models
 from plain.runtime import SettingsReference
 
 
 @models.register_model
 class SupportFormEntry(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
     user = models.ForeignKey(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.SET_NULL,
@@ -24,11 +21,6 @@ class SupportFormEntry(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["uuid"], name="plainsupport_supportformentry_unique_uuid"
-            ),
-        ]
         indexes = [
             models.Index(fields=["created_at"]),
         ]

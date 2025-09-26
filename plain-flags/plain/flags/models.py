@@ -1,5 +1,4 @@
 import re
-import uuid
 
 from plain import models
 from plain.exceptions import ValidationError
@@ -18,7 +17,6 @@ def validate_flag_name(value):
 
 @models.register_model
 class FlagResult(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     flag = models.ForeignKey("Flag", on_delete=models.CASCADE)
@@ -30,9 +28,6 @@ class FlagResult(models.Model):
             models.UniqueConstraint(
                 fields=["flag", "key"], name="plainflags_flagresult_unique_key"
             ),
-            models.UniqueConstraint(
-                fields=["uuid"], name="plainflags_flagresult_unique_uuid"
-            ),
         ]
 
     def __str__(self):
@@ -41,7 +36,6 @@ class FlagResult(models.Model):
 
 @models.register_model
 class Flag(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     name = models.CharField(max_length=255, validators=[validate_flag_name])
@@ -60,9 +54,6 @@ class Flag(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["name"], name="plainflags_flag_unique_name"
-            ),
-            models.UniqueConstraint(
-                fields=["uuid"], name="plainflags_flag_unique_uuid"
             ),
         ]
 
