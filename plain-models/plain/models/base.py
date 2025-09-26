@@ -89,11 +89,6 @@ class ModelBase(type):
                     field = attr_value
                 new_class.add_to_class(attr_name, field)
 
-        # Copy indexes so that index names are unique when models extend another class.
-        new_class._meta.indexes = [
-            copy.deepcopy(idx) for idx in new_class._meta.indexes
-        ]
-
         new_class._prepare()
 
         return new_class
