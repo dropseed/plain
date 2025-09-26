@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.47.0](https://github.com/dropseed/plain/releases/plain-models@0.47.0) (2025-09-25)
+
+### What's changed
+
+- The `QuerySet.query` property has been renamed to `QuerySet.sql_query` to better distinguish it from the `Model.query` manager interface ([d250eea](https://github.com/dropseed/plain/commit/d250eeac03))
+
+### Upgrade instructions
+
+- If you directly accessed the `QuerySet.query` property in your code (typically for advanced query manipulation or debugging), rename it to `QuerySet.sql_query`
+
 ## [0.46.1](https://github.com/dropseed/plain/releases/plain-models@0.46.1) (2025-09-25)
 
 ### What's changed
