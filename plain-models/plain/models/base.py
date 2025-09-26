@@ -86,7 +86,12 @@ class ModelBase(type):
                     field = attr_value
                 field.contribute_to_class(new_class, attr_name)
 
-        new_class._prepare()
+        # Set the name of _meta.indexes. This can't be done in
+        # Options.contribute_to_class() because fields haven't been added to
+        # the model at that point.
+        for index in new_class._meta.indexes:
+            if not index.name:
+                index.set_name_with_model(new_class)
 
         return new_class
 
@@ -131,15 +136,6 @@ class ModelBase(type):
                 "__qualname__": f"{cls.__qualname__}.MultipleObjectsReturned",
             },
         )
-
-    def _prepare(cls):
-        """Create some methods once self._meta has been populated."""
-        # Set the name of _meta.indexes. This can't be done in
-        # Options.contribute_to_class() because fields haven't been added to
-        # the model at that point.
-        for index in cls._meta.indexes:
-            if not index.name:
-                index.set_name_with_model(cls)
 
     @property
     def query(cls) -> QuerySet:
