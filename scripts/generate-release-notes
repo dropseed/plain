@@ -8,7 +8,7 @@ The release notes should include two sections.
 
 The first is a \"What's changed\" section that should provide short summaries of changes that an end-user would care about (they likely don't care about internal refactors or changes that don't affect the public API or user experience). Where posssible, include the git commit hash where the change took place.
 
-The second section is the \"Upgrade instructions\". This should also be a bulleted list of anything the user *needs* to do when upgrading from the previous version to this one. The upgrade instructions should be specific and actionable, so that a human or AI could read them and make the changes quickly and easily. If they don't *need* to do anything, then leave one instruction of \"No changes required\".
+The second section is the \"Upgrade instructions\". This should also be a bulleted list of anything the user *needs* to do when upgrading from the previous version to this one. The upgrade instructions should be specific and actionable, so that a human or AI could read them and make the changes quickly and easily. If they don't *need* to do anything, then leave one instruction of \"No changes required\". Note that running \`plain migrate\` is not an upgrade instruction we need to call out, it is assumed.
 
 Example release notes:
 
