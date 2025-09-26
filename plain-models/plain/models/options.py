@@ -150,7 +150,7 @@ class Options:
             new_objs.append(obj)
         return new_objs
 
-    def add_field(self, field, private=False):
+    def add_field(self, field):
         # Insert the given field in the order in which it was created, using
         # the "creation_counter" attribute of the field.
         # Move many-to-many related fields from self.fields into
