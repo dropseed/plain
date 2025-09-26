@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.23.0) (2025-09-26)
+
+### What's changed
+
+- Removed the unused `uuid` field from the `Pageview` model ([c25c3fd](https://github.com/dropseed/plain/commit/c25c3fd816c6dbf14a145a70bc025f328845f5e7))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.22.0) (2025-09-25)
 
 ### What's changed
