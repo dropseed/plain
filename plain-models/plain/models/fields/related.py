@@ -303,8 +303,8 @@ class RelatedField(FieldCacheMixin, Field):
         # columns from another table.
         return None
 
-    def contribute_to_class(self, cls, name, **kwargs):
-        super().contribute_to_class(cls, name, **kwargs)
+    def contribute_to_class(self, cls, name):
+        super().contribute_to_class(cls, name)
 
         self.opts = cls._meta
 
@@ -582,8 +582,8 @@ class ForeignKey(RelatedField):
     def reverse_path_infos(self):
         return self.get_reverse_path_info()
 
-    def contribute_to_class(self, cls, name, **kwargs):
-        super().contribute_to_class(cls, name, **kwargs)
+    def contribute_to_class(self, cls, name):
+        super().contribute_to_class(cls, name)
         setattr(cls, self.name, self.forward_related_accessor_class(self))
 
     def contribute_to_related_class(self, cls, related):
@@ -1237,8 +1237,8 @@ class ManyToManyField(RelatedField):
                     break
         return getattr(self, cache_attr)
 
-    def contribute_to_class(self, cls, name, **kwargs):
-        super().contribute_to_class(cls, name, **kwargs)
+    def contribute_to_class(self, cls, name):
+        super().contribute_to_class(cls, name)
 
         def resolve_through_model(_, model, field):
             field.remote_field.through = model
