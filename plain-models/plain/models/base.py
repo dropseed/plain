@@ -153,13 +153,6 @@ class ModelBase(type):
         opts = cls._meta
         opts._prepare(cls)
 
-        # Give the class a docstring -- its definition.
-        if cls.__doc__ is None:
-            cls.__doc__ = "{}({})".format(
-                cls.__name__,
-                ", ".join(f.name for f in opts.fields),
-            )
-
         # Set the name of _meta.indexes. This can't be done in
         # Options.contribute_to_class() because fields haven't been added to
         # the model at that point.
