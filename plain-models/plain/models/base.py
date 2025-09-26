@@ -2,6 +2,7 @@ import copy
 import inspect
 import warnings
 from itertools import chain
+from typing import Any
 
 import plain.runtime
 from plain.exceptions import (
@@ -42,6 +43,64 @@ class Deferred:
 DEFERRED = Deferred()
 
 
+class DoesNotExistDescriptor:
+    """Descriptor that creates a unique DoesNotExist exception class per model."""
+
+    def __init__(self) -> None:
+        self._exceptions_by_class: dict[type, type[ObjectDoesNotExist]] = {}
+
+    def __get__(self, instance: Any, owner: type | None) -> type[ObjectDoesNotExist]:
+        if owner is None:
+            return ObjectDoesNotExist  # Return base class as fallback
+
+        # Create a unique exception class for this model if we haven't already
+        if owner not in self._exceptions_by_class:
+            exc_class = type(
+                "DoesNotExist",
+                (ObjectDoesNotExist,),
+                {
+                    "__module__": owner.__module__,
+                    "__qualname__": f"{owner.__qualname__}.DoesNotExist",
+                },
+            )
+            self._exceptions_by_class[owner] = exc_class
+
+        return self._exceptions_by_class[owner]
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        raise AttributeError("Cannot set DoesNotExist")
+
+
+class MultipleObjectsReturnedDescriptor:
+    """Descriptor that creates a unique MultipleObjectsReturned exception class per model."""
+
+    def __init__(self) -> None:
+        self._exceptions_by_class: dict[type, type[MultipleObjectsReturned]] = {}
+
+    def __get__(
+        self, instance: Any, owner: type | None
+    ) -> type[MultipleObjectsReturned]:
+        if owner is None:
+            return MultipleObjectsReturned  # Return base class as fallback
+
+        # Create a unique exception class for this model if we haven't already
+        if owner not in self._exceptions_by_class:
+            exc_class = type(
+                "MultipleObjectsReturned",
+                (MultipleObjectsReturned,),
+                {
+                    "__module__": owner.__module__,
+                    "__qualname__": f"{owner.__qualname__}.MultipleObjectsReturned",
+                },
+            )
+            self._exceptions_by_class[owner] = exc_class
+
+        return self._exceptions_by_class[owner]
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        raise AttributeError("Cannot set MultipleObjectsReturned")
+
+
 class ModelBase(type):
     """Metaclass for all models."""
 
@@ -66,7 +125,6 @@ class ModelBase(type):
         new_class = super().__new__(cls, name, bases, attrs, **kwargs)
 
         new_class._setup_meta()
-        new_class._add_exceptions()
 
         # Now go back over all the attrs on this class see if they have a contribute_to_class() method.
         # Attributes with contribute_to_class are fields and meta options.
@@ -118,25 +176,6 @@ class ModelBase(type):
 
         Options(meta, package_label).contribute_to_class(cls, "_meta")
 
-    def _add_exceptions(cls):
-        cls.DoesNotExist = type(
-            "DoesNotExist",
-            (ObjectDoesNotExist,),
-            {
-                "__module__": cls.__module__,
-                "__qualname__": f"{cls.__qualname__}.DoesNotExist",
-            },
-        )
-
-        cls.MultipleObjectsReturned = type(
-            "MultipleObjectsReturned",
-            (MultipleObjectsReturned,),
-            {
-                "__module__": cls.__module__,
-                "__qualname__": f"{cls.__qualname__}.MultipleObjectsReturned",
-            },
-        )
-
     @property
     def query(cls) -> QuerySet:
         """Create a new QuerySet for this model."""
@@ -164,8 +203,10 @@ class ModelState:
 
 class Model(metaclass=ModelBase):
     _meta: Options
-    DoesNotExist: type[ObjectDoesNotExist]
-    MultipleObjectsReturned: type[MultipleObjectsReturned]
+
+    # Use descriptors for exception classes instead of metaclass generation
+    DoesNotExist = DoesNotExistDescriptor()
+    MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 
     # Every model gets an automatic id field
     id = PrimaryKeyField()
