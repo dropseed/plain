@@ -89,8 +89,6 @@ class ModelBase(type):
                     field = attr_value
                 new_class.add_to_class(attr_name, field)
 
-        new_class._meta.concrete_model = new_class
-
         # Copy indexes so that index names are unique when models extend another class.
         new_class._meta.indexes = [
             copy.deepcopy(idx) for idx in new_class._meta.indexes
@@ -320,7 +318,7 @@ class Model(metaclass=ModelBase):
     def __eq__(self, other):
         if not isinstance(other, Model):
             return NotImplemented
-        if self._meta.concrete_model != other._meta.concrete_model:
+        if self.__class__ != other.__class__:
             return False
         my_id = self.id
         if my_id is None:

@@ -940,9 +940,9 @@ class SQLCompiler:
         start_alias = start_alias or self.query.get_initial_alias()
 
         for field in opts.concrete_fields:
-            model = field.model._meta.concrete_model
-            # A proxy model will have a different model and concrete_model. We
-            # will assign None if the field belongs to this model.
+            model = field.model
+            # Since we no longer have proxy models or inheritance,
+            # the field's model should always be the same as opts.model.
             if model == opts.model:
                 model = None
             if select_mask and field not in select_mask:
@@ -1331,9 +1331,9 @@ class SQLCompiler:
             select_fields is filled recursively, so it also contains fields
             from the parent models.
             """
-            concrete_model = klass_info["model"]._meta.concrete_model
+            model = klass_info["model"]
             for select_index in klass_info["select_fields"]:
-                if self.select[select_index][0].target.model == concrete_model:
+                if self.select[select_index][0].target.model == model:
                     return self.select[select_index][0]
 
         def _get_field_choices():

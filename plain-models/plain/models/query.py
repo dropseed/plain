@@ -1034,7 +1034,7 @@ class QuerySet:
                 "Cannot call QuerySet.contains() after .values() or .values_list()."
             )
         try:
-            if obj._meta.concrete_model != self.model._meta.concrete_model:
+            if obj.__class__ != self.model:
                 return False
         except AttributeError:
             raise TypeError("'obj' must be a model instance.")

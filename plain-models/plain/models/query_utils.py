@@ -355,7 +355,7 @@ def check_rel_lookup_compatibility(model, target_opts, field):
     """
 
     def check(opts):
-        return model._meta.concrete_model == opts.concrete_model
+        return model == opts.model
 
     # If the field is a primary key, then doing a query against the field's
     # model is ok, too. Consider the case:

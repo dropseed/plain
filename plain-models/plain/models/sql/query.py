@@ -706,7 +706,7 @@ class Query(BaseExpression):
                 if not field.is_relation:
                     raise FieldError(next(iter(field_mask)))
                 field_select_mask = select_mask.setdefault(field, {})
-                related_model = field.remote_field.model._meta.concrete_model
+                related_model = field.remote_field.model
                 self._get_defer_select_mask(
                     related_model._meta, field_mask, field_select_mask
                 )
@@ -721,7 +721,7 @@ class Query(BaseExpression):
             else:
                 field = opts.get_field(field_name).field
                 field_select_mask = select_mask.setdefault(field, {})
-            related_model = field.model._meta.concrete_model
+            related_model = field.model
             self._get_defer_select_mask(
                 related_model._meta, field_mask, field_select_mask
             )
@@ -738,7 +738,7 @@ class Query(BaseExpression):
             if field_mask:
                 if not field.is_relation:
                     raise FieldError(next(iter(field_mask)))
-                related_model = field.remote_field.model._meta.concrete_model
+                related_model = field.remote_field.model
                 self._get_only_select_mask(
                     related_model._meta, field_mask, field_select_mask
                 )

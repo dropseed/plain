@@ -590,7 +590,7 @@ class ForeignKey(RelatedField):
         # Internal FK's - i.e., those with a related name ending with '+'
         if not self.remote_field.is_hidden():
             setattr(
-                cls._meta.concrete_model,
+                cls,
                 related.get_accessor_name(),
                 self.related_accessor_class(related),
             )
@@ -696,13 +696,10 @@ class ForeignKey(RelatedField):
         related_fields = [(from_field, to_field)]
 
         for from_field, to_field in related_fields:
-            if (
-                to_field
-                and to_field.model != self.remote_field.model._meta.concrete_model
-            ):
+            if to_field and to_field.model != self.remote_field.model:
                 raise exceptions.FieldError(
                     f"'{self.model._meta.label}.{self.name}' refers to field '{to_field.name}' which is not local to model "
-                    f"'{self.remote_field.model._meta.concrete_model._meta.label}'."
+                    f"'{self.remote_field.model._meta.label}'."
                 )
         return related_fields
 
@@ -1109,13 +1106,8 @@ class ManyToManyField(RelatedField):
         }
         m2m_db_table = self.m2m_db_table()
         model = registered_tables.get(m2m_db_table)
-        # The second condition allows multiple m2m relations on a model if
-        # some point to a through model that proxies another through model.
-        if (
-            model
-            and model._meta.concrete_model
-            != self.remote_field.through._meta.concrete_model
-        ):
+        # Check if there's already a m2m field using the same through model.
+        if model and model != self.remote_field.through:
             clashing_obj = model._meta.label
             return [
                 PreflightResult(

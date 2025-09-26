@@ -70,11 +70,6 @@ class Options:
         self.required_db_vendor = None
         self.meta = meta
 
-        # For any non-abstract class, the concrete class is the model
-        # in the end of the proxy_for_model chain. In particular, for
-        # concrete models, the concrete_model is always the class itself.
-        self.concrete_model = None
-
         # List of all lookups defined in ForeignKey 'limit_choices_to' options
         # from *other* models. Needed for some admin checks. Internal use only.
         self.related_fkey_lookups = []
@@ -417,7 +412,7 @@ class Options:
             )
             for f in fields_with_relations:
                 if not isinstance(f.remote_field.model, str):
-                    remote_label = f.remote_field.model._meta.concrete_model._meta.label
+                    remote_label = f.remote_field.model._meta.label
                     related_objects_graph[remote_label].append(f)
 
         for model in all_models:
@@ -426,9 +421,7 @@ class Options:
             # __dict__ takes precedence over a data descriptor (such as
             # @cached_property). This means that the _meta._relation_tree is
             # only called if related_objects is not in __dict__.
-            related_objects = related_objects_graph[
-                model._meta.concrete_model._meta.label
-            ]
+            related_objects = related_objects_graph[model._meta.label]
             model._meta.__dict__["_relation_tree"] = related_objects
         # It seems it is possible that self is not in all_models, so guard
         # against that with default for get().

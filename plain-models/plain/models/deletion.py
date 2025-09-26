@@ -139,9 +139,7 @@ class Collector:
     def add_dependency(self, model, dependency, reverse_dependency=False):
         if reverse_dependency:
             model, dependency = dependency, model
-        self.dependencies[model._meta.concrete_model].add(
-            dependency._meta.concrete_model
-        )
+        self.dependencies[model].add(dependency)
         self.data.setdefault(dependency, self.data.default_factory())
 
     def add_field_update(self, field, value, objs):
@@ -363,10 +361,10 @@ class Collector:
             for model in models:
                 if model in sorted_models:
                     continue
-                dependencies = self.dependencies.get(model._meta.concrete_model)
+                dependencies = self.dependencies.get(model)
                 if not (dependencies and dependencies.difference(concrete_models)):
                     sorted_models.append(model)
-                    concrete_models.add(model._meta.concrete_model)
+                    concrete_models.add(model)
                     found = True
             if not found:
                 return
