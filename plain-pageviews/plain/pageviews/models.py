@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 
 from plain import models
@@ -12,8 +11,6 @@ from .params import extract_tracking_params
 
 @models.register_model
 class Pageview(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
-
     # A full URL can be thousands of characters, but MySQL has a 3072-byte limit
     # on indexed columns (when using the default ``utf8mb4`` character set that
     # stores up to 4 bytes per character). The ``url`` field is indexed below,
@@ -44,11 +41,6 @@ class Pageview(models.Model):
             models.Index(fields=["url"]),
             models.Index(fields=["source"]),
             models.Index(fields=["medium"]),
-        ]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["uuid"], name="plainpageviews_pageview_unique_uuid"
-            ),
         ]
 
     def __str__(self) -> str:
