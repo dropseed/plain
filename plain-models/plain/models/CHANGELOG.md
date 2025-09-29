@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.49.1](https://github.com/dropseed/plain/releases/plain-models@0.49.1) (2025-09-29)
+
+### What's changed
+
+- Fixed `get_field_display()` method to accept field name as string instead of field object ([1c20405](https://github.com/dropseed/plain/commit/1c20405ac3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.49.0](https://github.com/dropseed/plain/releases/plain-models@0.49.0) (2025-09-29)
 
 ### What's changed
