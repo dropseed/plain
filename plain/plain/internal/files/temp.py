@@ -16,10 +16,16 @@ arguments available in tempfile.NamedTemporaryFile.
 2: https://bugs.python.org/issue14243
 """
 
+from __future__ import annotations
+
 import os
 import tempfile
+from typing import TYPE_CHECKING
 
 from plain.internal.files.utils import FileProxyMixin
+
+if TYPE_CHECKING:
+    from typing import Any
 
 __all__ = (
     "NamedTemporaryFile",
@@ -39,7 +45,14 @@ if os.name == "nt":
         'newline' keyword arguments.
         """
 
-        def __init__(self, mode="w+b", bufsize=-1, suffix="", prefix="", dir=None):
+        def __init__(
+            self,
+            mode: str = "w+b",
+            bufsize: int = -1,
+            suffix: str = "",
+            prefix: str = "",
+            dir: str | None = None,
+        ) -> None:
             fd, name = tempfile.mkstemp(suffix=suffix, prefix=prefix, dir=dir)
             self.name = name
             self.file = os.fdopen(fd, mode, bufsize)
@@ -50,7 +63,7 @@ if os.name == "nt":
         # as self.unlink only
         unlink = os.unlink
 
-        def close(self):
+        def close(self) -> None:
             if not self.close_called:
                 self.close_called = True
                 try:
@@ -62,14 +75,19 @@ if os.name == "nt":
                 except OSError:
                     pass
 
-        def __del__(self):
+        def __del__(self) -> None:
             self.close()
 
-        def __enter__(self):
+        def __enter__(self) -> TemporaryFile:
             self.file.__enter__()
             return self
 
-        def __exit__(self, exc, value, tb):
+        def __exit__(
+            self,
+            exc: type[BaseException] | None,
+            value: BaseException | None,
+            tb: Any,
+        ) -> None:
             self.file.__exit__(exc, value, tb)
 
     NamedTemporaryFile = TemporaryFile

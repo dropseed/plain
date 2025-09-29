@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 import types
+from typing import TYPE_CHECKING
 
 from opentelemetry import baggage, trace
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
@@ -11,6 +14,12 @@ from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
 
 from .exception import convert_exception_to_response
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from plain.http import HttpRequest, Response
+    from plain.urls import ResolverMatch
 
 logger = logging.getLogger("plain.request")
 
@@ -34,9 +43,9 @@ tracer = trace.get_tracer("plain")
 
 
 class BaseHandler:
-    _middleware_chain = None
+    _middleware_chain: Callable[[HttpRequest], Response] | None = None
 
-    def load_middleware(self):
+    def load_middleware(self) -> None:
         """
         Populate middleware lists from settings.MIDDLEWARE.
 
@@ -63,7 +72,7 @@ class BaseHandler:
         # as a flag for initialization being complete.
         self._middleware_chain = handler
 
-    def get_response(self, request):
+    def get_response(self, request: HttpRequest) -> Response:
         """Return a Response object for the given HttpRequest."""
 
         span_attributes = {
@@ -115,7 +124,7 @@ class BaseHandler:
                 )
             return response
 
-    def _get_response(self, request):
+    def _get_response(self, request: HttpRequest) -> Response:
         """
         Resolve and call the view, then apply view, exception, and
         template_response middleware. This method is everything that happens
@@ -132,7 +141,7 @@ class BaseHandler:
 
         return response
 
-    def resolve_request(self, request):
+    def resolve_request(self, request: HttpRequest) -> ResolverMatch:
         """
         Retrieve/set the urlrouter for the request. Return the view resolved,
         with its args and kwargs.
@@ -154,7 +163,12 @@ class BaseHandler:
         request.resolver_match = resolver_match
         return resolver_match
 
-    def check_response(self, response, callback, name=None):
+    def check_response(
+        self,
+        response: Response | None,
+        callback: Callable[..., Response],
+        name: str | None = None,
+    ) -> None:
         """
         Raise an error if the view returned None or an uncalled coroutine.
         """

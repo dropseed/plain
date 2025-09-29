@@ -1,14 +1,21 @@
+from __future__ import annotations
+
 import os
 from functools import cached_property
 from io import UnsupportedOperation
+from typing import TYPE_CHECKING
 
 from plain.internal.files.utils import FileProxyMixin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import IO, Any
 
 
 class File(FileProxyMixin):
     DEFAULT_CHUNK_SIZE = 64 * 2**10
 
-    def __init__(self, file, name=None):
+    def __init__(self, file: IO[Any], name: str | None = None) -> None:
         self.file = file
         if name is None:
             name = getattr(file, "name", None)
@@ -16,20 +23,20 @@ class File(FileProxyMixin):
         if hasattr(file, "mode"):
             self.mode = file.mode
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name or ""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<{}: {}>".format(self.__class__.__name__, self or "None")
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return bool(self.name)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.size
 
     @cached_property
-    def size(self):
+    def size(self) -> int:
         if hasattr(self.file, "size"):
             return self.file.size
         if hasattr(self.file, "name"):
@@ -45,7 +52,7 @@ class File(FileProxyMixin):
             return size
         raise AttributeError("Unable to determine the file's size.")
 
-    def chunks(self, chunk_size=None):
+    def chunks(self, chunk_size: int | None = None) -> Iterator[bytes]:
         """
         Read the file and yield chunks of ``chunk_size`` bytes (defaults to
         ``File.DEFAULT_CHUNK_SIZE``).
@@ -62,7 +69,7 @@ class File(FileProxyMixin):
                 break
             yield data
 
-    def multiple_chunks(self, chunk_size=None):
+    def multiple_chunks(self, chunk_size: int | None = None) -> bool:
         """
         Return ``True`` if you can expect multiple chunks.
 
@@ -72,7 +79,7 @@ class File(FileProxyMixin):
         """
         return self.size > (chunk_size or self.DEFAULT_CHUNK_SIZE)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[bytes | str]:
         # Iterate over this file-like object by newlines
         buffer_ = None
         for chunk in self.chunks():
@@ -99,13 +106,18 @@ class File(FileProxyMixin):
         if buffer_ is not None:
             yield buffer_
 
-    def __enter__(self):
+    def __enter__(self) -> File:
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        tb: Any,
+    ) -> None:
         self.close()
 
-    def open(self, mode=None):
+    def open(self, mode: str | None = None) -> File:
         if not self.closed:
             self.seek(0)
         elif self.name and os.path.exists(self.name):
@@ -114,20 +126,24 @@ class File(FileProxyMixin):
             raise ValueError("The file cannot be reopened.")
         return self
 
-    def close(self):
+    def close(self) -> None:
         self.file.close()
 
 
-def endswith_cr(line):
+def endswith_cr(line: str | bytes) -> bool:
     """Return True if line (a text or bytestring) ends with '\r'."""
-    return line.endswith("\r" if isinstance(line, str) else b"\r")
+    if isinstance(line, str):
+        return line.endswith("\r")
+    return line.endswith(b"\r")
 
 
-def endswith_lf(line):
+def endswith_lf(line: str | bytes) -> bool:
     """Return True if line (a text or bytestring) ends with '\n'."""
-    return line.endswith("\n" if isinstance(line, str) else b"\n")
+    if isinstance(line, str):
+        return line.endswith("\n")
+    return line.endswith(b"\n")
 
 
-def equals_lf(line):
+def equals_lf(line: str | bytes) -> bool:
     """Return True if line (a text or bytestring) equals '\n'."""
     return line == ("\n" if isinstance(line, str) else b"\n")

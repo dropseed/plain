@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from plain import signals
 from plain.exceptions import (
@@ -17,8 +20,15 @@ from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views.errors import ErrorView
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-def convert_exception_to_response(get_response):
+    from plain.http import HttpRequest, Response
+
+
+def convert_exception_to_response(
+    get_response: Callable[[HttpRequest], Response],
+) -> Callable[[HttpRequest], Response]:
     """
     Wrap the given get_response callable in exception-to-response conversion.
 
@@ -33,7 +43,7 @@ def convert_exception_to_response(get_response):
     """
 
     @wraps(get_response)
-    def inner(request):
+    def inner(request: HttpRequest) -> Response:
         try:
             response = get_response(request)
         except Exception as exc:
@@ -43,7 +53,7 @@ def convert_exception_to_response(get_response):
     return inner
 
 
-def response_for_exception(request, exc):
+def response_for_exception(request: HttpRequest, exc: Exception) -> Response:
     if isinstance(exc, Http404):
         response = get_exception_response(
             request=request, status_code=404, exception=None
@@ -120,7 +130,9 @@ def response_for_exception(request, exc):
     return response
 
 
-def get_exception_response(*, request, status_code, exception):
+def get_exception_response(
+    *, request: HttpRequest, status_code: int, exception: Exception | None
+) -> Response:
     try:
         view_class = get_error_view(status_code=status_code, exception=exception)
         return view_class(request)
@@ -135,7 +147,9 @@ def get_exception_response(*, request, status_code, exception):
         return ResponseServerError()
 
 
-def get_error_view(*, status_code, exception):
+def get_error_view(
+    *, status_code: int, exception: Exception | None
+) -> Callable[[HttpRequest], Response]:
     views_by_status = settings.HTTP_ERROR_VIEWS
     if status_code in views_by_status:
         view = views_by_status[status_code]

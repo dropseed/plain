@@ -5,6 +5,8 @@ Move a file in the safest way possible::
     >>> file_move_safe("/tmp/old_file", "/tmp/new_file")
 """
 
+from __future__ import annotations
+
 import os
 from shutil import copymode, copystat
 
@@ -13,7 +15,7 @@ from plain.internal.files import locks
 __all__ = ["file_move_safe"]
 
 
-def _samefile(src, dst):
+def _samefile(src: str, dst: str) -> bool:
     # Macintosh, Unix.
     if hasattr(os.path, "samefile"):
         try:
@@ -28,8 +30,11 @@ def _samefile(src, dst):
 
 
 def file_move_safe(
-    old_file_name, new_file_name, chunk_size=1024 * 64, allow_overwrite=False
-):
+    old_file_name: str,
+    new_file_name: str,
+    chunk_size: int = 1024 * 64,
+    allow_overwrite: bool = False,
+) -> None:
     """
     Move a file from one location to another in the safest way possible.
 

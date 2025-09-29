@@ -17,14 +17,22 @@ Example Usage::
     ...     f.write('Plain')
 """
 
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import IO
 
 __all__ = ("LOCK_EX", "LOCK_SH", "LOCK_NB", "lock", "unlock")
 
 
-def _fd(f):
+def _fd(f: IO[bytes] | int) -> int:
     """Get a filedescriptor from something which could be a file or an fd."""
-    return f.fileno() if hasattr(f, "fileno") else f
+    if isinstance(f, int):
+        return f
+    return f.fileno()
 
 
 if os.name == "nt":
@@ -33,7 +41,7 @@ if os.name == "nt":
         POINTER,
         Structure,
         Union,
-        WinDLL,
+        WinDLL,  # type: ignore[attr-defined]
         byref,
         c_int64,
         c_ulong,
@@ -82,14 +90,14 @@ if os.name == "nt":
     UnlockFileEx.restype = BOOL
     UnlockFileEx.argtypes = [HANDLE, DWORD, DWORD, DWORD, LPOVERLAPPED]
 
-    def lock(f, flags):
-        hfile = msvcrt.get_osfhandle(_fd(f))
+    def lock(f: IO[bytes] | int, flags: int) -> bool:
+        hfile = msvcrt.get_osfhandle(_fd(f))  # type: ignore[attr-defined]
         overlapped = OVERLAPPED()
         ret = LockFileEx(hfile, flags, 0, 0, 0xFFFF0000, byref(overlapped))
         return bool(ret)
 
-    def unlock(f):
-        hfile = msvcrt.get_osfhandle(_fd(f))
+    def unlock(f: IO[bytes] | int) -> bool:
+        hfile = msvcrt.get_osfhandle(_fd(f))  # type: ignore[attr-defined]
         overlapped = OVERLAPPED()
         ret = UnlockFileEx(hfile, 0, 0, 0xFFFF0000, byref(overlapped))
         return bool(ret)
@@ -106,23 +114,23 @@ else:
         LOCK_EX = LOCK_SH = LOCK_NB = 0
 
         # Dummy functions that don't do anything.
-        def lock(f, flags):
+        def lock(f: IO[bytes] | int, flags: int) -> bool:
             # File is not locked
             return False
 
-        def unlock(f):
+        def unlock(f: IO[bytes] | int) -> bool:
             # File is unlocked
             return True
 
     else:
 
-        def lock(f, flags):
+        def lock(f: IO[bytes] | int, flags: int) -> bool:
             try:
                 fcntl.flock(_fd(f), flags)
                 return True
             except BlockingIOError:
                 return False
 
-        def unlock(f):
+        def unlock(f: IO[bytes] | int) -> bool:
             fcntl.flock(_fd(f), fcntl.LOCK_UN)
             return True

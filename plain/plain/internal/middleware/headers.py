@@ -1,11 +1,20 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from plain.runtime import settings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from plain.http import HttpRequest, Response
 
 
 class DefaultHeadersMiddleware:
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable[[HttpRequest], Response]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: HttpRequest) -> Response:
         response = self.get_response(request)
 
         for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():

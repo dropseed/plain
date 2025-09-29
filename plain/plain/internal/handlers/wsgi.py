@@ -1,12 +1,19 @@
+from __future__ import annotations
+
 import uuid
 from functools import cached_property
 from io import IOBase
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from plain import signals
 from plain.http import HttpRequest, QueryDict, parse_cookie
 from plain.internal.handlers import base
 from plain.utils.regex_helper import _lazy_re_compile
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+    from typing import Any
 
 _slashes_re = _lazy_re_compile(rb"/+")
 
@@ -19,13 +26,13 @@ class LimitedStream(IOBase):
     See https://github.com/pallets/werkzeug/blob/dbf78f67/src/werkzeug/wsgi.py#L828
     """
 
-    def __init__(self, stream, limit):
+    def __init__(self, stream: Any, limit: int) -> None:
         self._read = stream.read
         self._readline = stream.readline
         self._pos = 0
         self.limit = limit
 
-    def read(self, size=-1, /):
+    def read(self, size: int = -1, /) -> bytes:
         _pos = self._pos
         limit = self.limit
         if _pos >= limit:
@@ -38,7 +45,7 @@ class LimitedStream(IOBase):
         self._pos += len(data)
         return data
 
-    def readline(self, size=-1, /):
+    def readline(self, size: int = -1, /) -> bytes:
         _pos = self._pos
         limit = self.limit
         if _pos >= limit:
@@ -56,7 +63,7 @@ class WSGIRequest(HttpRequest):
     non_picklable_attrs = HttpRequest.non_picklable_attrs | frozenset(["environ"])
     meta_non_picklable_attrs = frozenset(["wsgi.errors", "wsgi.input"])
 
-    def __init__(self, environ):
+    def __init__(self, environ: dict[str, Any]) -> None:
         # A unique ID we can use to trace this request
         self.unique_id = str(uuid.uuid4())
 
@@ -86,32 +93,32 @@ class WSGIRequest(HttpRequest):
         self._read_started = False
         self.resolver_match = None
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
         for attr in self.meta_non_picklable_attrs:
             if attr in state["meta"]:
                 del state["meta"][attr]
         return state
 
-    def _get_scheme(self):
+    def _get_scheme(self) -> str | None:
         return self.environ.get("wsgi.url_scheme")
 
     @cached_property
-    def query_params(self):
+    def query_params(self) -> QueryDict:
         # The WSGI spec says 'QUERY_STRING' may be absent.
         raw_query_string = get_bytes_from_wsgi(self.environ, "QUERY_STRING", "")
         return QueryDict(raw_query_string, encoding=self._encoding)
 
-    def _get_data(self):
+    def _get_data(self) -> QueryDict:
         if not hasattr(self, "_data"):
             self._load_data_and_files()
         return self._data
 
-    def _set_data(self, data):
+    def _set_data(self, data: QueryDict) -> None:
         self._data = data
 
     @cached_property
-    def cookies(self):
+    def cookies(self) -> dict[str, str]:
         raw_cookie = get_str_from_wsgi(self.environ, "HTTP_COOKIE", "")
         return parse_cookie(raw_cookie)
 
@@ -125,11 +132,15 @@ class WSGIRequest(HttpRequest):
 
 
 class WSGIHandler(base.BaseHandler):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.load_middleware()
 
-    def __call__(self, environ, start_response):
+    def __call__(
+        self,
+        environ: dict[str, Any],
+        start_response: Callable[[str, list[tuple[str, str]]], Any],
+    ) -> Iterable[bytes]:
         signals.request_started.send(sender=self.__class__, environ=environ)
         request = WSGIRequest(environ)
         response = self.get_response(request)
@@ -155,11 +166,11 @@ class WSGIHandler(base.BaseHandler):
         return response
 
 
-def get_path_info(environ):
+def get_path_info(environ: dict[str, Any]) -> str:
     """Return the HTTP request's PATH_INFO as a string."""
     path_info = get_bytes_from_wsgi(environ, "PATH_INFO", "/")
 
-    def repercent_broken_unicode(path):
+    def repercent_broken_unicode(path: bytes) -> bytes:
         """
         As per RFC 3987 Section 3.2, step three of converting a URI into an IRI,
         repercent-encode any octet produced that is not part of a strictly legal
@@ -179,7 +190,7 @@ def get_path_info(environ):
     return repercent_broken_unicode(path_info).decode()
 
 
-def get_script_name(environ):
+def get_script_name(environ: dict[str, Any]) -> str:
     """
     Return the equivalent of the HTTP request's SCRIPT_NAME environment
     variable. If Apache mod_rewrite is used, return what would have been
@@ -208,7 +219,7 @@ def get_script_name(environ):
     return script_name.decode()
 
 
-def get_bytes_from_wsgi(environ, key, default):
+def get_bytes_from_wsgi(environ: dict[str, Any], key: str, default: str) -> bytes:
     """
     Get a value from the WSGI environ dictionary as bytes.
 
@@ -221,7 +232,7 @@ def get_bytes_from_wsgi(environ, key, default):
     return value.encode("iso-8859-1")
 
 
-def get_str_from_wsgi(environ, key, default):
+def get_str_from_wsgi(environ: dict[str, Any], key: str, default: str) -> str:
     """
     Get a value from the WSGI environ dictionary as str.
 

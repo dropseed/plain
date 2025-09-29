@@ -2,15 +2,24 @@
 Base file upload handler classes, and the built-in concrete subclasses
 """
 
+from __future__ import annotations
+
 import os
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 from plain.internal.files.uploadedfile import (
     InMemoryUploadedFile,
     TemporaryUploadedFile,
+    UploadedFile,
 )
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from plain.http import HttpRequest
 
 __all__ = [
     "UploadFileException",
@@ -37,7 +46,7 @@ class StopUpload(UploadFileException):
     This exception is raised when an upload must abort.
     """
 
-    def __init__(self, connection_reset=False):
+    def __init__(self, connection_reset: bool = False) -> None:
         """
         If ``connection_reset`` is ``True``, Plain knows will halt the upload
         without consuming the rest of the upload. This will cause the browser to
@@ -45,7 +54,7 @@ class StopUpload(UploadFileException):
         """
         self.connection_reset = connection_reset
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.connection_reset:
             return "StopUpload: Halt current upload."
         else:
@@ -76,7 +85,7 @@ class FileUploadHandler:
 
     chunk_size = 64 * 2**10  # : The default chunk size is 64 KB.
 
-    def __init__(self, request=None):
+    def __init__(self, request: HttpRequest | None = None) -> None:
         self.file_name = None
         self.content_type = None
         self.content_length = None
@@ -85,8 +94,13 @@ class FileUploadHandler:
         self.request = request
 
     def handle_raw_input(
-        self, input_data, meta, content_length, boundary, encoding=None
-    ):
+        self,
+        input_data: Any,
+        meta: dict[str, Any],
+        content_length: int,
+        boundary: bytes,
+        encoding: str | None = None,
+    ) -> None:
         """
         Handle the raw input from the client.
 
@@ -106,13 +120,13 @@ class FileUploadHandler:
 
     def new_file(
         self,
-        field_name,
-        file_name,
-        content_type,
-        content_length,
-        charset=None,
-        content_type_extra=None,
-    ):
+        field_name: str,
+        file_name: str,
+        content_type: str,
+        content_length: int,
+        charset: str | None = None,
+        content_type_extra: dict[str, str] | None = None,
+    ) -> None:
         """
         Signal that a new file has been started.
 
@@ -126,7 +140,7 @@ class FileUploadHandler:
         self.charset = charset
         self.content_type_extra = content_type_extra
 
-    def receive_data_chunk(self, raw_data, start):
+    def receive_data_chunk(self, raw_data: bytes, start: int) -> bytes | None:
         """
         Receive data from the streamed upload parser. ``start`` is the position
         in the file of the chunk.
@@ -135,7 +149,7 @@ class FileUploadHandler:
             "subclasses of FileUploadHandler must provide a receive_data_chunk() method"
         )
 
-    def file_complete(self, file_size):
+    def file_complete(self, file_size: int) -> UploadedFile | None:
         """
         Signal that a file has completed. File size corresponds to the actual
         size accumulated by all the chunks.
@@ -146,14 +160,14 @@ class FileUploadHandler:
             "subclasses of FileUploadHandler must provide a file_complete() method"
         )
 
-    def upload_complete(self):
+    def upload_complete(self) -> None:
         """
         Signal that the upload is complete. Subclasses should perform cleanup
         that is necessary for this handler.
         """
         pass
 
-    def upload_interrupted(self):
+    def upload_interrupted(self) -> None:
         """
         Signal that the upload was interrupted. Subclasses should perform
         cleanup that is necessary for this handler.
@@ -166,7 +180,7 @@ class TemporaryFileUploadHandler(FileUploadHandler):
     Upload handler that streams data into a temporary file.
     """
 
-    def new_file(self, *args, **kwargs):
+    def new_file(self, *args: Any, **kwargs: Any) -> None:
         """
         Create the file object to append to as data is coming in.
         """
@@ -175,15 +189,16 @@ class TemporaryFileUploadHandler(FileUploadHandler):
             self.file_name, self.content_type, 0, self.charset, self.content_type_extra
         )
 
-    def receive_data_chunk(self, raw_data, start):
+    def receive_data_chunk(self, raw_data: bytes, start: int) -> None:
         self.file.write(raw_data)
+        return None
 
-    def file_complete(self, file_size):
+    def file_complete(self, file_size: int) -> TemporaryUploadedFile:
         self.file.seek(0)
         self.file.size = file_size
         return self.file
 
-    def upload_interrupted(self):
+    def upload_interrupted(self) -> None:
         if hasattr(self, "file"):
             temp_location = self.file.temporary_file_path()
             try:
@@ -199,8 +214,13 @@ class MemoryFileUploadHandler(FileUploadHandler):
     """
 
     def handle_raw_input(
-        self, input_data, meta, content_length, boundary, encoding=None
-    ):
+        self,
+        input_data: Any,
+        meta: dict[str, Any],
+        content_length: int,
+        boundary: bytes,
+        encoding: str | None = None,
+    ) -> None:
         """
         Use the content_length to signal whether or not this handler should be
         used.
@@ -209,23 +229,24 @@ class MemoryFileUploadHandler(FileUploadHandler):
         # If the post is too large, we cannot use the Memory handler.
         self.activated = content_length <= settings.FILE_UPLOAD_MAX_MEMORY_SIZE
 
-    def new_file(self, *args, **kwargs):
+    def new_file(self, *args: Any, **kwargs: Any) -> None:
         super().new_file(*args, **kwargs)
         if self.activated:
             self.file = BytesIO()
             raise StopFutureHandlers()
 
-    def receive_data_chunk(self, raw_data, start):
+    def receive_data_chunk(self, raw_data: bytes, start: int) -> bytes | None:
         """Add the data to the BytesIO file."""
         if self.activated:
             self.file.write(raw_data)
+            return None
         else:
             return raw_data
 
-    def file_complete(self, file_size):
+    def file_complete(self, file_size: int) -> InMemoryUploadedFile | None:
         """Return a file object if this handler is activated."""
         if not self.activated:
-            return
+            return None
 
         self.file.seek(0)
         return InMemoryUploadedFile(
@@ -239,7 +260,7 @@ class MemoryFileUploadHandler(FileUploadHandler):
         )
 
 
-def load_handler(path, *args, **kwargs):
+def load_handler(path: str, *args: Any, **kwargs: Any) -> FileUploadHandler:
     """
     Given a path to a handler, return an instance of that handler.
 

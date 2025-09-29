@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import os
 import pathlib
+from typing import TYPE_CHECKING
 
 from plain.exceptions import SuspiciousFileOperation
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import Any
 
-def validate_file_name(name, allow_relative_path=False):
+
+def validate_file_name(name: str, allow_relative_path: bool = False) -> str:
     # Remove potentially dangerous names
     if os.path.basename(name) in {"", ".", ".."}:
         raise SuspiciousFileOperation(f"Could not derive file name from '{name}'")
@@ -53,26 +60,26 @@ class FileProxyMixin:
     def closed(self):
         return not self.file or self.file.closed
 
-    def readable(self):
+    def readable(self) -> bool:
         if self.closed:
             return False
         if hasattr(self.file, "readable"):
             return self.file.readable()
         return True
 
-    def writable(self):
+    def writable(self) -> bool:
         if self.closed:
             return False
         if hasattr(self.file, "writable"):
             return self.file.writable()
         return "w" in getattr(self.file, "mode", "")
 
-    def seekable(self):
+    def seekable(self) -> bool:
         if self.closed:
             return False
         if hasattr(self.file, "seekable"):
             return self.file.seekable()
         return True
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(self.file)
