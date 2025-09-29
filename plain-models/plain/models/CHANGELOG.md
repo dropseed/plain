@@ -1,5 +1,21 @@
 # plain-models changelog
 
+## [0.49.0](https://github.com/dropseed/plain/releases/plain-models@0.49.0) (2025-09-29)
+
+### What's changed
+
+- Model exceptions (`FieldDoesNotExist`, `FieldError`, `ObjectDoesNotExist`, `MultipleObjectsReturned`, `EmptyResultSet`, `FullResultSet`) have been moved from `plain.exceptions` to `plain.models.exceptions` ([1c02564](https://github.com/dropseed/plain/commit/1c02564561))
+- The `get_FOO_display()` methods for fields with choices have been replaced with a single `get_field_display(field_name)` method ([e796e71](https://github.com/dropseed/plain/commit/e796e71e02))
+- The `get_next_by_*` and `get_previous_by_*` methods for date fields have been removed ([3a5b8a8](https://github.com/dropseed/plain/commit/3a5b8a89d1))
+- The `id` primary key field is now defined directly on the Model base class instead of being added dynamically via Options ([e164dc7](https://github.com/dropseed/plain/commit/e164dc7982))
+- Model `DoesNotExist` and `MultipleObjectsReturned` exceptions now use descriptors for better performance ([8f54ea3](https://github.com/dropseed/plain/commit/8f54ea3a62))
+
+### Upgrade instructions
+
+- Update imports for model exceptions from `plain.exceptions` to `plain.models.exceptions` (e.g., `from plain.exceptions import ObjectDoesNotExist` becomes `from plain.models.exceptions import ObjectDoesNotExist`)
+- Replace any usage of `instance.get_FOO_display()` with `instance.get_field_display("FOO")` where FOO is the field name
+- Remove any usage of `get_next_by_*` and `get_previous_by_*` methods - use QuerySet ordering instead (e.g., `Model.query.filter(date__gt=obj.date).order_by("date").first()`)
+
 ## [0.48.0](https://github.com/dropseed/plain/releases/plain-models@0.48.0) (2025-09-26)
 
 ### What's changed
