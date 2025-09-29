@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from plain.auth.views import AuthViewMixin
 from plain.runtime import settings
@@ -13,6 +13,8 @@ from .registry import registry
 from .types import Img
 
 if TYPE_CHECKING:
+    from plain.http import Response
+
     from ..cards import Card
 
 
@@ -42,14 +44,14 @@ class AdminView(AuthViewMixin, TemplateView):
     template_name = "admin/page.html"
     cards: list["Card"] = []
 
-    def get_response(self):
+    def get_response(self) -> "Response":
         response = super().get_response()
         response.headers["Cache-Control"] = (
             "no-cache, no-store, must-revalidate, max-age=0"
         )
         return response
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         context["title"] = self.get_title()
         context["image"] = self.get_image()
@@ -107,15 +109,15 @@ class AdminView(AuthViewMixin, TemplateView):
         )
 
     @classmethod
-    def get_view_url(cls, obj=None) -> str:
+    def get_view_url(cls, obj: Any = None) -> str:
         # Check if this view's path expects an id parameter
         if obj and "<int:id>" in cls.get_path():
             return reverse(f"{URL_NAMESPACE}:" + cls.view_name(), id=obj.id)
         else:
             return reverse(f"{URL_NAMESPACE}:" + cls.view_name())
 
-    def get_links(self) -> dict[str]:
+    def get_links(self) -> dict[str, str]:
         return self.links.copy()
 
-    def get_cards(self):
+    def get_cards(self) -> list["Card"]:
         return self.cards.copy()

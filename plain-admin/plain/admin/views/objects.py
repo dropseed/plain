@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
 from plain.htmx.views import HTMXViewMixin
 from plain.http import Response, ResponseRedirect
@@ -13,6 +14,9 @@ from plain.views import (
 
 from .base import AdminView
 
+if TYPE_CHECKING:
+    from plain.forms import BaseForm
+
 
 class AdminListView(HTMXViewMixin, AdminView):
     template_name = "admin/list.html"
@@ -24,11 +28,11 @@ class AdminListView(HTMXViewMixin, AdminView):
     allow_global_search = False
 
     @cached_property
-    def display(self):
+    def display(self) -> str:
         """Get the current display parameter from the request."""
         return self.request.query_params.get("display", "")
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
         # Make this available to get_displays and stuff
@@ -108,13 +112,13 @@ class AdminListView(HTMXViewMixin, AdminView):
             self.fields.copy()
         )  # Avoid mutating the class attribute if using append etc
 
-    def get_actions(self) -> dict[str]:
+    def get_actions(self) -> list[str]:
         return self.actions.copy()  # Avoid mutating the class attribute itself
 
     def get_displays(self) -> list[str]:
         return self.displays.copy()  # Avoid mutating the class attribute itself
 
-    def get_field_value(self, obj, field: str):
+    def get_field_value(self, obj: Any, field: str) -> Any:
         try:
             # Try basic dict lookup first
             if field in obj:
@@ -136,10 +140,10 @@ class AdminListView(HTMXViewMixin, AdminView):
         else:
             return attr
 
-    def get_object_id(self, obj):
+    def get_object_id(self, obj: Any) -> Any:
         return self.get_field_value(obj, "id")
 
-    def get_field_value_template(self, obj, field: str, value):
+    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
         type_str = type(value).__name__.lower()
         return [
             f"admin/values/{type_str}.html",  # Create a template per-type
@@ -153,16 +157,16 @@ class AdminListView(HTMXViewMixin, AdminView):
     def get_create_url(self) -> str:
         return ""
 
-    def get_detail_url(self, obj) -> str:
+    def get_detail_url(self, obj: Any) -> str:
         return ""
 
-    def get_update_url(self, obj) -> str:
+    def get_update_url(self, obj: Any) -> str:
         return ""
 
-    def get_delete_url(self, obj) -> str:
+    def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_object_url(self, obj) -> str:
+    def get_object_url(self, obj: Any) -> str:
         if url := self.get_detail_url(obj):
             return url
         if url := self.get_update_url(obj):
@@ -171,7 +175,7 @@ class AdminListView(HTMXViewMixin, AdminView):
             return url
         return ""
 
-    def get_object_links(self, obj) -> dict[str]:
+    def get_object_links(self, obj: Any) -> dict[str, str]:
         links = {}
         if self.get_detail_url(obj):
             links["View"] = self.get_detail_url(obj)
@@ -181,7 +185,7 @@ class AdminListView(HTMXViewMixin, AdminView):
             links["Delete"] = self.get_delete_url(obj)
         return links
 
-    def get_links(self):
+    def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
         # Not tied to a specific object
@@ -201,16 +205,16 @@ class AdminCreateView(AdminView, CreateView):
     def get_create_url(self) -> str:
         return ""
 
-    def get_detail_url(self, obj) -> str:
+    def get_detail_url(self, obj: Any) -> str:
         return ""
 
-    def get_update_url(self, obj) -> str:
+    def get_update_url(self, obj: Any) -> str:
         return ""
 
-    def get_delete_url(self, obj) -> str:
+    def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_success_url(self, form):
+    def get_success_url(self, form: "BaseForm") -> str:
         if list_url := self.get_list_url():
             return list_url
 
@@ -222,7 +226,7 @@ class AdminDetailView(AdminView, DetailView):
     nav_section = None
     fields: list[str] = []
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         context["get_field_value"] = self.get_field_value
         context["get_field_value_template"] = self.get_field_value_template
@@ -234,7 +238,7 @@ class AdminDetailView(AdminView, DetailView):
             "admin/detail.html",  # A generic detail view for rendering any object
         ]
 
-    def get_field_value(self, obj, field: str):
+    def get_field_value(self, obj: Any, field: str) -> Any:
         try:
             # Try basic dict lookup first
             if field in obj:
@@ -256,7 +260,7 @@ class AdminDetailView(AdminView, DetailView):
         else:
             return attr
 
-    def get_field_value_template(self, obj, field: str, value):
+    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
         templates = []
 
         # By type name
@@ -281,19 +285,19 @@ class AdminDetailView(AdminView, DetailView):
     def get_create_url(self) -> str:
         return ""
 
-    def get_detail_url(self, obj) -> str:
+    def get_detail_url(self, obj: Any) -> str:
         return ""
 
-    def get_update_url(self, obj) -> str:
+    def get_update_url(self, obj: Any) -> str:
         return ""
 
-    def get_delete_url(self, obj) -> str:
+    def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_fields(self):
+    def get_fields(self) -> list[str]:
         return self.fields.copy()  # Avoid mutating the class attribute itself
 
-    def get_links(self):
+    def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
         if hasattr(self.object, "get_absolute_url"):
@@ -318,16 +322,16 @@ class AdminUpdateView(AdminView, UpdateView):
     def get_create_url(self) -> str:
         return ""
 
-    def get_detail_url(self, obj) -> str:
+    def get_detail_url(self, obj: Any) -> str:
         return ""
 
-    def get_update_url(self, obj) -> str:
+    def get_update_url(self, obj: Any) -> str:
         return ""
 
-    def get_delete_url(self, obj) -> str:
+    def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_links(self):
+    def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
         if hasattr(self.object, "get_absolute_url"):
@@ -341,7 +345,7 @@ class AdminUpdateView(AdminView, UpdateView):
 
         return links
 
-    def get_success_url(self, form):
+    def get_success_url(self, form: "BaseForm") -> str:
         if detail_url := self.get_detail_url(self.object):
             return detail_url
 
@@ -364,16 +368,16 @@ class AdminDeleteView(AdminView, DeleteView):
     def get_create_url(self) -> str:
         return ""
 
-    def get_detail_url(self, obj) -> str:
+    def get_detail_url(self, obj: Any) -> str:
         return ""
 
-    def get_update_url(self, obj) -> str:
+    def get_update_url(self, obj: Any) -> str:
         return ""
 
-    def get_delete_url(self, obj) -> str:
+    def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_links(self):
+    def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
         if hasattr(self.object, "get_absolute_url"):
@@ -387,7 +391,7 @@ class AdminDeleteView(AdminView, DeleteView):
 
         return links
 
-    def get_success_url(self, form):
+    def get_success_url(self, form: "BaseForm") -> str:
         if list_url := self.get_list_url():
             return list_url
 

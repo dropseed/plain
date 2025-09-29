@@ -1,4 +1,9 @@
+from collections.abc import Callable
+from typing import Any, TypeVar
+
 from plain.urls import path, reverse_lazy
+
+T = TypeVar("T")
 
 
 class NavSection:
@@ -6,15 +11,15 @@ class NavSection:
         self.name = name
         self.icon = icon
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, NavSection):
             return self.name == other.name
         return self.name == other
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
 
@@ -23,8 +28,10 @@ class AdminViewRegistry:
         # View classes that will be added to the admin automatically
         self.registered_views = set()
 
-    def register_view(self, view=None):
-        def inner(view):
+    def register_view(
+        self, view: type[T] | None = None
+    ) -> type[T] | Callable[[type[T]], type[T]]:
+        def inner(view: type[T]) -> type[T]:
             self.registered_views.add(view)
             # TODO do this somewhere else...
             # self.registered_views = set(self.registered_views, key=lambda v: v.title)
@@ -35,8 +42,10 @@ class AdminViewRegistry:
         else:
             return inner
 
-    def register_viewset(self, viewset=None):
-        def inner(viewset):
+    def register_viewset(
+        self, viewset: type[T] | None = None
+    ) -> type[T] | Callable[[type[T]], type[T]]:
+        def inner(viewset: type[T]) -> type[T]:
             for view in viewset.get_views():
                 self.register_view(view)
             return viewset
@@ -46,10 +55,10 @@ class AdminViewRegistry:
         else:
             return inner
 
-    def get_app_nav_sections(self):
+    def get_app_nav_sections(self) -> dict[NavSection, list[type]]:
         """Returns nav sections for app/user packages only."""
-        sections = {}
-        section_icons = {}  # Track icons per section
+        sections: dict[NavSection, list[type]] = {}
+        section_icons: dict[str, str] = {}  # Track icons per section
 
         for view in self.registered_views:
             # Skip plain package views
@@ -80,16 +89,16 @@ class AdminViewRegistry:
             section.sort(key=lambda v: v.get_nav_title())
 
         # Sort sections alphabetically, but put empty string first
-        def section_sort_key(item):
+        def section_sort_key(item: tuple[NavSection, list[type]]) -> tuple[str, str]:
             section_name = item[0].name
             return ("z" if section_name else "", section_name)
 
         return dict(sorted(sections.items(), key=section_sort_key))
 
-    def get_plain_nav_sections(self):
+    def get_plain_nav_sections(self) -> dict[NavSection, list[type]]:
         """Returns nav sections for plain packages only."""
-        sections = {}
-        section_icons = {}  # Track icons per section
+        sections: dict[NavSection, list[type]] = {}
+        section_icons: dict[str, str] = {}  # Track icons per section
 
         for view in self.registered_views:
             # Only include plain package views
@@ -121,7 +130,7 @@ class AdminViewRegistry:
         # Sort sections alphabetically
         return dict(sorted(sections.items(), key=lambda item: item[0].name))
 
-    def get_urls(self):
+    def get_urls(self) -> list:
         urls = []
 
         paths_seen = {}
@@ -147,7 +156,7 @@ class AdminViewRegistry:
 
         return urls
 
-    def get_searchable_views(self):
+    def get_searchable_views(self) -> list[type]:
         views = [
             view
             for view in self.registered_views
@@ -157,13 +166,13 @@ class AdminViewRegistry:
         views.sort(key=lambda v: v.get_slug())
         return views
 
-    def get_model_detail_url(self, instance):
+    def get_model_detail_url(self, instance: Any) -> str | None:
         from plain.admin.views.base import URL_NAMESPACE
         from plain.admin.views.models import AdminModelDetailView
 
         if not getattr(instance, "id", None):
             # Has to actually be in the db
-            return
+            return None
 
         for view in self.registered_views:
             if not issubclass(view, AdminModelDetailView):
@@ -174,6 +183,7 @@ class AdminViewRegistry:
                     f"{URL_NAMESPACE}:{view.view_name()}",
                     id=instance.id,
                 )
+        return None
 
 
 registry = AdminViewRegistry()

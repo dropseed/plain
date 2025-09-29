@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models import Q
@@ -17,7 +19,7 @@ if TYPE_CHECKING:
     from plain import models
 
 
-def get_model_field(instance, field):
+def get_model_field(instance: models.Model, field: str) -> Any:
     if "__" in field:
         # Allow __ syntax like querysets use,
         # also automatically calling callables (like __date)
@@ -41,7 +43,7 @@ class AdminModelListView(AdminListView):
     show_search = True
     allow_global_search = True
 
-    model: "models.Model"
+    model: models.Model
 
     fields: list = ["id"]
     queryset_order = []
@@ -70,7 +72,7 @@ class AdminModelListView(AdminListView):
 
         return f"{cls.model._meta.model_name}/"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
         order_by = self.request.query_params.get("order_by", "")
@@ -86,42 +88,43 @@ class AdminModelListView(AdminListView):
 
         return context
 
-    def get_objects(self):
+    def get_objects(self) -> models.QuerySet | list:
         queryset = self.get_initial_queryset()
         queryset = self.search_queryset(queryset)
         queryset = self.order_queryset(queryset)
         return queryset
 
-    def get_initial_queryset(self):
+    def get_initial_queryset(self) -> models.QuerySet:
         # Separate override for the initial queryset
         # so that annotations can be added BEFORE order_by, etc.
         return self.model.query.all()
 
-    def order_queryset(self, queryset):
+    def order_queryset(self, queryset: models.QuerySet) -> models.QuerySet | list:
+        result = queryset
         if order_by := self.request.query_params.get("order_by"):
             try:
-                queryset = queryset.order_by(order_by)
+                result = queryset.order_by(order_by)
             except FieldError:
                 # Fallback to sorting in Python if the field is not valid
                 # Note this can be an expensive operation!
                 if order_by.startswith("-"):
-                    queryset = sorted(
+                    result = sorted(
                         queryset,
                         key=lambda obj: self.get_field_value(obj, order_by[1:]),
                         reverse=True,
                     )
                 else:
-                    queryset = sorted(
+                    result = sorted(
                         queryset,
                         key=lambda obj: self.get_field_value(obj, order_by),
                         reverse=False,
                     )
         elif self.queryset_order:
-            queryset = queryset.order_by(*self.queryset_order)
+            result = queryset.order_by(*self.queryset_order)
 
-        return queryset
+        return result
 
-    def search_queryset(self, queryset):
+    def search_queryset(self, queryset: models.QuerySet) -> models.QuerySet:
         if search := self.request.query_params.get("search"):
             filters = Q()
             for field in self.search_fields:
@@ -131,7 +134,7 @@ class AdminModelListView(AdminListView):
 
         return queryset
 
-    def get_field_value(self, obj, field: str):
+    def get_field_value(self, obj: Any, field: str) -> Any:
         try:
             value = super().get_field_value(obj, field)
             # Check if we got a related manager back and need to get its queryset
@@ -141,7 +144,7 @@ class AdminModelListView(AdminListView):
         except (AttributeError, TypeError):
             return get_model_field(obj, field)
 
-    def get_field_value_template(self, obj, field: str, value):
+    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
         templates = super().get_field_value_template(obj, field, value)
         if hasattr(obj, f"get_{field}_display"):
             # Insert before the last default template,
@@ -151,7 +154,7 @@ class AdminModelListView(AdminListView):
 
 
 class AdminModelDetailView(AdminDetailView):
-    model: "models.Model"
+    model: models.Model
 
     def get_title(self) -> str:
         return str(self.object)
@@ -173,13 +176,13 @@ class AdminModelDetailView(AdminDetailView):
 
         return f"{cls.model._meta.model_name}/<int:id>/"
 
-    def get_fields(self):
+    def get_fields(self) -> list[str]:
         if fields := super().get_fields():
             return fields
 
         return [f.name for f in self.object._meta.get_fields() if f.concrete]
 
-    def get_field_value(self, obj, field: str):
+    def get_field_value(self, obj: Any, field: str) -> Any:
         try:
             value = super().get_field_value(obj, field)
             # Check if we got a related manager back and need to get its queryset
@@ -189,12 +192,12 @@ class AdminModelDetailView(AdminDetailView):
         except (AttributeError, TypeError):
             return get_model_field(obj, field)
 
-    def get_object(self):
+    def get_object(self) -> models.Model:
         return self.model.query.get(id=self.url_kwargs["id"])
 
 
 class AdminModelCreateView(AdminCreateView):
-    model: "models.Model"
+    model: models.Model
     form_class = None  # TODO type annotation
 
     def get_title(self) -> str:
@@ -212,7 +215,7 @@ class AdminModelCreateView(AdminCreateView):
 
 
 class AdminModelUpdateView(AdminUpdateView):
-    model: "models.Model"
+    model: models.Model
     form_class = None  # TODO type annotation
     success_url = "."  # Redirect back to the same update page by default
 
@@ -229,12 +232,12 @@ class AdminModelUpdateView(AdminUpdateView):
 
         return f"{cls.model._meta.model_name}/<int:id>/update/"
 
-    def get_object(self):
+    def get_object(self) -> models.Model:
         return self.model.query.get(id=self.url_kwargs["id"])
 
 
 class AdminModelDeleteView(AdminDeleteView):
-    model: "models.Model"
+    model: models.Model
 
     def get_title(self) -> str:
         return f"Delete {self.object}"
@@ -246,5 +249,5 @@ class AdminModelDeleteView(AdminDeleteView):
 
         return f"{cls.model._meta.model_name}/<int:id>/delete/"
 
-    def get_object(self):
+    def get_object(self) -> models.Model:
         return self.model.query.get(id=self.url_kwargs["id"])
