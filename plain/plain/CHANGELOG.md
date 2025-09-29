@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.69.0](https://github.com/dropseed/plain/releases/plain@0.69.0) (2025-09-29)
+
+### What's changed
+
+- Model-related exceptions (`FieldDoesNotExist`, `FieldError`, `ObjectDoesNotExist`, `MultipleObjectsReturned`, `EmptyResultSet`, `FullResultSet`) moved from `plain.exceptions` to `plain.models.exceptions` ([1c02564](https://github.com/dropseed/plain/commit/1c02564561))
+- Added `plain dev` alias prompt that suggests adding `p` as a shell alias for convenience ([d913b44](https://github.com/dropseed/plain/commit/d913b44fab))
+
+### Upgrade instructions
+
+- Replace imports of `FieldDoesNotExist`, `FieldError`, `ObjectDoesNotExist`, `MultipleObjectsReturned`, `EmptyResultSet`, or `FullResultSet` from `plain.exceptions` to `plain.models.exceptions`
+- If you're using `ObjectDoesNotExist` in views, update your import from `plain.exceptions.ObjectDoesNotExist` to `plain.models.exceptions.ObjectDoesNotExist`
+
 ## [0.68.1](https://github.com/dropseed/plain/releases/plain@0.68.1) (2025-09-25)
 
 ### What's changed
