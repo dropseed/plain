@@ -1,24 +1,27 @@
+from __future__ import annotations
+
 import os
+from typing import Any
 
 import click
 from click.formatting import iter_rows, measure_table, term_len, wrap_text
 
 
 class PlainHelpFormatter(click.HelpFormatter):
-    def write_heading(self, heading):
+    def write_heading(self, heading: str) -> None:
         styled_heading = click.style(heading, underline=True)
         self.write(f"{'':>{self.current_indent}}{styled_heading}\n")
 
-    def write_usage(self, prog, args, prefix="Usage: "):
+    def write_usage(self, prog: str, args: str = "", prefix: str = "Usage: ") -> None:
         prefix_styled = click.style(prefix, italic=True)
         super().write_usage(prog, args, prefix=prefix_styled)
 
     def write_dl(
         self,
-        rows,
-        col_max=30,
-        col_spacing=2,
-    ):
+        rows: list[tuple[str, str]],
+        col_max: int = 30,
+        col_spacing: int = 2,
+    ) -> None:
         """Writes a definition list into the buffer.  This is how options
         and commands are usually formatted.
 
@@ -62,7 +65,7 @@ class PlainHelpFormatter(click.HelpFormatter):
 class PlainContext(click.Context):
     formatter_class = PlainHelpFormatter
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
         # Force colors in CI environments

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 from pathlib import Path
 
@@ -7,10 +9,10 @@ import click
 class LLMDocs:
     """Generates LLM-friendly documentation."""
 
-    def __init__(self, paths):
+    def __init__(self, paths: list[Path]):
         self.paths = paths
 
-    def load(self):
+    def load(self) -> None:
         self.docs = set()
         self.sources = set()
 
@@ -47,7 +49,7 @@ class LLMDocs:
         self.docs = sorted(self.docs)
         self.sources = sorted(self.sources)
 
-    def display_path(self, path):
+    def display_path(self, path: Path) -> Path:
         if "plain" in path.parts:
             root_index = path.parts.index("plain")
         elif "plainx" in path.parts:
@@ -58,7 +60,7 @@ class LLMDocs:
         plain_root = Path(*path.parts[: root_index + 1])
         return path.relative_to(plain_root.parent)
 
-    def print(self, relative_to=None):
+    def print(self, relative_to: Path | None = None) -> None:
         for doc in self.docs:
             if relative_to:
                 display_path = doc.relative_to(relative_to)
@@ -81,7 +83,7 @@ class LLMDocs:
                 click.echo()
 
     @staticmethod
-    def symbolicate(file_path: Path):
+    def symbolicate(file_path: Path) -> str:
         if "internal" in str(file_path).split("/"):
             return ""
 
@@ -89,7 +91,7 @@ class LLMDocs:
 
         parsed = ast.parse(source)
 
-        def should_skip(node):
+        def should_skip(node: ast.AST) -> bool:
             if isinstance(node, ast.ClassDef | ast.FunctionDef):
                 if any(
                     isinstance(d, ast.Name) and d.id == "internalcode"
@@ -104,7 +106,7 @@ class LLMDocs:
                         return True
             return False
 
-        def process_node(node, indent=0):
+        def process_node(node: ast.AST, indent: int = 0) -> list[str]:
             lines = []
             prefix = "    " * indent
 

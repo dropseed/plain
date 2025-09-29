@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
@@ -17,7 +19,7 @@ import click
     "--command",
     help="Execute the given command and exit.",
 )
-def shell(interface, command):
+def shell(interface: str | None, command: str | None) -> None:
     """
     Runs a Python interactive interpreter. Tries to use IPython or
     bpython, if one of them is available.
@@ -32,11 +34,12 @@ def shell(interface, command):
             sys.exit(result.returncode)
         return
 
+    interface_list: list[str]
     if interface:
-        interface = [interface]
+        interface_list = [interface]
     else:
 
-        def get_default_interface():
+        def get_default_interface() -> list[str]:
             try:
                 import IPython  # noqa
 
@@ -46,10 +49,10 @@ def shell(interface, command):
 
             return ["python"]
 
-        interface = get_default_interface()
+        interface_list = get_default_interface()
 
     result = subprocess.run(
-        interface,
+        interface_list,
         env={
             "PYTHONSTARTUP": os.path.join(os.path.dirname(__file__), "startup.py"),
             **os.environ,
@@ -61,7 +64,7 @@ def shell(interface, command):
 
 @click.command()
 @click.argument("script", nargs=1, type=click.Path(exists=True))
-def run(script):
+def run(script: str) -> None:
     """Run a Python script in the context of your app"""
     before_script = "import plain.runtime; plain.runtime.setup()"
     command = f"{before_script}; exec(open('{script}').read())"

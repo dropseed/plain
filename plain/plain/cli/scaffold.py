@@ -7,7 +7,7 @@ import plain.runtime
 
 @click.command()
 @click.argument("package_name")
-def create(package_name):
+def create(package_name: str) -> None:
     """
     Create a new local package.
 

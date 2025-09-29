@@ -3,19 +3,19 @@ import plain.runtime
 plain.runtime.setup()
 
 
-def print_bold(s):
+def print_bold(s: str) -> None:
     print("\033[1m", end="")
     print(s)
     print("\033[0m", end="")
 
 
-def print_italic(s):
+def print_italic(s: str) -> None:
     print("\x1b[3m", end="")
     print(s)
     print("\x1b[0m", end="")
 
 
-def print_dim(s):
+def print_dim(s: str) -> None:
     print("\x1b[2m", end="")
     print(s)
     print("\x1b[0m", end="")

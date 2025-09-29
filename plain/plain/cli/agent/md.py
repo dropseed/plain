@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib.util
 import pkgutil
 from pathlib import Path
@@ -7,7 +9,7 @@ import click
 from ..output import iterate_markdown
 
 
-def _get_packages_with_agents():
+def _get_packages_with_agents() -> dict[str, Path]:
     """Get dict mapping package names to AGENTS.md paths."""
     agents_files = {}
 
@@ -57,7 +59,7 @@ def _get_packages_with_agents():
     is_flag=True,
     help="List packages with AGENTS.md files",
 )
-def md(package, show_all, show_list):
+def md(package: str, show_all: bool, show_list: bool) -> None:
     """Show AGENTS.md for a package."""
 
     agents_files = _get_packages_with_agents()

@@ -7,7 +7,7 @@ logger = logging.getLogger("plain.chores")
 
 
 @click.group()
-def chores():
+def chores() -> None:
     """Routine maintenance tasks"""
     pass
 
@@ -17,7 +17,7 @@ def chores():
 @click.option(
     "--name", default=None, type=str, help="Name of the chore to run", multiple=True
 )
-def list_chores(group, name):
+def list_chores(group: tuple[str, ...], name: tuple[str, ...]) -> None:
     """
     List all registered chores.
     """
@@ -50,7 +50,7 @@ def list_chores(group, name):
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be done without executing"
 )
-def run_chores(group, name, dry_run):
+def run_chores(group: tuple[str, ...], name: tuple[str, ...], dry_run: bool) -> None:
     """
     Run the specified chores.
     """
@@ -72,7 +72,7 @@ def run_chores(group, name, dry_run):
     for chore in chores:
         click.echo(f"{chore.name}:", nl=False)
         if dry_run:
-            click.echo(" (dry run)", fg="yellow")
+            click.secho(" (dry run)", fg="yellow", nl=False)
         else:
             try:
                 result = chore.run()

@@ -1,15 +1,19 @@
+from __future__ import annotations
+
+from collections.abc import Iterator
+
 import click
 
 
 @click.group()
-def urls():
+def urls() -> None:
     """URL related commands"""
     pass
 
 
 @urls.command("list")
 @click.option("--flat", is_flag=True, help="List all URLs in a flat list")
-def list_urls(flat):
+def list_urls(flat: bool) -> None:
     """Print all URL patterns under settings.URLS_ROUTER"""
     from plain.runtime import settings
     from plain.urls import URLResolver, get_resolver
@@ -20,7 +24,9 @@ def list_urls(flat):
     resolver = get_resolver(settings.URLS_ROUTER)
     if flat:
 
-        def flat_list(patterns, prefix="", curr_ns=""):
+        def flat_list(
+            patterns: list, prefix: str = "", curr_ns: str = ""
+        ) -> Iterator[str]:
             for pattern in patterns:
                 full_pattern = f"{prefix}{pattern.pattern}"
                 if isinstance(pattern, URLResolver):
@@ -50,7 +56,7 @@ def list_urls(flat):
             click.echo(p)
     else:
 
-        def print_tree(patterns, prefix="", curr_ns=""):
+        def print_tree(patterns: list, prefix: str = "", curr_ns: str = "") -> None:
             count = len(patterns)
             for idx, pattern in enumerate(patterns):
                 is_last = idx == (count - 1)

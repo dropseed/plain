@@ -10,7 +10,7 @@ from plain.runtime import settings
 
 
 @click.group("preflight")
-def preflight_cli():
+def preflight_cli() -> None:
     """Run or manage preflight checks."""
     pass
 
@@ -32,7 +32,7 @@ def preflight_cli():
     is_flag=True,
     help="Hide progress output and warnings, only show errors.",
 )
-def check_command(deploy, format, quiet):
+def check_command(deploy: bool, format: str, quiet: bool) -> None:
     """
     Use the system check framework to validate entire Plain project.
     Exit with error code if any errors are found. Warnings do not cause failure.
@@ -203,7 +203,7 @@ def check_command(deploy, format, quiet):
 
 
 @preflight_cli.command("list")
-def list_checks():
+def list_checks() -> None:
     """List all available preflight checks."""
     packages_registry.autodiscover_modules("preflight", include_app=True)
 

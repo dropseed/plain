@@ -7,9 +7,9 @@ from .output import iterate_markdown
 
 
 @click.command()
-@click.option("--open")
+@click.option("--open", is_flag=True, help="Open the README in your default editor")
 @click.argument("module", default="")
-def docs(module, open):
+def docs(module: str, open: bool) -> None:
     if not module:
         raise click.UsageError(
             "You must specify a module. For LLM-friendly docs, use `plain agent docs`."

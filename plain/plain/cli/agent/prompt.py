@@ -5,7 +5,7 @@ import subprocess
 import click
 
 
-def is_agent_environment():
+def is_agent_environment() -> bool:
     """Check if we're running inside a coding agent."""
     return bool(
         os.environ.get("CLAUDECODE")

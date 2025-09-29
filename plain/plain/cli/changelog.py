@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from importlib.util import find_spec
 from pathlib import Path
@@ -7,7 +9,7 @@ import click
 from .output import style_markdown
 
 
-def parse_version(version_str):
+def parse_version(version_str: str) -> tuple[int, ...]:
     """Parse a version string into a tuple of integers for comparison."""
     # Remove 'v' prefix if present and split by dots
     clean_version = version_str.lstrip("v")
@@ -22,7 +24,7 @@ def parse_version(version_str):
     return tuple(parts)
 
 
-def compare_versions(v1, v2):
+def compare_versions(v1: str, v2: str) -> int:
     """Compare two version strings. Returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2."""
     parsed_v1 = parse_version(v1)
     parsed_v2 = parse_version(v2)
@@ -44,7 +46,9 @@ def compare_versions(v1, v2):
 @click.argument("package_label")
 @click.option("--from", "from_version", help="Show entries from this version onwards")
 @click.option("--to", "to_version", help="Show entries up to this version")
-def changelog(package_label, from_version, to_version):
+def changelog(
+    package_label: str, from_version: str | None, to_version: str | None
+) -> None:
     """Show changelog entries for a package."""
     module_name = package_label.replace("-", ".")
     spec = find_spec(module_name)
@@ -85,7 +89,7 @@ def changelog(package_label, from_version, to_version):
     if current_version is not None:
         entries.append((current_version, current_lines))
 
-    def version_found(version):
+    def version_found(version: str) -> bool:
         return any(compare_versions(v, version) == 0 for v, _ in entries)
 
     if from_version and not version_found(from_version):

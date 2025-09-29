@@ -1,11 +1,15 @@
+from __future__ import annotations
+
+from collections.abc import Iterator
+
 import click
 
 
-def style_markdown(content):
+def style_markdown(content: str) -> str:
     return "".join(iterate_markdown(content))
 
 
-def iterate_markdown(content):
+def iterate_markdown(content: str) -> Iterator[str]:
     """
     Iterator that does basic markdown for a Click pager.
 

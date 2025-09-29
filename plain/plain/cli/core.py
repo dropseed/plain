@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import traceback
+from typing import Any
 
 import click
 from click.core import Command, Context
@@ -24,7 +27,7 @@ from .utils import utils
 
 
 @click.group()
-def plain_cli():
+def plain_cli() -> None:
     pass
 
 
@@ -49,14 +52,14 @@ class CLIRegistryGroup(click.Group):
     Click Group that exposes commands from the CLI registry.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         cli_registry.import_modules()
 
-    def list_commands(self, ctx):
+    def list_commands(self, ctx: Context) -> list[str]:
         return sorted(cli_registry.get_commands().keys())
 
-    def get_command(self, ctx, name):
+    def get_command(self, ctx: Context, name: str) -> Command | None:
         commands = cli_registry.get_commands()
         return commands.get(name)
 
@@ -64,7 +67,7 @@ class CLIRegistryGroup(click.Group):
 class PlainCommandCollection(click.CommandCollection):
     context_class = PlainContext
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         sources = []
 
         try:

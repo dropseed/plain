@@ -5,7 +5,7 @@ import plain.runtime
 
 @click.command()
 @click.argument("setting_name")
-def setting(setting_name):
+def setting(setting_name: str) -> None:
     """Print the value of a setting at runtime"""
     try:
         setting = getattr(plain.runtime.settings, setting_name)

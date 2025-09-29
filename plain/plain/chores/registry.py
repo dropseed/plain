@@ -1,17 +1,22 @@
+from __future__ import annotations
+
+from types import FunctionType
+from typing import Any
+
 from plain.packages import packages_registry
 
 
 class Chore:
-    def __init__(self, *, group, func):
+    def __init__(self, *, group: str, func: FunctionType):
         self.group = group
         self.func = func
         self.name = f"{group}.{func.__name__}"
         self.description = func.__doc__.strip() if func.__doc__ else ""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def run(self):
+    def run(self) -> Any:
         """
         Run the chore.
         """
@@ -20,21 +25,21 @@ class Chore:
 
 class ChoresRegistry:
     def __init__(self):
-        self._chores = {}
+        self._chores: dict[FunctionType, Chore] = {}
 
-    def register_chore(self, chore):
+    def register_chore(self, chore: Chore) -> None:
         """
         Register a chore with the specified name.
         """
         self._chores[chore.func] = chore
 
-    def import_modules(self):
+    def import_modules(self) -> None:
         """
         Import modules from installed packages and app to trigger registration.
         """
         packages_registry.autodiscover_modules("chores", include_app=True)
 
-    def get_chores(self):
+    def get_chores(self) -> list[Chore]:
         """
         Get all registered chores.
         """
@@ -44,7 +49,7 @@ class ChoresRegistry:
 chores_registry = ChoresRegistry()
 
 
-def register_chore(group):
+def register_chore(group: str) -> Any:
     """
     Register a chore with a given group.
 
@@ -54,7 +59,7 @@ def register_chore(group):
             pass
     """
 
-    def wrapper(func):
+    def wrapper(func: FunctionType) -> FunctionType:
         chore = Chore(group=group, func=func)
         chores_registry.register_chore(chore)
         return func

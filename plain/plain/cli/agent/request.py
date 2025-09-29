@@ -37,7 +37,15 @@ from plain.test import Client
     multiple=True,
     help="Additional headers (format: 'Name: Value')",
 )
-def request(path, method, data, user_id, follow, content_type, headers):
+def request(
+    path: str,
+    method: str,
+    data: str | None,
+    user_id: str | None,
+    follow: bool,
+    content_type: str | None,
+    headers: tuple[str, ...],
+) -> None:
     """Make an HTTP request using the test client against the development database."""
 
     try:

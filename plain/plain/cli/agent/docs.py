@@ -15,7 +15,7 @@ from .llmdocs import LLMDocs
     is_flag=True,
     help="List available packages",
 )
-def docs(package, show_list):
+def docs(package: str, show_list: bool) -> None:
     """Show LLM-friendly documentation and source for a package."""
 
     if show_list:
