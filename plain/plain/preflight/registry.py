@@ -1,11 +1,24 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Generator
+from typing import Any, TypeVar
+
 from plain.runtime import settings
+
+from .results import PreflightResult
+
+T = TypeVar("T")
 
 
 class CheckRegistry:
-    def __init__(self):
-        self.checks = {}  # name -> (check_class, deploy)
+    def __init__(self) -> None:
+        self.checks: dict[
+            str, tuple[type[Any], bool]
+        ] = {}  # name -> (check_class, deploy)
 
-    def register_check(self, check_class, name, deploy=False):
+    def register_check(
+        self, check_class: type[Any], name: str, deploy: bool = False
+    ) -> None:
         """Register a check class with a unique name."""
         if name in self.checks:
             raise ValueError(f"Check {name} already registered")
@@ -13,8 +26,8 @@ class CheckRegistry:
 
     def run_checks(
         self,
-        include_deploy_checks=False,
-    ):
+        include_deploy_checks: bool = False,
+    ) -> Generator[tuple[type[Any], str, list[PreflightResult]]]:
         """
         Run all registered checks and yield (check_class, name, results) tuples.
         """
@@ -42,9 +55,11 @@ class CheckRegistry:
             results = check.run()
             yield check_class, name, results
 
-    def get_checks(self, include_deploy_checks=False):
+    def get_checks(
+        self, include_deploy_checks: bool = False
+    ) -> list[tuple[type[Any], str]]:
         """Get list of (check_class, name) tuples."""
-        result = []
+        result: list[tuple[type[Any], str]] = []
         for name, (check_class, deploy) in self.checks.items():
             if deploy and not include_deploy_checks:
                 continue
@@ -55,7 +70,7 @@ class CheckRegistry:
 checks_registry = CheckRegistry()
 
 
-def register_check(name: str, *, deploy: bool = False):
+def register_check(name: str, *, deploy: bool = False) -> Callable[[type[T]], type[T]]:
     """
     Decorator to register a check class.
 
@@ -69,7 +84,7 @@ def register_check(name: str, *, deploy: bool = False):
             pass
     """
 
-    def wrapper(cls):
+    def wrapper(cls: type[T]) -> type[T]:
         checks_registry.register_check(cls, name=name, deploy=deploy)
         return cls
 

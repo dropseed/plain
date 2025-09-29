@@ -1,12 +1,19 @@
+from __future__ import annotations
+
 import sys
 import threading
 from collections import Counter
+from collections.abc import Iterable
 from importlib import import_module
 from importlib.util import find_spec
+from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured, PackageRegistryNotReady
 
 from .config import PackageConfig
+
+if TYPE_CHECKING:
+    pass
 
 CONFIG_MODULE_NAME = "config"
 
@@ -18,7 +25,7 @@ class PackagesRegistry:
     It also keeps track of models, e.g. to provide reverse relations.
     """
 
-    def __init__(self, installed_packages=()):
+    def __init__(self, installed_packages: Iterable[str | PackageConfig] | None = ()):
         # installed_packages is set to None when creating the main registry
         # because it cannot be populated at that point. Other registries must
         # provide a list of installed packages and are populated immediately.
@@ -28,7 +35,7 @@ class PackagesRegistry:
             raise RuntimeError("You must supply an installed_packages argument.")
 
         # Mapping of labels to PackageConfig instances for installed packages.
-        self.package_configs = {}
+        self.package_configs: dict[str, PackageConfig] = {}
 
         # Whether the registry is populated.
         self.packages_ready = self.ready = False
@@ -41,7 +48,9 @@ class PackagesRegistry:
         if installed_packages is not None:
             self.populate(installed_packages)
 
-    def populate(self, installed_packages=None):
+    def populate(
+        self, installed_packages: Iterable[str | PackageConfig] | None = None
+    ) -> None:
         """
         Load application configurations and models.
 
@@ -67,6 +76,9 @@ class PackagesRegistry:
             self.loading = True
 
             # Phase 1: initialize app configs and import app modules.
+            if installed_packages is None:
+                return
+
             for entry in installed_packages:
                 if isinstance(entry, PackageConfig):
                     # Some instances of the registry pass in the
@@ -92,9 +104,10 @@ class PackagesRegistry:
                         entry_config = self.register_config(auto_package_config)
 
             # Make sure we have the same number of configs as we have installed packages
-            if len(self.package_configs) != len(installed_packages):
+            installed_packages_list = list(installed_packages)
+            if len(self.package_configs) != len(installed_packages_list):
                 raise ImproperlyConfigured(
-                    f"The number of installed packages ({len(installed_packages)}) does not match the number of "
+                    f"The number of installed packages ({len(installed_packages_list)}) does not match the number of "
                     f"registered configs ({len(self.package_configs)})."
                 )
 
@@ -118,7 +131,7 @@ class PackagesRegistry:
 
             self.ready = True
 
-    def check_packages_ready(self):
+    def check_packages_ready(self) -> None:
         """Raise an exception if all packages haven't been imported yet."""
         if not self.packages_ready:
             from plain.runtime import settings
@@ -129,12 +142,12 @@ class PackagesRegistry:
             settings.INSTALLED_PACKAGES
             raise PackageRegistryNotReady("Packages aren't loaded yet.")
 
-    def get_package_configs(self):
+    def get_package_configs(self) -> Iterable[PackageConfig]:
         """Import applications and return an iterable of app configs."""
         self.check_packages_ready()
         return self.package_configs.values()
 
-    def get_package_config(self, package_label):
+    def get_package_config(self, package_label: str) -> PackageConfig:
         """
         Import applications and returns an app config for the given label.
 
@@ -151,7 +164,7 @@ class PackagesRegistry:
                     break
             raise LookupError(message)
 
-    def get_containing_package_config(self, object_name):
+    def get_containing_package_config(self, object_name: str) -> PackageConfig | None:
         """
         Look for an app config containing a given object.
 
@@ -169,8 +182,9 @@ class PackagesRegistry:
                     candidates.append(package_config)
         if candidates:
             return sorted(candidates, key=lambda ac: -len(ac.name))[0]
+        return None
 
-    def register_config(self, package_config):
+    def register_config(self, package_config: PackageConfig) -> PackageConfig:
         """
         Add a config to the registry.
 
@@ -190,9 +204,10 @@ class PackagesRegistry:
         return package_config
 
     def autodiscover_modules(self, module_name: str, *, include_app: bool) -> None:
-        def _import_if_exists(name):
+        def _import_if_exists(name: str) -> None:
             if find_spec(name):
                 import_module(name)
+            return None
 
         # Load from all packages
         for package_config in self.get_package_configs():
@@ -206,7 +221,7 @@ class PackagesRegistry:
 packages_registry = PackagesRegistry(installed_packages=None)
 
 
-def register_config(package_config_class):
+def register_config(package_config_class: type[PackageConfig]) -> type[PackageConfig]:
     """A decorator to register a PackageConfig subclass."""
     module_name = package_config_class.__module__
 

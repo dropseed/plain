@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import json
 import logging
+from typing import Any
 
 
 class KeyValueFormatter(logging.Formatter):
     """Formatter that outputs key-value pairs from Plain's context system."""
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         # Build key-value pairs from context
         kv_pairs = []
 
@@ -22,7 +25,7 @@ class KeyValueFormatter(logging.Formatter):
         return super().format(record)
 
     @staticmethod
-    def _format_value(value):
+    def _format_value(value: Any) -> str:
         """Format a value for key-value output."""
         if isinstance(value, str):
             s = value
@@ -46,7 +49,7 @@ class KeyValueFormatter(logging.Formatter):
 class JSONFormatter(logging.Formatter):
     """Formatter that outputs JSON from Plain's context system, with optional format string."""
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         # Build the JSON object from Plain's context data
         log_obj = {
             "timestamp": self.formatTime(record),

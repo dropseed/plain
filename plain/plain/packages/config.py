@@ -1,8 +1,15 @@
+from __future__ import annotations
+
 import os
 from functools import cached_property
 from importlib import import_module
+from types import ModuleType
+from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured
+
+if TYPE_CHECKING:
+    from plain.packages.registry import PackagesRegistry
 
 CONFIG_MODULE_NAME = "config"
 
@@ -12,13 +19,13 @@ class PackageConfig:
 
     package_label: str
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         # Full Python path to the application e.g. 'plain.admin.admin'.
         self.name = name
 
         # Reference to the Packages registry that holds this PackageConfig. Set by the
         # registry when it registers the PackageConfig instance.
-        self.packages_registry = None
+        self.packages: PackagesRegistry | None = None
 
         if not hasattr(self, "package_label"):
             # Last component of the Python path to the application e.g. 'admin'.
@@ -30,14 +37,14 @@ class PackageConfig:
                 f"The app label '{self.package_label}' is not a valid Python identifier."
             )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.package_label}>"
 
     @cached_property
-    def path(self):
+    def path(self) -> str:
         # Filesystem path to the application directory e.g.
         # '/path/to/admin'.
-        def _path_from_module(module):
+        def _path_from_module(module: ModuleType) -> str:
             """Attempt to determine app's filesystem path from its module."""
             # See #21874 for extended discussion of the behavior of this method in
             # various cases.
@@ -68,7 +75,8 @@ class PackageConfig:
         module = import_module(self.name)
         return _path_from_module(module)
 
-    def ready(self):
+    def ready(self) -> None:
         """
         Override this method in subclasses to run code when Plain starts.
         """
+        return None

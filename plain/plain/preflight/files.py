@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from plain.runtime import settings
@@ -11,7 +13,7 @@ from .results import PreflightResult
 class CheckSettingFileUploadTempDir(PreflightCheck):
     """Validates that the FILE_UPLOAD_TEMP_DIR setting points to an existing directory."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         setting = settings.FILE_UPLOAD_TEMP_DIR
         if setting and not Path(setting).is_dir():
             return [

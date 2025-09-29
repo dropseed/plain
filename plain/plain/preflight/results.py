@@ -1,20 +1,26 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.runtime import settings
 
 
 class PreflightResult:
-    def __init__(self, *, fix: str, id: str, obj=None, warning: bool = False):
+    def __init__(
+        self, *, fix: str, id: str, obj: Any = None, warning: bool = False
+    ) -> None:
         self.fix = fix
         self.obj = obj
         self.id = id
         self.warning = warning
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, self.__class__) and all(
             getattr(self, attr) == getattr(other, attr)
             for attr in ["fix", "obj", "id", "warning"]
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.obj is None:
             obj = ""
         elif hasattr(self.obj, "_meta") and hasattr(self.obj._meta, "label"):
@@ -25,5 +31,5 @@ class PreflightResult:
         id_part = f"({self.id}) " if self.id else ""
         return f"{obj}: {id_part}{self.fix}"
 
-    def is_silenced(self):
+    def is_silenced(self) -> bool:
         return self.id and self.id in settings.PREFLIGHT_SILENCED_RESULTS

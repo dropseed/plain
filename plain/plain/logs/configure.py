@@ -3,7 +3,9 @@ import logging
 from .formatters import JSONFormatter, KeyValueFormatter
 
 
-def configure_logging(*, plain_log_level, app_log_level, app_log_format):
+def configure_logging(
+    *, plain_log_level: int | str, app_log_level: int | str, app_log_format: str
+) -> None:
     # Create and configure the plain logger (uses standard Logger, not AppLogger)
     plain_logger = logging.Logger("plain")
     plain_logger.setLevel(plain_log_level)

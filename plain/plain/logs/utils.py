@@ -1,17 +1,24 @@
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from plain.http.request import HttpRequest
+    from plain.http.response import ResponseBase
 
 request_logger = logging.getLogger("plain.request")
 
 
 def log_response(
-    message,
-    *args,
-    response=None,
-    request=None,
-    logger=request_logger,
-    level=None,
-    exception=None,
-):
+    message: str,
+    *args: Any,
+    response: ResponseBase | None = None,
+    request: HttpRequest | None = None,
+    logger: logging.Logger = request_logger,
+    level: str | None = None,
+    exception: BaseException | None = None,
+) -> None:
     """
     Log errors based on Response status.
 
@@ -19,6 +26,9 @@ def log_response(
     is given as a keyword argument). The Response status_code and the
     request are passed to the logger's extra parameter.
     """
+    if response is None:
+        return
+
     # Check if the response has already been logged. Multiple requests to log
     # the same response can be received in some cases, e.g., when the
     # response is the result of an exception and is logged when the exception
@@ -43,4 +53,4 @@ def log_response(
         },
         exc_info=exception,
     )
-    response._has_been_logged = True
+    response._has_been_logged = True  # type: ignore[attr-defined]

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from plain.runtime import settings
 
 from .checks import PreflightCheck
@@ -8,7 +10,7 @@ SECRET_KEY_MIN_LENGTH = 50
 SECRET_KEY_MIN_UNIQUE_CHARACTERS = 5
 
 
-def _check_secret_key(secret_key):
+def _check_secret_key(secret_key: str) -> bool:
     return (
         len(set(secret_key)) >= SECRET_KEY_MIN_UNIQUE_CHARACTERS
         and len(secret_key) >= SECRET_KEY_MIN_LENGTH
@@ -19,7 +21,7 @@ def _check_secret_key(secret_key):
 class CheckSecretKey(PreflightCheck):
     """Validates that SECRET_KEY is long and random enough for security."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         if not _check_secret_key(settings.SECRET_KEY):
             return [
                 PreflightResult(
@@ -36,7 +38,7 @@ class CheckSecretKey(PreflightCheck):
 class CheckSecretKeyFallbacks(PreflightCheck):
     """Validates that SECRET_KEY_FALLBACKS are long and random enough for security."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         errors = []
         for index, key in enumerate(settings.SECRET_KEY_FALLBACKS):
             if not _check_secret_key(key):
@@ -55,7 +57,7 @@ class CheckSecretKeyFallbacks(PreflightCheck):
 class CheckDebug(PreflightCheck):
     """Ensures DEBUG is False in production deployment."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         if settings.DEBUG:
             return [
                 PreflightResult(
@@ -70,7 +72,7 @@ class CheckDebug(PreflightCheck):
 class CheckAllowedHosts(PreflightCheck):
     """Ensures ALLOWED_HOSTS is not empty in production deployment."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         if not settings.ALLOWED_HOSTS:
             return [
                 PreflightResult(
