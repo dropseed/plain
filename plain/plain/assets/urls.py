@@ -18,7 +18,7 @@ class AssetsRouter(Router):
     ]
 
 
-def get_asset_url(url_path):
+def get_asset_url(url_path: str) -> str:
     """
     Get the full URL to a given asset path.
     """

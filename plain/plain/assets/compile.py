@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import gzip
 import os
 import shutil
+from collections.abc import Iterator
+from pathlib import Path
 
 from plain.runtime import PLAIN_TEMP_PATH
 
-from .finders import iter_assets
+from .finders import Asset, iter_assets
 from .fingerprints import AssetsFingerprintsManifest, get_file_fingerprint
 
 SKIP_COMPRESS_EXTENSIONS = (
@@ -40,7 +44,7 @@ SKIP_COMPRESS_EXTENSIONS = (
 )
 
 
-def get_compiled_path():
+def get_compiled_path() -> Path:
     """
     Get the path at runtime to the compiled assets directory.
 
@@ -49,7 +53,9 @@ def get_compiled_path():
     return PLAIN_TEMP_PATH / "assets" / "compiled"
 
 
-def compile_assets(*, target_dir, keep_original, fingerprint, compress):
+def compile_assets(
+    *, target_dir: str, keep_original: bool, fingerprint: bool, compress: bool
+) -> Iterator[tuple[str, str, list[str]]]:
     """
     Compile all assets to the target directory and save a JSON manifest
     mapping the original filenames to the compiled filenames.
@@ -73,17 +79,24 @@ def compile_assets(*, target_dir, keep_original, fingerprint, compress):
     manifest.save()
 
 
-def compile_asset(*, asset, target_dir, keep_original, fingerprint, compress):
+def compile_asset(
+    *,
+    asset: Asset,
+    target_dir: str,
+    keep_original: bool,
+    fingerprint: bool,
+    compress: bool,
+) -> tuple[str, list[str]]:
     """
     Compile an asset to multiple output paths.
     """
-    compiled_paths = []
+    compiled_paths: list[str] = []
 
     # The expected destination for the original asset
     target_path = os.path.join(target_dir, asset.url_path)
 
     # Keep track of where the final, resolved asset ends up
-    resolved_url_path = asset.url_path
+    resolved_url_path: str = asset.url_path
 
     # Make sure all the expected directories exist
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -106,7 +119,7 @@ def compile_asset(*, asset, target_dir, keep_original, fingerprint, compress):
         shutil.copy(asset.absolute_path, fingerprinted_path)
         compiled_paths.append(fingerprinted_path)
 
-        resolved_url_path = os.path.relpath(fingerprinted_path, target_dir)
+        resolved_url_path = str(os.path.relpath(fingerprinted_path, target_dir))
 
     if compress and extension.lower() not in SKIP_COMPRESS_EXTENSIONS:
         for path in compiled_paths.copy():

@@ -15,18 +15,18 @@ class AssetsFingerprintsManifest(dict):
     def __init__(self):
         self.path = PLAIN_TEMP_PATH / "assets" / "fingerprints.json"
 
-    def load(self):
+    def load(self) -> None:
         if self.path.exists():
             with open(self.path) as f:
                 self.update(json.load(f))
 
-    def save(self):
+    def save(self) -> None:
         with open(self.path, "w") as f:
             json.dump(self, f, indent=2)
 
 
 @cache
-def _get_manifest():
+def _get_manifest() -> AssetsFingerprintsManifest:
     """
     A cached function for loading the asset fingerprints manifest,
     so we don't have to keep loading it from disk over and over.
@@ -36,16 +36,17 @@ def _get_manifest():
     return manifest
 
 
-def get_fingerprinted_url_path(url_path):
+def get_fingerprinted_url_path(url_path: str) -> str | None:
     """
     Get the final fingerprinted path for an asset URL path.
     """
     manifest = _get_manifest()
     if url_path in manifest:
         return manifest[url_path]
+    return None
 
 
-def get_file_fingerprint(file_path):
+def get_file_fingerprint(file_path: str) -> str:
     """
     Get the fingerprint hash for a file.
     """

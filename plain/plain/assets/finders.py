@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from collections.abc import Iterator
 
 from plain.packages import packages_registry
 from plain.runtime import APP_PATH
@@ -8,21 +11,22 @@ APP_ASSETS_DIR = APP_PATH / "assets"
 SKIP_ASSETS = (".DS_Store", ".gitignore")
 
 
-def iter_assets():
+class Asset:
+    def __init__(self, *, url_path: str, absolute_path: str):
+        self.url_path = url_path
+        self.absolute_path = absolute_path
+
+    def __str__(self) -> str:
+        return self.url_path
+
+
+def iter_assets() -> Iterator[Asset]:
     """
     Iterate all valid asset files found in the installed
     packages and the app itself.
     """
 
-    class Asset:
-        def __init__(self, *, url_path, absolute_path):
-            self.url_path = url_path
-            self.absolute_path = absolute_path
-
-        def __str__(self):
-            return self.url_path
-
-    def _iter_assets_dir(path):
+    def _iter_assets_dir(path: str) -> Iterator[tuple[str, str]]:
         for root, _, files in os.walk(path):
             for f in files:
                 if f in SKIP_ASSETS:
@@ -36,7 +40,7 @@ def iter_assets():
             yield Asset(url_path=url_path, absolute_path=abs_path)
 
 
-def iter_asset_dirs():
+def iter_asset_dirs() -> Iterator[str]:
     """
     Iterate all directories containing assets, from installed
     packages and from app/assets.

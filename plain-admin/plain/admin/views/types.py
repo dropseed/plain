@@ -6,7 +6,7 @@ class Img:
         alt: str = "",
         width: int | None = None,
         height: int | None = None,
-    ) -> None:
+    ):
         self.src = src
         self.alt = alt
         self.width = width

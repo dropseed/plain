@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import mimetypes
 import os
@@ -28,14 +30,14 @@ class AssetView(View):
     This class could be subclassed to further tweak the responses or behavior.
     """
 
-    def __init__(self, asset_path=None):
+    def __init__(self, asset_path: str | None = None):
         # Allow a path to be passed in AssetView.as_view(path="...")
         self.asset_path = asset_path
 
-    def get_url_path(self):
+    def get_url_path(self) -> str:
         return self.asset_path or self.url_kwargs["path"]
 
-    def get(self):
+    def get(self) -> Response | FileResponse:
         url_path = self.get_url_path()
 
         # Make a trailing slash work, but we don't expect it
@@ -71,7 +73,7 @@ class AssetView(View):
         response.headers = self.update_headers(response.headers, absolute_path)
         return response
 
-    def get_asset_path(self, path):
+    def get_asset_path(self, path: str) -> str:
         """Get the path to the compiled asset"""
         compiled_path = os.path.abspath(get_compiled_path())
         asset_path = os.path.join(compiled_path, path)
@@ -82,13 +84,14 @@ class AssetView(View):
 
         return asset_path
 
-    def get_debug_asset_path(self, path):
+    def get_debug_asset_path(self, path: str) -> str | None:
         """Make a "live" check to find the uncompiled asset in the filesystem"""
         for asset in iter_assets():
             if asset.url_path == path:
                 return asset.absolute_path
+        return None
 
-    def check_asset_path(self, path):
+    def check_asset_path(self, path: str | None) -> None:
         if not path:
             raise Http404("Asset not found")
 
@@ -99,7 +102,7 @@ class AssetView(View):
             raise Http404("Asset is a directory")
 
     @functools.cache
-    def get_last_modified(self, path):
+    def get_last_modified(self, path: str) -> str | None:
         try:
             mtime = os.path.getmtime(path)
         except OSError:
@@ -107,9 +110,10 @@ class AssetView(View):
 
         if mtime:
             return formatdate(mtime, usegmt=True)
+        return None
 
     @functools.cache
-    def get_etag(self, path):
+    def get_etag(self, path: str) -> str:
         try:
             mtime = os.path.getmtime(path)
         except OSError:
@@ -120,10 +124,10 @@ class AssetView(View):
         return f'"{timestamp:x}-{size:x}"'
 
     @functools.cache
-    def get_size(self, path):
+    def get_size(self, path: str) -> int:
         return os.path.getsize(path)
 
-    def update_headers(self, headers, path):
+    def update_headers(self, headers: dict, path: str) -> dict:
         headers.setdefault("Access-Control-Allow-Origin", "*")
 
         # Always vary on Accept-Encoding
@@ -165,7 +169,7 @@ class AssetView(View):
 
         return headers
 
-    def is_immutable(self, path):
+    def is_immutable(self, path: str) -> bool:
         """
         Determine whether an asset looks like it is immutable.
 
@@ -182,14 +186,14 @@ class AssetView(View):
 
         return False
 
-    def get_encoded_path(self, path):
+    def get_encoded_path(self, path: str) -> str | None:
         """
         If the client supports compression, return the path to the compressed file.
         Otherwise, return the original path.
         """
         accept_encoding = self.request.headers.get("Accept-Encoding")
         if not accept_encoding:
-            return
+            return None
 
         if "br" in accept_encoding:
             br_path = path + ".br"
@@ -200,15 +204,16 @@ class AssetView(View):
             gzip_path = path + ".gz"
             if os.path.exists(gzip_path):
                 return gzip_path
+        return None
 
-    def get_redirect_response(self, path):
+    def get_redirect_response(self, path: str) -> ResponseRedirect | None:
         """If the asset is not found, try to redirect to the fingerprinted path"""
         fingerprinted_url_path = get_fingerprinted_url_path(path)
 
         if not fingerprinted_url_path or fingerprinted_url_path == path:
             # Don't need to redirect if there is no fingerprinted path,
             # or we're already looking at it.
-            return
+            return None
 
         from .urls import AssetsRouter
 
@@ -221,7 +226,7 @@ class AssetView(View):
             },
         )
 
-    def get_conditional_response(self, path):
+    def get_conditional_response(self, path: str) -> ResponseNotModified | None:
         """
         Support conditional requests (HTTP 304 response) based on ETag and Last-Modified headers.
         """
@@ -241,8 +246,9 @@ class AssetView(View):
                 response = ResponseNotModified()
                 response.headers = self.update_headers(response.headers, path)
                 return response
+        return None
 
-    def get_range_response(self, path):
+    def get_range_response(self, path: str) -> Response | StreamingResponse | None:
         """
         Support range requests (HTTP 206 response).
         """
