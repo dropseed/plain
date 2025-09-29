@@ -1,7 +1,15 @@
+from __future__ import annotations
+
+from collections.abc import Callable
 from importlib import import_module
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 
-def deconstructible(*args, path=None):
+def deconstructible(
+    *args: type[T], path: str | None = None
+) -> Callable[[type[T]], type[T]] | type[T]:
     """
     Class decorator that allows the decorated class to be serialized
     by the migrations subsystem.
@@ -9,14 +17,14 @@ def deconstructible(*args, path=None):
     The `path` kwarg specifies the import path.
     """
 
-    def decorator(klass):
-        def __new__(cls, *args, **kwargs):
+    def decorator(klass: type[T]) -> type[T]:
+        def __new__(cls: type[T], *args: Any, **kwargs: Any) -> T:
             # We capture the arguments to make returning them trivial
             obj = super(klass, cls).__new__(cls)
             obj._constructor_args = (args, kwargs)
             return obj
 
-        def deconstruct(obj):
+        def deconstruct(obj: Any) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
             """
             Return a 3-tuple of class import path, positional arguments,
             and keyword arguments.

@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import copy
 import itertools
 import operator
+from collections.abc import Callable
 from functools import total_ordering, wraps
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 
 class classproperty:
@@ -10,13 +16,13 @@ class classproperty:
     that can be accessed directly from the class.
     """
 
-    def __init__(self, method=None):
+    def __init__(self, method: Callable[[type], Any] | None = None) -> None:
         self.fget = method
 
-    def __get__(self, instance, cls=None):
+    def __get__(self, instance: Any, cls: type | None = None) -> Any:
         return self.fget(cls)
 
-    def getter(self, method):
+    def getter(self, method: Callable[[type], Any]) -> classproperty:
         self.fget = method
         return self
 
@@ -30,7 +36,7 @@ class Promise:
     pass
 
 
-def lazy(func, *resultclasses):
+def lazy(func: Callable[..., Any], *resultclasses: type) -> Callable[..., Any]:
     """
     Turn any callable into a lazy evaluated callable. result classes or types
     is required -- at least one is needed so that the automatic forcing of
@@ -48,24 +54,24 @@ def lazy(func, *resultclasses):
 
         __prepared = False
 
-        def __init__(self, args, kw):
+        def __init__(self, args: tuple[Any, ...], kw: dict[str, Any]) -> None:
             self.__args = args
             self.__kw = kw
             if not self.__prepared:
                 self.__prepare_class__()
             self.__class__.__prepared = True
 
-        def __reduce__(self):
+        def __reduce__(self) -> tuple[Callable[..., Any], tuple[Any, ...]]:
             return (
                 _lazy_proxy_unpickle,
                 (func, self.__args, self.__kw) + resultclasses,
             )
 
-        def __repr__(self):
+        def __repr__(self) -> str:
             return repr(self.__cast())
 
         @classmethod
-        def __prepare_class__(cls):
+        def __prepare_class__(cls) -> None:
             for resultclass in resultclasses:
                 for type_ in resultclass.mro():
                     for method_name in type_.__dict__:
@@ -87,9 +93,9 @@ def lazy(func, *resultclasses):
                 cls.__bytes__ = cls.__bytes_cast
 
         @classmethod
-        def __promise__(cls, method_name):
+        def __promise__(cls, method_name: str) -> Callable[..., Any]:
             # Builds a wrapper around some magic method
-            def __wrapper__(self, *args, **kw):
+            def __wrapper__(self: Any, *args: Any, **kw: Any) -> Any:
                 # Automatically triggers the evaluation of a lazy value and
                 # applies the given magic method of the result type.
                 res = func(*self.__args, **self.__kw)
@@ -97,16 +103,16 @@ def lazy(func, *resultclasses):
 
             return __wrapper__
 
-        def __text_cast(self):
+        def __text_cast(self) -> str:
             return func(*self.__args, **self.__kw)
 
-        def __bytes_cast(self):
+        def __bytes_cast(self) -> bytes:
             return bytes(func(*self.__args, **self.__kw))
 
-        def __bytes_cast_encoded(self):
+        def __bytes_cast_encoded(self) -> bytes:
             return func(*self.__args, **self.__kw).encode()
 
-        def __cast(self):
+        def __cast(self) -> Any:
             if self._delegate_bytes:
                 return self.__bytes_cast()
             elif self._delegate_text:
@@ -114,36 +120,36 @@ def lazy(func, *resultclasses):
             else:
                 return func(*self.__args, **self.__kw)
 
-        def __str__(self):
+        def __str__(self) -> str:
             # object defines __str__(), so __prepare_class__() won't overload
             # a __str__() method from the proxied class.
             return str(self.__cast())
 
-        def __eq__(self, other):
+        def __eq__(self, other: Any) -> bool:
             if isinstance(other, Promise):
                 other = other.__cast()
             return self.__cast() == other
 
-        def __lt__(self, other):
+        def __lt__(self, other: Any) -> bool:
             if isinstance(other, Promise):
                 other = other.__cast()
             return self.__cast() < other
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash(self.__cast())
 
-        def __mod__(self, rhs):
+        def __mod__(self, rhs: Any) -> Any:
             if self._delegate_text:
                 return str(self) % rhs
             return self.__cast() % rhs
 
-        def __add__(self, other):
+        def __add__(self, other: Any) -> Any:
             return self.__cast() + other
 
-        def __radd__(self, other):
+        def __radd__(self, other: Any) -> Any:
             return other + self.__cast()
 
-        def __deepcopy__(self, memo):
+        def __deepcopy__(self, memo: dict[int, Any]) -> __proxy__:
             # Instances of this class are effectively immutable. It's just a
             # collection of functions. So we don't need to do anything
             # complicated for copying.
@@ -151,18 +157,25 @@ def lazy(func, *resultclasses):
             return self
 
     @wraps(func)
-    def __wrapper__(*args, **kw):
+    def __wrapper__(*args: Any, **kw: Any) -> __proxy__:
         # Creates the proxy object, instead of the actual value.
         return __proxy__(args, kw)
 
     return __wrapper__
 
 
-def _lazy_proxy_unpickle(func, args, kwargs, *resultclasses):
+def _lazy_proxy_unpickle(
+    func: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    *resultclasses: type,
+) -> Any:
     return lazy(func, *resultclasses)(*args, **kwargs)
 
 
-def keep_lazy(*resultclasses):
+def keep_lazy(
+    *resultclasses: type,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     A decorator that allows a function to be called with one or more lazy
     arguments. If none of the args are lazy, the function is evaluated
@@ -172,11 +185,11 @@ def keep_lazy(*resultclasses):
     if not resultclasses:
         raise TypeError("You must pass at least one argument to keep_lazy().")
 
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         lazy_func = lazy(func, *resultclasses)
 
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             if any(
                 isinstance(arg, Promise)
                 for arg in itertools.chain(args, kwargs.values())
@@ -189,7 +202,7 @@ def keep_lazy(*resultclasses):
     return decorator
 
 
-def keep_lazy_text(func):
+def keep_lazy_text(func: Callable[..., Any]) -> Callable[..., Any]:
     """
     A decorator for functions that accept lazy arguments and return text.
     """
@@ -199,14 +212,14 @@ def keep_lazy_text(func):
 empty = object()
 
 
-def new_method_proxy(func):
-    def inner(self, *args):
+def new_method_proxy(func: Callable[..., Any]) -> Callable[..., Any]:
+    def inner(self: Any, *args: Any) -> Any:
         if (_wrapped := self._wrapped) is empty:
             self._setup()
             _wrapped = self._wrapped
         return func(_wrapped, *args)
 
-    inner._mask_wrapped = False
+    inner._mask_wrapped = False  # type: ignore[attr-defined]
     return inner
 
 
@@ -227,7 +240,7 @@ class LazyObject:
         # override __copy__() and __deepcopy__() as well.
         self._wrapped = empty
 
-    def __getattribute__(self, name):
+    def __getattribute__(self, name: str) -> Any:
         if name == "_wrapped":
             # Avoid recursion when getting wrapped object.
             return super().__getattribute__(name)
@@ -240,7 +253,7 @@ class LazyObject:
 
     __getattr__ = new_method_proxy(getattr)
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         if name == "_wrapped":
             # Assign to __dict__ to avoid infinite __setattr__ loops.
             self.__dict__["_wrapped"] = value
@@ -249,14 +262,14 @@ class LazyObject:
                 self._setup()
             setattr(self._wrapped, name, value)
 
-    def __delattr__(self, name):
+    def __delattr__(self, name: str) -> None:
         if name == "_wrapped":
             raise TypeError("can't delete _wrapped.")
         if self._wrapped is empty:
             self._setup()
         delattr(self._wrapped, name)
 
-    def _setup(self):
+    def _setup(self) -> None:
         """
         Must be implemented by subclasses to initialize the wrapped object.
         """
@@ -278,12 +291,12 @@ class LazyObject:
     # pickle the wrapped object as the unpickler's argument, so that pickle
     # will pickle it normally, and then the unpickler simply returns its
     # argument.
-    def __reduce__(self):
+    def __reduce__(self) -> tuple[Callable[[Any], Any], tuple[Any, ...]]:
         if self._wrapped is empty:
             self._setup()
         return (unpickle_lazyobject, (self._wrapped,))
 
-    def __copy__(self):
+    def __copy__(self) -> LazyObject | Any:
         if self._wrapped is empty:
             # If uninitialized, copy the wrapper. Use type(self), not
             # self.__class__, because the latter is proxied.
@@ -292,7 +305,7 @@ class LazyObject:
             # If initialized, return a copy of the wrapped object.
             return copy.copy(self._wrapped)
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> LazyObject | Any:
         if self._wrapped is empty:
             # We have to use type(self), not self.__class__, because the
             # latter is proxied.
@@ -326,7 +339,7 @@ class LazyObject:
     __contains__ = new_method_proxy(operator.contains)
 
 
-def unpickle_lazyobject(wrapped):
+def unpickle_lazyobject(wrapped: Any) -> Any:
     """
     Used to unpickle lazy objects. Just return its argument, which will be the
     wrapped object.
@@ -342,7 +355,7 @@ class SimpleLazyObject(LazyObject):
     known type, use plain.utils.functional.lazy.
     """
 
-    def __init__(self, func):
+    def __init__(self, func: Callable[[], Any]) -> None:
         """
         Pass in a callable that returns the object to be wrapped.
 
@@ -354,19 +367,19 @@ class SimpleLazyObject(LazyObject):
         self.__dict__["_setupfunc"] = func
         super().__init__()
 
-    def _setup(self):
+    def _setup(self) -> None:
         self._wrapped = self._setupfunc()
 
     # Return a meaningful representation of the lazy object for debugging
     # without evaluating the wrapped object.
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self._wrapped is empty:
             repr_attr = self._setupfunc
         else:
             repr_attr = self._wrapped
         return f"<{type(self).__name__}: {repr_attr!r}>"
 
-    def __copy__(self):
+    def __copy__(self) -> SimpleLazyObject | Any:
         if self._wrapped is empty:
             # If uninitialized, copy the wrapper. Use SimpleLazyObject, not
             # self.__class__, because the latter is proxied.
@@ -375,7 +388,7 @@ class SimpleLazyObject(LazyObject):
             # If initialized, return a copy of the wrapped object.
             return copy.copy(self._wrapped)
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> SimpleLazyObject | Any:
         if self._wrapped is empty:
             # We have to use SimpleLazyObject, not self.__class__, because the
             # latter is proxied.
@@ -387,11 +400,13 @@ class SimpleLazyObject(LazyObject):
     __add__ = new_method_proxy(operator.add)
 
     @new_method_proxy
-    def __radd__(self, other):
+    def __radd__(self: Any, other: Any) -> Any:
         return other + self
 
 
-def partition(predicate, values):
+def partition(
+    predicate: Callable[[Any], bool], values: Any
+) -> tuple[list[Any], list[Any]]:
     """
     Split the values into two sets, based on the return value of the function
     (True/False). e.g.:
@@ -399,7 +414,7 @@ def partition(predicate, values):
         >>> partition(lambda x: x > 3, range(5))
         [0, 1, 2, 3], [4]
     """
-    results = ([], [])
+    results: tuple[list[Any], list[Any]] = ([], [])
     for item in values:
         results[predicate(item)].append(item)
     return results

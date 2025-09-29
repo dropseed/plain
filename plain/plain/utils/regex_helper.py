@@ -6,7 +6,11 @@ This is not, and is not intended to be, a complete reg-exp decompiler. It
 should be good enough for a large class of URLS, however.
 """
 
+from __future__ import annotations
+
 import re
+from collections.abc import Iterator
+from typing import Any, cast
 
 from plain.utils.functional import SimpleLazyObject
 
@@ -39,7 +43,7 @@ class NonCapture(list):
     """Represent a non-capturing group in the pattern string."""
 
 
-def normalize(pattern):
+def normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
     r"""
     Given a reg-exp pattern, normalize it to an iterable of forms that
     suffice for reverse matching. This does the following:
@@ -193,7 +197,7 @@ def normalize(pattern):
     return list(zip(*flatten_result(result)))
 
 
-def next_char(input_iter):
+def next_char(input_iter: Iterator[str]) -> Iterator[tuple[str, bool]]:
     r"""
     An iterator that yields the next character from "pattern_iter", respecting
     escape sequences. An escaped character is replaced by a representative of
@@ -214,7 +218,7 @@ def next_char(input_iter):
         yield representative, True
 
 
-def walk_to_end(ch, input_iter):
+def walk_to_end(ch: str, input_iter: Iterator[tuple[str, bool]]) -> None:
     """
     The iterator is currently inside a capturing group. Walk to the close of
     this group, skipping over any nested groups and handling escaped
@@ -235,7 +239,9 @@ def walk_to_end(ch, input_iter):
             nesting -= 1
 
 
-def get_quantifier(ch, input_iter):
+def get_quantifier(
+    ch: str, input_iter: Iterator[tuple[str, bool]]
+) -> tuple[int, str | None]:
     """
     Parse a quantifier from the input, where "ch" is the first character in the
     quantifier.
@@ -263,16 +269,18 @@ def get_quantifier(ch, input_iter):
     values = "".join(quant).split(",")
 
     # Consume the trailing '?', if necessary.
+    ch2: str | None
     try:
         ch, escaped = next(input_iter)
+        ch2 = ch
     except StopIteration:
-        ch = None
-    if ch == "?":
-        ch = None
-    return int(values[0]), ch
+        ch2 = None
+    if ch2 == "?":
+        ch2 = None
+    return int(values[0]), ch2
 
 
-def contains(source, inst):
+def contains(source: Any, inst: type) -> bool:
     """
     Return True if the "source" contains an instance of "inst". False,
     otherwise.
@@ -286,7 +294,7 @@ def contains(source, inst):
     return False
 
 
-def flatten_result(source):
+def flatten_result(source: Any) -> tuple[list[str], list[list[str | None]]]:
     """
     Turn the given source sequence into a list of reg-exp possibilities and
     their arguments. Return a list of strings and a list of argument lists.
@@ -340,15 +348,17 @@ def flatten_result(source):
     return result, result_args
 
 
-def _lazy_re_compile(regex, flags=0):
+def _lazy_re_compile(
+    regex: str | bytes | re.Pattern[str] | re.Pattern[bytes], flags: int = 0
+) -> SimpleLazyObject:
     """Lazily compile a regex with flags."""
 
-    def _compile():
+    def _compile() -> re.Pattern[str] | re.Pattern[bytes]:
         # Compile the regex if it was not passed pre-compiled.
         if isinstance(regex, str | bytes):
             return re.compile(regex, flags)
         else:
             assert not flags, "flags must be empty if regex is passed pre-compiled"
-            return regex
+            return cast(re.Pattern[str] | re.Pattern[bytes], regex)
 
     return SimpleLazyObject(_compile)

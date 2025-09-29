@@ -5,15 +5,21 @@ that the producer of the string has already turned characters that should not
 be interpreted by the HTML engine (e.g. '<') into the appropriate entities.
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
 from functools import wraps
+from typing import Any, TypeVar
 
 from plain.utils.functional import keep_lazy
+
+_T = TypeVar("_T")
 
 
 class SafeData:
     __slots__ = ()
 
-    def __html__(self):
+    def __html__(self) -> SafeData:
         """
         Return the html representation of a string for interoperability.
 
@@ -30,7 +36,7 @@ class SafeString(str, SafeData):
 
     __slots__ = ()
 
-    def __add__(self, rhs):
+    def __add__(self, rhs: str) -> SafeString | str:
         """
         Concatenating a safe string with another safe bytestring or
         safe string is safe. Otherwise, the result is no longer safe.
@@ -40,20 +46,22 @@ class SafeString(str, SafeData):
             return SafeString(t)
         return t
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self
 
 
-def _safety_decorator(safety_marker, func):
+def _safety_decorator(
+    safety_marker: Callable[[Any], _T], func: Callable[..., Any]
+) -> Callable[..., _T]:
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> _T:
         return safety_marker(func(*args, **kwargs))
 
     return wrapper
 
 
 @keep_lazy(SafeString)
-def mark_safe(s):
+def mark_safe(s: Any) -> SafeString | SafeData | Callable[..., Any]:
     """
     Explicitly mark a string as safe for (HTML) output purposes. The returned
     object can be used everywhere a string is appropriate.

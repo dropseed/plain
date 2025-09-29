@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Generator, Iterable
 from email.utils import formatdate
+from typing import Any
 from urllib.parse import quote, unquote
 from urllib.parse import urlencode as original_urlencode
 
@@ -7,7 +11,10 @@ from plain.utils.datastructures import MultiValueDict
 RFC3986_SUBDELIMS = "!$&'()*+,;="
 
 
-def urlencode(query, doseq=False):
+def urlencode(
+    query: MultiValueDict | dict[str, Any] | Iterable[tuple[str, Any]],
+    doseq: bool = False,
+) -> str:
     """
     A version of Python's urllib.parse.urlencode() function that can operate on
     MultiValueDict and non-string values.
@@ -15,7 +22,7 @@ def urlencode(query, doseq=False):
     if isinstance(query, MultiValueDict):
         query = query.lists()
     elif hasattr(query, "items"):
-        query = query.items()
+        query = query.items()  # type: ignore[assignment]
     query_params = []
     for key, value in query:
         if value is None:
@@ -48,7 +55,7 @@ def urlencode(query, doseq=False):
     return original_urlencode(query_params, doseq)
 
 
-def http_date(epoch_seconds=None):
+def http_date(epoch_seconds: float | None = None) -> str:
     """
     Format the time to match the RFC 5322 date format as specified by RFC 9110
     Section 5.6.7.
@@ -65,7 +72,7 @@ def http_date(epoch_seconds=None):
 # Base 36 functions: useful for generating compact URLs
 
 
-def base36_to_int(s):
+def base36_to_int(s: str) -> int:
     """
     Convert a base 36 string to an int. Raise ValueError if the input won't fit
     into an int.
@@ -78,7 +85,7 @@ def base36_to_int(s):
     return int(s, 36)
 
 
-def int_to_base36(i):
+def int_to_base36(i: int) -> str:
     """Convert an integer to a base36 string."""
     char_set = "0123456789abcdefghijklmnopqrstuvwxyz"
     if i < 0:
@@ -92,7 +99,7 @@ def int_to_base36(i):
     return b36
 
 
-def escape_leading_slashes(url):
+def escape_leading_slashes(url: str) -> str:
     """
     If redirecting to an absolute path (two leading slashes), a slash must be
     escaped to prevent browsers from handling the path as schemaless and
@@ -103,7 +110,7 @@ def escape_leading_slashes(url):
     return url
 
 
-def _parseparam(s):
+def _parseparam(s: str) -> Generator[str, None, None]:
     while s[:1] == ";":
         s = s[1:]
         end = s.find(";")
@@ -116,7 +123,7 @@ def _parseparam(s):
         s = s[end:]
 
 
-def parse_header_parameters(line):
+def parse_header_parameters(line: str) -> tuple[str, dict[str, str]]:
     """
     Parse a Content-type like header.
     Return the main content-type and a dictionary of options.
@@ -146,7 +153,7 @@ def parse_header_parameters(line):
     return key, pdict
 
 
-def content_disposition_header(as_attachment, filename):
+def content_disposition_header(as_attachment: bool, filename: str) -> str | None:
     """
     Construct a Content-Disposition HTTP header value from the given filename
     as specified by RFC 6266.

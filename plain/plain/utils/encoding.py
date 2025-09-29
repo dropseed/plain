@@ -1,17 +1,20 @@
+from __future__ import annotations
+
 import datetime
 from decimal import Decimal
 from types import NoneType
+from typing import Any
 from urllib.parse import quote
 
 from plain.utils.functional import Promise
 
 
 class PlainUnicodeDecodeError(UnicodeDecodeError):
-    def __init__(self, obj, *args):
+    def __init__(self, obj: Any, *args: Any):
         self.obj = obj
         super().__init__(*args)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{super().__str__()}. You passed in {self.obj!r} ({type(self.obj)})"
 
 
@@ -26,7 +29,7 @@ _PROTECTED_TYPES = (
 )
 
 
-def is_protected_type(obj):
+def is_protected_type(obj: Any) -> bool:
     """Determine if the object instance is of a protected type.
 
     Objects of protected types are preserved as-is when passed to
@@ -35,7 +38,9 @@ def is_protected_type(obj):
     return isinstance(obj, _PROTECTED_TYPES)
 
 
-def force_str(s, encoding="utf-8", strings_only=False, errors="strict"):
+def force_str(
+    s: Any, encoding: str = "utf-8", strings_only: bool = False, errors: str = "strict"
+) -> str | Any:
     """
     Similar to smart_str(), except that lazy instances are resolved to
     strings, rather than kept as lazy objects.
@@ -57,7 +62,9 @@ def force_str(s, encoding="utf-8", strings_only=False, errors="strict"):
     return s
 
 
-def force_bytes(s, encoding="utf-8", strings_only=False, errors="strict"):
+def force_bytes(
+    s: Any, encoding: str = "utf-8", strings_only: bool = False, errors: str = "strict"
+) -> bytes | Any:
     """
     Similar to smart_bytes, except that lazy instances are resolved to
     strings, rather than kept as lazy objects.
@@ -77,7 +84,7 @@ def force_bytes(s, encoding="utf-8", strings_only=False, errors="strict"):
     return str(s).encode(encoding, errors)
 
 
-def iri_to_uri(iri):
+def iri_to_uri(iri: str | Promise | None) -> str | None:
     """
     Convert an Internationalized Resource Identifier (IRI) portion to a URI
     portion that is suitable for inclusion in a URL.
@@ -125,6 +132,6 @@ _hextobyte.update(
 )
 
 
-def punycode(domain):
+def punycode(domain: str) -> str:
     """Return the Punycode of the given domain if it's non-ASCII."""
     return domain.encode("idna").decode("ascii")

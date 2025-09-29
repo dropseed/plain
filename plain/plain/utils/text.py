@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import re
 import unicodedata
+from typing import Any
 
 from plain.utils.functional import SimpleLazyObject, keep_lazy_text, lazy
 from plain.utils.regex_helper import _lazy_re_compile
@@ -15,10 +18,10 @@ class Truncator(SimpleLazyObject):
     An object used to truncate text, either by characters or words.
     """
 
-    def __init__(self, text):
+    def __init__(self, text: Any):
         super().__init__(lambda: str(text))
 
-    def add_truncation_text(self, text, truncate=None):
+    def add_truncation_text(self, text: str, truncate: str | None = None) -> str:
         if truncate is None:
             truncate = "%(truncated_text)s…"
         if "%(truncated_text)s" in truncate:
@@ -31,7 +34,7 @@ class Truncator(SimpleLazyObject):
             return text
         return f"{text}{truncate}"
 
-    def chars(self, num, truncate=None, html=False):
+    def chars(self, num: int, truncate: str | None = None, html: bool = False) -> str:
         """
         Return the text truncated to be no longer than the specified number
         of characters.
@@ -54,7 +57,9 @@ class Truncator(SimpleLazyObject):
             return self._truncate_html(length, truncate, text, truncate_len, False)
         return self._text_chars(length, truncate, text, truncate_len)
 
-    def _text_chars(self, length, truncate, text, truncate_len):
+    def _text_chars(
+        self, length: int, truncate: str | None, text: str, truncate_len: int
+    ) -> str:
         """Truncate a string after a certain number of chars."""
         s_len = 0
         end_index = None
@@ -73,7 +78,7 @@ class Truncator(SimpleLazyObject):
         # Return the original string since no truncation was necessary
         return text
 
-    def words(self, num, truncate=None, html=False):
+    def words(self, num: int, truncate: str | None = None, html: bool = False) -> str:
         """
         Truncate a string after a certain number of words. `truncate` specifies
         what should be used to notify that the string has been truncated,
@@ -85,7 +90,7 @@ class Truncator(SimpleLazyObject):
             return self._truncate_html(length, truncate, self._wrapped, length, True)
         return self._text_words(length, truncate)
 
-    def _text_words(self, length, truncate):
+    def _text_words(self, length: int, truncate: str | None) -> str:
         """
         Truncate a string after a certain number of words.
 
@@ -97,7 +102,14 @@ class Truncator(SimpleLazyObject):
             return self.add_truncation_text(" ".join(words), truncate)
         return " ".join(words)
 
-    def _truncate_html(self, length, truncate, text, truncate_len, words):
+    def _truncate_html(
+        self,
+        length: int,
+        truncate: str | None,
+        text: str,
+        truncate_len: int,
+        words: bool,
+    ) -> str:
         """
         Truncate HTML to a certain number of chars (not counting tags and
         comments), or, if words is True, then to a certain number of words.
@@ -178,7 +190,7 @@ class Truncator(SimpleLazyObject):
 
 
 @keep_lazy_text
-def slugify(value, allow_unicode=False):
+def slugify(value: Any, allow_unicode: bool = False) -> str:
     """
     Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
     dashes to single dashes. Remove characters that aren't alphanumerics,
@@ -198,18 +210,22 @@ def slugify(value, allow_unicode=False):
     return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
-def pluralize(singular, plural, number):
+def pluralize(singular: str, plural: str, number: int) -> str:
     if number == 1:
         return singular
     else:
         return plural
 
 
-def pluralize_lazy(singular, plural, number):
-    def _lazy_number_unpickle(func, resultclass, number, kwargs):
+def pluralize_lazy(singular: str, plural: str, number: int | str) -> Any:
+    def _lazy_number_unpickle(
+        func: Any, resultclass: Any, number: Any, kwargs: dict[str, Any]
+    ) -> Any:
         return lazy_number(func, resultclass, number=number, **kwargs)
 
-    def lazy_number(func, resultclass, number=None, **kwargs):
+    def lazy_number(
+        func: Any, resultclass: Any, number: int | str | None = None, **kwargs: Any
+    ) -> Any:
         if isinstance(number, int):
             kwargs["number"] = number
             proxy = lazy(func, resultclass)(**kwargs)
@@ -217,12 +233,12 @@ def pluralize_lazy(singular, plural, number):
             original_kwargs = kwargs.copy()
 
             class NumberAwareString(resultclass):
-                def __bool__(self):
+                def __bool__(self) -> bool:
                     return bool(kwargs["singular"])
 
-                def _get_number_value(self, values):
+                def _get_number_value(self, values: dict[str, Any]) -> Any:
                     try:
-                        return values[number]
+                        return values[number]  # type: ignore[index]
                     except KeyError:
                         raise KeyError(
                             f"Your dictionary lacks key '{number}'. Please provide "
@@ -230,17 +246,17 @@ def pluralize_lazy(singular, plural, number):
                             "string is singular or plural."
                         )
 
-                def _translate(self, number_value):
+                def _translate(self, number_value: int) -> str:
                     kwargs["number"] = number_value
                     return func(**kwargs)
 
-                def format(self, *args, **kwargs):
+                def format(self, *args: Any, **kwargs: Any) -> str:
                     number_value = (
                         self._get_number_value(kwargs) if kwargs and number else args[0]
                     )
                     return self._translate(number_value).format(*args, **kwargs)
 
-                def __mod__(self, rhs):
+                def __mod__(self, rhs: Any) -> str:
                     if isinstance(rhs, dict) and number:
                         number_value = self._get_number_value(rhs)
                     else:

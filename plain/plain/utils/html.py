@@ -1,15 +1,18 @@
 """HTML utilities suitable for global use."""
 
+from __future__ import annotations
+
 import html
 import json
 from html.parser import HTMLParser
+from typing import Any
 
 from plain.utils.functional import Promise, keep_lazy, keep_lazy_text
 from plain.utils.safestring import SafeString, mark_safe
 
 
 @keep_lazy(SafeString)
-def escape(text):
+def escape(text: Any) -> SafeString:
     """
     Return the given text with ampersands, quotes and angle brackets encoded
     for use in HTML.
@@ -28,7 +31,11 @@ _json_script_escapes = {
 }
 
 
-def json_script(value, element_id=None, encoder=None):
+def json_script(
+    value: Any,
+    element_id: str | None = None,
+    encoder: type[json.JSONEncoder] | None = None,
+) -> SafeString:
     """
     Escape all the HTML/XML special characters with their unicode escapes, so
     value is safe to be output anywhere except for inside a tag attribute. Wrap
@@ -48,7 +55,7 @@ def json_script(value, element_id=None, encoder=None):
     return format_html(template, *args)
 
 
-def conditional_escape(text):
+def conditional_escape(text: Any) -> SafeString | str:
     """
     Similar to escape(), except that it doesn't operate on pre-escaped strings.
 
@@ -58,12 +65,12 @@ def conditional_escape(text):
     if isinstance(text, Promise):
         text = str(text)
     if hasattr(text, "__html__"):
-        return text.__html__()
+        return text.__html__()  # type: ignore[call-non-callable]
     else:
         return escape(text)
 
 
-def format_html(format_string, *args, **kwargs):
+def format_html(format_string: str, *args: Any, **kwargs: Any) -> SafeString:
     """
     Similar to str.format, but pass all arguments through conditional_escape(),
     and call mark_safe() on the result. This function should be used instead
@@ -75,25 +82,25 @@ def format_html(format_string, *args, **kwargs):
 
 
 class MLStripper(HTMLParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
         self.reset()
-        self.fed = []
+        self.fed: list[str] = []
 
-    def handle_data(self, d):
+    def handle_data(self, d: str) -> None:
         self.fed.append(d)
 
-    def handle_entityref(self, name):
+    def handle_entityref(self, name: str) -> None:
         self.fed.append(f"&{name};")
 
-    def handle_charref(self, name):
+    def handle_charref(self, name: str) -> None:
         self.fed.append(f"&#{name};")
 
-    def get_data(self):
+    def get_data(self) -> str:
         return "".join(self.fed)
 
 
-def _strip_once(value):
+def _strip_once(value: str) -> str:
     """
     Internal tag stripping utility used by strip_tags.
     """
@@ -104,7 +111,7 @@ def _strip_once(value):
 
 
 @keep_lazy_text
-def strip_tags(value):
+def strip_tags(value: Any) -> str:
     """Return the given HTML with all tags stripped."""
     # Note: in typical case this loop executes _strip_once once. Loop condition
     # is redundant, but helps to reduce number of executions of _strip_once.
@@ -118,7 +125,7 @@ def strip_tags(value):
     return value
 
 
-def avoid_wrapping(value):
+def avoid_wrapping(value: str) -> str:
     """
     Avoid text wrapping in the middle of a phrase by adding non-breaking
     spaces where there previously were normal spaces.

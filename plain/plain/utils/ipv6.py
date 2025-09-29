@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import ipaddress
 
 from plain.exceptions import ValidationError
 
 
 def clean_ipv6_address(
-    ip_str, unpack_ipv4=False, error_message="This is not a valid IPv6 address."
-):
+    ip_str: str,
+    unpack_ipv4: bool = False,
+    error_message: str = "This is not a valid IPv6 address.",
+) -> str:
     """
     Clean an IPv6 address string.
 
@@ -35,7 +39,7 @@ def clean_ipv6_address(
     return str(addr)
 
 
-def is_valid_ipv6_address(ip_str):
+def is_valid_ipv6_address(ip_str: str) -> bool:
     """
     Return whether or not the `ip_str` string is a valid IPv6 address.
     """

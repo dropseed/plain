@@ -15,16 +15,22 @@ An example: i18n middleware would need to distinguish caches by the
 "Accept-language" header.
 """
 
+from __future__ import annotations
+
 import time
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 from .http import http_date
 from .regex_helper import _lazy_re_compile
 
+if TYPE_CHECKING:
+    from plain.http import Response
+
 cc_delim_re = _lazy_re_compile(r"\s*,\s*")
 
 
-def patch_response_headers(response, cache_timeout):
+def patch_response_headers(response: Response, cache_timeout: int | float) -> None:
     """
     Add HTTP caching headers to the given HttpResponse: Expires and
     Cache-Control.
@@ -38,7 +44,7 @@ def patch_response_headers(response, cache_timeout):
     patch_cache_control(response, max_age=cache_timeout)
 
 
-def add_never_cache_headers(response):
+def add_never_cache_headers(response: Response) -> None:
     """
     Add headers to a response to indicate that a page should never be cached.
     """
@@ -48,7 +54,7 @@ def add_never_cache_headers(response):
     )
 
 
-def patch_cache_control(response, **kwargs):
+def patch_cache_control(response: Response, **kwargs: Any) -> None:
     """
     Patch the Cache-Control header by adding all keyword arguments to it.
     The transformation is as follows:
@@ -61,16 +67,16 @@ def patch_cache_control(response, **kwargs):
       str() to it.
     """
 
-    def dictitem(s):
+    def dictitem(s: str) -> tuple[str, str | bool]:
         t = s.split("=", 1)
         if len(t) > 1:
             return (t[0].lower(), t[1])
         else:
             return (t[0].lower(), True)
 
-    def dictvalue(*t):
+    def dictvalue(*t: str | bool) -> str:
         if t[1] is True:
-            return t[0]
+            return str(t[0])
         else:
             return f"{t[0]}={t[1]}"
 
@@ -117,7 +123,7 @@ def patch_cache_control(response, **kwargs):
     response.headers["Cache-Control"] = cc
 
 
-def patch_vary_headers(response, newheaders):
+def patch_vary_headers(response: Response, newheaders: list[str]) -> None:
     """
     Add (or update) the "Vary" header in the given Response object.
     newheaders is a list of header names that should be in "Vary". If headers
@@ -145,7 +151,7 @@ def patch_vary_headers(response, newheaders):
         response.headers["Vary"] = ", ".join(vary_headers)
 
 
-def _to_tuple(s):
+def _to_tuple(s: str) -> tuple[str, str | bool]:
     t = s.split("=", 1)
     if len(t) == 2:
         return t[0].lower(), t[1]

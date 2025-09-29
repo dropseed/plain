@@ -1,7 +1,11 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.utils.itercompat import is_iterable
 
 
-def make_hashable(value):
+def make_hashable(value: Any) -> Any:
     """
     Attempt to make value hashable or raise a TypeError if it fails.
 

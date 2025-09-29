@@ -2,9 +2,13 @@
 Plain's standard crypto functions and utilities.
 """
 
+from __future__ import annotations
+
 import hashlib
 import hmac
 import secrets
+from collections.abc import Callable
+from typing import Any
 
 from plain.runtime import settings
 from plain.utils.encoding import force_bytes
@@ -16,7 +20,13 @@ class InvalidAlgorithm(ValueError):
     pass
 
 
-def salted_hmac(key_salt, value, secret=None, *, algorithm="sha1"):
+def salted_hmac(
+    key_salt: str | bytes,
+    value: str | bytes,
+    secret: str | bytes | None = None,
+    *,
+    algorithm: str = "sha1",
+) -> hmac.HMAC:
     """
     Return the HMAC of 'value', using a key generated from key_salt and a
     secret (which defaults to settings.SECRET_KEY). Default algorithm is SHA1,
@@ -48,7 +58,7 @@ def salted_hmac(key_salt, value, secret=None, *, algorithm="sha1"):
 RANDOM_STRING_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 
-def get_random_string(length, allowed_chars=RANDOM_STRING_CHARS):
+def get_random_string(length: int, allowed_chars: str = RANDOM_STRING_CHARS) -> str:
     """
     Return a securely generated random string.
 
@@ -62,11 +72,17 @@ def get_random_string(length, allowed_chars=RANDOM_STRING_CHARS):
     return "".join(secrets.choice(allowed_chars) for i in range(length))
 
 
-def pbkdf2(password, salt, iterations, dklen=0, digest=None):
+def pbkdf2(
+    password: str | bytes,
+    salt: str | bytes,
+    iterations: int,
+    dklen: int = 0,
+    digest: Callable[[], Any] | None = None,
+) -> bytes:
     """Return the hash of password using pbkdf2."""
     if digest is None:
         digest = hashlib.sha256
-    dklen = dklen or None
+    dklen_value: int | None = dklen if dklen else None
     password = force_bytes(password)
     salt = force_bytes(salt)
-    return hashlib.pbkdf2_hmac(digest().name, password, salt, iterations, dklen)
+    return hashlib.pbkdf2_hmac(digest().name, password, salt, iterations, dklen_value)

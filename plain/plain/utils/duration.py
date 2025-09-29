@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import datetime
 
 
-def _get_duration_components(duration):
+def _get_duration_components(
+    duration: datetime.timedelta,
+) -> tuple[int, int, int, int, int]:
     days = duration.days
     seconds = duration.seconds
     microseconds = duration.microseconds
@@ -15,7 +19,7 @@ def _get_duration_components(duration):
     return days, hours, minutes, seconds, microseconds
 
 
-def duration_string(duration):
+def duration_string(duration: datetime.timedelta) -> str:
     """Version of str(timedelta) which is not English specific."""
     days, hours, minutes, seconds, microseconds = _get_duration_components(duration)
 
@@ -28,7 +32,7 @@ def duration_string(duration):
     return string
 
 
-def duration_iso_string(duration):
+def duration_iso_string(duration: datetime.timedelta) -> str:
     if duration < datetime.timedelta(0):
         sign = "-"
         duration *= -1
@@ -40,5 +44,5 @@ def duration_iso_string(duration):
     return f"{sign}P{days}DT{hours:02d}H{minutes:02d}M{seconds:02d}{ms}S"
 
 
-def duration_microseconds(delta):
+def duration_microseconds(delta: datetime.timedelta) -> int:
     return (24 * 60 * 60 * delta.days + delta.seconds) * 1000000 + delta.microseconds

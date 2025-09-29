@@ -1,5 +1,11 @@
+from __future__ import annotations
+
 import copy
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from typing import Any, TypeVar
+
+_KT = TypeVar("_KT")
+_VT = TypeVar("_VT")
 
 
 class OrderedSet:
@@ -7,37 +13,37 @@ class OrderedSet:
     A set which keeps the ordering of the inserted items.
     """
 
-    def __init__(self, iterable=None):
-        self.dict = dict.fromkeys(iterable or ())
+    def __init__(self, iterable: Iterable[Any] | None = None) -> None:
+        self.dict: dict[Any, None] = dict.fromkeys(iterable or ())
 
-    def add(self, item):
+    def add(self, item: Any) -> None:
         self.dict[item] = None
 
-    def remove(self, item):
+    def remove(self, item: Any) -> None:
         del self.dict[item]
 
-    def discard(self, item):
+    def discard(self, item: Any) -> None:
         try:
             self.remove(item)
         except KeyError:
             pass
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(self.dict)
 
-    def __reversed__(self):
+    def __reversed__(self) -> Iterator[Any]:
         return reversed(self.dict)
 
-    def __contains__(self, item):
+    def __contains__(self, item: Any) -> bool:
         return item in self.dict
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return bool(self.dict)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dict)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         data = repr(list(self.dict)) if self.dict else ""
         return f"{self.__class__.__qualname__}({data})"
 
@@ -46,7 +52,7 @@ class MultiValueDictKeyError(KeyError):
     pass
 
 
-class MultiValueDict(dict):
+class MultiValueDict(dict[str, list[Any]]):
     """
     A subclass of dictionary customized to handle multiple values for the
     same key.
@@ -69,13 +75,17 @@ class MultiValueDict(dict):
     single name-value pairs.
     """
 
-    def __init__(self, key_to_list_mapping=()):
+    def __init__(
+        self,
+        key_to_list_mapping: Mapping[str, list[Any]]
+        | Iterable[tuple[str, list[Any]]] = (),
+    ) -> None:
         super().__init__(key_to_list_mapping)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {super().__repr__()}>"
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         """
         Return the last data value for this key, or [] if it's an empty list;
         raise KeyError if not found.
@@ -89,13 +99,13 @@ class MultiValueDict(dict):
         except IndexError:
             return []
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         super().__setitem__(key, [value])
 
-    def __copy__(self):
+    def __copy__(self) -> MultiValueDict:
         return self.__class__([(k, v[:]) for k, v in self.lists()])
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> MultiValueDict:
         result = self.__class__()
         memo[id(self)] = result
         for key, value in dict.items(self):
@@ -104,16 +114,16 @@ class MultiValueDict(dict):
             )
         return result
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         return {**self.__dict__, "_data": {k: self._getlist(k) for k in self}}
 
-    def __setstate__(self, obj_dict):
+    def __setstate__(self, obj_dict: dict[str, Any]) -> None:
         data = obj_dict.pop("_data", {})
         for k, v in data.items():
             self.setlist(k, v)
         self.__dict__.update(obj_dict)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Any = None) -> Any:
         """
         Return the last data value for the passed key. If key doesn't exist
         or value is an empty list, return `default`.
@@ -126,7 +136,9 @@ class MultiValueDict(dict):
             return default
         return val
 
-    def _getlist(self, key, default=None, force_list=False):
+    def _getlist(
+        self, key: str, default: list[Any] | None = None, force_list: bool = False
+    ) -> list[Any] | None:
         """
         Return a list of values for the key.
 
@@ -144,24 +156,26 @@ class MultiValueDict(dict):
                 values = list(values) if values is not None else None
             return values
 
-    def getlist(self, key, default=None):
+    def getlist(self, key: str, default: list[Any] | None = None) -> list[Any]:
         """
         Return the list of values for the key. If key doesn't exist, return a
         default value.
         """
         return self._getlist(key, default, force_list=True)
 
-    def setlist(self, key, list_):
+    def setlist(self, key: str, list_: list[Any]) -> None:
         super().__setitem__(key, list_)
 
-    def setdefault(self, key, default=None):
+    def setdefault(self, key: str, default: Any = None) -> Any:
         if key not in self:
             self[key] = default
             # Do not return default here because __setitem__() may store
             # another value -- QueryDict.__setitem__() does. Look it up.
         return self[key]
 
-    def setlistdefault(self, key, default_list=None):
+    def setlistdefault(
+        self, key: str, default_list: list[Any] | None = None
+    ) -> list[Any]:
         if key not in self:
             if default_list is None:
                 default_list = []
@@ -170,11 +184,11 @@ class MultiValueDict(dict):
             # another value -- QueryDict.setlist() does. Look it up.
         return self._getlist(key)
 
-    def appendlist(self, key, value):
+    def appendlist(self, key: str, value: Any) -> None:
         """Append an item to the internal list associated with key."""
         self.setlistdefault(key).append(value)
 
-    def items(self):
+    def items(self) -> Iterator[tuple[str, Any]]:
         """
         Yield (key, value) pairs, where value is the last item in the list
         associated with the key.
@@ -182,23 +196,23 @@ class MultiValueDict(dict):
         for key in self:
             yield key, self[key]
 
-    def lists(self):
+    def lists(self) -> Iterator[tuple[str, list[Any]]]:
         """Yield (key, list) pairs."""
         return iter(super().items())
 
-    def values(self):
+    def values(self) -> Iterator[Any]:
         """Yield the last value on every key list."""
         for key in self:
             yield self[key]
 
-    def copy(self):
+    def copy(self) -> MultiValueDict:
         """Return a shallow copy of this object."""
         return copy.copy(self)
 
-    def update(self, *args, **kwargs):
+    def update(self, *args: Any, **kwargs: Any) -> None:
         """Extend rather than replace existing key lists."""
         if len(args) > 1:
-            raise TypeError("update expected at most 1 argument, got %d" % len(args))  # noqa: UP031
+            raise TypeError(f"update expected at most 1 argument, got {len(args)}")
         if args:
             arg = args[0]
             if isinstance(arg, MultiValueDict):
@@ -212,7 +226,7 @@ class MultiValueDict(dict):
         for key, value in kwargs.items():
             self.setlistdefault(key).append(value)
 
-    def dict(self):
+    def dict(self) -> dict[str, Any]:
         """Return current object as a dict with singular values."""
         return {key: self[key] for key in self}
 
@@ -230,12 +244,17 @@ class ImmutableList(tuple):
         AttributeError: You cannot mutate this.
     """
 
-    def __new__(cls, *args, warning="ImmutableList object is immutable.", **kwargs):
+    def __new__(
+        cls,
+        *args: Any,
+        warning: str = "ImmutableList object is immutable.",
+        **kwargs: Any,
+    ) -> ImmutableList:
         self = tuple.__new__(cls, *args, **kwargs)
         self.warning = warning
         return self
 
-    def complain(self, *args, **kwargs):
+    def complain(self, *args: Any, **kwargs: Any) -> None:
         raise AttributeError(self.warning)
 
     # All list mutation functions complain.
@@ -254,7 +273,7 @@ class ImmutableList(tuple):
     reverse = complain
 
 
-class DictWrapper(dict):
+class DictWrapper(dict[str, Any]):
     """
     Wrap accesses to a dictionary so that certain values (those starting with
     the specified prefix) are passed through a function before being returned.
@@ -264,12 +283,14 @@ class DictWrapper(dict):
     quoted before being used.
     """
 
-    def __init__(self, data, func, prefix):
+    def __init__(
+        self, data: dict[str, Any], func: Callable[[Any], Any], prefix: str
+    ) -> None:
         super().__init__(data)
         self.func = func
         self.prefix = prefix
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         """
         Retrieve the real value after stripping the prefix string (if
         present). If the prefix is present, pass the value through self.func
@@ -283,7 +304,7 @@ class DictWrapper(dict):
         return value
 
 
-class CaseInsensitiveMapping(Mapping):
+class CaseInsensitiveMapping(Mapping[str, Any]):
     """
     Mapping allowing case-insensitive key lookups. Original case of keys is
     preserved for iteration and string representation.
@@ -301,35 +322,44 @@ class CaseInsensitiveMapping(Mapping):
         {'name': 'Jane'}
     """
 
-    def __init__(self, data):
-        self._store = {k.lower(): (k, v) for k, v in self._unpack_items(data)}
+    def __init__(self, data: Mapping[str, Any] | Iterable[tuple[str, Any]]) -> None:
+        self._store: dict[str, tuple[str, Any]] = {
+            k.lower(): (k, v) for k, v in self._unpack_items(data)
+        }
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         return self._store[key.lower()][1]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._store)
 
-    def __eq__(self, other):
-        return isinstance(other, Mapping) and {
-            k.lower(): v for k, v in self.items()
-        } == {k.lower(): v for k, v in other.items()}
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Mapping):
+            return False
+        return {k.lower(): v for k, v in self.items()} == {
+            k.lower(): v for k, v in other.items() if isinstance(k, str)
+        }
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return (original_key for original_key, value in self._store.values())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(dict(self._store.values()))
 
-    def copy(self):
+    def copy(self) -> CaseInsensitiveMapping:
         return self
 
     @staticmethod
-    def _unpack_items(data):
+    def _unpack_items(
+        data: Mapping[str, Any] | Iterable[tuple[str, Any]],
+    ) -> Iterator[tuple[str, Any]]:
         # Explicitly test for dict first as the common case for performance,
         # avoiding abc's __instancecheck__ and _abc_instancecheck for the
         # general Mapping case.
-        if isinstance(data, dict | Mapping):
+        if isinstance(data, dict):
+            yield from data.items()
+            return
+        if isinstance(data, Mapping):
             yield from data.items()
             return
         for i, elem in enumerate(data):

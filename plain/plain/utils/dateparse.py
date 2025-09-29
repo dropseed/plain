@@ -1,10 +1,11 @@
 """Functions to parse datetime objects."""
 
+from __future__ import annotations
+
 # We're using regular expressions rather than time.strptime because:
 # - They provide both validation and parsing.
 # - They're more flexible for datetimes.
 # - The date/datetime/time constructors produce friendlier error messages.
-
 import datetime
 
 from plain.utils.regex_helper import _lazy_re_compile
@@ -64,7 +65,7 @@ postgres_interval_re = _lazy_re_compile(
 )
 
 
-def parse_date(value):
+def parse_date(value: str) -> datetime.date | None:
     """Parse a string and return a datetime.date.
 
     Raise ValueError if the input is well formatted but not a valid date.
@@ -75,10 +76,11 @@ def parse_date(value):
     except ValueError:
         if match := date_re.match(value):
             kw = {k: int(v) for k, v in match.groupdict().items()}
-            return datetime.date(**kw)
+            return datetime.date(**kw)  # type: ignore[arg-type]
+    return None
 
 
-def parse_time(value):
+def parse_time(value: str) -> datetime.time | None:
     """Parse a string and return a datetime.time.
 
     This function doesn't support time zone offsets.
@@ -101,7 +103,7 @@ def parse_time(value):
             return datetime.time(**kw)
 
 
-def parse_datetime(value):
+def parse_datetime(value: str) -> datetime.datetime | None:
     """Parse a string and return a datetime.datetime.
 
     This function supports time zone offsets. When the input contains one,
@@ -126,10 +128,11 @@ def parse_datetime(value):
                     offset = -offset
                 tzinfo = get_fixed_timezone(offset)
             kw = {k: int(v) for k, v in kw.items() if v is not None}
-            return datetime.datetime(**kw, tzinfo=tzinfo)
+            return datetime.datetime(**kw, tzinfo=tzinfo)  # type: ignore[arg-type]
+    return None
 
 
-def parse_duration(value):
+def parse_duration(value: str) -> datetime.timedelta | None:
     """Parse a duration string and return a datetime.timedelta.
 
     The preferred format for durations in Plain is '%d %H:%M:%S.%f'.

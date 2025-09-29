@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import os
 import sys
 from importlib import import_module
+from types import ModuleType
+from typing import Any
 
 
-def cached_import(module_path, class_name):
+def cached_import(module_path: str, class_name: str) -> Any:
     # Check whether module is loaded and fully initialized.
     if not (
         (module := sys.modules.get(module_path))
@@ -14,7 +18,7 @@ def cached_import(module_path, class_name):
     return getattr(module, class_name)
 
 
-def import_string(dotted_path):
+def import_string(dotted_path: str) -> Any:
     """
     Import a dotted module path and return the attribute/class designated by the
     last name in the path. Raise ImportError if the import failed.
@@ -32,7 +36,7 @@ def import_string(dotted_path):
         ) from err
 
 
-def module_dir(module):
+def module_dir(module: ModuleType) -> str:
     """
     Find the name of the directory that contains a module, if possible.
 

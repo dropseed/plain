@@ -3,7 +3,10 @@ A class for storing a tree graph. Primarily used for filter constructs in the
 ORM.
 """
 
+from __future__ import annotations
+
 import copy
+from typing import Any
 
 from plain.utils.hashable import make_hashable
 
@@ -17,16 +20,26 @@ class Node:
 
     # Standard connector type. Clients usually won't use this at all and
     # subclasses will usually override the value.
-    default = "DEFAULT"
+    default: str = "DEFAULT"
 
-    def __init__(self, children=None, connector=None, negated=False):
+    def __init__(
+        self,
+        children: list[Any] | None = None,
+        connector: str | None = None,
+        negated: bool = False,
+    ) -> None:
         """Construct a new Node. If no connector is given, use the default."""
-        self.children = children[:] if children else []
-        self.connector = connector or self.default
-        self.negated = negated
+        self.children: list[Any] = children[:] if children else []
+        self.connector: str = connector or self.default
+        self.negated: bool = negated
 
     @classmethod
-    def create(cls, children=None, connector=None, negated=False):
+    def create(
+        cls,
+        children: list[Any] | None = None,
+        connector: str | None = None,
+        negated: bool = False,
+    ) -> Node:
         """
         Create a new instance using Node() instead of __init__() as some
         subclasses, e.g. plain.models.query_utils.Q, may implement a custom
@@ -37,38 +50,38 @@ class Node:
         obj.__class__ = cls
         return obj
 
-    def __str__(self):
+    def __str__(self) -> str:
         template = "(NOT (%s: %s))" if self.negated else "(%s: %s)"
         return template % (self.connector, ", ".join(str(c) for c in self.children))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
 
-    def __copy__(self):
+    def __copy__(self) -> Node:
         obj = self.create(connector=self.connector, negated=self.negated)
         obj.children = self.children  # Don't [:] as .__init__() via .create() does.
         return obj
 
     copy = __copy__
 
-    def __deepcopy__(self, memodict):
+    def __deepcopy__(self, memodict: dict[int, Any]) -> Node:
         obj = self.create(connector=self.connector, negated=self.negated)
         obj.children = copy.deepcopy(self.children, memodict)
         return obj
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the number of children this node has."""
         return len(self.children)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Return whether or not this node has children."""
         return bool(self.children)
 
-    def __contains__(self, other):
+    def __contains__(self, other: Any) -> bool:
         """Return True if 'other' is a direct child of this instance."""
         return other in self.children
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
             self.__class__ == other.__class__
             and self.connector == other.connector
@@ -76,7 +89,7 @@ class Node:
             and self.children == other.children
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(
             (
                 self.__class__,
@@ -86,7 +99,7 @@ class Node:
             )
         )
 
-    def add(self, data, conn_type):
+    def add(self, data: Any, conn_type: str) -> Any:
         """
         Combine this tree and the data represented by data using the
         connector conn_type. The combine is done by squashing the node other
@@ -121,6 +134,6 @@ class Node:
             self.children.append(data)
             return data
 
-    def negate(self):
+    def negate(self) -> None:
         """Negate the sense of the root connector."""
         self.negated = not self.negated
