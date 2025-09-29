@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable
 from http import HTTPMethod
+from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.code_attributes import (
@@ -33,7 +37,9 @@ class View:
     # View.as_view(example="foo") usage can be customized by defining your own __init__ method.
     # def __init__(self, *args, **kwargs):
 
-    def setup(self, request: HttpRequest, *url_args, **url_kwargs) -> None:
+    def setup(
+        self, request: HttpRequest, *url_args: object, **url_kwargs: object
+    ) -> None:
         if hasattr(self, "get") and not hasattr(self, "head"):
             self.head = self.get
 
@@ -42,8 +48,12 @@ class View:
         self.url_kwargs = url_kwargs
 
     @classonlymethod
-    def as_view(cls, *init_args, **init_kwargs):
-        def view(request, *url_args, **url_kwargs):
+    def as_view(
+        cls, *init_args: object, **init_kwargs: object
+    ) -> Callable[[HttpRequest, Any, Any], ResponseBase]:
+        def view(
+            request: HttpRequest, *url_args: object, **url_kwargs: object
+        ) -> ResponseBase:
             with tracer.start_as_current_span(
                 f"{cls.__name__}",
                 kind=trace.SpanKind.INTERNAL,
@@ -62,11 +72,11 @@ class View:
                 )
                 return response
 
-        view.view_class = cls
+        view.view_class = cls  # type: ignore[attr-defined]
 
         return view
 
-    def get_request_handler(self) -> callable:
+    def get_request_handler(self) -> Callable[[], Any] | None:
         """Return the handler for the current request method."""
 
         if not self.request.method:
@@ -93,7 +103,7 @@ class View:
 
         return self.convert_value_to_response(result)
 
-    def convert_value_to_response(self, value) -> ResponseBase:
+    def convert_value_to_response(self, value: object) -> ResponseBase:
         """Convert a return value to a Response."""
         if isinstance(value, ResponseBase):
             return value

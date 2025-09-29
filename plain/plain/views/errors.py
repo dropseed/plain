@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
 from plain.http import ResponseBase
 from plain.templates import TemplateFileMissing
 
@@ -15,7 +20,7 @@ class ErrorView(TemplateView):
         # Allow creating an ErrorView with an exception
         self.exception = exception
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict:
         context = super().get_template_context()
         context["status_code"] = self.status_code
         context["exception"] = self.exception
@@ -24,7 +29,7 @@ class ErrorView(TemplateView):
     def get_template_names(self) -> list[str]:
         return [f"{self.status_code}.html", "error.html"]
 
-    def get_request_handler(self):
+    def get_request_handler(self) -> Callable[[], Any]:
         return self.get  # All methods (post, patch, etc.) will use the get()
 
     def get_response(self) -> ResponseBase:
@@ -33,7 +38,7 @@ class ErrorView(TemplateView):
         response.status_code = self.status_code
         return response
 
-    def get(self):
+    def get(self) -> ResponseBase:
         try:
             return super().get()
         except TemplateFileMissing:

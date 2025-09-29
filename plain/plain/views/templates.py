@@ -13,7 +13,7 @@ class TemplateView(View):
 
     template_name: str | None = None
 
-    def __init__(self, template_name=None):
+    def __init__(self, template_name: str | None = None) -> None:
         # Allow template_name to be passed in as_view()
         self.template_name = template_name or self.template_name
 

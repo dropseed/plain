@@ -6,7 +6,7 @@ from plain.exceptions import ImproperlyConfigured
 try:
     from plain.models.exceptions import ObjectDoesNotExist
 except ImportError:
-    ObjectDoesNotExist = None
+    ObjectDoesNotExist = None  # type: ignore[assignment]
 
 from plain.forms import Form
 from plain.http import Http404
@@ -21,7 +21,7 @@ class CreateView(FormView):
     """
 
     # TODO? would rather you have to specify this...
-    def get_success_url(self, form):
+    def get_success_url(self, form: Form) -> str:
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
             url = self.success_url.format(**self.object.__dict__)
@@ -35,9 +35,9 @@ class CreateView(FormView):
                 )
         return url
 
-    def form_valid(self, form):
+    def form_valid(self, form: Form) -> Any:
         """If the form is valid, save the associated model."""
-        self.object = form.save()
+        self.object = form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)
 
 
@@ -91,7 +91,7 @@ class DetailView(ObjectTemplateViewMixin, TemplateView):
 class UpdateView(ObjectTemplateViewMixin, FormView):
     """View for updating an object, with a response rendered by a template."""
 
-    def get_success_url(self, form):
+    def get_success_url(self, form: Form) -> str:
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
             url = self.success_url.format(**self.object.__dict__)
@@ -105,12 +105,12 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
                 )
         return url
 
-    def form_valid(self, form):
+    def form_valid(self, form: Form) -> Any:
         """If the form is valid, save the associated model."""
-        form.save()
+        form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)
 
-    def get_form_kwargs(self):
+    def get_form_kwargs(self) -> dict:
         """Return the keyword arguments for instantiating the form."""
         kwargs = super().get_form_kwargs()
         kwargs.update({"instance": self.object})
@@ -124,24 +124,24 @@ class DeleteView(ObjectTemplateViewMixin, FormView):
     """
 
     class EmptyDeleteForm(Form):
-        def __init__(self, instance, *args, **kwargs):
+        def __init__(self, instance: Any, *args: object, **kwargs: object) -> None:
             self.instance = instance
             super().__init__(*args, **kwargs)
 
-        def save(self):
+        def save(self) -> None:
             self.instance.delete()
 
     form_class = EmptyDeleteForm
 
-    def get_form_kwargs(self):
+    def get_form_kwargs(self) -> dict:
         """Return the keyword arguments for instantiating the form."""
         kwargs = super().get_form_kwargs()
         kwargs.update({"instance": self.object})
         return kwargs
 
-    def form_valid(self, form):
+    def form_valid(self, form: Form) -> Any:
         """If the form is valid, save the associated model."""
-        form.save()
+        form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)
 
 
@@ -154,10 +154,10 @@ class ListView(TemplateView):
     context_object_name = ""
 
     @cached_property
-    def objects(self):
+    def objects(self) -> Any:
         return self.get_objects()
 
-    def get_objects(self):
+    def get_objects(self) -> Any:
         raise NotImplementedError(
             f"get_objects() is not implemented on {self.__class__.__name__}"
         )
