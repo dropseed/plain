@@ -24,7 +24,12 @@ __all__ = ("BaseForm", "Form")
 class DeclarativeFieldsMetaclass(type):
     """Collect Fields declared on the base classes."""
 
-    def __new__(mcs, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> type:
+    def __new__(
+        mcs: type[DeclarativeFieldsMetaclass],
+        name: str,
+        bases: tuple[type, ...],
+        attrs: dict[str, Any],
+    ) -> type:
         # Collect fields from current class and remove them from attrs.
         attrs["declared_fields"] = {
             key: attrs.pop(key)
@@ -32,7 +37,7 @@ class DeclarativeFieldsMetaclass(type):
             if isinstance(value, Field)
         }
 
-        new_class = super().__new__(mcs, name, bases, attrs)
+        new_class = super().__new__(mcs, name, bases, attrs)  # type: ignore[misc]
 
         # Walk through the MRO.
         declared_fields = {}

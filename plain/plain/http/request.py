@@ -508,11 +508,12 @@ class QueryDict(MultiValueDict):
         }
         if isinstance(query_string, bytes):
             # query_string normally contains URL-encoded data, a subset of ASCII.
+            query_bytes = query_string
             try:
-                query_string = query_string.decode(self.encoding)
+                query_string = query_bytes.decode(self.encoding)
             except UnicodeDecodeError:
                 # ... but some user agents are misbehaving :-(
-                query_string = query_string.decode("iso-8859-1")
+                query_string = query_bytes.decode("iso-8859-1")
         try:
             for key, value in parse_qsl(query_string, **parse_qsl_kwargs):
                 self.appendlist(key, value)

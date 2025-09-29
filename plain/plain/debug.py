@@ -28,5 +28,5 @@ def dd(*objs: Any) -> NoReturn:
     response = Response()
     response.status_code = 500
     response.content = combined_dump_str
-    response.content_type = "text/html"
+    response.headers["Content-Type"] = "text/html"
     raise ResponseException(response)

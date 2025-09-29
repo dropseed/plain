@@ -65,8 +65,8 @@ class RegexValidator:
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, RegexValidator)
-            and self.regex.pattern == other.regex.pattern
-            and self.regex.flags == other.regex.flags
+            and self.regex.pattern == other.regex.pattern  # type: ignore[attr-defined]
+            and self.regex.flags == other.regex.flags  # type: ignore[attr-defined]
             and (self.message == other.message)
             and (self.code == other.code)
             and (self.inverse_match == other.inverse_match)
@@ -321,7 +321,7 @@ def int_list_validator(
             sep=re.escape(sep),
         )
     )
-    return RegexValidator(regexp, message=message, code=code)
+    return RegexValidator(regexp, message=message, code=code)  # type: ignore[arg-type]
 
 
 validate_comma_separated_integer_list = int_list_validator(
@@ -563,7 +563,7 @@ class FileExtensionValidator:
 
 def get_available_image_extensions() -> list[str]:
     try:
-        from PIL import Image
+        from PIL import Image  # type: ignore[import-untyped]
     except ImportError:
         return []
     else:

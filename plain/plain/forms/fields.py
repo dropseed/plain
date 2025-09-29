@@ -372,12 +372,12 @@ class BaseTemporalField(Field):
         "%m/%d/%y %H:%M",  # '10/25/06 14:30'
     ]
 
-    def __init__(self, *, input_formats=None, **kwargs):
+    def __init__(self, *, input_formats: list[str] | None = None, **kwargs: Any):
         super().__init__(**kwargs)
         if input_formats is not None:
             self.input_formats = input_formats
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         value = value.strip()
         # Try to strptime against each input format.
         for format in self.input_formats:
@@ -387,7 +387,7 @@ class BaseTemporalField(Field):
                 continue
         raise ValidationError(self.error_messages["invalid"], code="invalid")
 
-    def strptime(self, value, format):
+    def strptime(self, value: str, format: str) -> Any:
         raise NotImplementedError("Subclasses must define this method.")
 
 
@@ -397,7 +397,7 @@ class DateField(BaseTemporalField):
         "invalid": "Enter a valid date.",
     }
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> datetime.date | None:
         """
         Validate that the input can be converted to a date. Return a Python
         datetime.date object.
@@ -410,7 +410,7 @@ class DateField(BaseTemporalField):
             return value
         return super().to_python(value)
 
-    def strptime(self, value, format):
+    def strptime(self, value: str, format: str) -> datetime.date:
         return datetime.datetime.strptime(value, format).date()
 
 
@@ -418,7 +418,7 @@ class TimeField(BaseTemporalField):
     input_formats = BaseTemporalField.TIME_INPUT_FORMATS
     default_error_messages = {"invalid": "Enter a valid time."}
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> datetime.time | None:
         """
         Validate that the input can be converted to a time. Return a Python
         datetime.time object.
@@ -429,12 +429,12 @@ class TimeField(BaseTemporalField):
             return value
         return super().to_python(value)
 
-    def strptime(self, value, format):
+    def strptime(self, value: str, format: str) -> datetime.time:
         return datetime.datetime.strptime(value, format).time()
 
 
 class DateTimeFormatsIterator:
-    def __iter__(self):
+    def __iter__(self) -> Any:
         yield from BaseTemporalField.DATETIME_INPUT_FORMATS
         yield from BaseTemporalField.DATE_INPUT_FORMATS
 
@@ -445,12 +445,12 @@ class DateTimeField(BaseTemporalField):
         "invalid": "Enter a valid date/time.",
     }
 
-    def prepare_value(self, value):
+    def prepare_value(self, value: Any) -> Any:
         if isinstance(value, datetime.datetime):
             value = to_current_timezone(value)
         return value
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> datetime.datetime | None:
         """
         Validate that the input can be converted to a datetime. Return a
         Python datetime.datetime object.
@@ -470,7 +470,7 @@ class DateTimeField(BaseTemporalField):
             result = super().to_python(value)
         return from_current_timezone(result)
 
-    def strptime(self, value, format):
+    def strptime(self, value: str, format: str) -> datetime.datetime:
         return datetime.datetime.strptime(value, format)
 
 
@@ -480,12 +480,12 @@ class DurationField(Field):
         "overflow": "The number of days must be between {min_days} and {max_days}.",
     }
 
-    def prepare_value(self, value):
+    def prepare_value(self, value: Any) -> Any:
         if isinstance(value, datetime.timedelta):
             return duration_string(value)
         return value
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> datetime.timedelta | None:
         if value in self.empty_values:
             return None
         if isinstance(value, datetime.timedelta):
@@ -506,7 +506,7 @@ class DurationField(Field):
 
 
 class RegexField(CharField):
-    def __init__(self, regex, **kwargs):
+    def __init__(self, regex: str | re.Pattern[str], **kwargs: Any) -> None:
         """
         regex can be either a string or a compiled regular expression object.
         """
@@ -514,10 +514,10 @@ class RegexField(CharField):
         super().__init__(**kwargs)
         self._set_regex(regex)
 
-    def _get_regex(self):
+    def _get_regex(self) -> re.Pattern[str]:
         return self._regex
 
-    def _set_regex(self, regex):
+    def _set_regex(self, regex: str | re.Pattern[str]) -> None:
         if isinstance(regex, str):
             regex = re.compile(regex)
         self._regex = regex
@@ -535,7 +535,7 @@ class RegexField(CharField):
 class EmailField(CharField):
     default_validators = [validators.validate_email]
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(strip=True, **kwargs)
 
 
@@ -552,12 +552,18 @@ class FileField(Field):
         "contradiction": "Please either submit a file or check the clear checkbox, not both.",
     }
 
-    def __init__(self, *, max_length=None, allow_empty_file=False, **kwargs):
+    def __init__(
+        self,
+        *,
+        max_length: int | None = None,
+        allow_empty_file: bool = False,
+        **kwargs: Any,
+    ) -> None:
         self.max_length = max_length
         self.allow_empty_file = allow_empty_file
         super().__init__(**kwargs)
 
-    def to_python(self, data):
+    def to_python(self, data: Any) -> Any:
         if data in self.empty_values:
             return None
 
@@ -580,7 +586,7 @@ class FileField(Field):
 
         return data
 
-    def clean(self, data, initial=None):
+    def clean(self, data: Any, initial: Any = None) -> Any:
         # If the widget got contradictory inputs, we raise a validation error
         if data is FILE_INPUT_CONTRADICTION:
             raise ValidationError(
@@ -601,16 +607,16 @@ class FileField(Field):
             return initial
         return super().clean(data)
 
-    def bound_data(self, _, initial):
+    def bound_data(self, _: Any, initial: Any) -> Any:
         return initial
 
-    def has_changed(self, initial, data):
+    def has_changed(self, initial: Any, data: Any) -> bool:
         return data is not None
 
-    def value_from_form_data(self, data, files, html_name):
+    def value_from_form_data(self, data: Any, files: Any, html_name: str) -> Any:
         return files.get(html_name)
 
-    def value_from_json_data(self, data, files, html_name):
+    def value_from_json_data(self, data: Any, files: Any, html_name: str) -> Any:
         return files.get(html_name)
 
 
@@ -620,7 +626,7 @@ class ImageField(FileField):
         "invalid_image": "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
     }
 
-    def to_python(self, data):
+    def to_python(self, data: Any) -> Any:
         """
         Check that the file-upload field data contains a valid image (GIF, JPG,
         PNG, etc. -- whatever Pillow supports).
@@ -670,11 +676,11 @@ class URLField(CharField):
     }
     default_validators = [validators.URLValidator()]
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(strip=True, **kwargs)
 
-    def to_python(self, value):
-        def split_url(url):
+    def to_python(self, value: Any) -> str:
+        def split_url(url: str | bytes) -> list[str]:
             """
             Return a list of url parts via urlparse.urlsplit(), or raise
             ValidationError for some malformed URLs.
@@ -699,13 +705,16 @@ class URLField(CharField):
                 url_fields[2] = ""
                 # Rebuild the url_fields list, since the domain segment may now
                 # contain the path too.
-                url_fields = split_url(urlunsplit(url_fields))
-            value = urlunsplit(url_fields)
+                url_result = urlunsplit(url_fields)
+                url_fields = split_url(
+                    str(url_result) if isinstance(url_result, bytes) else url_result
+                )
+            value = str(urlunsplit(url_fields))
         return value
 
 
 class BooleanField(Field):
-    def to_python(self, value):
+    def to_python(self, value: Any) -> bool:
         """Return a Python boolean object."""
         # Explicitly check for the string 'False', which is what a hidden field
         # will submit for False. Also check for '0', since this is what
@@ -717,16 +726,18 @@ class BooleanField(Field):
             value = bool(value)
         return super().to_python(value)
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if not value and self.required:
             raise ValidationError(self.error_messages["required"], code="required")
 
-    def has_changed(self, initial, data):
+    def has_changed(self, initial: Any, data: Any) -> bool:
         # Sometimes data or initial may be a string equivalent of a boolean
         # so we should run it through to_python first to get a boolean value
         return self.to_python(initial) != self.to_python(data)
 
-    def value_from_form_data(self, data, files, html_name):
+    def value_from_form_data(
+        self, data: Any, files: Any, html_name: str
+    ) -> bool | None:
         if html_name not in data:
             # Unselected checkboxes aren't in HTML form data, so return False
             return False
@@ -743,7 +754,7 @@ class BooleanField(Field):
             "on": True,
         }.get(value)
 
-    def value_from_json_data(self, data, files, html_name):
+    def value_from_json_data(self, data: Any, files: Any, html_name: str) -> Any:
         # Boolean fields must be present in the JSON data
         try:
             return data[html_name]
@@ -757,7 +768,7 @@ class NullBooleanField(BooleanField):
     to None.
     """
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> bool | None:
         """
         Explicitly check for the string 'True' and 'False', which is what a
         hidden field will submit for True and False, for 'true' and 'false',
@@ -773,15 +784,15 @@ class NullBooleanField(BooleanField):
         else:
             return None
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         pass
 
 
 class CallableChoiceIterator:
-    def __init__(self, choices_func):
+    def __init__(self, choices_func: Callable[[], Any]) -> None:
         self.choices_func = choices_func
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         yield from self.choices_func()
 
 
@@ -790,7 +801,7 @@ class ChoiceField(Field):
         "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
     }
 
-    def __init__(self, *, choices=(), **kwargs):
+    def __init__(self, *, choices: Any = (), **kwargs: Any) -> None:
         super().__init__(**kwargs)
         if hasattr(choices, "choices"):
             choices = choices.choices
@@ -798,15 +809,15 @@ class ChoiceField(Field):
             choices = [(member.value, member.name) for member in choices]
         self.choices = choices
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> ChoiceField:
         result = super().__deepcopy__(memo)
         result._choices = copy.deepcopy(self._choices, memo)
         return result
 
-    def _get_choices(self):
+    def _get_choices(self) -> Any:
         return self._choices
 
-    def _set_choices(self, value):
+    def _set_choices(self, value: Any) -> None:
         # Setting choices also sets the choices on the widget.
         # choices can be any iterable, but we call list() on it because
         # it will be consumed more than once.
@@ -819,13 +830,13 @@ class ChoiceField(Field):
 
     choices = property(_get_choices, _set_choices)
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> str:
         """Return a string."""
         if value in self.empty_values:
             return ""
         return str(value)
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         """Validate that the input is in self.choices."""
         super().validate(value)
         if value and not self.valid_value(value):
@@ -835,7 +846,7 @@ class ChoiceField(Field):
                 params={"value": value},
             )
 
-    def valid_value(self, value):
+    def valid_value(self, value: Any) -> bool:
         """Check to see if the provided value is a valid choice."""
         text_value = str(value)
         for k, v in self.choices:
@@ -851,12 +862,18 @@ class ChoiceField(Field):
 
 
 class TypedChoiceField(ChoiceField):
-    def __init__(self, *, coerce=lambda val: val, empty_value="", **kwargs):
+    def __init__(
+        self,
+        *,
+        coerce: Callable[[Any], Any] = lambda val: val,
+        empty_value: Any = "",
+        **kwargs: Any,
+    ) -> None:
         self.coerce = coerce
         self.empty_value = empty_value
         super().__init__(**kwargs)
 
-    def _coerce(self, value):
+    def _coerce(self, value: Any) -> Any:
         """
         Validate that the value can be coerced to the right type (if not empty).
         """
@@ -872,7 +889,7 @@ class TypedChoiceField(ChoiceField):
             )
         return value
 
-    def clean(self, value):
+    def clean(self, value: Any) -> Any:
         value = super().clean(value)
         return self._coerce(value)
 
@@ -883,7 +900,7 @@ class MultipleChoiceField(ChoiceField):
         "invalid_list": "Enter a list of values.",
     }
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> list[str]:
         if not value:
             return []
         elif not isinstance(value, list | tuple):
@@ -892,7 +909,7 @@ class MultipleChoiceField(ChoiceField):
             )
         return [str(val) for val in value]
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         """Validate that the input is a list or tuple."""
         if self.required and not value:
             raise ValidationError(self.error_messages["required"], code="required")
@@ -905,7 +922,7 @@ class MultipleChoiceField(ChoiceField):
                     params={"value": val},
                 )
 
-    def has_changed(self, initial, data):
+    def has_changed(self, initial: Any, data: Any) -> bool:
         if initial is None:
             initial = []
         if data is None:
@@ -916,7 +933,7 @@ class MultipleChoiceField(ChoiceField):
         data_set = {str(value) for value in data}
         return data_set != initial_set
 
-    def value_from_form_data(self, data, files, html_name):
+    def value_from_form_data(self, data: Any, files: Any, html_name: str) -> Any:
         return data.getlist(html_name)
 
 
@@ -925,12 +942,12 @@ class UUIDField(CharField):
         "invalid": "Enter a valid UUID.",
     }
 
-    def prepare_value(self, value):
+    def prepare_value(self, value: Any) -> Any:
         if isinstance(value, uuid.UUID):
             return str(value)
         return value
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> uuid.UUID | None:
         value = super().to_python(value)
         if value in self.empty_values:
             return None
@@ -956,15 +973,20 @@ class JSONField(CharField):
     }
 
     def __init__(
-        self, encoder=None, decoder=None, indent=None, sort_keys=False, **kwargs
-    ):
+        self,
+        encoder: Any = None,
+        decoder: Any = None,
+        indent: int | None = None,
+        sort_keys: bool = False,
+        **kwargs: Any,
+    ) -> None:
         self.encoder = encoder
         self.decoder = decoder
         self.indent = indent
         self.sort_keys = sort_keys
         super().__init__(**kwargs)
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value in self.empty_values:
             return None
         elif isinstance(value, list | dict | int | float | JSONString):
@@ -982,7 +1004,7 @@ class JSONField(CharField):
         else:
             return converted
 
-    def bound_data(self, data, initial):
+    def bound_data(self, data: Any, initial: Any) -> Any:
         if data is None:
             return None
         try:
@@ -990,7 +1012,7 @@ class JSONField(CharField):
         except json.JSONDecodeError:
             return InvalidJSONInput(data)
 
-    def prepare_value(self, value):
+    def prepare_value(self, value: Any) -> Any:
         if isinstance(value, InvalidJSONInput):
             return value
         return json.dumps(
@@ -1001,7 +1023,7 @@ class JSONField(CharField):
             cls=self.encoder,
         )
 
-    def has_changed(self, initial, data):
+    def has_changed(self, initial: Any, data: Any) -> bool:
         if super().has_changed(initial, data):
             return True
         # For purposes of seeing whether something has changed, True isn't the
@@ -1011,7 +1033,7 @@ class JSONField(CharField):
         )
 
 
-def from_current_timezone(value):
+def from_current_timezone(value: datetime.datetime | None) -> datetime.datetime | None:
     """
     When time zone support is enabled, convert naive datetimes
     entered in the current time zone to aware datetimes.
@@ -1025,7 +1047,7 @@ def from_current_timezone(value):
         except Exception as exc:
             raise ValidationError(
                 (
-                    "%(datetime)s couldn’t be interpreted "
+                    "%(datetime)s couldn't be interpreted "
                     "in time zone %(current_timezone)s; it "
                     "may be ambiguous or it may not exist."
                 ),
@@ -1035,7 +1057,7 @@ def from_current_timezone(value):
     return value
 
 
-def to_current_timezone(value):
+def to_current_timezone(value: datetime.datetime | None) -> datetime.datetime | None:
     """
     When time zone support is enabled, convert aware datetimes
     to naive datetimes in the current time zone for display.
