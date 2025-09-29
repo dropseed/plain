@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import io
 import json
@@ -6,10 +8,12 @@ import os
 import re
 import sys
 import time
+from collections.abc import Iterator
 from email.header import Header
 from functools import cached_property
 from http.client import responses
 from http.cookies import SimpleCookie
+from typing import IO, Any
 
 from plain import signals
 from plain.http.cookie import sign_cookie_value
@@ -27,7 +31,7 @@ _charset_from_content_type_re = _lazy_re_compile(
 
 
 class ResponseHeaders(CaseInsensitiveMapping):
-    def __init__(self, data):
+    def __init__(self, data: dict[str, Any] | None = None):
         """
         Populate the initial data using __setitem__ to ensure values are
         correctly encoded.
@@ -37,7 +41,9 @@ class ResponseHeaders(CaseInsensitiveMapping):
             for header, value in self._unpack_items(data):
                 self[header] = value
 
-    def _convert_to_charset(self, value, charset, mime_encode=False):
+    def _convert_to_charset(
+        self, value: str | bytes, charset: str, mime_encode: bool = False
+    ) -> str:
         """
         Convert headers key/value to ascii/latin-1 native strings.
         `charset` must be 'ascii' or 'latin-1'. If `mime_encode` is True and
@@ -72,22 +78,23 @@ class ResponseHeaders(CaseInsensitiveMapping):
             if mime_encode:
                 value = Header(value, "utf-8", maxlinelen=sys.maxsize).encode()
             else:
-                e.reason += f", HTTP response headers must be in {charset} format"
+                if hasattr(e, "reason") and isinstance(e.reason, str):
+                    e.reason += f", HTTP response headers must be in {charset} format"
                 raise
         return value
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         self.pop(key)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: str | bytes) -> None:
         key = self._convert_to_charset(key, "ascii")
         value = self._convert_to_charset(value, "latin-1", mime_encode=True)
         self._store[key.lower()] = (key, value)
 
-    def pop(self, key, default=None):
+    def pop(self, key: str, default: Any = None) -> Any:
         return self._store.pop(key.lower(), default)
 
-    def setdefault(self, key, value):
+    def setdefault(self, key: str, value: str | bytes) -> None:
         if key not in self:
             self[key] = value
 
@@ -109,11 +116,11 @@ class ResponseBase:
     def __init__(
         self,
         *,
-        content_type=None,
-        status_code=None,
-        reason=None,
-        charset=None,
-        headers=None,
+        content_type: str | None = None,
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
     ):
         self.headers = ResponseHeaders(headers)
         self._charset = charset
@@ -143,7 +150,7 @@ class ResponseBase:
         self._reason_phrase = reason
 
     @property
-    def reason_phrase(self):
+    def reason_phrase(self) -> str:
         if self._reason_phrase is not None:
             return self._reason_phrase
         # Leave self._reason_phrase unset in order to use the default
@@ -151,11 +158,11 @@ class ResponseBase:
         return responses.get(self.status_code, "Unknown Status Code")
 
     @reason_phrase.setter
-    def reason_phrase(self, value):
+    def reason_phrase(self, value: str) -> None:
         self._reason_phrase = value
 
     @property
-    def charset(self):
+    def charset(self) -> str:
         if self._charset is not None:
             return self._charset
         # The Content-Type header may not yet be set, because the charset is
@@ -170,10 +177,10 @@ class ResponseBase:
         return settings.DEFAULT_CHARSET
 
     @charset.setter
-    def charset(self, value):
+    def charset(self, value: str) -> None:
         self._charset = value
 
-    def serialize_headers(self):
+    def serialize_headers(self) -> bytes:
         """HTTP headers as a bytestring."""
         return b"\r\n".join(
             [
@@ -185,7 +192,7 @@ class ResponseBase:
     __bytes__ = serialize_headers
 
     @property
-    def _content_type_for_repr(self):
+    def _content_type_for_repr(self) -> str:
         return (
             ', "{}"'.format(self.headers["Content-Type"])
             if "Content-Type" in self.headers
@@ -194,16 +201,16 @@ class ResponseBase:
 
     def set_cookie(
         self,
-        key,
-        value="",
-        max_age=None,
-        expires=None,
-        path="/",
-        domain=None,
-        secure=False,
-        httponly=False,
-        samesite=None,
-    ):
+        key: str,
+        value: str = "",
+        max_age: int | float | datetime.timedelta | None = None,
+        expires: str | datetime.datetime | None = None,
+        path: str | None = "/",
+        domain: str | None = None,
+        secure: bool = False,
+        httponly: bool = False,
+        samesite: str | None = None,
+    ) -> None:
         """
         Set a cookie.
 
@@ -256,13 +263,21 @@ class ResponseBase:
                 raise ValueError('samesite must be "lax", "none", or "strict".')
             self.cookies[key]["samesite"] = samesite
 
-    def set_signed_cookie(self, key, value, salt="", **kwargs):
+    def set_signed_cookie(
+        self, key: str, value: str, salt: str = "", **kwargs: Any
+    ) -> None:
         """Set a cookie signed with the SECRET_KEY."""
 
         signed_value = sign_cookie_value(key, value, salt)
         return self.set_cookie(key, signed_value, **kwargs)
 
-    def delete_cookie(self, key, path="/", domain=None, samesite=None):
+    def delete_cookie(
+        self,
+        key: str,
+        path: str = "/",
+        domain: str | None = None,
+        samesite: str | None = None,
+    ) -> None:
         # Browsers can ignore the Set-Cookie header if the cookie doesn't use
         # the secure flag and:
         # - the cookie name starts with "__Host-" or "__Secure-", or
@@ -282,7 +297,7 @@ class ResponseBase:
 
     # Common methods used by subclasses
 
-    def make_bytes(self, value):
+    def make_bytes(self, value: str | bytes) -> bytes:
         """Turn a value into a bytestring encoded in the output charset."""
         # Per PEP 3333, this response body must be bytes. To avoid returning
         # an instance of a subclass, this function returns `bytes(value)`.
@@ -303,7 +318,7 @@ class ResponseBase:
 
     # The WSGI server must call this method upon completion of the request.
     # See http://blog.dscpl.com.au/2012/10/obligations-for-calling-close-on.html
-    def close(self):
+    def close(self) -> None:
         for closer in self._resource_closers:
             try:
                 closer()
@@ -314,13 +329,13 @@ class ResponseBase:
         self.closed = True
         signals.request_finished.send(sender=self._handler_class)
 
-    def write(self, content):
+    def write(self, content: bytes) -> None:
         raise OSError(f"This {self.__class__.__name__} instance is not writable")
 
-    def flush(self):
+    def flush(self) -> None:
         pass
 
-    def tell(self):
+    def tell(self) -> int:
         raise OSError(
             f"This {self.__class__.__name__} instance cannot tell its position"
         )
@@ -328,16 +343,16 @@ class ResponseBase:
     # These methods partially implement a stream-like object interface.
     # See https://docs.python.org/library/io.html#io.IOBase
 
-    def readable(self):
+    def readable(self) -> bool:
         return False
 
-    def seekable(self):
+    def seekable(self) -> bool:
         return False
 
-    def writable(self):
+    def writable(self) -> bool:
         return False
 
-    def writelines(self, lines):
+    def writelines(self, lines: list[bytes]) -> None:
         raise OSError(f"This {self.__class__.__name__} instance is not writable")
 
 
@@ -360,45 +375,45 @@ class Response(ResponseBase):
         ]
     )
 
-    def __init__(self, content=b"", **kwargs):
+    def __init__(self, content: bytes | str | Iterator[bytes] = b"", **kwargs: Any):
         super().__init__(**kwargs)
         # Content is a bytestring. See the `content` property methods.
         self.content = content
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         obj_dict = self.__dict__.copy()
         for attr in self.non_picklable_attrs:
             if attr in obj_dict:
                 del obj_dict[attr]
         return obj_dict
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__name__,
             "status_code": self.status_code,
             "content_type": self._content_type_for_repr,
         }
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         """Full HTTP message, including headers, as a bytestring."""
         return self.serialize_headers() + b"\r\n\r\n" + self.content
 
     __bytes__ = serialize
 
     @property
-    def content(self):
+    def content(self) -> bytes:
         return b"".join(self._container)
 
     @content.setter
-    def content(self, value):
+    def content(self, value: bytes | str | Iterator[bytes]) -> None:
         # Consume iterators upon assignment to allow repeated iteration.
         if hasattr(value, "__iter__") and not isinstance(
             value, bytes | memoryview | str
         ):
             content = b"".join(self.make_bytes(chunk) for chunk in value)
-            if hasattr(value, "close"):
+            if hasattr(value, "close") and callable(getattr(value, "close")):
                 try:
-                    value.close()
+                    value.close()  # type: ignore
                 except Exception:
                     pass
         else:
@@ -407,25 +422,25 @@ class Response(ResponseBase):
         self._container = [content]
 
     @cached_property
-    def text(self):
+    def text(self) -> str:
         return self.content.decode(self.charset or "utf-8")
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[bytes]:
         return iter(self._container)
 
-    def write(self, content):
+    def write(self, content: bytes | str) -> None:
         self._container.append(self.make_bytes(content))
 
-    def tell(self):
+    def tell(self) -> int:
         return len(self.content)
 
-    def getvalue(self):
+    def getvalue(self) -> bytes:
         return self.content
 
-    def writable(self):
+    def writable(self) -> bool:
         return True
 
-    def writelines(self, lines):
+    def writelines(self, lines: list[bytes | str]) -> None:
         for line in lines:
             self.write(line)
 
@@ -441,13 +456,13 @@ class StreamingResponse(ResponseBase):
 
     streaming = True
 
-    def __init__(self, streaming_content=(), **kwargs):
+    def __init__(self, streaming_content: Any = (), **kwargs: Any):
         super().__init__(**kwargs)
         # `streaming_content` should be an iterable of bytestrings.
         # See the `streaming_content` property methods.
         self.streaming_content = streaming_content
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__qualname__,
             "status_code": self.status_code,
@@ -455,30 +470,30 @@ class StreamingResponse(ResponseBase):
         }
 
     @property
-    def content(self):
+    def content(self) -> bytes:
         raise AttributeError(
             f"This {self.__class__.__name__} instance has no `content` attribute. Use "
             "`streaming_content` instead."
         )
 
     @property
-    def streaming_content(self):
+    def streaming_content(self) -> Iterator[bytes]:
         return map(self.make_bytes, self._iterator)
 
     @streaming_content.setter
-    def streaming_content(self, value):
+    def streaming_content(self, value: Iterator[bytes | str]) -> None:
         self._set_streaming_content(value)
 
-    def _set_streaming_content(self, value):
+    def _set_streaming_content(self, value: Iterator[bytes | str]) -> None:
         # Ensure we can never iterate on "value" more than once.
         self._iterator = iter(value)
         if hasattr(value, "close"):
             self._resource_closers.append(value.close)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[bytes]:
         return iter(self.streaming_content)
 
-    def getvalue(self):
+    def getvalue(self) -> bytes:
         return b"".join(self.streaming_content)
 
 
@@ -489,7 +504,9 @@ class FileResponse(StreamingResponse):
 
     block_size = 4096
 
-    def __init__(self, *args, as_attachment=False, filename="", **kwargs):
+    def __init__(
+        self, *args: Any, as_attachment: bool = False, filename: str = "", **kwargs: Any
+    ):
         self.as_attachment = as_attachment
         self.filename = filename
         self._no_explicit_content_type = (
@@ -497,7 +514,7 @@ class FileResponse(StreamingResponse):
         )
         super().__init__(*args, **kwargs)
 
-    def _set_streaming_content(self, value):
+    def _set_streaming_content(self, value: Any) -> None:
         if not hasattr(value, "read"):
             self.file_to_stream = None
             return super()._set_streaming_content(value)
@@ -509,7 +526,7 @@ class FileResponse(StreamingResponse):
         self.set_headers(filelike)
         super()._set_streaming_content(value)
 
-    def set_headers(self, filelike):
+    def set_headers(self, filelike: IO[bytes]) -> None:
         """
         Set some common response headers (Content-Length, Content-Type, and
         Content-Disposition) based on the `filelike` response content.
@@ -525,9 +542,11 @@ class FileResponse(StreamingResponse):
                 filelike.seek(0, io.SEEK_END)
                 self.headers["Content-Length"] = filelike.tell() - initial_position
                 filelike.seek(initial_position)
-            elif hasattr(filelike, "getbuffer"):
+            elif hasattr(filelike, "getbuffer") and callable(
+                getattr(filelike, "getbuffer")
+            ):
                 self.headers["Content-Length"] = (
-                    filelike.getbuffer().nbytes - filelike.tell()
+                    filelike.getbuffer().nbytes - filelike.tell()  # type: ignore
                 )
             elif os.path.exists(filename):
                 self.headers["Content-Length"] = (
@@ -569,15 +588,15 @@ class ResponseRedirect(Response):
 
     status_code = 302
 
-    def __init__(self, redirect_to, **kwargs):
+    def __init__(self, redirect_to: str, **kwargs: Any):
         super().__init__(**kwargs)
-        self.headers["Location"] = iri_to_uri(redirect_to)
+        self.headers["Location"] = iri_to_uri(redirect_to) or ""
 
     @property
-    def url(self):
+    def url(self) -> str:
         return self.headers["Location"]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             '<%(cls)s status_code=%(status_code)d%(content_type)s, url="%(url)s">'  # noqa: UP031
             % {
@@ -594,12 +613,12 @@ class ResponseNotModified(Response):
 
     status_code = 304
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         del self.headers["content-type"]
 
     @Response.content.setter
-    def content(self, value):
+    def content(self, value: bytes | str | Iterator[bytes]) -> None:
         if value:
             raise AttributeError(
                 "You cannot set content to a 304 (Not Modified) response"
@@ -630,11 +649,11 @@ class ResponseNotAllowed(Response):
 
     status_code = 405
 
-    def __init__(self, permitted_methods, *args, **kwargs):
+    def __init__(self, permitted_methods: list[str], *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.headers["Allow"] = ", ".join(permitted_methods)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<%(cls)s [%(methods)s] status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__name__,
             "status_code": self.status_code,
@@ -675,11 +694,11 @@ class JsonResponse(Response):
 
     def __init__(
         self,
-        data,
-        encoder=PlainJSONEncoder,
-        safe=True,
-        json_dumps_params=None,
-        **kwargs,
+        data: Any,
+        encoder: type[json.JSONEncoder] = PlainJSONEncoder,
+        safe: bool = True,
+        json_dumps_params: dict[str, Any] | None = None,
+        **kwargs: Any,
     ):
         if safe and not isinstance(data, dict):
             raise TypeError(
