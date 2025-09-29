@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import json
+from typing import Any
 
 import click
 
@@ -143,8 +146,11 @@ def request(
 
         if hasattr(response, "resolver_match") and response.resolver_match:
             match = response.resolver_match
-            url_name = match.namespaced_url_name or match.url_name or "unnamed"
-            click.secho(f"URL pattern matched: {url_name}", fg="blue", dim=True)
+            namespaced_url_name = getattr(match, "namespaced_url_name", None)
+            url_name_attr = getattr(match, "url_name", None)
+            url_name = namespaced_url_name or url_name_attr
+            if url_name:
+                click.secho(f"URL pattern matched: {url_name}", fg="blue", dim=True)
 
         # Show headers
         if response.headers:
@@ -159,9 +165,15 @@ def request(
 
             if "json" in content_type.lower():
                 try:
-                    json_data = response.json()
-                    click.secho("Response Body (JSON):", fg="yellow", bold=True)
-                    click.echo(json.dumps(json_data, indent=2))
+                    # The test client adds a json() method to the response
+                    json_method = getattr(response, "json", None)
+                    if json_method and callable(json_method):
+                        json_data: Any = json_method()
+                        click.secho("Response Body (JSON):", fg="yellow", bold=True)
+                        click.echo(json.dumps(json_data, indent=2))
+                    else:
+                        click.secho("Response Body:", fg="yellow", bold=True)
+                        click.echo(response.content.decode("utf-8", errors="replace"))
                 except Exception:
                     click.secho("Response Body:", fg="yellow", bold=True)
                     click.echo(response.content.decode("utf-8", errors="replace"))
