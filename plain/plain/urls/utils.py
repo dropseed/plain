@@ -1,10 +1,14 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.utils.functional import lazy
 
 from .exceptions import NoReverseMatch
 from .resolvers import get_ns_resolver, get_resolver
 
 
-def reverse(url_name: str, *args, **kwargs):
+def reverse(url_name: str, *args: Any, **kwargs: Any) -> str:
     resolver = get_resolver()
 
     *path, view = url_name.split(":")

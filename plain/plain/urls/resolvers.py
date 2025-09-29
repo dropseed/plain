@@ -6,9 +6,12 @@ a string) and returns a ResolverMatch object which provides access to all
 attributes of the resolved URL match.
 """
 
+from __future__ import annotations
+
 import functools
 import re
 from threading import local
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from plain.runtime import settings
@@ -18,7 +21,12 @@ from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import normalize
 
 from .exceptions import NoReverseMatch, Resolver404
-from .patterns import RegexPattern, URLPattern
+from .patterns import RegexPattern, RoutePattern, URLPattern
+
+if TYPE_CHECKING:
+    from plain.preflight import PreflightResult
+
+    from .routers import Router
 
 
 class ResolverMatch:
@@ -48,7 +56,7 @@ class ResolverMatch:
         )
 
 
-def get_resolver(router=None):
+def get_resolver(router: str | Router | None = None) -> URLResolver:
     if router is None:
         router = settings.URLS_ROUTER
 
@@ -56,7 +64,7 @@ def get_resolver(router=None):
 
 
 @functools.cache
-def _get_cached_resolver(router):
+def _get_cached_resolver(router: str | Router) -> URLResolver:
     if isinstance(router, str):
         # Do this inside the cached call, primarily for the URLS_ROUTER
         router_class = import_string(router)
@@ -66,7 +74,9 @@ def _get_cached_resolver(router):
 
 
 @functools.cache
-def get_ns_resolver(ns_pattern, resolver, converters):
+def get_ns_resolver(
+    ns_pattern: str, resolver: URLResolver, converters: tuple[tuple[str, Any], ...]
+) -> URLResolver:
     from .routers import Router
 
     # Build a namespaced resolver for the given parent urls_module pattern.
@@ -95,13 +105,13 @@ class URLResolver:
     def __init__(
         self,
         *,
-        pattern,
-        router,
+        pattern: RegexPattern | RoutePattern,
+        router: Router,
     ):
         self.pattern = pattern
         self.router = router
-        self._reverse_dict = {}
-        self._namespace_dict = {}
+        self._reverse_dict: dict[Any, Any] = {}
+        self._namespace_dict: dict[str, tuple[str, URLResolver]] = {}
         self._populated = False
         self._local = local()
 
@@ -110,17 +120,17 @@ class URLResolver:
         self.namespace = self.router.namespace
         self.url_patterns = self.router.urls
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {repr(self.router)} ({self.namespace}) {self.pattern.describe()}>"
 
-    def preflight(self):
+    def preflight(self) -> list[PreflightResult]:
         messages = []
         messages.extend(self.pattern.preflight())
         for pattern in self.url_patterns:
             messages.extend(pattern.preflight())
         return messages
 
-    def _populate(self):
+    def _populate(self) -> None:
         # Short-circuit if called recursively in this thread to prevent
         # infinite recursion. Concurrent threads may call this at the same
         # time and will need to continue, so set 'populating' on a
@@ -203,14 +213,14 @@ class URLResolver:
         return self._namespace_dict
 
     @staticmethod
-    def _join_route(route1, route2):
+    def _join_route(route1: str, route2: str) -> str:
         """Join two routes, without the starting ^ in the second route."""
         if not route1:
             return route2
         route2 = route2.removeprefix("^")
         return route1 + route2
 
-    def resolve(self, path):
+    def resolve(self, path: str) -> ResolverMatch:
         path = str(path)  # path may be a reverse_lazy object
         match = self.pattern.match(path)
         if match:
@@ -247,7 +257,7 @@ class URLResolver:
             raise Resolver404({"path": new_path})
         raise Resolver404({"path": path})
 
-    def reverse(self, lookup_view, *args, **kwargs):
+    def reverse(self, lookup_view: Any, *args: Any, **kwargs: Any) -> str:
         if args and kwargs:
             raise ValueError("Don't mix *args and **kwargs in call to reverse()!")
 

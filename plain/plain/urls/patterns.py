@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import re
 import string
+from typing import Any
 
 from plain.exceptions import ImproperlyConfigured
 from plain.internal import internalcode
@@ -12,7 +15,7 @@ from .converters import get_converter
 
 @internalcode
 class CheckURLMixin:
-    def describe(self):
+    def describe(self) -> str:
         """
         Format the URL pattern for display in warning messages.
         """
@@ -21,7 +24,7 @@ class CheckURLMixin:
             description += f" [name='{self.name}']"
         return description
 
-    def _check_pattern_startswith_slash(self):
+    def _check_pattern_startswith_slash(self) -> list[PreflightResult]:
         """
         Check that the pattern does not begin with a forward slash.
         """
@@ -44,14 +47,14 @@ class CheckURLMixin:
 
 
 class RegexPattern(CheckURLMixin):
-    def __init__(self, regex, name=None, is_endpoint=False):
+    def __init__(self, regex: str, name: str | None = None, is_endpoint: bool = False):
         self._regex = regex
         self._is_endpoint = is_endpoint
         self.name = name
-        self.converters = {}
+        self.converters: dict[str, Any] = {}
         self.regex = self._compile(str(regex))
 
-    def match(self, path):
+    def match(self, path: str) -> tuple[str, tuple[Any, ...], dict[str, Any]] | None:
         match = (
             self.regex.fullmatch(path)
             if self._is_endpoint and self.regex.pattern.endswith("$")
@@ -67,14 +70,14 @@ class RegexPattern(CheckURLMixin):
             return path[match.end() :], args, kwargs
         return None
 
-    def preflight(self):
+    def preflight(self) -> list[PreflightResult]:
         warnings = []
         warnings.extend(self._check_pattern_startswith_slash())
         if not self._is_endpoint:
             warnings.extend(self._check_include_trailing_dollar())
         return warnings
 
-    def _check_include_trailing_dollar(self):
+    def _check_include_trailing_dollar(self) -> list[PreflightResult]:
         regex_pattern = self.regex.pattern
         if regex_pattern.endswith("$") and not regex_pattern.endswith(r"\$"):
             return [
@@ -87,7 +90,7 @@ class RegexPattern(CheckURLMixin):
         else:
             return []
 
-    def _compile(self, regex):
+    def _compile(self, regex: str) -> re.Pattern[str]:
         """Compile and return the given regular expression."""
         try:
             return re.compile(regex)
@@ -96,7 +99,7 @@ class RegexPattern(CheckURLMixin):
                 f'"{regex}" is not a valid regular expression: {e}'
             ) from e
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._regex)
 
 
@@ -105,7 +108,9 @@ _PATH_PARAMETER_COMPONENT_RE = _lazy_re_compile(
 )
 
 
-def _route_to_regex(route, is_endpoint=False):
+def _route_to_regex(
+    route: str, is_endpoint: bool = False
+) -> tuple[str, dict[str, Any]]:
     """
     Convert a path pattern into a regular expression. Return the regular
     expression and a dictionary mapping the capture names to the converters.
@@ -151,14 +156,14 @@ def _route_to_regex(route, is_endpoint=False):
 
 
 class RoutePattern(CheckURLMixin):
-    def __init__(self, route, name=None, is_endpoint=False):
+    def __init__(self, route: str, name: str | None = None, is_endpoint: bool = False):
         self._route = route
         self._is_endpoint = is_endpoint
         self.name = name
         self.converters = _route_to_regex(str(route), is_endpoint)[1]
         self.regex = self._compile(str(route))
 
-    def match(self, path):
+    def match(self, path: str) -> tuple[str, tuple[()], dict[str, Any]] | None:
         match = self.regex.search(path)
         if match:
             # RoutePattern doesn't allow non-named groups so args are ignored.
@@ -172,7 +177,7 @@ class RoutePattern(CheckURLMixin):
             return path[match.end() :], (), kwargs
         return None
 
-    def preflight(self):
+    def preflight(self) -> list[PreflightResult]:
         warnings = self._check_pattern_startswith_slash()
         route = self._route
         if "(?P<" in route or route.startswith("^") or route.endswith("$"):
@@ -187,28 +192,34 @@ class RoutePattern(CheckURLMixin):
             )
         return warnings
 
-    def _compile(self, route):
+    def _compile(self, route: str) -> re.Pattern[str]:
         return re.compile(_route_to_regex(route, self._is_endpoint)[0])
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._route)
 
 
 class URLPattern:
-    def __init__(self, *, pattern, view, name=None):
+    def __init__(
+        self,
+        *,
+        pattern: RegexPattern | RoutePattern,
+        view: Any,
+        name: str | None = None,
+    ):
         self.pattern = pattern
         self.view = view
         self.name = name
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.pattern.describe()}>"
 
-    def preflight(self):
+    def preflight(self) -> list[PreflightResult]:
         warnings = self._check_pattern_name()
         warnings.extend(self.pattern.preflight())
         return warnings
 
-    def _check_pattern_name(self):
+    def _check_pattern_name(self) -> list[PreflightResult]:
         """
         Check that the pattern name does not contain a colon.
         """
@@ -223,7 +234,7 @@ class URLPattern:
         else:
             return []
 
-    def resolve(self, path):
+    def resolve(self, path: str) -> Any:
         match = self.pattern.match(path)
         if match:
             new_path, args, captured_kwargs = match
@@ -236,3 +247,4 @@ class URLPattern:
                 url_name=self.pattern.name,
                 route=str(self.pattern),
             )
+        return None
