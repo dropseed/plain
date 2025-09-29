@@ -28,6 +28,40 @@ Some instructions for writing READMEs:
 - For the **FAQs**, use h4s for the questions.
 - The most advanced usages of the package don't need to be fully documented (i.e. every possible paramater, etc.). They can be mentioned if the user otherwise wouldn't know about them, but then they can be linked to the code itself for more information.
 
+## Type annotations
+
+We are gradually adding type annotations to improve IDE/type checker friendliness. We are using Python 3.13+. Use the following workflow:
+
+1. **Check current coverage**: `./scripts/type-coverage <directory> --details --missing`
+2. **Add annotations**: Focus on function/method signatures (parameters and return types)
+3. **Type check**: `./scripts/type-check <directory>` (uses `uv run ty check`)
+4. **Format**: `./scripts/fix`
+5. **Test**: `./scripts/test <package>`
+6. **Verify improvement**: `./scripts/type-coverage <directory>`
+7. **Add to validation**: Once a directory reaches 100% coverage, add it to `FULLY_TYPED_DIRS` in `scripts/type-validate` to prevent regressions
+
+Guidelines:
+
+- Add `from __future__ import annotations` when necessary
+- Focus on public APIs and user-facing methods first
+- Don't annotate `__init__` return types (type checkers infer `None`)
+- Use explicit `return None` for functions with `-> Type | None` return type
+- Some Django-style ORM patterns are inherently difficult to type - that's okay
+- Goal is progress, not perfection
+
+Example workflow:
+
+```bash
+# Check coverage
+./scripts/type-coverage plain/plain/assets --details --missing
+
+# After adding annotations...
+./scripts/type-check plain/plain/assets
+./scripts/fix
+./scripts/test plain
+./scripts/type-coverage plain/plain/assets  # Should show 100%
+```
+
 ## Verifying changes
 
 Not everything needs a test, but be liberal about using `print()` statements to verify changes and show the before and after effects of your changes. Make sure those print statements are removed before committing your changes.

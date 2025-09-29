@@ -1,2 +1,2 @@
 #!/bin/bash -e
-uvx ty check "$@"
+uv run ty check "$@"

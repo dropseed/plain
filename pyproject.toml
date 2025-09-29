@@ -33,6 +33,7 @@ dev-dependencies = [
     "plain-tunnel",
     "plain-vendor",
     "plain-worker",
+    "ty>=0.0.1a21",
 ]
 
 [tool.uv.sources]

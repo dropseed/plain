@@ -6,5 +6,9 @@ echo "${BOLD}Checking formatting and linting${NORMAL}"
 ./scripts/fix --check
 
 echo ""
+echo "${BOLD}Validating type annotations${NORMAL}"
+./scripts/type-validate
+
+echo ""
 echo "${BOLD}Running tests${NORMAL}"
 ./scripts/test

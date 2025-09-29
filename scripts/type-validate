@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""
+Validate type annotations for directories that should have 100% coverage.
+
+This script ensures that once a directory reaches 100% type annotation coverage,
+it stays at 100% to prevent backwards regressions.
+"""
+
+import sys
+import subprocess
+import json
+from pathlib import Path
+
+# Directories that must maintain 100% type annotation coverage
+FULLY_TYPED_DIRS = [
+    "plain/plain",
+]
+
+
+def check_type_coverage(directory: str) -> tuple[float, int, int]:
+    """Check type coverage for a directory."""
+    result = subprocess.run(
+        ["./scripts/type-coverage", directory, "--json"],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print(f"Error checking coverage for {directory}:", file=sys.stderr)
+        print(result.stderr, file=sys.stderr)
+        return 0.0, 0, 0
+
+    data = json.loads(result.stdout)
+    return (
+        data["overall_coverage"],
+        data["fully_typed_functions"],
+        data["total_functions"],
+    )
+
+
+def run_type_check(directory: str) -> bool:
+    """Run type checker on a directory."""
+    result = subprocess.run(
+        ["./scripts/type-check", directory],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print(f"Type check failed for {directory}:", file=sys.stderr)
+        print(result.stdout, file=sys.stderr)
+        print(result.stderr, file=sys.stderr)
+        return False
+
+    return True
+
+
+def main():
+    """Main entry point."""
+    print("Validating type annotations for fully typed directories...")
+    print()
+
+    failed_dirs = []
+
+    for directory in FULLY_TYPED_DIRS:
+        dir_path = Path(directory)
+        if not dir_path.exists():
+            print(f"⚠️  {directory} does not exist, skipping")
+            continue
+
+        print(f"Checking {directory}...")
+
+        # Check coverage
+        coverage, typed, total = check_type_coverage(directory)
+
+        if coverage < 100.0:
+            print(f"  ✗ Coverage: {coverage:.1f}% ({typed}/{total}) - Expected 100%")
+            failed_dirs.append((directory, f"coverage {coverage:.1f}%"))
+        else:
+            print(f"  ✓ Coverage: 100% ({typed}/{total})")
+
+        # Run type checker
+        if not run_type_check(directory):
+            print(f"  ✗ Type check failed")
+            failed_dirs.append((directory, "type check failed"))
+        else:
+            print(f"  ✓ Type check passed")
+
+        print()
+
+    if failed_dirs:
+        print("❌ Type validation failed for the following directories:")
+        for directory, reason in failed_dirs:
+            print(f"  - {directory}: {reason}")
+        print()
+        print("To fix:")
+        print("  1. Check coverage: ./scripts/type-coverage <directory> --details --missing")
+        print("  2. Add missing annotations")
+        print("  3. Run type check: ./scripts/type-check <directory>")
+        print("  4. Format: ./scripts/fix")
+        sys.exit(1)
+
+    print("✓ All directories passed type validation")
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
