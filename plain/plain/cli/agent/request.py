@@ -98,11 +98,11 @@ def request(
 
         # Make the request
         method = method.upper()
-        kwargs = {
-            "path": path,
+        kwargs: dict[str, object] = {
             "follow": follow,
-            "headers": header_dict or None,
         }
+        if header_dict:
+            kwargs["headers"] = header_dict
 
         if method in ("POST", "PUT", "PATCH") and data:
             kwargs["data"] = data
@@ -111,21 +111,21 @@ def request(
 
         # Call the appropriate client method
         if method == "GET":
-            response = client.get(**kwargs)
+            response = client.get(path, **kwargs)
         elif method == "POST":
-            response = client.post(**kwargs)
+            response = client.post(path, **kwargs)
         elif method == "PUT":
-            response = client.put(**kwargs)
+            response = client.put(path, **kwargs)
         elif method == "PATCH":
-            response = client.patch(**kwargs)
+            response = client.patch(path, **kwargs)
         elif method == "DELETE":
-            response = client.delete(**kwargs)
+            response = client.delete(path, **kwargs)
         elif method == "HEAD":
-            response = client.head(**kwargs)
+            response = client.head(path, **kwargs)
         elif method == "OPTIONS":
-            response = client.options(**kwargs)
+            response = client.options(path, **kwargs)
         elif method == "TRACE":
-            response = client.trace(**kwargs)
+            response = client.trace(path, **kwargs)
         else:
             click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
             return

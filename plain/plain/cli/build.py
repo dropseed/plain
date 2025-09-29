@@ -79,7 +79,7 @@ def build(keep_original, fingerprint, compress):
     total_compiled = 0
 
     for url_path, resolved_url_path, compiled_paths in compile_assets(
-        target_dir=target_dir,
+        target_dir=str(target_dir),
         keep_original=keep_original,
         fingerprint=fingerprint,
         compress=compress,

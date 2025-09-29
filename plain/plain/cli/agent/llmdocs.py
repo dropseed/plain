@@ -92,7 +92,15 @@ class LLMDocs:
         parsed = ast.parse(source)
 
         def should_skip(node: ast.AST) -> bool:
-            if isinstance(node, ast.ClassDef | ast.FunctionDef):
+            if isinstance(node, ast.ClassDef):
+                if any(
+                    isinstance(d, ast.Name) and d.id == "internalcode"
+                    for d in node.decorator_list
+                ):
+                    return True
+                if node.name.startswith("_"):
+                    return True
+            elif isinstance(node, ast.FunctionDef):
                 if any(
                     isinstance(d, ast.Name) and d.id == "internalcode"
                     for d in node.decorator_list

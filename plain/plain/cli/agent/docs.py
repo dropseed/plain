@@ -33,11 +33,12 @@ def docs(package: str, show_list: bool) -> None:
                     available_packages.append("plain")
 
                 # Check other plain.* subpackages
-                for importer, modname, ispkg in pkgutil.iter_modules(
-                    plain.__path__, "plain."
-                ):
-                    if ispkg:
-                        available_packages.append(modname)
+                if hasattr(plain, "__path__"):
+                    for importer, modname, ispkg in pkgutil.iter_modules(
+                        plain.__path__, "plain."
+                    ):
+                        if ispkg:
+                            available_packages.append(modname)
             except Exception:
                 pass
 

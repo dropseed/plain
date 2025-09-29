@@ -27,18 +27,21 @@ def _get_packages_with_agents() -> dict[str, Path]:
                 agents_files["plain"] = agents_path
 
         # Check other plain.* subpackages
-        for importer, modname, ispkg in pkgutil.iter_modules(plain.__path__, "plain."):
-            if ispkg:
-                try:
-                    spec = importlib.util.find_spec(modname)
-                    if spec and spec.origin:
-                        package_path = Path(spec.origin).parent
-                        # Look for AGENTS.md at package root
-                        agents_path = package_path / "AGENTS.md"
-                        if agents_path.exists():
-                            agents_files[modname] = agents_path
-                except Exception:
-                    continue
+        if hasattr(plain, "__path__"):
+            for importer, modname, ispkg in pkgutil.iter_modules(
+                plain.__path__, "plain."
+            ):
+                if ispkg:
+                    try:
+                        spec = importlib.util.find_spec(modname)
+                        if spec and spec.origin:
+                            package_path = Path(spec.origin).parent
+                            # Look for AGENTS.md at package root
+                            agents_path = package_path / "AGENTS.md"
+                            if agents_path.exists():
+                                agents_files[modname] = agents_path
+                    except Exception:
+                        continue
     except Exception:
         pass
 
