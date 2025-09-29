@@ -10,7 +10,7 @@ The `plain` CLI is the main entrypoint for the framework. If `plain` is not avai
 - `plain run <filename>`: Run a Python script with Plain configured.
 - `plain agent docs <package>`: Show README.md and symbolicated source files for a specific package.
 - `plain agent docs --list`: List packages with docs available.
-- `plain agent request <path> --user <user_id>`: Make an authenticated request to the application and inspect the output.
+- `plain agent request <path> --user <user_id>`: Make an authenticated request to the running application and inspect the output.
 - `plain --help`: List all available commands (including those from installed packages).
 
 ## Code style
