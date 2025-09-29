@@ -63,36 +63,17 @@ def get_commits_since_version_change(repo_path: Path, package_path: Path):
     return [line.split(" ", 1) for line in lines if line]
 
 
-def bump_version(version: str, bump_type: str) -> str:
-    major, minor, patch = map(int, version.split("."))
-    if bump_type == "major":
-        major += 1
-        minor = 0
-        patch = 0
-    elif bump_type == "minor":
-        minor += 1
-        patch = 0
-    elif bump_type == "patch":
-        patch += 1
-    else:
-        print(f"Error: Unknown bump type: {bump_type}")
-        sys.exit(1)
-    return f"{major}.{minor}.{patch}"
-
-
-def update_version_in_file(file_path: Path, old_version: str, new_version: str):
-    content = file_path.read_text()
-    content = content.replace(f'version = "{old_version}"', f'version = "{new_version}"')
-    file_path.write_text(content)
+def bump_version_with_uv(package_path: Path, bump_type: str) -> str:
+    """Bump the version using uv version --bump and return the new version."""
+    # Run uv version --bump in the package directory
+    run(f"uv version --bump {bump_type}", package_path, capture=False)
+    # Return the new version
+    return get_current_version(package_path)
 
 
 def get_current_version(package_path: Path) -> str:
-    pyproject = package_path / "pyproject.toml"
-    for line in pyproject.read_text().splitlines():
-        if line.strip().startswith("version"):
-            return line.split("=")[1].strip().strip('"').strip("'")
-    print(f"Error: Could not find version in {pyproject}")
-    sys.exit(1)
+    """Get the current version using uv version --short."""
+    return run("uv version --short", package_path)
 
 
 def main():
@@ -148,8 +129,7 @@ def main():
             continue
 
         old_version = get_current_version(pkg_path)
-        new_version = bump_version(old_version, choice)
-        update_version_in_file(pkg_path / "pyproject.toml", old_version, new_version)
+        new_version = bump_version_with_uv(pkg_path, choice)
         run("uv sync", repo_path)
 
         # Need to update the changelog here so it's in the commit
