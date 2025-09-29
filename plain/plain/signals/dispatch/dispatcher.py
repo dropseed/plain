@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 import logging
 import threading
 import weakref
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from plain.utils.inspect import func_accepts_kwargs
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = logging.getLogger("plain.signals.dispatch")
 
 
-def _make_id(target):
+def _make_id(target: Any) -> int | tuple[int, int]:
     if hasattr(target, "__func__"):
         return (id(target.__self__), id(target.__func__))
     return id(target)
@@ -29,7 +36,7 @@ class Signal:
             { receiverkey (id) : weakref(receiver) }
     """
 
-    def __init__(self, use_caching=False):
+    def __init__(self, use_caching: bool = False):
         """
         Create a new signal.
         """
@@ -44,7 +51,13 @@ class Signal:
         self.sender_receivers_cache = weakref.WeakKeyDictionary() if use_caching else {}
         self._dead_receivers = False
 
-    def connect(self, receiver, sender=None, weak=True, dispatch_uid=None):
+    def connect(
+        self,
+        receiver: Callable[..., Any],
+        sender: Any = None,
+        weak: bool = True,
+        dispatch_uid: Any = None,
+    ) -> None:
         """
         Connect receiver to sender for signal.
 
@@ -111,7 +124,12 @@ class Signal:
                 self.receivers.append((lookup_key, receiver))
             self.sender_receivers_cache.clear()
 
-    def disconnect(self, receiver=None, sender=None, dispatch_uid=None):
+    def disconnect(
+        self,
+        receiver: Callable[..., Any] | None = None,
+        sender: Any = None,
+        dispatch_uid: Any = None,
+    ) -> bool:
         """
         Disconnect receiver from sender for signal.
 
@@ -147,11 +165,11 @@ class Signal:
             self.sender_receivers_cache.clear()
         return disconnected
 
-    def has_listeners(self, sender=None):
+    def has_listeners(self, sender: Any = None) -> bool:
         sync_receivers = self._live_receivers(sender)
         return bool(sync_receivers)
 
-    def send(self, sender, **named):
+    def send(self, sender: Any, **named: Any) -> list[tuple[Callable[..., Any], Any]]:
         """
         Send signal from sender to all connected receivers.
 
@@ -185,15 +203,17 @@ class Signal:
             responses.append((receiver, response))
         return responses
 
-    def _log_robust_failure(self, receiver, err):
+    def _log_robust_failure(self, receiver: Callable[..., Any], err: Exception) -> None:
         logger.error(
             "Error calling %s in Signal.send_robust() (%s)",
-            receiver.__qualname__,
+            getattr(receiver, "__qualname__", repr(receiver)),
             err,
             exc_info=err,
         )
 
-    def send_robust(self, sender, **named):
+    def send_robust(
+        self, sender: Any, **named: Any
+    ) -> list[tuple[Callable[..., Any], Any]]:
         """
         Send signal from sender to all connected receivers catching errors.
 
@@ -236,7 +256,7 @@ class Signal:
                 responses.append((receiver, response))
         return responses
 
-    def _clear_dead_receivers(self):
+    def _clear_dead_receivers(self) -> None:
         # Note: caller is assumed to hold self.lock.
         if self._dead_receivers:
             self._dead_receivers = False
@@ -246,7 +266,7 @@ class Signal:
                 if not (isinstance(r[1], weakref.ReferenceType) and r[1]() is None)
             ]
 
-    def _live_receivers(self, sender):
+    def _live_receivers(self, sender: Any) -> list[Callable[..., Any]]:
         """
         Filter sequence of receivers to get resolved, live receivers.
 
@@ -285,7 +305,7 @@ class Signal:
                 non_weak_sync_receivers.append(receiver)
         return non_weak_sync_receivers
 
-    def _remove_receiver(self, receiver=None):
+    def _remove_receiver(self, receiver: Any = None) -> None:
         # Mark that the self.receivers list has dead weakrefs. If so, we will
         # clean those up in connect, disconnect and _live_receivers while
         # holding self.lock. Note that doing the cleanup here isn't a good
@@ -295,7 +315,9 @@ class Signal:
         self._dead_receivers = True
 
 
-def receiver(signal, **kwargs):
+def receiver(
+    signal: Signal | Sequence[Signal], **kwargs: Any
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     A decorator for connecting receivers to signals. Used by passing in the
     signal (or list of signals) and keyword arguments to connect::
@@ -309,12 +331,12 @@ def receiver(signal, **kwargs):
             ...
     """
 
-    def _decorator(func):
-        if isinstance(signal, list | tuple):
+    def _decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        if isinstance(signal, Signal):
+            signal.connect(func, **kwargs)
+        else:
             for s in signal:
                 s.connect(func, **kwargs)
-        else:
-            signal.connect(func, **kwargs)
         return func
 
     return _decorator
