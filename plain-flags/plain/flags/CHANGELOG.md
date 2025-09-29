@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.25.1](https://github.com/dropseed/plain/releases/plain-flags@0.25.1) (2025-09-29)
+
+### What's changed
+
+- Fixed the admin interface for unused flags to display the `fix` field instead of `message` field in PreflightResult ([b75a38d](https://github.com/dropseed/plain/commit/b75a38d52a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-flags@0.25.0) (2025-09-26)
 
 ### What's changed
