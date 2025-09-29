@@ -114,7 +114,7 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 100
 FILE_UPLOAD_TEMP_DIR = None
 
 # User-defined overrides for error views by status code
-HTTP_ERROR_VIEWS: dict[int] = {}
+HTTP_ERROR_VIEWS: dict[int, type] = {}
 
 # MARK: Middleware
 

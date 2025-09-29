@@ -2,7 +2,7 @@ import tomllib
 from pathlib import Path
 
 
-def get_app_info_from_pyproject():
+def get_app_info_from_pyproject() -> tuple[str, str]:
     """Get the project name and version from the nearest pyproject.toml file."""
     current_path = Path.cwd()
 

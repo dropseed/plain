@@ -2,6 +2,7 @@ import importlib.metadata
 import sys
 from importlib.metadata import entry_points
 from pathlib import Path
+from typing import Self
 
 from plain.logs.configure import configure_logging
 from plain.packages import packages_registry
@@ -32,7 +33,7 @@ class SetupError(RuntimeError):
     pass
 
 
-def setup():
+def setup() -> None:
     """
     Configure the settings (this happens as a side effect of accessing the
     first setting), configure logging and populate the app registry.
@@ -77,11 +78,11 @@ class SettingsReference(str):
     the value in memory but serializes to a settings.NAME attribute reference.
     """
 
-    def __new__(self, setting_name):
+    def __new__(self, setting_name: str) -> Self:
         value = getattr(settings, setting_name)
         return str.__new__(self, value)
 
-    def __init__(self, setting_name):
+    def __init__(self, setting_name: str):
         self.setting_name = setting_name
 
 

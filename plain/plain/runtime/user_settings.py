@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib
 import json
 import os
@@ -26,13 +28,13 @@ class Settings:
     Lazy initialization is implemented to defer loading until settings are first accessed.
     """
 
-    def __init__(self, settings_module=None):
+    def __init__(self, settings_module: str | None = None):
         self._settings_module = settings_module
         self._settings = {}
         self._errors = []  # Collect configuration errors
         self.configured = False
 
-    def _setup(self):
+    def _setup(self) -> None:
         if self.configured:
             return
         else:
@@ -71,7 +73,7 @@ class Settings:
         # Check for any collected errors
         self._raise_errors_if_any()
 
-    def _load_module_settings(self, module):
+    def _load_module_settings(self, module: types.ModuleType) -> None:
         annotations = getattr(module, "__annotations__", {})
         settings = dir(module)
 
@@ -100,7 +102,7 @@ class Settings:
                     required=True,
                 )
 
-    def _load_default_settings(self, settings_module):
+    def _load_default_settings(self, settings_module: types.ModuleType) -> None:
         for entry in getattr(settings_module, "INSTALLED_PACKAGES", []):
             if isinstance(entry, PackageConfig):
                 app_settings = entry.module.default_settings
@@ -111,7 +113,7 @@ class Settings:
 
             self._load_module_settings(app_settings)
 
-    def _load_env_settings(self):
+    def _load_env_settings(self) -> None:
         env_settings = {
             k[len(ENV_SETTINGS_PREFIX) :]: v
             for k, v in os.environ.items()
@@ -128,7 +130,7 @@ class Settings:
                 except ImproperlyConfigured as e:
                     self._errors.append(str(e))
 
-    def _load_explicit_settings(self, settings_module):
+    def _load_explicit_settings(self, settings_module: types.ModuleType) -> None:
         for setting in dir(settings_module):
             if setting.isupper():
                 setting_value = getattr(settings_module, setting)
@@ -172,19 +174,19 @@ class Settings:
                 os.environ["TZ"] = self.TIME_ZONE
                 time.tzset()
 
-    def _check_required_settings(self):
+    def _check_required_settings(self) -> None:
         missing = [k for k, v in self._settings.items() if v.required and not v.is_set]
         if missing:
             self._errors.append(f"Missing required setting(s): {', '.join(missing)}.")
 
-    def _raise_errors_if_any(self):
+    def _raise_errors_if_any(self) -> None:
         if self._errors:
             errors = ["- " + e for e in self._errors]
             raise ImproperlyConfigured(
                 "Settings configuration errors:\n" + "\n".join(errors)
             )
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> typing.Any:
         # Avoid recursion by directly returning internal attributes
         if not name.isupper():
             return object.__getattribute__(self, name)
@@ -196,7 +198,7 @@ class Settings:
         else:
             raise AttributeError(f"'Settings' object has no attribute '{name}'")
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: typing.Any) -> None:
         # Handle internal attributes without recursion
         if not name.isupper():
             object.__setattr__(self, name, value)
@@ -207,13 +209,15 @@ class Settings:
             else:
                 object.__setattr__(self, name, value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if not self.configured:
             return "<Settings [Unevaluated]>"
         return f'<Settings "{self._settings_module}">'
 
 
-def _parse_env_value(value, annotation, setting_name):
+def _parse_env_value(
+    value: str, annotation: type | None, setting_name: str
+) -> typing.Any:
     if not annotation:
         raise ImproperlyConfigured(
             f"{setting_name}: Type hint required to set from environment."
@@ -238,7 +242,12 @@ class SettingDefinition:
     """Store detailed information about settings."""
 
     def __init__(
-        self, name, default_value=None, annotation=None, module=None, required=False
+        self,
+        name: str,
+        default_value: typing.Any = None,
+        annotation: type | None = None,
+        module: types.ModuleType | None = None,
+        required: bool = False,
     ):
         self.name = name
         self.default_value = default_value
@@ -249,13 +258,13 @@ class SettingDefinition:
         self.source = "default"  # 'default', 'env', 'explicit', or 'runtime'
         self.is_set = False  # Indicates if the value was set explicitly
 
-    def set_value(self, value, source):
+    def set_value(self, value: typing.Any, source: str) -> None:
         self.check_type(value)
         self.value = value
         self.source = source
         self.is_set = True
 
-    def check_type(self, obj):
+    def check_type(self, obj: typing.Any) -> None:
         if not self.annotation:
             return
 
@@ -265,7 +274,7 @@ class SettingDefinition:
             )
 
     @staticmethod
-    def _is_instance_of_type(value, type_hint) -> bool:
+    def _is_instance_of_type(value: typing.Any, type_hint: typing.Any) -> bool:
         # Simple types
         if isinstance(type_hint, type):
             return isinstance(value, type_hint)
@@ -300,5 +309,5 @@ class SettingDefinition:
 
         raise ValueError(f"Unsupported type hint: {type_hint}")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"SettingDefinition(name={self.name}, value={self.value}, source={self.source})"
