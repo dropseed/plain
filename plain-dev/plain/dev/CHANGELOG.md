@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-dev@0.37.0) (2025-09-29)
+
+### What's changed
+
+- Added a `p` alias prompt that suggests setting up a shell alias for `uv run plain` to make command execution faster ([d913b44](https://github.com/dropseed/plain/commit/d913b44fab), [6632529](https://github.com/dropseed/plain/commit/663252925b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-dev@0.36.0) (2025-09-25)
 
 ### What's changed
