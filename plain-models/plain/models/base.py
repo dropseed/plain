@@ -665,8 +665,10 @@ class Model(metaclass=ModelBase):
         collector.collect([self])
         return collector.delete()
 
-    def get_field_display(self, field):
+    def get_field_display(self, field_name: str) -> str:
         """Get the display value for a field, especially useful for fields with choices."""
+        # Get the field object from the field name
+        field = self._meta.get_field(field_name)
         value = getattr(self, field.attname)
 
         # If field has no choices, just return the value as string
