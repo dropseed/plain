@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
 from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils.functional import LazyObject
@@ -7,7 +12,7 @@ from .environments import DefaultEnvironment, get_template_dirs
 
 
 class JinjaEnvironment(LazyObject):
-    def _setup(self):
+    def _setup(self) -> None:
         environment_setting = settings.TEMPLATES_JINJA_ENVIRONMENT
 
         if isinstance(environment_setting, str):
@@ -25,12 +30,12 @@ class JinjaEnvironment(LazyObject):
 environment = JinjaEnvironment()
 
 
-def register_template_extension(extension_class):
+def register_template_extension(extension_class: type) -> type:
     environment.add_extension(extension_class)
     return extension_class
 
 
-def register_template_global(value, name=None):
+def register_template_global(value: Any, name: str | None = None) -> Any:
     """
     Adds a global to the Jinja environment.
 
@@ -54,9 +59,12 @@ def register_template_global(value, name=None):
     return value
 
 
-def register_template_filter(func, name=None):
+def register_template_filter(
+    func: Callable[..., Any], name: str | None = None
+) -> Callable[..., Any]:
     """Adds a filter to the Jinja environment."""
-    environment.filters[name or func.__name__] = func
+    filter_name = name if name is not None else func.__name__  # type: ignore[attr-defined]
+    environment.filters[filter_name] = func
     return func
 
 

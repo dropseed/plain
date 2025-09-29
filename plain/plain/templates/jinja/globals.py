@@ -5,7 +5,7 @@ from plain.urls import reverse
 from plain.utils import timezone
 
 
-def asset(url_path):
+def asset(url_path: str) -> str:
     # An explicit callable we can control, but also delay the import of asset.urls->views->templates
     # for circular import reasons
     from plain.assets.urls import get_asset_url

@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import datetime
 from itertools import islice
+from typing import Any
 
 from plain.utils.html import json_script
 from plain.utils.timesince import timesince, timeuntil
 from plain.utils.timezone import localtime
 
 
-def localtime_filter(value, timezone=None):
+def localtime_filter(
+    value: datetime.datetime | None, timezone: Any = None
+) -> datetime.datetime:
     """Converts a datetime to local time in a template."""
     if not value:
         # Without this, we get the current localtime
@@ -15,7 +20,7 @@ def localtime_filter(value, timezone=None):
     return localtime(value, timezone)
 
 
-def pluralize_filter(value, singular="", plural="s"):
+def pluralize_filter(value: Any, singular: str = "", plural: str = "s") -> str:
     """Returns plural suffix based on the value count.
 
     Usage:
