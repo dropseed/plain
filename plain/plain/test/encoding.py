@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import mimetypes
 import os
+from typing import Any
 
 from plain.runtime import settings
 from plain.utils.encoding import force_bytes
 from plain.utils.itercompat import is_iterable
 
 
-def encode_multipart(boundary, data):
+def encode_multipart(boundary: str, data: dict[str, Any]) -> bytes:
     """
     Encode multipart POST data from a dictionary of form values.
 
@@ -14,13 +17,13 @@ def encode_multipart(boundary, data):
     as content. If the value is a file, the contents of the file will be sent
     as an application/octet-stream; otherwise, str(value) will be sent.
     """
-    lines = []
+    lines: list[bytes] = []
 
-    def to_bytes(s):
+    def to_bytes(s: str) -> bytes:
         return force_bytes(s, settings.DEFAULT_CHARSET)
 
     # Not by any means perfect, but good enough for our purposes.
-    def is_file(thing):
+    def is_file(thing: Any) -> bool:
         return hasattr(thing, "read") and callable(thing.read)
 
     # Each bit of the multipart form data could be either a form value or a
@@ -68,8 +71,8 @@ def encode_multipart(boundary, data):
     return b"\r\n".join(lines)
 
 
-def encode_file(boundary, key, file):
-    def to_bytes(s):
+def encode_file(boundary: str, key: str, file: Any) -> list[bytes]:
+    def to_bytes(s: str) -> bytes:
         return force_bytes(s, settings.DEFAULT_CHARSET)
 
     # file.name might not be a string. For example, it's an int for
