@@ -2,6 +2,8 @@
 Field classes.
 """
 
+from __future__ import annotations
+
 import copy
 import datetime
 import enum
@@ -9,8 +11,10 @@ import json
 import math
 import re
 import uuid
+from collections.abc import Callable
 from decimal import Decimal, DecimalException
 from io import BytesIO
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit, urlunsplit
 
 from plain import validators
@@ -23,6 +27,9 @@ from plain.utils.text import pluralize_lazy
 
 from .boundfield import BoundField
 from .exceptions import FormFieldMissingError
+
+if TYPE_CHECKING:
+    from .forms import BaseForm
 
 __all__ = (
     "Field",
@@ -53,7 +60,7 @@ FILE_INPUT_CONTRADICTION = object()
 
 
 class Field:
-    default_validators = []  # Default set of validators
+    default_validators: list[Callable[[Any], None]] = []  # Default set of validators
     # Add an 'invalid' entry to default_error_message if you want a specific
     # field error message not raised by the field validators.
     default_error_messages = {
@@ -64,10 +71,10 @@ class Field:
     def __init__(
         self,
         *,
-        required=True,
-        initial=None,
-        error_messages=None,
-        validators=(),
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: tuple[Callable[[Any], None], ...] = (),
     ):
         # required -- Boolean that specifies whether the field is required.
         #             True by default.
@@ -87,19 +94,19 @@ class Field:
 
         self.validators = [*self.default_validators, *validators]
 
-    def prepare_value(self, value):
+    def prepare_value(self, value: Any) -> Any:
         return value
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         return value
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if value in self.empty_values and self.required:
             raise ValidationError(self.error_messages["required"], code="required")
 
-    def run_validators(self, value):
+    def run_validators(self, value: Any) -> None:
         if value in self.empty_values:
-            return
+            return None
         errors = []
         for v in self.validators:
             try:
@@ -111,7 +118,7 @@ class Field:
         if errors:
             raise ValidationError(errors)
 
-    def clean(self, value):
+    def clean(self, value: Any) -> Any:
         """
         Validate the given value and return its "cleaned" value as an
         appropriate Python object. Raise ValidationError for any errors.
@@ -121,7 +128,7 @@ class Field:
         self.run_validators(value)
         return value
 
-    def bound_data(self, data, initial):
+    def bound_data(self, data: Any, initial: Any) -> Any:
         """
         Return the value that should be shown for this field on render of a
         bound form, given the submitted POST data for the field and the initial
@@ -132,7 +139,7 @@ class Field:
         """
         return data
 
-    def has_changed(self, initial, data):
+    def has_changed(self, initial: Any, data: Any) -> bool:
         """Return True if data differs from initial."""
         try:
             data = self.to_python(data)
@@ -147,28 +154,28 @@ class Field:
         data_value = data if data is not None else ""
         return initial_value != data_value
 
-    def get_bound_field(self, form, field_name):
+    def get_bound_field(self, form: BaseForm, field_name: str) -> BoundField:
         """
         Return a BoundField instance that will be used when accessing the form
         field in a template.
         """
         return BoundField(form, self, field_name)
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> Field:
         result = copy.copy(self)
         memo[id(self)] = result
         result.error_messages = self.error_messages.copy()
         result.validators = self.validators[:]
         return result
 
-    def value_from_form_data(self, data, files, html_name):
+    def value_from_form_data(self, data: Any, files: Any, html_name: str) -> Any:
         # By default, all fields are expected to be present in HTML form data.
         try:
             return data[html_name]
         except KeyError as e:
             raise FormFieldMissingError(html_name) from e
 
-    def value_from_json_data(self, data, files, html_name):
+    def value_from_json_data(self, data: Any, files: Any, html_name: str) -> Any:
         if self.required and html_name not in data:
             raise FormFieldMissingError(html_name)
 
@@ -177,7 +184,13 @@ class Field:
 
 class CharField(Field):
     def __init__(
-        self, *, max_length=None, min_length=None, strip=True, empty_value="", **kwargs
+        self,
+        *,
+        max_length: int | None = None,
+        min_length: int | None = None,
+        strip: bool = True,
+        empty_value: str = "",
+        **kwargs: Any,
     ):
         self.max_length = max_length
         self.min_length = min_length
@@ -190,7 +203,7 @@ class CharField(Field):
             self.validators.append(validators.MaxLengthValidator(int(max_length)))
         self.validators.append(validators.ProhibitNullCharactersValidator())
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> str:
         """Return a string."""
         if value not in self.empty_values:
             value = str(value)
@@ -207,7 +220,14 @@ class IntegerField(Field):
     }
     re_decimal = _lazy_re_compile(r"\.0*\s*$")
 
-    def __init__(self, *, max_value=None, min_value=None, step_size=None, **kwargs):
+    def __init__(
+        self,
+        *,
+        max_value: int | None = None,
+        min_value: int | None = None,
+        step_size: int | None = None,
+        **kwargs: Any,
+    ):
         self.max_value, self.min_value, self.step_size = max_value, min_value, step_size
         super().__init__(**kwargs)
 
@@ -218,7 +238,7 @@ class IntegerField(Field):
         if step_size is not None:
             self.validators.append(validators.StepValueValidator(step_size))
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> int | None:
         """
         Validate that int() can be called on the input. Return the result
         of int() or None for empty values.
@@ -239,7 +259,7 @@ class FloatField(IntegerField):
         "invalid": "Enter a number.",
     }
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> float | None:
         """
         Validate that float() can be called on the input. Return the result
         of float() or None for empty values.
@@ -253,10 +273,10 @@ class FloatField(IntegerField):
             raise ValidationError(self.error_messages["invalid"], code="invalid")
         return value
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         super().validate(value)
         if value in self.empty_values:
-            return
+            return None
         if not math.isfinite(value):
             raise ValidationError(self.error_messages["invalid"], code="invalid")
 
@@ -269,17 +289,17 @@ class DecimalField(IntegerField):
     def __init__(
         self,
         *,
-        max_value=None,
-        min_value=None,
-        max_digits=None,
-        decimal_places=None,
-        **kwargs,
+        max_value: int | None = None,
+        min_value: int | None = None,
+        max_digits: int | None = None,
+        decimal_places: int | None = None,
+        **kwargs: Any,
     ):
         self.max_digits, self.decimal_places = max_digits, decimal_places
         super().__init__(max_value=max_value, min_value=min_value, **kwargs)
         self.validators.append(validators.DecimalValidator(max_digits, decimal_places))
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Decimal | None:
         """
         Validate that the input is a decimal number. Return a Decimal
         instance or None for empty values. Ensure that there are no more
@@ -294,10 +314,10 @@ class DecimalField(IntegerField):
             raise ValidationError(self.error_messages["invalid"], code="invalid")
         return value
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         super().validate(value)
         if value in self.empty_values:
-            return
+            return None
         if not value.is_finite():
             raise ValidationError(
                 self.error_messages["invalid"],
@@ -609,7 +629,7 @@ class ImageField(FileField):
         if f is None:
             return None
 
-        from PIL import Image
+        from PIL import Image  # type: ignore[import-not-found]
 
         # We need to get a file object for Pillow. We might have a path or we might
         # have to read the data into memory.

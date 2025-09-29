@@ -2,7 +2,11 @@
 Global Plain exception and warning classes.
 """
 
+from __future__ import annotations
+
 import operator
+from collections.abc import Iterator
+from typing import Any
 
 from plain.utils.hashable import make_hashable
 
@@ -90,7 +94,12 @@ NON_FIELD_ERRORS = "__all__"
 class ValidationError(Exception):
     """An error while validating data."""
 
-    def __init__(self, message, code=None, params=None):
+    def __init__(
+        self,
+        message: str | list[Any] | dict[str, Any] | ValidationError,
+        code: str | None = None,
+        params: dict[str, Any] | None = None,
+    ):
         """
         The `message` argument can be a single error, a list of errors, or a
         dictionary that maps field names to lists of errors. What we define as
@@ -134,12 +143,14 @@ class ValidationError(Exception):
             self.error_list = [self]
 
     @property
-    def messages(self):
+    def messages(self) -> list[str]:
         if hasattr(self, "error_dict"):
             return sum(dict(self).values(), [])
         return list(self)
 
-    def update_error_dict(self, error_dict):
+    def update_error_dict(
+        self, error_dict: dict[str, list[ValidationError]]
+    ) -> dict[str, list[ValidationError]]:
         if hasattr(self, "error_dict"):
             for field, error_list in self.error_dict.items():
                 error_dict.setdefault(field, []).extend(error_list)
@@ -147,7 +158,7 @@ class ValidationError(Exception):
             error_dict.setdefault(NON_FIELD_ERRORS, []).extend(self.error_list)
         return error_dict
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple[str, list[str]] | str]:
         if hasattr(self, "error_dict"):
             for field, errors in self.error_dict.items():
                 yield field, list(ValidationError(errors))
@@ -158,20 +169,20 @@ class ValidationError(Exception):
                     message %= error.params
                 yield str(message)
 
-    def __str__(self):
+    def __str__(self) -> str:
         if hasattr(self, "error_dict"):
             return repr(dict(self))
         return repr(list(self))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ValidationError({self})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, ValidationError):
             return NotImplemented
         return hash(self) == hash(other)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if hasattr(self, "message"):
             return hash(
                 (

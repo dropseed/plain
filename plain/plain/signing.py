@@ -33,12 +33,15 @@ There are 65 url-safe characters: the 64 used by url-safe base64 and the ':'.
 These functions make use of all of them.
 """
 
+from __future__ import annotations
+
 import base64
 import datetime
 import hmac
 import json
 import time
 import zlib
+from typing import Any
 
 from plain.runtime import settings
 from plain.utils.crypto import salted_hmac
@@ -61,7 +64,7 @@ class SignatureExpired(BadSignature):
     pass
 
 
-def b62_encode(s):
+def b62_encode(s: int) -> str:
     if s == 0:
         return "0"
     sign = "-" if s < 0 else ""
@@ -73,7 +76,7 @@ def b62_encode(s):
     return sign + encoded
 
 
-def b62_decode(s):
+def b62_decode(s: str) -> int:
     if s == "0":
         return 0
     sign = 1
@@ -86,16 +89,16 @@ def b62_decode(s):
     return sign * decoded
 
 
-def b64_encode(s):
+def b64_encode(s: bytes) -> bytes:
     return base64.urlsafe_b64encode(s).strip(b"=")
 
 
-def b64_decode(s):
+def b64_decode(s: bytes) -> bytes:
     pad = b"=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s + pad)
 
 
-def base64_hmac(salt, value, key, algorithm="sha1"):
+def base64_hmac(salt: str, value: str, key: str, algorithm: str = "sha1") -> str:
     return b64_encode(
         salted_hmac(salt, value, key, algorithm=algorithm).digest()
     ).decode()
@@ -107,16 +110,20 @@ class JSONSerializer:
     signing.loads.
     """
 
-    def dumps(self, obj):
+    def dumps(self, obj: Any) -> bytes:
         return json.dumps(obj, separators=(",", ":")).encode("latin-1")
 
-    def loads(self, data):
+    def loads(self, data: bytes) -> Any:
         return json.loads(data.decode("latin-1"))
 
 
 def dumps(
-    obj, key=None, salt="plain.signing", serializer=JSONSerializer, compress=False
-):
+    obj: Any,
+    key: str | None = None,
+    salt: str = "plain.signing",
+    serializer: type[JSONSerializer] = JSONSerializer,
+    compress: bool = False,
+) -> str:
     """
     Return URL-safe, hmac signed base64 compressed JSON string. If key is
     None, use settings.SECRET_KEY instead. The hmac algorithm is the default
@@ -139,13 +146,13 @@ def dumps(
 
 
 def loads(
-    s,
-    key=None,
-    salt="plain.signing",
-    serializer=JSONSerializer,
-    max_age=None,
-    fallback_keys=None,
-):
+    s: str,
+    key: str | None = None,
+    salt: str = "plain.signing",
+    serializer: type[JSONSerializer] = JSONSerializer,
+    max_age: int | float | datetime.timedelta | None = None,
+    fallback_keys: list[str] | None = None,
+) -> Any:
     """
     Reverse of dumps(), raise BadSignature if signature fails.
 
@@ -164,12 +171,12 @@ class Signer:
     def __init__(
         self,
         *,
-        key=None,
-        sep=":",
-        salt=None,
-        algorithm="sha256",
-        fallback_keys=None,
-    ):
+        key: str | None = None,
+        sep: str = ":",
+        salt: str | None = None,
+        algorithm: str = "sha256",
+        fallback_keys: list[str] | None = None,
+    ) -> None:
         self.key = key or settings.SECRET_KEY
         self.fallback_keys = (
             fallback_keys
@@ -186,14 +193,14 @@ class Signer:
                 "only A-z0-9-_=)",
             )
 
-    def signature(self, value, key=None):
+    def signature(self, value: str, key: str | None = None) -> str:
         key = key or self.key
         return base64_hmac(self.salt + "signer", value, key, algorithm=self.algorithm)
 
-    def sign(self, value):
+    def sign(self, value: str) -> str:
         return f"{value}{self.sep}{self.signature(value)}"
 
-    def unsign(self, signed_value):
+    def unsign(self, signed_value: str) -> str:
         if self.sep not in signed_value:
             raise BadSignature(f'No "{self.sep}" found in value')
         value, sig = signed_value.rsplit(self.sep, 1)
@@ -204,7 +211,12 @@ class Signer:
                 return value
         raise BadSignature(f'Signature "{sig}" does not match')
 
-    def sign_object(self, obj, serializer=JSONSerializer, compress=False):
+    def sign_object(
+        self,
+        obj: Any,
+        serializer: type[JSONSerializer] = JSONSerializer,
+        compress: bool = False,
+    ) -> str:
         """
         Return URL-safe, hmac signed base64 compressed JSON string.
 
@@ -229,7 +241,12 @@ class Signer:
             base64d = "." + base64d
         return self.sign(base64d)
 
-    def unsign_object(self, signed_obj, serializer=JSONSerializer, **kwargs):
+    def unsign_object(
+        self,
+        signed_obj: str,
+        serializer: type[JSONSerializer] = JSONSerializer,
+        **kwargs: Any,
+    ) -> Any:
         # Signer.unsign() returns str but base64 and zlib compression operate
         # on bytes.
         base64d = self.unsign(signed_obj, **kwargs).encode()
@@ -244,14 +261,16 @@ class Signer:
 
 
 class TimestampSigner(Signer):
-    def timestamp(self):
+    def timestamp(self) -> str:
         return b62_encode(int(time.time()))
 
-    def sign(self, value):
+    def sign(self, value: str) -> str:
         value = f"{value}{self.sep}{self.timestamp()}"
         return super().sign(value)
 
-    def unsign(self, value, max_age=None):
+    def unsign(
+        self, value: str, max_age: int | float | datetime.timedelta | None = None
+    ) -> str:
         """
         Retrieve original value and check it wasn't signed more
         than max_age seconds ago.

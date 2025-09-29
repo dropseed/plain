@@ -2,13 +2,21 @@
 Form classes
 """
 
+from __future__ import annotations
+
 import copy
 from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import NON_FIELD_ERRORS
 
 from .exceptions import ValidationError
 from .fields import Field, FileField
+
+if TYPE_CHECKING:
+    from plain.http import HttpRequest
+
+    from .boundfield import BoundField
 
 __all__ = ("BaseForm", "Form")
 
@@ -16,7 +24,7 @@ __all__ = ("BaseForm", "Form")
 class DeclarativeFieldsMetaclass(type):
     """Collect Fields declared on the base classes."""
 
-    def __new__(mcs, name, bases, attrs):
+    def __new__(mcs, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> type:
         # Collect fields from current class and remove them from attrs.
         attrs["declared_fields"] = {
             key: attrs.pop(key)
@@ -52,15 +60,15 @@ class BaseForm:
     class.
     """
 
-    prefix = None
+    prefix: str | None = None
 
     def __init__(
         self,
         *,
-        request,
-        auto_id="id_%s",
-        prefix=None,
-        initial=None,
+        request: HttpRequest,
+        auto_id: str | bool = "id_%s",
+        prefix: str | None = None,
+        initial: dict[str, Any] | None = None,
     ):
         self.data = request.data
         self.files = request.files
@@ -75,17 +83,19 @@ class BaseForm:
         if prefix is not None:
             self.prefix = prefix
         self.initial = initial or {}
-        self._errors = None  # Stores the errors after clean() has been called.
+        self._errors: dict[str, list[str]] | None = (
+            None  # Stores the errors after clean() has been called.
+        )
 
         # The base_fields class attribute is the *class-wide* definition of
         # fields. Because a particular *instance* of the class might want to
         # alter self.fields, we create self.fields here by copying base_fields.
         # Instances should always modify self.fields; they should not modify
         # self.base_fields.
-        self.fields = copy.deepcopy(self.base_fields)
-        self._bound_fields_cache = {}
+        self.fields: dict[str, Field] = copy.deepcopy(self.base_fields)
+        self._bound_fields_cache: dict[str, BoundField] = {}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self._errors is None:
             is_valid = "Unknown"
         else:
@@ -97,17 +107,17 @@ class BaseForm:
             fields=";".join(self.fields),
         )
 
-    def _bound_items(self):
+    def _bound_items(self) -> Any:
         """Yield (name, bf) pairs, where bf is a BoundField object."""
         for name in self.fields:
             yield name, self[name]
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         """Yield the form's fields as BoundField objects."""
         for name in self.fields:
             yield self[name]
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: str) -> BoundField:
         """Return a BoundField with the given name."""
         try:
             field = self.fields[name]
@@ -130,11 +140,11 @@ class BaseForm:
             self.full_clean()
         return self._errors
 
-    def is_valid(self):
+    def is_valid(self) -> bool:
         """Return True if the form has no errors, or False otherwise."""
         return self.is_bound and not self.errors
 
-    def add_prefix(self, field_name):
+    def add_prefix(self, field_name: str) -> str:
         """
         Return the field name with a prefix appended, if this Form has a
         prefix set.
@@ -155,7 +165,7 @@ class BaseForm:
             [],
         )
 
-    def add_error(self, field, error):
+    def add_error(self, field: str | None, error: ValidationError) -> None:
         """
         Update the content of `self._errors`.
 
@@ -179,6 +189,7 @@ class BaseForm:
                 f"`ValidationError`, not `{type(error).__name__}`."
             )
 
+        error_dict: dict[str, Any]
         if hasattr(error, "error_dict"):
             if field is not None:
                 raise TypeError(
@@ -186,45 +197,45 @@ class BaseForm:
                     "argument contains errors for multiple fields."
                 )
             else:
-                error = error.error_dict
+                error_dict = error.error_dict
         else:
-            error = {field or NON_FIELD_ERRORS: error.error_list}
+            error_dict = {field or NON_FIELD_ERRORS: error.error_list}
 
         class ValidationErrors(list):
-            def __iter__(self):
+            def __iter__(self) -> Any:
                 for err in super().__iter__():
                     # TODO make sure this works...
                     yield next(iter(err))
 
-        for field, error_list in error.items():
-            if field not in self.errors:
-                if field != NON_FIELD_ERRORS and field not in self.fields:
+        for field_key, error_list in error_dict.items():
+            if field_key not in self.errors:
+                if field_key != NON_FIELD_ERRORS and field_key not in self.fields:
                     raise ValueError(
-                        f"'{self.__class__.__name__}' has no field named '{field}'."
+                        f"'{self.__class__.__name__}' has no field named '{field_key}'."
                     )
-                self._errors[field] = ValidationErrors()
+                self._errors[field_key] = ValidationErrors()
 
-            self._errors[field].extend(error_list)
+            self._errors[field_key].extend(error_list)
 
             # The field had an error, so removed it from the final data
             # (we use getattr here so errors can be added to uncleaned forms)
-            if field in getattr(self, "cleaned_data", {}):
-                del self.cleaned_data[field]
+            if field_key in getattr(self, "cleaned_data", {}):
+                del self.cleaned_data[field_key]
 
-    def full_clean(self):
+    def full_clean(self) -> None:
         """
         Clean all of self.data and populate self._errors and self.cleaned_data.
         """
         self._errors = {}
         if not self.is_bound:  # Stop further processing.
-            return
+            return None
         self.cleaned_data = {}
 
         self._clean_fields()
         self._clean_form()
         self._post_clean()
 
-    def _field_data_value(self, field, html_name):
+    def _field_data_value(self, field: Field, html_name: str) -> Any:
         if hasattr(self, f"parse_{html_name}"):
             # Allow custom parsing from form data/files at the form level
             return getattr(self, f"parse_{html_name}")()
@@ -234,7 +245,7 @@ class BaseForm:
         else:
             return field.value_from_form_data(self.data, self.files, html_name)
 
-    def _clean_fields(self):
+    def _clean_fields(self) -> None:
         for name, bf in self._bound_items():
             field = bf.field
 
@@ -252,7 +263,7 @@ class BaseForm:
             except ValidationError as e:
                 self.add_error(name, e)
 
-    def _clean_form(self):
+    def _clean_form(self) -> None:
         try:
             cleaned_data = self.clean()
         except ValidationError as e:
@@ -261,14 +272,14 @@ class BaseForm:
             if cleaned_data is not None:
                 self.cleaned_data = cleaned_data
 
-    def _post_clean(self):
+    def _post_clean(self) -> None:
         """
         An internal hook for performing additional cleaning after form cleaning
         is complete. Used for model validation in model forms.
         """
         pass
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
         """
         Hook for doing any extra form-wide cleaning after Field.clean() has been
         called on every field. Any ValidationError raised by this method will
@@ -278,10 +289,10 @@ class BaseForm:
         return self.cleaned_data
 
     @cached_property
-    def changed_data(self):
+    def changed_data(self) -> list[str]:
         return [name for name, bf in self._bound_items() if bf._has_changed()]
 
-    def get_initial_for_field(self, field, field_name):
+    def get_initial_for_field(self, field: Field, field_name: str) -> Any:
         """
         Return initial data for field on form. Use initial data from the form
         or the field, in that order. Evaluate callable values.

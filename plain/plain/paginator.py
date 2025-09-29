@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import collections.abc
 import inspect
 import warnings
+from collections.abc import Iterator
 from functools import cached_property
 from math import ceil
+from typing import Any
 
 from plain.utils.inspect import method_has_no_args
 
@@ -24,18 +28,24 @@ class EmptyPage(InvalidPage):
 
 
 class Paginator:
-    def __init__(self, object_list, per_page, orphans=0, allow_empty_first_page=True):
+    def __init__(
+        self,
+        object_list: Any,
+        per_page: int,
+        orphans: int = 0,
+        allow_empty_first_page: bool = True,
+    ) -> None:
         self.object_list = object_list
         self._check_object_list_is_ordered()
         self.per_page = int(per_page)
         self.orphans = int(orphans)
         self.allow_empty_first_page = allow_empty_first_page
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Page]:
         for page_number in self.page_range:
             yield self.page(page_number)
 
-    def validate_number(self, number):
+    def validate_number(self, number: Any) -> int:
         """Validate the given 1-based page number."""
         try:
             if isinstance(number, float) and not number.is_integer():
@@ -49,7 +59,7 @@ class Paginator:
             raise EmptyPage("That page contains no results")
         return number
 
-    def get_page(self, number):
+    def get_page(self, number: Any) -> Page:
         """
         Return a valid page, even if the page argument isn't a number or isn't
         in range.
@@ -62,7 +72,7 @@ class Paginator:
             number = self.num_pages
         return self.page(number)
 
-    def page(self, number):
+    def page(self, number: Any) -> Page:
         """Return a Page object for the given 1-based page number."""
         number = self.validate_number(number)
         bottom = (number - 1) * self.per_page
@@ -71,7 +81,7 @@ class Paginator:
             top = self.count
         return self._get_page(self.object_list[bottom:top], number, self)
 
-    def _get_page(self, *args, **kwargs):
+    def _get_page(self, *args: Any, **kwargs: Any) -> Page:
         """
         Return an instance of a single page.
 
@@ -81,7 +91,7 @@ class Paginator:
         return Page(*args, **kwargs)
 
     @cached_property
-    def count(self):
+    def count(self) -> int:
         """Return the total number of objects, across all pages."""
         c = getattr(self.object_list, "count", None)
         if callable(c) and not inspect.isbuiltin(c) and method_has_no_args(c):
@@ -89,7 +99,7 @@ class Paginator:
         return len(self.object_list)
 
     @cached_property
-    def num_pages(self):
+    def num_pages(self) -> int:
         """Return the total number of pages."""
         if self.count == 0 and not self.allow_empty_first_page:
             return 0
@@ -97,14 +107,14 @@ class Paginator:
         return ceil(hits / self.per_page)
 
     @property
-    def page_range(self):
+    def page_range(self) -> range:
         """
         Return a 1-based range of pages for iterating through within
         a template for loop.
         """
         return range(1, self.num_pages + 1)
 
-    def _check_object_list_is_ordered(self):
+    def _check_object_list_is_ordered(self) -> None:
         """
         Warn if self.object_list is unordered (typically a QuerySet).
         """
@@ -124,18 +134,18 @@ class Paginator:
 
 
 class Page(collections.abc.Sequence):
-    def __init__(self, object_list, number, paginator):
+    def __init__(self, object_list: Any, number: int, paginator: Paginator) -> None:
         self.object_list = object_list
         self.number = number
         self.paginator = paginator
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Page {self.number} of {self.paginator.num_pages}>"
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.object_list)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int | slice) -> Any:
         if not isinstance(index, int | slice):
             raise TypeError(
                 f"Page indices must be integers or slices, not {type(index).__name__}."
@@ -146,22 +156,22 @@ class Page(collections.abc.Sequence):
             self.object_list = list(self.object_list)
         return self.object_list[index]
 
-    def has_next(self):
+    def has_next(self) -> bool:
         return self.number < self.paginator.num_pages
 
-    def has_previous(self):
+    def has_previous(self) -> bool:
         return self.number > 1
 
-    def has_other_pages(self):
+    def has_other_pages(self) -> bool:
         return self.has_previous() or self.has_next()
 
-    def next_page_number(self):
+    def next_page_number(self) -> int:
         return self.paginator.validate_number(self.number + 1)
 
-    def previous_page_number(self):
+    def previous_page_number(self) -> int:
         return self.paginator.validate_number(self.number - 1)
 
-    def start_index(self):
+    def start_index(self) -> int:
         """
         Return the 1-based index of the first object on this page,
         relative to total objects in the paginator.
@@ -171,7 +181,7 @@ class Page(collections.abc.Sequence):
             return 0
         return (self.paginator.per_page * (self.number - 1)) + 1
 
-    def end_index(self):
+    def end_index(self) -> int:
         """
         Return the 1-based index of the last object on this page,
         relative to total objects found (hits).

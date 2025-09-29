@@ -2,6 +2,7 @@ import datetime
 import decimal
 import json
 import uuid
+from typing import Any
 
 from plain.utils.duration import duration_iso_string
 from plain.utils.functional import Promise
@@ -14,7 +15,7 @@ class PlainJSONEncoder(json.JSONEncoder):
     UUIDs.
     """
 
-    def default(self, o):
+    def default(self, o: Any) -> Any:
         # See "Date Time String Format" in the ECMA-262 specification.
         if isinstance(o, datetime.datetime):
             r = o.isoformat()

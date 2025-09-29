@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pprint import pformat
+from typing import Any, NoReturn
 
 from markupsafe import Markup, escape
 
@@ -6,7 +9,7 @@ from plain.http import Response
 from plain.views.exceptions import ResponseException
 
 
-def dd(*objs):
+def dd(*objs: Any) -> NoReturn:
     """
     Dump and die.
 

@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import plain.runtime
 from plain.internal.handlers.wsgi import WSGIHandler
 
 
-def _get_wsgi_application():
+def _get_wsgi_application() -> WSGIHandler:
     plain.runtime.setup()
     return WSGIHandler()
 
