@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.45.0](https://github.com/dropseed/plain/releases/plain-admin@0.45.0) (2025-09-29)
+
+### What's changed
+
+- Import path for `FieldError` exception updated to use `plain.models.exceptions` following the reorganization of exception classes ([1c02564](https://github.com/dropseed/plain/commit/1c02564561))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.44.1](https://github.com/dropseed/plain/releases/plain-admin@0.44.1) (2025-09-25)
 
 ### What's changed
