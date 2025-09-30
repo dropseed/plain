@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-oauth@0.28.0) (2025-09-30)
+
+### What's changed
+
+- `HttpRequest` has been renamed to `Request` throughout the OAuth provider classes ([cd46ff2](https://github.com/dropseed/plain/commit/cd46ff2003))
+
+### Upgrade instructions
+
+- If you have custom OAuth providers that override methods like `get_authorization_url_params`, `get_oauth_token`, `get_callback_url`, or any other methods that accept a request parameter, update the type hint from `HttpRequest` to `Request`
+- Update any imports of `HttpRequest` in custom OAuth provider code to import `Request` instead from `plain.http`
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-oauth@0.27.0) (2025-09-25)
 
 ### What's changed
