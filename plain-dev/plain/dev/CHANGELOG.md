@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.39.0](https://github.com/dropseed/plain/releases/plain-dev@0.39.0) (2025-09-30)
+
+### What's changed
+
+- The `plain dev` command now sets both `PLAIN_LOG_LEVEL` and `PLAIN_FRAMEWORK_LOG_LEVEL` environment variables when a log level is specified, replacing the previous `APP_LOG_LEVEL` setting ([4c5f216](https://github.com/dropseed/plain/commit/4c5f2166c1))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.38.0](https://github.com/dropseed/plain/releases/plain-dev@0.38.0) (2025-09-30)
 
 ### What's changed
