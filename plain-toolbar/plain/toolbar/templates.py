@@ -10,5 +10,5 @@ class ToolbarExtension(InclusionTagExtension):
     template_name = "toolbar/toolbar.html"
 
     def get_context(self, context, *args, **kwargs):
-        context.vars["toolbar"] = Toolbar(request=context["request"])
+        context.vars["toolbar"] = Toolbar(context=context)
         return context

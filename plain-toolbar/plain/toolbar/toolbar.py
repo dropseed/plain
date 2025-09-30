@@ -10,8 +10,9 @@ from .registry import register_toolbar_item, registry
 
 
 class Toolbar:
-    def __init__(self, request):
-        self.request = request
+    def __init__(self, context):
+        self.context = context
+        self.request = context["request"]
         self.version = settings.APP_VERSION
 
     def should_render(self):
@@ -37,12 +38,12 @@ class Toolbar:
             return exception
 
     def get_items(self):
-        items = [item(self.request) for item in registry.get_items()]
+        items = [item(self.context) for item in registry.get_items()]
 
         if self.request_exception():
             exception = self.request_exception()
             items = [
-                _ExceptionToolbarItem(self.request, exception),
+                _ExceptionToolbarItem(self.context, exception),
             ] + items
 
         return items
@@ -53,14 +54,14 @@ class ToolbarItem:
     panel_template_name: str = ""
     button_template_name: str = ""
 
-    def __init__(self, request):
-        self.request = request
+    def __init__(self, context):
+        self.context = context
+        self.request = context["request"]
 
     def get_template_context(self):
-        return {
-            "request": self.request,
-            "panel": self,
-        }
+        context = dict(self.context)
+        context["panel"] = self
+        return context
 
     def render_panel(self):
         template = Template(self.panel_template_name)
@@ -79,8 +80,8 @@ class _ExceptionToolbarItem(ToolbarItem):
     panel_template_name = "toolbar/exception.html"
     button_template_name = "toolbar/exception_button.html"
 
-    def __init__(self, request, exception):
-        super().__init__(request)
+    def __init__(self, context, exception):
+        super().__init__(context)
         self.exception = exception
 
     def get_template_context(self):
