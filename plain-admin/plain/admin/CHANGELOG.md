@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.48.0](https://github.com/dropseed/plain/releases/plain-admin@0.48.0) (2025-09-30)
+
+### What's changed
+
+- The `HttpRequest` class has been renamed to `Request` throughout the codebase for better consistency and brevity ([cd46ff2](https://github.com/dropseed/plain/commit/cd46ff2003))
+- Admin views now use the renamed `settings.NAME` instead of `settings.APP_NAME` following the global settings refactor ([4c5f216](https://github.com/dropseed/plain/commit/4c5f2166c1))
+
+### Upgrade instructions
+
+- If you have custom admin views or cards that reference `HttpRequest`, update them to use `Request` instead
+- If you're accessing `settings.APP_NAME` in admin customizations, update to use `settings.NAME`
+
 ## [0.47.0](https://github.com/dropseed/plain/releases/plain-admin@0.47.0) (2025-09-30)
 
 ### What's changed
