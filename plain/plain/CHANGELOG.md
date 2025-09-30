@@ -1,5 +1,22 @@
 # plain changelog
 
+## [0.71.0](https://github.com/dropseed/plain/releases/plain@0.71.0) (2025-09-30)
+
+### What's changed
+
+- Renamed `HttpRequest` to `Request` throughout the codebase for consistency and simplicity ([cd46ff20](https://github.com/dropseed/plain/commit/cd46ff2003))
+- Renamed `HttpHeaders` to `RequestHeaders` for naming consistency ([cd46ff20](https://github.com/dropseed/plain/commit/cd46ff2003))
+- Renamed settings: `APP_NAME` → `NAME`, `APP_VERSION` → `VERSION`, `APP_LOG_LEVEL` → `LOG_LEVEL`, `APP_LOG_FORMAT` → `LOG_FORMAT`, `PLAIN_LOG_LEVEL` → `FRAMEWORK_LOG_LEVEL` ([4c5f2166](https://github.com/dropseed/plain/commit/4c5f2166c1))
+- Added `request.get_preferred_type()` method to select the most preferred media type from Accept header ([b105ba4d](https://github.com/dropseed/plain/commit/b105ba4dd0))
+- Moved helper functions in `http/request.py` to be static methods of `QueryDict` ([0e1b0133](https://github.com/dropseed/plain/commit/0e1b0133c5))
+
+### Upgrade instructions
+
+- Replace all imports and usage of `HttpRequest` with `Request`
+- Replace all imports and usage of `HttpHeaders` with `RequestHeaders`
+- Update any custom settings that reference `APP_NAME` to `NAME`, `APP_VERSION` to `VERSION`, `APP_LOG_LEVEL` to `LOG_LEVEL`, `APP_LOG_FORMAT` to `LOG_FORMAT`, and `PLAIN_LOG_LEVEL` to `FRAMEWORK_LOG_LEVEL`
+- Configuring these settings via the `PLAIN_` prefixed environment variable will need to be updated accordingly
+
 ## [0.70.0](https://github.com/dropseed/plain/releases/plain@0.70.0) (2025-09-30)
 
 ### What's changed
