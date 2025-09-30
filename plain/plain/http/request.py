@@ -108,7 +108,8 @@ class Request:
         When quality values are equal, the original order from the Accept header
         is preserved (as per HTTP spec).
         """
-        types = parse_accept_header(self.headers.get("Accept", "*/*"))
+        header = self.headers.get("Accept", "*/*")
+        types = [MediaType(token) for token in header.split(",") if token.strip()]
         return sorted(types, key=lambda t: t.quality, reverse=True)
 
     def get_preferred_type(self, *media_types: str) -> str | None:
@@ -585,8 +586,8 @@ class QueryDict(MultiValueDict):
 
     def __setitem__(self, key: str, value: Any) -> None:
         self._assert_mutable()
-        key = bytes_to_text(key, self.encoding)
-        value = bytes_to_text(value, self.encoding)
+        key = self.bytes_to_text(key, self.encoding)
+        value = self.bytes_to_text(value, self.encoding)
         super().__setitem__(key, value)
 
     def __delitem__(self, key: str) -> None:
@@ -608,8 +609,8 @@ class QueryDict(MultiValueDict):
 
     def setlist(self, key: str, list_: list[Any]) -> None:
         self._assert_mutable()
-        key = bytes_to_text(key, self.encoding)
-        list_ = [bytes_to_text(elt, self.encoding) for elt in list_]
+        key = self.bytes_to_text(key, self.encoding)
+        list_ = [self.bytes_to_text(elt, self.encoding) for elt in list_]
         super().setlist(key, list_)
 
     def setlistdefault(
@@ -620,8 +621,8 @@ class QueryDict(MultiValueDict):
 
     def appendlist(self, key: str, value: Any) -> None:
         self._assert_mutable()
-        key = bytes_to_text(key, self.encoding)
-        value = bytes_to_text(value, self.encoding)
+        key = self.bytes_to_text(key, self.encoding)
+        value = self.bytes_to_text(value, self.encoding)
         super().appendlist(key, value)
 
     def pop(self, key: str, *args: Any) -> Any:
@@ -638,8 +639,8 @@ class QueryDict(MultiValueDict):
 
     def setdefault(self, key: str, default: Any = None) -> Any:
         self._assert_mutable()
-        key = bytes_to_text(key, self.encoding)
-        default = bytes_to_text(default, self.encoding)
+        key = self.bytes_to_text(key, self.encoding)
+        default = self.bytes_to_text(default, self.encoding)
         return super().setdefault(key, default)
 
     def copy(self) -> QueryDict:
@@ -678,6 +679,23 @@ class QueryDict(MultiValueDict):
             )
         return "&".join(output)
 
+    # It's neither necessary nor appropriate to use
+    # plain.utils.encoding.force_str() for parsing URLs and form inputs. Thus,
+    # this slightly more restricted function, used by QueryDict.
+    @staticmethod
+    def bytes_to_text(s: Any, encoding: str) -> str:
+        """
+        Convert bytes objects to strings, using the given encoding. Illegally
+        encoded input characters are replaced with Unicode "unknown" codepoint
+        (\ufffd).
+
+        Return any non-bytes objects without change.
+        """
+        if isinstance(s, bytes):
+            return str(s, encoding, "replace")
+        else:
+            return s
+
 
 class MediaType:
     def __init__(self, media_type_raw_line: str | MediaType):
@@ -712,24 +730,3 @@ class MediaType:
         if self.main_type == other.main_type and self.sub_type in {"*", other.sub_type}:
             return True
         return False
-
-
-# It's neither necessary nor appropriate to use
-# plain.utils.encoding.force_str() for parsing URLs and form inputs. Thus,
-# this slightly more restricted function, used by QueryDict.
-def bytes_to_text(s: Any, encoding: str) -> str:
-    """
-    Convert bytes objects to strings, using the given encoding. Illegally
-    encoded input characters are replaced with Unicode "unknown" codepoint
-    (\ufffd).
-
-    Return any non-bytes objects without change.
-    """
-    if isinstance(s, bytes):
-        return str(s, encoding, "replace")
-    else:
-        return s
-
-
-def parse_accept_header(header: str) -> list[MediaType]:
-    return [MediaType(token) for token in header.split(",") if token.strip()]
