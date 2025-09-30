@@ -13,7 +13,7 @@ class Toolbar:
     def __init__(self, context):
         self.context = context
         self.request = context["request"]
-        self.version = settings.APP_VERSION
+        self.version = settings.VERSION
 
     def should_render(self):
         if settings.DEBUG:

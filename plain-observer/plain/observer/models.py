@@ -182,8 +182,8 @@ class Trace(models.Model):
             request_id=request_id,
             user_id=user_id,
             session_id=session_id,
-            app_name=app_name or getattr(settings, "APP_NAME", ""),
-            app_version=app_version or getattr(settings, "APP_VERSION", ""),
+            app_name=app_name or settings.NAME,
+            app_version=app_version or settings.VERSION,
             root_span_name=root_span.name if root_span else "",
         )
 

@@ -36,8 +36,8 @@ class Config(PackageConfig):
             # Start our own provider, new sampler, and span processor
             resource = Resource.create(
                 {
-                    service_attributes.SERVICE_NAME: settings.APP_NAME,
-                    service_attributes.SERVICE_VERSION: settings.APP_VERSION,
+                    service_attributes.SERVICE_NAME: settings.NAME,
+                    service_attributes.SERVICE_VERSION: settings.VERSION,
                 }
             )
             provider = TracerProvider(sampler=sampler, resource=resource)

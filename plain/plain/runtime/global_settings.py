@@ -3,8 +3,6 @@ Default Plain settings. Override these with settings in the module pointed to
 by the PLAIN_SETTINGS_MODULE environment variable.
 """
 
-from os import environ
-
 from .utils import get_app_info_from_pyproject
 
 # MARK: Core Settings
@@ -12,8 +10,8 @@ from .utils import get_app_info_from_pyproject
 DEBUG: bool = False
 
 name, version = get_app_info_from_pyproject()
-APP_NAME: str = name
-APP_VERSION: str = version
+NAME: str = name
+VERSION: str = version
 
 # List of strings representing installed packages.
 INSTALLED_PACKAGES: list[str] = []
@@ -135,11 +133,10 @@ CSRF_TRUSTED_ORIGINS: list[str] = []
 CSRF_EXEMPT_PATHS: list[str] = []
 
 # MARK: Logging
-# (Uses some custom env names in addition to PLAIN_ prefixed )
 
-PLAIN_LOG_LEVEL: str = environ.get("PLAIN_LOG_LEVEL", "INFO")
-APP_LOG_LEVEL: str = environ.get("APP_LOG_LEVEL", "INFO")
-APP_LOG_FORMAT: str = environ.get("APP_LOG_FORMAT", "keyvalue")
+FRAMEWORK_LOG_LEVEL: str = "INFO"
+LOG_LEVEL: str = "INFO"
+LOG_FORMAT: str = "keyvalue"
 
 # MARK: Assets
 

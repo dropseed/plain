@@ -64,9 +64,9 @@ def setup() -> None:
         sys.path.insert(0, APP_PATH.parent.as_posix())
 
     configure_logging(
-        plain_log_level=settings.PLAIN_LOG_LEVEL,
-        app_log_level=settings.APP_LOG_LEVEL,
-        app_log_format=settings.APP_LOG_FORMAT,
+        plain_log_level=settings.FRAMEWORK_LOG_LEVEL,
+        app_log_level=settings.LOG_LEVEL,
+        app_log_format=settings.LOG_FORMAT,
     )
 
     packages_registry.populate(settings.INSTALLED_PACKAGES)

@@ -70,8 +70,8 @@ class DevProcess(ProcessManager):
         }
 
         if log_level:
+            self.plain_env["PLAIN_FRAMEWORK_LOG_LEVEL"] = log_level.upper()
             self.plain_env["PLAIN_LOG_LEVEL"] = log_level.upper()
-            self.plain_env["APP_LOG_LEVEL"] = log_level.upper()
 
         self.custom_process_env = {
             **self.plain_env,
