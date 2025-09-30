@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.47.0](https://github.com/dropseed/plain/releases/plain-admin@0.47.0) (2025-09-30)
+
+### What's changed
+
+- Added a new admin toolbar item that integrates with the plain-toolbar package, providing quick admin access and navigation ([79654db](https://github.com/dropseed/plain/commit/79654dbefe))
+- The toolbar now shows direct links to admin pages for objects when viewing non-admin pages that have a corresponding admin detail view ([821bfc6](https://github.com/dropseed/plain/commit/821bfc6fab))
+- Removed the `is_admin_view` context variable from admin views as it was no longer needed ([79654db](https://github.com/dropseed/plain/commit/79654dbefe))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.46.0](https://github.com/dropseed/plain/releases/plain-admin@0.46.0) (2025-09-30)
 
 ### What's changed
