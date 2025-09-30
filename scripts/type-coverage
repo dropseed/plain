@@ -6,13 +6,14 @@ Analyzes Python files to determine the percentage of functions/methods
 that have complete type annotations (parameters and return types).
 """
 
+import argparse
 import ast
 import os
 import sys
-from pathlib import Path
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
+from pathlib import Path
 from typing import List, Optional
-import argparse
 
 
 @dataclass
@@ -30,9 +31,6 @@ class FunctionInfo:
     @property
     def is_fully_typed(self) -> bool:
         """Check if function has all type annotations."""
-        # Properties don't need return type annotations
-        if self.is_property:
-            return self.typed_params == self.total_params
         return self.has_return_type and (self.typed_params == self.total_params)
 
 
@@ -105,22 +103,29 @@ class TypeCoverageAnalyzer(ast.NodeVisitor):
             is_property=is_property,
         )
 
-        # Check return type (not needed for __init__ or properties)
-        if not is_init and not is_property:
+        # Check return type (not needed for __init__)
+        if not is_init:
             func_info.has_return_type = node.returns is not None
-        elif is_init or is_property:
-            # For __init__ and properties, we consider them as having return type
+        else:
             func_info.has_return_type = True
 
-        # Analyze parameters
-        for arg in node.args.args:
-            # Skip 'self' and 'cls' parameters in methods
-            if is_method and arg.arg in {'self', 'cls'}:
-                continue
+        def handle_param(arg: ast.arg) -> None:
+            if is_method and arg.arg in {"self", "cls"}:
+                return
 
             func_info.total_params += 1
             if arg.annotation is not None:
                 func_info.typed_params += 1
+
+        # Analyze parameters
+        for arg in node.args.posonlyargs:
+            handle_param(arg)
+
+        for arg in node.args.args:
+            handle_param(arg)
+
+        for arg in node.args.kwonlyargs:
+            handle_param(arg)
 
         # Check *args and **kwargs
         if node.args.vararg:
@@ -156,35 +161,51 @@ def analyze_file(file_path: Path) -> Optional[FileStats]:
 
 def find_python_files(directory: Path, exclude_patterns: Optional[List[str]] = None) -> List[Path]:
     """Find all Python files in a directory, excluding certain patterns."""
-    exclude_patterns = exclude_patterns or [
-        '__pycache__',
-        '.git',
-        '.venv',
-        'venv',
-        'env',
-        '.tox',
-        'build',
-        'dist',
-        '*.egg-info',
-        '.mypy_cache',
-        '.pytest_cache',
+    default_patterns = [
+        "__pycache__",
+        ".git",
+        ".venv",
+        "venv",
+        "env",
+        ".tox",
+        "build",
+        "dist",
+        "*.egg-info",
+        ".mypy_cache",
+        ".pytest_cache",
     ]
+
+    patterns = list(default_patterns)
+    if exclude_patterns:
+        patterns.extend(exclude_patterns)
+
+    def should_exclude(path: Path) -> bool:
+        try:
+            relative = path.relative_to(directory).as_posix()
+        except ValueError:
+            relative = path.as_posix()
+
+        candidates = {relative, path.as_posix(), path.name}
+        for pattern in patterns:
+            if any(fnmatch(candidate, pattern) for candidate in candidates):
+                return True
+        return False
 
     python_files = []
 
     for root, dirs, files in os.walk(directory):
         # Filter out excluded directories
-        dirs[:] = [d for d in dirs if not any(
-            pattern in d or d == pattern.rstrip('*')
-            for pattern in exclude_patterns
-        )]
-
         root_path = Path(root)
+        dirs[:] = [
+            d for d in dirs
+            if not should_exclude(root_path / d)
+        ]
+
         for file in files:
             if file.endswith('.py'):
                 file_path = root_path / file
-                # Check if file path contains excluded patterns
-                if not any(pattern in str(file_path) for pattern in exclude_patterns):
+                # Check if file path matches excluded patterns
+                if not should_exclude(file_path):
                     python_files.append(file_path)
 
     return python_files
@@ -240,7 +261,7 @@ def format_report(
                     lines.append("  Missing annotations:")
                     for func in missing_functions[:10]:  # Limit to first 10
                         issues = []
-                        if not func.has_return_type and not func.is_property:
+                        if not func.has_return_type:
                             issues.append("return")
                         missing_params = func.total_params - func.typed_params
                         if missing_params > 0:
