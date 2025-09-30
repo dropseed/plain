@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.46.0](https://github.com/dropseed/plain/releases/plain-admin@0.46.0) (2025-09-30)
+
+### What's changed
+
+- Type annotations have been added throughout the admin views module, improving IDE support and type checking for better developer experience ([5bf1192](https://github.com/dropseed/plain/commit/5bf11926c7), [365414c](https://github.com/dropseed/plain/commit/365414cc6f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.45.0](https://github.com/dropseed/plain/releases/plain-admin@0.45.0) (2025-09-29)
 
 ### What's changed
