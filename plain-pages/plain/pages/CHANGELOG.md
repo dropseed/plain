@@ -1,5 +1,16 @@
 # plain-pages changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-pages@0.14.0) (2025-09-30)
+
+### What's changed
+
+- Pages now support content negotiation via Accept headers to serve raw markdown when `PAGES_SERVE_MARKDOWN` is enabled ([b105ba4](https://github.com/dropseed/plain/commit/b105ba4dd0))
+- Renamed `PAGES_MARKDOWN_URLS` setting to `PAGES_SERVE_MARKDOWN` for clarity ([b105ba4](https://github.com/dropseed/plain/commit/b105ba4dd0))
+
+### Upgrade instructions
+
+- If you were using `PAGES_MARKDOWN_URLS = True` in your settings, rename it to `PAGES_SERVE_MARKDOWN = True`
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-pages@0.13.0) (2025-09-19)
 
 ### What's changed
