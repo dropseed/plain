@@ -1,9 +1,9 @@
 from plain.http.cookie import parse_cookie
 from plain.http.request import (
-    HttpHeaders,
-    HttpRequest,
     QueryDict,
     RawPostDataException,
+    Request,
+    RequestHeaders,
     UnreadablePostError,
 )
 from plain.http.response import (
@@ -26,8 +26,8 @@ from plain.http.response import (
 
 __all__ = [
     "parse_cookie",
-    "HttpHeaders",
-    "HttpRequest",
+    "Request",
+    "RequestHeaders",
     "QueryDict",
     "RawPostDataException",
     "UnreadablePostError",

@@ -47,7 +47,7 @@ class RawPostDataException(Exception):
     pass
 
 
-class HttpRequest:
+class Request:
     """A basic HTTP request."""
 
     # The encoding used in GET/POST dicts. None means use default setting.
@@ -89,7 +89,7 @@ class HttpRequest:
                 del obj_dict[attr]
         return obj_dict
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> HttpRequest:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Request:
         obj = copy.copy(self)
         for attr in self.non_picklable_attrs:
             if hasattr(self, attr):
@@ -98,8 +98,8 @@ class HttpRequest:
         return obj
 
     @cached_property
-    def headers(self) -> HttpHeaders:
-        return HttpHeaders(self.meta)
+    def headers(self) -> RequestHeaders:
+        return RequestHeaders(self.meta)
 
     @cached_property
     def accepted_types(self) -> list[MediaType]:
@@ -454,7 +454,7 @@ class HttpRequest:
         return unsign_cookie_value(key, cookie_value, salt, max_age, default)
 
 
-class HttpHeaders(CaseInsensitiveMapping):
+class RequestHeaders(CaseInsensitiveMapping):
     HTTP_PREFIX = "HTTP_"
     # PEP 333 gives two headers which aren't prepended with HTTP_.
     UNPREFIXED_HEADERS = {"CONTENT_TYPE", "CONTENT_LENGTH"}

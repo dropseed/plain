@@ -4,7 +4,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from plain.auth import login as auth_login
-from plain.http import HttpRequest, Response, ResponseRedirect
+from plain.http import Request, Response, ResponseRedirect
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
@@ -65,7 +65,7 @@ class OAuthProvider:
         self.client_secret = client_secret
         self.scope = scope
 
-    def get_authorization_url_params(self, *, request: HttpRequest) -> dict:
+    def get_authorization_url_params(self, *, request: Request) -> dict:
         return {
             "redirect_uri": self.get_callback_url(request=request),
             "client_id": self.get_client_id(),
@@ -77,13 +77,13 @@ class OAuthProvider:
     def refresh_oauth_token(self, *, oauth_token: OAuthToken) -> OAuthToken:
         raise NotImplementedError()
 
-    def get_oauth_token(self, *, code: str, request: HttpRequest) -> OAuthToken:
+    def get_oauth_token(self, *, code: str, request: Request) -> OAuthToken:
         raise NotImplementedError()
 
     def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
         raise NotImplementedError()
 
-    def get_authorization_url(self, *, request: HttpRequest) -> str:
+    def get_authorization_url(self, *, request: Request) -> str:
         return self.authorization_url
 
     def get_client_id(self) -> str:
@@ -95,14 +95,14 @@ class OAuthProvider:
     def get_scope(self) -> str:
         return self.scope
 
-    def get_callback_url(self, *, request: HttpRequest) -> str:
+    def get_callback_url(self, *, request: Request) -> str:
         url = reverse("oauth:callback", provider=self.provider_key)
         return request.build_absolute_uri(url)
 
     def generate_state(self) -> str:
         return get_random_string(length=32)
 
-    def check_request_state(self, *, request: HttpRequest) -> None:
+    def check_request_state(self, *, request: Request) -> None:
         if error := request.query_params.get("error"):
             raise OAuthError(error)
 
@@ -117,7 +117,7 @@ class OAuthProvider:
             raise OAuthStateMismatchError()
 
     def handle_login_request(
-        self, *, request: HttpRequest, redirect_to: str = ""
+        self, *, request: Request, redirect_to: str = ""
     ) -> Response:
         authorization_url = self.get_authorization_url(request=request)
         authorization_params = self.get_authorization_url_params(request=request)
@@ -138,11 +138,11 @@ class OAuthProvider:
         return self.get_redirect_response(redirect_url)
 
     def handle_connect_request(
-        self, *, request: HttpRequest, redirect_to: str = ""
+        self, *, request: Request, redirect_to: str = ""
     ) -> Response:
         return self.handle_login_request(request=request, redirect_to=redirect_to)
 
-    def handle_disconnect_request(self, *, request: HttpRequest) -> Response:
+    def handle_disconnect_request(self, *, request: Request) -> Response:
         provider_user_id = request.data["provider_user_id"]
         connection = OAuthConnection.query.get(
             provider_key=self.provider_key, provider_user_id=provider_user_id
@@ -151,7 +151,7 @@ class OAuthProvider:
         redirect_url = self.get_disconnect_redirect_url(request=request)
         return self.get_redirect_response(redirect_url)
 
-    def handle_callback_request(self, *, request: HttpRequest) -> Response:
+    def handle_callback_request(self, *, request: Request) -> Response:
         self.check_request_state(request=request)
 
         oauth_token = self.get_oauth_token(
@@ -181,13 +181,13 @@ class OAuthProvider:
         redirect_url = self.get_login_redirect_url(request=request)
         return self.get_redirect_response(redirect_url)
 
-    def login(self, *, request: HttpRequest, user: Any) -> None:
+    def login(self, *, request: Request, user: Any) -> None:
         auth_login(request=request, user=user)
 
-    def get_login_redirect_url(self, *, request: HttpRequest) -> str:
+    def get_login_redirect_url(self, *, request: Request) -> str:
         return request.session.pop(SESSION_NEXT_KEY, "/")
 
-    def get_disconnect_redirect_url(self, *, request: HttpRequest) -> str:
+    def get_disconnect_redirect_url(self, *, request: Request) -> str:
         return request.data.get("next", "/")
 
     def get_redirect_response(self, redirect_url: str) -> Response:

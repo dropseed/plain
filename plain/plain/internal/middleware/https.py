@@ -8,17 +8,17 @@ from plain.runtime import settings
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from plain.http import HttpRequest, Response
+    from plain.http import Request, Response
 
 
 class HttpsRedirectMiddleware:
-    def __init__(self, get_response: Callable[[HttpRequest], Response]) -> None:
+    def __init__(self, get_response: Callable[[Request], Response]) -> None:
         self.get_response = get_response
 
         # Settings for HTTPS
         self.https_redirect_enabled = settings.HTTPS_REDIRECT_ENABLED
 
-    def __call__(self, request: HttpRequest) -> Response:
+    def __call__(self, request: Request) -> Response:
         """
         Perform a blanket HTTP→HTTPS redirect when enabled.
         """
@@ -28,7 +28,7 @@ class HttpsRedirectMiddleware:
 
         return self.get_response(request)
 
-    def maybe_https_redirect(self, request: HttpRequest) -> Response | None:
+    def maybe_https_redirect(self, request: Request) -> Response | None:
         if self.https_redirect_enabled and not request.is_https():
             return ResponseRedirect(
                 f"https://{request.host}{request.get_full_path()}", status_code=301

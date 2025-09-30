@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from plain.http.request import HttpRequest
+    from plain.http.request import Request
     from plain.http.response import ResponseBase
 
 request_logger = logging.getLogger("plain.request")
@@ -14,7 +14,7 @@ def log_response(
     message: str,
     *args: Any,
     response: ResponseBase | None = None,
-    request: HttpRequest | None = None,
+    request: Request | None = None,
     logger: logging.Logger = request_logger,
     level: str | None = None,
     exception: BaseException | None = None,

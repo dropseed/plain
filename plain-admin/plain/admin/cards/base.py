@@ -1,6 +1,6 @@
 from enum import Enum
 
-from plain.http import HttpRequest
+from plain.http import Request
 from plain.templates import Template
 from plain.views import View
 
@@ -29,7 +29,7 @@ class Card:
 
     # These will be accessible at render time
     view: View
-    request: HttpRequest
+    request: Request
 
     def render(self, view, request):
         self.view = view

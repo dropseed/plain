@@ -10,15 +10,15 @@ from plain.utils.http import escape_leading_slashes
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from plain.http import HttpRequest, Response
+    from plain.http import Request, Response
     from plain.urls import ResolverMatch
 
 
 class RedirectSlashMiddleware:
-    def __init__(self, get_response: Callable[[HttpRequest], Response]) -> None:
+    def __init__(self, get_response: Callable[[Request], Response]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request: HttpRequest) -> Response:
+    def __call__(self, request: Request) -> Response:
         """
         Rewrite the URL based on settings.APPEND_SLASH
         """
@@ -50,7 +50,7 @@ class RedirectSlashMiddleware:
         except Resolver404:
             return False
 
-    def should_redirect_with_slash(self, request: HttpRequest) -> ResolverMatch | bool:
+    def should_redirect_with_slash(self, request: Request) -> ResolverMatch | bool:
         """
         Return True if settings.APPEND_SLASH is True and appending a slash to
         the request path turns an invalid path into a valid one.
@@ -60,7 +60,7 @@ class RedirectSlashMiddleware:
                 return self._is_valid_path(f"{request.path_info}/")
         return False
 
-    def get_full_path_with_slash(self, request: HttpRequest) -> str:
+    def get_full_path_with_slash(self, request: Request) -> str:
         """
         Return the full path of the request with a trailing slash appended.
 

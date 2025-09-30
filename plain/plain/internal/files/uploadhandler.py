@@ -19,7 +19,7 @@ from plain.utils.module_loading import import_string
 if TYPE_CHECKING:
     from typing import Any
 
-    from plain.http import HttpRequest
+    from plain.http import Request
 
 __all__ = [
     "UploadFileException",
@@ -85,7 +85,7 @@ class FileUploadHandler:
 
     chunk_size = 64 * 2**10  # : The default chunk size is 64 KB.
 
-    def __init__(self, request: HttpRequest | None = None) -> None:
+    def __init__(self, request: Request | None = None) -> None:
         self.file_name = None
         self.content_type = None
         self.content_length = None
@@ -265,8 +265,8 @@ def load_handler(path: str, *args: Any, **kwargs: Any) -> FileUploadHandler:
     Given a path to a handler, return an instance of that handler.
 
     E.g.::
-        >>> from plain.http import HttpRequest
-        >>> request = HttpRequest()
+        >>> from plain.http import Request
+        >>> request = Request()
         >>> load_handler(
         ...     'plain.internal.files.uploadhandler.TemporaryFileUploadHandler',
         ...     request,

@@ -6,7 +6,7 @@
 
 ## Overview
 
-Typically you will interact with [request](request.py#HttpRequest) and [response](response.py#ResponseBase) objects in your views and middleware.
+Typically you will interact with [Request](request.py#Request) and [Response](response.py#ResponseBase) objects in your views and middleware.
 
 ```python
 from plain.views import View

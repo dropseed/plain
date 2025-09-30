@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from plain import signals
-from plain.http import HttpRequest, QueryDict, parse_cookie
+from plain.http import QueryDict, Request, parse_cookie
 from plain.internal.handlers import base
 from plain.utils.datastructures import MultiValueDict
 from plain.utils.regex_helper import _lazy_re_compile
@@ -60,8 +60,8 @@ class LimitedStream(IOBase):
         return line
 
 
-class WSGIRequest(HttpRequest):
-    non_picklable_attrs = HttpRequest.non_picklable_attrs | frozenset(["environ"])
+class WSGIRequest(Request):
+    non_picklable_attrs = Request.non_picklable_attrs | frozenset(["environ"])
     meta_non_picklable_attrs = frozenset(["wsgi.errors", "wsgi.input"])
 
     def __init__(self, environ: dict[str, Any]) -> None:

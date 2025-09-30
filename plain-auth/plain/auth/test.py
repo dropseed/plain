@@ -1,6 +1,6 @@
 from http.cookies import SimpleCookie
 
-from plain.http.request import HttpRequest
+from plain.http.request import Request
 from plain.runtime import settings
 from plain.sessions import SessionStore
 
@@ -9,7 +9,7 @@ from .sessions import get_user, login, logout
 
 def login_client(client, user):
     """Log a user into a test client."""
-    request = HttpRequest()
+    request = Request()
     if client.session:
         request.session = client.session
     else:
@@ -30,7 +30,7 @@ def login_client(client, user):
 
 def logout_client(client):
     """Log out a user from a test client."""
-    request = HttpRequest()
+    request = Request()
     if client.session:
         request.session = client.session
         request.user = get_user(request)

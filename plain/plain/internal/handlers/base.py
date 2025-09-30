@@ -18,7 +18,7 @@ from .exception import convert_exception_to_response
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from plain.http import HttpRequest, Response
+    from plain.http import Request, Response
     from plain.urls import ResolverMatch
 
 logger = logging.getLogger("plain.request")
@@ -43,7 +43,7 @@ tracer = trace.get_tracer("plain")
 
 
 class BaseHandler:
-    _middleware_chain: Callable[[HttpRequest], Response] | None = None
+    _middleware_chain: Callable[[Request], Response] | None = None
 
     def load_middleware(self) -> None:
         """
@@ -72,8 +72,8 @@ class BaseHandler:
         # as a flag for initialization being complete.
         self._middleware_chain = handler
 
-    def get_response(self, request: HttpRequest) -> Response:
-        """Return a Response object for the given HttpRequest."""
+    def get_response(self, request: Request) -> Response:
+        """Return a Response object for the given Request."""
 
         span_attributes = {
             "plain.request.id": request.unique_id,
@@ -124,7 +124,7 @@ class BaseHandler:
                 )
             return response
 
-    def _get_response(self, request: HttpRequest) -> Response:
+    def _get_response(self, request: Request) -> Response:
         """
         Resolve and call the view, then apply view, exception, and
         template_response middleware. This method is everything that happens
@@ -141,7 +141,7 @@ class BaseHandler:
 
         return response
 
-    def resolve_request(self, request: HttpRequest) -> ResolverMatch:
+    def resolve_request(self, request: Request) -> ResolverMatch:
         """
         Retrieve/set the urlrouter for the request. Return the view resolved,
         with its args and kwargs.

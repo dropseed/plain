@@ -13,7 +13,7 @@ from .views import CsrfFailureView
 
 if TYPE_CHECKING:
     from plain.http import Response
-    from plain.http.request import HttpRequest
+    from plain.http.request import Request
 
 logger = logging.getLogger("plain.security.csrf")
 
@@ -27,7 +27,7 @@ class CsrfViewMiddleware:
     like subdomains can have different trust levels and are rejected.
     """
 
-    def __init__(self, get_response: Callable[[HttpRequest], Response]):
+    def __init__(self, get_response: Callable[[Request], Response]):
         self.get_response = get_response
 
         # Compile CSRF exempt patterns once for performance
@@ -35,7 +35,7 @@ class CsrfViewMiddleware:
             re.compile(r) for r in settings.CSRF_EXEMPT_PATHS
         ]
 
-    def __call__(self, request: HttpRequest) -> Response:
+    def __call__(self, request: Request) -> Response:
         allowed, reason = self.should_allow_request(request)
 
         if allowed:
@@ -43,7 +43,7 @@ class CsrfViewMiddleware:
         else:
             return self.reject(request, reason)
 
-    def should_allow_request(self, request: HttpRequest) -> tuple[bool, str]:
+    def should_allow_request(self, request: Request) -> tuple[bool, str]:
         # 1. Allow safe methods (GET, HEAD, OPTIONS)
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return True, f"Safe HTTP method: {request.method}"
@@ -128,7 +128,7 @@ class CsrfViewMiddleware:
             f"Cross-origin request detected - Origin {origin} does not match Host",
         )
 
-    def reject(self, request: HttpRequest, reason: str) -> Response:
+    def reject(self, request: Request, reason: str) -> Response:
         """Reject a request with a 403 Forbidden response."""
 
         response = CsrfFailureView.as_view()(request, reason=reason)

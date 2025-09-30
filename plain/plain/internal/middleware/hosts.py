@@ -4,7 +4,7 @@ import ipaddress
 import logging
 from typing import TYPE_CHECKING
 
-from plain.http import HttpRequest, ResponseBadRequest
+from plain.http import Request, ResponseBadRequest
 from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -29,10 +29,10 @@ class HostValidationMiddleware:
     host is not allowed.
     """
 
-    def __init__(self, get_response: Callable[[HttpRequest], Response]) -> None:
+    def __init__(self, get_response: Callable[[Request], Response]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request: HttpRequest) -> Response:
+    def __call__(self, request: Request) -> Response:
         if not is_host_valid(request):
             host = request.host
             msg = f"Invalid HTTP_HOST header: {host!r}."
@@ -55,7 +55,7 @@ class HostValidationMiddleware:
         return self.get_response(request)
 
 
-def is_host_valid(request: HttpRequest) -> bool:
+def is_host_valid(request: Request) -> bool:
     """
     Check if the host is valid according to ALLOWED_HOSTS settings.
     """

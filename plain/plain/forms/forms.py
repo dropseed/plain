@@ -14,7 +14,7 @@ from .exceptions import ValidationError
 from .fields import Field, FileField
 
 if TYPE_CHECKING:
-    from plain.http import HttpRequest
+    from plain.http import Request
 
     from .boundfield import BoundField
 
@@ -70,7 +70,7 @@ class BaseForm:
     def __init__(
         self,
         *,
-        request: HttpRequest,
+        request: Request,
         auto_id: str | bool = "id_%s",
         prefix: str | None = None,
         initial: dict[str, Any] | None = None,

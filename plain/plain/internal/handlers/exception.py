@@ -23,12 +23,12 @@ from plain.views.errors import ErrorView
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from plain.http import HttpRequest, Response
+    from plain.http import Request, Response
 
 
 def convert_exception_to_response(
-    get_response: Callable[[HttpRequest], Response],
-) -> Callable[[HttpRequest], Response]:
+    get_response: Callable[[Request], Response],
+) -> Callable[[Request], Response]:
     """
     Wrap the given get_response callable in exception-to-response conversion.
 
@@ -43,7 +43,7 @@ def convert_exception_to_response(
     """
 
     @wraps(get_response)
-    def inner(request: HttpRequest) -> Response:
+    def inner(request: Request) -> Response:
         try:
             response = get_response(request)
         except Exception as exc:
@@ -53,7 +53,7 @@ def convert_exception_to_response(
     return inner
 
 
-def response_for_exception(request: HttpRequest, exc: Exception) -> Response:
+def response_for_exception(request: Request, exc: Exception) -> Response:
     if isinstance(exc, Http404):
         response = get_exception_response(
             request=request, status_code=404, exception=None
@@ -131,7 +131,7 @@ def response_for_exception(request: HttpRequest, exc: Exception) -> Response:
 
 
 def get_exception_response(
-    *, request: HttpRequest, status_code: int, exception: Exception | None
+    *, request: Request, status_code: int, exception: Exception | None
 ) -> Response:
     try:
         view_class = get_error_view(status_code=status_code, exception=exception)
@@ -149,7 +149,7 @@ def get_exception_response(
 
 def get_error_view(
     *, status_code: int, exception: Exception | None
-) -> Callable[[HttpRequest], Response]:
+) -> Callable[[Request], Response]:
     views_by_status = settings.HTTP_ERROR_VIEWS
     if status_code in views_by_status:
         view = views_by_status[status_code]

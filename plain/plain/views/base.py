@@ -12,8 +12,8 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
 )
 
 from plain.http import (
-    HttpRequest,
     JsonResponse,
+    Request,
     Response,
     ResponseBase,
     ResponseNotAllowed,
@@ -30,16 +30,14 @@ tracer = trace.get_tracer("plain")
 
 
 class View:
-    request: HttpRequest
+    request: Request
     url_args: tuple
     url_kwargs: dict
 
     # View.as_view(example="foo") usage can be customized by defining your own __init__ method.
     # def __init__(self, *args, **kwargs):
 
-    def setup(
-        self, request: HttpRequest, *url_args: object, **url_kwargs: object
-    ) -> None:
+    def setup(self, request: Request, *url_args: object, **url_kwargs: object) -> None:
         if hasattr(self, "get") and not hasattr(self, "head"):
             self.head = self.get
 
@@ -50,9 +48,9 @@ class View:
     @classonlymethod
     def as_view(
         cls, *init_args: object, **init_kwargs: object
-    ) -> Callable[[HttpRequest, Any, Any], ResponseBase]:
+    ) -> Callable[[Request, Any, Any], ResponseBase]:
         def view(
-            request: HttpRequest, *url_args: object, **url_kwargs: object
+            request: Request, *url_args: object, **url_kwargs: object
         ) -> ResponseBase:
             with tracer.start_as_current_span(
                 f"{cls.__name__}",

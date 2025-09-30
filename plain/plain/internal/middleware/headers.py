@@ -7,14 +7,14 @@ from plain.runtime import settings
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from plain.http import HttpRequest, Response
+    from plain.http import Request, Response
 
 
 class DefaultHeadersMiddleware:
-    def __init__(self, get_response: Callable[[HttpRequest], Response]) -> None:
+    def __init__(self, get_response: Callable[[Request], Response]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request: HttpRequest) -> Response:
+    def __call__(self, request: Request) -> Response:
         response = self.get_response(request)
 
         for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():
