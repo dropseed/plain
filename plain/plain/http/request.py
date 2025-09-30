@@ -103,13 +103,35 @@ class HttpRequest:
 
     @cached_property
     def accepted_types(self) -> list[MediaType]:
-        """Return a list of MediaType instances."""
-        return parse_accept_header(self.headers.get("Accept", "*/*"))
+        """Return accepted media types sorted by quality value (highest first).
+
+        When quality values are equal, the original order from the Accept header
+        is preserved (as per HTTP spec).
+        """
+        types = parse_accept_header(self.headers.get("Accept", "*/*"))
+        return sorted(types, key=lambda t: t.quality, reverse=True)
+
+    def get_preferred_type(self, *media_types: str) -> str | None:
+        """Return the most preferred media type from the given options.
+
+        Checks the Accept header in priority order (by quality value) and returns
+        the first matching media type from the provided options.
+
+        Returns None if none of the options are accepted.
+
+        Example:
+            # Accept: text/html;q=1.0, application/json;q=0.5
+            request.get_preferred_type("application/json", "text/html")  # Returns "text/html"
+        """
+        for accepted in self.accepted_types:
+            for option in media_types:
+                if accepted.match(option):
+                    return option
+        return None
 
     def accepts(self, media_type: str) -> bool:
-        return any(
-            accepted_type.match(media_type) for accepted_type in self.accepted_types
-        )
+        """Check if the given media type is accepted."""
+        return self.get_preferred_type(media_type) is not None
 
     def _set_content_type_params(self, meta: dict[str, Any]) -> None:
         """Set content_type, content_params, and encoding."""
@@ -677,6 +699,11 @@ class MediaType:
     @property
     def is_all_types(self) -> bool:
         return self.main_type == "*" and self.sub_type == "*"
+
+    @property
+    def quality(self) -> float:
+        """Return the quality value from the Accept header (default 1.0)."""
+        return float(self.params.get("q", 1.0))
 
     def match(self, other: str | MediaType) -> bool:
         if self.is_all_types:

@@ -113,31 +113,36 @@ app/templates/pages/
 └── index.html          # Served at /
 ```
 
-## Markdown URLs
+## Serving raw markdown
 
-Optionally serve raw markdown content alongside rendered HTML pages. When enabled, each markdown file gets two URLs:
+Optionally serve raw markdown content (without frontmatter) alongside rendered HTML pages. When enabled, markdown pages can be accessed as raw markdown via:
+
+1. **Accept header negotiation** - Send `Accept: text/markdown` or `Accept: text/plain` to get raw markdown
+2. **Separate .md URLs** - Access `/docs/guide.md` alongside `/docs/guide/`
 
 ```python
 # settings.py
-PAGES_MARKDOWN_URLS = True
+PAGES_SERVE_MARKDOWN = True
 ```
 
 With this setting enabled:
 
-- `/docs/guide/` → Rendered HTML page
+- `/docs/guide/` with `Accept: text/html` → Rendered HTML page
+- `/docs/guide/` with `Accept: text/markdown` → Raw markdown content
 - `/docs/guide.md` → Raw markdown content (without frontmatter)
 
-The raw markdown URLs serve the content with `text/plain` content type, making them useful for:
+The raw markdown serves with `text/plain` content type, making it useful for:
 
 - External markdown processors
 - API consumers needing markdown source
 - Documentation tools that need raw content
+- Command-line tools like curl or httpie
 
 **Note**: This feature is disabled by default. Only enable it if you need to serve raw markdown content.
 
-### Linking to Markdown URLs
+### Linking to markdown URLs
 
-When markdown URLs are enabled, you can link to the raw markdown version from templates:
+When markdown serving is enabled, you can link to the raw markdown version from templates:
 
 ```html
 <!-- In your page template -->

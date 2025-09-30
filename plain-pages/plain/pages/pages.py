@@ -135,7 +135,7 @@ class Page:
         if not self.is_markdown():
             return None
 
-        if not settings.PAGES_MARKDOWN_URLS:
+        if not settings.PAGES_SERVE_MARKDOWN:
             return None
 
         url_name = self.get_url_name()
@@ -163,7 +163,7 @@ class Page:
             )
 
             # For markdown files, optionally add .md URL
-            if self.is_markdown() and settings.PAGES_MARKDOWN_URLS:
+            if self.is_markdown() and settings.PAGES_SERVE_MARKDOWN:
                 from .views import PageMarkdownView
 
                 urls.append(

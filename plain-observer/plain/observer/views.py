@@ -90,8 +90,9 @@ class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
 
     def get(self):
         """Return trace data as HTML, JSON, or logs based on content negotiation."""
+        preferred = self.request.get_preferred_type("application/json", "text/html")
         if (
-            "application/json" in self.request.headers.get("Accept", "")
+            preferred == "application/json"
             or self.request.query_params.get("format") == "json"
         ):
             return self.object.as_dict()
@@ -146,8 +147,9 @@ class ObserverTraceSharedView(DetailView):
 
     def get(self):
         """Return trace data as HTML or JSON based on content negotiation."""
+        preferred = self.request.get_preferred_type("application/json", "text/html")
         if (
-            "application/json" in self.request.headers.get("Accept", "")
+            preferred == "application/json"
             or self.request.query_params.get("format") == "json"
         ):
             return JsonResponse(self.object.as_dict())

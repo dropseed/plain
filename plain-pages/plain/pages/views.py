@@ -6,6 +6,7 @@ from plain.http import (
     Response,
     ResponseRedirect,
 )
+from plain.runtime import settings
 from plain.views import TemplateView, View
 
 from .exceptions import PageNotFoundError, RedirectPageError
@@ -25,6 +26,22 @@ class PageViewMixin:
 
 class PageView(PageViewMixin, TemplateView):
     template_name = "page.html"
+
+    def get(self):
+        """Check Accept header and serve markdown if requested."""
+        if self.page.is_markdown() and settings.PAGES_SERVE_MARKDOWN:
+            preferred = self.request.get_preferred_type(
+                "text/markdown", "text/plain", "text/html"
+            )
+            if preferred in ("text/markdown", "text/plain"):
+                markdown_content = self.page._frontmatter.content
+                response = Response(
+                    markdown_content, content_type="text/plain; charset=utf-8"
+                )
+                response.headers["Vary"] = "Accept"
+                return response
+
+        return super().get()
 
     def get_template_names(self) -> list[str]:
         """
