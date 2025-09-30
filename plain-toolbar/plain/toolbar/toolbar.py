@@ -6,7 +6,7 @@ from plain.templates import Template
 from plain.urls.exceptions import Resolver404
 from plain.utils.safestring import mark_safe
 
-from .registry import register_toolbar_panel, registry
+from .registry import register_toolbar_item, registry
 
 
 class Toolbar:
@@ -36,21 +36,21 @@ class Toolbar:
             )
             return exception
 
-    def get_panels(self):
-        panels = [panel(self.request) for panel in registry.get_panels()]
+    def get_items(self):
+        items = [item(self.request) for item in registry.get_items()]
 
         if self.request_exception():
             exception = self.request_exception()
-            panels = [
-                _ExceptionToolbarPanel(self.request, exception),
-            ] + panels
+            items = [
+                _ExceptionToolbarItem(self.request, exception),
+            ] + items
 
-        return panels
+        return items
 
 
-class ToolbarPanel:
-    name: str
-    template_name: str
+class ToolbarItem:
+    name: str = ""
+    panel_template_name: str = ""
     button_template_name: str = ""
 
     def __init__(self, request):
@@ -62,23 +62,21 @@ class ToolbarPanel:
             "panel": self,
         }
 
-    def render(self):
-        template = Template(self.template_name)
+    def render_panel(self):
+        template = Template(self.panel_template_name)
         context = self.get_template_context()
         return mark_safe(template.render(context))
 
     def render_button(self):
         """Render the toolbar button for the minimized state."""
-        if not self.button_template_name:
-            return ""
         template = Template(self.button_template_name)
         context = self.get_template_context()
         return mark_safe(template.render(context))
 
 
-class _ExceptionToolbarPanel(ToolbarPanel):
+class _ExceptionToolbarItem(ToolbarItem):
     name = "Exception"
-    template_name = "toolbar/exception.html"
+    panel_template_name = "toolbar/exception.html"
     button_template_name = "toolbar/exception_button.html"
 
     def __init__(self, request, exception):
@@ -91,7 +89,7 @@ class _ExceptionToolbarPanel(ToolbarPanel):
         return context
 
 
-@register_toolbar_panel
-class _RequestToolbarPanel(ToolbarPanel):
+@register_toolbar_item
+class _RequestToolbarItem(ToolbarItem):
     name = "Request"
-    template_name = "toolbar/request.html"
+    panel_template_name = "toolbar/request.html"

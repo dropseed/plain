@@ -1,5 +1,5 @@
 {% if toolbar.should_render() %}
-{% set panels=toolbar.get_panels() %}
+{% set items=toolbar.get_items() %}
 <script defer src="{{ asset('toolbar/toolbar.js') }}"></script>
 <div id="plaintoolbar" class="print:hidden text-stone-300 fixed bottom-0 w-full z-50 hidden sm:flex sm:flex-col">
 
@@ -7,8 +7,10 @@
 
         <div class="flex border-b border-white/5 px-2">
             <div class="flex flex-grow">
-                {% for panel in panels %}
-                <button {% if loop.first %}data-active{% endif %} data-toolbar-tab="{{ panel.name }}" class="data-active:border-yellow-500 px-4 py-2.5 -mb-px cursor-pointer border-b border-transparent hover:border-yellow-600" type="button">{{ panel.name }}</button>
+                {% for item in items %}
+                {% if item.name and item.panel_template_name %}
+                <button {% if loop.first %}data-active{% endif %} data-toolbar-tab="{{ item.name }}" class="data-active:border-yellow-500 px-4 py-2.5 -mb-px cursor-pointer border-b border-transparent hover:border-yellow-600" type="button">{{ item.name }}</button>
+                {% endif %}
                 {% endfor %}
                 <button data-plaintoolbar-expand class="flex-grow cursor-pointer inline-flex h-full" type="button"></button>
             </div>
@@ -31,10 +33,12 @@
         <div data-resizer class="cursor-grab w-20 h-1.5 top-1 bg-white/15 rounded-full absolute top-0 left-1/2 -translate-x-1/2"></div>
 
         <div class="overflow-auto h-[30vh] flex flex-col">
-            {% for panel in panels %}
-            <div data-toolbar-tab="{{ panel.name }}" class="h-full" {% if not loop.first %}style="display: none;"{% endif %}>
-                {{ panel.render() }}
+            {% for item in items %}
+            {% if item.name and item.panel_template_name %}
+            <div data-toolbar-tab="{{ item.name }}" class="h-full" {% if not loop.first %}style="display: none;"{% endif %}>
+                {{ item.render_panel() }}
             </div>
+            {% endif %}
             {% endfor %}
         </div>
 
@@ -43,34 +47,16 @@
     <div class="flex px-3 text-xs border-t border-white/5 space-x-4 py-2 bg-stone-950 shadow-xl">
         <div class="flex items-center">
             <code class="ml-1.5 bg-white/10 px-1.5 rounded-sm whitespace-nowrap text-mono">{{ toolbar.version }}</code>
-
-            {% if request.impersonator is defined %}
-            <div class="flex items-center ml-1 font-light">
-                Impersonating&nbsp;<span class="font-medium">{{ request.user }}</span>
-                </span>
-                <a href="{{ url('admin:impersonate:stop') }}" title="Stop impersonating" class="flex items-center px-1 ml-1 text-red-300 hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 bi bi-x-octagon-fill" viewBox="0 0 16 16">
-                        <path d="M11.46.146A.5.5 0 0 0 11.107 0H4.893a.5.5 0 0 0-.353.146L.146 4.54A.5.5 0 0 0 0 4.893v6.214a.5.5 0 0 0 .146.353l4.394 4.394a.5.5 0 0 0 .353.146h6.214a.5.5 0 0 0 .353-.146l4.394-4.394a.5.5 0 0 0 .146-.353V4.893a.5.5 0 0 0-.146-.353L11.46.146zm-6.106 4.5L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 1 1 .708-.708z"/>
-                    </svg>
-                </a>
-            </div>
-            {% endif %}
         </div>
         <button type="button" data-plaintoolbar-expand class="flex-grow cursor-pointer"></button>
         <div class="flex items-center space-x-4">
             <div class="flex items-center space-x-3 transition-all">
 
-                {% for panel in panels %}
-                {% if panel.button_template_name %}
-                {{ panel.render_button() }}
+                {% for item in items %}
+                {% if item.button_template_name %}
+                {{ item.render_button() }}
                 {% endif %}
                 {% endfor %}
-
-                {% if is_admin_view|default(false) %}
-                <a href="/" class="hover:underline">Back to {{ app_name }}</a>
-                {% else %}
-                <a href="{{ url('admin:index') }}" class="hover:underline">Admin</a>
-                {% endif %}
 
                 {% include "toolbar/links.html" ignore missing %}
 

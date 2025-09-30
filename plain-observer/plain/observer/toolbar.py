@@ -1,14 +1,14 @@
 from functools import cached_property
 
-from plain.toolbar import ToolbarPanel, register_toolbar_panel
+from plain.toolbar import ToolbarItem, register_toolbar_item
 
 from .core import Observer
 
 
-@register_toolbar_panel
-class ObserverToolbarPanel(ToolbarPanel):
+@register_toolbar_item
+class ObserverToolbarItem(ToolbarItem):
     name = "Observer"
-    template_name = "toolbar/observer.html"
+    panel_template_name = "toolbar/observer.html"
     button_template_name = "toolbar/observer_button.html"
 
     @cached_property

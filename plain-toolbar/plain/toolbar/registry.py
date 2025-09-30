@@ -1,19 +1,19 @@
-class ToolbarPanelRegistry:
+class ToolbarItemRegistry:
     def __init__(self):
-        self._panels = {}
+        self._items = {}
 
-    def register_panel(self, panel_class):
-        self._panels[panel_class.name] = panel_class
+    def register_item(self, item_class):
+        self._items[item_class.name] = item_class
 
-    def get_panels(self):
-        return self._panels.values()
+    def get_items(self):
+        return self._items.values()
 
 
 # Global registry instance
-registry = ToolbarPanelRegistry()
+registry = ToolbarItemRegistry()
 
 
-def register_toolbar_panel(panel_class):
-    """Decorator to register a toolbar panel."""
-    registry.register_panel(panel_class)
-    return panel_class
+def register_toolbar_item(item_class):
+    """Decorator to register a toolbar item."""
+    registry.register_item(item_class)
+    return item_class

@@ -62,7 +62,6 @@ class AdminView(AuthViewMixin, TemplateView):
         context["cards"] = self.get_cards()
         context["render_card"] = lambda card: card().render(self, self.request)
         context["time_zone"] = timezone.get_current_timezone_name()
-        context["is_admin_view"] = True
         context["view_class"] = self.__class__
         context["app_name"] = settings.APP_NAME
         context["get_gravatar_url"] = get_gravatar_url
