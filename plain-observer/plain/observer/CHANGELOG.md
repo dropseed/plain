@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.9.0](https://github.com/dropseed/plain/releases/plain-observer@0.9.0) (2025-09-30)
+
+### What's changed
+
+- Settings renamed from `APP_NAME` to `NAME` and `APP_VERSION` to `VERSION` for consistency with Plain conventions ([4c5f216](https://github.com/dropseed/plain/commit/4c5f2166c1))
+- Trace detail and shared views now use `request.get_preferred_type()` for improved content negotiation ([b105ba4](https://github.com/dropseed/plain/commit/b105ba4dd0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.8.0](https://github.com/dropseed/plain/releases/plain-observer@0.8.0) (2025-09-30)
 
 ### What's changed
