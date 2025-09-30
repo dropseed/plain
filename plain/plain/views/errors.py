@@ -12,7 +12,9 @@ from .templates import TemplateView
 class ErrorView(TemplateView):
     status_code: int
 
-    def __init__(self, *, status_code=None, exception=None) -> None:
+    def __init__(
+        self, *, status_code: int | None = None, exception: Any | None = None
+    ) -> None:
         # Allow creating an ErrorView with a status code
         # e.g. ErrorView.as_view(status_code=404)
         self.status_code = status_code or self.status_code

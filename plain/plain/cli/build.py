@@ -33,7 +33,7 @@ from plain.assets.compile import compile_assets, get_compiled_path
     default=True,
     help="Compress the assets",
 )
-def build(keep_original, fingerprint, compress):
+def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
     """Pre-deployment build step (compile assets, css, js, etc.)"""
 
     if not keep_original and not fingerprint:

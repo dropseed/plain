@@ -139,7 +139,7 @@ class BaseForm:
         return self._bound_fields_cache[name]
 
     @property
-    def errors(self):
+    def errors(self) -> dict[str, list[str]] | None:
         """Return an error dict for the data provided for the form."""
         if self._errors is None:
             self.full_clean()
@@ -159,7 +159,7 @@ class BaseForm:
         return f"{self.prefix}-{field_name}" if self.prefix else field_name
 
     @property
-    def non_field_errors(self):
+    def non_field_errors(self) -> list[str]:
         """
         Return a list of errors that aren't associated with a particular
         field -- i.e., from Form.clean(). Return an empty list if there

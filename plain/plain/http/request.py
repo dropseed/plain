@@ -675,7 +675,7 @@ class MediaType:
         return f"<{self.__class__.__qualname__}: {self}>"
 
     @property
-    def is_all_types(self):
+    def is_all_types(self) -> bool:
         return self.main_type == "*" and self.sub_type == "*"
 
     def match(self, other: str | MediaType) -> bool:

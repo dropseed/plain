@@ -9,6 +9,7 @@ from urllib.parse import quote
 from plain import signals
 from plain.http import HttpRequest, QueryDict, parse_cookie
 from plain.internal.handlers import base
+from plain.utils.datastructures import MultiValueDict
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
@@ -123,7 +124,7 @@ class WSGIRequest(HttpRequest):
         return parse_cookie(raw_cookie)
 
     @property
-    def files(self):
+    def files(self) -> MultiValueDict:
         if not hasattr(self, "_files"):
             self._load_data_and_files()
         return self._files

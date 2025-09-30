@@ -57,7 +57,7 @@ class FileProxyMixin:
     writelines = property(lambda self: self.file.writelines)
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         return not self.file or self.file.closed
 
     def readable(self) -> bool:

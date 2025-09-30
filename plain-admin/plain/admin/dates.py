@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from calendar import monthrange
 from enum import Enum
@@ -47,7 +49,7 @@ class DatetimeRangeAliases(Enum):
         raise ValueError(f"{value} is not a valid value for {cls.__name__}")
 
     @classmethod
-    def to_range(cls, value: str) -> tuple[datetime.datetime, datetime.datetime]:
+    def to_range(cls, value: str) -> DatetimeRange:
         now = timezone.localtime()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_of_week = start_of_today - datetime.timedelta(

@@ -1,5 +1,6 @@
 import functools
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment, StrictUndefined
 from jinja2.loaders import FileSystemLoader
@@ -11,7 +12,7 @@ from .filters import default_filters
 from .globals import default_globals
 
 
-def finalize_callable_error(obj):
+def finalize_callable_error(obj: Any) -> Any:
     """Prevent direct rendering of a callable (likely just forgotten ()) by raising a TypeError"""
     if callable(obj):
         raise TypeError(f"{obj} is callable, did you forget parentheses?")
@@ -23,14 +24,14 @@ def finalize_callable_error(obj):
     return obj
 
 
-def get_template_dirs():
+def get_template_dirs() -> tuple[Path, ...]:
     jinja_templates = Path(__file__).parent / "templates"
     app_templates = settings.path.parent / "templates"
     return (jinja_templates, app_templates) + _get_app_template_dirs()
 
 
 @functools.lru_cache
-def _get_app_template_dirs():
+def _get_app_template_dirs() -> tuple[Path, ...]:
     """
     Return an iterable of paths of directories to load app templates from.
 

@@ -33,12 +33,12 @@ class ResolverMatch:
     def __init__(
         self,
         *,
-        view,
-        args,
-        kwargs,
-        url_name=None,
-        namespaces=None,
-        route=None,
+        view: Any,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        url_name: str | None = None,
+        namespaces: list[str] | None = None,
+        route: str | None = None,
     ):
         self.view = view
         self.args = args
@@ -201,13 +201,13 @@ class URLResolver:
             self._local.populating = False
 
     @property
-    def reverse_dict(self):
+    def reverse_dict(self) -> MultiValueDict:
         if not self._reverse_dict:
             self._populate()
         return self._reverse_dict
 
     @property
-    def namespace_dict(self):
+    def namespace_dict(self) -> dict[str, tuple[str, URLResolver]]:
         if not self._namespace_dict:
             self._populate()
         return self._namespace_dict
