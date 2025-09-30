@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-sessions@0.31.0) (2025-09-30)
+
+### What's changed
+
+- The toolbar integration has been refactored to use the new `ToolbarItem` API instead of `ToolbarPanel`, with `SessionToolbarPanel` renamed to `SessionToolbarItem` ([79654db](https://github.com/dropseed/plain/commit/79654dbefe))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-sessions@0.30.0) (2025-09-25)
 
 ### What's changed
