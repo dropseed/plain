@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.38.0](https://github.com/dropseed/plain/releases/plain-dev@0.38.0) (2025-09-30)
+
+### What's changed
+
+- Added an `AGENTS.md` file with package-specific agent instructions for the `plain dev logs` command ([5841a3f](https://github.com/dropseed/plain/commit/5841a3fb0b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.0](https://github.com/dropseed/plain/releases/plain-dev@0.37.0) (2025-09-29)
 
 ### What's changed
