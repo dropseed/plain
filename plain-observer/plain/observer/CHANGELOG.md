@@ -1,5 +1,19 @@
 # plain-observer changelog
 
+## [0.8.0](https://github.com/dropseed/plain/releases/plain-observer@0.8.0) (2025-09-30)
+
+### What's changed
+
+- The toolbar panel class has been renamed from `ToolbarPanel` to `ToolbarItem` for better clarity and consistency ([79654db](https://github.com/dropseed/plain/commit/79654db))
+- The `template_name` attribute has been renamed to `panel_template_name` in toolbar items ([79654db](https://github.com/dropseed/plain/commit/79654db))
+- The registration decorator has been renamed from `register_toolbar_panel` to `register_toolbar_item` ([79654db](https://github.com/dropseed/plain/commit/79654db))
+
+### Upgrade instructions
+
+- If you have custom toolbar panels, rename your class from inheriting `ToolbarPanel` to `ToolbarItem`
+- If you use the `template_name` attribute in your toolbar items, rename it to `panel_template_name`
+- If you use the `@register_toolbar_panel` decorator, change it to `@register_toolbar_item`
+
 ## [0.7.0](https://github.com/dropseed/plain/releases/plain-observer@0.7.0) (2025-09-12)
 
 ### What's changed
