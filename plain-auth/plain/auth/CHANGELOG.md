@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-auth@0.19.0) (2025-09-30)
+
+### What's changed
+
+- Updated imports to use the renamed `Request` class instead of `HttpRequest` ([cd46ff2](https://github.com/dropseed/plain/commit/cd46ff2003))
+
+### Upgrade instructions
+
+- Replace any imports of `HttpRequest` from `plain.http.request` with `Request` (e.g., `from plain.http.request import HttpRequest` becomes `from plain.http.request import Request`)
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-auth@0.18.0) (2025-09-19)
 
 ### What's changed
