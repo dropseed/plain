@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.70.0](https://github.com/dropseed/plain/releases/plain@0.70.0) (2025-09-30)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the codebase for improved IDE support and type checking ([365414c](https://github.com/dropseed/plain/commit/365414cc6f))
+- The `Asset` class in `plain.assets.finders` is now a module-level public class instead of being defined inside `iter_assets()` ([6321765](https://github.com/dropseed/plain/commit/6321765d30))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.69.0](https://github.com/dropseed/plain/releases/plain@0.69.0) (2025-09-29)
 
 ### What's changed
