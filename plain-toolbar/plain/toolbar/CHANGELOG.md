@@ -1,5 +1,21 @@
 # plain-toolbar changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.4.0) (2025-09-30)
+
+### What's changed
+
+- Renamed `ToolbarPanel` to `ToolbarItem` and `register_toolbar_panel` to `register_toolbar_item` for better clarity ([79654db](https://github.com/dropseed/plain/commit/79654dbefe))
+- The toolbar now receives the full template context instead of just the request, allowing toolbar items to access context variables like `object` ([821bfc6](https://github.com/dropseed/plain/commit/821bfc6fab))
+- Removed admin URL link from the request panel to reduce clutter ([5e665fd](https://github.com/dropseed/plain/commit/5e665fd4ca))
+- Admin link and impersonation UI moved to a new AdminToolbarItem button ([821bfc6](https://github.com/dropseed/plain/commit/821bfc6fab))
+
+### Upgrade instructions
+
+- Replace any usage of `ToolbarPanel` with `ToolbarItem` in your custom toolbar extensions
+- Replace any usage of `@register_toolbar_panel` decorator with `@register_toolbar_item`
+- Update any custom toolbar items to expect `context` instead of `request` in `__init__()`: change `def __init__(self, request)` to `def __init__(self, context)` and add `self.request = context["request"]`
+- The `panel_template_name` attribute replaces `template_name` (though `template_name` still works for backward compatibility)
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.3.0) (2025-09-25)
 
 ### What's changed
