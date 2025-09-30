@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.0) (2025-09-30)
+
+### What's changed
+
+- The toolbar now uses `settings.VERSION` instead of the deprecated `settings.APP_VERSION` ([4c5f216](https://github.com/dropseed/plain/commit/4c5f2166c1))
+
+### Upgrade instructions
+
+- If you were accessing `settings.APP_VERSION` in any toolbar customizations, update to use `settings.VERSION` instead
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.4.0) (2025-09-30)
 
 ### What's changed
