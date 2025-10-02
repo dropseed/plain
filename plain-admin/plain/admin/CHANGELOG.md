@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.49.0](https://github.com/dropseed/plain/releases/plain-admin@0.49.0) (2025-10-02)
+
+### What's changed
+
+- Impersonation now uses a request-scoped storage pattern instead of request attributes, making it compatible with middleware that doesn't use `plain.auth.middleware.AuthenticationMiddleware` ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+- Added `get_request_impersonator()` helper function to safely retrieve the impersonator from any request context ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+- The admin toolbar now uses the new request helpers to display impersonation status correctly ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+
+### Upgrade instructions
+
+- If you were accessing `request.impersonator` directly in your code, update to use `from plain.admin.impersonate import get_request_impersonator` and call `get_request_impersonator(request)` instead
+
 ## [0.48.0](https://github.com/dropseed/plain/releases/plain-admin@0.48.0) (2025-09-30)
 
 ### What's changed
