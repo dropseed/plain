@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.10.2](https://github.com/dropseed/plain/releases/plain-htmx@0.10.2) (2025-10-02)
+
+### What's changed
+
+- Fixed documentation examples to use `self.user` instead of `self.request.user` ([f6278d9](https://github.com/dropseed/plain/commit/f6278d9bb4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.1](https://github.com/dropseed/plain/releases/plain-htmx@0.10.1) (2025-09-09)
 
 ### What's changed
