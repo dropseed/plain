@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.32.1](https://github.com/dropseed/plain/releases/plain-sessions@0.32.1) (2025-10-02)
+
+### What's changed
+
+- Documentation examples have been updated to reflect the new session access patterns introduced in 0.32.0 ([f6278d9](https://github.com/dropseed/plain/commit/f6278d9bb4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.32.0](https://github.com/dropseed/plain/releases/plain-sessions@0.32.0) (2025-10-02)
 
 ### What's changed
