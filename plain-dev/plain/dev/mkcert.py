@@ -4,15 +4,16 @@ import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 import click
 
 
 class MkcertManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.mkcert_bin = None
 
-    def setup_mkcert(self, install_path):
+    def setup_mkcert(self, install_path: Path) -> None:
         """Set up mkcert by checking if it's installed or downloading the binary and installing the local CA."""
         if mkcert_path := shutil.which("mkcert"):
             # mkcert is already installed somewhere
@@ -59,7 +60,7 @@ class MkcertManager:
             )
             subprocess.run([self.mkcert_bin, "-install"], check=True)
 
-    def is_mkcert_ca_installed(self):
+    def is_mkcert_ca_installed(self) -> bool:
         """Check if mkcert local CA is already installed using mkcert -check."""
         try:
             result = subprocess.run([self.mkcert_bin, "-check"], capture_output=True)
@@ -71,7 +72,7 @@ class MkcertManager:
             click.secho(f"Error checking mkcert CA installation: {e}", fg="red")
             return False
 
-    def generate_certs(self, domain, storage_path):
+    def generate_certs(self, domain: str, storage_path: Path) -> tuple[Path, Path]:
         cert_path = storage_path / f"{domain}-cert.pem"
         key_path = storage_path / f"{domain}-key.pem"
         timestamp_path = storage_path / f"{domain}.timestamp"

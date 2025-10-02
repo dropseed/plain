@@ -1,6 +1,7 @@
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 from .poncho.manager import Manager as PonchoManager
 from .poncho.printer import Printer
@@ -110,7 +111,7 @@ class ProcessManager:
         self.log_path = self.log_dir / f"{self.pid}.log"
         return self.log_path
 
-    def init_poncho(self, print_func) -> PonchoManager:  # noqa: D401
+    def init_poncho(self, print_func: Any) -> PonchoManager:  # noqa: D401
         """Return a :class:`~plain.dev.poncho.manager.Manager` instance."""
         if self.log_path is None:
             self.prepare_log()

@@ -26,7 +26,9 @@ class DevProcess(ProcessManager):
     pidfile = PLAIN_TEMP_PATH / "dev" / "dev.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "run"
 
-    def setup(self, *, port, hostname, log_level):
+    def setup(
+        self, *, port: int | None, hostname: str | None, log_level: str | None
+    ) -> None:
         if not hostname:
             project_name = os.path.basename(
                 os.getcwd()
@@ -112,19 +114,19 @@ class DevProcess(ProcessManager):
 
         self.init_poncho(self.console.out)
 
-    def _find_open_port(self, start_port):
+    def _find_open_port(self, start_port: int) -> int:
         port = start_port
         while not self._port_available(port):
             port += 1
         return port
 
-    def _port_available(self, port):
+    def _port_available(self, port: int) -> bool:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(0.5)
             result = sock.connect_ex(("127.0.0.1", port))
         return result != 0
 
-    def run(self):
+    def run(self) -> int:
         self.write_pidfile()
         mkcert_manager = MkcertManager()
         mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
@@ -181,9 +183,12 @@ class DevProcess(ProcessManager):
 
         return self.poncho.returncode
 
-    def symlink_plain_src(self):
+    def symlink_plain_src(self) -> None:
         """Symlink the plain package into .plain so we can look at it easily"""
-        plain_path = Path(find_spec("plain.runtime").origin).parent.parent
+        spec = find_spec("plain.runtime")
+        if spec is None or spec.origin is None:
+            return None
+        plain_path = Path(spec.origin).parent.parent
         if not PLAIN_TEMP_PATH.exists():
             PLAIN_TEMP_PATH.mkdir()
 
@@ -204,7 +209,7 @@ class DevProcess(ProcessManager):
         if plain_path.exists() and not symlink_path.exists():
             symlink_path.symlink_to(plain_path)
 
-    def modify_hosts_file(self):
+    def modify_hosts_file(self) -> None:
         """Modify the hosts file to map the custom domain to 127.0.0.1."""
         entry_identifier = "# Added by plain"
         hosts_entry = f"127.0.0.1 {self.hostname}  {entry_identifier}"
@@ -259,14 +264,14 @@ class DevProcess(ProcessManager):
                 )
                 sys.exit(1)
 
-    def run_preflight(self):
+    def run_preflight(self) -> None:
         if subprocess.run(
             ["plain", "preflight", "check", "--quiet"], env=self.plain_env
         ).returncode:
             click.secho("Preflight check failed!", fg="red")
             sys.exit(1)
 
-    def add_gunicorn(self):
+    def add_gunicorn(self) -> None:
         # Watch .env files for reload
         extra_watch_files = []
         for f in os.listdir(APP_PATH.parent):
@@ -306,7 +311,7 @@ class DevProcess(ProcessManager):
 
         self.poncho.add_process("plain", gunicorn, env=self.plain_env)
 
-    def add_entrypoints(self):
+    def add_entrypoints(self) -> None:
         for entry_point in entry_points().select(group=ENTRYPOINT_GROUP):
             self.poncho.add_process(
                 entry_point.name,
@@ -314,7 +319,7 @@ class DevProcess(ProcessManager):
                 env=self.plain_env,
             )
 
-    def add_pyproject_run(self):
+    def add_pyproject_run(self) -> None:
         """Additional processes that only run during `plain dev`."""
         if not has_pyproject_toml(APP_PATH.parent):
             return

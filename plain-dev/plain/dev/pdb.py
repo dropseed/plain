@@ -3,19 +3,22 @@ import logging
 import re
 import socket
 import sys
+from collections.abc import Iterator
 from pdb import Pdb
+from types import FrameType
+from typing import Any
 
 log = logging.getLogger(__name__)
 
 
-def cry(message, stderr=sys.__stderr__):
+def cry(message: str, stderr: Any = sys.__stderr__) -> None:
     log.critical(message)
     print(message, file=stderr)
-    stderr.flush()
+    stderr.flush()  # type: ignore[possibly-unbound]
 
 
 class LF2CRLF_FileWrapper:
-    def __init__(self, connection):
+    def __init__(self, connection: socket.socket) -> None:
         self.connection = connection
         self.stream = fh = connection.makefile("rw")
         self.read = fh.read
@@ -30,17 +33,19 @@ class LF2CRLF_FileWrapper:
             self._send = connection.sendall
 
     @property
-    def encoding(self):
+    def encoding(self) -> str | None:
         return self.stream.encoding
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return self.stream.__iter__()
 
-    def write(self, data, nl_rex=re.compile("\r?\n")):
+    def write(self, data: str, nl_rex: re.Pattern[str] = re.compile("\r?\n")) -> None:
         data = nl_rex.sub("\r\n", data)
         self._send(data)
 
-    def writelines(self, lines, nl_rex=re.compile("\r?\n")):
+    def writelines(
+        self, lines: list[str], nl_rex: re.Pattern[str] = re.compile("\r?\n")
+    ) -> None:
         for line in lines:
             self.write(line, nl_rex)
 
@@ -62,7 +67,9 @@ class DevPdb(Pdb):
 
     active_instance = None
 
-    def __init__(self, host, port, patch_stdstreams=False, quiet=False):
+    def __init__(
+        self, host: str, port: int, patch_stdstreams: bool = False, quiet: bool = False
+    ) -> None:
         self._quiet = quiet
         listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
@@ -93,7 +100,7 @@ class DevPdb(Pdb):
                 setattr(sys, name, self.handle)
         DevPdb.active_instance = self
 
-    def __restore(self):
+    def __restore(self) -> None:
         if self.backup and not self._quiet:
             cry(f"Restoring streams: {self.backup} ...")
         for name, fh in self.backup:
@@ -101,13 +108,13 @@ class DevPdb(Pdb):
         self.handle.close()
         DevPdb.active_instance = None
 
-    def do_quit(self, arg):
+    def do_quit(self, arg: str) -> Any:
         self.__restore()
         return Pdb.do_quit(self, arg)
 
     do_q = do_exit = do_quit
 
-    def set_trace(self, frame=None):
+    def set_trace(self, frame: FrameType | None = None) -> None:
         if frame is None:
             frame = sys._getframe().f_back
         try:
@@ -118,8 +125,12 @@ class DevPdb(Pdb):
 
 
 def set_trace(
-    frame=None, host="127.0.0.1", port=4444, patch_stdstreams=False, quiet=False
-):
+    frame: FrameType | None = None,
+    host: str = "127.0.0.1",
+    port: int = 4444,
+    patch_stdstreams: bool = False,
+    quiet: bool = False,
+) -> None:
     """
     Opens a remote PDB over a host:port.
     """

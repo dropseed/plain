@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from .debug import set_breakpoint_hook
 
 
-def setup():
+def setup() -> None:
     # Make sure our clis are registered
     # since this isn't an installed app
     from .cli import cli  # noqa

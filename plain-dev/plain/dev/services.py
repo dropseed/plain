@@ -1,6 +1,7 @@
 import os
 import tomllib
 from pathlib import Path
+from typing import Any
 
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
@@ -13,7 +14,7 @@ class ServicesProcess(ProcessManager):
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "services"
 
     @staticmethod
-    def get_services(root):
+    def get_services(root: str | Path) -> dict[str, Any]:
         if not has_pyproject_toml(root):
             return {}
 
@@ -27,7 +28,7 @@ class ServicesProcess(ProcessManager):
             .get("services", {})
         )
 
-    def run(self):
+    def run(self) -> None:
         self.write_pidfile()
         self.prepare_log()
         self.init_poncho(print)

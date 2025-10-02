@@ -15,7 +15,7 @@ class AliasManager:
     ALIAS_NAME = "p"
 
     @cached_property
-    def shell(self):
+    def shell(self) -> str | None:
         """Detect the current shell."""
         shell = os.environ.get("SHELL", "")
         if "zsh" in shell:
@@ -27,7 +27,7 @@ class AliasManager:
         return None
 
     @cached_property
-    def shell_config_file(self):
+    def shell_config_file(self) -> Path | None:
         """Get the appropriate shell configuration file."""
         home = Path.home()
 
@@ -43,7 +43,7 @@ class AliasManager:
 
         return None
 
-    def _command_exists(self, command):
+    def _command_exists(self, command: str) -> bool:
         """Check if a command exists in the system."""
         try:
             result = subprocess.run(
@@ -53,7 +53,7 @@ class AliasManager:
         except Exception:
             return False
 
-    def _alias_exists(self):
+    def _alias_exists(self) -> bool:
         """Check if the 'p' alias already exists."""
         # First check if 'p' is already a command
         if self._command_exists(self.ALIAS_NAME):
@@ -73,7 +73,7 @@ class AliasManager:
         except (subprocess.TimeoutExpired, Exception):
             return False
 
-    def _add_alias_to_shell(self):
+    def _add_alias_to_shell(self) -> bool:
         """Add the alias to the shell configuration file."""
         if not self.shell_config_file or not self.shell_config_file.exists():
             return False
@@ -106,7 +106,7 @@ class AliasManager:
             )
             return False
 
-    def check_and_prompt(self):
+    def check_and_prompt(self) -> None:
         """Check if alias exists and prompt user to set it up if needed."""
         # Only suggest if project uses uv (has uv.lock file)
         if not Path("uv.lock").exists():

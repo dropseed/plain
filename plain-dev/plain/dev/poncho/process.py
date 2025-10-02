@@ -2,6 +2,8 @@ import datetime
 import os
 import signal
 import subprocess
+from queue import Queue
+from typing import Any
 
 from .compat import ON_WINDOWS
 from .printer import Message
@@ -14,7 +16,15 @@ class Process:
     lifecycle events and output to a queue.
     """
 
-    def __init__(self, cmd, name=None, color=None, quiet=False, env=None, cwd=None):
+    def __init__(
+        self,
+        cmd: str,
+        name: str | None = None,
+        color: str | None = None,
+        quiet: bool = False,
+        env: dict[str, str] | None = None,
+        cwd: str | None = None,
+    ) -> None:
         self.cmd = cmd
         self.color = color
         self.quiet = quiet
@@ -26,7 +36,9 @@ class Process:
         self._child = None
         self._child_ctor = Popen
 
-    def run(self, events=None, ignore_signals=False):
+    def run(
+        self, events: Queue[Message] | None = None, ignore_signals: bool = False
+    ) -> None:
         self._events = events
         self._child = self._child_ctor(self.cmd, env=self.env, cwd=self.cwd)
         self._send_message({"pid": self._child.pid}, type="start")
@@ -46,7 +58,7 @@ class Process:
 
         self._send_message({"returncode": self._child.returncode}, type="stop")
 
-    def _send_message(self, data, type="line"):
+    def _send_message(self, data: bytes | dict[str, Any], type: str = "line") -> None:
         if self._events is not None:
             self._events.put(
                 Message(
@@ -60,7 +72,7 @@ class Process:
 
 
 class Popen(subprocess.Popen):
-    def __init__(self, cmd, **kwargs):
+    def __init__(self, cmd: str, **kwargs: Any) -> None:
         start_new_session = kwargs.pop("start_new_session", True)
         options = {
             "stdout": subprocess.PIPE,

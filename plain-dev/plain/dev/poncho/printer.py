@@ -1,6 +1,7 @@
 import re
 from collections import namedtuple
 from pathlib import Path
+from typing import Any
 
 Message = namedtuple("Message", "type data time name color")
 
@@ -14,13 +15,13 @@ class Printer:
 
     def __init__(
         self,
-        print_func,
-        time_format="%H:%M:%S",
-        width=0,
-        color=True,
-        prefix=True,
-        log_file=None,
-    ):
+        print_func: Any,
+        time_format: str = "%H:%M:%S",
+        width: int = 0,
+        color: bool = True,
+        prefix: bool = True,
+        log_file: Path | str | None = None,
+    ) -> None:
         self.print_func = print_func
         self.time_format = time_format
         self.width = width
@@ -33,7 +34,7 @@ class Printer:
         else:
             self.log_file = None
 
-    def write(self, message):
+    def write(self, message: Message) -> None:
         if message.type != "line":
             raise RuntimeError('Printer can only process messages of type "line"')
 
@@ -72,13 +73,13 @@ class Printer:
                 self.log_file.write(plain + "\n")
                 self.log_file.flush()
 
-    def close(self):
+    def close(self) -> None:
         if self.log_file and hasattr(self.log_file, "close"):
             self.log_file.close()
 
 
-def _color_string(color, s):
-    def _ansi(code):
+def _color_string(color: str, s: str) -> str:
+    def _ansi(code: str | int) -> str:
         return f"\033[{code}m"
 
     return f"{_ansi(0)}{_ansi(color)}{s}{_ansi(0)}"

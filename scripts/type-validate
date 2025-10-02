@@ -19,6 +19,7 @@ FULLY_TYPED_DIRS = [
     "plain-auth/plain/auth",
     "plain-cache/plain/cache",
     "plain-code/plain/code",
+    "plain-dev/plain/dev",
     "plain-sessions/plain/sessions",
 ]
 

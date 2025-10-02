@@ -2,6 +2,7 @@ import datetime
 import multiprocessing
 import queue
 import signal
+from types import FrameType
 
 from .color import get_colors
 from .compat import ProcessManager
@@ -45,7 +46,7 @@ class Manager:
     #: this will contain a return code that can be used with `sys.exit`.
     returncode = None
 
-    def __init__(self, printer=None):
+    def __init__(self, printer: Printer | None = None) -> None:
         self.events = multiprocessing.Queue()
         self.returncode = None
 
@@ -61,7 +62,14 @@ class Manager:
 
         self._terminating = False
 
-    def add_process(self, name, cmd, quiet=False, env=None, cwd=None):
+    def add_process(
+        self,
+        name: str,
+        cmd: str,
+        quiet: bool = False,
+        env: dict[str, str] | None = None,
+        cwd: str | None = None,
+    ) -> Process:
         """
         Add a process to this manager instance. The process will not be started
         until :func:`~poncho.manager.Manager.loop` is called.
@@ -82,13 +90,13 @@ class Manager:
 
         return proc
 
-    def num_processes(self):
+    def num_processes(self) -> int:
         """
         Return the number of processes managed by this instance.
         """
         return len(self._processes)
 
-    def loop(self):
+    def loop(self) -> None:
         """
         Start all the added processes and multiplex their output onto the bound
         printer (which by default will print to STDOUT).
@@ -99,7 +107,7 @@ class Manager:
         This method will block until all the processes have terminated.
         """
 
-        def _terminate(signum, frame):
+        def _terminate(signum: int, frame: FrameType | None) -> None:
             self._system_print("{} received\n".format(SIGNALS[signum]["name"]))
             self.returncode = SIGNALS[signum]["rc"]
             self.terminate()
@@ -149,7 +157,7 @@ class Manager:
                 if waiting > datetime.timedelta(seconds=KILL_WAIT):
                     self.kill()
 
-    def terminate(self):
+    def terminate(self) -> None:
         """
         Terminate all processes managed by this ProcessManager.
         """
@@ -158,13 +166,13 @@ class Manager:
         self._terminating = True
         self._killall()
 
-    def kill(self):
+    def kill(self) -> None:
         """
         Kill all processes managed by this ProcessManager.
         """
         self._killall(force=True)
 
-    def _killall(self, force=False):
+    def _killall(self, force: bool = False) -> None:
         """Kill all remaining processes, forcefully if requested."""
         for_termination = []
 
@@ -183,26 +191,26 @@ class Manager:
             else:
                 self._procmgr.terminate(p["pid"])
 
-    def _start_process(self, name):
+    def _start_process(self, name: str) -> None:
         p = self._processes[name]
         p["process"] = multiprocessing.Process(
             name=name, target=p["obj"].run, args=(self.events, True)
         )
         p["process"].start()
 
-    def _is_running(self):
+    def _is_running(self) -> bool:
         return any(p.get("pid") is not None for _, p in self._processes.items())
 
-    def _all_started(self):
+    def _all_started(self) -> bool:
         return all(p.get("pid") is not None for _, p in self._processes.items())
 
-    def _all_stopped(self):
+    def _all_stopped(self) -> bool:
         return all(p.get("returncode") is not None for _, p in self._processes.items())
 
-    def _any_stopped(self):
+    def _any_stopped(self) -> bool:
         return any(p.get("returncode") is not None for _, p in self._processes.items())
 
-    def _system_print(self, data):
+    def _system_print(self, data: str) -> None:
         self._printer.write(
             Message(
                 type="line",

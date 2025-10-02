@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 ANSI_COLOURS = ["grey", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
 
 for i, name in enumerate(ANSI_COLOURS):
@@ -5,7 +7,7 @@ for i, name in enumerate(ANSI_COLOURS):
     globals()["intense_" + name] = str(30 + i) + ";1"
 
 
-def get_colors():
+def get_colors() -> Iterator[str]:
     cs = [
         "cyan",
         "yellow",

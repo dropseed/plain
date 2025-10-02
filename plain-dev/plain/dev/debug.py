@@ -7,7 +7,7 @@ from pathlib import Path
 from . import pdb
 
 
-def set_breakpoint_hook():
+def set_breakpoint_hook() -> None:
     """
     If a `plain dev` process is running, set a
     breakpoint hook to trigger a remote debugger.
@@ -18,7 +18,7 @@ def set_breakpoint_hook():
         # we're in a process managed by `plain dev`
         return
 
-    def _breakpoint():
+    def _breakpoint() -> None:
         system = platform.system()
 
         if system == "Darwin":
@@ -38,4 +38,4 @@ def set_breakpoint_hook():
             frame=sys._getframe().f_back,
         )
 
-    sys.breakpointhook = _breakpoint
+    sys.breakpointhook = _breakpoint  # type: ignore[assignment]

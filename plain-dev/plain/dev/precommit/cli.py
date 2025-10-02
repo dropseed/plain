@@ -11,7 +11,7 @@ from plain.cli import register_cli
 from plain.cli.print import print_event
 
 
-def install_git_hook():
+def install_git_hook() -> None:
     hook_path = os.path.join(".git", "hooks", "pre-commit")
     if os.path.exists(hook_path):
         print("pre-commit hook already exists")
@@ -28,7 +28,7 @@ plain pre-commit"""
 @register_cli("pre-commit")
 @click.command()
 @click.option("--install", is_flag=True)
-def cli(install):
+def cli(install: bool) -> None:
     """Git pre-commit checks"""
     if install:
         install_git_hook()
@@ -96,7 +96,7 @@ def cli(install):
             sys.exit(result.returncode)
 
 
-def plain_db_connected():
+def plain_db_connected() -> bool:
     result = subprocess.run(
         [
             "plain",
@@ -109,7 +109,7 @@ def plain_db_connected():
     return result.returncode == 0
 
 
-def check_short(message, *args):
+def check_short(message: str, *args: str) -> None:
     print_event(message, newline=False)
     result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if result.returncode != 0:

@@ -17,7 +17,7 @@ from plain.cli import register_cli
     "--all", "all_packages", is_flag=True, help="Link all installed plain packages"
 )
 @click.argument("packages", nargs=-1)
-def cli(packages, repo, reset, all_packages):
+def cli(packages: tuple[str, ...], repo: str, reset: bool, all_packages: bool) -> None:
     """Contribute to plain by linking packages locally."""
 
     if reset:
@@ -35,11 +35,11 @@ def cli(packages, repo, reset, all_packages):
 
         return
 
-    packages = list(packages)
+    packages_list = list(packages)
 
-    repo = Path(repo)
-    if not repo.exists():
-        click.secho(f"Repo not found at {repo}", fg="red")
+    repo_path = Path(repo)
+    if not repo_path.exists():
+        click.secho(f"Repo not found at {repo_path}", fg="red")
         return
 
     repo_branch = (
@@ -50,12 +50,12 @@ def cli(packages, repo, reset, all_packages):
                 "--abbrev-ref",
                 "HEAD",
             ],
-            cwd=repo,
+            cwd=repo_path,
         )
         .decode()
         .strip()
     )
-    click.secho(f"Using repo at {repo} ({repo_branch} branch)", bold=True)
+    click.secho(f"Using repo at {repo_path} ({repo_branch} branch)", bold=True)
 
     plain_packages = []
     plainx_packages = []
@@ -70,7 +70,7 @@ def cli(packages, repo, reset, all_packages):
             click.secho("No installed packages found", fg="red")
             sys.exit(1)
 
-        packages = []
+        packages_list = []
         for line in installed_packages.splitlines():
             if not line.startswith("plain"):
                 continue
@@ -78,7 +78,7 @@ def cli(packages, repo, reset, all_packages):
             if package.startswith("plainx-"):
                 skipped_plainx_packages.append(package)
             else:
-                packages.append(package)
+                packages_list.append(package)
 
         if skipped_plainx_packages:
             click.secho(
@@ -88,13 +88,13 @@ def cli(packages, repo, reset, all_packages):
                 fg="yellow",
             )
 
-    for package in packages:
+    for package in packages_list:
         package = package.replace(".", "-")
-        click.secho(f"Linking {package} to {repo}", bold=True)
+        click.secho(f"Linking {package} to {repo_path}", bold=True)
         if package == "plain" or package.startswith("plain-"):
-            plain_packages.append(str(repo / package))
+            plain_packages.append(str(repo_path / package))
         elif package.startswith("plainx-"):
-            plainx_packages.append(str(repo))
+            plainx_packages.append(str(repo_path))
         else:
             raise click.UsageError(f"Unknown package {package}")
 
