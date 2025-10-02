@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.15.1](https://github.com/dropseed/plain/releases/plain-api@0.15.1) (2025-10-02)
+
+### What's changed
+
+- Updates docs references to `request.user`
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-api@0.15.0) (2025-09-25)
 
 ### What's changed
