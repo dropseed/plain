@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.49.2](https://github.com/dropseed/plain/releases/plain-models@0.49.2) (2025-10-02)
+
+### What's changed
+
+- Updated dependency to use the latest plain package version
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.49.1](https://github.com/dropseed/plain/releases/plain-models@0.49.1) (2025-09-29)
 
 ### What's changed
