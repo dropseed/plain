@@ -1,3 +1,5 @@
+from typing import Any
+
 from plain.toolbar import ToolbarItem, register_toolbar_item
 
 from .impersonate import get_request_impersonator
@@ -9,7 +11,7 @@ class AdminToolbarItem(ToolbarItem):
     name = "Admin"
     button_template_name = "admin/toolbar/button.html"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         # Add admin-specific context for the object if it exists
         if "object" in context:

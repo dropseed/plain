@@ -1,7 +1,8 @@
 import hashlib
+from typing import Any
 
 
-def get_gravatar_url(user):
+def get_gravatar_url(user: Any) -> str | None:
     """Generate gravatar URL for the given user if they have an email address."""
     if not user or not hasattr(user, "email") or not user.email:
         return None

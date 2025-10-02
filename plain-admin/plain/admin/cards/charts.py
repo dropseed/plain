@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Any
 
 from plain.admin.dates import DatetimeRangeAliases
 from plain.models import Count
@@ -13,7 +14,7 @@ from .base import Card
 class ChartCard(Card):
     template_name = "admin/cards/chart.html"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         context["chart_data"] = self.get_chart_data()
         return context
@@ -34,16 +35,16 @@ class TrendCard(ChartCard):
 
     displays = DatetimeRangeAliases
 
-    def get_description(self):
+    def get_description(self) -> str:
         datetime_range = DatetimeRangeAliases.to_range(self.get_current_display())
         return f"{datetime_range.start} to {datetime_range.end}"
 
-    def get_current_display(self):
+    def get_current_display(self) -> DatetimeRangeAliases:
         if s := super().get_current_display():
             return DatetimeRangeAliases.from_value(s)
         return self.default_display
 
-    def get_trend_data(self) -> list[int | float]:
+    def get_trend_data(self) -> dict[str, int]:
         if not self.model or not self.datetime_field:
             raise NotImplementedError(
                 "model and datetime_field must be set, or get_values must be overridden"
@@ -80,7 +81,7 @@ class TrendCard(ChartCard):
         trend_labels = list(data.keys())
         trend_data = list(data.values())
 
-        def calculate_trend_line(data):
+        def calculate_trend_line(data: list[int | float]) -> list[int | float]:
             """
             Calculate a trend line using basic linear regression.
             :param data: A list of numeric values representing the y-axis.

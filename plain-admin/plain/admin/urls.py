@@ -1,4 +1,6 @@
-from plain.http import ResponseRedirect
+from typing import Any
+
+from plain.http import Response, ResponseRedirect
 from plain.urls import Router, include, path
 
 from .impersonate.urls import ImpersonateRouter
@@ -10,7 +12,7 @@ class AdminIndexView(AdminView):
     template_name = "admin/index.html"
     title = "Dashboard"
 
-    def get(self):
+    def get(self) -> Response:
         # Slight hack to redirect to the first view that doesn't
         # require any url params...
         if views := registry.get_searchable_views():
@@ -23,7 +25,7 @@ class AdminSearchView(AdminView):
     template_name = "admin/search.html"
     title = "Search"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         context["searchable_views"] = registry.get_searchable_views()
         context["global_search_query"] = self.request.query_params.get("query", "")

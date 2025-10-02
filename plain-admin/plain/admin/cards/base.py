@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 
 from plain.http import Request
 from plain.templates import Template
@@ -31,7 +32,7 @@ class Card:
     view: View
     request: Request
 
-    def render(self, view, request):
+    def render(self, view: View, request: Request) -> str:
         self.view = view
         self.request = request
         return Template(self.template_name).render(self.get_template_context())
@@ -40,7 +41,7 @@ class Card:
     def view_name(cls) -> str:
         return f"card_{cls.get_slug()}"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = {}
 
         context["size"] = self.size

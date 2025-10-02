@@ -1,6 +1,9 @@
+from collections.abc import Callable
+from typing import Any
+
 from plain.auth import get_user_model
 from plain.auth.requests import get_request_user, set_request_user
-from plain.http import ResponseForbidden
+from plain.http import Request, Response, ResponseForbidden
 from plain.sessions import get_request_session
 
 from .constants import IMPERSONATE_SESSION_KEY
@@ -8,7 +11,7 @@ from .permissions import can_be_impersonator, can_impersonate_user
 from .requests import set_request_impersonator
 
 
-def get_user_by_id(id):
+def get_user_by_id(id: int) -> Any | None:
     UserModel = get_user_model()
 
     try:
@@ -18,10 +21,10 @@ def get_user_by_id(id):
 
 
 class ImpersonateMiddleware:
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable[[Request], Response]):
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: Request) -> Response:
         session = get_request_session(request)
         user = get_request_user(request)
 

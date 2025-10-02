@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 from calendar import monthrange
+from collections.abc import Iterator
 from enum import Enum
 
 from plain.utils import timezone
@@ -38,11 +39,11 @@ class DatetimeRangeAliases(Enum):
     # TODO doesn't include anything less than a day...
     # ex. SINCE_1_HOUR_AGO = "Since 1 Hour Ago"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
     @classmethod
-    def from_value(cls, value):
+    def from_value(cls, value: str) -> DatetimeRangeAliases:
         for member in cls:
             if member.value == value:
                 return member
@@ -61,18 +62,18 @@ class DatetimeRangeAliases(Enum):
         )
         start_of_year = start_of_today.replace(month=1, day=1)
 
-        def end_of_day(dt):
+        def end_of_day(dt: datetime.datetime) -> datetime.datetime:
             return dt.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        def end_of_month(dt):
+        def end_of_month(dt: datetime.datetime) -> datetime.datetime:
             last_day = monthrange(dt.year, dt.month)[1]
             return end_of_day(dt.replace(day=last_day))
 
-        def end_of_quarter(dt):
+        def end_of_quarter(dt: datetime.datetime) -> datetime.datetime:
             end_month = ((dt.month - 1) // 3 + 1) * 3
             return end_of_month(dt.replace(month=end_month))
 
-        def end_of_year(dt):
+        def end_of_year(dt: datetime.datetime) -> datetime.datetime:
             return end_of_month(dt.replace(month=12))
 
         if value == cls.TODAY:
@@ -156,7 +157,11 @@ class DatetimeRangeAliases(Enum):
 
 
 class DatetimeRange:
-    def __init__(self, start, end):
+    def __init__(
+        self,
+        start: datetime.datetime | datetime.date | str,
+        end: datetime.datetime | datetime.date | str,
+    ):
         self.start = start
         self.end = end
 
@@ -180,20 +185,20 @@ class DatetimeRange:
                 year=self.end.year, month=self.end.month, day=self.end.day
             )
 
-    def as_tuple(self):
+    def as_tuple(self) -> tuple[datetime.datetime, datetime.datetime]:
         return (self.start, self.end)
 
-    def total_days(self):
+    def total_days(self) -> int:
         return (self.end - self.start).days
 
-    def iter_days(self):
+    def iter_days(self) -> Iterator[datetime.date]:
         """Yields each day in the range."""
         return iter(
             self.start.date() + datetime.timedelta(days=i)
             for i in range(0, self.total_days())
         )
 
-    def iter_weeks(self):
+    def iter_weeks(self) -> Iterator[datetime.datetime]:
         """Yields the start of each week in the range."""
         current = self.start - datetime.timedelta(days=self.start.weekday())
         current = current.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -202,7 +207,7 @@ class DatetimeRange:
             yield current
             current = next_week
 
-    def iter_months(self):
+    def iter_months(self) -> Iterator[datetime.datetime]:
         """Yields the start of each month in the range."""
         current = self.start.replace(day=1)
         current = current.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -214,7 +219,7 @@ class DatetimeRange:
             yield current
             current = next_month
 
-    def iter_quarters(self):
+    def iter_quarters(self) -> Iterator[datetime.datetime]:
         """Yields the start of each quarter in the range."""
         current = self.start.replace(month=((self.start.month - 1) // 3) * 3 + 1, day=1)
         current = current.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -231,7 +236,7 @@ class DatetimeRange:
             yield current
             current = next_quarter
 
-    def iter_years(self):
+    def iter_years(self) -> Iterator[datetime.datetime]:
         """Yields the start of each year in the range."""
         current = self.start.replace(month=1, day=1)
         current = current.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -240,17 +245,19 @@ class DatetimeRange:
             yield current
             current = next_year
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"DatetimeRange({self.start}, {self.end})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.start} to {self.end}"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, DatetimeRange):
+            return False
         return self.start == other.start and self.end == other.end
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.start, self.end))
 
-    def __contains__(self, item):
+    def __contains__(self, item: datetime.datetime) -> bool:
         return self.start <= item <= self.end
