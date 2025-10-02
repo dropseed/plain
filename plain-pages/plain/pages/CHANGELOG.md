@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.14.1](https://github.com/dropseed/plain/releases/plain-pages@0.14.1) (2025-10-02)
+
+### What's changed
+
+- Fixed documentation example to use `get_current_user()` instead of `request.user` ([f6278d9](https://github.com/dropseed/plain/commit/f6278d9bb4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-pages@0.14.0) (2025-09-30)
 
 ### What's changed
