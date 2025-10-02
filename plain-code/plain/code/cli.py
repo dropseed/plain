@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -15,7 +18,7 @@ DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
 
 @register_cli("code")
 @click.group()
-def cli():
+def cli() -> None:
     """Code formatting and linting"""
     pass
 
@@ -23,7 +26,7 @@ def cli():
 @cli.command()
 @click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
-def install(ctx, force):
+def install(ctx: click.Context, force: bool) -> None:
     """Install or update the Biome standalone per configuration."""
     config = get_code_config()
 
@@ -50,7 +53,7 @@ def install(ctx, force):
 
 
 @cli.command()
-def update():
+def update() -> None:
     """Update the Biome standalone binary to the latest release."""
     config = get_code_config()
 
@@ -67,7 +70,7 @@ def update():
 @cli.command()
 @click.pass_context
 @click.argument("path", default=".")
-def check(ctx, path):
+def check(ctx: click.Context, path: str) -> None:
     """Check the given path for formatting or linting issues."""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
@@ -103,7 +106,7 @@ def check(ctx, path):
 @click.argument("path", default=".")
 @click.option("--unsafe-fixes", is_flag=True, help="Apply ruff unsafe fixes")
 @click.option("--add-noqa", is_flag=True, help="Add noqa comments to suppress errors")
-def fix(ctx, path, unsafe_fixes, add_noqa):
+def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> None:
     """Lint and format the given path."""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
@@ -153,7 +156,7 @@ def fix(ctx, path, unsafe_fixes, add_noqa):
             sys.exit(result.returncode)
 
 
-def get_code_config():
+def get_code_config() -> dict[str, Any]:
     pyproject = Path("pyproject.toml")
     if not pyproject.exists():
         return {}

@@ -153,7 +153,7 @@ class Biome:
         self.set_version_in_config(v)
         return v
 
-    def invoke(self, *args, cwd=None) -> subprocess.CompletedProcess:
+    def invoke(self, *args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
         # Run the standalone biome binary with given args
         config_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "biome_defaults.json")
