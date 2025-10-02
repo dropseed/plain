@@ -1,5 +1,20 @@
 # plain-sessions changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-sessions@0.32.0) (2025-10-02)
+
+### What's changed
+
+- Session access has been refactored to use explicit functions and mixins instead of attaching directly to the request object ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+- New `get_request_session()` function provides explicit access to sessions in middleware and other contexts
+- New `SessionViewMixin` provides convenient `self.session` property for class-based views
+- New `get_current_session()` template global function for accessing sessions in templates
+
+### Upgrade instructions
+
+- Replace `request.session` with `get_request_session(request)` in middleware or other non-view code
+- In class-based views, inherit from `SessionViewMixin` and use `self.session` instead of `self.request.session`
+- In templates, replace `request.session` with `get_current_session()` if not using views downstream of a `SessionViewMixin`
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-sessions@0.31.0) (2025-09-30)
 
 ### What's changed
