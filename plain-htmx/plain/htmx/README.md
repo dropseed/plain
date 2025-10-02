@@ -202,7 +202,7 @@ Then in the view class, we can define methods for each HTTP method + `plain-hx-a
 class PullRequestDetailView(HTMXViewMixin, DetailView):
     def get_queryset(self):
         # The queryset will apply to all actions on the view, so "permission" logic can be shared
-        return super().get_queryset().filter(users=self.request.user)
+        return super().get_queryset().filter(users=self.user)
 
     # Action handling methods follow this format:
     # htmx_{method}_{action}
@@ -251,7 +251,7 @@ this can basically all be done through standard request and response headers:
 class PullRequestDetailView(HTMXViewMixin, DetailView):
     def get_queryset(self):
         # The queryset will apply to all actions on the view, so "permission" logic can be shared
-        return super().get_queryset().filter(users=self.request.user)
+        return super().get_queryset().filter(users=self.user)
 
     # You can also leave off the "plain-hx-action" attribute and just handle the HTTP method
     def htmx_delete(self):

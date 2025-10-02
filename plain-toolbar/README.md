@@ -31,4 +31,4 @@ Add the toolbar to your base template:
 </html>
 ```
 
-The toolbar will appear when `settings.DEBUG` is True or when `request.user.is_admin` is True.
+The toolbar will appear when `settings.DEBUG` is True or when the authenticated user has `is_admin` set to True.

@@ -20,6 +20,7 @@ Because [Views](/plain/plain/views/README.md) can convert built-in types to resp
 ```python
 # app/api/views.py
 from plain.api.views import APIKeyView, APIView
+from plain.auth import get_request_user, set_request_user
 from plain.http import JsonResponse
 from plain.views.exeptions import ResponseException
 
@@ -33,7 +34,7 @@ class BaseAPIView(APIView, APIKeyView):
         super().use_api_key()
 
         if user := self.api_key.users.first():
-            self.request.user = user
+            set_request_user(self.request, user)
         else:
             raise ResponseException(
                 JsonResponse(
@@ -46,10 +47,11 @@ class BaseAPIView(APIView, APIKeyView):
 # An endpoint that returns the current user
 class UserView(BaseAPIView):
     def get(self):
+        user = get_request_user(self.request)
         return {
-            "uuid": self.request.user.uuid,
-            "username": self.request.user.username,
-            "time_zone": str(self.request.user.time_zone),
+            "uuid": user.uuid,
+            "username": user.username,
+            "time_zone": str(user.time_zone),
         }
 
 
@@ -59,7 +61,7 @@ class PullRequestView(BaseAPIView):
         try:
             pull = (
                 PullRequest.query.all()
-                .visible_to_user(self.request.user)
+                .visible_to_user(get_request_user(self.request))
                 .get(uuid=self.url_kwargs["uuid"])
             )
         except PullRequest.DoesNotExist:
@@ -104,10 +106,12 @@ Handling authentication in the API is pretty straightforward. If you use [API ke
 ```python
 class BaseAPIView(APIView, APIKeyView):
     def use_api_key(self):
+        from plain.auth import set_request_user
+
         super().use_api_key()
 
         if user := self.api_key.users.first():
-            self.request.user = user
+            set_request_user(self.request, user)
         else:
             raise ResponseException(
                 JsonResponse(
@@ -122,10 +126,12 @@ When it comes to authorizing actions, typically you will factor this in to the q
 ```python
 class PullRequestView(BaseAPIView):
     def get(self):
+        from plain.auth import get_request_user
+
         try:
             pull = (
                 PullRequest.query.all()
-                .visible_to_user(self.request.user)
+                .visible_to_user(get_request_user(self.request))
                 .get(uuid=self.url_kwargs["uuid"])
             )
         except PullRequest.DoesNotExist:
@@ -149,9 +155,11 @@ class UserForm(ModelForm):
 
 class UserView(BaseAPIView):
     def patch(self):
+        from plain.auth import get_request_user
+
         form = UserForm(
             request=self.request,
-            instance=self.request.user,
+            instance=get_request_user(self.request),
         )
 
         if form.is_valid():
@@ -174,10 +182,12 @@ Deletes can be handled in the `delete` method of the view. Most of the time this
 ```python
 class PullRequestView(BaseAPIView):
     def delete(self):
+        from plain.auth import get_request_user
+
         try:
             pull = (
                 PullRequest.query.all()
-                .visible_to_user(self.request.user)
+                .visible_to_user(get_request_user(self.request))
                 .get(uuid=self.url_kwargs["uuid"])
             )
         except PullRequest.DoesNotExist:
@@ -229,11 +239,12 @@ user.api_key = APIKey.query.create()
 user.save()
 ```
 
-To use API keys in your views, you can inherit from `APIKeyView` and customize the [`use_api_key`](./views.py#use_api_key) method to set the `request.user` attribute (or any other attribute) to the object associated with the API key.
+To use API keys in your views, you can inherit from `APIKeyView` and customize the [`use_api_key`](./views.py#use_api_key) method to associate the request with a user (or any other object) using `set_request_user()`.
 
 ```python
 # app/api/views.py
 from plain.api.views import APIKeyView, APIView
+from plain.auth import set_request_user
 
 
 class BaseAPIView(APIView, APIKeyView):
@@ -241,7 +252,7 @@ class BaseAPIView(APIView, APIKeyView):
         super().use_api_key()
 
         if user := self.api_key.users.first():
-            self.request.user = user
+            set_request_user(self.request, user)
         else:
             raise ResponseException(
                 JsonResponse(
@@ -292,9 +303,10 @@ class CurrentUserAPIView(BaseAPIView):
         "summary": "Get current user",
     })
     def get(self):
-        if self.request.user:
-            user = self.request.user
-        else:
+        from plain.auth import get_request_user
+
+        user = get_request_user(self.request)
+        if not user:
             raise Http404
 
         return schemas.UserSchema.from_user(user, self.request)
@@ -325,9 +337,10 @@ class TeamAccountAPIView(BaseAPIView):
                     team__organization=self.organization, uuid=self.url_kwargs["uuid"]
                 )
 
-            if self.request.user:
+            user = get_request_user(self.request)
+            if user:
                 return TeamAccount.query.get(
-                    team__organization__in=self.request.user.organizations.all(),
+                    team__organization__in=user.organizations.all(),
                     uuid=self.url_kwargs["uuid"],
                 )
         except TeamAccount.DoesNotExist:

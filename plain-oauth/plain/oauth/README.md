@@ -182,11 +182,11 @@ Here's an very basic example:
 {% extends "base.html" %}
 
 {% block content %}
-Hello {{ request.user }}!
+Hello {{ get_current_user() }}!
 
 <h2>Existing connections</h2>
 <ul>
-    {% for connection in request.user.oauth_connections.all %}
+    {% for connection in get_current_user().oauth_connections.all %}
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         <form action="{% url 'oauth:disconnect' connection.provider_key %}" method="post">

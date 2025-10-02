@@ -20,28 +20,38 @@ Sessions are implemented as a dictionary-like object that automatically handles 
 
 ## Basic usage
 
-Sessions are automatically available on request objects when the middleware is installed. You can use `request.session` like a standard Python dictionary:
+In views that inherit from `SessionViewMixin`, you can use `self.session` like a standard Python dictionary:
 
 ```python
+from plain.sessions.views import SessionViewMixin
 from plain.views import View
 
-class MyView(View):
+class MyView(SessionViewMixin, View):
     def get(self):
         # Store values in the session
-        self.request.session['username'] = 'jane'
-        self.request.session['cart_items'] = [1, 2, 3]
+        self.session['username'] = 'jane'
+        self.session['cart_items'] = [1, 2, 3]
 
         # Retrieve values from the session
-        username = self.request.session.get('username')
-        cart_items = self.request.session.get('cart_items', [])
+        username = self.session.get('username')
+        cart_items = self.session.get('cart_items', [])
 
         # Check if a key exists
-        if 'username' in self.request.session:
+        if 'username' in self.session:
             # User has a session
             pass
 
         # Delete values from the session
-        del self.request.session['cart_items']
+        del self.session['cart_items']
+```
+
+Outside of views, you can use `get_request_session()`:
+
+```python
+from plain.sessions import get_request_session
+
+session = get_request_session(request)
+session['key'] = 'value'
 ```
 
 The session data is automatically saved when you set or delete values. Sessions are stored in the database using the [`Session`](./models.py#Session) model.
@@ -89,8 +99,13 @@ The [`SessionStore`](./core.py#SessionStore) class provides additional methods f
 To completely remove the current session data and regenerate the session key:
 
 ```python
-# Delete all session data and get a new session key
-request.session.flush()
+# In a view with SessionViewMixin
+self.session.flush()
+
+# Outside a view
+from plain.sessions import get_request_session
+session = get_request_session(request)
+session.flush()
 ```
 
 ### Cycling session keys
@@ -98,14 +113,27 @@ request.session.flush()
 To create a new session key while retaining the current session data (useful for security purposes):
 
 ```python
-# Keep the data but change the session key
-request.session.cycle_key()
+# In a view with SessionViewMixin
+self.session.cycle_key()
+
+# Outside a view
+from plain.sessions import get_request_session
+session = get_request_session(request)
+session.cycle_key()
 ```
 
 ### Checking if session is empty
 
 ```python
-if request.session.is_empty():
+# In a view with SessionViewMixin
+if self.session.is_empty():
+    # No session data exists
+    pass
+
+# Outside a view
+from plain.sessions import get_request_session
+session = get_request_session(request)
+if session.is_empty():
     # No session data exists
     pass
 ```

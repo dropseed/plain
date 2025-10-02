@@ -37,7 +37,7 @@ class FooEnabled(Flag):
 Use flags in HTML templates:
 
 ```html
-{% if flags.FooEnabled(request.user) %}
+{% if flags.FooEnabled(get_current_user()) %}
     <p>Foo is enabled for you!</p>
 {% else %}
     <p>Foo is disabled for you.</p>

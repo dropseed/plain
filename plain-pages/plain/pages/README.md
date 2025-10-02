@@ -56,7 +56,7 @@ title: Features
 ---
 
 <h1>{{ page.title }}</h1>
-<p>Current user: {{ request.user }}</p>
+<p>Current user: {{ get_current_user() }}</p>
 ```
 
 ### Markdown pages

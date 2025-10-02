@@ -17,8 +17,11 @@ The `plain.auth` package provides user authentication and authorization for Plai
 
 ```python
 # In a view
-if request.user:
-    print(f"Hello, {request.user.email}!")
+from plain.auth import get_request_user
+
+user = get_request_user(request)
+if user:
+    print(f"Hello, {user.email}!")
 else:
     print("You are not logged in.")
 ```
@@ -33,7 +36,7 @@ class ProfileView(AuthViewMixin, View):
     login_required = True
 
     def get(self):
-        return f"Welcome, {self.request.user.email}!"
+        return f"Welcome, {self.user.email}!"
 ```
 
 ## Authentication setup
@@ -108,23 +111,24 @@ urlpatterns = [
 
 ## Checking if a user is logged in
 
-A `request.user` will either be `None` or point to an instance of your `AUTH_USER_MODEL`.
-
-In templates:
+In templates, use the `get_current_user()` function:
 
 ```html
-{% if request.user %}
-    <p>Hello, {{ request.user.email }}!</p>
+{% if get_current_user() %}
+    <p>Hello, {{ get_current_user().email }}!</p>
 {% else %}
     <p>You are not logged in.</p>
 {% endif %}
 ```
 
-In Python code:
+In Python code, use `get_request_user()`:
 
 ```python
-if request.user:
-    print(f"Hello, {request.user.email}!")
+from plain.auth import get_request_user
+
+user = get_request_user(request)
+if user:
+    print(f"Hello, {user.email}!")
 else:
     print("You are not logged in.")
 ```
@@ -151,7 +155,7 @@ class AdminOnlyView(AuthViewMixin, View):
 class CustomPermissionView(AuthViewMixin, View):
     def check_auth(self):
         super().check_auth()
-        if not self.request.user.is_special:
+        if not self.user.is_special:
             raise PermissionDenied("You're not special!")
 ```
 

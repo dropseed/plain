@@ -181,7 +181,7 @@ class ExampleDetailView(DetailView):
     def get_object(self):
         return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
-            user=self.request.user,  # Limit access
+            user=self.user,  # Limit access
         )
 
 
@@ -199,7 +199,7 @@ class ExampleUpdateView(UpdateView):
     def get_object(self):
         return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
-            user=self.request.user,  # Limit access
+            user=self.user,  # Limit access
         )
 
 
@@ -213,7 +213,7 @@ class ExampleDeleteView(DeleteView):
     def get_object(self):
         return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
-            user=self.request.user,  # Limit access
+            user=self.user,  # Limit access
         )
 
 
@@ -222,7 +222,7 @@ class ExampleListView(ListView):
 
     def get_objects(self):
         return MyObjectClass.query.filter(
-            user=self.request.user,  # Limit access
+            user=self.user,  # Limit access
         )
 ```
 
@@ -241,7 +241,7 @@ from plain.http import Response
 
 class ExampleView(DetailView):
     def get_object(self):
-        if self.request.user.exceeds_rate_limit:
+        if self.user and self.user.exceeds_rate_limit:
             raise ResponseException(
                 Response("Rate limit exceeded", status_code=429)
             )
