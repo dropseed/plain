@@ -1,5 +1,17 @@
 # plain-oauth changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-oauth@0.29.0) (2025-10-02)
+
+### What's changed
+
+- Removed direct access to `request.user` and `request.session` attributes in favor of using `get_request_user()` and `get_request_session()` functions ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+- Removed dependency on `AuthenticationMiddleware` from test settings ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+
+### Upgrade instructions
+
+- If you have custom OAuth providers or views that access `request.user`, update them to use `get_request_user(request)` from `plain.auth`
+- If you have custom OAuth providers that access `request.session`, update them to use `get_request_session(request)` from `plain.sessions`
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-oauth@0.28.0) (2025-09-30)
 
 ### What's changed
