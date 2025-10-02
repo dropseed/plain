@@ -41,7 +41,7 @@ if [ -z "$PKG" ]; then
   exit 1
 fi
 
-NOTES=$(claude --model opus --permission-mode acceptEdits -p "$PROMPT $PKG $VERSION")
+NOTES=$(claude --permission-mode acceptEdits -p "$PROMPT $PKG $VERSION")
 
 echo "\n\n"
 
