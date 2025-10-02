@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-auth@0.20.1) (2025-10-02)
+
+### What's changed
+
+- Updated README documentation to use `get_request_user()` and `get_current_user()` instead of `request.user` ([f6278d9](https://github.com/dropseed/plain/commit/f6278d9bb4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-auth@0.20.0) (2025-10-02)
 
 ### What's changed
