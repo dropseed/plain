@@ -1,24 +1,20 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from weakref import WeakKeyDictionary
 
 if TYPE_CHECKING:
     from plain.http import Request
 
-    from .sessions import get_user_model
-
-    User = get_user_model()
-
-_request_users: WeakKeyDictionary[Request, User | None] = WeakKeyDictionary()
+_request_users: WeakKeyDictionary[Request, Any | None] = WeakKeyDictionary()
 
 
-def set_request_user(request: Request, user: User | None) -> None:
+def set_request_user(request: Request, user: Any | None) -> None:
     """Store the authenticated user for this request."""
     _request_users[request] = user
 
 
-def get_request_user(request: Request) -> User | None:
+def get_request_user(request: Request) -> Any | None:
     """
     Get the authenticated user for this request, if any.
 

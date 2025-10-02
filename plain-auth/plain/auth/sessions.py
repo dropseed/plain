@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import hmac
+from collections.abc import Generator
+from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models import models_registry
@@ -9,18 +13,21 @@ from plain.utils.encoding import force_bytes
 
 from .requests import get_request_user, set_request_user
 
+if TYPE_CHECKING:
+    from plain.http import Request
+
 USER_ID_SESSION_KEY = "_auth_user_id"
 USER_HASH_SESSION_KEY = "_auth_user_hash"
 
 
-def get_session_auth_hash(user):
+def get_session_auth_hash(user: Any) -> str:
     """
     Return an HMAC of the password field.
     """
     return _get_session_auth_hash(user)
 
 
-def update_session_auth_hash(request, user):
+def update_session_auth_hash(request: Request, user: Any) -> None:
     """
     Updating a user's password (for example) logs out all sessions for the user.
 
@@ -36,12 +43,12 @@ def update_session_auth_hash(request, user):
         session[USER_HASH_SESSION_KEY] = get_session_auth_hash(user)
 
 
-def get_session_auth_fallback_hash(user):
+def get_session_auth_fallback_hash(user: Any) -> Generator[str, None, None]:
     for fallback_secret in settings.SECRET_KEY_FALLBACKS:
         yield _get_session_auth_hash(user, secret=fallback_secret)
 
 
-def _get_session_auth_hash(user, secret=None):
+def _get_session_auth_hash(user: Any, secret: str | None = None) -> str:
     key_salt = "plain.auth.get_session_auth_hash"
     return salted_hmac(
         key_salt,
@@ -51,7 +58,7 @@ def _get_session_auth_hash(user, secret=None):
     ).hexdigest()
 
 
-def login(request, user):
+def login(request: Request, user: Any) -> None:
     """
     Persist a user id and a backend in the request. This way a user doesn't
     have to reauthenticate on every request. Note that data set during
@@ -87,7 +94,7 @@ def login(request, user):
     set_request_user(request, user)
 
 
-def logout(request):
+def logout(request: Request) -> None:
     """
     Remove the authenticated user's ID from the request and flush their session
     data.
@@ -99,7 +106,7 @@ def logout(request):
     set_request_user(request, None)
 
 
-def get_user_model():
+def get_user_model() -> type[Any]:
     """
     Return the User model that is active in this project.
     """
@@ -115,7 +122,7 @@ def get_user_model():
         )
 
 
-def get_user(request):
+def get_user(request: Request) -> Any | None:
     """
     Return the user model instance associated with the given request session.
     If no user is retrieved, return None.

@@ -1,8 +1,12 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.urls import NoReverseMatch, reverse
 from plain.utils.functional import Promise
 
 
-def resolve_url(to, *args, **kwargs):
+def resolve_url(to: Any, *args: Any, **kwargs: Any) -> str:
     """
     Return a URL appropriate for the arguments passed.
 

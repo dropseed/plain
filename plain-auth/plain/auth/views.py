@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse, urlunparse
 
 from plain.exceptions import PermissionDenied
@@ -23,13 +23,9 @@ from .utils import resolve_url
 if TYPE_CHECKING:
     from plain.http import Request
 
-    from .sessions import get_user_model
-
-    User = get_user_model()
-
 
 class LoginRequired(Exception):
-    def __init__(self, login_url=None, redirect_field_name="next"):
+    def __init__(self, login_url: str | None = None, redirect_field_name: str = "next"):
         self.login_url = login_url or settings.AUTH_LOGIN_URL
         self.redirect_field_name = redirect_field_name
 
@@ -42,7 +38,7 @@ class AuthViewMixin(SessionViewMixin):
     request: Request
 
     @cached_property
-    def user(self) -> User | None:
+    def user(self) -> Any | None:
         """Get the authenticated user for this request."""
         from .requests import get_request_user
 
@@ -116,12 +112,14 @@ class AuthViewMixin(SessionViewMixin):
 
 
 class LogoutView(View):
-    def post(self):
+    def post(self) -> ResponseRedirect:
         logout(self.request)
         return ResponseRedirect("/")
 
 
-def redirect_to_login(next, login_url=None, redirect_field_name="next"):
+def redirect_to_login(
+    next: str, login_url: str | None = None, redirect_field_name: str = "next"
+) -> ResponseRedirect:
     """
     Redirect the user to the login page, passing the given 'next' page.
     """
@@ -133,4 +131,4 @@ def redirect_to_login(next, login_url=None, redirect_field_name="next"):
         querystring[redirect_field_name] = next
         login_url_parts[4] = querystring.urlencode(safe="/")
 
-    return ResponseRedirect(urlunparse(login_url_parts))
+    return ResponseRedirect(str(urlunparse(login_url_parts)))
