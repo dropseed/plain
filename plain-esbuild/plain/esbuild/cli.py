@@ -11,13 +11,13 @@ from .core import esbuild, get_esbuilt_path
 
 @register_cli("esbuild")
 @click.group("esbuild")
-def cli():
+def cli() -> None:
     pass
 
 
 @cli.command()
 @click.option("--minify", is_flag=True, default=True)
-def build(minify):
+def build(minify: bool) -> None:
     returncode = 0
     for asset in iter_assets():
         if ".esbuild." in asset.absolute_path:
@@ -35,14 +35,14 @@ def build(minify):
 
 @cli.command()
 @click.pass_context
-def dev(ctx):
+def dev(ctx: click.Context) -> None:
     # Do an initial build of the assets
     ctx.invoke(build, minify=False)
 
     asset_dirs = list(iter_asset_dirs())
 
     class EsbuildFilter(DefaultFilter):
-        def __call__(self, change, path):
+        def __call__(self, change: Change, path: str) -> bool:
             return super().__call__(change, path) and ".esbuild." in path
 
     print("Watching for changes in .esbuild. asset files...")

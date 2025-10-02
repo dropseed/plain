@@ -2,7 +2,7 @@ import os
 import subprocess
 
 
-def esbuild(input_path, output_path, *, minify=True):
+def esbuild(input_path: str, output_path: str, *, minify: bool = True) -> bool:
     # Ensure the directory for the output file exists
     output_dir = os.path.dirname(output_path)
     if not os.path.exists(output_dir):
@@ -28,7 +28,7 @@ def esbuild(input_path, output_path, *, minify=True):
     return result.returncode == 0
 
 
-def get_esbuilt_path(input_path):
+def get_esbuilt_path(input_path: str) -> str:
     # Rename .esbuild. to .esbuilt. in the output filename
     base_name = os.path.basename(input_path)
     base_name = base_name.replace(".esbuild.", ".esbuilt.")
