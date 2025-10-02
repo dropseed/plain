@@ -2,19 +2,25 @@
 Email backend that writes messages to console instead of sending them.
 """
 
+from __future__ import annotations
+
 import sys
 import threading
+from typing import TYPE_CHECKING, Any
 
 from .base import BaseEmailBackend
 
+if TYPE_CHECKING:
+    from ..message import EmailMessage
+
 
 class EmailBackend(BaseEmailBackend):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.stream = kwargs.pop("stream", sys.stdout)
         self._lock = threading.RLock()
         super().__init__(*args, **kwargs)
 
-    def write_message(self, message):
+    def write_message(self, message: EmailMessage) -> None:
         msg = message.message()
         msg_data = msg.as_bytes()
         charset = (
@@ -25,10 +31,10 @@ class EmailBackend(BaseEmailBackend):
         self.stream.write("-" * 79)
         self.stream.write("\n")
 
-    def send_messages(self, email_messages):
+    def send_messages(self, email_messages: list[EmailMessage]) -> int:
         """Write all messages to the stream in a thread-safe way."""
         if not email_messages:
-            return
+            return 0
         msg_count = 0
         with self._lock:
             try:

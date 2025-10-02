@@ -1,5 +1,14 @@
 """Base email backend class."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from ..message import EmailMessage
+
 
 class BaseEmailBackend:
     """
@@ -15,10 +24,10 @@ class BaseEmailBackend:
            pass
     """
 
-    def __init__(self, fail_silently=False, **kwargs):
+    def __init__(self, fail_silently: bool = False, **kwargs: Any) -> None:
         self.fail_silently = fail_silently
 
-    def open(self):
+    def open(self) -> None:
         """
         Open a network connection.
 
@@ -37,11 +46,11 @@ class BaseEmailBackend:
         """
         pass
 
-    def close(self):
+    def close(self) -> None:
         """Close a network connection."""
         pass
 
-    def __enter__(self):
+    def __enter__(self) -> BaseEmailBackend:
         try:
             self.open()
         except Exception:
@@ -49,10 +58,15 @@ class BaseEmailBackend:
             raise
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         self.close()
 
-    def send_messages(self, email_messages):
+    def send_messages(self, email_messages: list[EmailMessage]) -> int:
         """
         Send one or more EmailMessage objects and return the number of email
         messages sent.

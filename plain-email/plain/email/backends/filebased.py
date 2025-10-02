@@ -1,16 +1,22 @@
 """Email backend that writes messages to a file."""
 
+from __future__ import annotations
+
 import datetime
 import os
+from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 
 from .console import EmailBackend as ConsoleEmailBackend
 
+if TYPE_CHECKING:
+    from ..message import EmailMessage
+
 
 class EmailBackend(ConsoleEmailBackend):
-    def __init__(self, *args, file_path=None, **kwargs):
+    def __init__(self, *args: Any, file_path: str | None = None, **kwargs: Any) -> None:
         self._fname = None
         if file_path is not None:
             self.file_path = file_path
@@ -38,12 +44,12 @@ class EmailBackend(ConsoleEmailBackend):
         kwargs["stream"] = None
         super().__init__(*args, **kwargs)
 
-    def write_message(self, message):
+    def write_message(self, message: EmailMessage) -> None:
         self.stream.write(message.message().as_bytes() + b"\n")
         self.stream.write(b"-" * 79)
         self.stream.write(b"\n")
 
-    def _get_filename(self):
+    def _get_filename(self) -> str:
         """Return a unique file name."""
         if self._fname is None:
             timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -51,13 +57,13 @@ class EmailBackend(ConsoleEmailBackend):
             self._fname = os.path.join(self.file_path, fname)
         return self._fname
 
-    def open(self):
+    def open(self) -> bool:
         if self.stream is None:
             self.stream = open(self._get_filename(), "ab")
             return True
         return False
 
-    def close(self):
+    def close(self) -> None:
         try:
             if self.stream is not None:
                 self.stream.close()

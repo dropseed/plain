@@ -2,8 +2,15 @@
 Tools for sending email.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
+
+if TYPE_CHECKING:
+    from .backends.base import BaseEmailBackend
 
 from .message import (
     DEFAULT_ATTACHMENT_MIME_TYPE,
@@ -36,7 +43,9 @@ __all__ = [
 ]
 
 
-def get_connection(backend=None, fail_silently=False, **kwds):
+def get_connection(
+    backend: str | None = None, fail_silently: bool = False, **kwds: Any
+) -> BaseEmailBackend:
     """Load an email backend and return an instance of it.
 
     If backend is None (default), use settings.EMAIL_BACKEND.
@@ -49,16 +58,16 @@ def get_connection(backend=None, fail_silently=False, **kwds):
 
 
 def send_mail(
-    subject,
-    message,
-    from_email,
-    recipient_list,
-    fail_silently=False,
-    auth_user=None,
-    auth_password=None,
-    connection=None,
-    html_message=None,
-):
+    subject: str,
+    message: str,
+    from_email: str | None,
+    recipient_list: list[str],
+    fail_silently: bool = False,
+    auth_user: str | None = None,
+    auth_password: str | None = None,
+    connection: BaseEmailBackend | None = None,
+    html_message: str | None = None,
+) -> int:
     """
     Easy wrapper for sending a single message to a recipient list. All members
     of the recipient list will see the other recipients in the 'To' field.
@@ -85,8 +94,12 @@ def send_mail(
 
 
 def send_mass_mail(
-    datatuple, fail_silently=False, auth_user=None, auth_password=None, connection=None
-):
+    datatuple: tuple[tuple[str, str, str, list[str]], ...],
+    fail_silently: bool = False,
+    auth_user: str | None = None,
+    auth_password: str | None = None,
+    connection: BaseEmailBackend | None = None,
+) -> int:
     """
     Given a datatuple of (subject, message, from_email, recipient_list), send
     each message to each recipient list. Return the number of emails sent.

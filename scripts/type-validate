@@ -21,6 +21,7 @@ FULLY_TYPED_DIRS = [
     "plain-code/plain/code",
     "plain-dev/plain/dev",
     "plain-elements/plain/elements",
+    "plain-email/plain/email",
     "plain-sessions/plain/sessions",
 ]
 

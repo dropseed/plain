@@ -1,15 +1,21 @@
 """SMTP email backend class."""
 
+from __future__ import annotations
+
 import smtplib
 import ssl
 import threading
 from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
 from plain.runtime import settings
 
 from ..backends.base import BaseEmailBackend
 from ..message import sanitize_address
 from ..utils import DNS_NAME
+
+if TYPE_CHECKING:
+    from ..message import EmailMessage
 
 
 class EmailBackend(BaseEmailBackend):
@@ -19,18 +25,18 @@ class EmailBackend(BaseEmailBackend):
 
     def __init__(
         self,
-        host=None,
-        port=None,
-        username=None,
-        password=None,
-        use_tls=None,
-        fail_silently=False,
-        use_ssl=None,
-        timeout=None,
-        ssl_keyfile=None,
-        ssl_certfile=None,
-        **kwargs,
-    ):
+        host: str | None = None,
+        port: int | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        use_tls: bool | None = None,
+        fail_silently: bool = False,
+        use_ssl: bool | None = None,
+        timeout: int | None = None,
+        ssl_keyfile: str | None = None,
+        ssl_certfile: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(fail_silently=fail_silently)
         self.host = host or settings.EMAIL_HOST
         self.port = port or settings.EMAIL_PORT
@@ -54,11 +60,11 @@ class EmailBackend(BaseEmailBackend):
         self._lock = threading.RLock()
 
     @property
-    def connection_class(self):
+    def connection_class(self) -> type[smtplib.SMTP]:
         return smtplib.SMTP_SSL if self.use_ssl else smtplib.SMTP
 
     @cached_property
-    def ssl_context(self):
+    def ssl_context(self) -> ssl.SSLContext:
         if self.ssl_certfile or self.ssl_keyfile:
             ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
             ssl_context.load_cert_chain(self.ssl_certfile, self.ssl_keyfile)
@@ -66,7 +72,7 @@ class EmailBackend(BaseEmailBackend):
         else:
             return ssl.create_default_context()
 
-    def open(self):
+    def open(self) -> bool | None:
         """
         Ensure an open connection to the email server. Return whether or not a
         new connection was required (True or False) or None if an exception
@@ -99,10 +105,10 @@ class EmailBackend(BaseEmailBackend):
             if not self.fail_silently:
                 raise
 
-    def close(self):
+    def close(self) -> None:
         """Close the connection to the email server."""
         if self.connection is None:
-            return
+            return None
         try:
             try:
                 self.connection.quit()
@@ -113,12 +119,12 @@ class EmailBackend(BaseEmailBackend):
                 self.connection.close()
             except smtplib.SMTPException:
                 if self.fail_silently:
-                    return
+                    return None
                 raise
         finally:
             self.connection = None
 
-    def send_messages(self, email_messages):
+    def send_messages(self, email_messages: list[EmailMessage]) -> int:
         """
         Send one or more EmailMessage objects and return the number of email
         messages sent.
@@ -142,7 +148,7 @@ class EmailBackend(BaseEmailBackend):
                     self.close()
         return num_sent
 
-    def _send(self, email_message):
+    def _send(self, email_message: EmailMessage) -> bool:
         """A helper method that does the actual sending."""
         if not email_message.recipients():
             return False

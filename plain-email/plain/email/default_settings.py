@@ -6,7 +6,7 @@ EMAIL_BACKEND: str
 
 EMAIL_DEFAULT_FROM: str
 
-EMAIL_DEFAULT_REPLY_TO: list[str] = None
+EMAIL_DEFAULT_REPLY_TO: list[str] | None = None
 
 # Host for sending email.
 EMAIL_HOST: str = "localhost"
@@ -22,6 +22,6 @@ EMAIL_HOST_USER: str = ""
 EMAIL_HOST_PASSWORD: str = ""
 EMAIL_USE_TLS: bool = True
 EMAIL_USE_SSL: bool = False
-EMAIL_SSL_CERTFILE: str = None
-EMAIL_SSL_KEYFILE: str = None
-EMAIL_TIMEOUT: int = None
+EMAIL_SSL_CERTFILE: str | None = None
+EMAIL_SSL_KEYFILE: str | None = None
+EMAIL_TIMEOUT: int | None = None
