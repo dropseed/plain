@@ -8,6 +8,11 @@ from plain.utils.safestring import mark_safe
 
 from .registry import register_toolbar_item, registry
 
+try:
+    from plain.auth import get_request_user
+except ImportError:
+    get_request_user = None
+
 
 class Toolbar:
     def __init__(self, context):
@@ -22,7 +27,8 @@ class Toolbar:
         if impersonator := getattr(self.request, "impersonator", None):
             return getattr(impersonator, "is_admin", False)
 
-        if user := getattr(self.request, "user", None):
+        user = get_request_user(self.request) if get_request_user else None
+        if user:
             return getattr(user, "is_admin", False)
 
         return False

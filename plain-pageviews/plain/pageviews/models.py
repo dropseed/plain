@@ -8,6 +8,16 @@ from plain.utils import timezone
 
 from .params import extract_tracking_params
 
+try:
+    from plain.auth import get_request_user
+except ImportError:
+    get_request_user = None
+
+try:
+    from plain.sessions import get_request_session
+except ImportError:
+    get_request_session = None
+
 
 @models.register_model
 class Pageview(models.Model):
@@ -101,12 +111,18 @@ class Pageview(models.Model):
             if campaign is None:
                 campaign = extracted_campaign
 
-        if user := getattr(request, "user", None):
-            user_id = user.id
-        else:
-            user_id = ""
+        user = get_request_user(request) if get_request_user else None
+        user_id = user.id if user else ""
 
-        if session := getattr(request, "session", None):
+        if get_request_session:
+            try:
+                session = get_request_session(request)
+            except KeyError:
+                session = None
+        else:
+            session = None
+
+        if session:
             session_instance = session.model_instance
             session_id = str(session_instance.id) if session_instance else ""
 
