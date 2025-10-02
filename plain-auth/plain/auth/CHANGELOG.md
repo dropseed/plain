@@ -1,5 +1,21 @@
 # plain-auth changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-auth@0.20.0) (2025-10-02)
+
+### What's changed
+
+- Removed `AuthenticationMiddleware` - authentication is now handled through request-based functions instead of middleware ([154ee10](https://github.com/dropseed/plain/commit/154ee10))
+- Replaced `request.user` attribute with `get_request_user(request)` function and `{{ get_current_user() }}` template global ([154ee10](https://github.com/dropseed/plain/commit/154ee10))
+- `AuthViewMixin` now provides a `self.user` property for accessing the authenticated user in views ([154ee10](https://github.com/dropseed/plain/commit/154ee10))
+- Renamed `get_user` to `get_request_user` in the public API ([154ee10](https://github.com/dropseed/plain/commit/154ee10))
+
+### Upgrade instructions
+
+- Remove `plain.auth.middleware.AuthenticationMiddleware` from your `MIDDLEWARE` setting
+- In views, use `AuthViewMixin` for access to `self.user` instead of `self.request.user`
+- Replace `request.user` with `get_request_user(request)` in code outside of `AuthViewMixin` views
+- In templates, replace `{{ request.user }}` with `{{ user }}` (from `AuthViewMixin`) or with `{{ get_current_user() }}`
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-auth@0.19.0) (2025-09-30)
 
 ### What's changed
