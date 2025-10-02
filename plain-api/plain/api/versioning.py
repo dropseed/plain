@@ -1,7 +1,8 @@
 import json
 from functools import cached_property
+from typing import Any
 
-from plain.http import ResponseBadRequest
+from plain.http import Request, ResponseBadRequest, ResponseBase
 from plain.views import View
 from plain.views.exceptions import ResponseException
 
@@ -9,14 +10,16 @@ from plain.views.exceptions import ResponseException
 class APIVersionChange:
     description: str = ""
 
-    def transform_request_forward(self, request, data):
+    def transform_request_forward(self, request: Request, data: dict[str, Any]) -> None:
         """
         If this version of the API made a change in how a request is processed,
         (ex. the name of an input changed) then you can
         """
         pass
 
-    def transform_response_backward(self, response, data):
+    def transform_response_backward(
+        self, response: ResponseBase, data: dict[str, Any]
+    ) -> None:
         """
         Transform the response data for this version.
 
@@ -68,7 +71,7 @@ class VersionedAPIView(View):
 
         return self.default_api_version
 
-    def get_response(self):
+    def get_response(self) -> ResponseBase:
         if self.request.content_type == "application/json":
             self.transform_request(self.request)
 
@@ -83,7 +86,7 @@ class VersionedAPIView(View):
 
         return response
 
-    def transform_request(self, request):
+    def transform_request(self, request: Request) -> None:
         request_changes = []
 
         # Find the version being requested,
@@ -109,7 +112,7 @@ class VersionedAPIView(View):
         # Update the request body with the transformed data
         request._body = json.dumps(request_data).encode("utf-8")
 
-    def transform_response(self, response):
+    def transform_response(self, response: ResponseBase) -> None:
         response_changes = []
 
         # Get the changes starting AFTER the current version
@@ -126,11 +129,11 @@ class VersionedAPIView(View):
             return
 
         # Get the original response JSON
-        response_data = json.loads(response.content)
+        response_data = json.loads(response.content)  # type: ignore[attr-defined]
 
         for change in reversed(response_changes):
             # Transform the response data for this version
             change().transform_response_backward(response, response_data)
 
         # Update the response body with the transformed data
-        response.content = json.dumps(response_data).encode("utf-8")
+        response.content = json.dumps(response_data).encode("utf-8")  # type: ignore[attr-defined]

@@ -1,10 +1,11 @@
 import datetime
 import logging
 from functools import cached_property
+from typing import Any
 
 from plain.exceptions import PermissionDenied, ValidationError
 from plain.forms.exceptions import FormFieldMissingError
-from plain.http import Http404, JsonResponse, Response
+from plain.http import Http404, JsonResponse, ResponseBase
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
 from plain.views.base import View
@@ -17,7 +18,7 @@ from .schemas import ErrorSchema
 try:
     from .models import APIKey
 except ImportError:
-    APIKey = None
+    APIKey = None  # type: ignore[assignment]
 
 logger = logging.getLogger("plain.api")
 
@@ -28,10 +29,10 @@ class APIKeyView(View):
     api_key_required = True
 
     @cached_property
-    def api_key(self):
+    def api_key(self) -> Any:
         return self.get_api_key()
 
-    def get_response(self) -> Response:
+    def get_response(self) -> ResponseBase:
         if self.api_key:
             self.use_api_key()
         elif self.api_key_required:
@@ -39,6 +40,7 @@ class APIKeyView(View):
                 ErrorSchema(
                     id="api_key_required",
                     message="API key required",
+                    url="",
                 ),
                 status_code=401,
             )
@@ -48,7 +50,7 @@ class APIKeyView(View):
         patch_cache_control(response, private=True)
         return response
 
-    def use_api_key(self):
+    def use_api_key(self) -> None:
         """
         Use the API key for this request.
 
@@ -57,7 +59,7 @@ class APIKeyView(View):
         self.api_key.last_used_at = timezone.now()
         self.api_key.save(update_fields=["last_used_at"])
 
-    def get_api_key(self):
+    def get_api_key(self) -> Any:
         """
         Get the API key from the request.
 
@@ -73,6 +75,7 @@ class APIKeyView(View):
                         ErrorSchema(
                             id="invalid_authorization_header",
                             message="Invalid Authorization header",
+                            url="",
                         ),
                         status_code=400,
                     )
@@ -86,6 +89,7 @@ class APIKeyView(View):
                         ErrorSchema(
                             id="invalid_api_token",
                             message="Invalid API token",
+                            url="",
                         ),
                         status_code=400,
                     )
@@ -97,6 +101,7 @@ class APIKeyView(View):
                         ErrorSchema(
                             id="api_token_expired",
                             message="API token has expired",
+                            url="",
                         ),
                         status_code=400,
                     )
@@ -113,7 +118,7 @@ class APIKeyView(View):
     "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
 )
 class APIView(View):
-    def get_response(self):
+    def get_response(self) -> ResponseBase:
         try:
             return super().get_response()
         except ResponseException as e:
@@ -124,6 +129,7 @@ class APIView(View):
                 ErrorSchema(
                     id="validation_error",
                     message=f"Validation error: {e.message}",
+                    url="",
                     # "errors": {field: e.errors[field] for field in e.errors},
                 ),
                 status_code=400,
@@ -133,6 +139,7 @@ class APIView(View):
                 ErrorSchema(
                     id="missing_field",
                     message=f"Missing field: {e.field_name}",
+                    url="",
                 ),
                 status_code=400,
             )
@@ -141,6 +148,7 @@ class APIView(View):
                 ErrorSchema(
                     id="permission_denied",
                     message="Permission denied",
+                    url="",
                 ),
                 status_code=403,
             )
@@ -149,6 +157,7 @@ class APIView(View):
                 ErrorSchema(
                     id="not_found",
                     message="Not found",
+                    url="",
                 ),
                 status_code=404,
             )
@@ -158,6 +167,7 @@ class APIView(View):
                 ErrorSchema(
                     id="server_error",
                     message="Internal server error",
+                    url="",
                 ),
                 status_code=500,
             )

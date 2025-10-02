@@ -2,7 +2,7 @@ from typing import Any
 from uuid import UUID
 
 
-def merge_data(data1, data2):
+def merge_data(data1: dict[str, Any], data2: dict[str, Any]) -> dict[str, Any]:
     merged = data1.copy()
     for key, value in data2.items():
         if key in merged:
@@ -15,7 +15,7 @@ def merge_data(data1, data2):
     return merged
 
 
-def schema_from_type(t) -> dict[str, Any]:
+def schema_from_type(t: Any) -> dict[str, Any]:
     # if it's a union with None, add nullable: true
 
     # if t has a comment, add description

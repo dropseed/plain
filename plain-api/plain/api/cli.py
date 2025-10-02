@@ -13,7 +13,7 @@ from .openapi.generator import OpenAPISchemaGenerator
 
 @register_cli("api")
 @click.group()
-def cli():
+def cli() -> None:
     """API commands."""
     pass
 
@@ -27,7 +27,7 @@ def cli():
     help="Output format (json or yaml).",
     type=click.Choice(["json", "yaml"]),
 )
-def generate_openapi(validate, indent, format):
+def generate_openapi(validate: bool, indent: int, format: str) -> None:
     if not settings.API_OPENAPI_ROUTER:
         click.secho("No OpenAPI URL router configured.", fg="red", err=True)
         sys.exit(1)

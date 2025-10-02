@@ -1,23 +1,27 @@
+from collections.abc import Callable
 from http import HTTPStatus
+from typing import Any, TypeVar
 
 from plain.forms import fields
 from plain.forms.forms import BaseForm
 
 from .utils import merge_data, schema_from_type
 
+F = TypeVar("F", bound=Callable[..., Any])
+
 
 def response_typed_dict(
     status_code: int | HTTPStatus | str,
-    return_type,
+    return_type: Any,
     *,
-    description="",
-    component_name="",
-):
+    description: str = "",
+    component_name: str = "",
+) -> Callable[[F], F]:
     """
     A decorator to attach responses to a view method.
     """
 
-    def decorator(func):
+    def decorator(func: F) -> F:
         # TODO if return_type is a list/tuple,
         # then use anyOf or oneOf?
 
@@ -39,7 +43,7 @@ def response_typed_dict(
                     return_component_name: schema_from_type(return_type),
                 },
             }
-            func.openapi_components = merge_data(
+            func.openapi_components = merge_data(  # type: ignore[attr-defined]
                 getattr(func, "openapi_components", {}),
                 _component_schema,
             )
@@ -52,7 +56,7 @@ def response_typed_dict(
                     }
                 }
             }
-            func.openapi_components = merge_data(
+            func.openapi_components = merge_data(  # type: ignore[attr-defined]
                 getattr(func, "openapi_components", {}),
                 {
                     "responses": {
@@ -64,7 +68,7 @@ def response_typed_dict(
             _schema = {"responses": {str(status_code): response_schema}}
 
         # Add the response schema to the function
-        func.openapi_schema = merge_data(
+        func.openapi_schema = merge_data(  # type: ignore[attr-defined]
             getattr(func, "openapi_schema", {}),
             _schema,
         )
@@ -74,12 +78,12 @@ def response_typed_dict(
     return decorator
 
 
-def request_form(form_class: BaseForm):
+def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
     """
     Create OpenAPI parameters from a form class.
     """
 
-    def decorator(func):
+    def decorator(func: F) -> F:
         field_mappings = {
             fields.IntegerField: {
                 "type": "integer",
@@ -149,7 +153,7 @@ def request_form(form_class: BaseForm):
 
         required_fields = []
 
-        for field_name, field in form_class.base_fields.items():
+        for field_name, field in form_class.base_fields.items():  # type: ignore[attr-defined]
             field_schema = field_mappings[field.__class__].copy()
             _schema["requestBody"]["content"]["application/json"]["schema"][
                 "properties"
@@ -169,7 +173,7 @@ def request_form(form_class: BaseForm):
             # The body is required if any field is
             _schema["requestBody"]["required"] = True
 
-        func.openapi_schema = merge_data(
+        func.openapi_schema = merge_data(  # type: ignore[attr-defined]
             getattr(func, "openapi_schema", {}),
             _schema,
         )
@@ -179,13 +183,13 @@ def request_form(form_class: BaseForm):
     return decorator
 
 
-def schema(data):
+def schema(data: dict[str, Any]) -> Callable[[F], F]:
     """
     A decorator to attach raw OpenAPI schema to a router, view, or view method.
     """
 
-    def decorator(func):
-        func.openapi_schema = merge_data(
+    def decorator(func: F) -> F:
+        func.openapi_schema = merge_data(  # type: ignore[attr-defined]
             getattr(func, "openapi_schema", {}),
             data,
         )

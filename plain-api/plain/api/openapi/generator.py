@@ -24,17 +24,19 @@ class OpenAPISchemaGenerator:
         if self.components:
             self.schema["components"] = self.components
 
-    def as_json(self, indent):
+    def as_json(self, indent: int) -> str:
         return json.dumps(self.schema, indent=indent, sort_keys=True)
 
-    def as_yaml(self, indent):
+    def as_yaml(self, indent: int) -> str:
         import yaml
 
         # Don't want to get anchors when we dump...
         cleaned = json.loads(self.as_json(indent=0))
         return yaml.safe_dump(cleaned, indent=indent, sort_keys=True)
 
-    def get_paths(self, urls) -> dict[str, dict[str, Any]]:
+    def get_paths(
+        self, urls: list[URLPattern | URLResolver]
+    ) -> dict[str, dict[str, Any]]:
         paths = {}
 
         for url_pattern in urls:
@@ -50,7 +52,7 @@ class OpenAPISchemaGenerator:
 
         return paths
 
-    def path_from_url_pattern(self, url_pattern, root_path) -> str:
+    def path_from_url_pattern(self, url_pattern: URLPattern, root_path: str) -> str:
         path = root_path + str(url_pattern.pattern)
 
         for name, converter in url_pattern.pattern.converters.items():
@@ -58,7 +60,7 @@ class OpenAPISchemaGenerator:
             path = path.replace(f"<{key}:{name}>", f"{{{name}}}")
         return path
 
-    def extract_components(self, obj):
+    def extract_components(self, obj: Any) -> None:
         """
         Extract components from a view or router.
         """
@@ -68,7 +70,7 @@ class OpenAPISchemaGenerator:
                 getattr(obj, "openapi_components", {}),
             )
 
-    def operations_for_url_pattern(self, url_pattern) -> dict[str, Any]:
+    def operations_for_url_pattern(self, url_pattern: URLPattern) -> dict[str, Any]:
         operations = {}
 
         for vc in reversed(url_pattern.view.view_class.__mro__):
@@ -125,7 +127,9 @@ class OpenAPISchemaGenerator:
 
         return operations
 
-    def parameters_from_url_patterns(self, url_patterns) -> list[dict[str, Any]]:
+    def parameters_from_url_patterns(
+        self, url_patterns: list[URLPattern]
+    ) -> list[dict[str, Any]]:
         """Need to process any parent/included url patterns too"""
         parameters = []
 

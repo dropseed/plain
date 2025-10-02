@@ -5,7 +5,7 @@ import uuid
 from plain import models
 
 
-def generate_token():
+def generate_token() -> str:
     return binascii.hexlify(os.urandom(20)).decode()
 
 
@@ -33,5 +33,5 @@ class APIKey(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name or str(self.uuid)
