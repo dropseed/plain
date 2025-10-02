@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.5.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.1) (2025-10-02)
+
+### What's changed
+
+- The toolbar now uses `get_request_user()` helper to check user authentication, improving compatibility with different auth implementations ([2663c49](https://github.com/dropseed/plain/commit/2663c49404))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.5.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.0) (2025-09-30)
 
 ### What's changed
