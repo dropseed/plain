@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.72.1](https://github.com/dropseed/plain/releases/plain@0.72.1) (2025-10-02)
+
+### What's changed
+
+- Fixed documentation examples to use the correct view attribute names (`self.user` instead of `self.request.user`) ([f6278d9](https://github.com/dropseed/plain/commit/f6278d9bb4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.72.0](https://github.com/dropseed/plain/releases/plain@0.72.0) (2025-10-02)
 
 ### What's changed
