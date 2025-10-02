@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.13.0) (2025-10-02)
+
+### What's changed
+
+- Login views now use `AuthViewMixin` to access user and session data instead of request attributes ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.12.0) (2025-09-12)
 
 ### What's changed
