@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.72.0](https://github.com/dropseed/plain/releases/plain@0.72.0) (2025-10-02)
+
+### What's changed
+
+- Request attributes `user` and `session` are no longer set directly on the request object ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+- Test client now uses `plain.auth.requests.get_request_user()` to retrieve user for response object when available ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+- Removed `plain.auth.middleware.AuthenticationMiddleware` from default middleware configuration ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.71.0](https://github.com/dropseed/plain/releases/plain@0.71.0) (2025-09-30)
 
 ### What's changed
