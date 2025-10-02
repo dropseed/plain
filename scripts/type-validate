@@ -25,6 +25,7 @@ FULLY_TYPED_DIRS = [
     "plain-esbuild/plain/esbuild",
     "plain-flags/plain/flags",
     "plain-htmx/plain/htmx",
+    "plain-loginlink/plain/loginlink",
     "plain-sessions/plain/sessions",
 ]
 

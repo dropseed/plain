@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import time
 import zlib
+from typing import Any
 
 from plain.signing import (
     JSONSerializer,
@@ -15,12 +18,12 @@ from plain.signing import (
 class ExpiringSigner(Signer):
     """A signer with an embedded expiration (vs max age unsign)"""
 
-    def sign(self, value, expires_in):
+    def sign(self, value: str, expires_in: int) -> str:
         timestamp = b62_encode(int(time.time() + expires_in))
         value = f"{value}{self.sep}{timestamp}"
         return super().sign(value)
 
-    def unsign(self, value):
+    def unsign(self, value: str) -> str:
         """
         Retrieve original value and check the expiration hasn't passed.
         """
@@ -32,8 +35,12 @@ class ExpiringSigner(Signer):
         return value
 
     def sign_object(
-        self, obj, serializer=JSONSerializer, compress=False, expires_in=None
-    ):
+        self,
+        obj: Any,
+        serializer: type = JSONSerializer,
+        compress: bool = False,
+        expires_in: int | None = None,
+    ) -> str:
         """
         Return URL-safe, hmac signed base64 compressed JSON string.
 
@@ -58,7 +65,7 @@ class ExpiringSigner(Signer):
             base64d = "." + base64d
         return self.sign(base64d, expires_in)
 
-    def unsign_object(self, signed_obj, serializer=JSONSerializer):
+    def unsign_object(self, signed_obj: str, serializer: type = JSONSerializer) -> Any:
         # Signer.unsign() returns str but base64 and zlib compression operate
         # on bytes.
         base64d = self.unsign(signed_obj).encode()
@@ -73,13 +80,13 @@ class ExpiringSigner(Signer):
 
 
 def dumps(
-    obj,
-    key=None,
-    salt="plain.loginlink",
-    serializer=JSONSerializer,
-    compress=False,
-    expires_in=None,
-):
+    obj: Any,
+    key: str | None = None,
+    salt: str = "plain.loginlink",
+    serializer: type = JSONSerializer,
+    compress: bool = False,
+    expires_in: int | None = None,
+) -> str:
     """
     Return URL-safe, hmac signed base64 compressed JSON string. If key is
     None, use settings.SECRET_KEY instead. The hmac algorithm is the default
@@ -102,12 +109,12 @@ def dumps(
 
 
 def loads(
-    s,
-    key=None,
-    salt="plain.loginlink",
-    serializer=JSONSerializer,
-    fallback_keys=None,
-):
+    s: str,
+    key: str | None = None,
+    salt: str = "plain.loginlink",
+    serializer: type = JSONSerializer,
+    fallback_keys: list[str] | None = None,
+) -> Any:
     """
     Reverse of dumps(), raise BadSignature if signature fails.
 

@@ -1,8 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from plain.auth import get_user_model
 from plain.signing import BadSignature, SignatureExpired
 from plain.urls import reverse
 
 from . import signing
+
+if TYPE_CHECKING:
+    from plain.http import Request
+    from plain.models import Model
 
 
 class LoginLinkExpired(Exception):
@@ -17,7 +25,9 @@ class LoginLinkChanged(Exception):
     pass
 
 
-def generate_link_url(*, request, user, email, expires_in):
+def generate_link_url(
+    *, request: Request, user: Model, email: str, expires_in: int
+) -> str:
     """
     Generate a login link using both the user's ID
     and email address, so links break if the user email changes or is assigned to another user.
@@ -27,7 +37,7 @@ def generate_link_url(*, request, user, email, expires_in):
     return request.build_absolute_uri(reverse("loginlink:login", token))
 
 
-def get_link_token_user(token):
+def get_link_token_user(token: str) -> Model:
     """
     Validate a link token and get the user from it.
     """

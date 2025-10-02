@@ -1,6 +1,10 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.auth import login, logout
 from plain.auth.views import AuthViewMixin
-from plain.http import ResponseRedirect
+from plain.http import Response, ResponseRedirect
 from plain.runtime import settings
 from plain.urls import reverse, reverse_lazy
 from plain.views import FormView, TemplateView, View
@@ -18,7 +22,7 @@ class LoginLinkFormView(AuthViewMixin, FormView):
     form_class = LoginLinkForm
     success_url = reverse_lazy("loginlink:sent")
 
-    def get(self):
+    def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
             form = self.get_form()
@@ -26,11 +30,11 @@ class LoginLinkFormView(AuthViewMixin, FormView):
 
         return super().get()
 
-    def form_valid(self, form):
+    def form_valid(self, form: LoginLinkForm) -> Response:
         form.maybe_send_link(self.request)
         return super().form_valid(form)
 
-    def get_success_url(self, form):
+    def get_success_url(self, form: LoginLinkForm) -> str:
         if next_url := form.cleaned_data.get("next"):
             # Keep the next URL in the query string so the sent
             # view can redirect to it if reloaded and logged in already.
@@ -42,7 +46,7 @@ class LoginLinkFormView(AuthViewMixin, FormView):
 class LoginLinkSentView(AuthViewMixin, TemplateView):
     template_name = "loginlink/sent.html"
 
-    def get(self):
+    def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
             next_url = self.request.query_params.get("next", "/")
@@ -54,7 +58,7 @@ class LoginLinkSentView(AuthViewMixin, TemplateView):
 class LoginLinkFailedView(TemplateView):
     template_name = "loginlink/failed.html"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         context["error"] = self.request.query_params.get("error")
         context["login_url"] = reverse(settings.AUTH_LOGIN_URL)
@@ -64,7 +68,7 @@ class LoginLinkFailedView(TemplateView):
 class LoginLinkLoginView(AuthViewMixin, View):
     success_url = "/"
 
-    def get(self):
+    def get(self) -> Response:
         # If they're logged in, log them out and process the link again
         if self.user:
             logout(self.request)
