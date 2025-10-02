@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import os
 import re
+from typing import Any
 
 from jinja2 import nodes, pass_context
+from jinja2.environment import Environment
 from jinja2.ext import Extension
+from jinja2.parser import Parser
+from jinja2.runtime import Context
 
 from plain.templates import register_template_extension
-from plain.utils.safestring import mark_safe
+from plain.utils.safestring import SafeString, mark_safe
 
 
 @pass_context
-def Element(ctx, _element_name, **kwargs):
+def Element(ctx: Context, _element_name: str, **kwargs: Any) -> SafeString:
     element_path_name = _element_name.replace(".", os.sep)
     template = ctx.environment.get_template(f"elements/{element_path_name}.html")
 
@@ -32,7 +38,7 @@ def Element(ctx, _element_name, **kwargs):
 class ElementsExtension(Extension):
     tags = {"use_elements"}
 
-    def __init__(self, env):
+    def __init__(self, env: Environment):
         super().__init__(env)
         # Make the Element function available in connection with this extension
         env.globals["Element"] = Element
@@ -48,12 +54,14 @@ class ElementsExtension(Extension):
             rf"</\1>"
         )
 
-    def parse(self, parser):
+    def parse(self, parser: Parser) -> nodes.Output:
         # Consume {% use_elements %} and output nothing
         parser.stream.skip()
         return nodes.Output([])
 
-    def preprocess(self, source, name, filename=None):
+    def preprocess(
+        self, source: str, name: str | None, filename: str | None = None
+    ) -> str:
         if "{% use_elements %}" in source:
             # If we have a use_elements tag, we need to replace the template element tags
             # with the Element() calls
@@ -61,7 +69,7 @@ class ElementsExtension(Extension):
 
         return source
 
-    def replace_template_element_tags(self, contents: str):
+    def replace_template_element_tags(self, contents: str) -> str:
         if not contents:
             return contents
 
@@ -90,7 +98,7 @@ class ElementsExtension(Extension):
 
         return contents
 
-    def convert_element(self, element_name, s: str, children: str):
+    def convert_element(self, element_name: str, s: str, children: str) -> str:
         attrs: dict[str, str] = {}
 
         # Quoted attrs
