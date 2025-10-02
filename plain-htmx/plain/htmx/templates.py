@@ -1,6 +1,12 @@
+from __future__ import annotations
+
+from typing import Any
+
 import jinja2
 from jinja2 import meta, nodes
 from jinja2.ext import Extension
+from jinja2.nodes import CallBlock, Node
+from jinja2.parser import Parser
 
 from plain.runtime import settings
 from plain.templates import register_template_extension
@@ -12,7 +18,9 @@ class HTMXJSExtension(InclusionTagExtension):
     tags = {"htmx_js"}
     template_name = "htmx/js.html"
 
-    def get_context(self, context, *args, **kwargs):
+    def get_context(
+        self, context: dict[str, Any], *args: Any, **kwargs: Any
+    ) -> dict[str, Any]:
         return {
             "DEBUG": settings.DEBUG,
             "extensions": kwargs.get("extensions", []),
@@ -23,11 +31,11 @@ class HTMXJSExtension(InclusionTagExtension):
 class HTMXFragmentExtension(Extension):
     tags = {"htmxfragment"}
 
-    def __init__(self, environment):
+    def __init__(self, environment: jinja2.Environment):
         super().__init__(environment)
         environment.extend(htmx_fragment_nodes={})
 
-    def parse(self, parser):
+    def parse(self, parser: Parser) -> Node:
         lineno = next(parser.stream).lineno
 
         fragment_name = parser.parse_expression()
@@ -42,25 +50,27 @@ class HTMXFragmentExtension(Extension):
                 value = parser.parse_expression()
                 kwargs.append(nodes.Keyword(key, value))
 
-        body = parser.parse_statements(["name:endhtmxfragment"], drop_needle=True)
+        body = parser.parse_statements(("name:endhtmxfragment",), drop_needle=True)
 
         call = self.call_method(
             "_render_htmx_fragment",
-            args=[fragment_name, jinja2.nodes.ContextReference()],
+            args=[fragment_name, nodes.ContextReference()],
             kwargs=kwargs,
         )
 
-        node = jinja2.nodes.CallBlock(call, [], [], body).set_lineno(lineno)
+        node = CallBlock(call, [], [], body).set_lineno(lineno)
 
         # Store a reference to the node for later
-        self.environment.htmx_fragment_nodes.setdefault(parser.name, {})[
-            fragment_name.value
+        self.environment.htmx_fragment_nodes.setdefault(parser.name, {})[  # type: ignore[attr-defined]
+            fragment_name.value  # type: ignore[attr-defined]
         ] = node
 
         return node
 
-    def _render_htmx_fragment(self, fragment_name, context, caller, **kwargs):
-        def attrs_to_str(attrs):
+    def _render_htmx_fragment(
+        self, fragment_name: str, context: dict[str, Any], caller: Any, **kwargs: Any
+    ) -> str:
+        def attrs_to_str(attrs: dict[str, Any]) -> str:
             parts = []
             for k, v in attrs.items():
                 if v == "":
@@ -96,41 +106,46 @@ class HTMXFragmentExtension(Extension):
             return f'<{as_element} plain-hx-fragment="{fragment_name}" {attrs_str}>{caller()}</{as_element}>'
 
 
-def render_template_fragment(*, template, fragment_name, context):
+def render_template_fragment(
+    *, template: jinja2.Template, fragment_name: str, context: dict[str, Any]
+) -> str:
     template = find_template_fragment(template, fragment_name)
     return template.render(context)
 
 
-def find_template_fragment(template: jinja2.Template, fragment_name: str):
+def find_template_fragment(
+    template: jinja2.Template, fragment_name: str
+) -> jinja2.Template:
     # Look in this template for the fragment
-    callblock_node = template.environment.htmx_fragment_nodes.get(
+    callblock_node = template.environment.htmx_fragment_nodes.get(  # type: ignore[attr-defined]
         template.name, {}
     ).get(fragment_name)
 
     if not callblock_node:
         # Look in other templates for this fragment
         matching_callblock_nodes = []
-        for fragments in template.environment.htmx_fragment_nodes.values():
+        for fragments in template.environment.htmx_fragment_nodes.values():  # type: ignore[attr-defined]
             if fragment_name in fragments:
                 matching_callblock_nodes.append(fragments[fragment_name])
 
         if len(matching_callblock_nodes) == 0:
             # If we still haven't found anything, it's possible that we're
             # in a different/new worker/process and haven't parsed the related templates yet
-            ast = template.environment.parse(
-                template.environment.loader.get_source(
-                    template.environment, template.name
-                )[0]
-            )
-            for ref in meta.find_referenced_templates(ast):
-                if ref not in template.environment.htmx_fragment_nodes:
-                    # Trigger them to parse
-                    template.environment.get_template(ref)
+            if template.environment.loader and template.name:
+                ast = template.environment.parse(
+                    template.environment.loader.get_source(
+                        template.environment, template.name
+                    )[0]
+                )
+                for ref in meta.find_referenced_templates(ast):
+                    if ref not in template.environment.htmx_fragment_nodes:  # type: ignore[attr-defined]
+                        # Trigger them to parse
+                        template.environment.get_template(ref)
 
-            # Now look again
-            for fragments in template.environment.htmx_fragment_nodes.values():
-                if fragment_name in fragments:
-                    matching_callblock_nodes.append(fragments[fragment_name])
+                # Now look again
+                for fragments in template.environment.htmx_fragment_nodes.values():  # type: ignore[attr-defined]
+                    if fragment_name in fragments:
+                        matching_callblock_nodes.append(fragments[fragment_name])
 
         if len(matching_callblock_nodes) == 1:
             callblock_node = matching_callblock_nodes[0]
@@ -149,5 +164,5 @@ def find_template_fragment(template: jinja2.Template, fragment_name: str):
         )
 
     # Create a new template from the node
-    template_node = jinja2.nodes.Template(callblock_node.body)
-    return template.environment.from_string(template_node)
+    template_node = nodes.Template(callblock_node.body)  # type: ignore[attr-defined]
+    return template.environment.from_string(template_node)  # type: ignore[arg-type]

@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
+from plain.http import Response
 from plain.utils.cache import patch_vary_headers
 
 from .templates import render_template_fragment
 
 
 class HTMXViewMixin:
-    def render_template(self):
+    def render_template(self) -> str:
         template = self.get_template()
         context = self.get_template_context()
 
@@ -17,7 +23,7 @@ class HTMXViewMixin:
 
         return template.render(context)
 
-    def get_response(self):
+    def get_response(self) -> Response:
         response = super().get_response()
         # Tell browser caching to also consider the fragment header,
         # not just the url/cookie.
@@ -26,7 +32,7 @@ class HTMXViewMixin:
         )
         return response
 
-    def get_request_handler(self):
+    def get_request_handler(self) -> Callable[..., Any]:
         if self.is_htmx_request():
             # You can use an htmx_{method} method on views
             # (or htmx_{method}_{action} for specific actions)
@@ -45,12 +51,12 @@ class HTMXViewMixin:
 
         return super().get_request_handler()
 
-    def is_htmx_request(self):
+    def is_htmx_request(self) -> bool:
         return self.request.headers.get("HX-Request") == "true"
 
-    def get_htmx_fragment_name(self):
+    def get_htmx_fragment_name(self) -> str:
         # A custom header that we pass with the {% htmxfragment %} tag
         return self.request.headers.get("Plain-HX-Fragment", "")
 
-    def get_htmx_action_name(self):
+    def get_htmx_action_name(self) -> str:
         return self.request.headers.get("Plain-HX-Action", "")
