@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from functools import cached_property
+from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.db_attributes import (
@@ -28,7 +31,7 @@ class Cached:
         self._model_class = CachedItem
 
     @cached_property
-    def _model_instance(self):
+    def _model_instance(self) -> Any:
         try:
             return self._model_class.query.get(key=self.key)
         except self._model_class.DoesNotExist:
@@ -38,7 +41,7 @@ class Cached:
         if hasattr(self, "_model_instance"):
             del self._model_instance
 
-    def _is_expired(self):
+    def _is_expired(self) -> bool:
         if not self._model_instance:
             return True
 
@@ -66,7 +69,7 @@ class Cached:
             return not self._is_expired()
 
     @property
-    def value(self):
+    def value(self) -> Any:
         with tracer.start_as_current_span(
             "cache.get",
             kind=SpanKind.CLIENT,
@@ -92,13 +95,15 @@ class Cached:
 
             return self._model_instance.value
 
-    def set(self, value, expiration: datetime | timedelta | int | float | None = None):
+    def set(
+        self, value: Any, expiration: datetime | timedelta | int | float | None = None
+    ) -> Any:
         defaults = {
             "value": value,
         }
 
         if isinstance(expiration, int | float):
-            defaults["expires_at"] = timezone.now() + timedelta(seconds=expiration)
+            defaults["expires_at"] = timezone.now() + timedelta(seconds=expiration)  # type: ignore[arg-type]
         elif isinstance(expiration, timedelta):
             defaults["expires_at"] = timezone.now() + expiration
         elif isinstance(expiration, datetime):

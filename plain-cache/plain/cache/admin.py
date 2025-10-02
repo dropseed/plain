@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -5,6 +7,7 @@ from plain.admin.views import (
     register_viewset,
 )
 from plain.cache.models import CachedItem
+from plain.models import QuerySet
 
 
 @register_viewset
@@ -23,7 +26,7 @@ class CachedItemViewset(AdminViewset):
         queryset_order = ["-id"]
         allow_global_search = False
 
-        def get_objects(self):
+        def get_objects(self) -> QuerySet[CachedItem]:
             return (
                 super()
                 .get_objects()

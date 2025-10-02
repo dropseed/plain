@@ -7,20 +7,20 @@ from .models import CachedItem
 
 @register_cli("cache")
 @click.group()
-def cli():
+def cli() -> None:
     pass
 
 
 @cli.command()
-def clear_expired():
+def clear_expired() -> None:
     click.echo("Clearing expired cache items...")
-    result = CachedItem.query.expired().delete()
+    result = CachedItem.query.expired().delete()  # type: ignore[attr-defined]
     click.echo(f"Deleted {result[0]} expired cache items.")
 
 
 @cli.command()
 @click.option("--force", is_flag=True)
-def clear_all(force):
+def clear_all(force: bool) -> None:
     if not force and not click.confirm(
         "Are you sure you want to delete all cache items?"
     ):
@@ -31,11 +31,11 @@ def clear_all(force):
 
 
 @cli.command()
-def stats():
+def stats() -> None:
     total = CachedItem.query.count()
-    expired = CachedItem.query.expired().count()
-    unexpired = CachedItem.query.unexpired().count()
-    forever = CachedItem.query.forever().count()
+    expired = CachedItem.query.expired().count()  # type: ignore[attr-defined]
+    unexpired = CachedItem.query.unexpired().count()  # type: ignore[attr-defined]
+    forever = CachedItem.query.forever().count()  # type: ignore[attr-defined]
 
     click.echo(f"Total: {click.style(total, bold=True)}")
     click.echo(f"Expired: {click.style(expired, bold=True)}")
