@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import string
-from collections.abc import MutableMapping
+from collections.abc import Iterator, MutableMapping
 from datetime import timedelta
+from typing import Any
 
 from plain.models import transaction
 from plain.runtime import settings
@@ -14,7 +17,7 @@ class SessionStore(MutableMapping):
     backed by the underlying Session model for the storage.
     """
 
-    def __init__(self, session_key=None):
+    def __init__(self, session_key: str | None = None) -> None:
         self.session_key = session_key
         self.accessed = False
         self.modified = False
@@ -26,27 +29,27 @@ class SessionStore(MutableMapping):
 
         self._model = Session
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         return key in self._session
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         return self._session[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         self._session[key] = value
         self.modified = True
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         del self._session[key]
         self.modified = True
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._session)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._session)
 
-    def clear(self):
+    def clear(self) -> None:
         # To avoid unnecessary persistent storage accesses, we set up the
         # internals directly (loading data wastes time, since we are going to
         # set it to an empty dict anyway).
@@ -55,18 +58,18 @@ class SessionStore(MutableMapping):
         self.accessed = True
         self.modified = True
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         "Return True when there is no session_key and the session is empty."
         return not self.session_key and not self._session_cache
 
-    def _get_new_session_key(self):
+    def _get_new_session_key(self) -> str:
         "Return session key that isn't being used."
         while True:
             session_key = get_random_string(32, string.ascii_lowercase + string.digits)
             if not self._model.query.filter(session_key=session_key).exists():
                 return session_key
 
-    def _get_session_data(self, no_load=False):
+    def _get_session_data(self, no_load: bool = False) -> dict:
         """
         Lazily load session from storage (unless "no_load" is True, when only
         an empty dict is stored) and store it in the current instance.
@@ -99,14 +102,14 @@ class SessionStore(MutableMapping):
             return self._session_cache
 
     @property
-    def _session(self):
+    def _session(self) -> dict:
         """
         Property to access the session data, ensuring it is loaded.
         """
         return self._get_session_data()
 
     @property
-    def model_instance(self):
+    def model_instance(self) -> Any:
         """
         Return the underlying Session model instance, or None if no session exists.
         """
@@ -117,7 +120,7 @@ class SessionStore(MutableMapping):
         self._get_session_data()
         return self._session_instance
 
-    def flush(self):
+    def flush(self) -> None:
         """
         Remove the current session data from the database and regenerate the
         key.
@@ -130,7 +133,7 @@ class SessionStore(MutableMapping):
         self.session_key = None
         self._session_instance = None
 
-    def cycle_key(self):
+    def cycle_key(self) -> None:
         """
         Create a new session key, while retaining the current session data.
         """
@@ -144,7 +147,7 @@ class SessionStore(MutableMapping):
             except self._model.DoesNotExist:
                 pass
 
-    def create(self):
+    def create(self) -> None:
         self.session_key = self._get_new_session_key()
         data = self._get_session_data(no_load=True)
         with transaction.atomic():
@@ -156,7 +159,7 @@ class SessionStore(MutableMapping):
             )
         self.modified = True
 
-    def save(self):
+    def save(self) -> None:
         """
         Save the current session data to the database using update_or_create.
         """

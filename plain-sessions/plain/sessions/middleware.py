@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import time
+from collections.abc import Callable
+from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.session_attributes import SESSION_ID
 
+from plain.http import Response
 from plain.runtime import settings
 from plain.utils.cache import patch_vary_headers
 from plain.utils.http import http_date
@@ -12,10 +17,10 @@ from .requests import get_request_session, set_request_session
 
 
 class SessionMiddleware:
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable[[Any], Any]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: Any) -> Response:
         session_key = request.cookies.get(settings.SESSION_COOKIE_NAME)
 
         session = SessionStore(session_key)
@@ -47,10 +52,10 @@ class SessionMiddleware:
                 domain=settings.SESSION_COOKIE_DOMAIN,
                 samesite=settings.SESSION_COOKIE_SAMESITE,
             )
-            patch_vary_headers(response, ("Cookie",))
+            patch_vary_headers(response, ["Cookie"])
         else:
             if accessed:
-                patch_vary_headers(response, ("Cookie",))
+                patch_vary_headers(response, ["Cookie"])
             if (modified or settings.SESSION_SAVE_EVERY_REQUEST) and not empty:
                 if settings.SESSION_EXPIRE_AT_BROWSER_CLOSE:
                     max_age = None

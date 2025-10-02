@@ -15,6 +15,7 @@ from pathlib import Path
 FULLY_TYPED_DIRS = [
     "plain/plain",
     "plain-auth/plain/auth",
+    "plain-sessions/plain/sessions",
 ]
 
 

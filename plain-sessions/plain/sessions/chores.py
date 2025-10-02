@@ -5,7 +5,7 @@ from .models import Session
 
 
 @register_chore("sessions")
-def clear_expired():
+def clear_expired() -> str:
     """
     Delete sessions that have expired.
     """

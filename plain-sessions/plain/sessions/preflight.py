@@ -2,11 +2,11 @@ from plain.preflight import PreflightCheck, PreflightResult, register_check
 from plain.runtime import settings
 
 
-def _session_middleware():
+def _session_middleware() -> bool:
     return "plain.sessions.middleware.SessionMiddleware" in settings.MIDDLEWARE
 
 
-def _session_app():
+def _session_app() -> bool:
     return "plain.sessions" in settings.INSTALLED_PACKAGES
 
 
@@ -14,7 +14,7 @@ def _session_app():
 class CheckSessionCookieSecure(PreflightCheck):
     """Ensures SESSION_COOKIE_SECURE is True in production deployment."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         if settings.SESSION_COOKIE_SECURE is True:
             return []
 
@@ -50,7 +50,7 @@ class CheckSessionCookieSecure(PreflightCheck):
 class CheckSessionCookieHttpOnly(PreflightCheck):
     """Ensures SESSION_COOKIE_HTTPONLY is True in production deployment."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         if settings.SESSION_COOKIE_HTTPONLY is True:
             return []
 
