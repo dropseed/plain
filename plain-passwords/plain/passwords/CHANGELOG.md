@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-passwords@0.13.0) (2025-10-02)
+
+### What's changed
+
+- Password views now inherit from `AuthViewMixin` and use `self.user` and `self.session` properties instead of accessing them through `self.request` ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+
+### Upgrade instructions
+
+- If you have custom views that inherit from `PasswordResetView`, `PasswordChangeView`, or `PasswordLoginView`, update any references to `self.request.user` to use `self.user` and `self.request.session` to use `self.session`
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-passwords@0.12.0) (2025-09-19)
 
 ### What's changed
