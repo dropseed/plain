@@ -1,5 +1,6 @@
 import logging
 
+from plain.auth.requests import get_request_user
 from plain.auth.views import AuthViewMixin
 from plain.http import ResponseRedirect
 from plain.views import TemplateView, View
@@ -16,7 +17,7 @@ class OAuthLoginView(View):
     def post(self):
         request = self.request
         provider = self.url_kwargs["provider"]
-        if request.user:
+        if get_request_user(request):
             return ResponseRedirect("/")
 
         provider_instance = get_oauth_provider_instance(provider_key=provider)

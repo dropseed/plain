@@ -1,4 +1,5 @@
 from plain.auth import login, logout
+from plain.auth.views import AuthViewMixin
 from plain.http import ResponseRedirect
 from plain.runtime import settings
 from plain.urls import reverse, reverse_lazy
@@ -13,13 +14,13 @@ from .links import (
 )
 
 
-class LoginLinkFormView(FormView):
+class LoginLinkFormView(AuthViewMixin, FormView):
     form_class = LoginLinkForm
     success_url = reverse_lazy("loginlink:sent")
 
     def get(self):
         # Redirect if the user is already logged in
-        if self.request.user:
+        if self.user:
             form = self.get_form()
             return ResponseRedirect(self.get_success_url(form))
 
@@ -38,12 +39,12 @@ class LoginLinkFormView(FormView):
             return self.success_url
 
 
-class LoginLinkSentView(TemplateView):
+class LoginLinkSentView(AuthViewMixin, TemplateView):
     template_name = "loginlink/sent.html"
 
     def get(self):
         # Redirect if the user is already logged in
-        if self.request.user:
+        if self.user:
             next_url = self.request.query_params.get("next", "/")
             return ResponseRedirect(next_url)
 
@@ -60,12 +61,12 @@ class LoginLinkFailedView(TemplateView):
         return context
 
 
-class LoginLinkLoginView(View):
+class LoginLinkLoginView(AuthViewMixin, View):
     success_url = "/"
 
     def get(self):
         # If they're logged in, log them out and process the link again
-        if self.request.user:
+        if self.user:
             logout(self.request)
 
         token = self.url_kwargs["token"]

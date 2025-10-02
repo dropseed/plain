@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
 {% block content %}
-Hello {{ request.user }}!
+Hello {{ user }}!
 
 <h2>Existing connections</h2>
 <ul>
-    {% for connection in request.user.oauth_connections.query.all() %}
+    {% for connection in user.oauth_connections.query.all() %}
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         <form action="{{ url('oauth:disconnect', connection.provider_key) }}" method="post">

@@ -1,11 +1,12 @@
 from plain.assets.urls import get_asset_url
+from plain.auth.views import AuthViewMixin
 from plain.http import ResponseRedirect
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views import FormView, View
 
 
-class SupportFormView(FormView):
+class SupportFormView(AuthViewMixin, FormView):
     template_name = "support/page.html"
 
     def get_form(self):
@@ -24,7 +25,7 @@ class SupportFormView(FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
+        kwargs["user"] = self.user
         kwargs["form_slug"] = self.url_kwargs["form_slug"]
         return kwargs
 

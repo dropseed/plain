@@ -9,12 +9,14 @@ class LoginView(View):
 
 
 class ProtectedView(AuthViewMixin, View):
+    login_required = True
+
     def get(self):
         return "protected"
 
 
 class OpenView(AuthViewMixin, View):
-    login_required = False
+    # login_required = False
 
     def get(self):
         return "open"
@@ -28,6 +30,7 @@ class AdminView(AuthViewMixin, View):
 
 
 class NoLoginUrlView(AuthViewMixin, View):
+    login_required = True
     login_url = None
 
     def get(self):

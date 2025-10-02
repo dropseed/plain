@@ -7,6 +7,7 @@ from plain.views import TemplateView
 
 class LoggedInView(AuthViewMixin, TemplateView):
     template_name = "index.html"
+    login_required = True
 
     def get_template_context(self):
         context = super().get_template_context()

@@ -1,5 +1,5 @@
 <dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8 px-6 py-4">
-    {% for k, v in request.session.items() %}
+    {% for k, v in get_current_session().items() %}
     <dt class="font-mono">{{ k }}</dt>
     <dd class="text-sm text-white/50 max-h-32 overflow-auto">
         {% if v is iterable and not v|string %}

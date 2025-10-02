@@ -5,6 +5,7 @@ from plain import signing
 from plain.auth import get_user_model
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
+from plain.auth.views import AuthViewMixin
 from plain.exceptions import BadRequest
 from plain.http import (
     ResponseRedirect,
@@ -51,7 +52,7 @@ class PasswordForgotView(FormView):
         return super().form_valid(form)
 
 
-class PasswordResetView(FormView):
+class PasswordResetView(AuthViewMixin, FormView):
     form_class = PasswordSetForm
     reset_token_max_age = 60 * 60  # 1 hour
     _reset_token_session_key = "_password_reset_token"
@@ -86,7 +87,7 @@ class PasswordResetView(FormView):
         return user
 
     def get(self):
-        if self.request.user:
+        if self.user:
             # Redirect if the user is already logged in
             return ResponseRedirect(self.success_url)
 
@@ -97,7 +98,7 @@ class PasswordResetView(FormView):
             # password reset form at a URL without the token. That
             # avoids the possibility of leaking the token in the
             # HTTP Referer header.
-            self.request.session[self._reset_token_session_key] = token
+            self.session[self._reset_token_session_key] = token
             # Redirect to the path itself, without the GET parameters
             response = ResponseRedirect(self.request.path)
             add_never_cache_headers(response)
@@ -106,7 +107,7 @@ class PasswordResetView(FormView):
         return super().get()
 
     def get_user(self):
-        session_token = self.request.session.get(self._reset_token_session_key, "")
+        session_token = self.session.get(self._reset_token_session_key, "")
         if not session_token:
             # No token in the session, so we can't check the password reset token.
             raise BadRequest("No password reset token found.")
@@ -114,7 +115,7 @@ class PasswordResetView(FormView):
         user = self.check_password_reset_token(session_token)
         if not user:
             # Remove it from the session if it is invalid.
-            del self.request.session[self._reset_token_session_key]
+            del self.session[self._reset_token_session_key]
             raise BadRequest("Password reset token is no longer valid.")
 
         return user
@@ -126,20 +127,20 @@ class PasswordResetView(FormView):
 
     def form_valid(self, form):
         form.save()
-        del self.request.session[self._reset_token_session_key]
+        del self.session[self._reset_token_session_key]
         # If you wanted, you could log in the user here so they don't have to
         # go through the log in form again.
         return super().form_valid(form)
 
 
-class PasswordChangeView(FormView):
+class PasswordChangeView(AuthViewMixin, FormView):
     # Change to PasswordSetForm if you want to set new passwords
     # without confirming the old one.
     form_class = PasswordChangeForm
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
+        kwargs["user"] = self.user
         return kwargs
 
     def form_valid(self, form):
@@ -150,13 +151,13 @@ class PasswordChangeView(FormView):
         return super().form_valid(form)
 
 
-class PasswordLoginView(FormView):
+class PasswordLoginView(AuthViewMixin, FormView):
     form_class = PasswordLoginForm
     success_url = "/"
 
     def get(self):
         # Redirect if the user is already logged in
-        if self.request.user:
+        if self.user:
             return ResponseRedirect(self.success_url)
 
         return super().get()

@@ -494,9 +494,13 @@ class Client:
         response.request = request
         response.json = partial(self._parse_json, response)
 
-        # If the request had a user attached, make it available on the response.
-        if hasattr(response.wsgi_request, "user"):
-            response.user = response.wsgi_request.user
+        # If the request had a user, make it available on the response.
+        try:
+            from plain.auth.requests import get_request_user
+
+            response.user = get_request_user(response.wsgi_request)
+        except ImportError:
+            pass
 
         # Attach the ResolverMatch instance to the response.
         resolver = get_resolver()

@@ -4,8 +4,10 @@ from typing import Any
 from urllib.parse import urlencode
 
 from plain.auth import login as auth_login
+from plain.auth.requests import get_request_user
 from plain.http import Request, Response, ResponseRedirect
 from plain.runtime import settings
+from plain.sessions import get_request_session
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.crypto import get_random_string
@@ -111,8 +113,9 @@ class OAuthProvider:
         except KeyError as e:
             raise OAuthStateMissingError() from e
 
-        expected_state = request.session.pop(SESSION_STATE_KEY)
-        request.session.save()  # Make sure the pop is saved (won't save on an exception)
+        session = get_request_session(request)
+        expected_state = session.pop(SESSION_STATE_KEY)
+        session.save()  # Make sure the pop is saved (won't save on an exception)
         if not secrets.compare_digest(state, expected_state):
             raise OAuthStateMismatchError()
 
@@ -122,15 +125,17 @@ class OAuthProvider:
         authorization_url = self.get_authorization_url(request=request)
         authorization_params = self.get_authorization_url_params(request=request)
 
+        session = get_request_session(request)
+
         if "state" in authorization_params:
             # Store the state in the session so we can check on callback
-            request.session[SESSION_STATE_KEY] = authorization_params["state"]
+            session[SESSION_STATE_KEY] = authorization_params["state"]
 
         # Store next url in session so we can get it on the callback request
         if redirect_to:
-            request.session[SESSION_NEXT_KEY] = redirect_to
+            session[SESSION_NEXT_KEY] = redirect_to
         elif "next" in request.data:
-            request.session[SESSION_NEXT_KEY] = request.data["next"]
+            session[SESSION_NEXT_KEY] = request.data["next"]
 
         # Sort authorization params for consistency
         sorted_authorization_params = sorted(authorization_params.items())
@@ -159,9 +164,10 @@ class OAuthProvider:
         )
         oauth_user = self.get_oauth_user(oauth_token=oauth_token)
 
-        if request.user:
+        user = get_request_user(request)
+        if user:
             connection = OAuthConnection.connect(
-                user=request.user,
+                user=user,
                 provider_key=self.provider_key,
                 oauth_token=oauth_token,
                 oauth_user=oauth_user,
@@ -185,7 +191,8 @@ class OAuthProvider:
         auth_login(request=request, user=user)
 
     def get_login_redirect_url(self, *, request: Request) -> str:
-        return request.session.pop(SESSION_NEXT_KEY, "/")
+        session = get_request_session(request)
+        return session.pop(SESSION_NEXT_KEY, "/")
 
     def get_disconnect_redirect_url(self, *, request: Request) -> str:
         return request.data.get("next", "/")

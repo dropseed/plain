@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from functools import cached_property
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
 
 from plain.exceptions import PermissionDenied
@@ -8,12 +12,20 @@ from plain.http import (
     ResponseRedirect,
 )
 from plain.runtime import settings
+from plain.sessions.views import SessionViewMixin
 from plain.urls import reverse
 from plain.utils.cache import patch_cache_control
 from plain.views import View
 
 from .sessions import logout
 from .utils import resolve_url
+
+if TYPE_CHECKING:
+    from plain.http import Request
+
+    from .sessions import get_user_model
+
+    User = get_user_model()
 
 
 class LoginRequired(Exception):
@@ -22,10 +34,25 @@ class LoginRequired(Exception):
         self.redirect_field_name = redirect_field_name
 
 
-class AuthViewMixin:
-    login_required = True
-    admin_required = False
+class AuthViewMixin(SessionViewMixin):
+    login_required = False
+    admin_required = False  # Implies login_required
     login_url = settings.AUTH_LOGIN_URL
+
+    request: Request
+
+    @cached_property
+    def user(self) -> User | None:
+        """Get the authenticated user for this request."""
+        from .requests import get_request_user
+
+        return get_request_user(self.request)
+
+    def get_template_context(self) -> dict:
+        """Add user and impersonator to template context."""
+        context = super().get_template_context()
+        context["user"] = self.user
+        return context
 
     def check_auth(self) -> None:
         """
@@ -33,32 +60,27 @@ class AuthViewMixin:
         - LoginRequired can specify a login_url and redirect_field_name
         - PermissionDenied can specify a message
         """
+        if not self.login_required and not self.admin_required:
+            return None
 
-        if not hasattr(self, "request"):
-            raise AttributeError(
-                "AuthViewMixin requires the request attribute to be set."
-            )
-
-        if self.login_required and not self.request.user:
+        if not self.user:
             raise LoginRequired(login_url=self.login_url)
 
-        if impersonator := getattr(self.request, "impersonator", None):
-            # Impersonators should be able to view admin pages while impersonating.
-            # There's probably never a case where an impersonator isn't admin, but it can be configured.
-            if self.admin_required and not impersonator.is_admin:
-                raise PermissionDenied(
-                    "You do not have permission to access this page."
-                )
-        elif self.admin_required and not self.request.user.is_admin:
-            # Show a 404 so we don't expose admin urls to non-admin users
-            raise Http404()
+        if self.admin_required:
+            # At this point, we know user is authenticated (from check above)
+            # Check if impersonation is active
+            if impersonator := getattr(self, "impersonator", None):
+                # Impersonators should be able to view admin pages while impersonating.
+                # There's probably never a case where an impersonator isn't admin, but it can be configured.
+                if not impersonator.is_admin:
+                    raise PermissionDenied(
+                        "You do not have permission to access this page."
+                    )
+            elif not self.user.is_admin:
+                # Show a 404 so we don't expose admin urls to non-admin users
+                raise Http404()
 
     def get_response(self) -> Response:
-        if not hasattr(self, "request"):
-            raise AttributeError(
-                "AuthViewMixin requires the request attribute to be set."
-            )
-
         try:
             self.check_auth()
         except LoginRequired as e:
@@ -85,8 +107,11 @@ class AuthViewMixin:
                 raise PermissionDenied("Login required")
 
         response = super().get_response()
-        # Make sure it at least has private as a default
-        patch_cache_control(response, private=True)
+
+        if self.user:
+            # Make sure it at least has private as a default
+            patch_cache_control(response, private=True)
+
         return response
 
 

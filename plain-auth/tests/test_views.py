@@ -14,7 +14,7 @@ def test_view_without_login_required(db):
     response = client.get("/open/")
     assert response.status_code == 200
     assert response.content == b"open"
-    assert response.headers["Cache-Control"] == "private"
+    assert "Cache-Control" not in response.headers
 
 
 def test_admin_required(db):
@@ -33,6 +33,7 @@ def test_admin_required(db):
     resp = client.get("/admin/")
     assert resp.status_code == 200
     assert resp.content == b"admin"
+    assert resp.headers["Cache-Control"] == "private"
 
 
 def test_no_login_url_forbidden(db):

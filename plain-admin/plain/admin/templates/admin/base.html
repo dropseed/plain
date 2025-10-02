@@ -166,11 +166,11 @@
             <div class="mt-8 flex flex-col text-sm pb-3 pt-3 text-stone-400 sticky bottom-0 bg-stone-950/95 pl-3.5 pr-5">
                 <div class="flex items-center justify-between space-x-1.5">
                     <div class="flex items-center truncate">
-                        {% set gravatar_url = get_gravatar_url(request.user) %}
+                        {% set gravatar_url = get_gravatar_url(user) %}
                         {% if gravatar_url %}
                             <img
                                 src="{{ gravatar_url }}"
-                                alt="{{ request.user }}"
+                                alt="{{ user }}"
                                 class="w-5 h-5 mr-1.5 flex-shrink-0 rounded-full"
                             />
                         {% else %}
@@ -180,7 +180,7 @@
                             </svg>
                         {% endif %}
                         <span class="truncate">
-                            {{ request.user }}
+                            {{ user }}
                         </span>
                     </div>
                     <form method="POST" action="{{ url('logout') }}" class="flex items-center flex-shrink-0 ml-2">
