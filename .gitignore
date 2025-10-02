@@ -16,3 +16,4 @@ plain*/tests/.plain
 
 .vscode
 /.claude
+/.benchmarks

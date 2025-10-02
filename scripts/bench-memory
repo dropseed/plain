@@ -1,0 +1,129 @@
+#!/bin/bash -e
+
+# Memory benchmark for Plain framework requests using memray.
+#
+# Usage:
+#   ./scripts/bench-memory                    # Run benchmark and show stats
+#   ./scripts/bench-memory --flamegraph       # Generate flamegraph HTML
+#   ./scripts/bench-memory --table            # Generate allocation table HTML
+#   ./scripts/bench-memory --save-baseline    # Save current run as baseline
+#   ./scripts/bench-memory --compare          # Compare to saved baseline
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BENCH_DIR="$REPO_ROOT/.benchmarks"
+
+# Create benchmarks directory if it doesn't exist
+mkdir -p "$BENCH_DIR"
+
+OUTPUT_FILE="$BENCH_DIR/bench.bin"
+BASELINE_FILE="$BENCH_DIR/baseline.bin"
+
+# Set DATABASE_URL if not already set
+export DATABASE_URL="${DATABASE_URL:-sqlite://:memory:}"
+
+# Handle comparison and baseline saving
+if [ "$1" = "--save-baseline" ]; then
+  echo "Running benchmark and saving as baseline..."
+  uv run --with memray python -m memray run -f -o "$BASELINE_FILE" "$SCRIPT_DIR/benchmark-request.py"
+  echo ""
+  echo "✓ Baseline saved to $BASELINE_FILE"
+  echo ""
+  uvx memray stats "$BASELINE_FILE"
+  exit 0
+fi
+
+if [ "$1" = "--compare" ]; then
+  if [ ! -f "$BASELINE_FILE" ]; then
+    echo "Error: No baseline found. Run './scripts/bench-memory --save-baseline' first." >&2
+    exit 1
+  fi
+
+  echo "Running current benchmark..."
+  uv run --with memray python -m memray run -f -o "$OUTPUT_FILE" "$SCRIPT_DIR/benchmark-request.py"
+  echo ""
+  echo "=========================================="
+  echo "COMPARISON: Baseline vs Current"
+  echo "=========================================="
+  echo ""
+
+  # Export stats to JSON for easier parsing
+  BASELINE_JSON="$BENCH_DIR/baseline_stats.json"
+  CURRENT_JSON="$BENCH_DIR/current_stats.json"
+
+  uvx memray stats --json -f -o "$BASELINE_JSON" "$BASELINE_FILE" >/dev/null 2>&1
+  uvx memray stats --json -f -o "$CURRENT_JSON" "$OUTPUT_FILE" >/dev/null 2>&1
+
+  # Use Python to parse JSON and calculate percentage changes
+  python3 - <<'EOF'
+import json
+import sys
+
+try:
+    with open(".benchmarks/baseline_stats.json") as f:
+        baseline = json.load(f)
+    with open(".benchmarks/current_stats.json") as f:
+        current = json.load(f)
+
+    # Extract metrics (memory is in bytes, convert to MiB)
+    baseline_total = baseline["total_bytes_allocated"] / 1024 / 1024
+    baseline_peak = baseline["metadata"]["peak_memory"] / 1024 / 1024
+    baseline_alloc = baseline["total_num_allocations"]
+
+    current_total = current["total_bytes_allocated"] / 1024 / 1024
+    current_peak = current["metadata"]["peak_memory"] / 1024 / 1024
+    current_alloc = current["total_num_allocations"]
+
+    # Calculate percentage changes
+    total_change = ((current_total - baseline_total) / baseline_total) * 100
+    peak_change = ((current_peak - baseline_peak) / baseline_peak) * 100
+    alloc_change = ((current_alloc - baseline_alloc) / baseline_alloc) * 100
+
+    # Format change with + or - sign
+    def format_change(change):
+        sign = "+" if change > 0 else ""
+        return f"{sign}{change:.1f}%"
+
+    # Display comparison table
+    print(f"{'Metric':<30} {'Baseline':>15} {'Current':>15} {'Change':>12}")
+    print("-" * 75)
+    print(f"{'Total memory allocated':<30} {baseline_total:>12.2f} MiB {current_total:>12.2f} MiB {format_change(total_change):>12}")
+    print(f"{'Peak memory allocated':<30} {baseline_peak:>12.2f} MiB {current_peak:>12.2f} MiB {format_change(peak_change):>12}")
+    print(f"{'Total allocations':<30} {baseline_alloc:>15,} {current_alloc:>15,} {format_change(alloc_change):>12}")
+
+except Exception as e:
+    print(f"Error parsing stats: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+
+  echo ""
+  echo "=========================================="
+  echo "For detailed comparison run:"
+  echo "  uvx memray stats $BASELINE_FILE"
+  echo "  uvx memray stats $OUTPUT_FILE"
+  exit 0
+fi
+
+# Run the benchmark
+echo "Running memory benchmark..."
+uv run --with memray python -m memray run -f -o "$OUTPUT_FILE" "$SCRIPT_DIR/benchmark-request.py"
+
+echo ""
+
+# Generate report based on argument
+case "${1:-stats}" in
+  --flamegraph)
+    echo "Generating flamegraph..."
+    uvx memray flamegraph "$OUTPUT_FILE"
+    ;;
+  --table)
+    echo "Generating allocation table..."
+    uvx memray table "$OUTPUT_FILE"
+    ;;
+  --summary)
+    uvx memray summary "$OUTPUT_FILE"
+    ;;
+  *)
+    uvx memray stats "$OUTPUT_FILE"
+    ;;
+esac
