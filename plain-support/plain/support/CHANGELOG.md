@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-support@0.19.0) (2025-10-02)
+
+### What's changed
+
+- `SupportFormView` now uses `AuthViewMixin` for better authentication handling and accesses user via `self.user` instead of `self.request.user` ([154ee10](https://github.com/dropseed/plain/commit/154ee10375))
+
+### Upgrade instructions
+
+- If you have custom support views that inherit from `SupportFormView` and access `self.request.user` directly, update them to use `self.user` instead
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-support@0.18.0) (2025-09-26)
 
 ### What's changed
