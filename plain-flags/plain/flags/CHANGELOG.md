@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.25.2](https://github.com/dropseed/plain/releases/plain-flags@0.25.2) (2025-10-02)
+
+### What's changed
+
+- Updated README documentation to use `get_current_user()` instead of `request.user` in template examples ([f6278d9](https://github.com/dropseed/plain/commit/f6278d9bb4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.1](https://github.com/dropseed/plain/releases/plain-flags@0.25.1) (2025-09-29)
 
 ### What's changed
