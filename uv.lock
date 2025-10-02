@@ -468,7 +468,7 @@ requires-dist = [
 [[package]]
 name = "plain-demo-full"
 version = "0.0.0"
-source = { virtual = "demos/full" }
+source = { virtual = "example" }
 dependencies = [
     { name = "plain" },
     { name = "plain-admin" },

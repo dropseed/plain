@@ -9,14 +9,11 @@ do
     cd ..
 done
 
-for demo in demos/*;
-do
-    echo ""
-    echo "${BOLD}Installing dependencies for $demo${NORMAL}"
-    cd "$demo"
-    DATABASE_URL=sqlite://:memory: ./scripts/install
-    cd ../..
-done
+echo ""
+echo "${BOLD}Installing dependencies for example${NORMAL}"
+cd "example"
+DATABASE_URL=sqlite://:memory: ./scripts/install
+cd ..
 
 uv sync
 

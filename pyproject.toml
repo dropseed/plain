@@ -71,7 +71,7 @@ members = [
     # By package name, or paths
     "plain",
     "plain-*",
-    "demos/*",
+    "example",
 ]
 
 [tool.plain.code.biome]

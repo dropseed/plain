@@ -70,11 +70,9 @@ for package in $packages; do
   cd ../..
 done
 
-# Demo projects (smoke-tests only)
-for demo in demos/*; do
-  echo
-  bold "Testing $demo"
-  cd "$demo"
-  uv run --isolated $WITH python -m pytest "$@"
-  cd ..
-done
+# Example project (smoke-tests only)
+echo
+bold "Testing example"
+cd "example"
+uv run --isolated $WITH python -m pytest "$@"
+cd ..

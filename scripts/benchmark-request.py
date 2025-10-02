@@ -12,14 +12,14 @@ import os
 import sys
 from pathlib import Path
 
-# Change to demos/full directory to have a valid Plain app
+# Change to example directory to have a valid Plain app
 script_dir = Path(__file__).parent
-demos_full = script_dir.parent / "demos" / "full"
+example_dir = script_dir.parent / "example"
 
-if demos_full.exists():
-    os.chdir(demos_full)
+if example_dir.exists():
+    os.chdir(example_dir)
 else:
-    print(f"Error: Could not find demos/full at {demos_full}", file=sys.stderr)
+    print(f"Error: Could not find example at {example_dir}", file=sys.stderr)
     sys.exit(1)
 
 import plain.runtime  # noqa: E402
