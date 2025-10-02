@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.23.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.23.1) (2025-10-02)
+
+### What's changed
+
+- Updated to use new `get_request_user()` and `get_request_session()` helper functions for better compatibility and error handling ([2663c49](https://github.com/dropseed/plain/commit/2663c494043a3ecf317e5ce3340fde217366e0b8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.23.0) (2025-09-26)
 
 ### What's changed
