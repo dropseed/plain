@@ -10,7 +10,7 @@ from .bridge import get_flag_class
 from .exceptions import FlagImportError
 
 
-def validate_flag_name(value):
+def validate_flag_name(value: str) -> None:
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", value):
         raise ValidationError(f"{value} is not a valid Python identifier name")
 
@@ -30,7 +30,7 @@ class FlagResult(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.key
 
 
@@ -57,11 +57,11 @@ class Flag(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     @classmethod
-    def preflight(cls):
+    def preflight(cls) -> list[PreflightResult]:
         """
         Check for flags that are in the database, but no longer defined in code.
 

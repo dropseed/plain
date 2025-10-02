@@ -1,10 +1,12 @@
+from types import ModuleType
+
 from plain.runtime import settings
 
 from . import exceptions
 from .flags import Flag
 
 
-def get_flags_module():
+def get_flags_module() -> ModuleType:
     flags_module = settings.FLAGS_MODULE
 
     try:

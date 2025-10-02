@@ -8,7 +8,9 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
+from plain.models import QuerySet
 from plain.models.forms import ModelForm
+from plain.preflight import PreflightResult
 
 from .models import Flag, FlagResult
 
@@ -17,13 +19,13 @@ class UnusedFlagsCard(Card):
     title = "Unused Flags"
 
     @cached_property
-    def flag_errors(self):
+    def flag_errors(self) -> list[PreflightResult]:
         return Flag.preflight()
 
-    def get_number(self):
+    def get_number(self) -> int:
         return len(self.flag_errors)
 
-    def get_text(self):
+    def get_text(self) -> str:
         return "\n".join(str(e.fix) for e in self.flag_errors)
 
 
@@ -63,7 +65,7 @@ class FlagResultAdmin(AdminViewset):
         nav_section = "Feature flags"
         nav_icon = "flag"
 
-        def get_initial_queryset(self):
+        def get_initial_queryset(self) -> QuerySet:
             return self.model.query.all().select_related("flag")
 
     class DetailView(AdminModelDetailView):

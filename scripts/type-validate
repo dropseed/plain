@@ -23,6 +23,7 @@ FULLY_TYPED_DIRS = [
     "plain-elements/plain/elements",
     "plain-email/plain/email",
     "plain-esbuild/plain/esbuild",
+    "plain-flags/plain/flags",
     "plain-sessions/plain/sessions",
 ]
 

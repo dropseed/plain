@@ -95,7 +95,7 @@ class Flag:
 
                 span.set_attribute(
                     FEATURE_FLAG_RESULT_REASON,
-                    FeatureFlagResultReasonValues.DYNAMIC.value,
+                    FeatureFlagResultReasonValues.TARGETING_MATCH.value,
                 )
                 span.set_attribute(FEATURE_FLAG_RESULT_VALUE, str(value))
 
@@ -142,13 +142,13 @@ class Flag:
         """
         return bool(self.value)
 
-    def __contains__(self, item) -> bool:
+    def __contains__(self, item: Any) -> bool:
         """
         Allow for use in `in` expressions.
         """
         return item in self.value
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """
         Allow for use in `==` expressions.
         """
