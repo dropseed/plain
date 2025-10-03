@@ -11,8 +11,9 @@ import subprocess
 import json
 from pathlib import Path
 
-# Directories that must maintain 100% type annotation coverage
-FULLY_TYPED_DIRS = [
+# Paths (files or directories) that must maintain 100% type annotation coverage
+FULLY_TYPED_PATHS = [
+    # Fully typed packages
     "plain/plain",
     "plain-admin/plain/admin",
     "plain-api/plain/api",
@@ -39,19 +40,36 @@ FULLY_TYPED_DIRS = [
     "plain-tunnel/plain/tunnel",
     "plain-vendor/plain/vendor",
     "plain-worker/plain/worker",
+    # plain-models: Fully typed directories
+    "plain-models/plain/models/functions",
+    # plain-models: Fully typed individual files
+    "plain-models/plain/models/aggregates.py",
+    "plain-models/plain/models/config.py",
+    "plain-models/plain/models/connections.py",
+    "plain-models/plain/models/constants.py",
+    "plain-models/plain/models/database_url.py",
+    "plain-models/plain/models/db.py",
+    "plain-models/plain/models/enums.py",
+    "plain-models/plain/models/exceptions.py",
+    "plain-models/plain/models/indexes.py",
+    "plain-models/plain/models/otel.py",
+    "plain-models/plain/models/preflight.py",
+    "plain-models/plain/models/registry.py",
+    "plain-models/plain/models/transaction.py",
+    "plain-models/plain/models/utils.py",
 ]
 
 
-def check_type_coverage(directory: str) -> tuple[float, int, int]:
-    """Check type coverage for a directory."""
+def check_type_coverage(path: str) -> tuple[float, int, int]:
+    """Check type coverage for a file or directory."""
     result = subprocess.run(
-        ["./scripts/type-coverage", directory, "--json"],
+        ["./scripts/type-coverage", path, "--json"],
         capture_output=True,
         text=True,
     )
 
     if result.returncode != 0:
-        print(f"Error checking coverage for {directory}:", file=sys.stderr)
+        print(f"Error checking coverage for {path}:", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
         return 0.0, 0, 0
 
@@ -63,16 +81,16 @@ def check_type_coverage(directory: str) -> tuple[float, int, int]:
     )
 
 
-def run_type_check(directory: str) -> bool:
-    """Run type checker on a directory."""
+def run_type_check(path: str) -> bool:
+    """Run type checker on a file or directory."""
     result = subprocess.run(
-        ["./scripts/type-check", directory],
+        ["./scripts/type-check", path],
         capture_output=True,
         text=True,
     )
 
     if result.returncode != 0:
-        print(f"Type check failed for {directory}:", file=sys.stderr)
+        print(f"Type check failed for {path}:", file=sys.stderr)
         print(result.stdout, file=sys.stderr)
         print(result.stderr, file=sys.stderr)
         return False
@@ -82,50 +100,50 @@ def run_type_check(directory: str) -> bool:
 
 def main():
     """Main entry point."""
-    print("Validating type annotations for fully typed directories...")
+    print("Validating type annotations for fully typed paths...")
     print()
 
-    failed_dirs = []
+    failed_items = []
 
-    for directory in FULLY_TYPED_DIRS:
-        dir_path = Path(directory)
-        if not dir_path.exists():
-            print(f"⚠️  {directory} does not exist, skipping")
+    for path in FULLY_TYPED_PATHS:
+        path_obj = Path(path)
+        if not path_obj.exists():
+            print(f"⚠️  {path} does not exist, skipping")
             continue
 
-        print(f"Checking {directory}...")
+        print(f"Checking {path}...")
 
         # Check coverage
-        coverage, typed, total = check_type_coverage(directory)
+        coverage, typed, total = check_type_coverage(path)
 
         if coverage < 100.0:
             print(f"  ✗ Coverage: {coverage:.1f}% ({typed}/{total}) - Expected 100%")
-            failed_dirs.append((directory, f"coverage {coverage:.1f}%"))
+            failed_items.append((path, f"coverage {coverage:.1f}%"))
         else:
             print(f"  ✓ Coverage: 100% ({typed}/{total})")
 
         # Run type checker
-        if not run_type_check(directory):
+        if not run_type_check(path):
             print(f"  ✗ Type check failed")
-            failed_dirs.append((directory, "type check failed"))
+            failed_items.append((path, "type check failed"))
         else:
             print(f"  ✓ Type check passed")
 
         print()
 
-    if failed_dirs:
-        print("❌ Type validation failed for the following directories:")
-        for directory, reason in failed_dirs:
-            print(f"  - {directory}: {reason}")
+    if failed_items:
+        print("❌ Type validation failed for the following paths:")
+        for path, reason in failed_items:
+            print(f"  - {path}: {reason}")
         print()
         print("To fix:")
-        print("  1. Check coverage: ./scripts/type-coverage <directory> --details --missing")
+        print("  1. Check coverage: ./scripts/type-coverage <path> --details --missing")
         print("  2. Add missing annotations")
-        print("  3. Run type check: ./scripts/type-check <directory>")
+        print("  3. Run type check: ./scripts/type-check <path>")
         print("  4. Format: ./scripts/fix")
         sys.exit(1)
 
-    print("✓ All directories passed type validation")
+    print("✓ All paths passed type validation")
     sys.exit(0)
 
 
