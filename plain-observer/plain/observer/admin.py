@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from plain import models
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -24,7 +29,7 @@ class TraceViewset(AdminViewset):
         allow_global_search = False
         actions = ["Delete"]
 
-        def perform_action(self, action: str, target_ids: list):
+        def perform_action(self, action: str, target_ids: Sequence[int]) -> None:
             if action == "Delete":
                 Trace.query.filter(id__in=target_ids).delete()
 
@@ -52,11 +57,11 @@ class SpanViewset(AdminViewset):
         search_fields = ["name", "span_id", "parent_id"]
         actions = ["Delete"]
 
-        def perform_action(self, action: str, target_ids: list):
+        def perform_action(self, action: str, target_ids: Sequence[int]) -> None:
             if action == "Delete":
                 Span.query.filter(id__in=target_ids).delete()
 
-        def get_objects(self):
+        def get_objects(self) -> models.QuerySet:
             return (
                 super()
                 .get_objects()
@@ -69,7 +74,7 @@ class SpanViewset(AdminViewset):
                 )
             )
 
-        def get_initial_queryset(self):
+        def get_initial_queryset(self) -> models.QuerySet:
             queryset = super().get_initial_queryset()
             if self.display == "Parents only":
                 queryset = queryset.filter(parent_id="")
@@ -99,13 +104,13 @@ class LogViewset(AdminViewset):
         filters = ["level", "logger"]
         actions = ["Delete selected", "Delete all"]
 
-        def perform_action(self, action: str, target_ids: list):
+        def perform_action(self, action: str, target_ids: Sequence[int]) -> None:
             if action == "Delete selected":
                 Log.query.filter(id__in=target_ids).delete()
             elif action == "Delete all":
                 Log.query.all().delete()
 
-        def get_objects(self):
+        def get_objects(self) -> models.QuerySet:
             return (
                 super()
                 .get_objects()

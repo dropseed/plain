@@ -1,13 +1,24 @@
+from __future__ import annotations
+
 import logging
 import re
 import threading
 from collections import defaultdict
+from collections.abc import MutableMapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 import opentelemetry.context as context_api
 from opentelemetry import baggage, trace
-from opentelemetry.sdk.trace import SpanProcessor, sampling
+from opentelemetry.context import Context
+from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, sampling
 from opentelemetry.semconv.attributes import url_attributes
-from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
+from opentelemetry.trace import (
+    Link,
+    SpanKind,
+    TraceState,
+    format_span_id,
+    format_trace_id,
+)
 
 from plain.http.cookie import unsign_cookie_value
 from plain.logs import app_logger
@@ -16,10 +27,16 @@ from plain.runtime import settings
 
 from .core import Observer, ObserverMode
 
+if TYPE_CHECKING:
+    from plain.observer.models import Span as ObserverSpanModel
+    from plain.observer.models import Trace as TraceModel
+
+    from .logging import ObserverLogEntry
+
 logger = logging.getLogger(__name__)
 
 
-def get_observer_span_processor():
+def get_observer_span_processor() -> ObserverSpanProcessor | None:
     """Get the span collector instance from the tracer provider."""
     if not (current_provider := trace.get_tracer_provider()):
         return None
@@ -30,7 +47,11 @@ def get_observer_span_processor():
         # It's a composite processor, check its _span_processors
         if composite_processor := current_provider._active_span_processor:
             if hasattr(composite_processor, "_span_processors"):
-                for processor in composite_processor._span_processors:
+                processors = cast(
+                    Sequence[SpanProcessor],
+                    getattr(composite_processor, "_span_processors", ()),
+                )
+                for processor in processors:
                     if isinstance(processor, ObserverSpanProcessor):
                         return processor
 
@@ -55,25 +76,25 @@ def get_current_trace_summary() -> str | None:
 class ObserverSampler(sampling.Sampler):
     """Samples traces based on request path and cookies."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Custom parent-based sampler
         self._delegate = sampling.ParentBased(sampling.ALWAYS_OFF)
 
         # TODO ignore url namespace instead? admin, observer, assets
-        self._ignore_url_paths = [
+        self._ignore_url_paths: list[re.Pattern[str]] = [
             re.compile(p) for p in settings.OBSERVER_IGNORE_URL_PATTERNS
         ]
 
     def should_sample(
         self,
-        parent_context,
-        trace_id,
-        name,
+        parent_context: Context | None,
+        trace_id: int,
+        name: str,
         kind: SpanKind | None = None,
-        attributes=None,
-        links=None,
-        trace_state=None,
-    ):
+        attributes: MutableMapping[str, Any] | None = None,
+        links: Sequence[Link] | None = None,
+        trace_state: TraceState | None = None,
+    ) -> sampling.SamplingResult:
         # First, drop if the URL should be ignored.
         if attributes:
             if url_path := attributes.get(url_attributes.URL_PATH, ""):
@@ -85,24 +106,27 @@ class ObserverSampler(sampling.Sampler):
                         )
 
         # If no processor decision, check cookies directly for root spans
-        decision = None
+        decision: sampling.Decision | None = None
         if parent_context:
             # Check cookies for sampling decision
-            if cookies := baggage.get_baggage("http.request.cookies", parent_context):
-                if observer_cookie := cookies.get(Observer.COOKIE_NAME):
-                    unsigned_value = unsign_cookie_value(
-                        Observer.COOKIE_NAME, observer_cookie, default=False
-                    )
+            cookies = cast(
+                MutableMapping[str, str] | None,
+                baggage.get_baggage("http.request.cookies", parent_context),
+            )
+            if cookies and (observer_cookie := cookies.get(Observer.COOKIE_NAME)):
+                unsigned_value = unsign_cookie_value(
+                    Observer.COOKIE_NAME, observer_cookie, default=None
+                )
 
-                    if unsigned_value in (
-                        ObserverMode.PERSIST.value,
-                        ObserverMode.SUMMARY.value,
-                    ):
-                        # Always use RECORD_AND_SAMPLE so ParentBased works correctly
-                        # The processor will check the mode to decide whether to export
-                        decision = sampling.Decision.RECORD_AND_SAMPLE
-                    else:
-                        decision = sampling.Decision.DROP
+                if unsigned_value in (
+                    ObserverMode.PERSIST.value,
+                    ObserverMode.SUMMARY.value,
+                ):
+                    # Always use RECORD_AND_SAMPLE so ParentBased works correctly
+                    # The processor will check the mode to decide whether to export
+                    decision = sampling.Decision.RECORD_AND_SAMPLE
+                else:
+                    decision = sampling.Decision.DROP
 
         # If there are links, assume it is to another trace/span that we are keeping
         if links:
@@ -133,20 +157,20 @@ class ObserverSampler(sampling.Sampler):
 class ObserverCombinedSampler(sampling.Sampler):
     """Combine another sampler with ``ObserverSampler``."""
 
-    def __init__(self, primary: sampling.Sampler, secondary: sampling.Sampler):
+    def __init__(self, primary: sampling.Sampler, secondary: sampling.Sampler) -> None:
         self.primary = primary
         self.secondary = secondary
 
     def should_sample(
         self,
-        parent_context,
-        trace_id,
-        name,
+        parent_context: Context | None,
+        trace_id: int,
+        name: str,
         kind: SpanKind | None = None,
-        attributes=None,
-        links=None,
-        trace_state=None,
-    ):
+        attributes: MutableMapping[str, Any] | None = None,
+        links: Sequence[Link] | None = None,
+        trace_state: TraceState | None = None,
+    ) -> sampling.SamplingResult:
         result = self.primary.should_sample(
             parent_context,
             trace_id,
@@ -183,9 +207,9 @@ class ObserverSpanProcessor(SpanProcessor):
     database.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Span storage
-        self._traces = defaultdict(
+        self._traces: defaultdict[str, dict[str, Any]] = defaultdict(
             lambda: {
                 "trace": None,  # Trace model instance
                 "active_otel_spans": {},  # span_id -> opentelemetry span
@@ -196,11 +220,11 @@ class ObserverSpanProcessor(SpanProcessor):
             }
         )
         self._traces_lock = threading.Lock()
-        self._ignore_url_paths = [
+        self._ignore_url_paths: list[re.Pattern[str]] = [
             re.compile(p) for p in settings.OBSERVER_IGNORE_URL_PATTERNS
         ]
 
-    def on_start(self, span, parent_context=None):
+    def on_start(self, span: Any, parent_context: Context | None = None) -> None:
         """Called when a span starts."""
         trace_id = f"0x{format_trace_id(span.get_span_context().trace_id)}"
 
@@ -232,7 +256,7 @@ class ObserverSpanProcessor(SpanProcessor):
             if not span.parent:
                 trace_info["root_span_id"] = span_id
 
-    def on_end(self, span):
+    def on_end(self, span: ReadableSpan) -> None:
         """Called when a span ends."""
         trace_id = f"0x{format_trace_id(span.get_span_context().trace_id)}"
         span_id = f"0x{format_span_id(span.get_span_context().span_id)}"
@@ -330,7 +354,13 @@ class ObserverSpanProcessor(SpanProcessor):
 
             return trace_info["trace"].get_trace_summary(span_models)
 
-    def _export_trace(self, *, trace, spans, logs):
+    def _export_trace(
+        self,
+        *,
+        trace: TraceModel,
+        spans: Sequence[ObserverSpanModel],
+        logs: Sequence[ObserverLogEntry],
+    ) -> None:
         """Export trace, spans, and logs to the database."""
         from .models import Log, Span, Trace
 
@@ -387,7 +417,9 @@ class ObserverSpanProcessor(SpanProcessor):
                         "Failed to clean up old observer traces: %s", e, exc_info=True
                     )
 
-    def _get_recording_mode(self, span, parent_context) -> str | None:
+    def _get_recording_mode(
+        self, span: Any, parent_context: Context | None
+    ) -> str | None:
         # Again check the span attributes, in case we relied on another sampler
         if span.attributes:
             if url_path := span.attributes.get(url_attributes.URL_PATH, ""):
@@ -409,10 +441,15 @@ class ObserverSpanProcessor(SpanProcessor):
         if not (context := parent_context or context_api.get_current()):
             return None
 
-        if not (cookies := baggage.get_baggage("http.request.cookies", context)):
+        cookies = cast(
+            MutableMapping[str, str] | None,
+            baggage.get_baggage("http.request.cookies", context),
+        )
+        if not cookies:
             return None
 
-        if not (observer_cookie := cookies.get(Observer.COOKIE_NAME)):
+        observer_cookie = cookies.get(Observer.COOKIE_NAME)
+        if not observer_cookie:
             return None
 
         try:
@@ -426,11 +463,11 @@ class ObserverSpanProcessor(SpanProcessor):
 
         return None
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Cleanup when shutting down."""
         with self._traces_lock:
             self._traces.clear()
 
-    def force_flush(self, timeout_millis=None):
+    def force_flush(self, timeout_millis: int | None = None) -> bool:
         """Required by SpanProcessor interface."""
         return True

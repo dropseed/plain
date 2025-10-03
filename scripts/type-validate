@@ -33,6 +33,7 @@ FULLY_TYPED_DIRS = [
     "plain-pytest/plain/pytest",
     "plain-redirection/plain/redirection",
     "plain-sessions/plain/sessions",
+    "plain-observer/plain/observer",
     "plain-support/plain/support",
     "plain-toolbar/plain/toolbar",
     "plain-tunnel/plain/tunnel",

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import cast
+
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -20,7 +24,7 @@ from .otel import (
 class Config(PackageConfig):
     package_label = "plainobserver"
 
-    def ready(self):
+    def ready(self) -> None:
         sampler = ObserverSampler()
         span_processor = ObserverSpanProcessor()
 
@@ -55,11 +59,11 @@ class Config(PackageConfig):
             app_logger.addHandler(observer_log_handler)
 
     @staticmethod
-    def get_existing_trace_provider():
+    def get_existing_trace_provider() -> TracerProvider | None:
         """Return the currently configured provider if set."""
         current_provider = trace.get_tracer_provider()
         if current_provider and not isinstance(
             current_provider, trace.ProxyTracerProvider
         ):
-            return current_provider
+            return cast(TracerProvider, current_provider)
         return None

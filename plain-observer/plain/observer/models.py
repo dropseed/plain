@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import json
 import secrets
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import cached_property
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlparse
+from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.semconv._incubating.attributes import (
     exception_attributes,
     session_attributes,
@@ -52,6 +57,12 @@ class Trace(models.Model):
     share_id = models.CharField(max_length=32, default="", required=False)
     share_created_at = models.DateTimeField(allow_null=True, required=False)
 
+    if TYPE_CHECKING:
+        from plain.models.fields.related_managers import BaseRelatedManager
+
+        spans: BaseRelatedManager
+        logs: BaseRelatedManager
+
     class Meta:
         ordering = ["-start_time"]
         constraints = [
@@ -68,32 +79,32 @@ class Trace(models.Model):
             models.Index(fields=["session_id"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.trace_id
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         """Return the canonical URL for this trace."""
         return reverse("observer:trace_detail", trace_id=self.trace_id)
 
-    def generate_share_id(self):
+    def generate_share_id(self) -> str:
         """Generate a unique share ID for this trace."""
         self.share_id = secrets.token_urlsafe(24)
         self.share_created_at = timezone.now()
         self.save(update_fields=["share_id", "share_created_at"])
         return self.share_id
 
-    def remove_share_id(self):
+    def remove_share_id(self) -> None:
         """Remove the share ID from this trace."""
         self.share_id = ""
         self.share_created_at = None
         self.save(update_fields=["share_id", "share_created_at"])
 
-    def duration_ms(self):
+    def duration_ms(self) -> float:
         return (self.end_time - self.start_time).total_seconds() * 1000
 
-    def get_trace_summary(self, spans):
+    def get_trace_summary(self, spans: Iterable[Span]) -> str:
         # Count database queries with query text and track duplicates
-        query_texts = []
+        query_texts: list[str] = []
         for span in spans:
             if query_text := span.attributes.get(db_attributes.DB_QUERY_TEXT):
                 query_texts.append(query_text)
@@ -103,7 +114,7 @@ class Trace(models.Model):
         duplicate_count = sum(query_counts.values()) - len(query_counts)
 
         # Build summary: "n spans, n queries (n duplicates), Xms"
-        parts = []
+        parts: list[str] = []
 
         # Queries count with duplicates
         if query_total > 0:
@@ -119,7 +130,7 @@ class Trace(models.Model):
         return " • ".join(parts)
 
     @classmethod
-    def from_opentelemetry_spans(cls, spans):
+    def from_opentelemetry_spans(cls, spans: Sequence[ReadableSpan]) -> Trace:
         """Create a Trace instance from a list of OpenTelemetry spans."""
         # Get trace information from the first span
         first_span = spans[0]
@@ -187,7 +198,7 @@ class Trace(models.Model):
             root_span_name=root_span.name if root_span else "",
         )
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, Any]:
         spans = [
             span.span_data for span in self.spans.query.all().order_by("start_time")
         ]
@@ -217,9 +228,9 @@ class Trace(models.Model):
             "logs": logs,
         }
 
-    def get_timeline_events(self):
+    def get_timeline_events(self) -> list[dict[str, Any]]:
         """Get chronological list of spans and logs for unified timeline display."""
-        events = []
+        events: list[dict[str, Any]] = []
 
         for span in self.spans.query.all().annotate_spans():
             events.append(
@@ -258,12 +269,12 @@ class Trace(models.Model):
 
 
 class SpanQuerySet(models.QuerySet):
-    def annotate_spans(self):
+    def annotate_spans(self) -> list[Span]:
         """Annotate spans with nesting levels and duplicate query warnings."""
-        spans = list(self.order_by("start_time"))
+        spans: list[Span] = list(self.order_by("start_time"))
 
         # Build span dictionary for parent lookups
-        span_dict = {span.span_id: span for span in spans}
+        span_dict: dict[str, Span] = {span.span_id: span for span in spans}
 
         # Calculate nesting levels
         for span in spans:
@@ -275,7 +286,7 @@ class SpanQuerySet(models.QuerySet):
                 parent_level = parent.level if parent else 0
                 span.level = parent_level + 1
 
-        query_counts = {}
+        query_counts: dict[str, int] = {}
 
         # First pass: count queries
         for span in spans:
@@ -283,7 +294,7 @@ class SpanQuerySet(models.QuerySet):
                 query_counts[sql_query] = query_counts.get(sql_query, 0) + 1
 
         # Second pass: add annotations
-        query_occurrences = {}
+        query_occurrences: dict[str, int] = {}
         for span in spans:
             span.annotations = []
 
@@ -334,8 +345,12 @@ class Span(models.Model):
             models.Index(fields=["start_time"]),
         ]
 
+    if TYPE_CHECKING:
+        level: int
+        annotations: list[dict[str, Any]]
+
     @classmethod
-    def from_opentelemetry_span(cls, otel_span, trace):
+    def from_opentelemetry_span(cls, otel_span: ReadableSpan, trace: Trace) -> Span:
         """Create a Span instance from an OpenTelemetry span."""
 
         span_data = json.loads(otel_span.to_json())
@@ -357,51 +372,51 @@ class Span(models.Model):
             span_data=span_data,
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.span_id
 
     @property
-    def attributes(self):
+    def attributes(self) -> Mapping[str, Any]:
         """Get attributes from span_data."""
-        return self.span_data.get("attributes", {})
+        return cast(Mapping[str, Any], self.span_data.get("attributes", {}))
 
     @property
-    def events(self):
+    def events(self) -> list[Mapping[str, Any]]:
         """Get events from span_data."""
-        return self.span_data.get("events", [])
+        return cast(list[Mapping[str, Any]], self.span_data.get("events", []))
 
     @property
-    def links(self):
+    def links(self) -> list[Mapping[str, Any]]:
         """Get links from span_data."""
-        return self.span_data.get("links", [])
+        return cast(list[Mapping[str, Any]], self.span_data.get("links", []))
 
     @property
-    def resource(self):
+    def resource(self) -> Mapping[str, Any]:
         """Get resource from span_data."""
-        return self.span_data.get("resource", {})
+        return cast(Mapping[str, Any], self.span_data.get("resource", {}))
 
     @property
-    def context(self):
+    def context(self) -> Mapping[str, Any]:
         """Get context from span_data."""
-        return self.span_data.get("context", {})
+        return cast(Mapping[str, Any], self.span_data.get("context", {}))
 
-    def duration_ms(self):
+    def duration_ms(self) -> float:
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds() * 1000
         return 0
 
     @cached_property
-    def sql_query(self):
+    def sql_query(self) -> str | None:
         """Get the SQL query if this span contains one."""
         return self.attributes.get(db_attributes.DB_QUERY_TEXT)
 
     @cached_property
-    def sql_query_params(self):
+    def sql_query_params(self) -> dict[str, Any]:
         """Get query parameters from attributes that start with 'db.query.parameter.'"""
         if not self.attributes:
             return {}
 
-        query_params = {}
+        query_params: dict[str, Any] = {}
         for key, value in self.attributes.items():
             if key.startswith(DB_QUERY_PARAMETER_TEMPLATE + "."):
                 param_name = key.replace(DB_QUERY_PARAMETER_TEMPLATE + ".", "")
@@ -410,7 +425,7 @@ class Span(models.Model):
         return query_params
 
     @cached_property
-    def source_code_location(self):
+    def source_code_location(self) -> dict[str, Any] | None:
         """Get the source code location attributes from this span."""
         if not self.attributes:
             return None
@@ -432,7 +447,7 @@ class Span(models.Model):
 
         return code_attrs if code_attrs else None
 
-    def get_formatted_sql(self):
+    def get_formatted_sql(self) -> str | None:
         """Get the pretty-formatted SQL query if this span contains one."""
         sql = self.sql_query
         if not sql:
@@ -450,22 +465,27 @@ class Span(models.Model):
             comma_first=False,
         )
 
-    def format_event_timestamp(self, timestamp):
+    def format_event_timestamp(
+        self, timestamp: float | int | datetime | str
+    ) -> datetime | str:
         """Convert event timestamp to a readable datetime."""
         if isinstance(timestamp, int | float):
+            ts_value = float(timestamp)
             try:
                 # Try as seconds first
-                if timestamp > 1e10:  # Likely nanoseconds
-                    timestamp = timestamp / 1e9
-                elif timestamp > 1e7:  # Likely milliseconds
-                    timestamp = timestamp / 1e3
+                if ts_value > 1e10:  # Likely nanoseconds
+                    ts_value /= 1e9
+                elif ts_value > 1e7:  # Likely milliseconds
+                    ts_value /= 1e3
 
-                return datetime.fromtimestamp(timestamp, tz=UTC)
+                return datetime.fromtimestamp(ts_value, tz=UTC)
             except (ValueError, OSError):
-                return str(timestamp)
-        return timestamp
+                return str(ts_value)
+        if isinstance(timestamp, datetime):
+            return timestamp
+        return str(timestamp)
 
-    def get_exception_stacktrace(self):
+    def get_exception_stacktrace(self) -> str | None:
         """Get the exception stacktrace if this span has an exception event."""
         if not self.events:
             return None

@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import logging
 import threading
 from datetime import UTC, datetime
+from typing import TypedDict
 
 from opentelemetry import trace
 from opentelemetry.trace import format_span_id, format_trace_id
@@ -9,15 +12,22 @@ from .core import ObserverMode
 from .otel import get_observer_span_processor
 
 
+class ObserverLogEntry(TypedDict):
+    message: str
+    level: str
+    span_id: str
+    timestamp: datetime
+
+
 class ObserverLogHandler(logging.Handler):
     """Custom logging handler that captures logs during active traces when observer is enabled."""
 
-    def __init__(self, level=logging.NOTSET):
+    def __init__(self, level: int = logging.NOTSET) -> None:
         super().__init__(level)
         self._logs_lock = threading.Lock()
-        self._trace_logs = {}  # trace_id -> list of log records
+        self._trace_logs: dict[str, list[ObserverLogEntry]] = {}
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         """Emit a log record if we're in an active observer trace."""
         try:
             # Get the current span to determine if we're in an active trace
@@ -45,7 +55,7 @@ class ObserverLogHandler(logging.Handler):
                     return
 
             # Store the formatted message with span context
-            log_entry = {
+            log_entry: ObserverLogEntry = {
                 "message": self.format(record),
                 "level": record.levelname,
                 "span_id": span_id,
@@ -65,7 +75,7 @@ class ObserverLogHandler(logging.Handler):
             # Don't let logging errors break the application
             pass
 
-    def pop_logs_for_trace(self, trace_id):
+    def pop_logs_for_trace(self, trace_id: str) -> list[ObserverLogEntry]:
         """Get and remove all logs for a specific trace in one operation."""
         with self._logs_lock:
             return self._trace_logs.pop(trace_id, []).copy()

@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import json
 import sys
 import urllib.request
+from datetime import datetime
+from typing import Any, cast
 
 import click
 
@@ -11,13 +15,13 @@ from plain.observer.models import Span, Trace
 
 @register_cli("observer")
 @click.group("observer")
-def observer_cli():
+def observer_cli() -> None:
     pass
 
 
 @observer_cli.command()
 @click.option("--force", is_flag=True, help="Skip confirmation prompt.")
-def clear(force: bool):
+def clear(force: bool) -> None:
     """Clear all observer data."""
     query = Trace.query.all()
     trace_count = query.count()
@@ -40,7 +44,13 @@ def clear(force: bool):
 @click.option("--request-id", help="Filter by request ID")
 @click.option("--session-id", help="Filter by session ID")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def trace_list(limit, user_id, request_id, session_id, output_json):
+def trace_list(
+    limit: int,
+    user_id: str | None,
+    request_id: str | None,
+    session_id: str | None,
+    output_json: bool,
+) -> None:
     """List recent traces."""
     # Build query
     query = Trace.query.all()
@@ -136,7 +146,7 @@ def trace_list(limit, user_id, request_id, session_id, output_json):
 @observer_cli.command("trace")
 @click.argument("trace_id")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def trace_detail(trace_id, output_json):
+def trace_detail(trace_id: str, output_json: bool) -> None:
     """Display detailed information about a specific trace."""
     try:
         trace = Trace.query.get(trace_id=trace_id)
@@ -154,7 +164,7 @@ def trace_detail(trace_id, output_json):
 @click.option("--trace-id", help="Filter by trace ID")
 @click.option("--limit", default=50, help="Number of spans to show (default: 50)")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def span_list(trace_id, limit, output_json):
+def span_list(trace_id: str | None, limit: int, output_json: bool) -> None:
     """List recent spans."""
     # Build query
     query = Span.query.all()
@@ -256,7 +266,7 @@ def span_list(trace_id, limit, output_json):
 @observer_cli.command("span")
 @click.argument("span_id")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def span_detail(span_id, output_json):
+def span_detail(span_id: str, output_json: bool) -> None:
     """Display detailed information about a specific span."""
     try:
         span = Span.query.select_related("trace").get(span_id=span_id)
@@ -354,22 +364,24 @@ def span_detail(span_id, output_json):
                         click.echo(f"    {key}: {value}")
 
 
-def format_trace_output(trace):
+def format_trace_output(trace: Trace) -> str:
     """Format trace output for display - extracted for reuse."""
-    output_lines = []
+    output_lines: list[str] = []
 
     # Trace details with aligned labels
     label_width = 12
+    start_time = cast(datetime, trace.start_time)
+    end_time = cast(datetime, trace.end_time)
     output_lines.append(
         click.style(
             f"{'Trace:':<{label_width}} {trace.trace_id}", fg="bright_blue", bold=True
         )
     )
     output_lines.append(
-        f"{'Start:':<{label_width}} {trace.start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} UTC"
+        f"{'Start:':<{label_width}} {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} UTC"
     )
     output_lines.append(
-        f"{'End:':<{label_width}} {trace.end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} UTC"
+        f"{'End:':<{label_width}} {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} UTC"
     )
     output_lines.append(f"{'Duration:':<{label_width}} {trace.duration_ms():.2f}ms")
 
@@ -391,15 +403,13 @@ def format_trace_output(trace):
 
     # Build parent-child relationships
     span_dict = {span.span_id: span for span in spans}
-    children = {}
+    children: dict[str, list[str]] = {}
     for span in spans:
         if span.parent_id:
-            if span.parent_id not in children:
-                children[span.parent_id] = []
-            children[span.parent_id].append(span.span_id)
+            children.setdefault(span.parent_id, []).append(span.span_id)
 
-    def format_span_tree(span, level=0):
-        lines = []
+    def format_span_tree(span: Span, level: int = 0) -> list[str]:
+        lines: list[str] = []
         # Simple 4-space indentation
         prefix = "    " * level
 
@@ -502,7 +512,13 @@ def format_trace_output(trace):
     is_flag=True,
     help="Print the prompt without running the agent",
 )
-def diagnose(trace_id, url, json_input, agent_command, print_only):
+def diagnose(
+    trace_id: str | None,
+    url: str | None,
+    json_input: str | None,
+    agent_command: str | None,
+    print_only: bool,
+) -> None:
     """Generate a diagnostic prompt for analyzing a trace.
 
     By default, provide a trace ID from the database. Use --url for a shareable
@@ -514,6 +530,8 @@ def diagnose(trace_id, url, json_input, agent_command, print_only):
         raise click.UsageError("Must provide trace ID, --url, or --json")
     elif input_count > 1:
         raise click.UsageError("Cannot specify multiple input methods")
+
+    trace_data: Any
 
     if json_input:
         if json_input == "-":
@@ -545,7 +563,7 @@ def diagnose(trace_id, url, json_input, agent_command, print_only):
         except Trace.DoesNotExist:
             raise click.ClickException(f"Trace with ID '{trace_id}' not found")
 
-    prompt_lines = [
+    prompt_lines: list[str] = [
         "I have an OpenTelemetry trace data JSON from a Plain application. Analyze it for performance issues or improvements.",
         "",
         "Focus on easy and obvious wins first and foremost. You have access to the codebase, so make sure you look at it before suggesting anything! If there is nothing obvious, that's ok -- tell me that and ask whether there are specific things we should look deeper into.",
