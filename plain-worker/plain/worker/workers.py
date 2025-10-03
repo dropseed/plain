@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gc
 import logging
 import multiprocessing
@@ -5,6 +7,7 @@ import os
 import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
+from typing import Any
 
 from plain import models
 from plain.models import transaction
@@ -22,13 +25,13 @@ logger = logging.getLogger("plain.worker")
 class Worker:
     def __init__(
         self,
-        queues,
-        jobs_schedule=None,
-        max_processes=None,
-        max_jobs_per_process=None,
-        max_pending_per_process=10,
-        stats_every=None,
-    ):
+        queues: list[str],
+        jobs_schedule: list[Any] | None = None,
+        max_processes: int | None = None,
+        max_jobs_per_process: int | None = None,
+        max_pending_per_process: int = 10,
+        stats_every: int | None = None,
+    ) -> None:
         if jobs_schedule is None:
             jobs_schedule = []
 
@@ -52,7 +55,7 @@ class Worker:
 
         self._is_shutting_down = False
 
-    def run(self):
+    def run(self) -> None:
         logger.info(
             "⬣ Starting Plain worker\n    Registered jobs: %s\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
             "\n                     ".join(
@@ -131,7 +134,7 @@ class Worker:
             # gives processes a chance to start up
             time.sleep(0.1)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         if self._is_shutting_down:
             # Already shutting down somewhere else
             return
@@ -141,7 +144,7 @@ class Worker:
         self.executor.shutdown(wait=True, cancel_futures=True)
         logger.info("Job worker shutdown complete")
 
-    def maybe_log_stats(self):
+    def maybe_log_stats(self) -> None:
         if not self.stats_every:
             return
 
@@ -154,7 +157,7 @@ class Worker:
             self._stats_logged_at = now
             self.log_stats()
 
-    def maybe_check_job_results(self):
+    def maybe_check_job_results(self) -> None:
         now = time.time()
 
         if not hasattr(self, "_job_results_checked_at"):
@@ -166,7 +169,7 @@ class Worker:
             self._job_results_checked_at = now
             self.rescue_job_results()
 
-    def maybe_schedule_jobs(self):
+    def maybe_schedule_jobs(self) -> None:
         if not self.jobs_schedule:
             return
 
@@ -207,7 +210,7 @@ class Worker:
 
             self._jobs_schedule_checked_at = now
 
-    def log_stats(self):
+    def log_stats(self) -> None:
         try:
             num_proccesses = len(self.executor._processes)
         except (AttributeError, TypeError):
@@ -227,14 +230,14 @@ class Worker:
             self.max_jobs_per_process,
         )
 
-    def rescue_job_results(self):
+    def rescue_job_results(self) -> None:
         """Find any lost or failed jobs on this worker's queues and handle them."""
         # TODO return results and log them if there are any?
         JobProcess.query.filter(queue__in=self.queues).mark_lost_jobs()
         JobResult.query.filter(queue__in=self.queues).retry_failed_jobs()
 
 
-def future_finished_callback(job_process_uuid: str, future: Future):
+def future_finished_callback(job_process_uuid: str, future: Future) -> None:
     if future.cancelled():
         logger.warning("Job cancelled job_process_uuid=%s", job_process_uuid)
         try:
@@ -260,7 +263,7 @@ def future_finished_callback(job_process_uuid: str, future: Future):
         logger.debug("Job finished job_process_uuid=%s", job_process_uuid)
 
 
-def process_job(job_process_uuid):
+def process_job(job_process_uuid: str) -> None:
     try:
         worker_pid = os.getpid()
 
@@ -278,7 +281,7 @@ def process_job(job_process_uuid):
             job_process.queue,
         )
 
-        def middleware_chain(job):
+        def middleware_chain(job: JobProcess) -> JobResult:
             return job.run()
 
         for middleware_path in reversed(settings.WORKER_MIDDLEWARE):
@@ -291,7 +294,7 @@ def process_job(job_process_uuid):
         # Release it now
         del job_process
 
-        duration = job_result.ended_at - job_result.started_at
+        duration = job_result.ended_at - job_result.started_at  # type: ignore[unsupported-operator]
         duration = duration.total_seconds()
 
         logger.info(

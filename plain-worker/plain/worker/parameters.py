@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import datetime
+from typing import Any
 
 from plain.models import Model, models_registry
 
@@ -6,20 +9,20 @@ from plain.models import Model, models_registry
 class JobParameter:
     """Base class for job parameter serialization/deserialization."""
 
-    STR_PREFIX = None  # Subclasses should define this
+    STR_PREFIX: str | None = None  # Subclasses should define this
 
     @classmethod
-    def serialize(cls, value):
+    def serialize(cls, value: Any) -> str | None:
         """Return serialized string or None if can't handle this value."""
         return None
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: Any) -> Any:
         """Return deserialized value or None if can't handle this data."""
         return None
 
     @classmethod
-    def _extract_string_value(cls, data):
+    def _extract_string_value(cls, data: Any) -> str | None:
         """Extract value from string with prefix, return None if invalid format."""
         if not isinstance(data, str) or not cls.STR_PREFIX:
             return None
@@ -34,13 +37,13 @@ class ModelParameter(JobParameter):
     STR_PREFIX = "__plain://model/"
 
     @classmethod
-    def serialize(cls, value):
+    def serialize(cls, value: Any) -> str | None:
         if isinstance(value, Model):
             return f"{cls.STR_PREFIX}{value._meta.package_label}/{value._meta.model_name}/{value.id}"
         return None
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: Any) -> Model | None:
         if value_part := cls._extract_string_value(data):
             try:
                 parts = value_part.split("/")
@@ -59,7 +62,7 @@ class DateParameter(JobParameter):
     STR_PREFIX = "__plain://date/"
 
     @classmethod
-    def serialize(cls, value):
+    def serialize(cls, value: Any) -> str | None:
         if isinstance(value, datetime.date) and not isinstance(
             value, datetime.datetime
         ):
@@ -67,7 +70,7 @@ class DateParameter(JobParameter):
         return None
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: Any) -> datetime.date | None:
         if value_part := cls._extract_string_value(data):
             try:
                 return datetime.date.fromisoformat(value_part)
@@ -82,13 +85,13 @@ class DateTimeParameter(JobParameter):
     STR_PREFIX = "__plain://datetime/"
 
     @classmethod
-    def serialize(cls, value):
+    def serialize(cls, value: Any) -> str | None:
         if isinstance(value, datetime.datetime):
             return f"{cls.STR_PREFIX}{value.isoformat()}"
         return None
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: Any) -> datetime.datetime | None:
         if value_part := cls._extract_string_value(data):
             try:
                 return datetime.datetime.fromisoformat(value_part)
@@ -103,12 +106,12 @@ class LegacyModelParameter(JobParameter):
     STR_PREFIX = "gid://"
 
     @classmethod
-    def serialize(cls, value):
+    def serialize(cls, value: Any) -> str | None:
         # Don't serialize new instances with legacy format
         return None
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: Any) -> Model | None:
         if value_part := cls._extract_string_value(data):
             try:
                 package, model, obj_id = value_part.split("/")
@@ -138,7 +141,7 @@ class JobParameters:
     """
 
     @staticmethod
-    def to_json(args, kwargs):
+    def to_json(args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
         serialized_args = []
         for arg in args:
             serialized = JobParameters._serialize_value(arg)
@@ -152,7 +155,7 @@ class JobParameters:
         return {"args": serialized_args, "kwargs": serialized_kwargs}
 
     @staticmethod
-    def _serialize_value(value):
+    def _serialize_value(value: Any) -> Any:
         """Serialize a single value using the registered parameter types."""
         # Try each parameter type to see if it can serialize this value
         for param_type in PARAMETER_TYPES:
@@ -164,7 +167,7 @@ class JobParameters:
         return value
 
     @staticmethod
-    def from_json(data):
+    def from_json(data: dict[str, Any]) -> tuple[list[Any], dict[str, Any]]:
         args = []
         for arg in data["args"]:
             deserialized = JobParameters._deserialize_value(arg)
@@ -178,7 +181,7 @@ class JobParameters:
         return args, kwargs
 
     @staticmethod
-    def _deserialize_value(value):
+    def _deserialize_value(value: Any) -> Any:
         """Deserialize a single value using the registered parameter types."""
         # Try each parameter type to see if it can deserialize this value
         for param_type in PARAMETER_TYPES:

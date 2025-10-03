@@ -8,7 +8,7 @@ from .models import JobResult
 
 
 @register_chore("worker")
-def clear_completed():
+def clear_completed() -> str:
     """Delete all completed job results in all queues."""
     cutoff = timezone.now() - datetime.timedelta(
         seconds=settings.WORKER_JOBS_CLEARABLE_AFTER

@@ -37,6 +37,7 @@ FULLY_TYPED_DIRS = [
     "plain-toolbar/plain/toolbar",
     "plain-tunnel/plain/tunnel",
     "plain-vendor/plain/vendor",
+    "plain-worker/plain/worker",
 ]
 
 

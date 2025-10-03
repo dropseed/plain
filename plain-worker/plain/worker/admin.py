@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import timedelta
+from typing import Any
 
 from plain import models
 from plain.admin.cards import Card
@@ -14,7 +17,7 @@ from plain.runtime import settings
 from .models import JobProcess, JobRequest, JobResult
 
 
-def _td_format(td_object):
+def _td_format(td_object: timedelta) -> str:
     seconds = int(td_object.total_seconds())
     periods = [
         ("year", 60 * 60 * 24 * 365),
@@ -39,10 +42,10 @@ class SuccessfulJobsCard(Card):
     title = "Successful Jobs"
     text = "View"
 
-    def get_number(self):
-        return JobResult.query.successful().count()
+    def get_number(self) -> int:
+        return JobResult.query.successful().count()  # type: ignore[unresolved-attribute]
 
-    def get_link(self):
+    def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Successful"
 
 
@@ -50,10 +53,10 @@ class ErroredJobsCard(Card):
     title = "Errored Jobs"
     text = "View"
 
-    def get_number(self):
-        return JobResult.query.errored().count()
+    def get_number(self) -> int:
+        return JobResult.query.errored().count()  # type: ignore[unresolved-attribute]
 
-    def get_link(self):
+    def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Errored"
 
 
@@ -61,14 +64,14 @@ class LostJobsCard(Card):
     title = "Lost Jobs"
     text = "View"  # TODO make not required - just an icon?
 
-    def get_description(self):
+    def get_description(self) -> str:
         delta = timedelta(seconds=settings.WORKER_JOBS_LOST_AFTER)
         return f"Jobs are considered lost after {_td_format(delta)}"
 
-    def get_number(self):
-        return JobResult.query.lost().count()
+    def get_number(self) -> int:
+        return JobResult.query.lost().count()  # type: ignore[unresolved-attribute]
 
-    def get_link(self):
+    def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Lost"
 
 
@@ -76,25 +79,25 @@ class RetriedJobsCard(Card):
     title = "Retried Jobs"
     text = "View"  # TODO make not required - just an icon?
 
-    def get_number(self):
-        return JobResult.query.retried().count()
+    def get_number(self) -> int:
+        return JobResult.query.retried().count()  # type: ignore[unresolved-attribute]
 
-    def get_link(self):
+    def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Retried"
 
 
 class WaitingJobsCard(Card):
     title = "Waiting Jobs"
 
-    def get_number(self):
-        return JobProcess.query.waiting().count()
+    def get_number(self) -> int:
+        return JobProcess.query.waiting().count()  # type: ignore[unresolved-attribute]
 
 
 class RunningJobsCard(Card):
     title = "Running Jobs"
 
-    def get_number(self):
-        return JobProcess.query.running().count()
+    def get_number(self) -> int:
+        return JobProcess.query.running().count()  # type: ignore[unresolved-attribute]
 
 
 @register_viewset
@@ -107,7 +110,7 @@ class JobRequestViewset(AdminViewset):
         fields = ["id", "job_class", "priority", "created_at", "start_at", "unique_key"]
         actions = ["Delete"]
 
-        def perform_action(self, action: str, target_ids: list):
+        def perform_action(self, action: str, target_ids: list[int]) -> None:
             if action == "Delete":
                 JobRequest.query.filter(id__in=target_ids).delete()
 
@@ -137,7 +140,7 @@ class JobProcessViewset(AdminViewset):
             RunningJobsCard,
         ]
 
-        def perform_action(self, action: str, target_ids: list):
+        def perform_action(self, action: str, target_ids: list[int]) -> None:
             if action == "Delete":
                 JobProcess.query.filter(id__in=target_ids).delete()
 
@@ -185,7 +188,7 @@ class JobResultViewset(AdminViewset):
         ]
         allow_global_search = False
 
-        def get_initial_queryset(self):
+        def get_initial_queryset(self) -> Any:
             queryset = super().get_initial_queryset()
             queryset = queryset.annotate(
                 retried=models.Case(
@@ -211,14 +214,14 @@ class JobResultViewset(AdminViewset):
                 return queryset.retried()
             return queryset
 
-        def get_fields(self):
+        def get_fields(self) -> list[str]:
             fields = super().get_fields()
             if self.display == "Retried":
                 fields.append("retries")
                 fields.append("retry_attempt")
             return fields
 
-        def perform_action(self, action: str, target_ids: list):
+        def perform_action(self, action: str, target_ids: list[int]) -> None:
             if action == "Retry":
                 for result in JobResult.query.filter(id__in=target_ids):
                     result.retry_job(delay=0)
@@ -229,6 +232,6 @@ class JobResultViewset(AdminViewset):
         model = JobResult
         title = "Job result"
 
-        def post(self):
+        def post(self) -> ResponseRedirect:
             self.object.retry_job(delay=0)
             return ResponseRedirect(".")

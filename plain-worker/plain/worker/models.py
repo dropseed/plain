@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import logging
 import traceback
@@ -86,10 +88,10 @@ class JobRequest(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.job_class} [{self.uuid}]"
 
-    def convert_to_job_process(self):
+    def convert_to_job_process(self) -> JobProcess:
         """
         JobRequests are the pending jobs that are waiting to be executed.
         We immediately convert them to JobProcess when they are picked up.
@@ -116,13 +118,13 @@ class JobRequest(models.Model):
 
 
 class JobQuerySet(models.QuerySet):
-    def running(self):
+    def running(self) -> JobQuerySet:
         return self.filter(started_at__isnull=False)
 
-    def waiting(self):
+    def waiting(self) -> JobQuerySet:
         return self.filter(started_at__isnull=True)
 
-    def mark_lost_jobs(self):
+    def mark_lost_jobs(self) -> None:
         # Lost jobs are jobs that have been pending for too long,
         # and probably never going to get picked up by a worker process.
         # In theory we could save a timeout per-job and mark them timed-out more quickly,
@@ -186,7 +188,7 @@ class JobProcess(models.Model):
             ),
         ]
 
-    def run(self):
+    def run(self) -> JobResult:
         links = []
         if self.trace_id and self.span_id:
             try:
@@ -238,7 +240,7 @@ class JobProcess(models.Model):
 
             return self.convert_to_result(status=status, error=error)
 
-    def convert_to_result(self, *, status, error=""):
+    def convert_to_result(self, *, status: str, error: str = "") -> JobResult:
         """
         Convert this JobProcess to a JobResult.
         """
@@ -269,7 +271,7 @@ class JobProcess(models.Model):
 
         return result
 
-    def as_json(self):
+    def as_json(self) -> dict[str, str | int | dict | None]:
         """A JSON-compatible representation to make it easier to reference in Sentry or logging"""
         return {
             "uuid": str(self.uuid),
@@ -290,25 +292,25 @@ class JobProcess(models.Model):
 
 
 class JobResultQuerySet(models.QuerySet):
-    def successful(self):
+    def successful(self) -> JobResultQuerySet:
         return self.filter(status=JobResultStatuses.SUCCESSFUL)
 
-    def cancelled(self):
+    def cancelled(self) -> JobResultQuerySet:
         return self.filter(status=JobResultStatuses.CANCELLED)
 
-    def lost(self):
+    def lost(self) -> JobResultQuerySet:
         return self.filter(status=JobResultStatuses.LOST)
 
-    def errored(self):
+    def errored(self) -> JobResultQuerySet:
         return self.filter(status=JobResultStatuses.ERRORED)
 
-    def retried(self):
+    def retried(self) -> JobResultQuerySet:
         return self.filter(
             models.Q(retry_job_request_uuid__isnull=False)
             | models.Q(retry_attempt__gt=0)
         )
 
-    def failed(self):
+    def failed(self) -> JobResultQuerySet:
         return self.filter(
             status__in=[
                 JobResultStatuses.ERRORED,
@@ -317,14 +319,14 @@ class JobResultQuerySet(models.QuerySet):
             ]
         )
 
-    def retryable(self):
+    def retryable(self) -> JobResultQuerySet:
         return self.failed().filter(
             retry_job_request_uuid__isnull=True,
             retries__gt=0,
             retry_attempt__lt=models.F("retries"),
         )
 
-    def retry_failed_jobs(self):
+    def retry_failed_jobs(self) -> None:
         for result in self.retryable():
             try:
                 result.retry_job()
@@ -406,7 +408,7 @@ class JobResult(models.Model):
             ),
         ]
 
-    def retry_job(self, delay: int | None = None):
+    def retry_job(self, delay: int | None = None) -> JobRequest:
         retry_attempt = self.retry_attempt + 1
         job = jobs_registry.load_job(self.job_class, self.parameters)
         retry_delay = delay or job.get_retry_delay(retry_attempt)
@@ -426,7 +428,7 @@ class JobResult(models.Model):
             # of pending jobs, which would need to be handled...
             # Right now it will throw an exception which could be caught by retry_failed_jobs.
 
-            self.retry_job_request_uuid = result.uuid
+            self.retry_job_request_uuid = result.uuid  # type: ignore
             self.save(update_fields=["retry_job_request_uuid"])
 
-        return result
+        return result  # type: ignore

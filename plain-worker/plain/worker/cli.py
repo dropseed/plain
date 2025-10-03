@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import datetime
 import logging
 import signal
+from typing import Any
 
 import click
 
@@ -18,7 +21,7 @@ logger = logging.getLogger("plain.worker")
 
 @register_cli("worker")
 @click.group()
-def cli():
+def cli() -> None:
     pass
 
 
@@ -60,12 +63,16 @@ def cli():
     envvar="PLAIN_WORKER_STATS_EVERY",
 )
 def run(
-    queues, max_processes, max_jobs_per_process, max_pending_per_process, stats_every
-):
+    queues: tuple[str, ...],
+    max_processes: int | None,
+    max_jobs_per_process: int | None,
+    max_pending_per_process: int,
+    stats_every: int,
+) -> None:
     jobs_schedule = load_schedule(settings.WORKER_JOBS_SCHEDULE)
 
     worker = Worker(
-        queues=queues,
+        queues=list(queues),
         jobs_schedule=jobs_schedule,
         max_processes=max_processes,
         max_jobs_per_process=max_jobs_per_process,
@@ -73,7 +80,7 @@ def run(
         stats_every=stats_every,
     )
 
-    def _shutdown(signalnum, _):
+    def _shutdown(signalnum: int, _: Any) -> None:
         logger.info("Job worker shutdown signal received signalnum=%s", signalnum)
         worker.shutdown()
 
@@ -86,7 +93,7 @@ def run(
 
 
 @cli.command()
-def clear_completed():
+def clear_completed() -> None:
     """Clear all completed job results in all queues."""
     cutoff = timezone.now() - datetime.timedelta(
         seconds=settings.WORKER_JOBS_CLEARABLE_AFTER
@@ -97,14 +104,14 @@ def clear_completed():
 
 
 @cli.command()
-def stats():
+def stats() -> None:
     """Stats across all queues."""
     pending = JobRequest.query.count()
     processing = JobProcess.query.count()
 
-    successful = JobResult.query.successful().count()
-    errored = JobResult.query.errored().count()
-    lost = JobResult.query.lost().count()
+    successful = JobResult.query.successful().count()  # type: ignore[unresolved-attribute]
+    errored = JobResult.query.errored().count()  # type: ignore[unresolved-attribute]
+    lost = JobResult.query.lost().count()  # type: ignore[unresolved-attribute]
 
     click.secho(f"Pending: {pending}", bold=True)
     click.secho(f"Processing: {processing}", bold=True)
@@ -114,7 +121,7 @@ def stats():
 
 
 @cli.command()
-def purge_processing():
+def purge_processing() -> None:
     """Delete all running and pending jobs regardless of queue."""
     if not click.confirm(
         "Are you sure you want to clear all running and pending jobs? This will delete all current Jobs and JobRequests"
@@ -130,7 +137,7 @@ def purge_processing():
 
 @cli.command()
 @click.argument("job_class_name", type=str)
-def run_job(job_class_name):
+def run_job(job_class_name: str) -> None:
     """Run a job class directly (and not using a worker)."""
     job = jobs_registry.load_job(job_class_name, {"args": [], "kwargs": {}})
     click.secho("Loaded job: ", bold=True, nl=False)
@@ -139,7 +146,7 @@ def run_job(job_class_name):
 
 
 @cli.command()
-def registered_jobs():
+def registered_jobs() -> None:
     """List all registered jobs."""
     for name, job_class in jobs_registry.jobs.items():
         click.echo(f"{click.style(name, fg='blue')}: {job_class}")

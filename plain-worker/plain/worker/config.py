@@ -9,7 +9,7 @@ from .registry import jobs_registry
 class Config(PackageConfig):
     package_label = "plainworker"
 
-    def ready(self):
+    def ready(self) -> None:
         # Trigger register calls to fire by importing the modules
         packages_registry.autodiscover_modules("jobs", include_app=True)
 

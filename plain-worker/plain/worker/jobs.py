@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import datetime
 import inspect
 import logging
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.code_attributes import (
@@ -23,6 +26,9 @@ from plain.utils import timezone
 
 from .registry import JobParameters, jobs_registry
 
+if TYPE_CHECKING:
+    from .models import JobProcess, JobRequest
+
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("plain.worker")
 
@@ -34,7 +40,7 @@ class JobType(type):
     when we schedule the job.
     """
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> Job:
         instance = super().__call__(*args, **kwargs)
         instance._init_args = args
         instance._init_kwargs = kwargs
@@ -42,7 +48,7 @@ class JobType(type):
 
 
 class Job(metaclass=JobType):
-    def run(self):
+    def run(self) -> None:
         raise NotImplementedError
 
     def run_in_worker(
@@ -54,7 +60,7 @@ class Job(metaclass=JobType):
         retries: int | None = None,
         retry_attempt: int = 0,
         unique_key: str | None = None,
-    ):
+    ) -> JobRequest | list[JobRequest | JobProcess]:
         from .models import JobRequest
 
         job_class_name = jobs_registry.get_job_class_name(self.__class__)
@@ -165,7 +171,7 @@ class Job(metaclass=JobType):
                 # Try to return the _in_progress list again
                 return self._in_progress(unique_key)
 
-    def _in_progress(self, unique_key):
+    def _in_progress(self, unique_key: str) -> list[JobRequest | JobProcess]:
         """Get all JobRequests and JobProcess that are currently in progress, regardless of queue."""
         from .models import JobProcess, JobRequest
 

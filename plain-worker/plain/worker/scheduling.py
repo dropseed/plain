@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import datetime
 import subprocess
+from typing import Any
 
 from plain.utils import timezone
 
@@ -32,20 +35,26 @@ _DAY_NAMES = {
 
 
 class _ScheduleComponent:
-    def __init__(self, values, raw=""):
+    def __init__(self, values: list[int], raw: str | int = "") -> None:
         self.values = sorted(values)
         self._raw = raw
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self._raw:
-            return self._raw
+            return str(self._raw)
         return ",".join(str(v) for v in self.values)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return self.values == other.values
 
     @classmethod
-    def parse(cls, value, min_allowed, max_allowed, str_conversions=None):
+    def parse(
+        cls,
+        value: int | str,
+        min_allowed: int,
+        max_allowed: int,
+        str_conversions: dict[str, int] | None = None,
+    ) -> _ScheduleComponent:
         if str_conversions is None:
             str_conversions = {}
 
@@ -77,7 +86,7 @@ class _ScheduleComponent:
         if value == "*":
             return cls(list(range(min_allowed, max_allowed + 1)), raw=value)
 
-        def _convert(value):
+        def _convert(value: str) -> int:
             result = str_conversions.get(value.upper(), value)
             return int(result)
 
@@ -97,13 +106,13 @@ class Schedule:
     def __init__(
         self,
         *,
-        minute="*",
-        hour="*",
-        day_of_month="*",
-        month="*",
-        day_of_week="*",
-        raw="",
-    ):
+        minute: int | str = "*",
+        hour: int | str = "*",
+        day_of_month: int | str = "*",
+        month: int | str = "*",
+        day_of_week: int | str = "*",
+        raw: str = "",
+    ) -> None:
         self.minute = _ScheduleComponent.parse(minute, min_allowed=0, max_allowed=59)
         self.hour = _ScheduleComponent.parse(hour, min_allowed=0, max_allowed=23)
         self.day_of_month = _ScheduleComponent.parse(
@@ -123,7 +132,7 @@ class Schedule:
         )
         self._raw = raw
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self._raw:
             return self._raw
         return f"{self.minute} {self.hour} {self.day_of_month} {self.month} {self.day_of_week}"
@@ -132,7 +141,7 @@ class Schedule:
         return f"<Schedule {self}>"
 
     @classmethod
-    def from_cron(cls, cron):
+    def from_cron(cls, cron: str) -> Schedule:
         raw = cron
 
         if cron == "@yearly" or cron == "@annually":
@@ -157,7 +166,7 @@ class Schedule:
             raw=raw,
         )
 
-    def next(self, now=None):
+    def next(self, now: datetime.datetime | None = None) -> datetime.datetime:
         """
         Find the next datetime that matches the schedule after the given datetime.
         """
@@ -167,7 +176,7 @@ class Schedule:
         dt += datetime.timedelta(minutes=1)
         dt = dt.replace(second=0, microsecond=0)
 
-        def _go_to_next_day(v):
+        def _go_to_next_day(v: datetime.datetime) -> datetime.datetime:
             v = v + datetime.timedelta(days=1)
             return v.replace(
                 hour=self.hour.values[0],
@@ -207,13 +216,13 @@ class Schedule:
 
 @register_job
 class ScheduledCommand(Job):
-    def __init__(self, command):
+    def __init__(self, command: str) -> None:
         self.command = command
 
     def __repr__(self) -> str:
         return f"<ScheduledCommand: {self.command}>"
 
-    def run(self):
+    def run(self) -> None:
         subprocess.run(self.command, shell=True, check=True)
 
     def get_unique_key(self) -> str:
@@ -222,8 +231,10 @@ class ScheduledCommand(Job):
         return self.command
 
 
-def load_schedule(schedules):
-    jobs_schedule = []
+def load_schedule(
+    schedules: list[tuple[str | Job, str | Schedule]],
+) -> list[tuple[Job, Schedule]]:
+    jobs_schedule: list[tuple[Job, Schedule]] = []
 
     for job, schedule in schedules:
         if isinstance(job, str):
