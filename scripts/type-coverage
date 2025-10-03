@@ -173,6 +173,11 @@ def find_python_files(directory: Path, exclude_patterns: Optional[List[str]] = N
         "*.egg-info",
         ".mypy_cache",
         ".pytest_cache",
+        # Exclude test files from coverage metrics (but they're still type-checked)
+        "test_*.py",
+        "*_test.py",
+        "tests",
+        "test",
     ]
 
     patterns = list(default_patterns)
@@ -302,9 +307,9 @@ def main():
         description="Calculate type annotation coverage for Python code"
     )
     parser.add_argument(
-        "directory",
+        "path",
         type=str,
-        help="Directory to analyze"
+        help="File or directory to analyze"
     )
     parser.add_argument(
         "--details",
@@ -342,25 +347,33 @@ def main():
 
     args = parser.parse_args()
 
-    # Validate directory
-    directory = Path(args.directory)
-    if not directory.exists():
-        print(f"Error: Directory '{directory}' does not exist", file=sys.stderr)
+    # Validate path
+    path = Path(args.path)
+    if not path.exists():
+        print(f"Error: Path '{path}' does not exist", file=sys.stderr)
         sys.exit(1)
 
-    if not directory.is_dir():
-        print(f"Error: '{directory}' is not a directory", file=sys.stderr)
+    # Determine if path is a file or directory
+    if path.is_file():
+        # Single file mode
+        if not path.suffix == '.py':
+            print(f"Error: '{path}' is not a Python file", file=sys.stderr)
+            sys.exit(1)
+        python_files = [path]
+        print(f"Analyzing 1 Python file...", file=sys.stderr)
+    elif path.is_dir():
+        # Directory mode
+        exclude_patterns = args.exclude if args.exclude else None
+        python_files = find_python_files(path, exclude_patterns)
+
+        if not python_files:
+            print(f"No Python files found in '{path}'", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Analyzing {len(python_files)} Python files...", file=sys.stderr)
+    else:
+        print(f"Error: '{path}' is not a file or directory", file=sys.stderr)
         sys.exit(1)
-
-    # Find Python files
-    exclude_patterns = args.exclude if args.exclude else None
-    python_files = find_python_files(directory, exclude_patterns)
-
-    if not python_files:
-        print(f"No Python files found in '{directory}'", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"Analyzing {len(python_files)} Python files...", file=sys.stderr)
 
     # Analyze files
     all_stats = []
