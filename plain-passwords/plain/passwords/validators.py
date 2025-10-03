@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gzip
 from functools import cached_property
 from pathlib import Path
@@ -15,10 +17,10 @@ class MinimumLengthValidator:
     Validate that the password is of a minimum length.
     """
 
-    def __init__(self, min_length=8):
+    def __init__(self, min_length: int = 8) -> None:
         self.min_length = min_length
 
-    def __call__(self, password):
+    def __call__(self, password: str) -> None:
         if len(password) < self.min_length:
             raise ValidationError(
                 pluralize(
@@ -46,10 +48,12 @@ class CommonPasswordValidator:
     """
 
     @cached_property
-    def DEFAULT_PASSWORD_LIST_PATH(self):
+    def DEFAULT_PASSWORD_LIST_PATH(self) -> Path:
         return Path(__file__).resolve().parent / "common-passwords.txt.gz"
 
-    def __init__(self, password_list_path=DEFAULT_PASSWORD_LIST_PATH):
+    def __init__(
+        self, password_list_path: Path | cached_property = DEFAULT_PASSWORD_LIST_PATH
+    ) -> None:
         if password_list_path is CommonPasswordValidator.DEFAULT_PASSWORD_LIST_PATH:
             password_list_path = self.DEFAULT_PASSWORD_LIST_PATH
         try:
@@ -59,7 +63,7 @@ class CommonPasswordValidator:
             with open(password_list_path) as f:
                 self.passwords = {x.strip() for x in f}
 
-    def __call__(self, password):
+    def __call__(self, password: str) -> None:
         if password.lower().strip() in self.passwords:
             raise ValidationError(
                 "This password is too common.",
@@ -73,7 +77,7 @@ class NumericPasswordValidator:
     Validate that the password is not entirely numeric.
     """
 
-    def __call__(self, password):
+    def __call__(self, password: str) -> None:
         if password.isdigit():
             raise ValidationError(
                 "This password is entirely numeric.",

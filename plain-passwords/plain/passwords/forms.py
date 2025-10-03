@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Generator
+from typing import TYPE_CHECKING, Any
+
 from plain import forms
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
@@ -7,6 +12,9 @@ from .core import check_user_password
 from .hashers import check_password
 from .utils import unicode_ci_compare
 
+if TYPE_CHECKING:
+    from plain.models import Model
+
 
 class PasswordResetForm(forms.Form):
     email = forms.EmailField(max_length=254)
@@ -15,10 +23,10 @@ class PasswordResetForm(forms.Form):
         self,
         *,
         template_name: str,
-        context: dict,
+        context: dict[str, Any],
         from_email: str,
         to_email: str,
-    ):
+    ) -> None:
         from plain.email import TemplateEmail
 
         email = TemplateEmail(
@@ -33,7 +41,7 @@ class PasswordResetForm(forms.Form):
 
         email.send()
 
-    def get_users(self, email):
+    def get_users(self, email: str) -> Generator[Model, None, None]:
         """Given an email, return matching user(s) who should receive a reset.
 
         This allows subclasses to more easily customize the default policies
@@ -46,11 +54,11 @@ class PasswordResetForm(forms.Form):
     def save(
         self,
         *,
-        generate_reset_url: callable,
+        generate_reset_url: Callable[[Model], str],
         email_template_name: str = "password_reset",
         from_email: str = "",
-        extra_email_context: dict | None = None,
-    ):
+        extra_email_context: dict[str, Any] | None = None,
+    ) -> None:
         """
         Generate a one-use only link for resetting password and send it to the
         user.
@@ -80,11 +88,11 @@ class PasswordSetForm(forms.Form):
     new_password1 = forms.CharField(strip=False)
     new_password2 = forms.CharField(strip=False)
 
-    def __init__(self, user, *args, **kwargs):
+    def __init__(self, user: Model, *args: Any, **kwargs: Any) -> None:
         self.user = user
         super().__init__(*args, **kwargs)
 
-    def clean_new_password2(self):
+    def clean_new_password2(self) -> str:
         password1 = self.cleaned_data.get("new_password1")
         password2 = self.cleaned_data.get("new_password2")
         if password1 and password2 and password1 != password2:
@@ -98,7 +106,7 @@ class PasswordSetForm(forms.Form):
 
         return password2
 
-    def save(self, commit=True):
+    def save(self, commit: bool = True) -> Model:
         self.user.password = self.cleaned_data["new_password1"]
         if commit:
             self.user.save()
@@ -113,7 +121,7 @@ class PasswordChangeForm(PasswordSetForm):
 
     current_password = forms.CharField(strip=False)
 
-    def clean_current_password(self):
+    def clean_current_password(self) -> str:
         """
         Validate that the current_password field is correct.
         """
@@ -130,7 +138,7 @@ class PasswordLoginForm(forms.Form):
     email = forms.EmailField(max_length=150)
     password = forms.CharField(strip=False)
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
         User = get_user_model()
 
         email = self.cleaned_data.get("email")
@@ -160,7 +168,7 @@ class PasswordLoginForm(forms.Form):
 
         return self.cleaned_data
 
-    def get_user(self):
+    def get_user(self) -> Model:
         return self._user
 
 
@@ -171,7 +179,7 @@ class PasswordSignupForm(ModelForm):
         model = get_user_model()
         fields = ("email", "password")
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
         password = cleaned_data.get("password")
         confirm_password = cleaned_data.get("confirm_password")
