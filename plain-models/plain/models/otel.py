@@ -1,10 +1,18 @@
+from __future__ import annotations
+
 import re
 import traceback
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import context as otel_context
 from opentelemetry import trace
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Span
+
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
     DB_USER,
@@ -99,7 +107,9 @@ def _clean_identifier(identifier: str) -> str:
 
 
 @contextmanager
-def db_span(db, sql: Any, *, many: bool = False, params=None):
+def db_span(
+    db: BaseDatabaseWrapper, sql: Any, *, many: bool = False, params: Any = None
+) -> Generator[Span | None, None, None]:
     """Open an OpenTelemetry CLIENT span for a database query.
 
     All common attributes (`db.*`, `network.*`, etc.) are set automatically.
@@ -107,7 +117,7 @@ def db_span(db, sql: Any, *, many: bool = False, params=None):
     """
 
     # Fast-exit if instrumentation suppression flag set in context.
-    if otel_context.get_value(_SUPPRESS_KEY):
+    if otel_context.get_value(_SUPPRESS_KEY):  # type: ignore[arg-type]
         yield None
         return
 
@@ -177,15 +187,15 @@ def db_span(db, sql: Any, *, many: bool = False, params=None):
 
 
 @contextmanager
-def suppress_db_tracing():
-    token = otel_context.attach(otel_context.set_value(_SUPPRESS_KEY, True))
+def suppress_db_tracing() -> Generator[None, None, None]:
+    token = otel_context.attach(otel_context.set_value(_SUPPRESS_KEY, True))  # type: ignore[arg-type]
     try:
         yield
     finally:
         otel_context.detach(token)
 
 
-def _get_code_attributes():
+def _get_code_attributes() -> dict[str, Any]:
     """Extract code context attributes for the current database query.
 
     Returns a dict of OpenTelemetry code attributes.

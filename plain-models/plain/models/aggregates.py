@@ -1,6 +1,6 @@
-"""
-Classes to represent the definitions of aggregate functions.
-"""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import FieldError, FullResultSet
 from plain.models.expressions import Case, Func, Star, Value, When
@@ -10,6 +10,11 @@ from plain.models.functions.mixins import (
     FixDurationInputMixin,
     NumericOutputFieldMixin,
 )
+
+if TYPE_CHECKING:
+    from plain.models.expressions import Expression
+    from plain.models.query_utils import Q
+    from plain.models.sql.compiler import SQLCompiler
 
 __all__ = [
     "Aggregate",
@@ -33,8 +38,13 @@ class Aggregate(Func):
     empty_result_set_value = None
 
     def __init__(
-        self, *expressions, distinct=False, filter=None, default=None, **extra
-    ):
+        self,
+        *expressions: Any,
+        distinct: bool = False,
+        filter: Q | Expression | None = None,
+        default: Any = None,
+        **extra: Any,
+    ) -> None:
         if distinct and not self.allow_distinct:
             raise TypeError(f"{self.__class__.__name__} does not allow distinct.")
         if default is not None and self.empty_result_set_value is not None:
@@ -44,23 +54,28 @@ class Aggregate(Func):
         self.default = default
         super().__init__(*expressions, **extra)
 
-    def get_source_fields(self):
+    def get_source_fields(self) -> list[Any]:
         # Don't return the filter expression since it's not a source field.
         return [e._output_field_or_none for e in super().get_source_expressions()]
 
-    def get_source_expressions(self):
+    def get_source_expressions(self) -> list[Expression]:
         source_expressions = super().get_source_expressions()
         if self.filter:
             return source_expressions + [self.filter]
         return source_expressions
 
-    def set_source_expressions(self, exprs):
+    def set_source_expressions(self, exprs: list[Expression]) -> list[Expression]:
         self.filter = self.filter and exprs.pop()
         return super().set_source_expressions(exprs)
 
     def resolve_expression(
-        self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False
-    ):
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> Expression:
         # Aggregates are not allowed in UPDATE queries, so ignore for_save
         c = super().resolve_expression(query, allow_joins, reuse, summarize)
         c.filter = c.filter and c.filter.resolve_expression(
@@ -95,16 +110,18 @@ class Aggregate(Func):
         return coalesce
 
     @property
-    def default_alias(self):
+    def default_alias(self) -> str:
         expressions = self.get_source_expressions()
         if len(expressions) == 1 and hasattr(expressions[0], "name"):
             return f"{expressions[0].name}__{self.name.lower()}"
         raise TypeError("Complex expressions require an alias")
 
-    def get_group_by_cols(self):
+    def get_group_by_cols(self) -> list[Any]:
         return []
 
-    def as_sql(self, compiler, connection, **extra_context):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         extra_context["distinct"] = "DISTINCT " if self.distinct else ""
         if self.filter:
             if connection.features.supports_aggregate_filter_clause:
@@ -135,7 +152,7 @@ class Aggregate(Func):
                 )
         return super().as_sql(compiler, connection, **extra_context)
 
-    def _get_repr_options(self):
+    def _get_repr_options(self) -> dict[str, Any]:
         options = super()._get_repr_options()
         if self.distinct:
             options["distinct"] = self.distinct
@@ -157,7 +174,9 @@ class Count(Aggregate):
     allow_distinct = True
     empty_result_set_value = 0
 
-    def __init__(self, expression, filter=None, **extra):
+    def __init__(
+        self, expression: Any, filter: Q | Expression | None = None, **extra: Any
+    ) -> None:
         if expression == "*":
             expression = Star()
         if isinstance(expression, Star) and filter is not None:
@@ -178,11 +197,11 @@ class Min(Aggregate):
 class StdDev(NumericOutputFieldMixin, Aggregate):
     name = "StdDev"
 
-    def __init__(self, expression, sample=False, **extra):
+    def __init__(self, expression: Any, sample: bool = False, **extra: Any) -> None:
         self.function = "STDDEV_SAMP" if sample else "STDDEV_POP"
         super().__init__(expression, **extra)
 
-    def _get_repr_options(self):
+    def _get_repr_options(self) -> dict[str, Any]:
         return {**super()._get_repr_options(), "sample": self.function == "STDDEV_SAMP"}
 
 
@@ -195,9 +214,9 @@ class Sum(FixDurationInputMixin, Aggregate):
 class Variance(NumericOutputFieldMixin, Aggregate):
     name = "Variance"
 
-    def __init__(self, expression, sample=False, **extra):
+    def __init__(self, expression: Any, sample: bool = False, **extra: Any) -> None:
         self.function = "VAR_SAMP" if sample else "VAR_POP"
         super().__init__(expression, **extra)
 
-    def _get_repr_options(self):
+    def _get_repr_options(self) -> dict[str, Any]:
         return {**super()._get_repr_options(), "sample": self.function == "VAR_SAMP"}

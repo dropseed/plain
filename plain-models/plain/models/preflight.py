@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import inspect
 from collections import defaultdict
+from collections.abc import Callable
+from typing import Any
 
 from plain.models.db import db_connection
-from plain.models.registry import models_registry
+from plain.models.registry import ModelsRegistry, models_registry
 from plain.packages import packages_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 
@@ -11,7 +15,7 @@ from plain.preflight import PreflightCheck, PreflightResult, register_check
 class CheckDatabaseBackends(PreflightCheck):
     """Validates database backend configuration when plain.models is available."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         return db_connection.validation.preflight()
 
 
@@ -19,7 +23,7 @@ class CheckDatabaseBackends(PreflightCheck):
 class CheckAllModels(PreflightCheck):
     """Validates all model definitions for common issues."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         db_table_models = defaultdict(list)
         indexes = defaultdict(list)
         constraints = defaultdict(list)
@@ -84,7 +88,9 @@ class CheckAllModels(PreflightCheck):
         return errors
 
 
-def _check_lazy_references(models_registry, packages_registry):
+def _check_lazy_references(
+    models_registry: ModelsRegistry, packages_registry: Any
+) -> list[PreflightResult]:
     """
     Ensure all lazy (i.e. string) model references have been resolved.
 
@@ -98,7 +104,9 @@ def _check_lazy_references(models_registry, packages_registry):
     if not pending_models:
         return []
 
-    def extract_operation(obj):
+    def extract_operation(
+        obj: Any,
+    ) -> tuple[Callable[..., Any], list[Any], dict[str, Any]]:
         """
         Take a callable found in Packages._pending_operations and identify the
         original callable passed to Packages.lazy_model_operation(). If that
@@ -115,7 +123,7 @@ def _check_lazy_references(models_registry, packages_registry):
             operation = operation.func
         return operation, args, keywords
 
-    def app_model_error(model_key):
+    def app_model_error(model_key: tuple[str, str]) -> str:
         try:
             packages_registry.get_package_config(model_key[0])
             model_error = "app '{}' doesn't provide model '{}'".format(*model_key)
@@ -129,7 +137,12 @@ def _check_lazy_references(models_registry, packages_registry):
     # pair, the original lazy function, and its positional and keyword args as
     # determined by extract_operation().
 
-    def field_error(model_key, func, args, keywords):
+    def field_error(
+        model_key: tuple[str, str],
+        func: Callable[..., Any],
+        args: list[Any],
+        keywords: dict[str, Any],
+    ) -> PreflightResult:
         error_msg = (
             "The field %(field)s was declared with a lazy reference "
             "to '%(model)s', but %(model_error)s."
@@ -145,7 +158,12 @@ def _check_lazy_references(models_registry, packages_registry):
             id="fields.lazy_reference_not_resolvable",
         )
 
-    def default_error(model_key, func, args, keywords):
+    def default_error(
+        model_key: tuple[str, str],
+        func: Callable[..., Any],
+        args: list[Any],
+        keywords: dict[str, Any],
+    ) -> PreflightResult:
         error_msg = (
             "%(op)s contains a lazy reference to %(model)s, but %(model_error)s."
         )
@@ -167,8 +185,13 @@ def _check_lazy_references(models_registry, packages_registry):
         ("plain.models.fields.related", "resolve_related_class"): field_error,
     }
 
-    def build_error(model_key, func, args, keywords):
-        key = (func.__module__, func.__name__)
+    def build_error(
+        model_key: tuple[str, str],
+        func: Callable[..., Any],
+        args: list[Any],
+        keywords: dict[str, Any],
+    ) -> PreflightResult | None:
+        key = (func.__module__, func.__name__)  # type: ignore[attr-defined]
         error_fn = known_lazy.get(key, default_error)
         return error_fn(model_key, func, args, keywords) if error_fn else None
 
@@ -189,7 +212,7 @@ def _check_lazy_references(models_registry, packages_registry):
 class CheckLazyReferences(PreflightCheck):
     """Ensures all lazy (string) model references have been resolved."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         return _check_lazy_references(models_registry, packages_registry)
 
 
@@ -197,7 +220,7 @@ class CheckLazyReferences(PreflightCheck):
 class CheckDatabaseTables(PreflightCheck):
     """Checks for unknown tables in the database when plain.models is available."""
 
-    def run(self):
+    def run(self) -> list[PreflightResult]:
         errors = []
 
         db_tables = db_connection.introspection.table_names()

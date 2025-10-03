@@ -1,11 +1,18 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from plain.models.expressions import Func, Value
-from plain.models.fields import FloatField, IntegerField
+from plain.models.fields import Field, FloatField, IntegerField
 from plain.models.functions import Cast
 from plain.models.functions.mixins import (
     FixDecimalInputMixin,
     NumericOutputFieldMixin,
 )
 from plain.models.lookups import Transform
+
+if TYPE_CHECKING:
+    from plain.models.sql.compiler import SQLCompiler
 
 
 class Abs(Transform):
@@ -32,7 +39,9 @@ class ATan2(NumericOutputFieldMixin, Func):
     function = "ATAN2"
     arity = 2
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         if not getattr(
             connection.ops, "spatialite", False
         ) or connection.ops.spatial_version >= (5, 0, 0):
@@ -93,7 +102,9 @@ class Log(FixDecimalInputMixin, NumericOutputFieldMixin, Func):
     function = "LOG"
     arity = 2
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         if not getattr(connection.ops, "spatialite", False):
             return self.as_sql(compiler, connection)
         # This function is usually Log(b, x) returning the logarithm of x to
@@ -127,13 +138,17 @@ class Random(NumericOutputFieldMixin, Func):
     function = "RANDOM"
     arity = 0
 
-    def as_mysql(self, compiler, connection, **extra_context):
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="RAND", **extra_context)
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="RAND", **extra_context)
 
-    def get_group_by_cols(self):
+    def get_group_by_cols(self) -> list[Any]:
         return []
 
 
@@ -142,16 +157,18 @@ class Round(FixDecimalInputMixin, Transform):
     lookup_name = "round"
     arity = None  # Override Transform's arity=1 to enable passing precision.
 
-    def __init__(self, expression, precision=0, **extra):
+    def __init__(self, expression: Any, precision: int = 0, **extra: Any) -> None:
         super().__init__(expression, precision, **extra)
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         precision = self.get_source_expressions()[1]
         if isinstance(precision, Value) and precision.value < 0:
             raise ValueError("SQLite does not support negative precision.")
         return super().as_sqlite(compiler, connection, **extra_context)
 
-    def _resolve_output_field(self):
+    def _resolve_output_field(self) -> Field:
         source = self.get_source_expressions()[0]
         return source.output_field
 

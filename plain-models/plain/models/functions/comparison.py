@@ -1,10 +1,17 @@
 """Database functions that do comparisons or type conversions."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from plain.models.db import NotSupportedError
 from plain.models.expressions import Func, Value
-from plain.models.fields import TextField
+from plain.models.fields import Field, TextField
 from plain.models.fields.json import JSONField
 from plain.utils.regex_helper import _lazy_re_compile
+
+if TYPE_CHECKING:
+    from plain.models.sql.compiler import SQLCompiler
 
 
 class Cast(Func):
@@ -13,14 +20,18 @@ class Cast(Func):
     function = "CAST"
     template = "%(function)s(%(expressions)s AS %(db_type)s)"
 
-    def __init__(self, expression, output_field):
+    def __init__(self, expression: Any, output_field: Field) -> None:
         super().__init__(expression, output_field=output_field)
 
-    def as_sql(self, compiler, connection, **extra_context):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         extra_context["db_type"] = self.output_field.cast_db_type(connection)
         return super().as_sql(compiler, connection, **extra_context)
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         db_type = self.output_field.db_type(connection)
         if db_type in {"datetime", "time"}:
             # Use strftime as datetime/time don't keep fractional seconds.
@@ -38,7 +49,9 @@ class Cast(Func):
             )
         return self.as_sql(compiler, connection, **extra_context)
 
-    def as_mysql(self, compiler, connection, **extra_context):
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         template = None
         output_type = self.output_field.get_internal_type()
         # MySQL doesn't support explicit cast to float.
@@ -49,7 +62,9 @@ class Cast(Func):
             template = "JSON_EXTRACT(%(expressions)s, '$')"
         return self.as_sql(compiler, connection, template=template, **extra_context)
 
-    def as_postgresql(self, compiler, connection, **extra_context):
+    def as_postgresql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         # CAST would be valid too, but the :: shortcut syntax is more readable.
         # 'expressions' is wrapped in parentheses in case it's a complex
         # expression.
@@ -66,13 +81,13 @@ class Coalesce(Func):
 
     function = "COALESCE"
 
-    def __init__(self, *expressions, **extra):
+    def __init__(self, *expressions: Any, **extra: Any) -> None:
         if len(expressions) < 2:
             raise ValueError("Coalesce must take at least two expressions")
         super().__init__(*expressions, **extra)
 
     @property
-    def empty_result_set_value(self):
+    def empty_result_set_value(self) -> Any:
         for expression in self.get_source_expressions():
             result = expression.empty_result_set_value
             if result is NotImplemented or result is not None:
@@ -87,13 +102,15 @@ class Collate(Func):
     # https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
     collation_re = _lazy_re_compile(r"^[\w\-]+$")
 
-    def __init__(self, expression, collation):
+    def __init__(self, expression: Any, collation: str) -> None:
         if not (collation and self.collation_re.match(collation)):
             raise ValueError(f"Invalid collation name: {collation!r}.")
         self.collation = collation
         super().__init__(expression)
 
-    def as_sql(self, compiler, connection, **extra_context):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         extra_context.setdefault("collation", connection.ops.quote_name(self.collation))
         return super().as_sql(compiler, connection, **extra_context)
 
@@ -109,12 +126,14 @@ class Greatest(Func):
 
     function = "GREATEST"
 
-    def __init__(self, *expressions, **extra):
+    def __init__(self, *expressions: Any, **extra: Any) -> None:
         if len(expressions) < 2:
             raise ValueError("Greatest must take at least two expressions")
         super().__init__(*expressions, **extra)
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         """Use the MAX function on SQLite."""
         return super().as_sqlite(compiler, connection, function="MAX", **extra_context)
 
@@ -123,20 +142,24 @@ class JSONObject(Func):
     function = "JSON_OBJECT"
     output_field = JSONField()
 
-    def __init__(self, **fields):
+    def __init__(self, **fields: Any) -> None:
         expressions = []
         for key, value in fields.items():
             expressions.extend((Value(key), value))
         super().__init__(*expressions)
 
-    def as_sql(self, compiler, connection, **extra_context):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         if not connection.features.has_json_object_function:
             raise NotSupportedError(
                 "JSONObject() is not supported on this database backend."
             )
         return super().as_sql(compiler, connection, **extra_context)
 
-    def as_postgresql(self, compiler, connection, **extra_context):
+    def as_postgresql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         copy = self.copy()
         copy.set_source_expressions(
             [
@@ -163,12 +186,14 @@ class Least(Func):
 
     function = "LEAST"
 
-    def __init__(self, *expressions, **extra):
+    def __init__(self, *expressions: Any, **extra: Any) -> None:
         if len(expressions) < 2:
             raise ValueError("Least must take at least two expressions")
         super().__init__(*expressions, **extra)
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         """Use the MIN function on SQLite."""
         return super().as_sqlite(compiler, connection, function="MIN", **extra_context)
 

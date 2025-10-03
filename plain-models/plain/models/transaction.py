@@ -1,6 +1,12 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Generator
 from contextlib import ContextDecorator, contextmanager
+from typing import Any, TypeVar
 
 from plain.models.db import DatabaseError, Error, ProgrammingError, db_connection
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 class TransactionManagementError(ProgrammingError):
@@ -10,7 +16,7 @@ class TransactionManagementError(ProgrammingError):
 
 
 @contextmanager
-def mark_for_rollback_on_error():
+def mark_for_rollback_on_error() -> Generator[None, None, None]:
     """
     Internal low-level utility to mark a transaction as "needs rollback" when
     an exception is raised while not enforcing the enclosed block to be in a
@@ -36,7 +42,7 @@ def mark_for_rollback_on_error():
         raise
 
 
-def on_commit(func, robust=False):
+def on_commit(func: Callable[[], Any], robust: bool = False) -> None:
     """
     Register `func` to be called when the current transaction is committed.
     If the current transaction is rolled back, `func` will not be called.
@@ -83,12 +89,12 @@ class Atomic(ContextDecorator):
     This is a private API.
     """
 
-    def __init__(self, savepoint, durable):
+    def __init__(self, savepoint: bool, durable: bool) -> None:
         self.savepoint = savepoint
         self.durable = durable
         self._from_testcase = False
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         if (
             self.durable
             and db_connection.atomic_blocks
@@ -127,7 +133,12 @@ class Atomic(ContextDecorator):
         if db_connection.in_atomic_block:
             db_connection.atomic_blocks.append(self)
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: Any,
+    ) -> None:
         if db_connection.in_atomic_block:
             db_connection.atomic_blocks.pop()
 
@@ -217,8 +228,10 @@ class Atomic(ContextDecorator):
                     db_connection.in_atomic_block = False
 
 
-def atomic(func=None, *, savepoint=True, durable=False):
+def atomic(
+    func: F | None = None, *, savepoint: bool = True, durable: bool = False
+) -> F | Atomic:
     """Create an atomic transaction context or decorator."""
     if callable(func):
-        return Atomic(savepoint, durable)(func)
+        return Atomic(savepoint, durable)(func)  # type: ignore[return-value]
     return Atomic(savepoint, durable)

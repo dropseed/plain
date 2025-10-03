@@ -1,7 +1,16 @@
+from __future__ import annotations
+
 import functools
 import warnings
 from collections import defaultdict
+from collections.abc import Callable
 from functools import partial
+from typing import TYPE_CHECKING, TypeVar
+
+if TYPE_CHECKING:
+    from plain.models.base import Model
+
+M = TypeVar("M", bound="Model")
 
 
 class ModelsRegistryNotReady(Exception):
@@ -11,7 +20,7 @@ class ModelsRegistryNotReady(Exception):
 
 
 class ModelsRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         # Mapping of app labels => model names => model classes. Every time a
         # model is imported, ModelBase.__new__ calls packages.register_model which
         # creates an entry in all_models. All imported models are registered,
@@ -19,23 +28,25 @@ class ModelsRegistry:
         # and whether the registry has been populated. Since it isn't possible
         # to reimport a module safely (it could reexecute initialization code)
         # all_models is never overridden or reset.
-        self.all_models = defaultdict(dict)
+        self.all_models: defaultdict[str, dict[str, type[Model]]] = defaultdict(dict)
 
         # Maps ("package_label", "modelname") tuples to lists of functions to be
         # called when the corresponding model is ready. Used by this class's
         # `lazy_model_operation()` and `do_pending_operations()` methods.
-        self._pending_operations = defaultdict(list)
+        self._pending_operations: defaultdict[
+            tuple[str, str], list[Callable[[type[Model]], None]]
+        ] = defaultdict(list)
 
-        self.ready = False
+        self.ready: bool = False
 
-    def check_ready(self):
+    def check_ready(self) -> None:
         """Raise an exception if all models haven't been imported yet."""
         if not self.ready:
             raise ModelsRegistryNotReady("Models aren't loaded yet.")
 
     # This method is performance-critical at least for Plain's test suite.
     @functools.cache
-    def get_models(self, *, package_label=""):
+    def get_models(self, *, package_label: str = "") -> list[type[Model]]:
         """
         Return a list of all installed models.
 
@@ -65,7 +76,12 @@ class ModelsRegistry:
 
         return models
 
-    def get_model(self, package_label, model_name=None, require_ready=True):
+    def get_model(
+        self,
+        package_label: str,
+        model_name: str | None = None,
+        require_ready: bool = True,
+    ) -> type[Model]:
         """
         Return the model matching the given package_label and model_name.
 
@@ -87,7 +103,7 @@ class ModelsRegistry:
         package_models = self.all_models[package_label]
         return package_models[model_name.lower()]
 
-    def register_model(self, package_label, model):
+    def register_model(self, package_label: str, model: type[Model]) -> None:
         # Since this method is called when models are imported, it cannot
         # perform imports because of the risk of import loops. It mustn't
         # call get_package_config().
@@ -113,7 +129,7 @@ class ModelsRegistry:
         self.do_pending_operations(model)
         self.clear_cache()
 
-    def _get_registered_model(self, package_label, model_name):
+    def _get_registered_model(self, package_label: str, model_name: str) -> type[Model]:
         """
         Similar to get_model(), but doesn't require that an app exists with
         the given package_label.
@@ -126,7 +142,7 @@ class ModelsRegistry:
             raise LookupError(f"Model '{package_label}.{model_name}' not registered.")
         return model
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """
         Clear all internal caches, for methods that alter the app registry.
 
@@ -142,7 +158,9 @@ class ModelsRegistry:
                 for model in package_models.values():
                     model._meta._expire_cache()
 
-    def lazy_model_operation(self, function, *model_keys):
+    def lazy_model_operation(
+        self, function: Callable[..., None], *model_keys: tuple[str, str]
+    ) -> None:
         """
         Take a function and a number of ("package_label", "modelname") tuples, and
         when all the corresponding models have been imported and registered,
@@ -165,11 +183,11 @@ class ModelsRegistry:
             # This will be executed after the class corresponding to next_model
             # has been imported and registered. The `func` attribute provides
             # duck-type compatibility with partials.
-            def apply_next_model(model):
-                next_function = partial(apply_next_model.func, model)
+            def apply_next_model(model: type[Model]) -> None:
+                next_function = partial(apply_next_model.func, model)  # type: ignore[attr-defined]
                 self.lazy_model_operation(next_function, *more_models)
 
-            apply_next_model.func = function
+            apply_next_model.func = function  # type: ignore[attr-defined]
 
             # If the model has already been imported and registered, partially
             # apply it to the function now. If not, add it to the list of
@@ -182,7 +200,7 @@ class ModelsRegistry:
             else:
                 apply_next_model(model_class)
 
-    def do_pending_operations(self, model):
+    def do_pending_operations(self, model: type[Model]) -> None:
         """
         Take a newly-prepared model and pass it to each function waiting for
         it. This is called at the very end of Models.register_model().
@@ -196,7 +214,7 @@ models_registry = ModelsRegistry()
 
 
 # Decorator to register a model (using the internal registry for the correct state).
-def register_model(model_class):
+def register_model(model_class: M) -> M:
     model_class._meta.models_registry.register_model(
         model_class._meta.package_label, model_class
     )

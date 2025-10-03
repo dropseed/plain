@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func
 from plain.models.fields import (
@@ -19,11 +22,14 @@ from plain.models.lookups import (
 )
 from plain.utils import timezone
 
+if TYPE_CHECKING:
+    from plain.models.sql.compiler import SQLCompiler
+
 
 class TimezoneMixin:
     tzinfo = None
 
-    def get_tzname(self):
+    def get_tzname(self) -> str | None:
         # Timezone conversions must happen to the input datetime *before*
         # applying a function. 2015-12-31 23:00:00 -02:00 is stored in the
         # database as 2016-01-01 01:00:00 +00:00. Any results should be
@@ -38,7 +44,13 @@ class Extract(TimezoneMixin, Transform):
     lookup_name = None
     output_field = IntegerField()
 
-    def __init__(self, expression, lookup_name=None, tzinfo=None, **extra):
+    def __init__(
+        self,
+        expression: Any,
+        lookup_name: str | None = None,
+        tzinfo: Any = None,
+        **extra: Any,
+    ) -> None:
         if self.lookup_name is None:
             self.lookup_name = lookup_name
         if self.lookup_name is None:
@@ -46,7 +58,9 @@ class Extract(TimezoneMixin, Transform):
         self.tzinfo = tzinfo
         super().__init__(expression, **extra)
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         sql, params = compiler.compile(self.lhs)
         lhs_output_field = self.lhs.output_field
         if isinstance(lhs_output_field, DateTimeField):
@@ -79,8 +93,13 @@ class Extract(TimezoneMixin, Transform):
         return sql, params
 
     def resolve_expression(
-        self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False
-    ):
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> Extract:
         copy = super().resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
@@ -209,7 +228,9 @@ class Now(Func):
     template = "CURRENT_TIMESTAMP"
     output_field = DateTimeField()
 
-    def as_postgresql(self, compiler, connection, **extra_context):
+    def as_postgresql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         # PostgreSQL's CURRENT_TIMESTAMP means "the time at the start of the
         # transaction". Use STATEMENT_TIMESTAMP to be cross-compatible with
         # other databases.
@@ -217,12 +238,16 @@ class Now(Func):
             compiler, connection, template="STATEMENT_TIMESTAMP()", **extra_context
         )
 
-    def as_mysql(self, compiler, connection, **extra_context):
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return self.as_sql(
             compiler, connection, template="CURRENT_TIMESTAMP(6)", **extra_context
         )
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return self.as_sql(
             compiler,
             connection,
@@ -237,15 +262,17 @@ class TruncBase(TimezoneMixin, Transform):
 
     def __init__(
         self,
-        expression,
-        output_field=None,
-        tzinfo=None,
-        **extra,
-    ):
+        expression: Any,
+        output_field: Field | None = None,
+        tzinfo: Any = None,
+        **extra: Any,
+    ) -> None:
         self.tzinfo = tzinfo
         super().__init__(expression, output_field=output_field, **extra)
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         sql, params = compiler.compile(self.lhs)
         tzname = None
         if isinstance(self.lhs.output_field, DateTimeField):
@@ -271,8 +298,13 @@ class TruncBase(TimezoneMixin, Transform):
         return sql, params
 
     def resolve_expression(
-        self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False
-    ):
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> TruncBase:
         copy = super().resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
@@ -325,7 +357,7 @@ class TruncBase(TimezoneMixin, Transform):
             )
         return copy
 
-    def convert_value(self, value, expression, connection):
+    def convert_value(self, value: Any, expression: Any, connection: Any) -> Any:
         if isinstance(self.output_field, DateTimeField):
             if value is not None:
                 value = value.replace(tzinfo=None)
@@ -348,12 +380,12 @@ class TruncBase(TimezoneMixin, Transform):
 class Trunc(TruncBase):
     def __init__(
         self,
-        expression,
-        kind,
-        output_field=None,
-        tzinfo=None,
-        **extra,
-    ):
+        expression: Any,
+        kind: str,
+        output_field: Field | None = None,
+        tzinfo: Any = None,
+        **extra: Any,
+    ) -> None:
         self.kind = kind
         super().__init__(expression, output_field=output_field, tzinfo=tzinfo, **extra)
 
@@ -385,7 +417,9 @@ class TruncDate(TruncBase):
     lookup_name = "date"
     output_field = DateField()
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         # Cast to date rather than truncate to date.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()
@@ -397,7 +431,9 @@ class TruncTime(TruncBase):
     lookup_name = "time"
     output_field = TimeField()
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         # Cast to time rather than truncate to time.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()

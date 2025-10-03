@@ -1,4 +1,12 @@
-from typing import Any
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 # MARK: Database Query Exceptions
 
@@ -152,7 +160,7 @@ class DatabaseErrorWrapper:
     exceptions using Plain's common wrappers.
     """
 
-    def __init__(self, wrapper):
+    def __init__(self, wrapper: BaseDatabaseWrapper) -> None:
         """
         wrapper is a database wrapper.
 
@@ -160,10 +168,15 @@ class DatabaseErrorWrapper:
         """
         self.wrapper = wrapper
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         pass
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: Any,
+    ) -> None:
         if exc_type is None:
             return
         for plain_exc_type in (
@@ -179,18 +192,20 @@ class DatabaseErrorWrapper:
         ):
             db_exc_type = getattr(self.wrapper.Database, plain_exc_type.__name__)
             if issubclass(exc_type, db_exc_type):
-                plain_exc_value = plain_exc_type(*exc_value.args)
+                plain_exc_value = (
+                    plain_exc_type(*exc_value.args) if exc_value else plain_exc_type()
+                )
                 # Only set the 'errors_occurred' flag for errors that may make
                 # the connection unusable.
                 if plain_exc_type not in (DataError, IntegrityError):
                     self.wrapper.errors_occurred = True
                 raise plain_exc_value.with_traceback(traceback) from exc_value
 
-    def __call__(self, func):
+    def __call__(self, func: F) -> F:
         # Note that we are intentionally not using @wraps here for performance
         # reasons. Refs #21109.
-        def inner(*args, **kwargs):
+        def inner(*args: Any, **kwargs: Any) -> Any:
             with self:
                 return func(*args, **kwargs)
 
-        return inner
+        return inner  # type: ignore[return-value]

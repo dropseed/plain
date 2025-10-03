@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from types import NoneType
+from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.utils import names_digest, split_identifier
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
@@ -6,6 +9,11 @@ from plain.models.functions import Collate
 from plain.models.query_utils import Q
 from plain.models.sql import Query
 from plain.utils.functional import partition
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.base import Model
+    from plain.models.expressions import Expression
 
 __all__ = ["Index"]
 
@@ -18,13 +26,13 @@ class Index:
 
     def __init__(
         self,
-        *expressions,
-        fields=(),
-        name=None,
-        opclasses=(),
-        condition=None,
-        include=None,
-    ):
+        *expressions: Any,
+        fields: tuple[str, ...] | list[str] = (),
+        name: str | None = None,
+        opclasses: tuple[str, ...] | list[str] = (),
+        condition: Q | None = None,
+        include: tuple[str, ...] | list[str] | None = None,
+    ) -> None:
         if opclasses and not name:
             raise ValueError("An index must be named to use opclasses.")
         if not isinstance(condition, NoneType | Q):
@@ -77,10 +85,12 @@ class Index:
         )
 
     @property
-    def contains_expressions(self):
+    def contains_expressions(self) -> bool:
         return bool(self.expressions)
 
-    def _get_condition_sql(self, model, schema_editor):
+    def _get_condition_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str | None:
         if self.condition is None:
             return None
         query = Query(model=model, alias_cols=False)
@@ -89,7 +99,9 @@ class Index:
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
-    def create_sql(self, model, schema_editor, **kwargs):
+    def create_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
+    ) -> str:
         include = [
             model._meta.get_field(field_name).column for field_name in self.include
         ]
@@ -127,10 +139,12 @@ class Index:
             **kwargs,
         )
 
-    def remove_sql(self, model, schema_editor, **kwargs):
+    def remove_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
+    ) -> str:
         return schema_editor._delete_index_sql(model, self.name, **kwargs)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, tuple[Expression, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         path = path.replace("plain.models.indexes", "plain.models")
         kwargs = {"name": self.name}
@@ -144,12 +158,12 @@ class Index:
             kwargs["include"] = self.include
         return (path, self.expressions, kwargs)
 
-    def clone(self):
+    def clone(self) -> Index:
         """Create a copy of this Index."""
         _, args, kwargs = self.deconstruct()
         return self.__class__(*args, **kwargs)
 
-    def set_name_with_model(self, model):
+    def set_name_with_model(self, model: type[Model]) -> None:
         """
         Generate a unique name for the index.
 
@@ -184,7 +198,7 @@ class Index:
         if self.name[0] == "_" or self.name[0].isdigit():
             self.name = f"D{self.name[1:]}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<{}:{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
             "" if not self.fields else f" fields={repr(self.fields)}",
@@ -195,9 +209,9 @@ class Index:
             "" if not self.opclasses else f" opclasses={repr(self.opclasses)}",
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.deconstruct() == other.deconstruct()
+            return self.deconstruct() == other.deconstruct()  # type: ignore[attr-defined]
         return NotImplemented
 
 
@@ -207,7 +221,7 @@ class IndexExpression(Func):
     template = "%(expressions)s"
     wrapper_classes = (OrderBy, Collate)
 
-    def set_wrapper_classes(self, connection=None):
+    def set_wrapper_classes(self, connection: Any = None) -> None:
         # Some databases (e.g. MySQL) treats COLLATE as an indexed expression.
         if connection and connection.features.collate_as_index_expression:
             self.wrapper_classes = tuple(
@@ -220,12 +234,12 @@ class IndexExpression(Func):
 
     def resolve_expression(
         self,
-        query=None,
-        allow_joins=True,
-        reuse=None,
-        summarize=False,
-        for_save=False,
-    ):
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> Expression:
         expressions = list(self.flatten())
         # Split expressions and wrappers.
         index_expressions, wrappers = partition(
@@ -287,6 +301,8 @@ class IndexExpression(Func):
             query, allow_joins, reuse, summarize, for_save
         )
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: Any, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         # Casting to numeric is unnecessary.
         return self.as_sql(compiler, connection, **extra_context)

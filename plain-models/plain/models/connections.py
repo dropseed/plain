@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 from importlib import import_module
 from threading import local
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from plain.runtime import settings as plain_settings
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class DatabaseConfig(TypedDict, total=False):
@@ -26,7 +31,7 @@ class DatabaseConnection:
 
     __slots__ = ("_settings", "_local")
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._settings: DatabaseConfig = {}
         self._local = local()
 
@@ -53,21 +58,21 @@ class DatabaseConnection:
 
         return database
 
-    def create_connection(self):
+    def create_connection(self) -> BaseDatabaseWrapper:
         database_config = self.configure_settings()
         backend = import_module(f"{database_config['ENGINE']}.base")
-        return backend.DatabaseWrapper(database_config)
+        return backend.DatabaseWrapper(database_config)  # type: ignore[attr-defined]
 
-    def has_connection(self):
+    def has_connection(self) -> bool:
         return hasattr(self._local, "conn")
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> Any:
         if not self.has_connection():
             self._local.conn = self.create_connection()
 
         return getattr(self._local.conn, attr)
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         if name.startswith("_"):
             super().__setattr__(name, value)
         else:

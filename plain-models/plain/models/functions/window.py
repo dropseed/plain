@@ -1,5 +1,9 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.models.expressions import Func
-from plain.models.fields import FloatField, IntegerField
+from plain.models.fields import Field, FloatField, IntegerField
 
 __all__ = [
     "CumeDist",
@@ -37,7 +41,9 @@ class FirstValue(Func):
 class LagLeadFunction(Func):
     window_compatible = True
 
-    def __init__(self, expression, offset=1, default=None, **extra):
+    def __init__(
+        self, expression: Any, offset: int = 1, default: Any = None, **extra: Any
+    ) -> None:
         if expression is None:
             raise ValueError(
                 f"{self.__class__.__name__} requires a non-null source expression."
@@ -51,7 +57,7 @@ class LagLeadFunction(Func):
             args += (default,)
         super().__init__(*args, **extra)
 
-    def _resolve_output_field(self):
+    def _resolve_output_field(self) -> Field:
         sources = self.get_source_expressions()
         return sources[0].output_field
 
@@ -74,7 +80,7 @@ class NthValue(Func):
     function = "NTH_VALUE"
     window_compatible = True
 
-    def __init__(self, expression, nth=1, **extra):
+    def __init__(self, expression: Any, nth: int = 1, **extra: Any) -> None:
         if expression is None:
             raise ValueError(
                 f"{self.__class__.__name__} requires a non-null source expression."
@@ -85,7 +91,7 @@ class NthValue(Func):
             )
         super().__init__(expression, nth, **extra)
 
-    def _resolve_output_field(self):
+    def _resolve_output_field(self) -> Field:
         sources = self.get_source_expressions()
         return sources[0].output_field
 
@@ -95,7 +101,7 @@ class Ntile(Func):
     output_field = IntegerField()
     window_compatible = True
 
-    def __init__(self, num_buckets=1, **extra):
+    def __init__(self, num_buckets: int = 1, **extra: Any) -> None:
         if num_buckets <= 0:
             raise ValueError("num_buckets must be greater than 0.")
         super().__init__(num_buckets, **extra)

@@ -182,4 +182,4 @@ def build_database_url(config: dict) -> str:
 
     path = f"/{name}"
     url = urlparse.urlunsplit((scheme, netloc, path, query, ""))
-    return url
+    return str(url)

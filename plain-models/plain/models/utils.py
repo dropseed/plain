@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import functools
 from collections import namedtuple
+from collections.abc import Generator
+from typing import Any
 
 
-def make_model_tuple(model):
+def make_model_tuple(model: Any) -> tuple[str, str]:
     """
     Take a model or a string of the form "package_label.ModelName" and return a
     corresponding ("package_label", "modelname") tuple. If a tuple is passed in,
@@ -25,7 +29,9 @@ def make_model_tuple(model):
         )
 
 
-def resolve_callables(mapping):
+def resolve_callables(
+    mapping: dict[str, Any],
+) -> Generator[tuple[str, Any], None, None]:
     """
     Generate key/value pairs for the given mapping where the values are
     evaluated if they're callable.
@@ -34,15 +40,17 @@ def resolve_callables(mapping):
         yield k, v() if callable(v) else v
 
 
-def unpickle_named_row(names, values):
+def unpickle_named_row(
+    names: tuple[str, ...], values: tuple[Any, ...]
+) -> tuple[Any, ...]:
     return create_namedtuple_class(*names)(*values)
 
 
 @functools.lru_cache
-def create_namedtuple_class(*names):
+def create_namedtuple_class(*names: str) -> type[tuple[Any, ...]]:
     # Cache type() with @lru_cache since it's too slow to be called for every
     # QuerySet evaluation.
-    def __reduce__(self):
+    def __reduce__(self: Any) -> tuple[Any, tuple[tuple[str, ...], tuple[Any, ...]]]:
         return unpickle_named_row, (names, tuple(self))
 
     return type(

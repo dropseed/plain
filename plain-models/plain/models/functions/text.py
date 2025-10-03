@@ -1,12 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from plain.models.expressions import Func, Value
 from plain.models.fields import CharField, IntegerField, TextField
 from plain.models.functions import Cast, Coalesce
 from plain.models.lookups import Transform
 
+if TYPE_CHECKING:
+    from plain.models.sql.compiler import SQLCompiler
+
 
 class MySQLSHA2Mixin:
-    def as_mysql(self, compiler, connection, **extra_context):
-        return super().as_sql(
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
+        return super().as_sql(  # type: ignore[misc]
             compiler,
             connection,
             template=f"SHA2(%(expressions)s, {self.function[3:]})",
@@ -15,8 +24,10 @@ class MySQLSHA2Mixin:
 
 
 class PostgreSQLSHAMixin:
-    def as_postgresql(self, compiler, connection, **extra_context):
-        return super().as_sql(
+    def as_postgresql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
+        return super().as_sql(  # type: ignore[misc]
             compiler,
             connection,
             template="ENCODE(DIGEST(%(expressions)s, '%(function)s'), 'hex')",
@@ -29,7 +40,9 @@ class Chr(Transform):
     function = "CHR"
     lookup_name = "chr"
 
-    def as_mysql(self, compiler, connection, **extra_context):
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(
             compiler,
             connection,
@@ -38,7 +51,9 @@ class Chr(Transform):
             **extra_context,
         )
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="CHAR", **extra_context)
 
 
@@ -50,7 +65,9 @@ class ConcatPair(Func):
 
     function = "CONCAT"
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         coalesced = self.coalesce()
         return super(ConcatPair, coalesced).as_sql(
             compiler,
@@ -60,7 +77,9 @@ class ConcatPair(Func):
             **extra_context,
         )
 
-    def as_postgresql(self, compiler, connection, **extra_context):
+    def as_postgresql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         copy = self.copy()
         copy.set_source_expressions(
             [
@@ -74,7 +93,9 @@ class ConcatPair(Func):
             **extra_context,
         )
 
-    def as_mysql(self, compiler, connection, **extra_context):
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         # Use CONCAT_WS with an empty separator so that NULLs are ignored.
         return super().as_sql(
             compiler,
@@ -84,7 +105,7 @@ class ConcatPair(Func):
             **extra_context,
         )
 
-    def coalesce(self):
+    def coalesce(self) -> ConcatPair:
         # null on either side results in null for expression, wrap with coalesce
         c = self.copy()
         c.set_source_expressions(
@@ -106,13 +127,13 @@ class Concat(Func):
     function = None
     template = "%(expressions)s"
 
-    def __init__(self, *expressions, **extra):
+    def __init__(self, *expressions: Any, **extra: Any) -> None:
         if len(expressions) < 2:
             raise ValueError("Concat must take at least two expressions")
         paired = self._paired(expressions)
         super().__init__(paired, **extra)
 
-    def _paired(self, expressions):
+    def _paired(self, expressions: tuple[Any, ...]) -> ConcatPair:
         # wrap pairs of expressions in successive concat functions
         # exp = [a, b, c, d]
         # -> ConcatPair(a, ConcatPair(b, ConcatPair(c, d))))
@@ -126,7 +147,7 @@ class Left(Func):
     arity = 2
     output_field = CharField()
 
-    def __init__(self, expression, length, **extra):
+    def __init__(self, expression: Any, length: Any, **extra: Any) -> None:
         """
         expression: the name of a field, or an expression returning a string
         length: the number of characters to return from the start of the string
@@ -136,10 +157,12 @@ class Left(Func):
                 raise ValueError("'length' must be greater than 0.")
         super().__init__(expression, length, **extra)
 
-    def get_substr(self):
+    def get_substr(self) -> Substr:
         return Substr(self.source_expressions[0], Value(1), self.source_expressions[1])
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return self.get_substr().as_sqlite(compiler, connection, **extra_context)
 
 
@@ -150,7 +173,9 @@ class Length(Transform):
     lookup_name = "length"
     output_field = IntegerField()
 
-    def as_mysql(self, compiler, connection, **extra_context):
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(
             compiler, connection, function="CHAR_LENGTH", **extra_context
         )
@@ -165,7 +190,9 @@ class LPad(Func):
     function = "LPAD"
     output_field = CharField()
 
-    def __init__(self, expression, length, fill_text=Value(" "), **extra):
+    def __init__(
+        self, expression: Any, length: Any, fill_text: Any = Value(" "), **extra: Any
+    ) -> None:
         if (
             not hasattr(length, "resolve_expression")
             and length is not None
@@ -190,10 +217,14 @@ class Ord(Transform):
     lookup_name = "ord"
     output_field = IntegerField()
 
-    def as_mysql(self, compiler, connection, **extra_context):
+    def as_mysql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="ORD", **extra_context)
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="UNICODE", **extra_context)
 
 
@@ -201,7 +232,7 @@ class Repeat(Func):
     function = "REPEAT"
     output_field = CharField()
 
-    def __init__(self, expression, number, **extra):
+    def __init__(self, expression: Any, number: Any, **extra: Any) -> None:
         if (
             not hasattr(number, "resolve_expression")
             and number is not None
@@ -214,7 +245,9 @@ class Repeat(Func):
 class Replace(Func):
     function = "REPLACE"
 
-    def __init__(self, expression, text, replacement=Value(""), **extra):
+    def __init__(
+        self, expression: Any, text: Any, replacement: Any = Value(""), **extra: Any
+    ) -> None:
         super().__init__(expression, text, replacement, **extra)
 
 
@@ -226,7 +259,7 @@ class Reverse(Transform):
 class Right(Left):
     function = "RIGHT"
 
-    def get_substr(self):
+    def get_substr(self) -> Substr:
         return Substr(
             self.source_expressions[0], self.source_expressions[1] * Value(-1)
         )
@@ -277,7 +310,9 @@ class StrIndex(Func):
     arity = 2
     output_field = IntegerField()
 
-    def as_postgresql(self, compiler, connection, **extra_context):
+    def as_postgresql(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="STRPOS", **extra_context)
 
 
@@ -285,7 +320,9 @@ class Substr(Func):
     function = "SUBSTRING"
     output_field = CharField()
 
-    def __init__(self, expression, pos, length=None, **extra):
+    def __init__(
+        self, expression: Any, pos: Any, length: Any = None, **extra: Any
+    ) -> None:
         """
         expression: the name of a field, or an expression returning a string
         pos: an integer > 0, or an expression returning an integer
@@ -299,7 +336,9 @@ class Substr(Func):
             expressions.append(length)
         super().__init__(*expressions, **extra)
 
-    def as_sqlite(self, compiler, connection, **extra_context):
+    def as_sqlite(
+        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+    ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="SUBSTR", **extra_context)
 
 
