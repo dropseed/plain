@@ -26,6 +26,7 @@ FULLY_TYPED_DIRS = [
     "plain-flags/plain/flags",
     "plain-htmx/plain/htmx",
     "plain-loginlink/plain/loginlink",
+    "plain-oauth/plain/oauth",
     "plain-sessions/plain/sessions",
 ]
 

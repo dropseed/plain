@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.auth import get_user_model
@@ -50,7 +50,7 @@ class OAuthConnection(models.Model):
         ]
         ordering = ("provider_key",)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.provider_key}[{self.user}:{self.provider_user_id}]"
 
     def refresh_access_token(self) -> None:
@@ -69,13 +69,13 @@ class OAuthConnection(models.Model):
         self.set_token_fields(refreshed_oauth_token)
         self.save()
 
-    def set_token_fields(self, oauth_token: "OAuthToken"):
+    def set_token_fields(self, oauth_token: "OAuthToken") -> None:
         self.access_token = oauth_token.access_token
         self.refresh_token = oauth_token.refresh_token
         self.access_token_expires_at = oauth_token.access_token_expires_at
         self.refresh_token_expires_at = oauth_token.refresh_token_expires_at
 
-    def set_user_fields(self, oauth_user: "OAuthUser"):
+    def set_user_fields(self, oauth_user: "OAuthUser") -> None:
         self.provider_user_id = oauth_user.provider_id
 
     def access_token_expired(self) -> bool:
@@ -125,7 +125,7 @@ class OAuthConnection(models.Model):
     def connect(
         cls,
         *,
-        user,
+        user: Any,
         provider_key: str,
         oauth_token: "OAuthToken",
         oauth_user: "OAuthUser",
@@ -155,7 +155,7 @@ class OAuthConnection(models.Model):
         return connection
 
     @classmethod
-    def preflight(cls):
+    def preflight(cls) -> list[PreflightResult]:
         """
         A system check for ensuring that provider_keys in the database are also present in settings.
         """

@@ -40,7 +40,7 @@ class OAuthUser:
         self.provider_id = provider_id  # ID on the provider's system
         self.user_model_fields = user_model_fields or {}
 
-    def __str__(self):
+    def __str__(self) -> str:
         if "email" in self.user_model_fields:
             return self.user_model_fields["email"]
         if "username" in self.user_model_fields:

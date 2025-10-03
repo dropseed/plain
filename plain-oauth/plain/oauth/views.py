@@ -2,7 +2,7 @@ import logging
 
 from plain.auth.requests import get_request_user
 from plain.auth.views import AuthViewMixin
-from plain.http import ResponseRedirect
+from plain.http import Response, ResponseRedirect
 from plain.views import TemplateView, View
 
 from .exceptions import (
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class OAuthLoginView(View):
-    def post(self):
+    def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]
         if get_request_user(request):
@@ -31,7 +31,7 @@ class OAuthCallbackView(TemplateView):
 
     template_name = "oauth/callback.html"
 
-    def get(self):
+    def get(self) -> Response:
         provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         try:
@@ -51,7 +51,7 @@ class OAuthCallbackView(TemplateView):
 
 
 class OAuthConnectView(AuthViewMixin, View):
-    def post(self):
+    def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
@@ -59,7 +59,7 @@ class OAuthConnectView(AuthViewMixin, View):
 
 
 class OAuthDisconnectView(AuthViewMixin, View):
-    def post(self):
+    def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]
         provider_instance = get_oauth_provider_instance(provider_key=provider)
