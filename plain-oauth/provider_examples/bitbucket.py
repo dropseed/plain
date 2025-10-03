@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import datetime
+from typing import TYPE_CHECKING, Any
 
 import requests
 
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.utils import timezone
 
+if TYPE_CHECKING:
+    from plain.http import Request
+
 
 class BitbucketOAuthProvider(OAuthProvider):
     authorization_url = "https://bitbucket.org/site/oauth2/authorize"
 
-    def _get_token(self, request_data):
+    def _get_token(self, request_data: dict[str, Any]) -> OAuthToken:
         response = requests.post(
             "https://bitbucket.org/site/oauth2/access_token",
             auth=(self.get_client_id(), self.get_client_secret()),
@@ -27,7 +33,7 @@ class BitbucketOAuthProvider(OAuthProvider):
             + datetime.timedelta(seconds=data["expires_in"]),
         )
 
-    def get_oauth_token(self, *, code, request):
+    def get_oauth_token(self, *, code: str, request: Request) -> OAuthToken:
         return self._get_token(
             {
                 "grant_type": "authorization_code",
@@ -36,7 +42,7 @@ class BitbucketOAuthProvider(OAuthProvider):
             }
         )
 
-    def refresh_oauth_token(self, *, oauth_token):
+    def refresh_oauth_token(self, *, oauth_token: OAuthToken) -> OAuthToken:
         return self._get_token(
             {
                 "grant_type": "refresh_token",
@@ -44,7 +50,7 @@ class BitbucketOAuthProvider(OAuthProvider):
             }
         )
 
-    def get_oauth_user(self, *, oauth_token):
+    def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
         response = requests.get(
             "https://api.bitbucket.org/2.0/user",
             headers={

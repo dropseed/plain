@@ -167,7 +167,7 @@ class JobParameters:
         return value
 
     @staticmethod
-    def from_json(data: dict[str, Any]) -> tuple[list[Any], dict[str, Any]]:
+    def from_json(data: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
         args = []
         for arg in data["args"]:
             deserialized = JobParameters._deserialize_value(arg)
@@ -178,7 +178,7 @@ class JobParameters:
             deserialized = JobParameters._deserialize_value(value)
             kwargs[key] = deserialized
 
-        return args, kwargs
+        return tuple(args), kwargs
 
     @staticmethod
     def _deserialize_value(value: Any) -> Any:

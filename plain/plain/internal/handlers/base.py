@@ -18,7 +18,7 @@ from .exception import convert_exception_to_response
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from plain.http import Request, Response
+    from plain.http import Request, Response, ResponseBase
     from plain.urls import ResolverMatch
 
 logger = logging.getLogger("plain.request")
@@ -72,7 +72,7 @@ class BaseHandler:
         # as a flag for initialization being complete.
         self._middleware_chain = handler
 
-    def get_response(self, request: Request) -> Response:
+    def get_response(self, request: Request) -> ResponseBase:
         """Return a Response object for the given Request."""
 
         span_attributes = {
@@ -124,7 +124,7 @@ class BaseHandler:
                 )
             return response
 
-    def _get_response(self, request: Request) -> Response:
+    def _get_response(self, request: Request) -> ResponseBase:
         """
         Resolve and call the view, then apply view, exception, and
         template_response middleware. This method is everything that happens

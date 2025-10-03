@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import datetime
+from typing import TYPE_CHECKING, Any
 
 import requests
 
 from plain.oauth.exceptions import OAuthError
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.utils import timezone
+
+if TYPE_CHECKING:
+    from plain.http import Request
 
 
 class GitHubOAuthProvider(OAuthProvider):
@@ -14,7 +20,7 @@ class GitHubOAuthProvider(OAuthProvider):
     github_user_url = "https://api.github.com/user"
     github_emails_url = "https://api.github.com/user/emails"
 
-    def _get_token(self, request_data):
+    def _get_token(self, request_data: dict[str, Any]) -> OAuthToken:
         response = requests.post(
             self.github_token_url,
             headers={
@@ -45,7 +51,7 @@ class GitHubOAuthProvider(OAuthProvider):
 
         return oauth_token
 
-    def get_oauth_token(self, *, code, request):
+    def get_oauth_token(self, *, code: str, request: Request) -> OAuthToken:
         return self._get_token(
             {
                 "client_id": self.get_client_id(),
@@ -54,7 +60,7 @@ class GitHubOAuthProvider(OAuthProvider):
             }
         )
 
-    def refresh_oauth_token(self, *, oauth_token):
+    def refresh_oauth_token(self, *, oauth_token: OAuthToken) -> OAuthToken:
         return self._get_token(
             {
                 "client_id": self.get_client_id(),
@@ -64,7 +70,7 @@ class GitHubOAuthProvider(OAuthProvider):
             }
         )
 
-    def get_oauth_user(self, *, oauth_token):
+    def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
         response = requests.get(
             self.github_user_url,
             headers={

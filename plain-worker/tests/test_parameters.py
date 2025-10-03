@@ -64,7 +64,9 @@ def test_datetime_parameter_serialization():
     # Test round trip
     assert DateTimeParameter.deserialize(datetime_serialized) == test_datetime
     assert DateTimeParameter.deserialize(datetime_tz_serialized) == test_datetime_tz
-    assert DateTimeParameter.deserialize(datetime_tz_serialized).tzinfo == datetime.UTC
+    deserialized_tz = DateTimeParameter.deserialize(datetime_tz_serialized)
+    assert deserialized_tz is not None
+    assert deserialized_tz.tzinfo == datetime.UTC
 
 
 def test_job_parameters_integration():
@@ -74,7 +76,7 @@ def test_job_parameters_integration():
 
     # Test args and kwargs
     serialized = JobParameters.to_json(
-        [42, "hello", test_date],
+        (42, "hello", test_date),
         {"name": "test", "scheduled_at": test_datetime, "count": 5},
     )
 
@@ -129,7 +131,7 @@ def test_model_parameter_formats():
 
 def test_round_trip_integrity():
     """Test that multiple serialization cycles preserve data."""
-    original_args = [datetime.date(2024, 1, 15), "string", 42]
+    original_args = (datetime.date(2024, 1, 15), "string", 42)
     original_kwargs = {
         "dt": datetime.datetime(2024, 1, 15, 10, 30, 45, 123456),
         "num": 100,

@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
     from typing import Any
 
+    from plain.http import ResponseBase
+
 _slashes_re = _lazy_re_compile(rb"/+")
 
 
@@ -141,7 +143,7 @@ class WSGIHandler(base.BaseHandler):
         self,
         environ: dict[str, Any],
         start_response: Callable[[str, list[tuple[str, str]]], Any],
-    ) -> Iterable[bytes]:
+    ) -> ResponseBase | Iterable[bytes]:
         signals.request_started.send(sender=self.__class__, environ=environ)
         request = WSGIRequest(environ)
         response = self.get_response(request)

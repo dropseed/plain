@@ -1,12 +1,19 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import requests
 
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
+
+if TYPE_CHECKING:
+    from plain.http import Request
 
 
 class GitLabOAuthProvider(OAuthProvider):
     authorization_url = "https://gitlab.com/oauth/authorize"
 
-    def _get_token(self, request_data):
+    def _get_token(self, request_data: dict[str, Any]) -> OAuthToken:
         request_data["client_id"] = self.get_client_id()
         request_data["client_secret"] = self.get_client_secret()
         response = requests.post(
@@ -24,7 +31,7 @@ class GitLabOAuthProvider(OAuthProvider):
             # expires_in is missing in response?
         )
 
-    def get_oauth_token(self, *, code, request):
+    def get_oauth_token(self, *, code: str, request: Request) -> OAuthToken:
         return self._get_token(
             {
                 "grant_type": "authorization_code",
@@ -33,7 +40,7 @@ class GitLabOAuthProvider(OAuthProvider):
             }
         )
 
-    def refresh_oauth_token(self, *, oauth_token):
+    def refresh_oauth_token(self, *, oauth_token: OAuthToken) -> OAuthToken:
         return self._get_token(
             {
                 "grant_type": "refresh_token",
@@ -41,7 +48,7 @@ class GitLabOAuthProvider(OAuthProvider):
             }
         )
 
-    def get_oauth_user(self, *, oauth_token):
+    def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
         response = requests.get(
             "https://gitlab.com/api/v4/user",
             headers={

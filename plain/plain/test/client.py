@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sys
-from functools import partial
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from io import BytesIO, IOBase
@@ -26,10 +25,12 @@ from .encoding import encode_multipart
 from .exceptions import RedirectCycleError
 
 if TYPE_CHECKING:
-    from plain.http import Response
+    from plain.http import Response, ResponseBase
+    from plain.urls import ResolverMatch
 
 __all__ = (
     "Client",
+    "ClientResponse",
     "RequestFactory",
 )
 
@@ -39,6 +40,79 @@ _MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
 _CONTENT_TYPE_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
 _JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
+
+
+class ClientResponse:
+    """
+    Response wrapper returned by test Client with test-specific attributes.
+
+    Wraps any ResponseBase subclass and adds attributes useful for testing,
+    while delegating all other attribute access to the wrapped response.
+    """
+
+    def __init__(
+        self,
+        response: ResponseBase,
+        client: Client,
+        request: dict[str, Any],
+        exc_info: tuple[Any, Any, Any] | None,
+    ):
+        # Store wrapped response in __dict__ directly to avoid __setattr__ recursion
+        object.__setattr__(self, "_response", response)
+        object.__setattr__(self, "_json_cache", None)
+        # Test-specific attributes
+        self.client = client
+        self.request = request
+        self.wsgi_request: WSGIRequest
+        self.redirect_chain: list[tuple[str, int]]
+        self.resolver_match: SimpleLazyObject | ResolverMatch
+        self.exc_info = exc_info
+        # Optional: set by plain.auth if available
+        # self.user: Model
+
+    def json(self, **extra: Any) -> Any:
+        """Parse response content as JSON."""
+        _json_cache = object.__getattribute__(self, "_json_cache")
+        if _json_cache is None:
+            response = object.__getattribute__(self, "_response")
+            content_type = response.headers.get("Content-Type", "")
+            if not _JSON_CONTENT_TYPE_RE.match(content_type):
+                raise ValueError(
+                    f'Content-Type header is "{content_type}", not "application/json"'
+                )
+            _json_cache = json.loads(
+                response.content.decode(response.charset),
+                **extra,
+            )
+            object.__setattr__(self, "_json_cache", _json_cache)
+        return _json_cache
+
+    @property
+    def url(self) -> str:
+        """
+        Return redirect URL if this is a redirect response.
+
+        This property exists on ResponseRedirect and is added for redirects.
+        """
+        response = object.__getattribute__(self, "_response")
+        if hasattr(response, "url"):
+            return response.url  # type: ignore[attr-defined,return-value]
+        # For non-redirect responses, try to get Location header
+        if "Location" in response.headers:
+            return response.headers["Location"]
+        raise AttributeError(f"{response.__class__.__name__} has no attribute 'url'")
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the wrapped response."""
+        return getattr(object.__getattribute__(self, "_response"), name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Set attributes on the wrapper itself."""
+        object.__setattr__(self, name, value)
+
+    def __repr__(self) -> str:
+        """Return repr of wrapped response."""
+        return repr(object.__getattribute__(self, "_response"))
 
 
 @internalcode
@@ -470,7 +544,7 @@ class Client:
         """Set the cookies on the request factory."""
         self._request_factory.cookies = value
 
-    def request(self, **request: Any) -> Response:
+    def request(self, **request: Any) -> ClientResponse:
         """
         Make a generic request. Compose the environment dictionary and pass
         to the handler, return the result of the handler. Assume defaults for
@@ -487,31 +561,36 @@ class Client:
         finally:
             # signals.template_rendered.disconnect(dispatch_uid=signal_uid)
             got_request_exception.disconnect(dispatch_uid=exception_uid)
-        # Check for signaled exceptions.
-        self.check_exception(response)
-        # Save the client and request that stimulated the response.
-        response.client = self
-        response.request = request
-        response.json = partial(self._parse_json, response)
+
+        # Wrap the response in ClientResponse for test-specific attributes
+        client_response = ClientResponse(
+            response=response,
+            client=self,
+            request=request,
+            exc_info=self.exc_info,
+        )
+
+        # Check for signaled exceptions and potentially re-raise
+        self.check_exception()
 
         # If the request had a user, make it available on the response.
         try:
             from plain.auth.requests import get_request_user
 
-            response.user = get_request_user(response.wsgi_request)
+            client_response.user = get_request_user(client_response.wsgi_request)
         except ImportError:
             pass
 
         # Attach the ResolverMatch instance to the response.
         resolver = get_resolver()
-        response.resolver_match = SimpleLazyObject(
+        client_response.resolver_match = SimpleLazyObject(
             lambda: resolver.resolve(request["PATH_INFO"]),
         )
 
         # Update persistent cookie data.
-        if response.cookies:
-            self.cookies.update(response.cookies)
-        return response
+        if client_response.cookies:
+            self.cookies.update(client_response.cookies)
+        return client_response
 
     def get(
         self,
@@ -522,7 +601,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Request a response from the server using GET."""
         self.extra = extra
         self.headers = headers
@@ -548,7 +627,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Request a response from the server using POST."""
         self.extra = extra
         self.headers = headers
@@ -578,7 +657,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Request a response from the server using HEAD."""
         self.extra = extra
         self.headers = headers
@@ -604,7 +683,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Request a response from the server using OPTIONS."""
         self.extra = extra
         self.headers = headers
@@ -635,7 +714,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Send a resource to the server using PUT."""
         self.extra = extra
         self.headers = headers
@@ -666,7 +745,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Send a resource to the server using PATCH."""
         self.extra = extra
         self.headers = headers
@@ -697,7 +776,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Send a DELETE request to the server."""
         self.extra = extra
         self.headers = headers
@@ -727,7 +806,7 @@ class Client:
         *,
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """Send a TRACE request to the server."""
         self.extra = extra
         self.headers = headers
@@ -745,16 +824,16 @@ class Client:
 
     def _handle_redirects(
         self,
-        response: Response,
+        response: ClientResponse,
         data: Any = "",
         content_type: str = "",
         headers: dict[str, str] | None = None,
         **extra: Any,
-    ) -> Response:
+    ) -> ClientResponse:
         """
         Follow any redirects by requesting responses from the server using GET.
         """
-        response.redirect_chain = []  # type: ignore[attr-defined]
+        response.redirect_chain = []
         redirect_status_codes = (
             HTTPStatus.MOVED_PERMANENTLY,
             HTTPStatus.FOUND,
@@ -763,8 +842,8 @@ class Client:
             HTTPStatus.PERMANENT_REDIRECT,
         )
         while response.status_code in redirect_status_codes:
-            response_url = response.url  # type: ignore[attr-defined]
-            redirect_chain = response.redirect_chain  # type: ignore[attr-defined]
+            response_url = response.url
+            redirect_chain = response.redirect_chain
             redirect_chain.append((response_url, response.status_code))
 
             url = urlsplit(response_url)
@@ -781,7 +860,7 @@ class Client:
                 path = "/"
             # Prepend the request path to handle relative path redirects
             if not path.startswith("/"):
-                path = urljoin(response.request["PATH_INFO"], path)  # type: ignore[attr-defined]
+                path = urljoin(response.request["PATH_INFO"], path)
 
             if response.status_code in (
                 HTTPStatus.TEMPORARY_REDIRECT,
@@ -789,7 +868,7 @@ class Client:
             ):
                 # Preserve request method and query string (if needed)
                 # post-redirect for 307/308 responses.
-                request_method_name = response.request["REQUEST_METHOD"].lower()  # type: ignore[attr-defined]
+                request_method_name = response.request["REQUEST_METHOD"].lower()
                 if request_method_name not in ("get", "head"):
                     extra["QUERY_STRING"] = url.query
                 request_method = getattr(self, request_method_name)
@@ -806,7 +885,7 @@ class Client:
                 headers=headers,
                 **extra,
             )
-            response.redirect_chain = redirect_chain  # type: ignore[attr-defined]
+            response.redirect_chain = redirect_chain
 
             if redirect_chain[-1] in redirect_chain[:-1]:
                 # Check that we're not redirecting to somewhere we've already
@@ -826,13 +905,8 @@ class Client:
         """Store exceptions when they are generated by a view."""
         self.exc_info = sys.exc_info()
 
-    def check_exception(self, response: Response) -> None:
-        """
-        Look for a signaled exception, clear the current context exception
-        data, re-raise the signaled exception, and clear the signaled exception
-        from the local cache.
-        """
-        response.exc_info = self.exc_info  # type: ignore[attr-defined]
+    def check_exception(self) -> None:
+        """Check for signaled exceptions and potentially re-raise."""
         if self.exc_info:
             _, exc_value, _ = self.exc_info
             self.exc_info = None
@@ -856,17 +930,3 @@ class Client:
         from plain.auth.test import logout_client
 
         logout_client(self)
-
-    def _parse_json(self, response: Response, **extra: Any) -> Any:
-        if not hasattr(response, "_json"):
-            if not _JSON_CONTENT_TYPE_RE.match(response.headers.get("Content-Type")):
-                raise ValueError(
-                    'Content-Type header is "{}", not "application/json"'.format(
-                        response.headers.get("Content-Type")
-                    )
-                )
-            response._json = json.loads(  # type: ignore[attr-defined]
-                response.content.decode(response.charset),
-                **extra,  # type: ignore[arg-type]
-            )
-        return response._json  # type: ignore[attr-defined]

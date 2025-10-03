@@ -1,5 +1,6 @@
 from io import BytesIO
 
+from plain.http import Response
 from plain.internal.handlers.wsgi import WSGIHandler
 
 
@@ -18,5 +19,6 @@ def test_wsgi_handler():
         lambda *args: None,
     )
 
+    assert isinstance(response, Response)
     assert response.status_code == 200
     assert response.content == b"Hello, world!"

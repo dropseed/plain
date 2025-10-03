@@ -1,4 +1,4 @@
-from app.users.models import User
+from app.users.models import User  # type: ignore[import-untyped]
 
 from plain.test import Client
 
