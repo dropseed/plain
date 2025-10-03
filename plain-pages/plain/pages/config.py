@@ -10,7 +10,7 @@ from .registry import pages_registry
 @internalcode
 @register_config
 class Config(PackageConfig):
-    def ready(self):
+    def ready(self) -> None:
         for pacakge_config in packages_registry.get_package_configs():
             pages_registry.discover_pages(
                 os.path.join(pacakge_config.path, "templates", "pages")

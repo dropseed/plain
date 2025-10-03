@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import os
 
 from plain.internal import internalcode
+from plain.urls import URLPattern
 
 from .exceptions import PageNotFoundError
 from .pages import Page
@@ -17,7 +20,7 @@ class PagesRegistry:
         self._url_name_mappings = {}  # url_name -> relative_path
         self._path_mappings = {}  # relative_path -> absolute_path
 
-    def get_page_urls(self):
+    def get_page_urls(self) -> list[URLPattern]:
         """
         Generate a list of real urls based on the files that exist.
         This way, you get a concrete url reversingerror if you try
@@ -33,11 +36,13 @@ class PagesRegistry:
 
         return paths
 
-    def discover_pages(self, pages_dir):
+    def discover_pages(self, pages_dir: str) -> None:
         for root, _, files in os.walk(pages_dir, followlinks=True):
             for file in files:
-                relative_path = os.path.relpath(os.path.join(root, file), pages_dir)
-                absolute_path = os.path.join(root, file)
+                relative_path = str(
+                    os.path.relpath(os.path.join(root, file), pages_dir)
+                )
+                absolute_path = str(os.path.join(root, file))
 
                 page = Page(relative_path=relative_path, absolute_path=absolute_path)
                 urls = page.get_urls()
@@ -54,7 +59,7 @@ class PagesRegistry:
                     url_name = url_path_obj.name
                     self._url_name_mappings[url_name] = relative_path
 
-    def get_page_from_name(self, url_name):
+    def get_page_from_name(self, url_name: str) -> Page:
         """Get a page by its URL name."""
         try:
             relative_path = self._url_name_mappings[url_name]
@@ -62,7 +67,7 @@ class PagesRegistry:
         except KeyError:
             raise PageNotFoundError(f"Could not find a page for URL name {url_name}")
 
-    def get_page_from_path(self, relative_path):
+    def get_page_from_path(self, relative_path: str) -> Page:
         """Get a page by its relative file path."""
         try:
             absolute_path = self._path_mappings[relative_path]

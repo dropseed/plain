@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import getpass
 import random
 import string
@@ -24,7 +26,9 @@ from .client import TunnelClient
 @click.option(
     "--quiet", "log_level", flag_value="WARNING", help="Only log warnings and errors."
 )
-def cli(destination, subdomain, tunnel_host, log_level):
+def cli(
+    destination: str, subdomain: str | None, tunnel_host: str, log_level: str | None
+) -> None:
     if not destination.startswith("http://") and not destination.startswith("https://"):
         destination = f"https://{destination}"
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import os
 import pathlib
@@ -17,11 +19,11 @@ from cryptography.x509.oid import NameOID
 from plain.test import Client
 
 if TYPE_CHECKING:
-    from playwright.sync_api import Browser
+    from playwright.sync_api import Browser, Page  # ty: ignore[unresolved-import]
 
 
 class TestBrowser:
-    def __init__(self, browser: "Browser", database_url: str):
+    def __init__(self, browser: Browser, database_url: str):
         self.browser = browser
 
         self.database_url = database_url
@@ -36,7 +38,7 @@ class TestBrowser:
         # Set the initial browser context
         self.reset_context()
 
-    def force_login(self, user):
+    def force_login(self, user: object) -> None:
         # Make sure existing session cookies are cleared
         self.context.clear_cookies()
 
@@ -73,17 +75,17 @@ class TestBrowser:
 
         self.context.add_cookies(cookies)
 
-    def logout(self):
+    def logout(self) -> None:
         self.context.clear_cookies()
 
-    def reset_context(self):
+    def reset_context(self) -> None:
         """Create a new browser context with the base URL and ignore HTTPS errors."""
         self.context = self.browser.new_context(
             base_url=self.base_url,
             ignore_https_errors=True,
         )
 
-    def new_page(self):
+    def new_page(self) -> Page:
         """Create a new page in the current context."""
         return self.context.new_page()
 
@@ -154,7 +156,7 @@ class TestBrowser:
 
         return list(visited)
 
-    def generate_certificates(self):
+    def generate_certificates(self) -> tuple[str, str]:
         """Generate self-signed certificates for HTTPS."""
 
         # Generate private key
@@ -209,7 +211,7 @@ class TestBrowser:
 
         return str(cert_file), str(key_file)
 
-    def run_server(self):
+    def run_server(self) -> None:
         cert_file, key_file = self.generate_certificates()
 
         env = os.environ.copy()
@@ -241,7 +243,7 @@ class TestBrowser:
 
         time.sleep(0.7)  # quick grace period
 
-    def cleanup_server(self):
+    def cleanup_server(self) -> None:
         if self.server_process:
             self.server_process.terminate()
             self.server_process.wait()

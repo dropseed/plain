@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from plain.chores import register_chore
 from plain.runtime import settings
 from plain.utils import timezone
@@ -6,7 +8,7 @@ from .models import NotFoundLog, RedirectLog
 
 
 @register_chore("redirection")
-def delete_logs():
+def delete_logs() -> str:
     """
     Delete logs older than REDIRECTION_LOG_RETENTION_TIMEDELTA.
     """

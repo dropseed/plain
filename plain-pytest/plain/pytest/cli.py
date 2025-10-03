@@ -15,7 +15,7 @@ from plain.cli import register_cli
     }
 )
 @click.argument("pytest_args", nargs=-1, type=click.UNPROCESSED)
-def cli(pytest_args):
+def cli(pytest_args: tuple[str, ...]) -> None:
     """Run pytest with .env.test loaded"""
 
     if os.path.exists(".env.test"):

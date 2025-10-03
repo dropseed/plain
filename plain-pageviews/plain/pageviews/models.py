@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.runtime import settings
@@ -8,15 +9,18 @@ from plain.utils import timezone
 
 from .params import extract_tracking_params
 
+if TYPE_CHECKING:
+    from plain.http import Request
+
 try:
     from plain.auth import get_request_user
 except ImportError:
-    get_request_user = None
+    get_request_user: Any = None
 
 try:
     from plain.sessions import get_request_session
 except ImportError:
-    get_request_session = None
+    get_request_session: Any = None
 
 
 @models.register_model
@@ -59,7 +63,7 @@ class Pageview(models.Model):
     @classmethod
     def create_from_request(
         cls,
-        request,
+        request: Request,
         *,
         url: str | None = None,
         title: str | None = None,

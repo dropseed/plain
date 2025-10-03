@@ -6,7 +6,7 @@ from .models import Pageview
 
 
 @register_chore("pageviews")
-def clear_old_pageviews():
+def clear_old_pageviews() -> str:
     """
     Delete old anonymous and authenticated pageviews.
     """

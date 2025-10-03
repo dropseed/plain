@@ -1,11 +1,19 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
 from plain.http import ResponseRedirect
+
+if TYPE_CHECKING:
+    from plain.http import Request, Response
 
 
 class RedirectionMiddleware:
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable[[Request], Response]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: Request) -> Response:
         response = self.get_response(request)
 
         if response.status_code == 404:
@@ -20,7 +28,7 @@ class RedirectionMiddleware:
                     redirect_log = RedirectLog.from_redirect(redirect, request)
                     # Then redirect
                     return ResponseRedirect(
-                        redirect_log.to_url, status_code=redirect.http_status
+                        str(redirect_log.to_url), status_code=redirect.http_status
                     )
 
             # Nothing matched, just log the 404

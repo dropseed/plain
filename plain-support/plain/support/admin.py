@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.admin.cards import Card
 from plain.admin.views import (
     AdminModelDetailView,
@@ -26,7 +30,7 @@ class UserSupportFormEntriesCard(Card):
     title = "Recent support"
     template_name = "support/card.html"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
         context["entries"] = SupportFormEntry.query.filter(user=self.view.object)

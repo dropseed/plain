@@ -35,7 +35,7 @@ class UserPageviewsCard(Card):
     title = "Recent pageviews"
     template_name = "pageviews/card.html"
 
-    def get_template_context(self):
+    def get_template_context(self) -> dict:
         context = super().get_template_context()
 
         context["pageviews"] = Pageview.query.filter(

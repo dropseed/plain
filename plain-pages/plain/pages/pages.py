@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import os
 from functools import cached_property
+from typing import Any
 
 import frontmatter
 
 from plain.runtime import settings
 from plain.templates import Template
-from plain.urls import path, reverse
+from plain.urls import URLPattern, path, reverse
 
 from .markdown import render_markdown
 
@@ -15,30 +18,30 @@ class PageRenderError(Exception):
 
 
 class Page:
-    def __init__(self, relative_path, absolute_path):
+    def __init__(self, relative_path: str, absolute_path: str):
         self.relative_path = relative_path
         self.absolute_path = absolute_path
-        self._template_context = {}
+        self._template_context: dict[str, Any] = {}
 
-    def set_template_context(self, context):
+    def set_template_context(self, context: dict[str, Any]) -> None:
         self._template_context = context
 
     @cached_property
-    def _frontmatter(self):
+    def _frontmatter(self) -> Any:
         with open(self.absolute_path) as f:
             return frontmatter.load(f)
 
     @cached_property
-    def vars(self):
+    def vars(self) -> dict[str, Any]:
         return self._frontmatter.metadata
 
     @cached_property
-    def title(self):
+    def title(self) -> str:
         default_title = os.path.splitext(os.path.basename(self.relative_path))[0]
         return self.vars.get("title", default_title)
 
     @cached_property
-    def content(self):
+    def content(self) -> str:
         # Strip the frontmatter
         content = self._frontmatter.content
 
@@ -59,14 +62,14 @@ class Page:
 
         return content
 
-    def is_markdown(self):
+    def is_markdown(self) -> bool:
         extension = os.path.splitext(self.absolute_path)[1]
         return extension == ".md"
 
-    def is_template(self):
+    def is_template(self) -> bool:
         return ".template." in os.path.basename(self.absolute_path)
 
-    def is_asset(self):
+    def is_asset(self) -> bool:
         extension = os.path.splitext(self.absolute_path)[1]
         # Anything that we don't specifically recognize for pages
         # gets treated as an asset
@@ -76,17 +79,17 @@ class Page:
             ".redirect",
         )
 
-    def is_redirect(self):
+    def is_redirect(self) -> bool:
         extension = os.path.splitext(self.absolute_path)[1]
         return extension == ".redirect"
 
-    def get_template_name(self):
+    def get_template_name(self) -> str:
         if template_name := self.vars.get("template_name"):
             return template_name
 
         return ""
 
-    def get_url_path(self):
+    def get_url_path(self) -> str | None:
         """Generate the primary URL path for this page."""
         if self.is_template():
             return None
@@ -107,7 +110,7 @@ class Page:
         # Everything else should get a trailing slash
         return url_path + "/"
 
-    def get_url_name(self):
+    def get_url_name(self) -> str | None:
         """Generate the URL name from the URL path."""
         url_path = self.get_url_path()
         if url_path is None:
@@ -118,7 +121,7 @@ class Page:
 
         return url_path.rstrip("/")
 
-    def get_view_class(self):
+    def get_view_class(self) -> type:
         """Get the appropriate view class for this page."""
         from .views import PageAssetView, PageRedirectView, PageView
 
@@ -130,7 +133,7 @@ class Page:
 
         return PageView
 
-    def get_markdown_url(self):
+    def get_markdown_url(self) -> str | None:
         """Get the markdown URL for this page if it exists."""
         if not self.is_markdown():
             return None
@@ -144,7 +147,7 @@ class Page:
 
         return reverse(f"pages:{url_name}-md")
 
-    def get_urls(self):
+    def get_urls(self) -> list[URLPattern]:
         """Get all URL path objects for this page."""
         urls = []
 

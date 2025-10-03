@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import click
@@ -13,13 +15,13 @@ VENDOR_DIR = APP_ASSETS_DIR / "vendor"
 
 @register_cli("vendor")
 @click.group()
-def cli():
+def cli() -> None:
     """Vendor CSS/JS from a CDN"""
     pass
 
 
 @cli.command()
-def sync():
+def sync() -> None:
     """Clear vendored assets and re-download"""
     click.secho("Clearing existing vendored dependencies...", bold=True)
     if VENDOR_DIR.exists():
@@ -55,7 +57,7 @@ def sync():
 
 @cli.command()
 @click.argument("name", nargs=-1, default=None)
-def update(name):
+def update(name: tuple[str, ...]) -> None:
     """Update vendored dependencies in pyproject.toml"""
     deps = get_deps()
     if not deps:
@@ -95,7 +97,7 @@ def update(name):
 @click.argument("url")
 @click.option("--name", help="Name of the dependency")
 @click.option("--sourcemap/--no-sourcemap", default=True, help="Download sourcemap")
-def add(url, name, sourcemap):
+def add(url: str, name: str | None, sourcemap: bool) -> None:
     """Add a new vendored dependency to pyproject.toml"""
     if not name:
         name = url.split("/")[-1].split("?")[0].split("#")[0]

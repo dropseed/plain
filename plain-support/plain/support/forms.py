@@ -1,5 +1,10 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.auth import get_user_model
 from plain.email import TemplateEmail
+from plain.models import Model
 from plain.models.forms import ModelForm
 from plain.runtime import settings
 
@@ -16,14 +21,14 @@ class SupportForm(ModelForm):
         model = SupportFormEntry
         fields = ["name", "email", "message"]
 
-    def __init__(self, user, form_slug, *args, **kwargs):
+    def __init__(self, user: Model | None, form_slug: str, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.user = user  # User provided directly by authed request
         self.form_slug = form_slug
         if self.user:
-            self.fields["email"].initial = user.email
+            self.fields["email"].initial = user.email  # type: ignore[attr-defined]
 
-    def find_user(self):
+    def find_user(self) -> Model | None:
         # If the user isn't logged in (typical in an iframe, depending on session cookie settings),
         # we can still try to look them up by email
         # to associate the entry with them.
@@ -38,9 +43,9 @@ class SupportForm(ModelForm):
         try:
             return UserModel.query.get(email=email)
         except UserModel.DoesNotExist:
-            return
+            return None
 
-    def save(self, commit=True):
+    def save(self, commit: bool = True) -> SupportFormEntry:
         instance = super().save(commit=False)
         instance.user = self.user or self.find_user()
         instance.form_slug = self.form_slug
@@ -48,7 +53,7 @@ class SupportForm(ModelForm):
             instance.save()
         return instance
 
-    def notify(self, instance):
+    def notify(self, instance: SupportFormEntry) -> None:
         """
         Notify the support team of a new support form entry.
 
@@ -58,7 +63,7 @@ class SupportForm(ModelForm):
             template="support_form_entry",
             subject=f"Support request from {instance.name}",
             to=[settings.SUPPORT_EMAIL],
-            reply_to=[instance.email],
+            reply_to=[str(instance.email)],
             context={
                 "support_form_entry": instance,
             },

@@ -6,7 +6,7 @@ from .models import Pageview
 
 
 class TrackView(View):
-    def post(self):
+    def post(self) -> int:
         try:
             data = self.request.data
         except json.JSONDecodeError:

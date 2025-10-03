@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import ssl
 import urllib.error
 import urllib.request
+from typing import Any
 from urllib.parse import urlparse
 
 import click
@@ -11,7 +14,9 @@ import websockets
 
 
 class TunnelClient:
-    def __init__(self, *, destination_url, subdomain, tunnel_host, log_level):
+    def __init__(
+        self, *, destination_url: str, subdomain: str, tunnel_host: str, log_level: str
+    ) -> None:
         self.destination_url = destination_url
         self.subdomain = subdomain
         self.tunnel_host = tunnel_host
@@ -36,7 +41,7 @@ class TunnelClient:
         asyncio.set_event_loop(self.loop)
         self.stop_event = asyncio.Event()
 
-    async def connect(self):
+    async def connect(self) -> None:
         retry_count = 0
         max_retries = 5
         while not self.stop_event.is_set():
@@ -80,7 +85,7 @@ class TunnelClient:
                 )
                 await asyncio.sleep(2)
 
-    async def forward_request(self, websocket):
+    async def forward_request(self, websocket: Any) -> None:
         try:
             async for message in websocket:
                 if isinstance(message, str):
@@ -100,7 +105,9 @@ class TunnelClient:
             self.logger.error(f"Error in forward_request: {e}")
             raise
 
-    async def handle_request_metadata(self, websocket, data):
+    async def handle_request_metadata(
+        self, websocket: Any, data: dict[str, Any]
+    ) -> None:
         request_id = data["id"]
         has_body = data.get("has_body", False)
         total_body_chunks = data.get("totalBodyChunks", 0)
@@ -115,7 +122,9 @@ class TunnelClient:
         )
         await self.check_and_process_request(websocket, request_id)
 
-    async def handle_request_body_chunk(self, websocket, chunk_data):
+    async def handle_request_body_chunk(
+        self, websocket: Any, chunk_data: bytes
+    ) -> None:
         offset = 0
 
         # Extract id_length
@@ -158,7 +167,7 @@ class TunnelClient:
                 f"Received body chunk for unknown or completed request ID: {request_id}"
             )
 
-    async def check_and_process_request(self, websocket, request_id):
+    async def check_and_process_request(self, websocket: Any, request_id: str) -> None:
         request_data = self.pending_requests.get(request_id)
         if request_data and request_data["metadata"]:
             has_body = request_data["has_body"]
@@ -185,8 +194,12 @@ class TunnelClient:
                 del self.pending_requests[request_id]
 
     async def process_request(
-        self, websocket, request_metadata, body_chunks, request_id
-    ):
+        self,
+        websocket: Any,
+        request_metadata: dict[str, Any],
+        body_chunks: dict[int, bytes],
+        request_id: str,
+    ) -> None:
         self.logger.debug(
             f"Processing request: {request_id} {request_metadata['method']} {request_metadata['url']}"
         )
@@ -224,7 +237,9 @@ class TunnelClient:
 
         # Override the HTTPErrorProcessor to stop processing redirects
         class NoRedirectProcessor(urllib.request.HTTPErrorProcessor):
-            def http_response(self, request, response):
+            def http_response(
+                self, request: urllib.request.Request, response: Any
+            ) -> Any:
                 return response
 
             https_response = http_response
@@ -310,7 +325,7 @@ class TunnelClient:
         else:
             self.logger.debug(f"No body to send for ID: {request_id}")
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         self.stop_event.set()
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
         if tasks:
@@ -320,7 +335,7 @@ class TunnelClient:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.loop.shutdown_asyncgens()
 
-    def run(self):
+    def run(self) -> None:
         try:
             self.loop.run_until_complete(self.connect())
         except KeyboardInterrupt:

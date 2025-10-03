@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import re
+from typing import TYPE_CHECKING
 
 from plain import models
 
+if TYPE_CHECKING:
+    from plain.http import Request
 
-def _get_client_ip(request):
+
+def _get_client_ip(request: Request) -> str | None:
     if x_forwarded_for := request.headers.get("X-Forwarded-For"):
         return x_forwarded_for.split(",")[0].strip()
     else:
@@ -40,10 +46,10 @@ class Redirect(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.from_pattern}"
 
-    def matches_request(self, request):
+    def matches_request(self, request: Request) -> bool:
         """
         Decide whether a request matches this Redirect,
         automatically checking whether the pattern is path based or full URL based.
@@ -57,11 +63,11 @@ class Redirect(models.Model):
             url = request.path
 
         if self.is_regex:
-            return re.match(self.from_pattern, url)
+            return bool(re.match(self.from_pattern, url))
         else:
             return url == self.from_pattern
 
-    def get_redirect_url(self, request):
+    def get_redirect_url(self, request: Request) -> str:
         if not self.is_regex:
             return self.to_pattern
 
@@ -97,7 +103,7 @@ class RedirectLog(models.Model):
         ]
 
     @classmethod
-    def from_redirect(cls, redirect, request):
+    def from_redirect(cls, redirect: Redirect, request: Request) -> RedirectLog:
         from_url = request.build_absolute_uri()
         to_url = redirect.get_redirect_url(request)
 
@@ -136,7 +142,7 @@ class NotFoundLog(models.Model):
         ]
 
     @classmethod
-    def from_request(cls, request):
+    def from_request(cls, request: Request) -> NotFoundLog:
         return cls.query.create(
             url=request.build_absolute_uri(),
             ip_address=_get_client_ip(request),
