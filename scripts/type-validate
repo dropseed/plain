@@ -27,7 +27,16 @@ FULLY_TYPED_DIRS = [
     "plain-htmx/plain/htmx",
     "plain-loginlink/plain/loginlink",
     "plain-oauth/plain/oauth",
+    "plain-pages/plain/pages",
+    "plain-pageviews/plain/pageviews",
+    "plain-passwords/plain/passwords",
+    "plain-pytest/plain/pytest",
+    "plain-redirection/plain/redirection",
     "plain-sessions/plain/sessions",
+    "plain-support/plain/support",
+    "plain-toolbar/plain/toolbar",
+    "plain-tunnel/plain/tunnel",
+    "plain-vendor/plain/vendor",
 ]
 
 
