@@ -36,6 +36,7 @@ FULLY_TYPED_PATHS = [
     "plain-sessions",
     "plain-observer",
     "plain-support",
+    "plain-tailwind",
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",

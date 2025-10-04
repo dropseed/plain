@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import os
 import platform
 import subprocess
 import sys
+from pathlib import Path
+from typing import Any
 
 import click
 import requests
@@ -27,14 +31,14 @@ class Tailwind:
         return os.path.join(self.target_directory, "tailwind.version")
 
     @property
-    def src_css_path(self) -> str:
+    def src_css_path(self) -> Path:
         return settings.TAILWIND_SRC_PATH
 
     @property
-    def dist_css_path(self) -> str:
+    def dist_css_path(self) -> Path:
         return settings.TAILWIND_DIST_PATH
 
-    def update_plain_sources(self):
+    def update_plain_sources(self) -> None:
         paths = set()
 
         # Add paths from installed packages
@@ -52,7 +56,7 @@ class Tailwind:
             for path in paths:
                 f.write(f'@source "{path}";\n')
 
-    def invoke(self, *args, cwd=None) -> None:
+    def invoke(self, *args: Any, cwd: str | None = None) -> None:
         result = subprocess.run([self.standalone_path] + list(args), cwd=cwd)
         if result.returncode != 0:
             sys.exit(result.returncode)
@@ -62,7 +66,7 @@ class Tailwind:
             os.mkdir(self.target_directory)
         return os.path.exists(os.path.join(self.target_directory, "tailwind"))
 
-    def create_src_css(self):
+    def create_src_css(self) -> None:
         os.makedirs(os.path.dirname(self.src_css_path), exist_ok=True)
         with open(self.src_css_path, "w") as f:
             f.write("""@import "tailwindcss";\n@import "./.plain/tailwind.css";\n""")
@@ -102,7 +106,7 @@ class Tailwind:
                 .get("version", "")
             )
 
-    def set_version_in_config(self, version):
+    def set_version_in_config(self, version: str) -> None:
         pyproject_path = os.path.join(
             os.path.dirname(self.target_directory), "pyproject.toml"
         )
@@ -117,7 +121,7 @@ class Tailwind:
         with open(pyproject_path, "w") as f:
             tomlkit.dump(config, f)
 
-    def download(self, version="") -> str:
+    def download(self, version: str = "") -> str:
         if version:
             if not version.startswith("v"):
                 version = f"v{version}"
@@ -129,7 +133,7 @@ class Tailwind:
         session = requests.Session()
 
         # Better connection pooling
-        adapter = requests.adapters.HTTPAdapter(
+        adapter = requests.adapters.HTTPAdapter(  # type: ignore[attr-defined]
             pool_connections=1, pool_maxsize=10, max_retries=3, pool_block=True
         )
         session.mount("https://", adapter)
@@ -173,7 +177,7 @@ class Tailwind:
 
         return version
 
-    def install(self, version="") -> str:
+    def install(self, version: str = "") -> str:
         installed_version = self.download(version)
         self.set_version_in_config(installed_version)
         return installed_version

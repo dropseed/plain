@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import click
@@ -10,14 +12,14 @@ from .core import Tailwind
 
 @register_cli("tailwind")
 @click.group("tailwind")
-def cli():
+def cli() -> None:
     """Tailwind CSS"""
     pass
 
 
 @cli.command()
 @click.pass_context
-def init(ctx):
+def init(ctx: click.Context) -> None:
     """Install Tailwind and create tailwind.css"""
     tailwind = Tailwind()
 
@@ -34,7 +36,7 @@ def init(ctx):
 @cli.command()
 @click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
-def install(ctx, force):
+def install(ctx: click.Context, force: bool) -> None:
     tailwind = Tailwind()
 
     if force or not tailwind.is_installed() or tailwind.needs_update():
@@ -54,7 +56,7 @@ def install(ctx, force):
 
 
 @cli.command()
-def update():
+def update() -> None:
     """Update the Tailwind CSS version"""
     tailwind = Tailwind()
     click.secho("Installing Tailwind standalone...", bold=True, nl=True)
@@ -66,7 +68,7 @@ def update():
 @click.option("--watch", is_flag=True)
 @click.option("--minify", is_flag=True)
 @click.pass_context
-def build(ctx, watch, minify):
+def build(ctx: click.Context, watch: bool, minify: bool) -> None:
     """Compile a Tailwind CSS file"""
     tailwind = Tailwind()
 
@@ -96,7 +98,7 @@ def build(ctx, watch, minify):
 
 
 @cli.command()
-def version():
+def version() -> None:
     """Show the installed Tailwind CSS version"""
     tailwind = Tailwind()
 
