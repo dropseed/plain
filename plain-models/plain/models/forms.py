@@ -6,7 +6,7 @@ and database field objects.
 from __future__ import annotations
 
 from itertools import chain
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import (
     NON_FIELD_ERRORS,
@@ -17,6 +17,9 @@ from plain.forms import fields
 from plain.forms.fields import ChoiceField, Field
 from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.models.exceptions import FieldError
+
+if TYPE_CHECKING:
+    from plain.models.fields import Field as ModelField
 
 __all__ = (
     "ModelForm",
@@ -649,7 +652,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
 
 
 def modelfield_to_formfield(
-    modelfield: Any,
+    modelfield: ModelField,
     form_class: type[Field] | None = None,
     choices_form_class: type[Field] | None = None,
     **kwargs: Any,
@@ -744,7 +747,7 @@ def modelfield_to_formfield(
 
     if isinstance(modelfield, models.ForeignKey):
         return ModelChoiceField(
-            queryset=modelfield.remote_field.model.query,
+            queryset=modelfield.remote_field.model.query,  # type: ignore[attr-defined]
             **defaults,
         )
 

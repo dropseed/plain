@@ -15,6 +15,7 @@ from plain.utils.datastructures import ImmutableList
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.fields import Field
 
 PROXY_PARENTS = object()
 
@@ -60,8 +61,8 @@ class Options:
 
     def __init__(self, meta: Any, package_label: str | None = None):
         self._get_fields_cache: dict[tuple[bool, bool, bool, bool], Any] = {}
-        self.local_fields: list[Any] = []
-        self.local_many_to_many: list[Any] = []
+        self.local_fields: list[Field] = []
+        self.local_many_to_many: list[Field] = []
         self.queryset_class: type[QuerySet] | None = None
         self.model_name: str | None = None
         self.db_table: str = ""
@@ -156,7 +157,7 @@ class Options:
             new_objs.append(obj)
         return new_objs
 
-    def add_field(self, field: Any) -> None:
+    def add_field(self, field: Field) -> None:
         # Insert the given field in the order in which it was created, using
         # the "creation_counter" attribute of the field.
         # Move many-to-many related fields from self.fields into
@@ -556,7 +557,7 @@ class Options:
         return frozenset(names)
 
     @cached_property
-    def db_returning_fields(self) -> list[Any]:
+    def db_returning_fields(self) -> list[Field]:
         """
         Private API intended only to be used by Plain itself.
         Fields to be returned after a database insert.

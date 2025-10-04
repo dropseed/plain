@@ -4,9 +4,12 @@ import datetime
 import re
 from collections import namedtuple
 from collections.abc import Generator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
+
+if TYPE_CHECKING:
+    from plain.models.fields import Field
 
 FieldReference = namedtuple("FieldReference", "to through")
 
@@ -58,10 +61,10 @@ def resolve_relation(
 
 def field_references(
     model_tuple: tuple[str, str],
-    field: Any,
+    field: Field,
     reference_model_tuple: tuple[str, str],
     reference_field_name: str | None = None,
-    reference_field: Any = None,
+    reference_field: Field | None = None,
 ) -> FieldReference | bool:
     """
     Return either False or a FieldReference if `field` references provided
@@ -105,7 +108,7 @@ def field_references(
 
 def get_references(
     state: Any, model_tuple: tuple[str, str], field_tuple: tuple[Any, ...] = ()
-) -> Generator[tuple[Any, str, Any, FieldReference], None, None]:
+) -> Generator[tuple[Any, str, Field, FieldReference], None, None]:
     """
     Generator of (model_state, name, field, reference) referencing
     provided context.
@@ -116,7 +119,10 @@ def get_references(
     for state_model_tuple, model_state in state.models.items():
         for name, field in model_state.fields.items():
             reference = field_references(
-                state_model_tuple, field, model_tuple, *field_tuple
+                state_model_tuple,
+                field,
+                model_tuple,
+                *field_tuple,  # type: ignore[arg-type]
             )
             if reference:
                 yield model_state, name, field, reference

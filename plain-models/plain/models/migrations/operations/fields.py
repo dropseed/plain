@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.fields import NOT_PROVIDED
 from plain.models.migrations.utils import field_references
 
 from .base import Operation
 
+if TYPE_CHECKING:
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.fields import Field
+    from plain.models.migrations.state import ProjectState
+
 
 class FieldOperation(Operation):
-    def __init__(self, model_name: str, name: str, field: Any = None) -> None:
+    def __init__(self, model_name: str, name: str, field: Field | None = None) -> None:
         self.model_name = model_name
         self.name = name
         self.field = field
@@ -76,7 +81,7 @@ class AddField(FieldOperation):
     """Add a field to a model."""
 
     def __init__(
-        self, model_name: str, name: str, field: Any, preserve_default: bool = True
+        self, model_name: str, name: str, field: Field, preserve_default: bool = True
     ) -> None:
         self.preserve_default = preserve_default
         super().__init__(model_name, name, field)
@@ -101,7 +106,11 @@ class AddField(FieldOperation):
         )
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         to_model = to_state.models_registry.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection, to_model):
@@ -132,6 +141,7 @@ class AddField(FieldOperation):
             operation
         ):
             if isinstance(operation, AlterField):
+                assert operation.field is not None
                 return [
                     AddField(
                         model_name=self.model_name,
@@ -166,7 +176,11 @@ class RemoveField(FieldOperation):
         state.remove_field(package_label, self.model_name_lower, self.name)
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         from_model = from_state.models_registry.get_model(
             package_label, self.model_name
@@ -203,7 +217,7 @@ class AlterField(FieldOperation):
     """
 
     def __init__(
-        self, model_name: str, name: str, field: Any, preserve_default: bool = True
+        self, model_name: str, name: str, field: Field, preserve_default: bool = True
     ) -> None:
         self.preserve_default = preserve_default
         super().__init__(model_name, name, field)
@@ -228,7 +242,11 @@ class AlterField(FieldOperation):
         )
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         to_model = to_state.models_registry.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection, to_model):
@@ -303,7 +321,11 @@ class RenameField(FieldOperation):
         )
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         to_model = to_state.models_registry.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection, to_model):

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from plain.models.backends.base.validation import BaseDatabaseValidation
 from plain.preflight import PreflightResult
+
+if TYPE_CHECKING:
+    from plain.models.fields import Field
 
 
 class DatabaseValidation(BaseDatabaseValidation):
@@ -29,7 +32,7 @@ class DatabaseValidation(BaseDatabaseValidation):
             ]
         return []
 
-    def check_field_type(self, field: Any, field_type: str) -> list[PreflightResult]:
+    def check_field_type(self, field: Field, field_type: str) -> list[PreflightResult]:
         """
         MySQL has the following field length restriction:
         No character (varchar) fields can have a length exceeding 255

@@ -185,7 +185,7 @@ class BaseDatabaseSchemaEditor:
     # Core utility functions
 
     def execute(
-        self, sql: str | Statement, params: tuple[Any, ...] | list[Any] = ()
+        self, sql: str | Statement, params: tuple[Any, ...] | list[Any] | None = ()
     ) -> None:
         """Execute the given SQL statement, with optional parameters."""
         # Don't perform the transactional DDL check if SQL is being collected
@@ -240,7 +240,7 @@ class BaseDatabaseSchemaEditor:
                 definition += f" {col_type_suffix}"
             params.extend(extra_params)
             # FK.
-            if field.remote_field and field.db_constraint:
+            if field.remote_field and field.db_constraint:  # type: ignore[attr-defined]
                 to_table = field.remote_field.model._meta.db_table
                 to_column = field.remote_field.model._meta.get_field(
                     field.remote_field.field_name

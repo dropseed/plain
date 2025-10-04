@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.migrations.state import ProjectState
 
 
 class Operation:
@@ -52,7 +54,7 @@ class Operation:
             self._constructor_args[1],  # type: ignore[attr-defined]
         )
 
-    def state_forwards(self, package_label: str, state: Any) -> None:
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         """
         Take the state from the previous migration, and mutate it
         so that it matches what this migration would perform.
@@ -62,7 +64,11 @@ class Operation:
         )
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         """
         Perform the mutation on the database schema in the normal

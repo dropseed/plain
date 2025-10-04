@@ -4,7 +4,7 @@ import ipaddress
 import json
 from collections.abc import Callable
 from functools import lru_cache, partial
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from psycopg import ClientCursor, errors  # type: ignore[import-untyped]
 from psycopg.types import numeric  # type: ignore[import-untyped]
@@ -14,6 +14,9 @@ from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.backends.utils import split_tzname_delta
 from plain.models.constants import OnConflict
 from plain.utils.regex_helper import _lazy_re_compile
+
+if TYPE_CHECKING:
+    from plain.models.fields import Field
 
 
 @lru_cache
@@ -53,7 +56,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         "PositiveBigIntegerField": numeric.Int8,
     }
 
-    def unification_cast_sql(self, output_field: Any) -> str:
+    def unification_cast_sql(self, output_field: Field) -> str:
         internal_type = output_field.get_internal_type()
         if internal_type in (
             "GenericIPAddressField",
@@ -67,9 +70,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             # PostgreSQL configuration so we need to explicitly cast them.
             # We must also remove components of the type within brackets:
             # varchar(255) -> varchar.
-            return "CAST(%s AS {})".format(
-                output_field.db_type(self.connection).split("(")[0]
-            )
+            db_type = output_field.db_type(self.connection)
+            if db_type:
+                return "CAST(%s AS {})".format(db_type.split("(")[0])
         return "%s"
 
     # EXTRACT format cannot be passed in parameters.
@@ -263,7 +266,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         except errors.DataError:
             return None
 
-    def return_insert_columns(self, fields: list[Any]) -> tuple[str, tuple[Any, ...]]:
+    def return_insert_columns(self, fields: list[Field]) -> tuple[str, tuple[Any, ...]]:
         if not fields:
             return "", ()
         columns = [
@@ -273,7 +276,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return "RETURNING {}".format(", ".join(columns)), ()
 
     def bulk_insert_sql(
-        self, fields: list[Any], placeholder_rows: list[list[str]]
+        self, fields: list[Field], placeholder_rows: list[list[str]]
     ) -> str:
         placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
         values_sql = ", ".join(f"({sql})" for sql in placeholder_rows_sql)
@@ -349,10 +352,10 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def on_conflict_suffix_sql(
         self,
-        fields: list[Any],
+        fields: list[Field],
         on_conflict: OnConflict | None,
-        update_fields: list[Any],
-        unique_fields: list[Any],
+        update_fields: list[Field],
+        unique_fields: list[Field],
     ) -> str:
         if on_conflict == OnConflict.IGNORE:
             return "ON CONFLICT DO NOTHING"

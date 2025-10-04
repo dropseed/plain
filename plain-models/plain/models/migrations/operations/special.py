@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .base import Operation
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.migrations.state import ProjectState
 
 
 class SeparateDatabaseAndState(Operation):
@@ -32,12 +36,16 @@ class SeparateDatabaseAndState(Operation):
             kwargs["state_operations"] = self.state_operations
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label: str, state: Any) -> None:
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         for state_operation in self.state_operations:
             state_operation.state_forwards(package_label, state)
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         # We calculate state separately in here since our state functions aren't useful
         for database_operation in self.database_operations:
@@ -81,12 +89,16 @@ class RunSQL(Operation):
             kwargs["state_operations"] = self.state_operations
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label: str, state: Any) -> None:
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         for state_operation in self.state_operations:
             state_operation.state_forwards(package_label, state)
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         self._run_sql(schema_editor, self.sql)
 
@@ -95,23 +107,29 @@ class RunSQL(Operation):
 
     def _run_sql(
         self,
-        schema_editor: Any,
+        schema_editor: BaseDatabaseSchemaEditor,
         sqls: str
         | list[str | tuple[str, list[Any]]]
         | tuple[str | tuple[str, list[Any]], ...],
     ) -> None:
         if isinstance(sqls, list | tuple):
-            for sql in sqls:
-                params = None
-                if isinstance(sql, list | tuple):
-                    elements = len(sql)
+            for sql_item in sqls:
+                params: list[Any] | None = None
+                sql: str
+                if isinstance(sql_item, list | tuple):
+                    elements = len(sql_item)
                     if elements == 2:
-                        sql, params = sql
+                        sql, params = sql_item  # type: ignore[misc]
                     else:
                         raise ValueError("Expected a 2-tuple but got %d" % elements)  # noqa: UP031
+                else:
+                    sql = sql_item
                 schema_editor.execute(sql, params=params)
         else:
-            statements = schema_editor.connection.ops.prepare_sql_script(sqls)
+            # sqls is a str in this branch
+            statements = schema_editor.connection.ops.prepare_sql_script(
+                cast(str, sqls)
+            )
             for statement in statements:
                 schema_editor.execute(statement, params=None)
 
@@ -151,7 +169,11 @@ class RunPython(Operation):
         pass
 
     def database_forwards(
-        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
     ) -> None:
         # RunPython has access to all models. Ensure that all models are
         # reloaded in case any are delayed.

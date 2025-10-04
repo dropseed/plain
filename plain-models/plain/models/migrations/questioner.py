@@ -5,7 +5,7 @@ import importlib
 import os
 import sys
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -14,6 +14,9 @@ from plain.packages import packages_registry
 from plain.utils import timezone
 
 from .loader import MigrationLoader
+
+if TYPE_CHECKING:
+    from plain.models.fields import Field
 
 
 class MigrationQuestioner:
@@ -76,7 +79,7 @@ class MigrationQuestioner:
         return None
 
     def ask_rename(
-        self, model_name: str, old_name: str, new_name: str, field_instance: Any
+        self, model_name: str, old_name: str, new_name: str, field_instance: Field
     ) -> bool:
         """Was this field really renamed?"""
         return self.defaults.get("ask_rename", False)
@@ -214,7 +217,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         return None
 
     def ask_rename(
-        self, model_name: str, old_name: str, new_name: str, field_instance: Any
+        self, model_name: str, old_name: str, new_name: str, field_instance: Field
     ) -> bool:
         """Was this field really renamed?"""
         msg = "Was %s.%s renamed to %s.%s (a %s)?"

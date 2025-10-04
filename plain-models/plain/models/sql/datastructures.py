@@ -12,6 +12,7 @@ from plain.models.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.fields import Field
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -57,7 +58,7 @@ class Join:
         parent_alias: str,
         table_alias: str,
         join_type: str,
-        join_field: Any,
+        join_field: Field,
         nullable: bool,
         filtered_relation: Any = None,
     ) -> None:
@@ -70,7 +71,7 @@ class Join:
         self.join_type = join_type
         # A list of 2-tuples to use in the ON clause of the JOIN.
         # Each 2-tuple will create one join condition in the ON clause.
-        self.join_cols = join_field.get_joining_columns()
+        self.join_cols = join_field.get_joining_columns()  # type: ignore[attr-defined]
         # Along which field (or ForeignObjectRel in the reverse join case)
         self.join_field = join_field
         # Is this join nullabled?
