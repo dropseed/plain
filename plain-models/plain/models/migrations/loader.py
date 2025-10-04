@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import pkgutil
 import sys
 from importlib import import_module, reload
+from typing import TYPE_CHECKING, Any
 
 from plain.models.migrations.graph import MigrationGraph
 from plain.models.migrations.recorder import MigrationRecorder
@@ -12,6 +15,9 @@ from .exceptions import (
     InconsistentMigrationHistory,
     NodeNotFoundError,
 )
+
+if TYPE_CHECKING:
+    from plain.models.migrations.migration import Migration
 
 MIGRATIONS_MODULE_NAME = "migrations"
 
@@ -43,21 +49,25 @@ class MigrationLoader:
 
     def __init__(
         self,
-        connection,
-        load=True,
-        ignore_no_migrations=False,
-        replace_migrations=True,
+        connection: Any,
+        load: bool = True,
+        ignore_no_migrations: bool = False,
+        replace_migrations: bool = True,
     ):
         self.connection = connection
-        self.disk_migrations = None
-        self.applied_migrations = None
+        self.disk_migrations: dict[tuple[str, str], Migration] | None = None
+        self.applied_migrations: dict[tuple[str, str], Any] | None = None
         self.ignore_no_migrations = ignore_no_migrations
         self.replace_migrations = replace_migrations
+        self.unmigrated_packages: set[str]
+        self.migrated_packages: set[str]
+        self.graph: MigrationGraph
+        self.replacements: dict[tuple[str, str], Migration]
         if load:
             self.build_graph()
 
     @classmethod
-    def migrations_module(cls, package_label):
+    def migrations_module(cls, package_label: str) -> tuple[str | None, bool]:
         """
         Return the path to the migrations module for the specified package_label
         and a boolean indicating if the module is specified in
@@ -71,7 +81,7 @@ class MigrationLoader:
         app = packages_registry.get_package_config(package_label)
         return f"{app.name}.{MIGRATIONS_MODULE_NAME}", False
 
-    def load_disk(self):
+    def load_disk(self) -> None:
         """Load the migrations from all INSTALLED_PACKAGES from disk."""
         self.disk_migrations = {}
         self.unmigrated_packages = set()
@@ -87,7 +97,9 @@ class MigrationLoader:
                 module = import_module(module_name)
             except ModuleNotFoundError as e:
                 if (explicit and self.ignore_no_migrations) or (
-                    not explicit and MIGRATIONS_MODULE_NAME in e.name.split(".")
+                    not explicit
+                    and e.name is not None
+                    and MIGRATIONS_MODULE_NAME in e.name.split(".")
                 ):
                     self.unmigrated_packages.add(package_config.package_label)
                     continue
@@ -132,17 +144,19 @@ class MigrationLoader:
                         f"Migration {migration_name} in app {package_config.package_label} has no Migration class"
                     )
                 self.disk_migrations[package_config.package_label, migration_name] = (
-                    migration_module.Migration(
+                    migration_module.Migration(  # type: ignore[call-non-callable]
                         migration_name,
                         package_config.package_label,
                     )
                 )
 
-    def get_migration(self, package_label, name_prefix):
+    def get_migration(self, package_label: str, name_prefix: str) -> Migration | None:
         """Return the named migration or raise NodeNotFoundError."""
         return self.graph.nodes[package_label, name_prefix]
 
-    def get_migration_by_prefix(self, package_label, name_prefix):
+    def get_migration_by_prefix(
+        self, package_label: str, name_prefix: str
+    ) -> Migration:
         """
         Return the migration(s) which match the given app label and name_prefix.
         """
@@ -165,7 +179,9 @@ class MigrationLoader:
         else:
             return self.disk_migrations[results[0]]
 
-    def check_key(self, key, current_package):
+    def check_key(
+        self, key: tuple[str, str], current_package: str
+    ) -> tuple[str, str] | None:
         if (key[1] != "__first__" and key[1] != "__latest__") or key in self.graph:
             return key
         # Special-case __first__, which means "the first migration" for
@@ -174,12 +190,12 @@ class MigrationLoader:
         # migrations.
         if key[0] == current_package:
             # Ignore __first__ references to the same app (#22325)
-            return
+            return None
         if key[0] in self.unmigrated_packages:
             # This app isn't migrated, but something depends on it.
             # The models will get auto-added into the state, though
             # so we're fine.
-            return
+            return None
         if key[0] in self.migrated_packages:
             try:
                 if key[1] == "__first__":
@@ -193,7 +209,9 @@ class MigrationLoader:
                     raise ValueError(f"Dependency on app with no migrations: {key[0]}")
         raise ValueError(f"Dependency on unknown app: {key[0]}")
 
-    def add_internal_dependencies(self, key, migration):
+    def add_internal_dependencies(
+        self, key: tuple[str, str], migration: Migration
+    ) -> None:
         """
         Internal dependencies need to be added first to ensure `__first__`
         dependencies find the correct root node.
@@ -203,7 +221,9 @@ class MigrationLoader:
             if parent[0] == key[0] and parent[1] != "__first__":
                 self.graph.add_dependency(migration, key, parent, skip_validation=True)
 
-    def add_external_dependencies(self, key, migration):
+    def add_external_dependencies(
+        self, key: tuple[str, str], migration: Migration
+    ) -> None:
         for parent in migration.dependencies:
             # Skip internal dependencies
             if key[0] == parent[0]:
@@ -212,7 +232,7 @@ class MigrationLoader:
             if parent is not None:
                 self.graph.add_dependency(migration, key, parent, skip_validation=True)
 
-    def build_graph(self):
+    def build_graph(self) -> None:
         """
         Build a migration dependency graph using both the disk and database.
         You'll need to rebuild the graph if you apply migrations. This isn't
@@ -295,7 +315,7 @@ class MigrationLoader:
             raise
         self.graph.ensure_not_cyclic()
 
-    def check_consistent_history(self, connection):
+    def check_consistent_history(self, connection: Any) -> None:
         """
         Raise InconsistentMigrationHistory if any applied migrations have
         unapplied dependencies.
@@ -320,7 +340,7 @@ class MigrationLoader:
                         f"{parent[0]}.{parent[1]} on the database."
                     )
 
-    def detect_conflicts(self):
+    def detect_conflicts(self) -> dict[str, list[str]]:
         """
         Look through the loaded graph and detect any conflicts - packages
         with more than one leaf migration. Return a dict of the app labels
@@ -337,7 +357,9 @@ class MigrationLoader:
             for package_label in conflicting_packages
         }
 
-    def project_state(self, nodes=None, at_end=True):
+    def project_state(
+        self, nodes: tuple[str, str] | None = None, at_end: bool = True
+    ) -> Any:
         """
         Return a ProjectState object representing the most recent state
         that the loaded migrations represent.
@@ -348,7 +370,7 @@ class MigrationLoader:
             nodes=nodes, at_end=at_end, real_packages=self.unmigrated_packages
         )
 
-    def collect_sql(self, plan):
+    def collect_sql(self, plan: list[Migration]) -> list[str]:
         """
         Take a migration plan and return a list of collected SQL statements
         that represent the best-efforts version of that plan.

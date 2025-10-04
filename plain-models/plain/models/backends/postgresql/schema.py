@@ -1,8 +1,19 @@
-from psycopg import sql
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from psycopg import sql  # type: ignore[import-untyped]
 
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
-from plain.models.backends.ddl_references import IndexColumns
+from plain.models.backends.ddl_references import Columns, IndexColumns, Statement
 from plain.models.backends.utils import strip_quotes
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from plain.models.base import Model
+    from plain.models.fields import Field
+    from plain.models.indexes import Index
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -39,7 +50,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         "ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
     )
 
-    def execute(self, sql, params=()):
+    def execute(
+        self, sql: str | Statement, params: tuple[Any, ...] | list[Any] | None = ()
+    ) -> None:
         # Merge the query client-side, as PostgreSQL won't do it server-side.
         if params is None:
             return super().execute(sql, params)
@@ -55,19 +68,19 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         "ALTER TABLE %(table)s ALTER COLUMN %(column)s DROP IDENTITY IF EXISTS"
     )
 
-    def quote_value(self, value):
+    def quote_value(self, value: Any) -> str:
         if isinstance(value, str):
             value = value.replace("%", "%%")
         return sql.quote(value, self.connection.connection)
 
-    def _field_indexes_sql(self, model, field):
+    def _field_indexes_sql(self, model: type[Model], field: Field) -> list[Statement]:
         output = super()._field_indexes_sql(model, field)
         like_index_statement = self._create_like_index_sql(model, field)
         if like_index_statement is not None:
             output.append(like_index_statement)
         return output
 
-    def _field_data_type(self, field):
+    def _field_data_type(self, field: Field) -> str | None:
         if field.is_relation:
             return field.rel_db_type(self.connection)
         return self.connection.data_types.get(
@@ -75,14 +88,16 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             field.db_type(self.connection),
         )
 
-    def _field_base_data_types(self, field):
+    def _field_base_data_types(self, field: Field) -> Generator[str | None, None, None]:
         # Yield base data types for array fields.
-        if field.base_field.get_internal_type() == "ArrayField":
-            yield from self._field_base_data_types(field.base_field)
+        if field.base_field.get_internal_type() == "ArrayField":  # type: ignore[attr-defined]
+            yield from self._field_base_data_types(field.base_field)  # type: ignore[attr-defined]
         else:
-            yield self._field_data_type(field.base_field)
+            yield self._field_data_type(field.base_field)  # type: ignore[attr-defined]
 
-    def _create_like_index_sql(self, model, field):
+    def _create_like_index_sql(
+        self, model: type[Model], field: Field
+    ) -> Statement | None:
         """
         Return the statement to create an index with varchar operator pattern
         when the column type is 'varchar' or 'text', otherwise return None.
@@ -107,18 +122,18 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     model,
                     fields=[field],
                     suffix="_like",
-                    opclasses=["varchar_pattern_ops"],
+                    opclasses=("varchar_pattern_ops",),
                 )
             elif db_type.startswith("text"):
                 return self._create_index_sql(
                     model,
                     fields=[field],
                     suffix="_like",
-                    opclasses=["text_pattern_ops"],
+                    opclasses=("text_pattern_ops",),
                 )
         return None
 
-    def _using_sql(self, new_field, old_field):
+    def _using_sql(self, new_field: Field, old_field: Field) -> str:
         using_sql = " USING %(column)s::%(type)s"
         new_internal_type = new_field.get_internal_type()
         old_internal_type = old_field.get_internal_type()
@@ -132,7 +147,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return using_sql
         return ""
 
-    def _get_sequence_name(self, table, column):
+    def _get_sequence_name(self, table: str, column: str) -> str | None:
         with self.connection.cursor() as cursor:
             for sequence in self.connection.introspection.get_sequences(cursor, table):
                 if sequence["column"] == column:
@@ -140,8 +155,14 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return None
 
     def _alter_column_type_sql(
-        self, model, old_field, new_field, new_type, old_collation, new_collation
-    ):
+        self,
+        model: type[Model],
+        old_field: Field,
+        new_field: Field,
+        new_type: str,
+        old_collation: str | None,
+        new_collation: str | None,
+    ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         # Drop indexes on varchar/text/citext columns that are changing to a
         # different type.
         old_db_params = old_field.db_parameters(connection=self.connection)
@@ -248,15 +269,15 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _alter_field(
         self,
-        model,
-        old_field,
-        new_field,
-        old_type,
-        new_type,
-        old_db_params,
-        new_db_params,
-        strict=False,
-    ):
+        model: type[Model],
+        old_field: Field,
+        new_field: Field,
+        old_type: str,
+        new_type: str,
+        old_db_params: dict[str, Any],
+        new_db_params: dict[str, Any],
+        strict: bool = False,
+    ) -> None:
         super()._alter_field(
             model,
             old_field,
@@ -270,9 +291,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Added an index? Create any PostgreSQL-specific indexes.
         if (
             not (
-                (old_field.remote_field and old_field.db_index) or old_field.primary_key
+                (old_field.remote_field and old_field.db_index)  # type: ignore[attr-defined]
+                or old_field.primary_key
             )
-            and (new_field.remote_field and new_field.db_index)
+            and (new_field.remote_field and new_field.db_index)  # type: ignore[attr-defined]
         ) or (not old_field.primary_key and new_field.primary_key):
             like_index_statement = self._create_like_index_sql(model, new_field)
             if like_index_statement is not None:
@@ -280,14 +302,21 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
         # Removed an index? Drop any PostgreSQL-specific indexes.
         if old_field.primary_key and not (
-            (new_field.remote_field and new_field.db_index) or new_field.primary_key
+            (new_field.remote_field and new_field.db_index)  # type: ignore[attr-defined]
+            or new_field.primary_key
         ):
             index_to_remove = self._create_index_name(
                 model._meta.db_table, [old_field.column], suffix="_like"
             )
             self.execute(self._delete_index_sql(model, index_to_remove))
 
-    def _index_columns(self, table, columns, col_suffixes, opclasses):
+    def _index_columns(
+        self,
+        table: str,
+        columns: list[str],
+        col_suffixes: tuple[str, ...],
+        opclasses: tuple[str, ...],
+    ) -> Columns | IndexColumns:
         if opclasses:
             return IndexColumns(
                 table,
@@ -298,15 +327,25 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             )
         return super()._index_columns(table, columns, col_suffixes, opclasses)
 
-    def add_index(self, model, index, concurrently=False):
+    def add_index(
+        self, model: type[Model], index: Index, concurrently: bool = False
+    ) -> None:
         self.execute(
             index.create_sql(model, self, concurrently=concurrently), params=None
         )
 
-    def remove_index(self, model, index, concurrently=False):
+    def remove_index(
+        self, model: type[Model], index: Index, concurrently: bool = False
+    ) -> None:
         self.execute(index.remove_sql(model, self, concurrently=concurrently))
 
-    def _delete_index_sql(self, model, name, sql=None, concurrently=False):
+    def _delete_index_sql(
+        self,
+        model: type[Model],
+        name: str,
+        sql: str | None = None,
+        concurrently: bool = False,
+    ) -> Statement:
         sql = (
             self.sql_delete_index_concurrently
             if concurrently
@@ -316,20 +355,20 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _create_index_sql(
         self,
-        model,
+        model: type[Model],
         *,
-        fields=None,
-        name=None,
-        suffix="",
-        using="",
-        col_suffixes=(),
-        sql=None,
-        opclasses=(),
-        condition=None,
-        concurrently=False,
-        include=None,
-        expressions=None,
-    ):
+        fields: list[Field] | None = None,
+        name: str | None = None,
+        suffix: str = "",
+        using: str = "",
+        col_suffixes: tuple[str, ...] = (),
+        sql: str | None = None,
+        opclasses: tuple[str, ...] = (),
+        condition: str | None = None,
+        concurrently: bool = False,
+        include: list[str] | None = None,
+        expressions: Any = None,
+    ) -> Statement:
         sql = sql or (
             self.sql_create_index
             if not concurrently

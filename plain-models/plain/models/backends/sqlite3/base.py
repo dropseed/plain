@@ -2,12 +2,15 @@
 SQLite backend for the sqlite3 module in the standard library.
 """
 
+from __future__ import annotations
+
 import datetime
 import decimal
 import warnings
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from itertools import chain, tee
 from sqlite3 import dbapi2 as Database
+from typing import Any
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -24,22 +27,22 @@ from .operations import DatabaseOperations
 from .schema import DatabaseSchemaEditor
 
 
-def decoder(conv_func):
+def decoder(conv_func: Callable[[str], Any]) -> Callable[[bytes], Any]:
     """
     Convert bytestrings from Python's sqlite3 interface to a regular string.
     """
     return lambda s: conv_func(s.decode())
 
 
-def adapt_date(val):
+def adapt_date(val: datetime.date) -> str:
     return val.isoformat()
 
 
-def adapt_datetime(val):
+def adapt_datetime(val: datetime.datetime) -> str:
     return val.isoformat(" ")
 
 
-def _get_varchar_column(data):
+def _get_varchar_column(data: dict[str, Any]) -> str:
     if data["max_length"] is None:
         return "varchar"
     return "varchar({max_length})".format(**data)
@@ -140,7 +143,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     introspection_class = DatabaseIntrospection
     ops_class = DatabaseOperations
 
-    def get_connection_params(self):
+    def get_connection_params(self) -> dict[str, Any]:
         settings_dict = self.settings_dict
         if not settings_dict["NAME"]:
             raise ImproperlyConfigured(
@@ -169,11 +172,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         kwargs.update({"check_same_thread": False, "uri": True})
         return kwargs
 
-    def get_database_version(self):
+    def get_database_version(self) -> tuple[int, ...]:
         return self.Database.sqlite_version_info
 
-    def get_new_connection(self, conn_params):
-        conn = Database.connect(**conn_params)
+    def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
+        conn = Database.connect(**conn_params)  # type: ignore[call-overload]
         register_functions(conn)
 
         conn.execute("PRAGMA foreign_keys = ON")
@@ -182,18 +185,19 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         conn.execute("PRAGMA legacy_alter_table = OFF")
         return conn
 
-    def create_cursor(self, name=None):
+    def create_cursor(self, name: str | None = None) -> Any:
         return self.connection.cursor(factory=SQLiteCursorWrapper)
 
-    def close(self):
+    def close(self) -> None:
         self.validate_thread_sharing()
         # If database is in memory, closing the connection destroys the
         # database. To prevent accidental data loss, ignore close requests on
         # an in-memory db.
         if not self.is_in_memory_db():
             BaseDatabaseWrapper.close(self)
+        return None
 
-    def _savepoint_allowed(self):
+    def _savepoint_allowed(self) -> bool:
         # When 'isolation_level' is not None, sqlite3 commits before each
         # savepoint; it's a bug. When it is None, savepoints don't make sense
         # because autocommit is enabled. The only exception is inside 'atomic'
@@ -201,7 +205,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         # transaction explicitly rather than simply disable autocommit.
         return self.in_atomic_block
 
-    def _set_autocommit(self, autocommit):
+    def _set_autocommit(self, autocommit: bool) -> None:
         if autocommit:
             level = None
         else:
@@ -212,8 +216,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         # SQLite always runs at the SERIALIZABLE isolation level.
         with self.wrap_database_errors:
             self.connection.isolation_level = level
+        return None
 
-    def disable_constraint_checking(self):
+    def disable_constraint_checking(self) -> bool:
         with self.cursor() as cursor:
             cursor.execute("PRAGMA foreign_keys = OFF")
             # Foreign key constraints cannot be turned off while in a multi-
@@ -222,11 +227,12 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             enabled = cursor.execute("PRAGMA foreign_keys").fetchone()[0]
         return not bool(enabled)
 
-    def enable_constraint_checking(self):
+    def enable_constraint_checking(self) -> None:
         with self.cursor() as cursor:
             cursor.execute("PRAGMA foreign_keys = ON")
+        return None
 
-    def check_constraints(self, table_names=None):
+    def check_constraints(self, table_names: list[str] | None = None) -> None:
         """
         Check each table name in `table_names` for rows with invalid foreign
         key references. This method is intended to be used in conjunction with
@@ -267,11 +273,12 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     f"invalid foreign key: {table_name}.{column_name} contains a value '{bad_value}' that "
                     f"does not have a corresponding value in {referenced_table_name}.{referenced_column_name}."
                 )
+        return None
 
-    def is_usable(self):
+    def is_usable(self) -> bool:
         return True
 
-    def _start_transaction_under_autocommit(self):
+    def _start_transaction_under_autocommit(self) -> None:
         """
         Start a transaction explicitly in autocommit mode.
 
@@ -279,8 +286,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         savepoints when autocommit is disabled.
         """
         self.cursor().execute("BEGIN")
+        return None
 
-    def is_in_memory_db(self):
+    def is_in_memory_db(self) -> bool:
         return self.creation.is_in_memory_db(self.settings_dict["NAME"])
 
 
@@ -300,7 +308,9 @@ class SQLiteCursorWrapper(Database.Cursor):
     In both cases, if you want to use a literal "%s", you'll need to use "%%s".
     """
 
-    def execute(self, query, params=None):
+    def execute(  # type: ignore[override]
+        self, query: str, params: Iterable[Any] | Mapping[str, Any] | None = None
+    ) -> Any:
         if params is None:
             return super().execute(query)
         # Extract names if params is a mapping, i.e. "pyformat" style is used.
@@ -308,7 +318,11 @@ class SQLiteCursorWrapper(Database.Cursor):
         query = self.convert_query(query, param_names=param_names)
         return super().execute(query, params)
 
-    def executemany(self, query, param_list):
+    def executemany(  # type: ignore[override]
+        self,
+        query: str,
+        param_list: Iterable[Iterable[Any] | Mapping[str, Any]],
+    ) -> Any:
         # Extract names if params is a mapping, i.e. "pyformat" style is used.
         # Peek carefully as a generator can be passed instead of a list/tuple.
         peekable, param_list = tee(iter(param_list))
@@ -319,7 +333,7 @@ class SQLiteCursorWrapper(Database.Cursor):
         query = self.convert_query(query, param_names=param_names)
         return super().executemany(query, param_list)
 
-    def convert_query(self, query, *, param_names=None):
+    def convert_query(self, query: str, *, param_names: list[str] | None = None) -> str:
         if param_names is None:
             # Convert from "format" style to "qmark" style.
             return FORMAT_QMARK_REGEX.sub("?", query).replace("%%", "%")

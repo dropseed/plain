@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import ipaddress
 import json
+from collections.abc import Callable
 from functools import lru_cache, partial
+from typing import Any
 
-from psycopg import ClientCursor, errors
-from psycopg.types import numeric
-from psycopg.types.json import Jsonb
+from psycopg import ClientCursor, errors  # type: ignore[import-untyped]
+from psycopg.types import numeric  # type: ignore[import-untyped]
+from psycopg.types.json import Jsonb  # type: ignore[import-untyped]
 
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.backends.utils import split_tzname_delta
@@ -13,7 +17,9 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 
 @lru_cache
-def get_json_dumps(encoder):
+def get_json_dumps(
+    encoder: type[json.JSONEncoder] | None,
+) -> Callable[..., str]:
     if encoder is None:
         return json.dumps
     return partial(json.dumps, cls=encoder)
@@ -47,7 +53,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         "PositiveBigIntegerField": numeric.Int8,
     }
 
-    def unification_cast_sql(self, output_field):
+    def unification_cast_sql(self, output_field: Any) -> str:
         internal_type = output_field.get_internal_type()
         if internal_type in (
             "GenericIPAddressField",
@@ -69,7 +75,9 @@ class DatabaseOperations(BaseDatabaseOperations):
     # EXTRACT format cannot be passed in parameters.
     _extract_format_re = _lazy_re_compile(r"[A-Z_]+")
 
-    def date_extract_sql(self, lookup_type, sql, params):
+    def date_extract_sql(
+        self, lookup_type: str, sql: str, params: list[Any] | tuple[Any, ...]
+    ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         # https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT
         if lookup_type == "week_day":
             # For consistency across backends, we return Sunday=1, Saturday=7.
@@ -84,65 +92,97 @@ class DatabaseOperations(BaseDatabaseOperations):
             raise ValueError(f"Invalid lookup type: {lookup_type!r}")
         return f"EXTRACT({lookup_type} FROM {sql})", params
 
-    def date_trunc_sql(self, lookup_type, sql, params, tzname=None):
+    def date_trunc_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None = None,
+    ) -> tuple[str, tuple[Any, ...]]:
         sql, params = self._convert_sql_to_tz(sql, params, tzname)
         # https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
         return f"DATE_TRUNC(%s, {sql})", (lookup_type, *params)
 
-    def _prepare_tzname_delta(self, tzname):
+    def _prepare_tzname_delta(self, tzname: str) -> str:
         tzname, sign, offset = split_tzname_delta(tzname)
         if offset:
             sign = "-" if sign == "+" else "+"
             return f"{tzname}{sign}{offset}"
         return tzname
 
-    def _convert_sql_to_tz(self, sql, params, tzname):
+    def _convert_sql_to_tz(
+        self, sql: str, params: list[Any] | tuple[Any, ...], tzname: str | None
+    ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         if tzname:
             tzname_param = self._prepare_tzname_delta(tzname)
             return f"{sql} AT TIME ZONE %s", (*params, tzname_param)
         return sql, params
 
-    def datetime_cast_date_sql(self, sql, params, tzname):
+    def datetime_cast_date_sql(
+        self, sql: str, params: list[Any] | tuple[Any, ...], tzname: str | None
+    ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         sql, params = self._convert_sql_to_tz(sql, params, tzname)
         return f"({sql})::date", params
 
-    def datetime_cast_time_sql(self, sql, params, tzname):
+    def datetime_cast_time_sql(
+        self, sql: str, params: list[Any] | tuple[Any, ...], tzname: str | None
+    ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         sql, params = self._convert_sql_to_tz(sql, params, tzname)
         return f"({sql})::time", params
 
-    def datetime_extract_sql(self, lookup_type, sql, params, tzname):
+    def datetime_extract_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None,
+    ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         sql, params = self._convert_sql_to_tz(sql, params, tzname)
         if lookup_type == "second":
             # Truncate fractional seconds.
             return f"EXTRACT(SECOND FROM DATE_TRUNC(%s, {sql}))", ("second", *params)
         return self.date_extract_sql(lookup_type, sql, params)
 
-    def datetime_trunc_sql(self, lookup_type, sql, params, tzname):
+    def datetime_trunc_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None,
+    ) -> tuple[str, tuple[Any, ...]]:
         sql, params = self._convert_sql_to_tz(sql, params, tzname)
         # https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
         return f"DATE_TRUNC(%s, {sql})", (lookup_type, *params)
 
-    def time_extract_sql(self, lookup_type, sql, params):
+    def time_extract_sql(
+        self, lookup_type: str, sql: str, params: list[Any] | tuple[Any, ...]
+    ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         if lookup_type == "second":
             # Truncate fractional seconds.
             return f"EXTRACT(SECOND FROM DATE_TRUNC(%s, {sql}))", ("second", *params)
         return self.date_extract_sql(lookup_type, sql, params)
 
-    def time_trunc_sql(self, lookup_type, sql, params, tzname=None):
+    def time_trunc_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None = None,
+    ) -> tuple[str, tuple[Any, ...]]:
         sql, params = self._convert_sql_to_tz(sql, params, tzname)
         return f"DATE_TRUNC(%s, {sql})::time", (lookup_type, *params)
 
-    def deferrable_sql(self):
+    def deferrable_sql(self) -> str:
         return " DEFERRABLE INITIALLY DEFERRED"
 
-    def fetch_returned_insert_rows(self, cursor):
+    def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the tuple of returned data.
         """
         return cursor.fetchall()
 
-    def lookup_cast(self, lookup_type, internal_type=None):
+    def lookup_cast(self, lookup_type: str, internal_type: str | None = None) -> str:
         lookup = "%s"
 
         if lookup_type == "isnull" and internal_type in (
@@ -175,27 +215,27 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         return lookup
 
-    def no_limit_value(self):
+    def no_limit_value(self) -> None:
         return None
 
-    def prepare_sql_script(self, sql):
+    def prepare_sql_script(self, sql: str) -> list[str]:
         return [sql]
 
-    def quote_name(self, name):
+    def quote_name(self, name: str) -> str:
         if name.startswith('"') and name.endswith('"'):
             return name  # Quoting once is enough.
         return f'"{name}"'
 
-    def compose_sql(self, sql, params):
+    def compose_sql(self, sql: str, params: Any) -> bytes:
         return ClientCursor(self.connection.connection).mogrify(sql, params)
 
-    def set_time_zone_sql(self):
+    def set_time_zone_sql(self) -> str:
         return "SELECT set_config('TimeZone', %s, false)"
 
-    def prep_for_iexact_query(self, x):
+    def prep_for_iexact_query(self, x: str) -> str:
         return x
 
-    def max_name_length(self):
+    def max_name_length(self) -> int:
         """
         Return the maximum length of an identifier.
 
@@ -208,20 +248,22 @@ class DatabaseOperations(BaseDatabaseOperations):
         """
         return 63
 
-    def distinct_sql(self, fields, params):
+    def distinct_sql(
+        self, fields: list[str], params: list[Any] | tuple[Any, ...]
+    ) -> tuple[list[str], list[Any]]:
         if fields:
             params = [param for param_list in params for param in param_list]
             return (["DISTINCT ON ({})".format(", ".join(fields))], params)
         else:
             return ["DISTINCT"], []
 
-    def last_executed_query(self, cursor, sql, params):
+    def last_executed_query(self, cursor: Any, sql: str, params: Any) -> bytes | None:
         try:
             return self.compose_sql(sql, params)
         except errors.DataError:
             return None
 
-    def return_insert_columns(self, fields):
+    def return_insert_columns(self, fields: list[Any]) -> tuple[str, tuple[Any, ...]]:
         if not fields:
             return "", ()
         columns = [
@@ -230,37 +272,53 @@ class DatabaseOperations(BaseDatabaseOperations):
         ]
         return "RETURNING {}".format(", ".join(columns)), ()
 
-    def bulk_insert_sql(self, fields, placeholder_rows):
+    def bulk_insert_sql(
+        self, fields: list[Any], placeholder_rows: list[list[str]]
+    ) -> str:
         placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
         values_sql = ", ".join(f"({sql})" for sql in placeholder_rows_sql)
         return "VALUES " + values_sql
 
-    def adapt_integerfield_value(self, value, internal_type):
+    def adapt_integerfield_value(
+        self, value: int | Any | None, internal_type: str
+    ) -> int | Any | None:
         if value is None or hasattr(value, "resolve_expression"):
             return value
         return self.integerfield_type_map[internal_type](value)
 
-    def adapt_datefield_value(self, value):
+    def adapt_datefield_value(self, value: Any) -> Any:
         return value
 
-    def adapt_datetimefield_value(self, value):
+    def adapt_datetimefield_value(self, value: Any) -> Any:
         return value
 
-    def adapt_timefield_value(self, value):
+    def adapt_timefield_value(self, value: Any) -> Any:
         return value
 
-    def adapt_decimalfield_value(self, value, max_digits=None, decimal_places=None):
+    def adapt_decimalfield_value(
+        self,
+        value: Any,
+        max_digits: int | None = None,
+        decimal_places: int | None = None,
+    ) -> Any:
         return value
 
-    def adapt_ipaddressfield_value(self, value):
+    def adapt_ipaddressfield_value(
+        self, value: str | None
+    ) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
         if value:
             return ipaddress.ip_address(value)
         return None
 
-    def adapt_json_value(self, value, encoder):
+    def adapt_json_value(self, value: Any, encoder: type[json.JSONEncoder]) -> Jsonb:
         return Jsonb(value, dumps=get_json_dumps(encoder))
 
-    def subtract_temporals(self, internal_type, lhs, rhs):
+    def subtract_temporals(
+        self,
+        internal_type: str,
+        lhs: tuple[str, list[Any] | tuple[Any, ...]],
+        rhs: tuple[str, list[Any] | tuple[Any, ...]],
+    ) -> tuple[str, tuple[Any, ...]]:
         if internal_type == "DateField":
             lhs_sql, lhs_params = lhs
             rhs_sql, rhs_params = rhs
@@ -268,7 +326,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return f"(interval '1 day' * ({lhs_sql} - {rhs_sql}))", params
         return super().subtract_temporals(internal_type, lhs, rhs)
 
-    def explain_query_prefix(self, format=None, **options):
+    def explain_query_prefix(self, format: str | None = None, **options: Any) -> str:
         extra = {}
         # Normalize options.
         if options:
@@ -289,7 +347,13 @@ class DatabaseOperations(BaseDatabaseOperations):
             )
         return prefix
 
-    def on_conflict_suffix_sql(self, fields, on_conflict, update_fields, unique_fields):
+    def on_conflict_suffix_sql(
+        self,
+        fields: list[Any],
+        on_conflict: OnConflict | None,
+        update_fields: list[Any],
+        unique_fields: list[Any],
+    ) -> str:
         if on_conflict == OnConflict.IGNORE:
             return "ON CONFLICT DO NOTHING"
         if on_conflict == OnConflict.UPDATE:

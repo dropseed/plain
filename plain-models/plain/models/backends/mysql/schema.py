@@ -1,8 +1,20 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import UniqueConstraint
 from plain.models.expressions import F
 from plain.models.fields import NOT_PROVIDED
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from plain.models.base import Model
+    from plain.models.constraints import BaseConstraint
+    from plain.models.fields import Field
+    from plain.models.indexes import Index
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -37,7 +49,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_alter_column_comment = None
 
     @property
-    def sql_delete_check(self):
+    def sql_delete_check(self) -> str:
         if self.connection.mysql_is_mariadb:
             # The name of the column check constraint is the same as the field
             # name on MariaDB. Adding IF EXISTS clause prevents migrations
@@ -46,7 +58,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return "ALTER TABLE %(table)s DROP CHECK %(name)s"
 
     @property
-    def sql_rename_column(self):
+    def sql_rename_column(self) -> str:
         # MariaDB >= 10.5.2 and MySQL >= 8.0.4 support an
         # "ALTER TABLE ... RENAME COLUMN" statement.
         if self.connection.mysql_is_mariadb:
@@ -56,7 +68,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return super().sql_rename_column
         return "ALTER TABLE %(table)s CHANGE %(old_column)s %(new_column)s %(type)s"
 
-    def quote_value(self, value):
+    def quote_value(self, value: Any) -> str:
         self.connection.ensure_connection()
         if isinstance(value, str):
             value = value.replace("%", "%%")
@@ -68,19 +80,19 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             quoted = quoted.decode()
         return quoted
 
-    def _is_limited_data_type(self, field):
+    def _is_limited_data_type(self, field: Field) -> bool:
         db_type = field.db_type(self.connection)
         return (
             db_type is not None
             and db_type.lower() in self.connection._limited_data_types
         )
 
-    def skip_default(self, field):
+    def skip_default(self, field: Field) -> bool:
         if not self._supports_limited_data_type_defaults:
             return self._is_limited_data_type(field)
         return False
 
-    def skip_default_on_alter(self, field):
+    def skip_default_on_alter(self, field: Field) -> bool:
         if self._is_limited_data_type(field) and not self.connection.mysql_is_mariadb:
             # MySQL doesn't support defaults for BLOB and TEXT in the
             # ALTER COLUMN statement.
@@ -88,13 +100,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return False
 
     @property
-    def _supports_limited_data_type_defaults(self):
+    def _supports_limited_data_type_defaults(self) -> bool:
         # MariaDB and MySQL >= 8.0.13 support defaults for BLOB and TEXT.
         if self.connection.mysql_is_mariadb:
             return True
         return self.connection.mysql_version >= (8, 0, 13)
 
-    def _column_default_sql(self, field):
+    def _column_default_sql(self, field: Field) -> str:
         if (
             not self.connection.mysql_is_mariadb
             and self._supports_limited_data_type_defaults
@@ -105,7 +117,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return "(%s)"
         return super()._column_default_sql(field)
 
-    def add_field(self, model, field):
+    def add_field(self, model: type[Model], field: Field) -> None:
         super().add_field(model, field)
 
         # Simulate the effect of a one-off default.
@@ -117,7 +129,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 [effective_default],
             )
 
-    def remove_constraint(self, model, constraint):
+    def remove_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
         if (
             isinstance(constraint, UniqueConstraint)
             and constraint.create_sql(model, self) is not None
@@ -129,7 +141,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             )
         super().remove_constraint(model, constraint)
 
-    def remove_index(self, model, index):
+    def remove_index(self, model: type[Model], index: Index) -> None:
         self._create_missing_fk_index(
             model,
             fields=[field_name for field_name, _ in index.fields_orders],
@@ -137,7 +149,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         super().remove_index(model, index)
 
-    def _field_should_be_indexed(self, model, field):
+    def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
         if not super()._field_should_be_indexed(model, field):
             return False
 
@@ -150,18 +162,18 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if (
             storage == "InnoDB"
             and field.get_internal_type() == "ForeignKey"
-            and field.db_constraint
+            and field.db_constraint  # type: ignore[attr-defined]
         ):
             return False
         return not self._is_limited_data_type(field)
 
     def _create_missing_fk_index(
         self,
-        model,
+        model: type[Model],
         *,
-        fields,
-        expressions=None,
-    ):
+        fields: Sequence[str],
+        expressions: Sequence[Any] | None = None,
+    ) -> None:
         """
         MySQL can remove an implicit FK index on a field when that field is
         covered by another index. "covered" here means
@@ -205,7 +217,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     self._create_index_sql(model, fields=[first_field], suffix="")
                 )
 
-    def _set_field_new_type_null_status(self, field, new_type):
+    def _set_field_new_type_null_status(self, field: Field, new_type: str) -> str:
         """
         Keep the null property of the old field. If it has changed, it will be
         handled separately.
@@ -217,14 +229,22 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return new_type
 
     def _alter_column_type_sql(
-        self, model, old_field, new_field, new_type, old_collation, new_collation
-    ):
+        self,
+        model: type[Model],
+        old_field: Field,
+        new_field: Field,
+        new_type: str,
+        old_collation: str,
+        new_collation: str,
+    ) -> tuple[str, list[Any]]:
         new_type = self._set_field_new_type_null_status(old_field, new_type)
         return super()._alter_column_type_sql(
             model, old_field, new_field, new_type, old_collation, new_collation
         )
 
-    def _field_db_check(self, field, field_db_params):
+    def _field_db_check(
+        self, field: Field, field_db_params: dict[str, Any]
+    ) -> str | None:
         if self.connection.mysql_is_mariadb and self.connection.mysql_version >= (
             10,
             5,
@@ -237,14 +257,18 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # renamed.
         return field_db_params["check"]
 
-    def _rename_field_sql(self, table, old_field, new_field, new_type):
+    def _rename_field_sql(
+        self, table: str, old_field: Field, new_field: Field, new_type: str
+    ) -> str:
         new_type = self._set_field_new_type_null_status(old_field, new_type)
         return super()._rename_field_sql(table, old_field, new_field, new_type)
 
-    def _alter_column_comment_sql(self, model, new_field, new_type, new_db_comment):
+    def _alter_column_comment_sql(
+        self, model: type[Model], new_field: Field, new_type: str, new_db_comment: str
+    ) -> tuple[str, list[Any]]:
         # Comment is alter when altering the column type.
         return "", []
 
-    def _comment_sql(self, comment):
+    def _comment_sql(self, comment: str | None) -> str:
         comment_sql = super()._comment_sql(comment)
         return f" COMMENT {comment_sql}"

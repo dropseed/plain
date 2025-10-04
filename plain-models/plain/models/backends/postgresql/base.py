@@ -1,15 +1,20 @@
+from __future__ import annotations
+
+import datetime
 import threading
 import warnings
+from collections.abc import Generator
 from contextlib import contextmanager
 from functools import cached_property, lru_cache
+from typing import Any
 
-import psycopg as Database
-from psycopg import IsolationLevel, adapt, adapters, sql
-from psycopg.postgres import types as pg_types
-from psycopg.pq import Format
-from psycopg.types.datetime import TimestamptzLoader
-from psycopg.types.range import Range, RangeDumper
-from psycopg.types.string import TextLoader
+import psycopg as Database  # type: ignore[import-untyped]
+from psycopg import IsolationLevel, adapt, adapters, sql  # type: ignore[import-untyped]
+from psycopg.postgres import types as pg_types  # type: ignore[import-untyped]
+from psycopg.pq import Format  # type: ignore[import-untyped]
+from psycopg.types.datetime import TimestamptzLoader  # type: ignore[import-untyped]
+from psycopg.types.range import Range, RangeDumper  # type: ignore[import-untyped]
+from psycopg.types.string import TextLoader  # type: ignore[import-untyped]
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -38,14 +43,14 @@ class BaseTzLoader(TimestamptzLoader):
     The timezone can be None too, in which case it will be chopped.
     """
 
-    timezone = None
+    timezone: datetime.tzinfo | None = None
 
-    def load(self, data):
+    def load(self, data: bytes) -> datetime.datetime:
         res = super().load(data)
         return res.replace(tzinfo=self.timezone)
 
 
-def register_tzloader(tz, context):
+def register_tzloader(tz: datetime.tzinfo | None, context: Any) -> None:
     class SpecificTzLoader(BaseTzLoader):
         timezone = tz
 
@@ -55,7 +60,7 @@ def register_tzloader(tz, context):
 class PlainRangeDumper(RangeDumper):
     """A Range dumper customized for Plain."""
 
-    def upgrade(self, obj, format):
+    def upgrade(self, obj: Any, format: Format) -> RangeDumper:
         dumper = super().upgrade(obj, format)
         if dumper is not self and dumper.oid == TSRANGE_OID:
             dumper.oid = TSTZRANGE_OID
@@ -63,7 +68,7 @@ class PlainRangeDumper(RangeDumper):
 
 
 @lru_cache
-def get_adapters_template(timezone):
+def get_adapters_template(timezone: datetime.tzinfo | None) -> adapters.AdaptersMap:
     ctx = adapt.AdaptersMap(adapters)
     # No-op JSON loader to avoid psycopg3 round trips
     ctx.register_loader("jsonb", TextLoader)
@@ -75,7 +80,7 @@ def get_adapters_template(timezone):
     return ctx
 
 
-def _get_varchar_column(data):
+def _get_varchar_column(data: dict[str, Any]) -> str:
     if data["max_length"] is None:
         return "varchar"
     return "varchar({max_length})".format(**data)
@@ -166,14 +171,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     # PostgreSQL backend-specific attributes.
     _named_cursor_idx = 0
 
-    def get_database_version(self):
+    def get_database_version(self) -> tuple[int, ...]:
         """
         Return a tuple of the database's version.
         E.g. for pg_version 120004, return (12, 4).
         """
         return divmod(self.pg_version, 10000)
 
-    def get_connection_params(self):
+    def get_connection_params(self) -> dict[str, Any]:
         settings_dict = self.settings_dict
         # None may be used to connect to the default 'postgres' db
         if settings_dict["NAME"] == "" and not settings_dict.get("OPTIONS", {}).get(
@@ -194,7 +199,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     self.ops.max_name_length(),
                 )
             )
-        conn_params = {"client_encoding": "UTF8"}
+        conn_params: dict[str, Any] = {"client_encoding": "UTF8"}
         if settings_dict["NAME"]:
             conn_params = {
                 "dbname": settings_dict["NAME"],
@@ -224,7 +229,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
         return conn_params
 
-    def get_new_connection(self, conn_params):
+    def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
         # self.isolation_level must be set:
         # - after connecting to the database in order to obtain the database's
         #   default when no value is explicitly specified in options.
@@ -257,7 +262,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         )
         return connection
 
-    def ensure_timezone(self):
+    def ensure_timezone(self) -> bool:
         if self.connection is None:
             return False
         conn_timezone_name = self.connection.info.parameter_status("TimeZone")
@@ -268,7 +273,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return True
         return False
 
-    def ensure_role(self):
+    def ensure_role(self) -> bool:
         if self.connection is None:
             return False
         if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
@@ -278,7 +283,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return True
         return False
 
-    def init_connection_state(self):
+    def init_connection_state(self) -> None:
         super().init_connection_state()
 
         # Commit after setting the time zone.
@@ -291,7 +296,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         if (commit_role or commit_tz) and not self.get_autocommit():
             self.connection.commit()
 
-    def create_cursor(self, name=None):
+    def create_cursor(self, name: str | None = None) -> Any:
         if name:
             # In autocommit mode, the cursor will be used outside of a
             # transaction, hence use a holdable cursor.
@@ -307,10 +312,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             register_tzloader(self.timezone, cursor)
         return cursor
 
-    def tzinfo_factory(self, offset):
+    def tzinfo_factory(self, offset: int) -> datetime.tzinfo | None:
         return self.timezone
 
-    def chunked_cursor(self):
+    def chunked_cursor(self) -> Any:
         self._named_cursor_idx += 1
         # Get the current async task
         # Note that right now this is behind @async_unsafe, so this is
@@ -329,11 +334,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             )
         )
 
-    def _set_autocommit(self, autocommit):
+    def _set_autocommit(self, autocommit: bool) -> None:
         with self.wrap_database_errors:
             self.connection.autocommit = autocommit
 
-    def check_constraints(self, table_names=None):
+    def check_constraints(self, table_names: list[str] | None = None) -> None:
         """
         Check constraints by setting them to immediate. Return them to deferred
         afterward.
@@ -342,7 +347,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
             cursor.execute("SET CONSTRAINTS ALL DEFERRED")
 
-    def is_usable(self):
+    def is_usable(self) -> bool:
         try:
             # Use a psycopg cursor directly, bypassing Plain's utilities.
             with self.connection.cursor() as cursor:
@@ -353,7 +358,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return True
 
     @contextmanager
-    def _nodb_cursor(self):
+    def _nodb_cursor(self) -> Generator[Any, None, None]:
         cursor = None
         try:
             with super()._nodb_cursor() as cursor:
@@ -382,11 +387,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                 conn.close()
 
     @cached_property
-    def pg_version(self):
+    def pg_version(self) -> int:
         with self.temporary_connection():
             return self.connection.info.server_version
 
-    def make_debug_cursor(self, cursor):
+    def make_debug_cursor(self, cursor: Any) -> CursorDebugWrapper:
         return CursorDebugWrapper(cursor, self)
 
 
@@ -395,11 +400,13 @@ class CursorMixin:
     A subclass of psycopg cursor implementing callproc.
     """
 
-    def callproc(self, name, args=None):
+    def callproc(
+        self, name: str | sql.Identifier, args: list[Any] | None = None
+    ) -> list[Any] | None:
         if not isinstance(name, sql.Identifier):
             name = sql.Identifier(name)
 
-        qparts = [sql.SQL("SELECT * FROM "), name, sql.SQL("(")]
+        qparts: list[sql.Composable] = [sql.SQL("SELECT * FROM "), name, sql.SQL("(")]
         if args:
             for item in args:
                 qparts.append(sql.Literal(item))
@@ -408,7 +415,7 @@ class CursorMixin:
 
         qparts.append(sql.SQL(")"))
         stmt = sql.Composed(qparts)
-        self.execute(stmt)
+        self.execute(stmt)  # type: ignore[attr-defined]
         return args
 
 
@@ -421,6 +428,6 @@ class Cursor(CursorMixin, Database.ClientCursor):
 
 
 class CursorDebugWrapper(BaseCursorDebugWrapper):
-    def copy(self, statement):
+    def copy(self, statement: Any) -> Any:
         with self.debug_sql(statement):
             return self.cursor.copy(statement)

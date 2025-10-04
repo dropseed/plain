@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
 import time
+from typing import Any
 
 import click
 
@@ -31,7 +34,7 @@ from .registry import models_registry
 
 @register_cli("models")
 @click.group()
-def cli():
+def cli() -> None:
     pass
 
 
@@ -40,7 +43,7 @@ cli.add_command(backups_cli)
 
 @cli.command()
 @click.argument("parameters", nargs=-1)
-def db_shell(parameters):
+def db_shell(parameters: tuple[str, ...]) -> None:
     """Runs the command-line client for specified database, or the default database if none is provided."""
     try:
         db_connection.client.runshell(parameters)
@@ -68,7 +71,7 @@ def db_shell(parameters):
 
 
 @cli.command()
-def db_wait():
+def db_wait() -> None:
     """Wait for the database to be ready"""
     attempts = 0
     while True:
@@ -100,7 +103,7 @@ def db_wait():
     is_flag=True,
     help="Only show models from packages that start with 'app'.",
 )
-def list_models(package_labels, app_only):
+def list_models(package_labels: tuple[str, ...], app_only: bool) -> None:
     """List installed models."""
 
     packages = set(package_labels)
@@ -153,19 +156,30 @@ def list_models(package_labels, app_only):
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
-def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbosity):
+def makemigrations(
+    package_labels: tuple[str, ...],
+    dry_run: bool,
+    empty: bool,
+    no_input: bool,
+    name: str | None,
+    check: bool,
+    verbosity: int,
+) -> None:
     """Creates new migration(s) for packages."""
 
-    written_files = []
+    written_files: list[str] = []
     interactive = not no_input
     migration_name = name
     check_changes = check
 
-    def log(msg, level=1):
+    def log(msg: str, level: int = 1) -> None:
         if verbosity >= level:
             click.echo(msg)
 
-    def write_migration_files(changes, update_previous_migration_paths=None):
+    def write_migration_files(
+        changes: dict[str, list[Migration]],
+        update_previous_migration_paths: dict[str, str] | None = None,
+    ) -> None:
         """Take a changes dict and write them out as migration files."""
         directory_created = {}
         for package_label, package_migrations in changes.items():
@@ -221,9 +235,9 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
                     log(writer.as_string(), level=3)
 
     # Validate package labels
-    package_labels = set(package_labels)
+    package_labels_set = set(package_labels)
     has_bad_labels = False
-    for package_label in package_labels:
+    for package_label in package_labels_set:
         try:
             packages_registry.get_package_config(package_label)
         except LookupError as err:
@@ -241,11 +255,11 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
 
     # Check for conflicts
     conflicts = loader.detect_conflicts()
-    if package_labels:
+    if package_labels_set:
         conflicts = {
             package_label: conflict
             for package_label, conflict in conflicts.items()
-            if package_label in package_labels
+            if package_label in package_labels_set
         }
 
     if conflicts:
@@ -261,12 +275,12 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
     # Set up questioner
     if interactive:
         questioner = InteractiveMigrationQuestioner(
-            specified_packages=package_labels,
+            specified_packages=package_labels_set,
             dry_run=dry_run,
         )
     else:
         questioner = NonInteractiveMigrationQuestioner(
-            specified_packages=package_labels,
+            specified_packages=package_labels_set,
             dry_run=dry_run,
             verbosity=verbosity,
         )
@@ -280,12 +294,12 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
 
     # Handle empty migrations if requested
     if empty:
-        if not package_labels:
+        if not package_labels_set:
             raise click.ClickException(
                 "You must supply at least one package label when using --empty."
             )
         changes = {
-            package: [Migration("custom", package)] for package in package_labels
+            package: [Migration("custom", package)] for package in package_labels_set
         }
         changes = autodetector.arrange_for_graph(
             changes=changes,
@@ -298,17 +312,17 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
     # Detect changes
     changes = autodetector.changes(
         graph=loader.graph,
-        trim_to_packages=package_labels or None,
-        convert_packages=package_labels or None,
+        trim_to_packages=package_labels_set or None,
+        convert_packages=package_labels_set or None,
         migration_name=migration_name,
     )
 
     if not changes:
         log(
             "No changes detected"
-            if not package_labels
-            else f"No changes detected in {'package' if len(package_labels) == 1 else 'packages'} "
-            f"'{', '.join(package_labels)}'",
+            if not package_labels_set
+            else f"No changes detected in {'package' if len(package_labels_set) == 1 else 'packages'} "
+            f"'{', '.join(package_labels_set)}'",
             level=1,
         )
     else:
@@ -368,20 +382,22 @@ def makemigrations(package_labels, dry_run, empty, no_input, name, check, verbos
     help="Run migrations in a single transaction (auto-detected by default)",
 )
 def migrate(
-    package_label,
-    migration_name,
-    fake,
-    plan,
-    check_unapplied,
-    backup,
-    prune,
-    no_input,
-    verbosity,
-    atomic_batch,
-):
+    package_label: str | None,
+    migration_name: str | None,
+    fake: bool,
+    plan: bool,
+    check_unapplied: bool,
+    backup: bool | None,
+    prune: bool,
+    no_input: bool,
+    verbosity: int,
+    atomic_batch: bool | None,
+) -> None:
     """Updates database schema. Manages both packages with migrations and those without."""
 
-    def migration_progress_callback(action, migration=None, fake=False):
+    def migration_progress_callback(
+        action: str, migration: Migration | None = None, fake: bool = False
+    ) -> None:
         if verbosity >= 1:
             if action == "apply_start":
                 click.echo(f"  Applying {migration}...", nl=False)
@@ -395,7 +411,7 @@ def migrate(
             elif action == "render_success":
                 click.echo(click.style(" DONE", fg="green"))
 
-    def describe_operation(operation):
+    def describe_operation(operation: Any) -> tuple[str, bool]:
         """Return a string that describes a migration operation for --plan."""
         prefix = ""
         is_error = False
@@ -438,6 +454,7 @@ def migrate(
 
     # If they supplied command line arguments, work out what they mean.
     target_package_labels_only = True
+    targets: list[tuple[str, str]]
     if package_label:
         try:
             packages_registry.get_package_config(package_label)
@@ -463,13 +480,13 @@ def migrate(
             raise click.ClickException(
                 f"Cannot find a migration matching '{migration_name}' from package '{package_label}'."
             )
-        target = (package_label, migration.name)
+        target: tuple[str, str] = (package_label, migration.name)
         if (
             target not in executor.loader.graph.nodes
             and target in executor.loader.replacements
         ):
             incomplete_migration = executor.loader.replacements[target]
-            target = incomplete_migration.replaces[-1]
+            target = incomplete_migration.replaces[-1]  # type: ignore[assignment]
         targets = [target]
         target_package_labels_only = False
     elif package_label:
@@ -477,7 +494,7 @@ def migrate(
             key for key in executor.loader.graph.leaf_nodes() if key[0] == package_label
         ]
     else:
-        targets = executor.loader.graph.leaf_nodes()
+        targets = list(executor.loader.graph.leaf_nodes())
 
     if prune:
         if not package_label:
@@ -486,8 +503,8 @@ def migrate(
             )
         if verbosity > 0:
             click.secho("Pruning migrations:", fg="cyan")
-        to_prune = set(executor.loader.applied_migrations) - set(
-            executor.loader.disk_migrations
+        to_prune = set(executor.loader.applied_migrations) - set(  # type: ignore[arg-type]
+            executor.loader.disk_migrations  # type: ignore[arg-type]
         )
         squashed_migrations_with_deleted_replaced_migrations = [
             migration_key
@@ -729,10 +746,12 @@ def migrate(
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
-def show_migrations(package_labels, format, verbosity):
+def show_migrations(
+    package_labels: tuple[str, ...], format: str, verbosity: int
+) -> None:
     """Shows all available migrations for the current project"""
 
-    def _validate_package_names(package_names):
+    def _validate_package_names(package_names: tuple[str, ...]) -> None:
         has_bad_names = False
         for package_name in package_names:
             try:
@@ -743,7 +762,7 @@ def show_migrations(package_labels, format, verbosity):
         if has_bad_names:
             sys.exit(2)
 
-    def show_list(db_connection, package_names):
+    def show_list(db_connection: Any, package_names: tuple[str, ...]) -> None:
         """
         Show a list of all migrations on the system, or only those of
         some named packages.
@@ -755,14 +774,16 @@ def show_migrations(package_labels, format, verbosity):
 
         graph = loader.graph
         # If we were passed a list of packages, validate it
+        package_names_list: list[str]
         if package_names:
             _validate_package_names(package_names)
+            package_names_list = list(package_names)
         # Otherwise, show all packages in alphabetic order
         else:
-            package_names = sorted(loader.migrated_packages)
+            package_names_list = sorted(loader.migrated_packages)
         # For each app, print its migrations in order from oldest (roots) to
         # newest (leaves).
-        for package_name in package_names:
+        for package_name in package_names_list:
             click.secho(package_name, fg="cyan", bold=True)
             shown = set()
             for node in graph.leaf_nodes(package_name):
@@ -770,9 +791,9 @@ def show_migrations(package_labels, format, verbosity):
                     if plan_node not in shown and plan_node[0] == package_name:
                         # Give it a nice title if it's a squashed one
                         title = plan_node[1]
-                        if graph.nodes[plan_node].replaces:
-                            title += f" ({len(graph.nodes[plan_node].replaces)} squashed migrations)"
-                        applied_migration = loader.applied_migrations.get(plan_node)
+                        if graph.nodes[plan_node].replaces:  # type: ignore[union-attr]
+                            title += f" ({len(graph.nodes[plan_node].replaces)} squashed migrations)"  # type: ignore[union-attr]
+                        applied_migration = loader.applied_migrations.get(plan_node)  # type: ignore[union-attr]
                         # Mark it as applied/unapplied
                         if applied_migration:
                             if plan_node in recorded_migrations:
@@ -795,8 +816,8 @@ def show_migrations(package_labels, format, verbosity):
             migration
             for migration in recorded_migrations
             if (
-                migration not in loader.disk_migrations
-                and (not package_names or migration[0] in package_names)
+                migration not in loader.disk_migrations  # type: ignore[operator]
+                and (not package_names_list or migration[0] in package_names_list)
             )
         ]
 
@@ -819,7 +840,7 @@ def show_migrations(package_labels, format, verbosity):
                 for name in sorted(prunable_by_package[package]):
                     click.echo(f"    - {name}")
 
-    def show_plan(db_connection, package_names):
+    def show_plan(db_connection: Any, package_names: tuple[str, ...]) -> None:
         """
         Show all known migrations (or only those of the specified package_names)
         in the order they will be applied.
@@ -844,7 +865,7 @@ def show_migrations(package_labels, format, verbosity):
                     seen.add(migration)
 
         # Output
-        def print_deps(node):
+        def print_deps(node: Any) -> str:
             out = []
             for parent in sorted(node.parents):
                 out.append(f"{parent.key[0]}.{parent.key[1]}")
@@ -856,7 +877,7 @@ def show_migrations(package_labels, format, verbosity):
             deps = ""
             if verbosity >= 2:
                 deps = print_deps(node)
-            if node.key in loader.applied_migrations:
+            if node.key in loader.applied_migrations:  # type: ignore[operator]
                 click.echo(f"[X]  {node.key[0]}.{node.key[1]}{deps}")
             else:
                 click.echo(f"[ ]  {node.key[0]}.{node.key[1]}{deps}")
@@ -896,20 +917,22 @@ def show_migrations(package_labels, format, verbosity):
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
 def squash_migrations(
-    package_label,
-    start_migration_name,
-    migration_name,
-    no_optimize,
-    no_input,
-    squashed_name,
-    verbosity,
-):
+    package_label: str,
+    start_migration_name: str | None,
+    migration_name: str,
+    no_optimize: bool,
+    no_input: bool,
+    squashed_name: str | None,
+    verbosity: int,
+) -> None:
     """
     Squashes an existing set of migrations (from first until specified) into a single new one.
     """
     interactive = not no_input
 
-    def find_migration(loader, package_label, name):
+    def find_migration(
+        loader: MigrationLoader, package_label: str, name: str
+    ) -> Migration:
         try:
             return loader.get_migration_by_prefix(package_label, name)
         except AmbiguityError:

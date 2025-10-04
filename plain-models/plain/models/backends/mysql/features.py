@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import operator
 from functools import cached_property
 
@@ -26,19 +28,19 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_logical_xor = True
 
     @cached_property
-    def minimum_database_version(self):
+    def minimum_database_version(self) -> tuple[int, ...]:
         if self.connection.mysql_is_mariadb:
             return (10, 4)
         else:
             return (8,)
 
     @cached_property
-    def _mysql_storage_engine(self):
+    def _mysql_storage_engine(self) -> str:
         "Internal method used in Plain tests. Don't rely on this from your code"
         return self.connection.mysql_server_data["default_storage_engine"]
 
     @cached_property
-    def allows_auto_pk_0(self):
+    def allows_auto_pk_0(self) -> bool:
         """
         Autoincrement primary key can be set to 0 if it doesn't generate new
         autoincrement values.
@@ -46,7 +48,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         return "NO_AUTO_VALUE_ON_ZERO" in self.connection.sql_mode
 
     @cached_property
-    def update_can_self_select(self):
+    def update_can_self_select(self) -> bool:
         return self.connection.mysql_is_mariadb and self.connection.mysql_version >= (
             10,
             3,
@@ -54,7 +56,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         )
 
     @cached_property
-    def can_return_columns_from_insert(self):
+    def can_return_columns_from_insert(self) -> bool:
         return self.connection.mysql_is_mariadb and self.connection.mysql_version >= (
             10,
             5,
@@ -66,21 +68,21 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     )
 
     @cached_property
-    def has_zoneinfo_database(self):
+    def has_zoneinfo_database(self) -> bool:
         return self.connection.mysql_server_data["has_zoneinfo_database"]
 
     @cached_property
-    def is_sql_auto_is_null_enabled(self):
+    def is_sql_auto_is_null_enabled(self) -> bool:
         return self.connection.mysql_server_data["sql_auto_is_null"]
 
     @cached_property
-    def supports_over_clause(self):
+    def supports_over_clause(self) -> bool:
         if self.connection.mysql_is_mariadb:
             return True
         return self.connection.mysql_version >= (8, 0, 2)
 
     @cached_property
-    def supports_column_check_constraints(self):
+    def supports_column_check_constraints(self) -> bool:
         if self.connection.mysql_is_mariadb:
             return True
         return self.connection.mysql_version >= (8, 0, 16)
@@ -90,32 +92,32 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     )
 
     @cached_property
-    def can_introspect_check_constraints(self):
+    def can_introspect_check_constraints(self) -> bool:
         if self.connection.mysql_is_mariadb:
             return True
         return self.connection.mysql_version >= (8, 0, 16)
 
     @cached_property
-    def has_select_for_update_skip_locked(self):
+    def has_select_for_update_skip_locked(self) -> bool:
         if self.connection.mysql_is_mariadb:
             return self.connection.mysql_version >= (10, 6)
         return self.connection.mysql_version >= (8, 0, 1)
 
     @cached_property
-    def has_select_for_update_nowait(self):
+    def has_select_for_update_nowait(self) -> bool:
         if self.connection.mysql_is_mariadb:
             return True
         return self.connection.mysql_version >= (8, 0, 1)
 
     @cached_property
-    def has_select_for_update_of(self):
+    def has_select_for_update_of(self) -> bool:
         return (
             not self.connection.mysql_is_mariadb
             and self.connection.mysql_version >= (8, 0, 1)
         )
 
     @cached_property
-    def supports_explain_analyze(self):
+    def supports_explain_analyze(self) -> bool:
         return self.connection.mysql_is_mariadb or self.connection.mysql_version >= (
             8,
             0,
@@ -123,7 +125,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         )
 
     @cached_property
-    def supported_explain_formats(self):
+    def supported_explain_formats(self) -> set[str]:
         # Alias MySQL's TRADITIONAL to TEXT for consistency with other
         # backends.
         formats = {"JSON", "TEXT", "TRADITIONAL"}
@@ -136,7 +138,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         return formats
 
     @cached_property
-    def supports_transactions(self):
+    def supports_transactions(self) -> bool:
         """
         All storage engines except MyISAM support transactions.
         """
@@ -145,17 +147,17 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     uses_savepoints = property(operator.attrgetter("supports_transactions"))
 
     @cached_property
-    def ignores_table_name_case(self):
+    def ignores_table_name_case(self) -> bool:
         return self.connection.mysql_server_data["lower_case_table_names"]
 
     @cached_property
-    def can_introspect_json_field(self):
+    def can_introspect_json_field(self) -> bool:
         if self.connection.mysql_is_mariadb:
             return self.can_introspect_check_constraints
         return True
 
     @cached_property
-    def supports_index_column_ordering(self):
+    def supports_index_column_ordering(self) -> bool:
         if self._mysql_storage_engine != "InnoDB":
             return False
         if self.connection.mysql_is_mariadb:
@@ -163,7 +165,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         return self.connection.mysql_version >= (8, 0, 1)
 
     @cached_property
-    def supports_expression_indexes(self):
+    def supports_expression_indexes(self) -> bool:
         return (
             not self.connection.mysql_is_mariadb
             and self._mysql_storage_engine != "MyISAM"
@@ -171,7 +173,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         )
 
     @cached_property
-    def supports_select_intersection(self):
+    def supports_select_intersection(self) -> bool:
         is_mariadb = self.connection.mysql_is_mariadb
         return is_mariadb or self.connection.mysql_version >= (8, 0, 31)
 
@@ -180,7 +182,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     )
 
     @cached_property
-    def can_rename_index(self):
+    def can_rename_index(self) -> bool:
         if self.connection.mysql_is_mariadb:
             return self.connection.mysql_version >= (10, 5, 2)
         return True

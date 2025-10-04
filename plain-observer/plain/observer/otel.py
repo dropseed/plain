@@ -372,7 +372,7 @@ class ObserverSpanProcessor(SpanProcessor):
                     span.trace = trace
 
                 # Bulk create spans
-                Span.query.bulk_create(spans)
+                Span.query.bulk_create(spans)  # type: ignore[arg-type]
 
                 # Create log models if we have logs
                 if logs:

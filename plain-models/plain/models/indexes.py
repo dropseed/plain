@@ -12,6 +12,7 @@ from plain.utils.functional import partition
 
 if TYPE_CHECKING:
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.backends.ddl_references import Statement
     from plain.models.base import Model
     from plain.models.expressions import Expression
 
@@ -101,7 +102,7 @@ class Index:
 
     def create_sql(
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
-    ) -> str:
+    ) -> Statement:
         include = [
             model._meta.get_field(field_name).column for field_name in self.include
         ]
@@ -123,15 +124,15 @@ class Index:
                 for field_name, _ in self.fields_orders
             ]
             if schema_editor.connection.features.supports_index_column_ordering:
-                col_suffixes = [order[1] for order in self.fields_orders]
+                col_suffixes = tuple(order[1] for order in self.fields_orders)
             else:
-                col_suffixes = [""] * len(self.fields_orders)
+                col_suffixes = ("",) * len(self.fields_orders)
             expressions = None
         return schema_editor._create_index_sql(
             model,
             fields=fields,
             name=self.name,
-            col_suffixes=col_suffixes,
+            col_suffixes=col_suffixes,  # type: ignore[arg-type]
             opclasses=self.opclasses,
             condition=condition,
             include=include,
@@ -141,7 +142,7 @@ class Index:
 
     def remove_sql(
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
-    ) -> str:
+    ) -> Statement:
         return schema_editor._delete_index_sql(model, self.name, **kwargs)
 
     def deconstruct(self) -> tuple[str, tuple[Expression, ...], dict[str, Any]]:

@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from functools import total_ordering
+from typing import TYPE_CHECKING, Any
 
 from plain.models.migrations.state import ProjectState
 
 from .exceptions import CircularDependencyError, NodeNotFoundError
+
+if TYPE_CHECKING:
+    from plain.models.migrations.migration import Migration
 
 
 @total_ordering
@@ -12,33 +18,33 @@ class Node:
     nodes in either direction.
     """
 
-    def __init__(self, key):
+    def __init__(self, key: tuple[str, str]):
         self.key = key
-        self.children = set()
-        self.parents = set()
+        self.children: set[Node] = set()
+        self.parents: set[Node] = set()
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return self.key == other
 
-    def __lt__(self, other):
+    def __lt__(self, other: object) -> bool:
         return self.key < other
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.key)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: int) -> str:
         return self.key[item]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.key)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: ({self.key[0]!r}, {self.key[1]!r})>"
 
-    def add_child(self, child):
+    def add_child(self, child: Node) -> None:
         self.children.add(child)
 
-    def add_parent(self, parent):
+    def add_parent(self, parent: Node) -> None:
         self.parents.add(parent)
 
 
@@ -51,12 +57,14 @@ class DummyNode(Node):
     If there are any left, a nonexistent dependency error is raised.
     """
 
-    def __init__(self, key, origin, error_message):
+    def __init__(
+        self, key: tuple[str, str], origin: tuple[str, str], error_message: str
+    ):
         super().__init__(key)
         self.origin = origin
         self.error_message = error_message
 
-    def raise_error(self):
+    def raise_error(self) -> None:
         raise NodeNotFoundError(self.error_message, self.key, origin=self.origin)
 
 
@@ -84,21 +92,29 @@ class MigrationGraph:
     """
 
     def __init__(self):
-        self.node_map = {}
-        self.nodes = {}
+        self.node_map: dict[tuple[str, str], Node] = {}
+        self.nodes: dict[tuple[str, str], Migration | None] = {}
 
-    def add_node(self, key, migration):
+    def add_node(self, key: tuple[str, str], migration: Migration) -> None:
         assert key not in self.node_map
         node = Node(key)
         self.node_map[key] = node
         self.nodes[key] = migration
 
-    def add_dummy_node(self, key, origin, error_message):
+    def add_dummy_node(
+        self, key: tuple[str, str], origin: tuple[str, str], error_message: str
+    ) -> None:
         node = DummyNode(key, origin, error_message)
         self.node_map[key] = node
         self.nodes[key] = None
 
-    def add_dependency(self, migration, child, parent, skip_validation=False):
+    def add_dependency(
+        self,
+        migration: tuple[str, str] | None,
+        child: tuple[str, str],
+        parent: tuple[str, str],
+        skip_validation: bool = False,
+    ) -> None:
         """
         This may create dummy nodes if they don't yet exist. If
         `skip_validation=True`, validate_consistency() should be called
@@ -109,26 +125,28 @@ class MigrationGraph:
                 f"Migration {migration} dependencies reference nonexistent"
                 f" child node {child!r}"
             )
-            self.add_dummy_node(child, migration, error_message)
+            self.add_dummy_node(child, migration, error_message)  # type: ignore[arg-type]
         if parent not in self.nodes:
             error_message = (
                 f"Migration {migration} dependencies reference nonexistent"
                 f" parent node {parent!r}"
             )
-            self.add_dummy_node(parent, migration, error_message)
+            self.add_dummy_node(parent, migration, error_message)  # type: ignore[arg-type]
         self.node_map[child].add_parent(self.node_map[parent])
         self.node_map[parent].add_child(self.node_map[child])
         if not skip_validation:
             self.validate_consistency()
 
-    def remove_replaced_nodes(self, replacement, replaced):
+    def remove_replaced_nodes(
+        self, replacement: tuple[str, str], replaced: list[tuple[str, str]]
+    ) -> None:
         """
         Remove each of the `replaced` nodes (when they exist). Any
         dependencies that were referencing them are changed to reference the
         `replacement` node instead.
         """
         # Cast list of replaced keys to set to speed up lookup later.
-        replaced = set(replaced)
+        replaced_set: set[tuple[str, str]] = set(replaced)
         try:
             replacement_node = self.node_map[replacement]
         except KeyError as err:
@@ -137,7 +155,7 @@ class MigrationGraph:
                 " to the migration graph, or has been removed.",
                 replacement,
             ) from err
-        for replaced_key in replaced:
+        for replaced_key in replaced_set:
             self.nodes.pop(replaced_key, None)
             replaced_node = self.node_map.pop(replaced_key, None)
             if replaced_node:
@@ -146,17 +164,19 @@ class MigrationGraph:
                     # We don't want to create dependencies between the replaced
                     # node and the replacement node as this would lead to
                     # self-referencing on the replacement node at a later iteration.
-                    if child.key not in replaced:
+                    if child.key not in replaced_set:
                         replacement_node.add_child(child)
                         child.add_parent(replacement_node)
                 for parent in replaced_node.parents:
                     parent.children.remove(replaced_node)
                     # Again, to avoid self-referencing.
-                    if parent.key not in replaced:
+                    if parent.key not in replaced_set:
                         replacement_node.add_parent(parent)
                         parent.add_child(replacement_node)
 
-    def remove_replacement_node(self, replacement, replaced):
+    def remove_replacement_node(
+        self, replacement: tuple[str, str], replaced: list[tuple[str, str]]
+    ) -> None:
         """
         The inverse operation to `remove_replaced_nodes`. Almost. Remove the
         replacement node `replacement` and remap its child nodes to `replaced`
@@ -172,8 +192,8 @@ class MigrationGraph:
                 " to the migration graph, or has been removed already.",
                 replacement,
             ) from err
-        replaced_nodes = set()
-        replaced_nodes_parents = set()
+        replaced_nodes: set[Node] = set()
+        replaced_nodes_parents: set[Node] = set()
         for key in replaced:
             replaced_node = self.node_map.get(key)
             if replaced_node:
@@ -192,11 +212,11 @@ class MigrationGraph:
             # NOTE: There is no need to remap parent dependencies as we can
             # assume the replaced nodes already have the correct ancestry.
 
-    def validate_consistency(self):
+    def validate_consistency(self) -> None:
         """Ensure there are no dummy nodes remaining in the graph."""
         [n.raise_error() for n in self.node_map.values() if isinstance(n, DummyNode)]
 
-    def forwards_plan(self, target):
+    def forwards_plan(self, target: tuple[str, str]) -> list[tuple[str, str]]:
         """
         Given a node, return a list of which previous nodes (dependencies) must
         be applied, ending with the node itself. This is the list you would
@@ -206,11 +226,13 @@ class MigrationGraph:
             raise NodeNotFoundError(f"Node {target!r} not a valid node", target)
         return self.iterative_dfs(self.node_map[target])
 
-    def iterative_dfs(self, start, forwards=True):
+    def iterative_dfs(
+        self, start: Node, forwards: bool = True
+    ) -> list[tuple[str, str]]:
         """Iterative depth-first search for finding dependencies."""
-        visited = []
-        visited_set = set()
-        stack = [(start, False)]
+        visited: list[tuple[str, str]] = []
+        visited_set: set[Node] = set()
+        stack: list[tuple[Node, bool]] = [(start, False)]
         while stack:
             node, processed = stack.pop()
             if node in visited_set:
@@ -226,12 +248,12 @@ class MigrationGraph:
                 ]
         return visited
 
-    def root_nodes(self, app=None):
+    def root_nodes(self, app: str | None = None) -> list[tuple[str, str]]:
         """
         Return all root nodes - that is, nodes with no dependencies inside
         their app. These are the starting point for an app.
         """
-        roots = set()
+        roots: set[tuple[str, str]] = set()
         for node in self.nodes:
             if all(key[0] != node[0] for key in self.node_map[node].parents) and (
                 not app or app == node[0]
@@ -239,7 +261,7 @@ class MigrationGraph:
                 roots.add(node)
         return sorted(roots)
 
-    def leaf_nodes(self, app=None):
+    def leaf_nodes(self, app: str | None = None) -> list[tuple[str, str]]:
         """
         Return all leaf nodes - that is, nodes with no dependents in their app.
         These are the "most current" version of an app's schema.
@@ -247,7 +269,7 @@ class MigrationGraph:
         gets handled further up, in the interactive command - it's usually the
         result of a VCS merge and needs some user input.
         """
-        leaves = set()
+        leaves: set[tuple[str, str]] = set()
         for node in self.nodes:
             if all(key[0] != node[0] for key in self.node_map[node].children) and (
                 not app or app == node[0]
@@ -255,13 +277,13 @@ class MigrationGraph:
                 leaves.add(node)
         return sorted(leaves)
 
-    def ensure_not_cyclic(self):
+    def ensure_not_cyclic(self) -> None:
         # Algo from GvR:
         # https://neopythonic.blogspot.com/2009/01/detecting-cycles-in-directed-graph.html
-        todo = set(self.nodes)
+        todo: set[tuple[str, str]] = set(self.nodes)
         while todo:
             node = todo.pop()
-            stack = [node]
+            stack: list[tuple[str, str]] = [node]
             while stack:
                 top = stack[-1]
                 for child in self.node_map[top].children:
@@ -280,27 +302,34 @@ class MigrationGraph:
                 else:
                     node = stack.pop()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Graph: {} nodes, {} edges".format(*self._nodes_and_edges())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         nodes, edges = self._nodes_and_edges()
         return f"<{self.__class__.__name__}: nodes={nodes}, edges={edges}>"
 
-    def _nodes_and_edges(self):
+    def _nodes_and_edges(self) -> tuple[int, int]:
         return len(self.nodes), sum(
             len(node.parents) for node in self.node_map.values()
         )
 
-    def _generate_plan(self, nodes, at_end):
-        plan = []
+    def _generate_plan(
+        self, nodes: list[tuple[str, str]], at_end: bool
+    ) -> list[tuple[str, str]]:
+        plan: list[tuple[str, str]] = []
         for node in nodes:
             for migration in self.forwards_plan(node):
                 if migration not in plan and (at_end or migration not in nodes):
                     plan.append(migration)
         return plan
 
-    def make_state(self, nodes=None, at_end=True, real_packages=None):
+    def make_state(
+        self,
+        nodes: tuple[str, str] | list[tuple[str, str]] | None = None,
+        at_end: bool = True,
+        real_packages: Any = None,
+    ) -> ProjectState:
         """
         Given a migration node or nodes, return a complete ProjectState for it.
         If at_end is False, return the state before the migration has run.
@@ -311,12 +340,12 @@ class MigrationGraph:
         if not nodes:
             return ProjectState()
         if not isinstance(nodes[0], tuple):
-            nodes = [nodes]
+            nodes = [nodes]  # type: ignore[list-item]
         plan = self._generate_plan(nodes, at_end)
         project_state = ProjectState(real_packages=real_packages)
         for node in plan:
-            project_state = self.nodes[node].mutate_state(project_state, preserve=False)
+            project_state = self.nodes[node].mutate_state(project_state, preserve=False)  # type: ignore[union-attr]
         return project_state
 
-    def __contains__(self, node):
+    def __contains__(self, node: tuple[str, str]) -> bool:
         return node in self.nodes

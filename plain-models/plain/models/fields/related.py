@@ -325,15 +325,15 @@ class RelatedField(FieldCacheMixin, Field):
             related_name = self.remote_field.related_name  # type: ignore[attr-defined]
             related_name %= {
                 "class": cls.__name__.lower(),
-                "model_name": cls._meta.model_name.lower(),
-                "package_label": cls._meta.package_label.lower(),
+                "model_name": cls._meta.model_name.lower(),  # type: ignore[union-attr]
+                "package_label": cls._meta.package_label.lower(),  # type: ignore[union-attr]
             }
             self.remote_field.related_name = related_name  # type: ignore[attr-defined]
 
         if self.remote_field.related_query_name:  # type: ignore[attr-defined]
             related_query_name = self.remote_field.related_query_name % {  # type: ignore[attr-defined]
                 "class": cls.__name__.lower(),
-                "package_label": cls._meta.package_label.lower(),
+                "package_label": cls._meta.package_label.lower(),  # type: ignore[union-attr]
             }
             self.remote_field.related_query_name = related_query_name  # type: ignore[attr-defined]
 

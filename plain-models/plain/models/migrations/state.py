@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import copy
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import cached_property, partial
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models.exceptions import FieldDoesNotExist
@@ -16,16 +19,23 @@ from plain.packages import packages_registry
 from .exceptions import InvalidBasesError
 from .utils import resolve_relation
 
+if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable
 
-def _get_package_label_and_model_name(model, package_label=""):
+    from plain.models.fields import Field
+
+
+def _get_package_label_and_model_name(
+    model: str | type[models.Model], package_label: str = ""
+) -> tuple[str, str]:
     if isinstance(model, str):
         split = model.split(".", 1)
-        return tuple(split) if len(split) == 2 else (package_label, split[0])
+        return tuple(split) if len(split) == 2 else (package_label, split[0])  # type: ignore[return-value]
     else:
-        return model._meta.package_label, model._meta.model_name
+        return model._meta.package_label, model._meta.model_name  # type: ignore[attr-defined]
 
 
-def _get_related_models(m):
+def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
     """Return all models that have a direct relationship to the given model."""
     related_models = [
         subclass
@@ -33,29 +43,29 @@ def _get_related_models(m):
         if issubclass(subclass, models.Model)
     ]
     related_fields_models = set()
-    for f in m._meta.get_fields(include_hidden=True):
+    for f in m._meta.get_fields(include_hidden=True):  # type: ignore[attr-defined]
         if (
-            f.is_relation
-            and f.related_model is not None
-            and not isinstance(f.related_model, str)
+            f.is_relation  # type: ignore[attr-defined]
+            and f.related_model is not None  # type: ignore[attr-defined]
+            and not isinstance(f.related_model, str)  # type: ignore[attr-defined]
         ):
-            related_fields_models.add(f.model)
-            related_models.append(f.related_model)
+            related_fields_models.add(f.model)  # type: ignore[attr-defined]
+            related_models.append(f.related_model)  # type: ignore[attr-defined]
     return related_models
 
 
-def get_related_models_tuples(model):
+def get_related_models_tuples(model: type[models.Model]) -> set[tuple[str, str]]:
     """
     Return a list of typical (package_label, model_name) tuples for all related
     models for the given model.
     """
     return {
-        (rel_mod._meta.package_label, rel_mod._meta.model_name)
+        (rel_mod._meta.package_label, rel_mod._meta.model_name)  # type: ignore[attr-defined]
         for rel_mod in _get_related_models(model)
     }
 
 
-def get_related_models_recursive(model):
+def get_related_models_recursive(model: type[models.Model]) -> set[tuple[str, str]]:
     """
     Return all models that have a direct or indirect relationship
     to the given model.
@@ -68,14 +78,14 @@ def get_related_models_recursive(model):
     queue = _get_related_models(model)
     for rel_mod in queue:
         rel_package_label, rel_model_name = (
-            rel_mod._meta.package_label,
-            rel_mod._meta.model_name,
+            rel_mod._meta.package_label,  # type: ignore[attr-defined]
+            rel_mod._meta.model_name,  # type: ignore[attr-defined]
         )
         if (rel_package_label, rel_model_name) in seen:
             continue
         seen.add((rel_package_label, rel_model_name))
         queue.extend(_get_related_models(rel_mod))
-    return seen - {(model._meta.package_label, model._meta.model_name)}
+    return seen - {(model._meta.package_label, model._meta.model_name)}  # type: ignore[attr-defined]
 
 
 class ProjectState:
@@ -85,7 +95,11 @@ class ProjectState:
     FKs/etc. resolve properly.
     """
 
-    def __init__(self, models=None, real_packages=None):
+    def __init__(
+        self,
+        models: dict[tuple[str, str], ModelState] | None = None,
+        real_packages: set[str] | None = None,
+    ):
         self.models = models or {}
         # Packages to include from main registry, usually unmigrated ones
         if real_packages is None:
@@ -95,15 +109,19 @@ class ProjectState:
         self.real_packages = real_packages
         self.is_delayed = False
         # {remote_model_key: {model_key: {field_name: field}}}
-        self._relations = None
+        self._relations: (
+            dict[tuple[str, str], dict[tuple[str, str], dict[str, Field]]] | None
+        ) = None
 
     @property
-    def relations(self):
+    def relations(
+        self,
+    ) -> dict[tuple[str, str], dict[tuple[str, str], dict[str, Field]]]:
         if self._relations is None:
             self.resolve_fields_and_relations()
-        return self._relations
+        return self._relations  # type: ignore[return-value]
 
-    def add_model(self, model_state):
+    def add_model(self, model_state: ModelState) -> None:
         model_key = model_state.package_label, model_state.name_lower
         self.models[model_key] = model_state
         if self._relations is not None:
@@ -111,7 +129,7 @@ class ProjectState:
         if "models_registry" in self.__dict__:  # hasattr would cache the property
             self.reload_model(*model_key)
 
-    def remove_model(self, package_label, model_name):
+    def remove_model(self, package_label: str, model_name: str) -> None:
         model_key = package_label, model_name
         del self.models[model_key]
         if self._relations is not None:
@@ -127,7 +145,7 @@ class ProjectState:
             # the cache automatically (#24513)
             self.models_registry.clear_cache()
 
-    def rename_model(self, package_label, old_name, new_name):
+    def rename_model(self, package_label: str, old_name: str, new_name: str) -> None:
         # Add a new model.
         old_name_lower = old_name.lower()
         new_name_lower = new_name.lower()
@@ -144,11 +162,11 @@ class ProjectState:
             changed_field = None
             if reference.to:
                 changed_field = field.clone()
-                changed_field.remote_field.model = new_remote_model
+                changed_field.remote_field.model = new_remote_model  # type: ignore[attr-defined]
             if reference.through:
                 if changed_field is None:
                     changed_field = field.clone()
-                changed_field.remote_field.through = new_remote_model
+                changed_field.remote_field.through = new_remote_model  # type: ignore[attr-defined]
             if changed_field:
                 model_state.fields[name] = changed_field
                 to_reload.add((model_state.package_label, model_state.name_lower))
@@ -166,7 +184,13 @@ class ProjectState:
         self.remove_model(package_label, old_name_lower)
         self.reload_model(package_label, new_name_lower, delay=True)
 
-    def alter_model_options(self, package_label, model_name, options, option_keys=None):
+    def alter_model_options(
+        self,
+        package_label: str,
+        model_name: str,
+        options: dict[str, Any],
+        option_keys: Iterable[str] | None = None,
+    ) -> None:
         model_state = self.models[package_label, model_name]
         model_state.options = {**model_state.options, **options}
         if option_keys:
@@ -175,48 +199,75 @@ class ProjectState:
                     model_state.options.pop(key, False)
         self.reload_model(package_label, model_name, delay=True)
 
-    def _append_option(self, package_label, model_name, option_name, obj):
+    def _append_option(
+        self, package_label: str, model_name: str, option_name: str, obj: Any
+    ) -> None:
         model_state = self.models[package_label, model_name]
         model_state.options[option_name] = [*model_state.options[option_name], obj]
         self.reload_model(package_label, model_name, delay=True)
 
-    def _remove_option(self, package_label, model_name, option_name, obj_name):
+    def _remove_option(
+        self, package_label: str, model_name: str, option_name: str, obj_name: str
+    ) -> None:
         model_state = self.models[package_label, model_name]
         objs = model_state.options[option_name]
-        model_state.options[option_name] = [obj for obj in objs if obj.name != obj_name]
+        model_state.options[option_name] = [
+            obj
+            for obj in objs
+            if obj.name != obj_name  # type: ignore[attr-defined]
+        ]
         self.reload_model(package_label, model_name, delay=True)
 
-    def add_index(self, package_label, model_name, index):
+    def add_index(self, package_label: str, model_name: str, index: Any) -> None:
         self._append_option(package_label, model_name, "indexes", index)
 
-    def remove_index(self, package_label, model_name, index_name):
+    def remove_index(
+        self, package_label: str, model_name: str, index_name: str
+    ) -> None:
         self._remove_option(package_label, model_name, "indexes", index_name)
 
-    def rename_index(self, package_label, model_name, old_index_name, new_index_name):
+    def rename_index(
+        self,
+        package_label: str,
+        model_name: str,
+        old_index_name: str,
+        new_index_name: str,
+    ) -> None:
         model_state = self.models[package_label, model_name]
         objs = model_state.options["indexes"]
 
         new_indexes = []
         for obj in objs:
-            if obj.name == old_index_name:
-                obj = obj.clone()
-                obj.name = new_index_name
+            if obj.name == old_index_name:  # type: ignore[attr-defined]
+                obj = obj.clone()  # type: ignore[attr-defined]
+                obj.name = new_index_name  # type: ignore[attr-defined]
             new_indexes.append(obj)
 
         model_state.options["indexes"] = new_indexes
         self.reload_model(package_label, model_name, delay=True)
 
-    def add_constraint(self, package_label, model_name, constraint):
+    def add_constraint(
+        self, package_label: str, model_name: str, constraint: Any
+    ) -> None:
         self._append_option(package_label, model_name, "constraints", constraint)
 
-    def remove_constraint(self, package_label, model_name, constraint_name):
+    def remove_constraint(
+        self, package_label: str, model_name: str, constraint_name: str
+    ) -> None:
         self._remove_option(package_label, model_name, "constraints", constraint_name)
 
-    def add_field(self, package_label, model_name, name, field, preserve_default):
+    def add_field(
+        self,
+        package_label: str,
+        model_name: str,
+        name: str,
+        field: Field,
+        preserve_default: bool,
+    ) -> None:
         # If preserve default is off, don't use the default for future state.
         if not preserve_default:
             field = field.clone()
-            field.default = NOT_PROVIDED
+            field.default = NOT_PROVIDED  # type: ignore[attr-defined]
         else:
             field = field
         model_key = package_label, model_name
@@ -224,33 +275,40 @@ class ProjectState:
         if self._relations is not None:
             self.resolve_model_field_relations(model_key, name, field)
         # Delay rendering of relationships if it's not a relational field.
-        delay = not field.is_relation
+        delay = not field.is_relation  # type: ignore[attr-defined]
         self.reload_model(*model_key, delay=delay)
 
-    def remove_field(self, package_label, model_name, name):
+    def remove_field(self, package_label: str, model_name: str, name: str) -> None:
         model_key = package_label, model_name
         model_state = self.models[model_key]
         old_field = model_state.fields.pop(name)
         if self._relations is not None:
             self.resolve_model_field_relations(model_key, name, old_field)
         # Delay rendering of relationships if it's not a relational field.
-        delay = not old_field.is_relation
+        delay = not old_field.is_relation  # type: ignore[attr-defined]
         self.reload_model(*model_key, delay=delay)
 
-    def alter_field(self, package_label, model_name, name, field, preserve_default):
+    def alter_field(
+        self,
+        package_label: str,
+        model_name: str,
+        name: str,
+        field: Field,
+        preserve_default: bool,
+    ) -> None:
         if not preserve_default:
             field = field.clone()
-            field.default = NOT_PROVIDED
+            field.default = NOT_PROVIDED  # type: ignore[attr-defined]
         else:
             field = field
         model_key = package_label, model_name
         fields = self.models[model_key].fields
         if self._relations is not None:
             old_field = fields.pop(name)
-            if old_field.is_relation:
+            if old_field.is_relation:  # type: ignore[attr-defined]
                 self.resolve_model_field_relations(model_key, name, old_field)
             fields[name] = field
-            if field.is_relation:
+            if field.is_relation:  # type: ignore[attr-defined]
                 self.resolve_model_field_relations(model_key, name, field)
         else:
             fields[name] = field
@@ -258,12 +316,14 @@ class ProjectState:
         # it's sufficient if the new field is (#27737).
         # Delay rendering of relationships if it's not a relational field and
         # not referenced by a foreign key.
-        delay = not field.is_relation and not field_is_referenced(
+        delay = not field.is_relation and not field_is_referenced(  # type: ignore[attr-defined]
             self, model_key, (name, field)
         )
         self.reload_model(*model_key, delay=delay)
 
-    def rename_field(self, package_label, model_name, old_name, new_name):
+    def rename_field(
+        self, package_label: str, model_name: str, old_name: str, new_name: str
+    ) -> None:
         model_key = package_label, model_name
         model_state = self.models[model_key]
         # Rename the field.
@@ -284,15 +344,17 @@ class ProjectState:
             for to_model in self._relations.values():
                 if old_name_lower in to_model[model_key]:
                     field = to_model[model_key].pop(old_name_lower)
-                    field.name = new_name_lower
+                    field.name = new_name_lower  # type: ignore[attr-defined]
                     to_model[model_key][new_name_lower] = field
         self.reload_model(*model_key, delay=delay)
 
-    def _find_reload_model(self, package_label, model_name, delay=False):
+    def _find_reload_model(
+        self, package_label: str, model_name: str, delay: bool = False
+    ) -> set[tuple[str, str]]:
         if delay:
             self.is_delayed = True
 
-        related_models = set()
+        related_models: set[tuple[str, str]] = set()
 
         try:
             old_model = self.models_registry.get_model(package_label, model_name)
@@ -311,11 +373,12 @@ class ProjectState:
         # Directly related models are the models pointed to by ForeignKeys and ManyToManyFields.
         direct_related_models = set()
         for field in model_state.fields.values():
-            if field.is_relation:
-                if field.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT:
+            if field.is_relation:  # type: ignore[attr-defined]
+                if field.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT:  # type: ignore[attr-defined]
                     continue
                 rel_package_label, rel_model_name = _get_package_label_and_model_name(
-                    field.related_model, package_label
+                    field.related_model,
+                    package_label,  # type: ignore[attr-defined]
                 )
                 direct_related_models.add((rel_package_label, rel_model_name.lower()))
 
@@ -339,12 +402,14 @@ class ProjectState:
 
         return related_models
 
-    def reload_model(self, package_label, model_name, delay=False):
+    def reload_model(
+        self, package_label: str, model_name: str, delay: bool = False
+    ) -> None:
         if "models_registry" in self.__dict__:  # hasattr would cache the property
             related_models = self._find_reload_model(package_label, model_name, delay)
             self._reload(related_models)
 
-    def reload_models(self, models, delay=True):
+    def reload_models(self, models: set[tuple[str, str]], delay: bool = True) -> None:
         if "models_registry" in self.__dict__:  # hasattr would cache the property
             related_models = set()
             for package_label, model_name in models:
@@ -353,7 +418,7 @@ class ProjectState:
                 )
             self._reload(related_models)
 
-    def _reload(self, related_models):
+    def _reload(self, related_models: set[tuple[str, str]]) -> None:
         # Unregister all related models
         with self.models_registry.bulk_update():
             for rel_package_label, rel_model_name in related_models:
@@ -381,19 +446,19 @@ class ProjectState:
 
     def update_model_field_relation(
         self,
-        model,
-        model_key,
-        field_name,
-        field,
-        concretes,
-    ):
+        model: str | type[models.Model],
+        model_key: tuple[str, str],
+        field_name: str,
+        field: Field,
+        concretes: dict[tuple[str, str], tuple[str, str]],
+    ) -> None:
         remote_model_key = resolve_relation(model, *model_key)
         if (
             remote_model_key[0] not in self.real_packages
             and remote_model_key in concretes
         ):
             remote_model_key = concretes[remote_model_key]
-        relations_to_remote_model = self._relations[remote_model_key]
+        relations_to_remote_model = self._relations[remote_model_key]  # type: ignore[index]
         if field_name in self.models[model_key].fields:
             # The assert holds because it's a new relation, or an altered
             # relation, in which case references have been removed by
@@ -407,19 +472,19 @@ class ProjectState:
 
     def resolve_model_field_relations(
         self,
-        model_key,
-        field_name,
-        field,
-        concretes=None,
-    ):
-        remote_field = field.remote_field
+        model_key: tuple[str, str],
+        field_name: str,
+        field: Field,
+        concretes: dict[tuple[str, str], tuple[str, str]] | None = None,
+    ) -> None:
+        remote_field = field.remote_field  # type: ignore[attr-defined]
         if not remote_field:
-            return
+            return None
         if concretes is None:
             concretes = self._get_concrete_models_mapping()
 
         self.update_model_field_relation(
-            remote_field.model,
+            remote_field.model,  # type: ignore[attr-defined]
             model_key,
             field_name,
             field,
@@ -428,12 +493,16 @@ class ProjectState:
 
         through = getattr(remote_field, "through", None)
         if not through:
-            return
+            return None
         self.update_model_field_relation(
             through, model_key, field_name, field, concretes
         )
 
-    def resolve_model_relations(self, model_key, concretes=None):
+    def resolve_model_relations(
+        self,
+        model_key: tuple[str, str],
+        concretes: dict[tuple[str, str], tuple[str, str]] | None = None,
+    ) -> None:
         if concretes is None:
             concretes = self._get_concrete_models_mapping()
 
@@ -441,11 +510,11 @@ class ProjectState:
         for field_name, field in model_state.fields.items():
             self.resolve_model_field_relations(model_key, field_name, field, concretes)
 
-    def resolve_fields_and_relations(self):
+    def resolve_fields_and_relations(self) -> None:
         # Resolve fields.
         for model_state in self.models.values():
             for field_name, field in model_state.fields.items():
-                field.name = field_name
+                field.name = field_name  # type: ignore[attr-defined]
         # Resolve relations.
         # {remote_model_key: {model_key: {field_name: field}}}
         self._relations = defaultdict(partial(defaultdict, dict))
@@ -454,13 +523,13 @@ class ProjectState:
         for model_key in concretes:
             self.resolve_model_relations(model_key, concretes)
 
-    def _get_concrete_models_mapping(self):
+    def _get_concrete_models_mapping(self) -> dict[tuple[str, str], tuple[str, str]]:
         concrete_models_mapping = {}
         for model_key, model_state in self.models.items():
             concrete_models_mapping[model_key] = model_key
         return concrete_models_mapping
 
-    def clone(self):
+    def clone(self) -> ProjectState:
         """Return an exact copy of this ProjectState."""
         new_state = ProjectState(
             models={k: v.clone() for k, v in self.models.items()},
@@ -471,16 +540,16 @@ class ProjectState:
         new_state.is_delayed = self.is_delayed
         return new_state
 
-    def clear_delayed_models_cache(self):
+    def clear_delayed_models_cache(self) -> None:
         if self.is_delayed and "models_registry" in self.__dict__:
             del self.__dict__["models_registry"]
 
     @cached_property
-    def models_registry(self):
+    def models_registry(self) -> StateModelsRegistry:
         return StateModelsRegistry(self.real_packages, self.models)
 
     @classmethod
-    def from_models_registry(cls, models_registry):
+    def from_models_registry(cls, models_registry: ModelsRegistry) -> ProjectState:
         """Take an Packages and return a ProjectState matching it."""
         app_models = {}
         for model in models_registry.get_models():
@@ -490,7 +559,9 @@ class ProjectState:
             )
         return cls(app_models)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ProjectState):
+            return NotImplemented
         return self.models == other.models and self.real_packages == other.real_packages
 
 
@@ -500,18 +571,22 @@ class StateModelsRegistry(ModelsRegistry):
     additions and removals.
     """
 
-    def __init__(self, real_packages, models):
+    def __init__(
+        self,
+        real_packages: set[str],
+        models: dict[tuple[str, str], ModelState],
+    ):
         # Any packages in self.real_packages should have all their models included
         # in the render. We don't use the original model instances as there
         # are some variables that refer to the Packages object.
         # FKs/M2Ms from real packages are also not included as they just
         # mess things up with partial states (due to lack of dependencies)
-        self.real_models = []
+        self.real_models: list[ModelState] = []
         for package_label in real_packages:
             for model in global_models.get_models(package_label=package_label):
                 self.real_models.append(ModelState.from_model(model, exclude_rels=True))
 
-        super().__init__()
+        super().__init__()  # type: ignore[misc]
 
         self.render_multiple([*models.values(), *self.real_models])
 
@@ -521,10 +596,10 @@ class StateModelsRegistry(ModelsRegistry):
         from plain.models.preflight import _check_lazy_references
 
         if errors := _check_lazy_references(self, packages_registry):
-            raise ValueError("\n".join(error.message for error in errors))
+            raise ValueError("\n".join(error.message for error in errors))  # type: ignore[attr-defined]
 
     @contextmanager
-    def bulk_update(self):
+    def bulk_update(self) -> Generator[None, None, None]:
         # Avoid clearing each model's cache for each change. Instead, clear
         # all caches when we're finished updating the model instances.
         ready = self.ready
@@ -535,13 +610,13 @@ class StateModelsRegistry(ModelsRegistry):
             self.ready = ready
             self.clear_cache()
 
-    def render_multiple(self, model_states):
+    def render_multiple(self, model_states: list[ModelState]) -> None:
         # We keep trying to render the models in a loop, ignoring invalid
         # base errors, until the size of the unrendered models doesn't
         # decrease by at least one, meaning there's a base dependency loop/
         # missing base.
         if not model_states:
-            return
+            return None
         # Prevent that all model caches are expired for each render.
         with self.bulk_update():
             unrendered_models = model_states
@@ -560,21 +635,21 @@ class StateModelsRegistry(ModelsRegistry):
                     )
                 unrendered_models = new_unrendered_models
 
-    def clone(self):
+    def clone(self) -> StateModelsRegistry:
         """Return a clone of this registry."""
-        clone = StateModelsRegistry([], {})
+        clone = StateModelsRegistry(set(), {})
         clone.all_models = copy.deepcopy(self.all_models)
 
         # No need to actually clone them, they'll never change
         clone.real_models = self.real_models
         return clone
 
-    def register_model(self, package_label, model):
-        self.all_models[package_label][model._meta.model_name] = model
+    def register_model(self, package_label: str, model: type[models.Model]) -> None:
+        self.all_models[package_label][model._meta.model_name] = model  # type: ignore[attr-defined]
         self.do_pending_operations(model)
         self.clear_cache()
 
-    def unregister_model(self, package_label, model_name):
+    def unregister_model(self, package_label: str, model_name: str) -> None:
         try:
             del self.all_models[package_label][model_name]
         except KeyError:
@@ -592,10 +667,17 @@ class ModelState:
     assign new ones, as these are not detached during a clone.
     """
 
-    def __init__(self, package_label, name, fields, options=None, bases=None):
+    def __init__(
+        self,
+        package_label: str,
+        name: str,
+        fields: Iterable[tuple[str, Field]],
+        options: dict[str, Any] | None = None,
+        bases: tuple[str | type[models.Model], ...] | None = None,
+    ):
         self.package_label = package_label
         self.name = name
-        self.fields = dict(fields)
+        self.fields: dict[str, Field] = dict(fields)
         self.options = options or {}
         self.options.setdefault("indexes", [])
         self.options.setdefault("constraints", [])
@@ -607,54 +689,56 @@ class ModelState:
                     f'ModelState.fields cannot be bound to a model - "{name}" is.'
                 )
             # Sanity-check that relation fields are NOT referring to a model class.
-            if field.is_relation and hasattr(field.related_model, "_meta"):
+            if field.is_relation and hasattr(field.related_model, "_meta"):  # type: ignore[attr-defined]
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.to" does. '
                     "Use a string reference instead."
                 )
-            if field.many_to_many and hasattr(field.remote_field.through, "_meta"):
+            if field.many_to_many and hasattr(field.remote_field.through, "_meta"):  # type: ignore[attr-defined]
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.through" '
                     "does. Use a string reference instead."
                 )
         # Sanity-check that indexes have their name set.
         for index in self.options["indexes"]:
-            if not index.name:
+            if not index.name:  # type: ignore[attr-defined]
                 raise ValueError(
                     "Indexes passed to ModelState require a name attribute. "
                     f"{index!r} doesn't have one."
                 )
 
     @cached_property
-    def name_lower(self):
+    def name_lower(self) -> str:
         return self.name.lower()
 
-    def get_field(self, field_name):
+    def get_field(self, field_name: str) -> Field:
         return self.fields[field_name]
 
     @classmethod
-    def from_model(cls, model, exclude_rels=False):
+    def from_model(
+        cls, model: type[models.Model], exclude_rels: bool = False
+    ) -> ModelState:
         """Given a model, return a ModelState representing it."""
         # Deconstruct the fields
         fields = []
-        for field in model._meta.local_fields:
+        for field in model._meta.local_fields:  # type: ignore[attr-defined]
             if getattr(field, "remote_field", None) and exclude_rels:
                 continue
-            name = field.name
+            name = field.name  # type: ignore[attr-defined]
             try:
-                fields.append((name, field.clone()))
+                fields.append((name, field.clone()))  # type: ignore[attr-defined]
             except TypeError as e:
                 raise TypeError(
-                    f"Couldn't reconstruct field {name} on {model._meta.label}: {e}"
+                    f"Couldn't reconstruct field {name} on {model._meta.label}: {e}"  # type: ignore[attr-defined]
                 )
         if not exclude_rels:
-            for field in model._meta.local_many_to_many:
-                name = field.name
+            for field in model._meta.local_many_to_many:  # type: ignore[attr-defined]
+                name = field.name  # type: ignore[attr-defined]
                 try:
-                    fields.append((name, field.clone()))
+                    fields.append((name, field.clone()))  # type: ignore[attr-defined]
                 except TypeError as e:
                     raise TypeError(
-                        f"Couldn't reconstruct m2m field {name} on {model._meta.object_name}: {e}"
+                        f"Couldn't reconstruct m2m field {name} on {model._meta.object_name}: {e}"  # type: ignore[attr-defined]
                     )
         # Extract the options
         options = {}
@@ -662,24 +746,25 @@ class ModelState:
             # Ignore some special options
             if name in ["models_registry", "package_label"]:
                 continue
-            elif name in model._meta.original_attrs:
+            elif name in model._meta.original_attrs:  # type: ignore[attr-defined]
                 if name == "indexes":
-                    indexes = [idx.clone() for idx in model._meta.indexes]
+                    indexes = [idx.clone() for idx in model._meta.indexes]  # type: ignore[attr-defined]
                     for index in indexes:
-                        if not index.name:
-                            index.set_name_with_model(model)
+                        if not index.name:  # type: ignore[attr-defined]
+                            index.set_name_with_model(model)  # type: ignore[attr-defined]
                     options["indexes"] = indexes
                 elif name == "constraints":
                     options["constraints"] = [
-                        con.clone() for con in model._meta.constraints
+                        con.clone()
+                        for con in model._meta.constraints  # type: ignore[attr-defined]
                     ]
                 else:
-                    options[name] = model._meta.original_attrs[name]
+                    options[name] = model._meta.original_attrs[name]  # type: ignore[attr-defined]
 
-        def flatten_bases(model):
+        def flatten_bases(model: type[models.Model]) -> list[type[models.Model]]:
             bases = []
             for base in model.__bases__:
-                bases.append(base)
+                bases.append(base)  # type: ignore[arg-type]
             return bases
 
         # We can't rely on __mro__ directly because we only want to flatten
@@ -693,7 +778,7 @@ class ModelState:
 
         # Make our record
         bases = tuple(
-            (base._meta.label_lower if hasattr(base, "_meta") else base)
+            (base._meta.label_lower if hasattr(base, "_meta") else base)  # type: ignore[attr-defined]
             for base in flattened_bases
         )
         # Ensure at least one base inherits from models.Model
@@ -704,14 +789,14 @@ class ModelState:
 
         # Construct the new ModelState
         return cls(
-            model._meta.package_label,
-            model._meta.object_name,
+            model._meta.package_label,  # type: ignore[attr-defined]
+            model._meta.object_name,  # type: ignore[attr-defined]
             fields,
             options,
             bases,
         )
 
-    def clone(self):
+    def clone(self) -> ModelState:
         """Return an exact copy of this ModelState."""
         return self.__class__(
             package_label=self.package_label,
@@ -724,7 +809,7 @@ class ModelState:
             bases=self.bases,
         )
 
-    def render(self, models_registry):
+    def render(self, models_registry: ModelsRegistry) -> type[models.Model]:
         """Create a Model object from our current state into the given packages."""
         # First, make a Meta object
         meta_contents = {
@@ -744,7 +829,7 @@ class ModelState:
                 f"Cannot resolve one or more bases from {self.bases!r}"
             )
         # Clone fields for the body, add other bits.
-        body = {name: field.clone() for name, field in self.fields.items()}
+        body = {name: field.clone() for name, field in self.fields.items()}  # type: ignore[attr-defined]
         body["Meta"] = meta
         body["__module__"] = "__fake__"
 
@@ -754,32 +839,34 @@ class ModelState:
 
         # Register it to the models_registry associated with the model meta
         # (could probably do this directly right here too...)
-        register_model(model_class)
+        register_model(model_class)  # type: ignore[arg-type]
 
-        return model_class
+        return model_class  # type: ignore[return-value]
 
-    def get_index_by_name(self, name):
+    def get_index_by_name(self, name: str) -> Any:
         for index in self.options["indexes"]:
-            if index.name == name:
+            if index.name == name:  # type: ignore[attr-defined]
                 return index
         raise ValueError(f"No index named {name} on model {self.name}")
 
-    def get_constraint_by_name(self, name):
+    def get_constraint_by_name(self, name: str) -> Any:
         for constraint in self.options["constraints"]:
-            if constraint.name == name:
+            if constraint.name == name:  # type: ignore[attr-defined]
                 return constraint
         raise ValueError(f"No constraint named {name} on model {self.name}")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: '{self.package_label}.{self.name}'>"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ModelState):
+            return NotImplemented
         return (
             (self.package_label == other.package_label)
             and (self.name == other.name)
             and (len(self.fields) == len(other.fields))
             and all(
-                k1 == k2 and f1.deconstruct()[1:] == f2.deconstruct()[1:]
+                k1 == k2 and f1.deconstruct()[1:] == f2.deconstruct()[1:]  # type: ignore[attr-defined]
                 for (k1, f1), (k2, f2) in zip(
                     sorted(self.fields.items()),
                     sorted(other.fields.items()),

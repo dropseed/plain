@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import datetime
 import decimal
 import uuid
+from collections.abc import Callable
 from functools import cached_property, lru_cache
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models.backends.base.operations import BaseDatabaseOperations
@@ -11,6 +15,9 @@ from plain.models.exceptions import FieldError
 from plain.models.expressions import Col
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class DatabaseOperations(BaseDatabaseOperations):
@@ -24,7 +31,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     # SQLite. Use JSON_TYPE() instead.
     jsonfield_datatype_values = frozenset(["null", "false", "true"])
 
-    def bulk_batch_size(self, fields, objs):
+    def bulk_batch_size(self, fields: list[Any], objs: list[Any]) -> int:
         """
         SQLite has a compile-time default (SQLITE_LIMIT_VARIABLE_NUMBER) of
         999 variables per query.
@@ -39,7 +46,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return len(objs)
 
-    def check_expression_support(self, expression):
+    def check_expression_support(self, expression: Any) -> None:
         bad_fields = (models.DateField, models.DateTimeField, models.TimeField)
         bad_aggregates = (models.Sum, models.Avg, models.Variance, models.StdDev)
         if isinstance(expression, bad_aggregates):
@@ -67,7 +74,9 @@ class DatabaseOperations(BaseDatabaseOperations):
                 "accepting multiple arguments."
             )
 
-    def date_extract_sql(self, lookup_type, sql, params):
+    def date_extract_sql(
+        self, lookup_type: str, sql: str, params: list[Any] | tuple[Any, ...]
+    ) -> tuple[str, tuple[Any, ...]]:
         """
         Support EXTRACT with a user-defined function plain_date_extract()
         that's registered in connect(). Use single quotes because this is a
@@ -75,69 +84,103 @@ class DatabaseOperations(BaseDatabaseOperations):
         """
         return f"plain_date_extract(%s, {sql})", (lookup_type.lower(), *params)
 
-    def fetch_returned_insert_rows(self, cursor):
+    def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the list of returned data.
         """
         return cursor.fetchall()
 
-    def format_for_duration_arithmetic(self, sql):
+    def format_for_duration_arithmetic(self, sql: str) -> str:
         """Do nothing since formatting is handled in the custom function."""
         return sql
 
-    def date_trunc_sql(self, lookup_type, sql, params, tzname=None):
+    def date_trunc_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None = None,
+    ) -> tuple[str, tuple[Any, ...]]:
         return f"plain_date_trunc(%s, {sql}, %s, %s)", (
             lookup_type.lower(),
             *params,
             *self._convert_tznames_to_sql(tzname),
         )
 
-    def time_trunc_sql(self, lookup_type, sql, params, tzname=None):
+    def time_trunc_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None = None,
+    ) -> tuple[str, tuple[Any, ...]]:
         return f"plain_time_trunc(%s, {sql}, %s, %s)", (
             lookup_type.lower(),
             *params,
             *self._convert_tznames_to_sql(tzname),
         )
 
-    def _convert_tznames_to_sql(self, tzname):
+    def _convert_tznames_to_sql(
+        self, tzname: str | None
+    ) -> tuple[str | None, str | None]:
         if tzname:
             return tzname, self.connection.timezone_name
         return None, None
 
-    def datetime_cast_date_sql(self, sql, params, tzname):
+    def datetime_cast_date_sql(
+        self, sql: str, params: list[Any] | tuple[Any, ...], tzname: str | None
+    ) -> tuple[str, tuple[Any, ...]]:
         return f"plain_datetime_cast_date({sql}, %s, %s)", (
             *params,
             *self._convert_tznames_to_sql(tzname),
         )
 
-    def datetime_cast_time_sql(self, sql, params, tzname):
+    def datetime_cast_time_sql(
+        self, sql: str, params: list[Any] | tuple[Any, ...], tzname: str | None
+    ) -> tuple[str, tuple[Any, ...]]:
         return f"plain_datetime_cast_time({sql}, %s, %s)", (
             *params,
             *self._convert_tznames_to_sql(tzname),
         )
 
-    def datetime_extract_sql(self, lookup_type, sql, params, tzname):
+    def datetime_extract_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None,
+    ) -> tuple[str, tuple[Any, ...]]:
         return f"plain_datetime_extract(%s, {sql}, %s, %s)", (
             lookup_type.lower(),
             *params,
             *self._convert_tznames_to_sql(tzname),
         )
 
-    def datetime_trunc_sql(self, lookup_type, sql, params, tzname):
+    def datetime_trunc_sql(
+        self,
+        lookup_type: str,
+        sql: str,
+        params: list[Any] | tuple[Any, ...],
+        tzname: str | None,
+    ) -> tuple[str, tuple[Any, ...]]:
         return f"plain_datetime_trunc(%s, {sql}, %s, %s)", (
             lookup_type.lower(),
             *params,
             *self._convert_tznames_to_sql(tzname),
         )
 
-    def time_extract_sql(self, lookup_type, sql, params):
+    def time_extract_sql(
+        self, lookup_type: str, sql: str, params: list[Any] | tuple[Any, ...]
+    ) -> tuple[str, tuple[Any, ...]]:
         return f"plain_time_extract(%s, {sql})", (lookup_type.lower(), *params)
 
-    def pk_default_value(self):
+    def pk_default_value(self) -> str:
         return "NULL"
 
-    def _quote_params_for_last_executed_query(self, params):
+    def _quote_params_for_last_executed_query(
+        self, params: list[Any] | tuple[Any, ...]
+    ) -> tuple[Any, ...]:
         """
         Only for last_executed_query! Don't use this to execute SQL queries!
         """
@@ -164,7 +207,12 @@ class DatabaseOperations(BaseDatabaseOperations):
         finally:
             cursor.close()
 
-    def last_executed_query(self, cursor, sql, params):
+    def last_executed_query(
+        self,
+        cursor: Any,
+        sql: str,
+        params: list[Any] | tuple[Any, ...] | dict[str, Any] | None,
+    ) -> str:
         # Python substitutes parameters in Modules/_sqlite/cursor.c with:
         # bind_parameters(state, self->statement, parameters);
         # Unfortunately there is no way to reach self->statement from Python,
@@ -173,7 +221,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             if isinstance(params, list | tuple):
                 params = self._quote_params_for_last_executed_query(params)
             else:
-                values = tuple(params.values())
+                values = tuple(params.values())  # type: ignore[union-attr]
                 values = self._quote_params_for_last_executed_query(values)
                 params = dict(zip(params, values))
             return sql % params
@@ -182,15 +230,15 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return sql
 
-    def quote_name(self, name):
+    def quote_name(self, name: str) -> str:
         if name.startswith('"') and name.endswith('"'):
             return name  # Quoting once is enough.
         return f'"{name}"'
 
-    def no_limit_value(self):
+    def no_limit_value(self) -> int:
         return -1
 
-    def __references_graph(self, table_name):
+    def __references_graph(self, table_name: str) -> list[str]:
         query = """
         WITH tables AS (
             SELECT %s name
@@ -210,12 +258,14 @@ class DatabaseOperations(BaseDatabaseOperations):
             return [row[0] for row in results.fetchall()]
 
     @cached_property
-    def _references_graph(self):
+    def _references_graph(self) -> Callable[[str], list[str]]:
         # 512 is large enough to fit the ~330 tables (as of this writing) in
         # Plain's test suite.
         return lru_cache(maxsize=512)(self.__references_graph)
 
-    def adapt_datetimefield_value(self, value):
+    def adapt_datetimefield_value(
+        self, value: datetime.datetime | Any | None
+    ) -> str | Any | None:
         if value is None:
             return None
 
@@ -229,7 +279,9 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         return str(value)
 
-    def adapt_timefield_value(self, value):
+    def adapt_timefield_value(
+        self, value: datetime.time | Any | None
+    ) -> str | Any | None:
         if value is None:
             return None
 
@@ -238,12 +290,12 @@ class DatabaseOperations(BaseDatabaseOperations):
             return value
 
         # SQLite doesn't support tz-aware datetimes
-        if timezone.is_aware(value):
+        if timezone.is_aware(value):  # type: ignore[arg-type]
             raise ValueError("SQLite backend does not support timezone-aware times.")
 
         return str(value)
 
-    def get_db_converters(self, expression):
+    def get_db_converters(self, expression: Any) -> list[Any]:
         converters = super().get_db_converters(expression)
         internal_type = expression.output_field.get_internal_type()
         if internal_type == "DateTimeField":
@@ -260,27 +312,33 @@ class DatabaseOperations(BaseDatabaseOperations):
             converters.append(self.convert_booleanfield_value)
         return converters
 
-    def convert_datetimefield_value(self, value, expression, connection):
+    def convert_datetimefield_value(
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
+    ) -> datetime.datetime | None:
         if value is not None:
             if not isinstance(value, datetime.datetime):
                 value = parse_datetime(value)
-            if not timezone.is_aware(value):
+            if value is not None and not timezone.is_aware(value):
                 value = timezone.make_aware(value, self.connection.timezone)
         return value
 
-    def convert_datefield_value(self, value, expression, connection):
+    def convert_datefield_value(
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
+    ) -> datetime.date | None:
         if value is not None:
             if not isinstance(value, datetime.date):
                 value = parse_date(value)
         return value
 
-    def convert_timefield_value(self, value, expression, connection):
+    def convert_timefield_value(
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
+    ) -> datetime.time | None:
         if value is not None:
             if not isinstance(value, datetime.time):
                 value = parse_time(value)
         return value
 
-    def get_decimalfield_converter(self, expression):
+    def get_decimalfield_converter(self, expression: Any) -> Callable[..., Any]:
         # SQLite stores only 15 significant digits. Digits coming from
         # float inaccuracy must be removed.
         create_decimal = decimal.Context(prec=15).create_decimal_from_float
@@ -289,34 +347,46 @@ class DatabaseOperations(BaseDatabaseOperations):
                 -expression.output_field.decimal_places
             )
 
-            def converter(value, expression, connection):
+            def converter(
+                value: Any, expression: Any, connection: BaseDatabaseWrapper
+            ) -> decimal.Decimal | None:
                 if value is not None:
                     return create_decimal(value).quantize(
                         quantize_value, context=expression.output_field.context
                     )
+                return None
 
         else:
 
-            def converter(value, expression, connection):
+            def converter(
+                value: Any, expression: Any, connection: BaseDatabaseWrapper
+            ) -> decimal.Decimal | None:
                 if value is not None:
                     return create_decimal(value)
+                return None
 
         return converter
 
-    def convert_uuidfield_value(self, value, expression, connection):
+    def convert_uuidfield_value(
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
+    ) -> uuid.UUID | None:
         if value is not None:
             value = uuid.UUID(value)
         return value
 
-    def convert_booleanfield_value(self, value, expression, connection):
+    def convert_booleanfield_value(
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
+    ) -> bool | Any:
         return bool(value) if value in (1, 0) else value
 
-    def bulk_insert_sql(self, fields, placeholder_rows):
+    def bulk_insert_sql(
+        self, fields: list[Any], placeholder_rows: list[list[str]]
+    ) -> str:
         placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
         values_sql = ", ".join(f"({sql})" for sql in placeholder_rows_sql)
         return f"VALUES {values_sql}"
 
-    def combine_expression(self, connector, sub_expressions):
+    def combine_expression(self, connector: str, sub_expressions: list[str]) -> str:
         # SQLite doesn't have a ^ operator, so use the user-defined POWER
         # function that's registered in connect().
         if connector == "^":
@@ -325,7 +395,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             return "BITXOR({})".format(",".join(sub_expressions))
         return super().combine_expression(connector, sub_expressions)
 
-    def combine_duration_expression(self, connector, sub_expressions):
+    def combine_duration_expression(
+        self, connector: str, sub_expressions: list[str]
+    ) -> str:
         if connector not in ["+", "-", "*", "/"]:
             raise DatabaseError(f"Invalid connector for timedelta: {connector}.")
         fn_params = [f"'{connector}'"] + sub_expressions
@@ -333,7 +405,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             raise ValueError("Too many params for timedelta operations.")
         return "plain_format_dtdelta({})".format(", ".join(fn_params))
 
-    def integer_field_range(self, internal_type):
+    def integer_field_range(self, internal_type: str) -> tuple[int, int]:
         # SQLite doesn't enforce any integer constraints, but sqlite3 supports
         # integers up to 64 bits.
         if internal_type in [
@@ -344,7 +416,12 @@ class DatabaseOperations(BaseDatabaseOperations):
             return (0, 9223372036854775807)
         return (-9223372036854775808, 9223372036854775807)
 
-    def subtract_temporals(self, internal_type, lhs, rhs):
+    def subtract_temporals(
+        self,
+        internal_type: str,
+        lhs: tuple[str, list[Any] | tuple[Any, ...]],
+        rhs: tuple[str, list[Any] | tuple[Any, ...]],
+    ) -> tuple[str, tuple[Any, ...]]:
         lhs_sql, lhs_params = lhs
         rhs_sql, rhs_params = rhs
         params = (*lhs_params, *rhs_params)
@@ -352,12 +429,12 @@ class DatabaseOperations(BaseDatabaseOperations):
             return f"plain_time_diff({lhs_sql}, {rhs_sql})", params
         return f"plain_timestamp_diff({lhs_sql}, {rhs_sql})", params
 
-    def insert_statement(self, on_conflict=None):
+    def insert_statement(self, on_conflict: Any = None) -> str:
         if on_conflict == OnConflict.IGNORE:
             return "INSERT OR IGNORE INTO"
         return super().insert_statement(on_conflict=on_conflict)
 
-    def return_insert_columns(self, fields):
+    def return_insert_columns(self, fields: list[Any]) -> tuple[str, tuple[Any, ...]]:
         # SQLite < 3.35 doesn't support an INSERT...RETURNING statement.
         if not fields:
             return "", ()
@@ -367,7 +444,13 @@ class DatabaseOperations(BaseDatabaseOperations):
         ]
         return "RETURNING {}".format(", ".join(columns)), ()
 
-    def on_conflict_suffix_sql(self, fields, on_conflict, update_fields, unique_fields):
+    def on_conflict_suffix_sql(
+        self,
+        fields: list[Any],
+        on_conflict: Any,
+        update_fields: list[Any],
+        unique_fields: list[Any],
+    ) -> str:
         if (
             on_conflict == OnConflict.UPDATE
             and self.connection.features.supports_update_conflicts_with_target

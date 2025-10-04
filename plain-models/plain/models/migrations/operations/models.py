@@ -1,14 +1,23 @@
+from __future__ import annotations
+
 from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
 from plain import models
+from plain.models.base import ModelBase
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.state import ModelState
 from plain.models.migrations.utils import field_references, resolve_relation
 
 from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
 
+if TYPE_CHECKING:
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.fields import Field
+    from plain.models.migrations.state import ProjectState
 
-def _check_for_duplicates(arg_name, objs):
+
+def _check_for_duplicates(arg_name: str, objs: Any) -> None:
     used_vals = set()
     for val in objs:
         if val in used_vals:
@@ -19,22 +28,24 @@ def _check_for_duplicates(arg_name, objs):
 
 
 class ModelOperation(Operation):
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
 
     @cached_property
-    def name_lower(self):
+    def name_lower(self) -> str:
         return self.name.lower()
 
-    def references_model(self, name, package_label):
+    def references_model(self, name: str, package_label: str) -> bool:
         return name.lower() == self.name_lower
 
-    def reduce(self, operation, package_label):
-        return super().reduce(operation, package_label) or self.can_reduce_through(
+    def reduce(
+        self, operation: Operation, package_label: str
+    ) -> bool | list[Operation]:
+        return super().reduce(operation, package_label) or self.can_reduce_through(  # type: ignore[misc]
             operation, package_label
         )
 
-    def can_reduce_through(self, operation, package_label):
+    def can_reduce_through(self, operation: Operation, package_label: str) -> bool:
         return not operation.references_model(self.name, package_label)
 
 
@@ -43,7 +54,13 @@ class CreateModel(ModelOperation):
 
     serialization_expand_args = ["fields", "options"]
 
-    def __init__(self, name, fields, options=None, bases=None):
+    def __init__(
+        self,
+        name: str,
+        fields: list[tuple[str, Field]],
+        options: dict[str, Any] | None = None,
+        bases: tuple[Any, ...] | None = None,
+    ) -> None:
         self.fields = fields
         self.options = options or {}
         self.bases = bases or (models.Model,)
@@ -53,7 +70,7 @@ class CreateModel(ModelOperation):
         _check_for_duplicates(
             "bases",
             (
-                base._meta.label_lower
+                base._meta.label_lower  # type: ignore[attr-defined]
                 if hasattr(base, "_meta")
                 else base.lower()
                 if isinstance(base, str)
@@ -62,8 +79,8 @@ class CreateModel(ModelOperation):
             ),
         )
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "name": self.name,
             "fields": self.fields,
         }
@@ -73,7 +90,7 @@ class CreateModel(ModelOperation):
             kwargs["bases"] = self.bases
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.add_model(
             ModelState(
                 package_label,
@@ -84,19 +101,25 @@ class CreateModel(ModelOperation):
             )
         )
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.models_registry.get_model(package_label, self.name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        model = to_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.create_model(model)
 
-    def describe(self):
+    def describe(self) -> str:
         return f"Create model {self.name}"
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return self.name_lower
 
-    def references_model(self, name, package_label):
+    def references_model(self, name: str, package_label: str) -> bool:
         name_lower = name.lower()
         if name_lower == self.name_lower:
             return True
@@ -106,7 +129,7 @@ class CreateModel(ModelOperation):
         for base in self.bases:
             if (
                 base is not models.Model
-                and isinstance(base, models.base.ModelBase | str)
+                and isinstance(base, ModelBase | str)
                 and resolve_relation(base, package_label) == reference_model_tuple
             ):
                 return True
@@ -119,7 +142,9 @@ class CreateModel(ModelOperation):
                 return True
         return False
 
-    def reduce(self, operation, package_label):
+    def reduce(
+        self, operation: Operation, package_label: str
+    ) -> bool | list[Operation]:
         if (
             isinstance(operation, DeleteModel)
             and self.name_lower == operation.name_lower
@@ -213,104 +238,118 @@ class CreateModel(ModelOperation):
 class DeleteModel(ModelOperation):
     """Drop a model's table."""
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "name": self.name,
         }
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.remove_model(package_label, self.name_lower)
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        model = from_state.models_registry.get_model(package_label, self.name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.delete_model(model)
 
-    def references_model(self, name, package_label):
+    def references_model(self, name: str, package_label: str) -> bool:
         # The deleted model could be referencing the specified model through
         # related fields.
         return True
 
-    def describe(self):
+    def describe(self) -> str:
         return f"Delete model {self.name}"
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return f"delete_{self.name_lower}"
 
 
 class RenameModel(ModelOperation):
     """Rename a model."""
 
-    def __init__(self, old_name, new_name):
+    def __init__(self, old_name: str, new_name: str) -> None:
         self.old_name = old_name
         self.new_name = new_name
         super().__init__(old_name)
 
     @cached_property
-    def old_name_lower(self):
+    def old_name_lower(self) -> str:
         return self.old_name.lower()
 
     @cached_property
-    def new_name_lower(self):
+    def new_name_lower(self) -> str:
         return self.new_name.lower()
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "old_name": self.old_name,
             "new_name": self.new_name,
         }
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.rename_model(package_label, self.old_name, self.new_name)
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        new_model = to_state.models_registry.get_model(package_label, self.new_name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        new_model = to_state.models_registry.get_model(package_label, self.new_name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(
+            old_model = from_state.models_registry.get_model(  # type: ignore[attr-defined]
                 package_label, self.old_name
             )
             # Move the main table
             schema_editor.alter_db_table(
                 new_model,
-                old_model._meta.db_table,
-                new_model._meta.db_table,
+                old_model._meta.db_table,  # type: ignore[attr-defined]
+                new_model._meta.db_table,  # type: ignore[attr-defined]
             )
             # Alter the fields pointing to us
-            for related_object in old_model._meta.related_objects:
-                if related_object.related_model == old_model:
+            for related_object in old_model._meta.related_objects:  # type: ignore[attr-defined]
+                if related_object.related_model == old_model:  # type: ignore[attr-defined]
                     model = new_model
                     related_key = (package_label, self.new_name_lower)
                 else:
-                    model = related_object.related_model
+                    model = related_object.related_model  # type: ignore[attr-defined]
                     related_key = (
-                        related_object.related_model._meta.package_label,
-                        related_object.related_model._meta.model_name,
+                        related_object.related_model._meta.package_label,  # type: ignore[attr-defined]
+                        related_object.related_model._meta.model_name,  # type: ignore[attr-defined]
                     )
-                to_field = to_state.models_registry.get_model(
+                to_field = to_state.models_registry.get_model(  # type: ignore[attr-defined]
                     *related_key
-                )._meta.get_field(related_object.field.name)
+                )._meta.get_field(related_object.field.name)  # type: ignore[attr-defined]
                 schema_editor.alter_field(
                     model,
-                    related_object.field,
+                    related_object.field,  # type: ignore[attr-defined]
                     to_field,
                 )
 
-    def references_model(self, name, package_label):
+    def references_model(self, name: str, package_label: str) -> bool:
         return (
             name.lower() == self.old_name_lower or name.lower() == self.new_name_lower
         )
 
-    def describe(self):
+    def describe(self) -> str:
         return f"Rename model {self.old_name} to {self.new_name}"
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return f"rename_{self.old_name_lower}_{self.new_name_lower}"
 
-    def reduce(self, operation, package_label):
+    def reduce(
+        self, operation: Operation, package_label: str
+    ) -> bool | list[Operation]:
         if (
             isinstance(operation, RenameModel)
             and self.new_name_lower == operation.old_name_lower
@@ -323,13 +362,15 @@ class RenameModel(ModelOperation):
             ]
         # Skip `ModelOperation.reduce` as we want to run `references_model`
         # against self.new_name.
-        return super(ModelOperation, self).reduce(
+        return super(ModelOperation, self).reduce(  # type: ignore[misc]
             operation, package_label
         ) or not operation.references_model(self.new_name, package_label)
 
 
 class ModelOptionOperation(ModelOperation):
-    def reduce(self, operation, package_label):
+    def reduce(
+        self, operation: Operation, package_label: str
+    ) -> bool | list[Operation]:
         if (
             isinstance(operation, self.__class__ | DeleteModel)
             and self.name_lower == operation.name_lower
@@ -341,75 +382,87 @@ class ModelOptionOperation(ModelOperation):
 class AlterModelTable(ModelOptionOperation):
     """Rename a model's table."""
 
-    def __init__(self, name, table):
+    def __init__(self, name: str, table: str | None) -> None:
         self.table = table
         super().__init__(name)
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "name": self.name,
             "table": self.table,
         }
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.alter_model_options(
             package_label, self.name_lower, {"db_table": self.table}
         )
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        new_model = to_state.models_registry.get_model(package_label, self.name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        new_model = to_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(package_label, self.name)
+            old_model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
             schema_editor.alter_db_table(
                 new_model,
-                old_model._meta.db_table,
-                new_model._meta.db_table,
+                old_model._meta.db_table,  # type: ignore[attr-defined]
+                new_model._meta.db_table,  # type: ignore[attr-defined]
             )
 
-    def describe(self):
+    def describe(self) -> str:
         return "Rename table for {} to {}".format(
             self.name,
             self.table if self.table is not None else "(default)",
         )
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return f"alter_{self.name_lower}_table"
 
 
 class AlterModelTableComment(ModelOptionOperation):
-    def __init__(self, name, table_comment):
+    def __init__(self, name: str, table_comment: str | None) -> None:
         self.table_comment = table_comment
         super().__init__(name)
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "name": self.name,
             "table_comment": self.table_comment,
         }
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.alter_model_options(
             package_label, self.name_lower, {"db_table_comment": self.table_comment}
         )
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        new_model = to_state.models_registry.get_model(package_label, self.name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        new_model = to_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(package_label, self.name)
+            old_model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
             schema_editor.alter_db_table_comment(
                 new_model,
-                old_model._meta.db_table_comment,
-                new_model._meta.db_table_comment,
+                old_model._meta.db_table_comment,  # type: ignore[attr-defined]
+                new_model._meta.db_table_comment,  # type: ignore[attr-defined]
             )
 
-    def describe(self):
+    def describe(self) -> str:
         return f"Alter {self.name} table comment"
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return f"alter_{self.name_lower}_table_comment"
 
 
@@ -425,18 +478,18 @@ class AlterModelOptions(ModelOptionOperation):
         "ordering",
     ]
 
-    def __init__(self, name, options):
+    def __init__(self, name: str, options: dict[str, Any]) -> None:
         self.options = options
         super().__init__(name)
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "name": self.name,
             "options": self.options,
         }
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.alter_model_options(
             package_label,
             self.name_lower,
@@ -444,14 +497,20 @@ class AlterModelOptions(ModelOptionOperation):
             self.ALTER_OPTION_KEYS,
         )
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
         pass
 
-    def describe(self):
+    def describe(self) -> str:
         return f"Change Meta options on {self.name}"
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return f"alter_{self.name_lower}_options"
 
 
@@ -459,32 +518,38 @@ class IndexOperation(Operation):
     option_name = "indexes"
 
     @cached_property
-    def model_name_lower(self):
-        return self.model_name.lower()
+    def model_name_lower(self) -> str:
+        return self.model_name.lower()  # type: ignore[attr-defined]
 
 
 class AddIndex(IndexOperation):
     """Add an index on a model."""
 
-    def __init__(self, model_name, index):
+    def __init__(self, model_name: str, index: Any) -> None:
         self.model_name = model_name
-        if not index.name:
+        if not index.name:  # type: ignore[attr-defined]
             raise ValueError(
                 "Indexes passed to AddIndex operations require a name "
                 f"argument. {index!r} doesn't have one."
             )
         self.index = index
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.add_index(package_label, self.model_name_lower, self.index)
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.models_registry.get_model(package_label, self.model_name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_index(model, self.index)
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "index": self.index,
         }
@@ -494,43 +559,49 @@ class AddIndex(IndexOperation):
             kwargs,
         )
 
-    def describe(self):
-        if self.index.expressions:
+    def describe(self) -> str:
+        if self.index.expressions:  # type: ignore[attr-defined]
             return "Create index {} on {} on model {}".format(
-                self.index.name,
-                ", ".join([str(expression) for expression in self.index.expressions]),
+                self.index.name,  # type: ignore[attr-defined]
+                ", ".join([str(expression) for expression in self.index.expressions]),  # type: ignore[attr-defined]
                 self.model_name,
             )
         return "Create index {} on field(s) {} of model {}".format(
-            self.index.name,
-            ", ".join(self.index.fields),
+            self.index.name,  # type: ignore[attr-defined]
+            ", ".join(self.index.fields),  # type: ignore[attr-defined]
             self.model_name,
         )
 
     @property
-    def migration_name_fragment(self):
-        return f"{self.model_name_lower}_{self.index.name.lower()}"
+    def migration_name_fragment(self) -> str:
+        return f"{self.model_name_lower}_{self.index.name.lower()}"  # type: ignore[attr-defined]
 
 
 class RemoveIndex(IndexOperation):
     """Remove an index from a model."""
 
-    def __init__(self, model_name, name):
+    def __init__(self, model_name: str, name: str) -> None:
         self.model_name = model_name
         self.name = name
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.remove_index(package_label, self.model_name_lower, self.name)
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        model = from_state.models_registry.get_model(package_label, self.model_name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        model = from_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, model):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             index = from_model_state.get_index_by_name(self.name)
             schema_editor.remove_index(model, index)
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "name": self.name,
         }
@@ -540,18 +611,24 @@ class RemoveIndex(IndexOperation):
             kwargs,
         )
 
-    def describe(self):
+    def describe(self) -> str:
         return f"Remove index {self.name} from {self.model_name}"
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return f"remove_{self.model_name_lower}_{self.name.lower()}"
 
 
 class RenameIndex(IndexOperation):
     """Rename an index."""
 
-    def __init__(self, model_name, new_name, old_name=None, old_fields=None):
+    def __init__(
+        self,
+        model_name: str,
+        new_name: str,
+        old_name: str | None = None,
+        old_fields: list[str] | tuple[str, ...] | None = None,
+    ) -> None:
         if not old_name and not old_fields:
             raise ValueError(
                 "RenameIndex requires one of old_name and old_fields arguments to be "
@@ -567,15 +644,15 @@ class RenameIndex(IndexOperation):
         self.old_fields = old_fields
 
     @cached_property
-    def old_name_lower(self):
-        return self.old_name.lower()
+    def old_name_lower(self) -> str:
+        return self.old_name.lower()  # type: ignore[union-attr]
 
     @cached_property
-    def new_name_lower(self):
+    def new_name_lower(self) -> str:
         return self.new_name.lower()
 
-    def deconstruct(self):
-        kwargs = {
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+        kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "new_name": self.new_name,
         }
@@ -585,7 +662,7 @@ class RenameIndex(IndexOperation):
             kwargs["old_fields"] = self.old_fields
         return (self.__class__.__qualname__, [], kwargs)
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         if self.old_fields:
             state.add_index(
                 package_label,
@@ -594,20 +671,30 @@ class RenameIndex(IndexOperation):
             )
         else:
             state.rename_index(
-                package_label, self.model_name_lower, self.old_name, self.new_name
+                package_label,
+                self.model_name_lower,
+                self.old_name,
+                self.new_name,  # type: ignore[arg-type]
             )
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.models_registry.get_model(package_label, self.model_name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
         if not self.allow_migrate_model(schema_editor.connection, model):
-            return
+            return None
 
         if self.old_fields:
-            from_model = from_state.models_registry.get_model(
+            from_model = from_state.models_registry.get_model(  # type: ignore[attr-defined]
                 package_label, self.model_name
             )
             columns = [
-                from_model._meta.get_field(field).column for field in self.old_fields
+                from_model._meta.get_field(field).column  # type: ignore[attr-defined]
+                for field in self.old_fields
             ]
             matching_index_name = schema_editor._constraint_names(
                 from_model, column_names=columns, index=True
@@ -616,7 +703,7 @@ class RenameIndex(IndexOperation):
                 raise ValueError(
                     "Found wrong number ({}) of indexes for {}({}).".format(
                         len(matching_index_name),
-                        from_model._meta.db_table,
+                        from_model._meta.db_table,  # type: ignore[attr-defined]
                         ", ".join(columns),
                     )
                 )
@@ -626,16 +713,17 @@ class RenameIndex(IndexOperation):
             )
         else:
             from_model_state = from_state.models[package_label, self.model_name_lower]
-            old_index = from_model_state.get_index_by_name(self.old_name)
+            old_index = from_model_state.get_index_by_name(self.old_name)  # type: ignore[arg-type]
         # Don't alter when the index name is not changed.
-        if old_index.name == self.new_name:
-            return
+        if old_index.name == self.new_name:  # type: ignore[attr-defined]
+            return None
 
         to_model_state = to_state.models[package_label, self.model_name_lower]
         new_index = to_model_state.get_index_by_name(self.new_name)
         schema_editor.rename_index(model, old_index, new_index)
+        return None
 
-    def describe(self):
+    def describe(self) -> str:
         if self.old_name:
             return (
                 f"Rename index {self.old_name} on {self.model_name} to {self.new_name}"
@@ -646,16 +734,18 @@ class RenameIndex(IndexOperation):
         )
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         if self.old_name:
             return f"rename_{self.old_name_lower}_{self.new_name_lower}"
         return "rename_{}_{}_{}".format(
             self.model_name_lower,
-            "_".join(self.old_fields),
+            "_".join(self.old_fields),  # type: ignore[arg-type]
             self.new_name_lower,
         )
 
-    def reduce(self, operation, package_label):
+    def reduce(
+        self, operation: Operation, package_label: str
+    ) -> bool | list[Operation]:
         if (
             isinstance(operation, RenameIndex)
             and self.model_name_lower == operation.model_name_lower
@@ -676,19 +766,25 @@ class RenameIndex(IndexOperation):
 class AddConstraint(IndexOperation):
     option_name = "constraints"
 
-    def __init__(self, model_name, constraint):
+    def __init__(self, model_name: str, constraint: Any) -> None:
         self.model_name = model_name
         self.constraint = constraint
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.add_constraint(package_label, self.model_name_lower, self.constraint)
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.models_registry.get_model(package_label, self.model_name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_constraint(model, self.constraint)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
         return (
             self.__class__.__name__,
             [],
@@ -698,32 +794,38 @@ class AddConstraint(IndexOperation):
             },
         )
 
-    def describe(self):
-        return f"Create constraint {self.constraint.name} on model {self.model_name}"
+    def describe(self) -> str:
+        return f"Create constraint {self.constraint.name} on model {self.model_name}"  # type: ignore[attr-defined]
 
     @property
-    def migration_name_fragment(self):
-        return f"{self.model_name_lower}_{self.constraint.name.lower()}"
+    def migration_name_fragment(self) -> str:
+        return f"{self.model_name_lower}_{self.constraint.name.lower()}"  # type: ignore[attr-defined]
 
 
 class RemoveConstraint(IndexOperation):
     option_name = "constraints"
 
-    def __init__(self, model_name, name):
+    def __init__(self, model_name: str, name: str) -> None:
         self.model_name = model_name
         self.name = name
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.remove_constraint(package_label, self.model_name_lower, self.name)
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
-        model = to_state.models_registry.get_model(package_label, self.model_name)
+    def database_forwards(
+        self,
+        package_label: str,
+        schema_editor: BaseDatabaseSchemaEditor,
+        from_state: ProjectState,
+        to_state: ProjectState,
+    ) -> None:
+        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
         if self.allow_migrate_model(schema_editor.connection, model):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             constraint = from_model_state.get_constraint_by_name(self.name)
             schema_editor.remove_constraint(model, constraint)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
         return (
             self.__class__.__name__,
             [],
@@ -733,9 +835,9 @@ class RemoveConstraint(IndexOperation):
             },
         )
 
-    def describe(self):
+    def describe(self) -> str:
         return f"Remove constraint {self.name} from model {self.model_name}"
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str:
         return f"remove_{self.model_name_lower}_{self.name.lower()}"

@@ -1,7 +1,7 @@
 """Test that exception classes work correctly with the new type annotations."""
 
 import pytest
-from app.examples.models import Car, DeleteParent
+from app.examples.models import Car, DeleteParent  # type: ignore[import-untyped]
 
 from plain.models.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 

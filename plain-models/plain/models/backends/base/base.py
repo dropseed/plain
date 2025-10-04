@@ -47,7 +47,13 @@ class BaseDatabaseWrapper:
     data_types_suffix: dict[str, str] = {}
     # Mapping of Field objects to their SQL for CHECK constraints.
     data_type_check_constraints: dict[str, str] = {}
-    ops: BaseDatabaseOperations | None = None
+    # Instance attributes - always assigned in __init__
+    ops: BaseDatabaseOperations
+    client: BaseDatabaseClient
+    creation: BaseDatabaseCreation
+    features: BaseDatabaseFeatures
+    introspection: BaseDatabaseIntrospection
+    validation: BaseDatabaseValidation
     vendor: str = "unknown"
     display_name: str = "unknown"
     SchemaEditorClass: type[BaseDatabaseSchemaEditor] | None = None

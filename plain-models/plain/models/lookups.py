@@ -552,8 +552,8 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
                 in_clause_elements.append(" OR ")
             in_clause_elements.append(f"{lhs} IN (")
             params.extend(lhs_params)
-            sqls = rhs[offset : offset + max_in_list_size]
-            sqls_params = rhs_params[offset : offset + max_in_list_size]  # type: ignore[index]
+            sqls = rhs[offset : offset + max_in_list_size]  # type: ignore[operator]
+            sqls_params = rhs_params[offset : offset + max_in_list_size]  # type: ignore[index,operator]
             param_group = ", ".join(sqls)
             in_clause_elements.append(param_group)
             in_clause_elements.append(")")
@@ -680,7 +680,7 @@ class IRegex(Regex):
 class YearLookup(Lookup):
     def year_lookup_bounds(
         self, connection: BaseDatabaseWrapper, year: int
-    ) -> tuple[Any, Any]:
+    ) -> list[str | Any | None]:
         from plain.models.functions import ExtractIsoYear
 
         iso_year = isinstance(self.lhs, ExtractIsoYear)

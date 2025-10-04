@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import os
 import sys
+from typing import Any
 
 from plain.runtime import settings
 
@@ -14,16 +17,16 @@ class BaseDatabaseCreation:
     destruction of the test database.
     """
 
-    def __init__(self, connection):
+    def __init__(self, connection: Any):
         self.connection = connection
 
-    def _nodb_cursor(self):
+    def _nodb_cursor(self) -> Any:
         return self.connection._nodb_cursor()
 
-    def log(self, msg):
+    def log(self, msg: str) -> None:
         sys.stderr.write(msg + os.linesep)
 
-    def create_test_db(self, verbosity=1, prefix=""):
+    def create_test_db(self, verbosity: int = 1, prefix: str = "") -> str:
         """
         Create a test database, prompting the user for confirmation if the
         database already exists. Return the name of the test database created.
@@ -67,7 +70,7 @@ class BaseDatabaseCreation:
 
         return test_database_name
 
-    def set_as_test_mirror(self, primary_settings_dict):
+    def set_as_test_mirror(self, primary_settings_dict: dict[str, Any]) -> None:
         """
         Set this database up to be used in testing as a mirror of a primary
         database whose settings are given.
@@ -126,7 +129,7 @@ class BaseDatabaseCreation:
     #         # because constraint checks were disabled.
     #         self.connection.check_constraints(table_names=table_names)
 
-    def _get_test_db_name(self, prefix=""):
+    def _get_test_db_name(self, prefix: str = "") -> str:
         """
         Internal implementation - return the name of the test DB that will be
         created. Only useful when called from create_test_db() and
@@ -146,10 +149,12 @@ class BaseDatabaseCreation:
             return self.connection.settings_dict["TEST"]["NAME"]
         return TEST_DATABASE_PREFIX + self.connection.settings_dict["NAME"]
 
-    def _execute_create_test_db(self, cursor, parameters):
+    def _execute_create_test_db(self, cursor: Any, parameters: dict[str, str]) -> None:
         cursor.execute("CREATE DATABASE {dbname} {suffix}".format(**parameters))
 
-    def _create_test_db(self, *, test_database_name, verbosity, autoclobber):
+    def _create_test_db(
+        self, *, test_database_name: str, verbosity: int, autoclobber: bool
+    ) -> str:
         """
         Internal implementation - create the test db tables.
         """
@@ -187,7 +192,9 @@ class BaseDatabaseCreation:
 
         return test_database_name
 
-    def destroy_test_db(self, old_database_name=None, verbosity=1):
+    def destroy_test_db(
+        self, old_database_name: str | None = None, verbosity: int = 1
+    ) -> None:
         """
         Destroy a test database, prompting the user for confirmation if the
         database already exists.
@@ -205,7 +212,7 @@ class BaseDatabaseCreation:
             settings.DATABASE["NAME"] = old_database_name
             self.connection.settings_dict["NAME"] = old_database_name
 
-    def _destroy_test_db(self, test_database_name, verbosity):
+    def _destroy_test_db(self, test_database_name: str, verbosity: int) -> None:
         """
         Internal implementation - remove the test db tables.
         """
@@ -218,13 +225,13 @@ class BaseDatabaseCreation:
                 f"DROP DATABASE {self.connection.ops.quote_name(test_database_name)}"
             )
 
-    def sql_table_creation_suffix(self):
+    def sql_table_creation_suffix(self) -> str:
         """
         SQL to append to the end of the test table creation statements.
         """
         return ""
 
-    def test_db_signature(self, prefix=""):
+    def test_db_signature(self, prefix: str = "") -> tuple[str, str, str, str]:
         """
         Return a tuple with elements of self.connection.settings_dict (a
         DATABASE setting value) that uniquely identify a database

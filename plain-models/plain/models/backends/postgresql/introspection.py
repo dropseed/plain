@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from collections import namedtuple
+from typing import Any
 
 from plain.models.backends.base.introspection import BaseDatabaseIntrospection
 from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
@@ -36,9 +39,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
     # A hook for subclasses.
     index_default_access_method = "btree"
 
-    ignored_tables = []
+    ignored_tables: list[str] = []
 
-    def get_field_type(self, data_type, description):
+    def get_field_type(self, data_type: Any, description: Any) -> str:
         field_type = super().get_field_type(data_type, description)
         if description.is_autofield or (
             # Required for pre-Plain 4.1 serial columns.
@@ -48,7 +51,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 return "PrimaryKeyField"
         return field_type
 
-    def get_table_list(self, cursor):
+    def get_table_list(self, cursor: Any) -> list[TableInfo]:
         """Return a list of table and view names in the current database."""
         cursor.execute(
             """
@@ -73,7 +76,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             if row[0] not in self.ignored_tables
         ]
 
-    def get_table_description(self, cursor, table_name):
+    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.
@@ -120,7 +123,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for line in cursor.description
         ]
 
-    def get_sequences(self, cursor, table_name, table_fields=()):
+    def get_sequences(
+        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+    ) -> list[dict[str, Any]]:
         cursor.execute(
             """
             SELECT
@@ -146,7 +151,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for row in cursor.fetchall()
         ]
 
-    def get_relations(self, cursor, table_name):
+    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all foreign keys in the given table.
@@ -171,13 +176,15 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         return {row[0]: (row[2], row[1]) for row in cursor.fetchall()}
 
-    def get_constraints(self, cursor, table_name):
+    def get_constraints(
+        self, cursor: Any, table_name: str
+    ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across
         one or more columns. Also retrieve the definition of expression-based
         indexes.
         """
-        constraints = {}
+        constraints: dict[str, dict[str, Any]] = {}
         # Loop over the key table, collecting things as constraints. The column
         # array must return column names in the same order in which they were
         # created.

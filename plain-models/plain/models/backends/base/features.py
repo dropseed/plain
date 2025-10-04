@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from functools import cached_property
+from typing import Any
 
 
 class BaseDatabaseFeatures:
@@ -185,16 +188,16 @@ class BaseDatabaseFeatures:
     # Does the backend support unlimited character columns?
     supports_unlimited_charfield = False
 
-    def __init__(self, connection):
+    def __init__(self, connection: Any):
         self.connection = connection
 
     @cached_property
-    def supports_explaining_query_execution(self):
+    def supports_explaining_query_execution(self) -> bool:
         """Does this backend support explaining query execution?"""
         return self.connection.ops.explain_prefix is not None
 
     @cached_property
-    def supports_transactions(self):
+    def supports_transactions(self) -> bool:
         """Confirm support for transactions."""
         with self.connection.cursor() as cursor:
             cursor.execute("CREATE TABLE ROLLBACK_TEST (X INT)")
@@ -207,7 +210,7 @@ class BaseDatabaseFeatures:
             cursor.execute("DROP TABLE ROLLBACK_TEST")
         return count == 0
 
-    def allows_group_by_selected_pks_on_model(self, model):
+    def allows_group_by_selected_pks_on_model(self, model: Any) -> bool:
         if not self.allows_group_by_selected_pks:
             return False
         return True

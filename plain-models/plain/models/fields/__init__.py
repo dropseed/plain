@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import collections.abc
 import copy
 import datetime
@@ -7,7 +9,9 @@ import operator
 import uuid
 import warnings
 from base64 import b64decode, b64encode
+from collections.abc import Callable
 from functools import cached_property, total_ordering
+from typing import TYPE_CHECKING, Any
 
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
@@ -29,6 +33,9 @@ from plain.utils.ipv6 import clean_ipv6_address
 from plain.utils.itercompat import is_iterable
 
 from ..registry import models_registry
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 __all__ = [
     "BLANK_CHOICE_DASH",
@@ -72,7 +79,7 @@ class NOT_PROVIDED:
 BLANK_CHOICE_DASH = [("", "---------")]
 
 
-def _load_field(package_label, model_name, field_name):
+def _load_field(package_label: str, model_name: str, field_name: str) -> Field:
     return models_registry.get_model(package_label, model_name)._meta.get_field(
         field_name
     )
@@ -92,13 +99,13 @@ def _load_field(package_label, model_name, field_name):
 # attname.
 
 
-def _empty(of_cls):
+def _empty(of_cls: type) -> Empty:
     new = Empty()
     new.__class__ = of_cls
     return new
 
 
-def return_None():
+def return_None() -> None:
     return None
 
 
@@ -150,7 +157,7 @@ class Field(RegisterLookupMixin):
     descriptor_class = DeferredAttribute
 
     # Generic field type description, usually overridden by subclasses
-    def _description(self):
+    def _description(self) -> str:
         return f"Field of type: {self.__class__.__name__}"
 
     description = property(_description)
@@ -158,16 +165,16 @@ class Field(RegisterLookupMixin):
     def __init__(
         self,
         *,
-        max_length=None,
-        required=True,
-        allow_null=False,
-        rel=None,
-        default=NOT_PROVIDED,
-        choices=None,
-        db_column=None,
-        validators=(),
-        error_messages=None,
-        db_comment=None,
+        max_length: int | None = None,
+        required: bool = True,
+        allow_null: bool = False,
+        rel: Any = None,
+        default: Any = NOT_PROVIDED,
+        choices: Any = None,
+        db_column: str | None = None,
+        validators: tuple[Callable[..., Any], ...] = (),
+        error_messages: dict[str, str] | None = None,
+        db_comment: str | None = None,
     ):
         self.name = None  # Set by set_attributes_from_name
         self.max_length = max_length
@@ -196,7 +203,7 @@ class Field(RegisterLookupMixin):
 
         self._error_messages = error_messages  # Store for deconstruction later
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Return "package_label.model_label.field_name" for fields attached to
         models.
@@ -206,7 +213,7 @@ class Field(RegisterLookupMixin):
         model = self.model
         return f"{model._meta.label}.{self.name}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Display the module, class, and name of the field."""
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         name = getattr(self, "name", None)
@@ -214,7 +221,7 @@ class Field(RegisterLookupMixin):
             return f"<{path}: {name}>"
         return f"<{path}>"
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *self._check_field_name(),
             *self._check_choices(),
@@ -224,7 +231,7 @@ class Field(RegisterLookupMixin):
             *self._check_validators(),
         ]
 
-    def _check_field_name(self):
+    def _check_field_name(self) -> list[PreflightResult]:
         """
         Check if field name is valid, i.e. 1) does not end with an
         underscore, 2) does not contain "__" and 3) is not "id".
@@ -257,10 +264,10 @@ class Field(RegisterLookupMixin):
             return []
 
     @classmethod
-    def _choices_is_value(cls, value):
+    def _choices_is_value(cls, value: Any) -> bool:
         return isinstance(value, str | Promise) or not is_iterable(value)
 
-    def _check_choices(self):
+    def _check_choices(self) -> list[PreflightResult]:
         if not self.choices:
             return []
 
@@ -332,7 +339,7 @@ class Field(RegisterLookupMixin):
             )
         ]
 
-    def _check_db_comment(self):
+    def _check_db_comment(self) -> list[PreflightResult]:
         if not self.db_comment:
             return []
         errors = []
@@ -351,7 +358,7 @@ class Field(RegisterLookupMixin):
             )
         return errors
 
-    def _check_null_allowed_for_primary_keys(self):
+    def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
         if self.primary_key and self.allow_null:
             # We cannot reliably check this for backends like Oracle which
             # consider NULL and '' to be equal (and thus set up
@@ -368,12 +375,12 @@ class Field(RegisterLookupMixin):
         else:
             return []
 
-    def _check_backend_specific_checks(self):
+    def _check_backend_specific_checks(self) -> list[PreflightResult]:
         errors = []
         errors.extend(db_connection.validation.check_field(self))
         return errors
 
-    def _check_validators(self):
+    def _check_validators(self) -> list[PreflightResult]:
         errors = []
         for i, validator in enumerate(self.validators):
             if not callable(validator):
@@ -390,7 +397,7 @@ class Field(RegisterLookupMixin):
                 )
         return errors
 
-    def get_col(self, alias, output_field=None):
+    def get_col(self, alias: str, output_field: Field | None = None) -> Any:
         if alias == self.model._meta.db_table and (
             output_field is None or output_field == self
         ):
@@ -400,12 +407,12 @@ class Field(RegisterLookupMixin):
         return Col(alias, self, output_field)
 
     @cached_property
-    def cached_col(self):
+    def cached_col(self) -> Any:
         from plain.models.expressions import Col
 
         return Col(self.model._meta.db_table, self)
 
-    def select_format(self, compiler, sql, params):
+    def select_format(self, compiler: Any, sql: str, params: Any) -> tuple[str, Any]:
         """
         Custom format for select clauses. For example, GIS columns need to be
         selected as AsText(table.col) on MySQL as the table.col data can't be
@@ -413,7 +420,7 @@ class Field(RegisterLookupMixin):
         """
         return sql, params
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         """
         Return enough information to recreate the field as a 4-tuple:
 
@@ -488,7 +495,7 @@ class Field(RegisterLookupMixin):
         # Return basic info - other fields should override this.
         return (self.name, path, [], keywords)
 
-    def clone(self):
+    def clone(self) -> Field:
         """
         Uses deconstruct() to clone a new copy of this Field.
         Will not preserve any class attachments/attribute names.
@@ -496,7 +503,7 @@ class Field(RegisterLookupMixin):
         name, path, args, kwargs = self.deconstruct()
         return self.__class__(*args, **kwargs)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         # Needed for @total_ordering
         if isinstance(other, Field):
             return self.creation_counter == other.creation_counter and getattr(
@@ -504,7 +511,7 @@ class Field(RegisterLookupMixin):
             ) == getattr(other, "model", None)
         return NotImplemented
 
-    def __lt__(self, other):
+    def __lt__(self, other: object) -> bool:
         # This is needed because bisect does not take a comparison function.
         # Order by creation_counter first for backward compatibility.
         if isinstance(other, Field):
@@ -524,10 +531,10 @@ class Field(RegisterLookupMixin):
                 )
         return NotImplemented
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.creation_counter)
 
-    def __deepcopy__(self, memodict):
+    def __deepcopy__(self, memodict: dict[int, Any]) -> Field:
         # We don't have to deepcopy very much here, since most things are not
         # intended to be altered after initial creation.
         obj = copy.copy(self)
@@ -538,15 +545,20 @@ class Field(RegisterLookupMixin):
         memodict[id(self)] = obj
         return obj
 
-    def __copy__(self):
+    def __copy__(self) -> Field:
         # We need to avoid hitting __reduce__, so define this
         # slightly weird copy construct.
         obj = Empty()
         obj.__class__ = self.__class__
         obj.__dict__ = self.__dict__.copy()
-        return obj
+        return obj  # type: ignore[return-value]
 
-    def __reduce__(self):
+    def __reduce__(
+        self,
+    ) -> (
+        tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]
+        | tuple[Callable[..., Field], tuple[str, str, str]]
+    ):
         """
         Pickling should return the model._meta.fields instance of the field,
         not a new copy of that field. So, use the app registry to load the
@@ -569,7 +581,7 @@ class Field(RegisterLookupMixin):
             self.name,
         )
 
-    def get_id_value_on_save(self, instance):
+    def get_id_value_on_save(self, instance: Any) -> Any:
         """
         Hook to generate new primary key values on save. This method is called when
         saving instances with no primary key value set. If this method returns
@@ -580,7 +592,7 @@ class Field(RegisterLookupMixin):
             return self.get_default()
         return None
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         """
         Convert the input value into the expected Python data type, raising
         plain.exceptions.ValidationError if the data can't be converted.
@@ -589,7 +601,7 @@ class Field(RegisterLookupMixin):
         return value
 
     @cached_property
-    def error_messages(self):
+    def error_messages(self) -> dict[str, str]:
         messages = {}
         for c in reversed(self.__class__.__mro__):
             messages.update(getattr(c, "default_error_messages", {}))
@@ -597,14 +609,14 @@ class Field(RegisterLookupMixin):
         return messages
 
     @cached_property
-    def validators(self):
+    def validators(self) -> list[Callable[..., Any]]:
         """
         Some validators can't be created at field initialization time.
         This method provides a way to delay their creation until required.
         """
         return [*self.default_validators, *self._validators]
 
-    def run_validators(self, value):
+    def run_validators(self, value: Any) -> None:
         if value in self.empty_values:
             return
 
@@ -620,7 +632,7 @@ class Field(RegisterLookupMixin):
         if errors:
             raise exceptions.ValidationError(errors)
 
-    def validate(self, value, model_instance):
+    def validate(self, value: Any, model_instance: Any) -> None:
         """
         Validate value and raise ValidationError if necessary. Subclasses
         should override this to provide validation logic.
@@ -652,7 +664,7 @@ class Field(RegisterLookupMixin):
                 self.error_messages["required"], code="required"
             )
 
-    def clean(self, value, model_instance):
+    def clean(self, value: Any, model_instance: Any) -> Any:
         """
         Convert the value's type and run validation. Validation errors
         from to_python() and validate() are propagated. Return the correct
@@ -663,10 +675,10 @@ class Field(RegisterLookupMixin):
         self.run_validators(value)
         return value
 
-    def db_type_parameters(self, connection):
+    def db_type_parameters(self, connection: BaseDatabaseWrapper) -> DictWrapper:
         return DictWrapper(self.__dict__, connection.ops.quote_name, "qn_")
 
-    def db_check(self, connection):
+    def db_check(self, connection: BaseDatabaseWrapper) -> str | None:
         """
         Return the database column check constraint for this field, for the
         provided connection. Works the same way as db_type() for the case that
@@ -680,7 +692,7 @@ class Field(RegisterLookupMixin):
         except KeyError:
             return None
 
-    def db_type(self, connection):
+    def db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         """
         Return the database column data type for this field, for the provided
         connection.
@@ -711,21 +723,21 @@ class Field(RegisterLookupMixin):
                 return column_type(data)
             return column_type % data
 
-    def rel_db_type(self, connection):
+    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. For example, this method is called by ForeignKey to determine its data type.
         """
         return self.db_type(connection)
 
-    def cast_db_type(self, connection):
+    def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         """Return the data type to use in the Cast() function."""
         db_type = connection.ops.cast_data_types.get(self.get_internal_type())
         if db_type:
             return db_type % self.db_type_parameters(connection)
         return self.db_type(connection)
 
-    def db_parameters(self, connection):
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
         """
         Extension of db_type(), providing a range of different return values
         (type, checks). This will look at db_type(), allowing custom model
@@ -738,28 +750,30 @@ class Field(RegisterLookupMixin):
             "check": check_string,
         }
 
-    def db_type_suffix(self, connection):
+    def db_type_suffix(self, connection: BaseDatabaseWrapper) -> str | None:
         return connection.data_types_suffix.get(self.get_internal_type())
 
-    def get_db_converters(self, connection):
+    def get_db_converters(
+        self, connection: BaseDatabaseWrapper
+    ) -> list[Callable[..., Any]]:
         if hasattr(self, "from_db_value"):
             return [self.from_db_value]
         return []
 
     @property
-    def db_returning(self):
+    def db_returning(self) -> bool:
         """
         Private API intended only to be used by Plain itself. Currently only
         the PostgreSQL backend supports returning multiple fields on a model.
         """
         return False
 
-    def set_attributes_from_name(self, name):
+    def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
         self.attname, self.column = self.get_attname_column()
         self.concrete = self.column is not None
 
-    def contribute_to_class(self, cls, name):
+    def contribute_to_class(self, cls: Any, name: str) -> None:
         """
         Register the field with the model class it belongs to.
         """
@@ -769,28 +783,30 @@ class Field(RegisterLookupMixin):
         if self.column:
             setattr(cls, self.attname, self.descriptor_class(self))
 
-    def get_attname(self):
+    def get_attname(self) -> str:
         return self.name
 
-    def get_attname_column(self):
+    def get_attname_column(self) -> tuple[str, str]:
         attname = self.get_attname()
         column = self.db_column or attname
         return attname, column
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return self.__class__.__name__
 
-    def pre_save(self, model_instance, add):
+    def pre_save(self, model_instance: Any, add: bool) -> Any:
         """Return field's value just before saving."""
         return getattr(model_instance, self.attname)
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         """Perform preliminary non-db specific value checks and conversions."""
         if isinstance(value, Promise):
             value = value._proxy____cast()
         return value
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         """
         Return field's value prepared for interacting with the database backend.
 
@@ -800,22 +816,22 @@ class Field(RegisterLookupMixin):
             value = self.get_prep_value(value)
         return value
 
-    def get_db_prep_save(self, value, connection):
+    def get_db_prep_save(self, value: Any, connection: BaseDatabaseWrapper) -> Any:
         """Return field's value prepared for saving into a database."""
         if hasattr(value, "as_sql"):
             return value
         return self.get_db_prep_value(value, connection=connection, prepared=False)
 
-    def has_default(self):
+    def has_default(self) -> bool:
         """Return a boolean of whether this field has a default value."""
         return self.default is not NOT_PROVIDED
 
-    def get_default(self):
+    def get_default(self) -> Any:
         """Return the default value for this field."""
         return self._get_default()
 
     @cached_property
-    def _get_default(self):
+    def _get_default(self) -> Callable[[], Any]:
         if self.has_default():
             if callable(self.default):
                 return self.default
@@ -827,11 +843,11 @@ class Field(RegisterLookupMixin):
 
     def get_choices(
         self,
-        include_blank=True,
-        blank_choice=BLANK_CHOICE_DASH,
-        limit_choices_to=None,
-        ordering=(),
-    ):
+        include_blank: bool = True,
+        blank_choice: list[tuple[str, str]] = BLANK_CHOICE_DASH,
+        limit_choices_to: Any = None,
+        ordering: tuple[str, ...] = (),
+    ) -> list[tuple[Any, str]]:
         """
         Return choices with a default blank choices included, for use
         as <select> choices for this field.
@@ -859,14 +875,14 @@ class Field(RegisterLookupMixin):
             (choice_func(x), str(x)) for x in qs
         ]
 
-    def value_to_string(self, obj):
+    def value_to_string(self, obj: Any) -> str:
         """
         Return a string value of this field from the passed obj.
         This is used by the serialization framework.
         """
         return str(self.value_from_object(obj))
 
-    def _get_flatchoices(self):
+    def _get_flatchoices(self) -> list[tuple[Any, Any]]:
         """Flattened version of choices tuple."""
         if self.choices is None:
             return []
@@ -880,10 +896,10 @@ class Field(RegisterLookupMixin):
 
     flatchoices = property(_get_flatchoices)
 
-    def save_form_data(self, instance, data):
+    def save_form_data(self, instance: Any, data: Any) -> None:
         setattr(instance, self.name, data)
 
-    def value_from_object(self, obj):
+    def value_from_object(self, obj: Any) -> Any:
         """Return the value of this field in the given model instance."""
         return getattr(obj, self.attname)
 
@@ -896,10 +912,10 @@ class BooleanField(Field):
     }
     description = "Boolean (Either True or False)"
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "BooleanField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if self.allow_null and value in self.empty_values:
             return None
         if value in (True, False):
@@ -915,7 +931,7 @@ class BooleanField(Field):
             params={"value": value},
         )
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         if value is None:
             return None
@@ -923,27 +939,27 @@ class BooleanField(Field):
 
 
 class CharField(Field):
-    def __init__(self, *, db_collation=None, **kwargs):
+    def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
         super().__init__(**kwargs)
         self.db_collation = db_collation
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
 
     @property
-    def description(self):
+    def description(self) -> str:
         if self.max_length is not None:
             return "String (up to %(max_length)s)"
         else:
             return "String (unlimited)"
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
             *self._check_db_collation(),
             *self._check_max_length_attribute(),
         ]
 
-    def _check_max_length_attribute(self, **kwargs):
+    def _check_max_length_attribute(self, **kwargs: Any) -> list[PreflightResult]:
         if self.max_length is None:
             if (
                 db_connection.features.supports_unlimited_charfield
@@ -973,7 +989,7 @@ class CharField(Field):
         else:
             return []
 
-    def _check_db_collation(self):
+    def _check_db_collation(self) -> list[PreflightResult]:
         errors = []
         if not (
             self.db_collation is None
@@ -991,61 +1007,61 @@ class CharField(Field):
             )
         return errors
 
-    def cast_db_type(self, connection):
+    def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         if self.max_length is None:
             return connection.ops.cast_char_field_without_max_length
         return super().cast_db_type(connection)
 
-    def db_parameters(self, connection):
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
         db_params = super().db_parameters(connection)
         db_params["collation"] = self.db_collation
         return db_params
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "CharField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if isinstance(value, str) or value is None:
             return value
         return str(value)
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.db_collation:
             kwargs["db_collation"] = self.db_collation
         return name, path, args, kwargs
 
 
-def _to_naive(value):
+def _to_naive(value: datetime.datetime) -> datetime.datetime:
     if timezone.is_aware(value):
         value = timezone.make_naive(value, datetime.UTC)
     return value
 
 
-def _get_naive_now():
+def _get_naive_now() -> datetime.datetime:
     return _to_naive(timezone.now())
 
 
 class DateTimeCheckMixin:
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
         return [
-            *super().preflight(**kwargs),
+            *super().preflight(**kwargs),  # type: ignore[misc]
             *self._check_mutually_exclusive_options(),
             *self._check_fix_default_value(),
         ]
 
-    def _check_mutually_exclusive_options(self):
+    def _check_mutually_exclusive_options(self) -> list[PreflightResult]:
         # auto_now, auto_now_add, and default are mutually exclusive
         # options. The use of more than one of these options together
         # will trigger an Error
         mutually_exclusive_options = [
-            self.auto_now_add,
-            self.auto_now,
-            self.has_default(),
+            self.auto_now_add,  # type: ignore[attr-defined]
+            self.auto_now,  # type: ignore[attr-defined]
+            self.has_default(),  # type: ignore[attr-defined]
         ]
         enabled_options = [
             option not in (None, False) for option in mutually_exclusive_options
@@ -1063,12 +1079,16 @@ class DateTimeCheckMixin:
         else:
             return []
 
-    def _check_fix_default_value(self):
+    def _check_fix_default_value(self) -> list[PreflightResult]:
         return []
 
     # Concrete subclasses use this in their implementations of
     # _check_fix_default_value().
-    def _check_if_value_fixed(self, value, now=None):
+    def _check_if_value_fixed(
+        self,
+        value: datetime.date | datetime.datetime,
+        now: datetime.datetime | None = None,
+    ) -> list[PreflightResult]:
         """
         Check if the given value appears to have been provided as a "fixed"
         time value, and include a warning in the returned list if it does. The
@@ -1110,13 +1130,15 @@ class DateField(DateTimeCheckMixin, Field):
     }
     description = "Date (without time)"
 
-    def __init__(self, *, auto_now=False, auto_now_add=False, **kwargs):
+    def __init__(
+        self, *, auto_now: bool = False, auto_now_add: bool = False, **kwargs: Any
+    ):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
             kwargs["required"] = False
         super().__init__(**kwargs)
 
-    def _check_fix_default_value(self):
+    def _check_fix_default_value(self) -> list[PreflightResult]:
         """
         Warn that using an actual date or datetime value is probably wrong;
         it's only evaluated on server startup.
@@ -1135,7 +1157,7 @@ class DateField(DateTimeCheckMixin, Field):
         # At this point, value is a date object.
         return self._check_if_value_fixed(value)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.auto_now:
             kwargs["auto_now"] = True
@@ -1145,10 +1167,10 @@ class DateField(DateTimeCheckMixin, Field):
             del kwargs["required"]
         return name, path, args, kwargs
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "DateField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return value
         if isinstance(value, datetime.datetime):
@@ -1178,7 +1200,7 @@ class DateField(DateTimeCheckMixin, Field):
             params={"value": value},
         )
 
-    def pre_save(self, model_instance, add):
+    def pre_save(self, model_instance: Any, add: bool) -> Any:
         if self.auto_now or (self.auto_now_add and add):
             value = datetime.date.today()
             setattr(model_instance, self.attname, value)
@@ -1186,17 +1208,19 @@ class DateField(DateTimeCheckMixin, Field):
         else:
             return super().pre_save(model_instance, add)
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         # Casts dates into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
         return connection.ops.adapt_datefield_value(value)
 
-    def value_to_string(self, obj):
+    def value_to_string(self, obj: Any) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
@@ -1212,7 +1236,7 @@ class DateTimeField(DateField):
 
     # __init__ is inherited from DateField
 
-    def _check_fix_default_value(self):
+    def _check_fix_default_value(self) -> list[PreflightResult]:
         """
         Warn that using an actual date or datetime value is probably wrong;
         it's only evaluated on server startup.
@@ -1226,10 +1250,10 @@ class DateTimeField(DateField):
         # No explicit date / datetime value -- no checks necessary.
         return []
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "DateTimeField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return value
         if isinstance(value, datetime.datetime):
@@ -1279,7 +1303,7 @@ class DateTimeField(DateField):
             params={"value": value},
         )
 
-    def pre_save(self, model_instance, add):
+    def pre_save(self, model_instance: Any, add: bool) -> Any:
         if self.auto_now or (self.auto_now_add and add):
             value = timezone.now()
             setattr(model_instance, self.attname, value)
@@ -1287,7 +1311,7 @@ class DateTimeField(DateField):
         else:
             return super().pre_save(model_instance, add)
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         value = self.to_python(value)
         if value is not None and timezone.is_naive(value):
@@ -1307,13 +1331,15 @@ class DateTimeField(DateField):
             value = timezone.make_aware(value, default_timezone)
         return value
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         # Casts datetimes into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
         return connection.ops.adapt_datetimefield_value(value)
 
-    def value_to_string(self, obj):
+    def value_to_string(self, obj: Any) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
@@ -1328,14 +1354,14 @@ class DecimalField(Field):
     def __init__(
         self,
         *,
-        max_digits=None,
-        decimal_places=None,
-        **kwargs,
+        max_digits: int | None = None,
+        decimal_places: int | None = None,
+        **kwargs: Any,
     ):
         self.max_digits, self.decimal_places = max_digits, decimal_places
         super().__init__(**kwargs)
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
 
         digits_errors = [
@@ -1348,7 +1374,7 @@ class DecimalField(Field):
             errors.extend(digits_errors)
         return errors
 
-    def _check_decimal_places(self):
+    def _check_decimal_places(self) -> list[PreflightResult]:
         try:
             decimal_places = int(self.decimal_places)
             if decimal_places < 0:
@@ -1372,7 +1398,7 @@ class DecimalField(Field):
         else:
             return []
 
-    def _check_max_digits(self):
+    def _check_max_digits(self) -> list[PreflightResult]:
         try:
             max_digits = int(self.max_digits)
             if max_digits <= 0:
@@ -1396,7 +1422,7 @@ class DecimalField(Field):
         else:
             return []
 
-    def _check_decimal_places_and_max_digits(self):
+    def _check_decimal_places_and_max_digits(self) -> list[PreflightResult]:
         if int(self.decimal_places) > int(self.max_digits):
             return [
                 PreflightResult(
@@ -1408,16 +1434,16 @@ class DecimalField(Field):
         return []
 
     @cached_property
-    def validators(self):
+    def validators(self) -> list[Callable[..., Any]]:
         return super().validators + [
             validators.DecimalValidator(self.max_digits, self.decimal_places)
         ]
 
     @cached_property
-    def context(self):
+    def context(self) -> decimal.Context:
         return decimal.Context(prec=self.max_digits)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.max_digits is not None:
             kwargs["max_digits"] = self.max_digits
@@ -1425,10 +1451,10 @@ class DecimalField(Field):
             kwargs["decimal_places"] = self.decimal_places
         return name, path, args, kwargs
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "DecimalField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return value
         try:
@@ -1450,7 +1476,9 @@ class DecimalField(Field):
             )
         return decimal_value
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
         if hasattr(value, "as_sql"):
@@ -1459,7 +1487,7 @@ class DecimalField(Field):
             value, self.max_digits, self.decimal_places
         )
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
 
@@ -1478,10 +1506,10 @@ class DurationField(Field):
     }
     description = "Duration"
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "DurationField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return value
         if isinstance(value, datetime.timedelta):
@@ -1500,20 +1528,24 @@ class DurationField(Field):
             params={"value": value},
         )
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         if connection.features.has_native_duration_field:
             return value
         if value is None:
             return None
         return duration_microseconds(value)
 
-    def get_db_converters(self, connection):
+    def get_db_converters(
+        self, connection: BaseDatabaseWrapper
+    ) -> list[Callable[..., Any]]:
         converters = []
         if not connection.features.has_native_duration_field:
             converters.append(connection.ops.convert_durationfield_value)
         return converters + super().get_db_converters(connection)
 
-    def value_to_string(self, obj):
+    def value_to_string(self, obj: Any) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else duration_string(val)
 
@@ -1522,12 +1554,12 @@ class EmailField(CharField):
     default_validators = [validators.validate_email]
     description = "Email address"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         # max_length=254 to be compliant with RFCs 3696 and 5321
         kwargs.setdefault("max_length", 254)
         super().__init__(**kwargs)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         # We do not exclude max_length if it matches default as we want to change
         # the default in future.
@@ -1541,7 +1573,7 @@ class FloatField(Field):
     }
     description = "Floating point number"
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         if value is None:
             return None
@@ -1552,10 +1584,10 @@ class FloatField(Field):
                 f"Field '{self.name}' expected a number but got {value!r}.",
             ) from e
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "FloatField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return value
         try:
@@ -1575,13 +1607,13 @@ class IntegerField(Field):
     }
     description = "Integer"
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
             *self._check_max_length_warning(),
         ]
 
-    def _check_max_length_warning(self):
+    def _check_max_length_warning(self) -> list[PreflightResult]:
         if self.max_length is not None:
             return [
                 PreflightResult(
@@ -1594,7 +1626,7 @@ class IntegerField(Field):
         return []
 
     @cached_property
-    def validators(self):
+    def validators(self) -> list[Callable[..., Any]]:
         # These validators can't be added at field initialization time since
         # they're based on values retrieved from the database connection.
         validators_ = super().validators
@@ -1628,7 +1660,7 @@ class IntegerField(Field):
             validators_.append(validators.MaxValueValidator(max_value))
         return validators_
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         if value is None:
             return None
@@ -1639,14 +1671,16 @@ class IntegerField(Field):
                 f"Field '{self.name}' expected a number but got {value!r}.",
             ) from e
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         return connection.ops.adapt_integerfield_value(value, self.get_internal_type())
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "IntegerField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return value
         try:
@@ -1662,14 +1696,14 @@ class IntegerField(Field):
 class BigIntegerField(IntegerField):
     description = "Big (8 byte) integer"
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "BigIntegerField"
 
 
 class SmallIntegerField(IntegerField):
     description = "Small integer"
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "SmallIntegerField"
 
 
@@ -1681,9 +1715,9 @@ class GenericIPAddressField(Field):
     def __init__(
         self,
         *,
-        protocol="both",
-        unpack_ipv4=False,
-        **kwargs,
+        protocol: str = "both",
+        unpack_ipv4: bool = False,
+        **kwargs: Any,
     ):
         self.unpack_ipv4 = unpack_ipv4
         self.protocol = protocol
@@ -1695,13 +1729,13 @@ class GenericIPAddressField(Field):
         kwargs["max_length"] = 39
         super().__init__(**kwargs)
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
             *self._check_required_and_null_values(),
         ]
 
-    def _check_required_and_null_values(self):
+    def _check_required_and_null_values(self) -> list[PreflightResult]:
         if not getattr(self, "allow_null", False) and not getattr(
             self, "required", True
         ):
@@ -1715,7 +1749,7 @@ class GenericIPAddressField(Field):
             ]
         return []
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.unpack_ipv4 is not False:
             kwargs["unpack_ipv4"] = self.unpack_ipv4
@@ -1725,10 +1759,10 @@ class GenericIPAddressField(Field):
             del kwargs["max_length"]
         return name, path, args, kwargs
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "GenericIPAddressField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return None
         if not isinstance(value, str):
@@ -1740,12 +1774,14 @@ class GenericIPAddressField(Field):
             )
         return value
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
         return connection.ops.adapt_ipaddressfield_value(value)
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         if value is None:
             return None
@@ -1758,7 +1794,7 @@ class GenericIPAddressField(Field):
 
 
 class PositiveIntegerRelDbTypeMixin:
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, "integer_field_class"):
             cls.integer_field_class = next(
@@ -1770,7 +1806,7 @@ class PositiveIntegerRelDbTypeMixin:
                 None,
             )
 
-    def rel_db_type(self, connection):
+    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. In most cases, a foreign key pointing to a positive integer
@@ -1788,38 +1824,38 @@ class PositiveIntegerRelDbTypeMixin:
 class PositiveBigIntegerField(PositiveIntegerRelDbTypeMixin, BigIntegerField):
     description = "Positive big integer"
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "PositiveBigIntegerField"
 
 
 class PositiveIntegerField(PositiveIntegerRelDbTypeMixin, IntegerField):
     description = "Positive integer"
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "PositiveIntegerField"
 
 
 class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField):
     description = "Positive small integer"
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "PositiveSmallIntegerField"
 
 
 class TextField(Field):
     description = "Text"
 
-    def __init__(self, *, db_collation=None, **kwargs):
+    def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
         super().__init__(**kwargs)
         self.db_collation = db_collation
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
             *self._check_db_collation(),
         ]
 
-    def _check_db_collation(self):
+    def _check_db_collation(self) -> list[PreflightResult]:
         errors = []
         if not (
             self.db_collation is None
@@ -1837,24 +1873,24 @@ class TextField(Field):
             )
         return errors
 
-    def db_parameters(self, connection):
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
         db_params = super().db_parameters(connection)
         db_params["collation"] = self.db_collation
         return db_params
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "TextField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if isinstance(value, str) or value is None:
             return value
         return str(value)
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.db_collation:
             kwargs["db_collation"] = self.db_collation
@@ -1869,13 +1905,15 @@ class TimeField(DateTimeCheckMixin, Field):
     }
     description = "Time"
 
-    def __init__(self, *, auto_now=False, auto_now_add=False, **kwargs):
+    def __init__(
+        self, *, auto_now: bool = False, auto_now_add: bool = False, **kwargs: Any
+    ):
         self.auto_now, self.auto_now_add = auto_now, auto_now_add
         if auto_now or auto_now_add:
             kwargs["required"] = False
         super().__init__(**kwargs)
 
-    def _check_fix_default_value(self):
+    def _check_fix_default_value(self) -> list[PreflightResult]:
         """
         Warn that using an actual date or datetime value is probably wrong;
         it's only evaluated on server startup.
@@ -1897,7 +1935,7 @@ class TimeField(DateTimeCheckMixin, Field):
         # At this point, value is a datetime object.
         return self._check_if_value_fixed(value, now=now)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.auto_now is not False:
             kwargs["auto_now"] = self.auto_now
@@ -1907,10 +1945,10 @@ class TimeField(DateTimeCheckMixin, Field):
             del kwargs["required"]
         return name, path, args, kwargs
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "TimeField"
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is None:
             return None
         if isinstance(value, datetime.time):
@@ -1938,7 +1976,7 @@ class TimeField(DateTimeCheckMixin, Field):
             params={"value": value},
         )
 
-    def pre_save(self, model_instance, add):
+    def pre_save(self, model_instance: Any, add: bool) -> Any:
         if self.auto_now or (self.auto_now_add and add):
             value = datetime.datetime.now().time()
             setattr(model_instance, self.attname, value)
@@ -1946,17 +1984,19 @@ class TimeField(DateTimeCheckMixin, Field):
         else:
             return super().pre_save(model_instance, add)
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         # Casts times into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
         return connection.ops.adapt_timefield_value(value)
 
-    def value_to_string(self, obj):
+    def value_to_string(self, obj: Any) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
@@ -1965,11 +2005,11 @@ class URLField(CharField):
     default_validators = [validators.URLValidator()]
     description = "URL"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         kwargs.setdefault("max_length", 200)
         super().__init__(**kwargs)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if kwargs.get("max_length") == 200:
             del kwargs["max_length"]
@@ -1980,15 +2020,15 @@ class BinaryField(Field):
     description = "Raw binary data"
     empty_values = [None, b""]
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*super().preflight(**kwargs), *self._check_str_default_value()]
 
-    def _check_str_default_value(self):
+    def _check_str_default_value(self) -> list[PreflightResult]:
         if self.has_default() and isinstance(self.default, str):
             return [
                 PreflightResult(
@@ -2000,13 +2040,15 @@ class BinaryField(Field):
             ]
         return []
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "BinaryField"
 
-    def get_placeholder(self, value, compiler, connection):
+    def get_placeholder(
+        self, value: Any, compiler: Any, connection: BaseDatabaseWrapper
+    ) -> Any:
         return connection.ops.binary_placeholder_sql(value)
 
-    def get_default(self):
+    def get_default(self) -> Any:
         if self.has_default() and not callable(self.default):
             return self.default
         default = super().get_default()
@@ -2014,17 +2056,19 @@ class BinaryField(Field):
             return b""
         return default
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         if value is not None:
-            return connection.Database.Binary(value)
+            return connection.Database.Binary(value)  # type: ignore[attr-defined]
         return value
 
-    def value_to_string(self, obj):
+    def value_to_string(self, obj: Any) -> str:
         """Binary data is serialized as base64"""
         return b64encode(self.value_from_object(obj)).decode("ascii")
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         # If it's a string, it should be base64-encoded data
         if isinstance(value, str):
             return memoryview(b64decode(value.encode("ascii")))
@@ -2038,23 +2082,25 @@ class UUIDField(Field):
     description = "Universally unique identifier"
     empty_strings_allowed = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         kwargs["max_length"] = 32
         super().__init__(**kwargs)
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         del kwargs["max_length"]
         return name, path, args, kwargs
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "UUIDField"
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         if value is None:
             return None
         if not isinstance(value, uuid.UUID):
@@ -2064,7 +2110,7 @@ class UUIDField(Field):
             return value
         return value.hex
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value is not None and not isinstance(value, uuid.UUID):
             input_form = "int" if isinstance(value, int) else "hex"
             try:
@@ -2091,27 +2137,29 @@ class PrimaryKeyField(BigIntegerField):
         self.creation_counter = Field.auto_creation_counter
         Field.auto_creation_counter -= 1
 
-    def preflight(self, **kwargs):
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
         # Remove the reserved_field_name_id error for 'id' field name since PrimaryKeyField is allowed to use it
         errors = [e for e in errors if e.id != "fields.reserved_field_name_id"]
         return errors
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         # PrimaryKeyField takes no parameters, so we return an empty kwargs dict
         return (self.name, "plain.models.PrimaryKeyField", [], {})
 
-    def validate(self, value, model_instance):
+    def validate(self, value: Any, model_instance: Any) -> None:
         pass
 
-    def get_db_prep_value(self, value, connection, prepared=False):
+    def get_db_prep_value(
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+    ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
             value = connection.ops.validate_autopk_value(value)
         return value
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         return "PrimaryKeyField"
 
-    def rel_db_type(self, connection):
+    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         return BigIntegerField().db_type(connection=connection)

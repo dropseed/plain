@@ -6,14 +6,10 @@ from collections import Counter
 from collections.abc import Iterable
 from importlib import import_module
 from importlib.util import find_spec
-from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured, PackageRegistryNotReady
 
 from .config import PackageConfig
-
-if TYPE_CHECKING:
-    pass
 
 CONFIG_MODULE_NAME = "config"
 

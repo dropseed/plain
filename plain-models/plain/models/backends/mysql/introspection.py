@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from collections import namedtuple
+from typing import Any
 
 import sqlparse
-from MySQLdb.constants import FIELD_TYPE
+from MySQLdb.constants import FIELD_TYPE  # type: ignore[import-untyped]
 
 from plain.models.backends.base.introspection import BaseDatabaseIntrospection
 from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
@@ -46,7 +49,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         FIELD_TYPE.VAR_STRING: "CharField",
     }
 
-    def get_field_type(self, data_type, description):
+    def get_field_type(self, data_type: Any, description: Any) -> str:
         field_type = super().get_field_type(data_type, description)
         if "auto_increment" in description.extra:
             if field_type == "BigIntegerField":
@@ -64,7 +67,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             return "JSONField"
         return field_type
 
-    def get_table_list(self, cursor):
+    def get_table_list(self, cursor: Any) -> list[TableInfo]:
         """Return a list of table and view names in the current database."""
         cursor.execute(
             """
@@ -81,12 +84,12 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for row in cursor.fetchall()
         ]
 
-    def get_table_description(self, cursor, table_name):
+    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface."
         """
-        json_constraints = {}
+        json_constraints: set[Any] = set()
         if (
             self.connection.mysql_is_mariadb
             and self.connection.features.can_introspect_json_field
@@ -148,7 +151,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             f"SELECT * FROM {self.connection.ops.quote_name(table_name)} LIMIT 1"
         )
 
-        def to_int(i):
+        def to_int(i: Any) -> Any:
             return int(i) if i is not None else i
 
         fields = []
@@ -172,14 +175,16 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             )
         return fields
 
-    def get_sequences(self, cursor, table_name, table_fields=()):
+    def get_sequences(
+        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+    ) -> list[dict[str, Any]]:
         for field_info in self.get_table_description(cursor, table_name):
             if "auto_increment" in field_info.extra:
                 # MySQL allows only one auto-increment column per table.
                 return [{"table": table_name, "column": field_info.name}]
         return []
 
-    def get_relations(self, cursor, table_name):
+    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all foreign keys in the given table.
@@ -200,7 +205,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for field_name, other_field, other_table in cursor.fetchall()
         }
 
-    def get_storage_engine(self, cursor, table_name):
+    def get_storage_engine(self, cursor: Any, table_name: str) -> str:
         """
         Retrieve the storage engine for a given table. Return the default
         storage engine if the table doesn't exist.
@@ -220,8 +225,10 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             return self.connection.features._mysql_storage_engine
         return result[0]
 
-    def _parse_constraint_columns(self, check_clause, columns):
-        check_columns = OrderedSet()
+    def _parse_constraint_columns(
+        self, check_clause: str, columns: set[str]
+    ) -> OrderedSet:
+        check_columns: OrderedSet = OrderedSet()
         statement = sqlparse.parse(check_clause)[0]
         tokens = (token for token in statement.flatten() if not token.is_whitespace)
         for token in tokens:
@@ -233,12 +240,14 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 check_columns.add(token.value[1:-1])
         return check_columns
 
-    def get_constraints(self, cursor, table_name):
+    def get_constraints(
+        self, cursor: Any, table_name: str
+    ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across
         one or more columns.
         """
-        constraints = {}
+        constraints: dict[str, dict[str, Any]] = {}
         # Get the actual constraint names and columns
         name_query = """
             SELECT kc.`constraint_name`, kc.`column_name`,

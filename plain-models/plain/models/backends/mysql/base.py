@@ -4,11 +4,14 @@ MySQL database backend for Plain.
 Requires mysqlclient: https://pypi.org/project/mysqlclient/
 """
 
-from functools import cached_property
+from __future__ import annotations
 
-import MySQLdb as Database
-from MySQLdb.constants import CLIENT, FIELD_TYPE
-from MySQLdb.converters import conversions
+from functools import cached_property
+from typing import Any
+
+import MySQLdb as Database  # type: ignore[import-untyped]
+from MySQLdb.constants import CLIENT, FIELD_TYPE  # type: ignore[import-untyped]
+from MySQLdb.converters import conversions  # type: ignore[import-untyped]
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils as backend_utils
@@ -53,10 +56,10 @@ class CursorWrapper:
         4025,  # CHECK constraint failed
     )
 
-    def __init__(self, cursor):
+    def __init__(self, cursor: Any) -> None:
         self.cursor = cursor
 
-    def execute(self, query, args=None):
+    def execute(self, query: str, args: Any = None) -> int:
         try:
             # args is None means no string interpolation
             return self.cursor.execute(query, args)
@@ -67,7 +70,7 @@ class CursorWrapper:
                 raise IntegrityError(*tuple(e.args))
             raise
 
-    def executemany(self, query, args):
+    def executemany(self, query: str, args: Any) -> int:
         try:
             return self.cursor.executemany(query, args)
         except Database.OperationalError as e:
@@ -77,10 +80,10 @@ class CursorWrapper:
                 raise IntegrityError(*tuple(e.args))
             raise
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> Any:
         return getattr(self.cursor, attr)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         return iter(self.cursor)
 
 
@@ -180,11 +183,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     ops_class = DatabaseOperations
     validation_class = DatabaseValidation
 
-    def get_database_version(self):
+    def get_database_version(self) -> tuple[int, int, int]:
         return self.mysql_version
 
-    def get_connection_params(self):
-        kwargs = {
+    def get_connection_params(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
             "conv": plain_conversions,
             "charset": "utf8",
         }
@@ -221,7 +224,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         kwargs.update(options)
         return kwargs
 
-    def get_new_connection(self, conn_params):
+    def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
         connection = Database.connect(**conn_params)
         # bytes encoder in mysqlclient doesn't work and was added only to
         # prevent KeyErrors in Plain < 2.0. We can remove this workaround when
@@ -231,7 +234,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             connection.encoders.pop(bytes)
         return connection
 
-    def init_connection_state(self):
+    def init_connection_state(self) -> None:
         super().init_connection_state()
         assignments = []
         if self.features.is_sql_auto_is_null_enabled:
@@ -250,21 +253,21 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             with self.cursor() as cursor:
                 cursor.execute("; ".join(assignments))
 
-    def create_cursor(self, name=None):
+    def create_cursor(self, name: str | None = None) -> CursorWrapper:
         cursor = self.connection.cursor()
         return CursorWrapper(cursor)
 
-    def _rollback(self):
+    def _rollback(self) -> None:
         try:
             BaseDatabaseWrapper._rollback(self)
         except Database.NotSupportedError:
             pass
 
-    def _set_autocommit(self, autocommit):
+    def _set_autocommit(self, autocommit: bool) -> None:
         with self.wrap_database_errors:
             self.connection.autocommit(autocommit)
 
-    def check_constraints(self, table_names=None):
+    def check_constraints(self, table_names: list[str] | None = None) -> None:
         """Check ``table_names`` for rows with invalid foreign key references."""
         with self.cursor() as cursor:
             if table_names is None:
@@ -295,7 +298,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                             f"does not have a corresponding value in {referenced_table_name}.{referenced_column_name}."
                         )
 
-    def is_usable(self):
+    def is_usable(self) -> bool:
         try:
             self.connection.ping()
         except Database.Error:
@@ -304,11 +307,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return True
 
     @cached_property
-    def display_name(self):
+    def display_name(self) -> str:
         return "MariaDB" if self.mysql_is_mariadb else "MySQL"
 
     @cached_property
-    def data_type_check_constraints(self):
+    def data_type_check_constraints(self) -> dict[str, str]:
         if self.features.supports_column_check_constraints:
             check_constraints = {
                 "PositiveBigIntegerField": "`%(column)s` >= 0",
@@ -323,7 +326,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return {}
 
     @cached_property
-    def mysql_server_data(self):
+    def mysql_server_data(self) -> dict[str, Any]:
         with self.temporary_connection() as cursor:
             # Select some server variables and test if the time zone
             # definitions are installed. CONVERT_TZ returns NULL if 'UTC'
@@ -349,11 +352,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         }
 
     @cached_property
-    def mysql_server_info(self):
+    def mysql_server_info(self) -> str:
         return self.mysql_server_data["version"]
 
     @cached_property
-    def mysql_version(self):
+    def mysql_version(self) -> tuple[int, int, int]:
         match = server_version_re.match(self.mysql_server_info)
         if not match:
             raise Exception(
@@ -362,10 +365,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return tuple(int(x) for x in match.groups())
 
     @cached_property
-    def mysql_is_mariadb(self):
+    def mysql_is_mariadb(self) -> bool:
         return "mariadb" in self.mysql_server_info.lower()
 
     @cached_property
-    def sql_mode(self):
+    def sql_mode(self) -> set[str]:
         sql_mode = self.mysql_server_data["sql_mode"]
         return set(sql_mode.split(",") if sql_mode else ())

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import copy
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
 from plain.models import register_model
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
@@ -9,6 +12,11 @@ from plain.models.constraints import UniqueConstraint
 from plain.models.db import NotSupportedError
 from plain.models.registry import ModelsRegistry
 from plain.models.transaction import atomic
+
+if TYPE_CHECKING:
+    from plain.models.base import Model
+    from plain.models.constraints import BaseConstraint
+    from plain.models.fields import Field
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -22,7 +30,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_create_unique = "CREATE UNIQUE INDEX %(name)s ON %(table)s (%(columns)s)"
     sql_delete_unique = "DROP INDEX %(name)s"
 
-    def __enter__(self):
+    def __enter__(self) -> DatabaseSchemaEditor:
         # Some SQLite schema alterations need foreign key constraints to be
         # disabled. Enforce it here for the duration of the schema edition.
         if not self.connection.disable_constraint_checking():
@@ -35,19 +43,19 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             )
         return super().__enter__()
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         self.connection.check_constraints()
         super().__exit__(exc_type, exc_value, traceback)
         self.connection.enable_constraint_checking()
 
-    def quote_value(self, value):
+    def quote_value(self, value: Any) -> str:
         # The backend "mostly works" without this function and there are use
         # cases for compiling Python without the sqlite3 libraries (e.g.
         # security hardening).
         try:
             import sqlite3
 
-            value = sqlite3.adapt(value)
+            value = sqlite3.adapt(value)  # type: ignore[call-overload]
         except ImportError:
             pass
         except sqlite3.ProgrammingError:
@@ -71,12 +79,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 f"Cannot quote parameter value {value!r} of type {type(value)}"
             )
 
-    def prepare_default(self, value):
+    def prepare_default(self, value: Any) -> str:
         return self.quote_value(value)
 
     def _is_referenced_by_fk_constraint(
-        self, table_name, column_name=None, ignore_self=False
-    ):
+        self, table_name: str, column_name: str | None = None, ignore_self: bool = False
+    ) -> bool:
         """
         Return whether or not the provided table name is referenced by another
         one. If `column_name` is specified, only references pointing to that
@@ -98,8 +106,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return False
 
     def alter_db_table(
-        self, model, old_db_table, new_db_table, disable_constraints=True
-    ):
+        self,
+        model: type[Model],
+        old_db_table: str,
+        new_db_table: str,
+        disable_constraints: bool = True,
+    ) -> None:
         if (
             not self.connection.features.supports_atomic_references_rename
             and disable_constraints
@@ -117,7 +129,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         else:
             super().alter_db_table(model, old_db_table, new_db_table)
 
-    def alter_field(self, model, old_field, new_field, strict=False):
+    def alter_field(
+        self,
+        model: type[Model],
+        old_field: Field,
+        new_field: Field,
+        strict: bool = False,
+    ) -> None:
         if not self._field_should_be_altered(old_field, new_field):
             return
         old_field_name = old_field.name
@@ -168,8 +186,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             super().alter_field(model, old_field, new_field, strict=strict)
 
     def _remake_table(
-        self, model, create_field=None, delete_field=None, alter_fields=None
-    ):
+        self,
+        model: type[Model],
+        create_field: Field | None = None,
+        delete_field: Field | None = None,
+        alter_fields: list[tuple[Field, Field]] | None = None,
+    ) -> None:
         """
         Shortcut to transform a model from old_model into new_model
 
@@ -189,8 +211,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Self-referential fields must be recreated rather than copied from
         # the old model to ensure their remote_field.field_name doesn't refer
         # to an altered field.
-        def is_self_referential(f):
-            return f.is_relation and f.remote_field.model is model
+        def is_self_referential(f: Field) -> bool:
+            return f.is_relation and f.remote_field.model is model  # type: ignore[attr-defined]
 
         # Work out the new fields dict / mapping
         body = {
@@ -276,7 +298,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         meta = type("Meta", (), meta_contents)
         body_copy["Meta"] = meta
         body_copy["__module__"] = model.__module__
-        register_model(type(model._meta.object_name, model.__bases__, body_copy))
+        register_model(type(model._meta.object_name, model.__bases__, body_copy))  # type: ignore[arg-type]
 
         # Construct a model with a renamed table name.
         body_copy = copy.deepcopy(body)
@@ -291,7 +313,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         body_copy["Meta"] = meta
         body_copy["__module__"] = model.__module__
         new_model = type(f"New{model._meta.object_name}", model.__bases__, body_copy)
-        register_model(new_model)
+        register_model(new_model)  # type: ignore[arg-type]
 
         # Create a new table with the updated schema.
         self.create_model(new_model)
@@ -299,7 +321,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Copy data from the old table into the new table
         self.execute(
             "INSERT INTO {} ({}) SELECT {} FROM {}".format(
-                self.quote_name(new_model._meta.db_table),
+                self.quote_name(new_model._meta.db_table),  # type: ignore[attr-defined]
                 ", ".join(self.quote_name(x) for x in mapping),
                 ", ".join(mapping.values()),
                 self.quote_name(model._meta.db_table),
@@ -311,8 +333,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
         # Rename the new table to take way for the old
         self.alter_db_table(
-            new_model,
-            new_model._meta.db_table,
+            new_model,  # type: ignore[arg-type]
+            new_model._meta.db_table,  # type: ignore[attr-defined]
             model._meta.db_table,
             disable_constraints=False,
         )
@@ -325,7 +347,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if restore_pk_field:
             restore_pk_field.primary_key = True
 
-    def delete_model(self, model, handle_autom2m=True):
+    def delete_model(self, model: type[Model], handle_autom2m: bool = True) -> None:
         if handle_autom2m:
             super().delete_model(model)
         else:
@@ -343,7 +365,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 ):
                     self.deferred_sql.remove(sql)
 
-    def add_field(self, model, field):
+    def add_field(self, model: type[Model], field: Field) -> None:
         """Create a field on a model."""
         if (
             # Primary keys are not supported in ALTER TABLE
@@ -360,7 +382,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         else:
             super().add_field(model, field)
 
-    def remove_field(self, model, field):
+    def remove_field(self, model: type[Model], field: Field) -> None:
         """
         Remove a field from a model. Usually involves deleting a column,
         but for M2Ms may involve deleting a table.
@@ -374,8 +396,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # Primary keys, unique fields, indexed fields, and foreign keys are
             # not supported in ALTER TABLE DROP COLUMN.
             and not field.primary_key
-            and not (field.remote_field and field.db_index)
-            and not (field.remote_field and field.db_constraint)
+            and not (field.remote_field and field.db_index)  # type: ignore[attr-defined]
+            and not (field.remote_field and field.db_constraint)  # type: ignore[attr-defined]
         ):
             super().remove_field(model, field)
         # For everything else, remake.
@@ -387,15 +409,15 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _alter_field(
         self,
-        model,
-        old_field,
-        new_field,
-        old_type,
-        new_type,
-        old_db_params,
-        new_db_params,
-        strict=False,
-    ):
+        model: type[Model],
+        old_field: Field,
+        new_field: Field,
+        old_type: str,
+        new_type: str,
+        old_db_params: dict[str, Any],
+        new_db_params: dict[str, Any],
+        strict: bool = False,
+    ) -> None:
         """Perform a "physical" (non-ManyToMany) field update."""
         # Use "ALTER TABLE ... RENAME COLUMN" if only the column name
         # changed and there aren't any constraints.
@@ -405,9 +427,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             and self.column_sql(model, old_field) == self.column_sql(model, new_field)
             and not (
                 old_field.remote_field
-                and old_field.db_constraint
+                and old_field.db_constraint  # type: ignore[attr-defined]
                 or new_field.remote_field
-                and new_field.db_constraint
+                and new_field.db_constraint  # type: ignore[attr-defined]
             )
         ):
             return self.execute(
@@ -440,37 +462,39 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             for related_model in related_models:
                 self._remake_table(related_model)
 
-    def _alter_many_to_many(self, model, old_field, new_field, strict):
+    def _alter_many_to_many(
+        self, model: type[Model], old_field: Field, new_field: Field, strict: bool
+    ) -> None:
         """Alter M2Ms to repoint their to= endpoints."""
         if (
-            old_field.remote_field.through._meta.db_table
-            == new_field.remote_field.through._meta.db_table
+            old_field.remote_field.through._meta.db_table  # type: ignore[attr-defined]
+            == new_field.remote_field.through._meta.db_table  # type: ignore[attr-defined]
         ):
             # The field name didn't change, but some options did, so we have to
             # propagate this altering.
             self._remake_table(
-                old_field.remote_field.through,
+                old_field.remote_field.through,  # type: ignore[attr-defined]
                 alter_fields=[
                     (
                         # The field that points to the target model is needed,
                         # so that table can be remade with the new m2m field -
                         # this is m2m_reverse_field_name().
-                        old_field.remote_field.through._meta.get_field(
-                            old_field.m2m_reverse_field_name()
+                        old_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                            old_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
                         ),
-                        new_field.remote_field.through._meta.get_field(
-                            new_field.m2m_reverse_field_name()
+                        new_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                            new_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
                         ),
                     ),
                     (
                         # The field that points to the model itself is needed,
                         # so that table can be remade with the new self field -
                         # this is m2m_field_name().
-                        old_field.remote_field.through._meta.get_field(
-                            old_field.m2m_field_name()
+                        old_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                            old_field.m2m_field_name()  # type: ignore[attr-defined]
                         ),
-                        new_field.remote_field.through._meta.get_field(
-                            new_field.m2m_field_name()
+                        new_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                            new_field.m2m_field_name()  # type: ignore[attr-defined]
                         ),
                     ),
                 ],
@@ -478,32 +502,32 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return
 
         # Make a new through table
-        self.create_model(new_field.remote_field.through)
+        self.create_model(new_field.remote_field.through)  # type: ignore[attr-defined]
         # Copy the data across
         self.execute(
             "INSERT INTO {} ({}) SELECT {} FROM {}".format(
-                self.quote_name(new_field.remote_field.through._meta.db_table),
+                self.quote_name(new_field.remote_field.through._meta.db_table),  # type: ignore[attr-defined]
                 ", ".join(
                     [
                         "id",
-                        new_field.m2m_column_name(),
-                        new_field.m2m_reverse_name(),
+                        new_field.m2m_column_name(),  # type: ignore[attr-defined]
+                        new_field.m2m_reverse_name(),  # type: ignore[attr-defined]
                     ]
                 ),
                 ", ".join(
                     [
                         "id",
-                        old_field.m2m_column_name(),
-                        old_field.m2m_reverse_name(),
+                        old_field.m2m_column_name(),  # type: ignore[attr-defined]
+                        old_field.m2m_reverse_name(),  # type: ignore[attr-defined]
                     ]
                 ),
-                self.quote_name(old_field.remote_field.through._meta.db_table),
+                self.quote_name(old_field.remote_field.through._meta.db_table),  # type: ignore[attr-defined]
             )
         )
         # Delete the old through table
-        self.delete_model(old_field.remote_field.through)
+        self.delete_model(old_field.remote_field.through)  # type: ignore[attr-defined]
 
-    def add_constraint(self, model, constraint):
+    def add_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
         if isinstance(constraint, UniqueConstraint) and (
             constraint.condition
             or constraint.contains_expressions
@@ -514,7 +538,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         else:
             self._remake_table(model)
 
-    def remove_constraint(self, model, constraint):
+    def remove_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
         if isinstance(constraint, UniqueConstraint) and (
             constraint.condition
             or constraint.contains_expressions
@@ -525,5 +549,5 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         else:
             self._remake_table(model)
 
-    def _collate_sql(self, collation):
+    def _collate_sql(self, collation: str) -> str:
         return "COLLATE " + collation

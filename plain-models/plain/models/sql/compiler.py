@@ -355,24 +355,24 @@ class SQLCompiler:
                 if not self.query.standard_ordering:
                     field = field.copy()
                     field.reverse_ordering()
-                select_ref = selected_exprs.get(field.expression)
+                select_ref = selected_exprs.get(field.expression)  # type: ignore[attr-defined]
                 if select_ref or (
-                    isinstance(field.expression, F)
-                    and (select_ref := selected_exprs.get(field.expression.name))
+                    isinstance(field.expression, F)  # type: ignore[attr-defined]
+                    and (select_ref := selected_exprs.get(field.expression.name))  # type: ignore[attr-defined]
                 ):
                     # Emulation of NULLS (FIRST|LAST) cannot be combined with
                     # the usage of ordering by position.
                     if (
-                        field.nulls_first is None and field.nulls_last is None
+                        field.nulls_first is None and field.nulls_last is None  # type: ignore[attr-defined]
                     ) or self.connection.features.supports_order_by_nulls_modifier:
                         field = field.copy()
-                        field.expression = select_ref
+                        field.expression = select_ref  # type: ignore[assignment]
                     # Alias collisions are not possible when dealing with
                     # combined queries so fallback to it if emulation of NULLS
                     # handling is required.
                     elif self.query.combinator:
                         field = field.copy()
-                        field.expression = Ref(select_ref.refs, select_ref.source)
+                        field.expression = Ref(select_ref.refs, select_ref.source)  # type: ignore[assignment]
                 yield field, select_ref is not None
                 continue
             if field == "?":  # random

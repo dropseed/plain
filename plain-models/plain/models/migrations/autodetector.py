@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import functools
 import re
 from graphlib import TopologicalSorter
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models.migrations import operations
@@ -14,6 +17,12 @@ from plain.models.migrations.utils import (
     resolve_relation,
 )
 from plain.runtime import settings
+
+if TYPE_CHECKING:
+    from plain.models.fields import Field
+    from plain.models.migrations.graph import MigrationGraph
+    from plain.models.migrations.operations.base import Operation
+    from plain.models.migrations.state import ProjectState
 
 
 class MigrationAutodetector:
@@ -29,15 +38,24 @@ class MigrationAutodetector:
     if it wishes, with the caveat that it may not always be possible.
     """
 
-    def __init__(self, from_state, to_state, questioner=None):
+    def __init__(
+        self,
+        from_state: ProjectState,
+        to_state: ProjectState,
+        questioner: MigrationQuestioner | None = None,
+    ):
         self.from_state = from_state
         self.to_state = to_state
         self.questioner = questioner or MigrationQuestioner()
         self.existing_packages = {app for app, model in from_state.models}
 
     def changes(
-        self, graph, trim_to_packages=None, convert_packages=None, migration_name=None
-    ):
+        self,
+        graph: MigrationGraph,
+        trim_to_packages: set[str] | None = None,
+        convert_packages: set[str] | None = None,
+        migration_name: str | None = None,
+    ) -> dict[str, list[Migration]]:
         """
         Main entry point to produce a list of applicable changes.
         Take a graph to base names on and an optional set of packages
@@ -49,7 +67,7 @@ class MigrationAutodetector:
             changes = self._trim_to_packages(changes, trim_to_packages)
         return changes
 
-    def deep_deconstruct(self, obj):
+    def deep_deconstruct(self, obj: Any) -> Any:
         """
         Recursive deconstruction for a field and its arguments.
         Used for full comparison for rename/alter; sometimes a single-level
@@ -87,7 +105,7 @@ class MigrationAutodetector:
         else:
             return obj
 
-    def only_relation_agnostic_fields(self, fields):
+    def only_relation_agnostic_fields(self, fields: dict[str, Field]) -> list[Any]:
         """
         Return a definition of the fields that ignores field names and
         what related fields actually relate to. Used for detecting renames (as
@@ -101,7 +119,11 @@ class MigrationAutodetector:
             fields_def.append(deconstruction)
         return fields_def
 
-    def _detect_changes(self, convert_packages=None, graph=None):
+    def _detect_changes(
+        self,
+        convert_packages: set[str] | None = None,
+        graph: MigrationGraph | None = None,
+    ) -> dict[str, list[Migration]]:
         """
         Return a dict of migration plans which will achieve the
         change from from_state to to_state. The dict has app labels
@@ -184,7 +206,7 @@ class MigrationAutodetector:
 
         return self.migrations
 
-    def _prepare_field_lists(self):
+    def _prepare_field_lists(self) -> None:
         """
         Prepare field lists and a list of the fields that used through models
         in the old state so dependencies can be made from the through model
@@ -206,7 +228,7 @@ class MigrationAutodetector:
             for field_name in self.to_state.models[package_label, model_name].fields
         }
 
-    def _generate_through_model_map(self):
+    def _generate_through_model_map(self) -> None:
         """Through model map generation."""
         for package_label, model_name in sorted(self.old_model_keys):
             old_model_name = self.renamed_models.get(
@@ -227,7 +249,9 @@ class MigrationAutodetector:
                     )
 
     @staticmethod
-    def _resolve_dependency(dependency):
+    def _resolve_dependency(
+        dependency: tuple[str, ...],
+    ) -> tuple[tuple[str, ...], bool]:
         """
         Return the resolved dependency and a boolean denoting whether or not
         it was a settings dependency.
@@ -241,7 +265,7 @@ class MigrationAutodetector:
             2:
         ], True
 
-    def _build_migration_list(self, graph=None):
+    def _build_migration_list(self, graph: MigrationGraph | None = None) -> None:
         """
         Chop the lists of operations up into migrations with dependencies on
         each other. Do this by going through an app's list of operations until
@@ -355,7 +379,7 @@ class MigrationAutodetector:
                     )
             num_ops = new_num_ops
 
-    def _sort_migrations(self):
+    def _sort_migrations(self) -> None:
         """
         Reorder to make things possible. Reordering may be needed so FKs work
         nicely inside the same app.
@@ -373,7 +397,7 @@ class MigrationAutodetector:
                     ts.add(op, *(x for x in ops if self.check_dependency(x, dep)))
             self.generated_operations[package_label] = list(ts.static_order())
 
-    def _optimize_migrations(self):
+    def _optimize_migrations(self) -> None:
         # Add in internal dependencies among the migrations
         for package_label, migrations in self.migrations.items():
             for m1, m2 in zip(migrations, migrations[1:]):
@@ -391,7 +415,9 @@ class MigrationAutodetector:
                     migration.operations, package_label
                 )
 
-    def check_dependency(self, operation, dependency):
+    def check_dependency(
+        self, operation: Operation, dependency: tuple[str, ...]
+    ) -> bool:
         """
         Return True if the given operation depends on the given dependency,
         False otherwise.
@@ -438,17 +464,21 @@ class MigrationAutodetector:
             raise ValueError(f"Can't handle dependency {dependency!r}")
 
     def add_operation(
-        self, package_label, operation, dependencies=None, beginning=False
-    ):
+        self,
+        package_label: str,
+        operation: Operation,
+        dependencies: list[tuple[str, ...]] | None = None,
+        beginning: bool = False,
+    ) -> None:
         # Dependencies are
         # (package_label, model_name, field_name, create/delete as True/False)
-        operation._auto_deps = dependencies or []
+        operation._auto_deps = dependencies or []  # type: ignore[attr-defined]
         if beginning:
             self.generated_operations.setdefault(package_label, []).insert(0, operation)
         else:
             self.generated_operations.setdefault(package_label, []).append(operation)
 
-    def generate_renamed_models(self):
+    def generate_renamed_models(self) -> None:
         """
         Find any renamed models, generate the operations for them, and remove
         the old entry from the model lists. Must be run before other
@@ -513,7 +543,7 @@ class MigrationAutodetector:
                             self.old_model_keys.add((package_label, model_name))
                             break
 
-    def generate_created_models(self):
+    def generate_created_models(self) -> None:
         """
         Find all new models and make create
         operations for them as well as separate operations to create any
@@ -649,7 +679,7 @@ class MigrationAutodetector:
                     dependencies=related_dependencies,
                 )
 
-    def generate_deleted_models(self):
+    def generate_deleted_models(self) -> None:
         """
         Find all deleted models and make delete
         operations for them as well as separate operations to delete any
@@ -724,7 +754,7 @@ class MigrationAutodetector:
                 dependencies=list(set(dependencies)),
             )
 
-    def create_renamed_fields(self):
+    def create_renamed_fields(self) -> None:
         """Work out renamed fields."""
         self.renamed_operations = []
         old_field_keys = self.old_field_keys.copy()
@@ -786,7 +816,7 @@ class MigrationAutodetector:
                             ] = rem_field_name
                             break
 
-    def generate_renamed_fields(self):
+    def generate_renamed_fields(self) -> None:
         """Generate RenameField operations."""
         for (
             rem_package_label,
@@ -825,14 +855,16 @@ class MigrationAutodetector:
             )
             self.old_field_keys.add((package_label, model_name, field_name))
 
-    def generate_added_fields(self):
+    def generate_added_fields(self) -> None:
         """Make AddField operations."""
         for package_label, model_name, field_name in sorted(
             self.new_field_keys - self.old_field_keys
         ):
             self._generate_added_field(package_label, model_name, field_name)
 
-    def _generate_added_field(self, package_label, model_name, field_name):
+    def _generate_added_field(
+        self, package_label: str, model_name: str, field_name: str
+    ) -> None:
         field = self.to_state.models[package_label, model_name].get_field(field_name)
         # Adding a field always depends at least on its removal.
         dependencies = [(package_label, model_name, field_name, False)]
@@ -883,14 +915,16 @@ class MigrationAutodetector:
             dependencies=dependencies,
         )
 
-    def generate_removed_fields(self):
+    def generate_removed_fields(self) -> None:
         """Make RemoveField operations."""
         for package_label, model_name, field_name in sorted(
             self.old_field_keys - self.new_field_keys
         ):
             self._generate_removed_field(package_label, model_name, field_name)
 
-    def _generate_removed_field(self, package_label, model_name, field_name):
+    def _generate_removed_field(
+        self, package_label: str, model_name: str, field_name: str
+    ) -> None:
         self.add_operation(
             package_label,
             operations.RemoveField(
@@ -899,7 +933,7 @@ class MigrationAutodetector:
             ),
         )
 
-    def generate_altered_fields(self):
+    def generate_altered_fields(self) -> None:
         """
         Make AlterField operations, or possibly RemovedField/AddField if alter
         isn't possible.
@@ -995,7 +1029,7 @@ class MigrationAutodetector:
                     self._generate_removed_field(package_label, model_name, field_name)
                     self._generate_added_field(package_label, model_name, field_name)
 
-    def create_altered_indexes(self):
+    def create_altered_indexes(self) -> None:
         option_name = operations.AddIndex.option_name
 
         for package_label, model_name in sorted(self.kept_model_keys):
@@ -1047,7 +1081,7 @@ class MigrationAutodetector:
                 }
             )
 
-    def generate_added_indexes(self):
+    def generate_added_indexes(self) -> None:
         for (package_label, model_name), alt_indexes in self.altered_indexes.items():
             dependencies = self._get_dependencies_for_model(package_label, model_name)
             for index in alt_indexes["added_indexes"]:
@@ -1060,7 +1094,7 @@ class MigrationAutodetector:
                     dependencies=dependencies,
                 )
 
-    def generate_removed_indexes(self):
+    def generate_removed_indexes(self) -> None:
         for (package_label, model_name), alt_indexes in self.altered_indexes.items():
             for index in alt_indexes["removed_indexes"]:
                 self.add_operation(
@@ -1071,7 +1105,7 @@ class MigrationAutodetector:
                     ),
                 )
 
-    def generate_renamed_indexes(self):
+    def generate_renamed_indexes(self) -> None:
         for (package_label, model_name), alt_indexes in self.altered_indexes.items():
             for old_index_name, new_index_name, old_fields in alt_indexes[
                 "renamed_indexes"
@@ -1086,7 +1120,7 @@ class MigrationAutodetector:
                     ),
                 )
 
-    def create_altered_constraints(self):
+    def create_altered_constraints(self) -> None:
         option_name = operations.AddConstraint.option_name
         for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
@@ -1109,7 +1143,7 @@ class MigrationAutodetector:
                 }
             )
 
-    def generate_added_constraints(self):
+    def generate_added_constraints(self) -> None:
         for (
             package_label,
             model_name,
@@ -1125,7 +1159,7 @@ class MigrationAutodetector:
                     dependencies=dependencies,
                 )
 
-    def generate_removed_constraints(self):
+    def generate_removed_constraints(self) -> None:
         for (
             package_label,
             model_name,
@@ -1141,8 +1175,8 @@ class MigrationAutodetector:
 
     @staticmethod
     def _get_dependencies_for_foreign_key(
-        package_label, model_name, field, project_state
-    ):
+        package_label: str, model_name: str, field: Field, project_state: ProjectState
+    ) -> list[tuple[str, str, None, bool]]:
         remote_field_model = None
         if hasattr(field.remote_field, "model"):
             remote_field_model = field.remote_field.model
@@ -1163,7 +1197,7 @@ class MigrationAutodetector:
         dependencies = [(dep_package_label, dep_object_name, None, True)]
         if getattr(field.remote_field, "through", None):
             through_package_label, through_object_name = resolve_relation(
-                field.remote_field.through,
+                field.remote_field.through,  # type: ignore[attr-defined]
                 package_label,
                 model_name,
             )
@@ -1172,7 +1206,9 @@ class MigrationAutodetector:
             )
         return dependencies
 
-    def _get_dependencies_for_model(self, package_label, model_name):
+    def _get_dependencies_for_model(
+        self, package_label: str, model_name: str
+    ) -> list[tuple[str, str, None, bool]]:
         """Return foreign key dependencies of the given model."""
         dependencies = []
         model_state = self.to_state.models[package_label, model_name]
@@ -1188,7 +1224,7 @@ class MigrationAutodetector:
                 )
         return dependencies
 
-    def generate_altered_db_table(self):
+    def generate_altered_db_table(self) -> None:
         for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
                 (package_label, model_name), model_name
@@ -1206,7 +1242,7 @@ class MigrationAutodetector:
                     ),
                 )
 
-    def generate_altered_db_table_comment(self):
+    def generate_altered_db_table_comment(self) -> None:
         for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(
                 (package_label, model_name), model_name
@@ -1225,7 +1261,7 @@ class MigrationAutodetector:
                     ),
                 )
 
-    def generate_altered_options(self):
+    def generate_altered_options(self) -> None:
         """
         Work out if any non-schema-affecting options have changed and make an
         operation to represent them in state changes (in case Python code in
@@ -1256,7 +1292,12 @@ class MigrationAutodetector:
                     ),
                 )
 
-    def arrange_for_graph(self, changes, graph, migration_name=None):
+    def arrange_for_graph(
+        self,
+        changes: dict[str, list[Migration]],
+        graph: MigrationGraph,
+        migration_name: str | None = None,
+    ) -> dict[str, list[Migration]]:
         """
         Take a result from changes() and a MigrationGraph, and fix the names
         and dependencies of the changes so they extend the graph from the leaf
@@ -1311,7 +1352,9 @@ class MigrationAutodetector:
                 ]
         return changes
 
-    def _trim_to_packages(self, changes, package_labels):
+    def _trim_to_packages(
+        self, changes: dict[str, list[Migration]], package_labels: set[str]
+    ) -> dict[str, list[Migration]]:
         """
         Take changes from arrange_for_graph() and set of app labels, and return
         a modified set of changes which trims out as many migrations that are
@@ -1344,7 +1387,7 @@ class MigrationAutodetector:
         return changes
 
     @classmethod
-    def parse_number(cls, name):
+    def parse_number(cls, name: str) -> int | None:
         """
         Given a migration name, try to extract a number from the beginning of
         it. For a squashed migration such as '0001_squashed_0004…', return the

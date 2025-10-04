@@ -1,5 +1,5 @@
 import pytest
-from app.examples.models import Car
+from app.examples.models import Car  # type: ignore[import-untyped]
 
 from plain.exceptions import ValidationError
 

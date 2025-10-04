@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 from collections import namedtuple
+from collections.abc import Generator
+from typing import Any
 
 import sqlparse
+import sqlparse.sql
+import sqlparse.tokens
 
 from plain.models import Index
 from plain.models.backends.base.introspection import (
@@ -18,7 +24,7 @@ FieldInfo = namedtuple(
 field_size_re = _lazy_re_compile(r"^\s*(?:var)?char\s*\(\s*(\d+)\s*\)\s*$")
 
 
-def get_field_size(name):
+def get_field_size(name: str) -> int | None:
     """Extract the size number from a "varchar(11)" type name"""
     m = field_size_re.search(name)
     return int(m[1]) if m else None
@@ -53,7 +59,7 @@ class FlexibleFieldLookupDict:
         "time": "TimeField",
     }
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> str:
         key = key.lower().split("(", 1)[0].strip()
         return self.base_data_types_reverse[key]
 
@@ -61,7 +67,7 @@ class FlexibleFieldLookupDict:
 class DatabaseIntrospection(BaseDatabaseIntrospection):
     data_types_reverse = FlexibleFieldLookupDict()
 
-    def get_field_type(self, data_type, description):
+    def get_field_type(self, data_type: Any, description: Any) -> str:
         field_type = super().get_field_type(data_type, description)
         if description.pk and field_type == "BigIntegerField":
             return "PrimaryKeyField"
@@ -69,7 +75,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             return "JSONField"
         return field_type
 
-    def get_table_list(self, cursor):
+    def get_table_list(self, cursor: Any) -> list[TableInfo]:
         """Return a list of table and view names in the current database."""
         # Skip the sqlite_sequence system table used for autoincrement key
         # generation.
@@ -81,7 +87,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         return [TableInfo(row[0], row[1][0]) for row in cursor.fetchall()]
 
-    def get_table_description(self, cursor, table_name):
+    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.
@@ -128,11 +134,13 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for cid, name, data_type, notnull, default, pk in table_info
         ]
 
-    def get_sequences(self, cursor, table_name, table_fields=()):
+    def get_sequences(
+        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+    ) -> list[dict[str, Any]]:
         pk_col = self.get_primary_key_column(cursor, table_name)
         return [{"table": table_name, "column": pk_col}]
 
-    def get_relations(self, cursor, table_name):
+    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {column_name: (ref_column_name, ref_table_name)}
         representing all foreign keys in the given table.
@@ -152,13 +160,15 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             ) in cursor.fetchall()
         }
 
-    def get_primary_key_columns(self, cursor, table_name):
+    def get_primary_key_columns(self, cursor: Any, table_name: str) -> list[str]:
         cursor.execute(
             f"PRAGMA table_info({self.connection.ops.quote_name(table_name)})"
         )
         return [name for _, name, *_, pk in cursor.fetchall() if pk]
 
-    def _parse_column_or_constraint_definition(self, tokens, columns):
+    def _parse_column_or_constraint_definition(
+        self, tokens: Generator[Any, None, None], columns: set[str]
+    ) -> tuple[str | None, dict[str, Any] | None, dict[str, Any] | None, Any]:
         token = None
         is_constraint_definition = None
         field_name = None
@@ -258,11 +268,13 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         return constraint_name, unique_constraint, check_constraint, token
 
-    def _parse_table_constraints(self, sql, columns):
+    def _parse_table_constraints(
+        self, sql: str, columns: set[str]
+    ) -> dict[str, dict[str, Any]]:
         # Check constraint parsing is based of SQLite syntax diagram.
         # https://www.sqlite.org/syntaxdiagrams.html#table-constraint
         statement = sqlparse.parse(sql)[0]
-        constraints = {}
+        constraints: dict[str, dict[str, Any]] = {}
         unnamed_constrains_index = 0
         tokens = (token for token in statement.flatten() if not token.is_whitespace)
         # Go to columns and constraint definition
@@ -297,12 +309,14 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 break
         return constraints
 
-    def get_constraints(self, cursor, table_name):
+    def get_constraints(
+        self, cursor: Any, table_name: str
+    ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across
         one or more columns.
         """
-        constraints = {}
+        constraints: dict[str, dict[str, Any]] = {}
         # Find inline check constraints.
         try:
             table_schema = cursor.execute(
@@ -393,7 +407,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         return constraints
 
-    def _get_index_columns_orders(self, sql):
+    def _get_index_columns_orders(self, sql: str) -> list[str] | None:
         tokens = sqlparse.parse(sql)[0]
         for token in tokens:
             if isinstance(token, sqlparse.sql.Parenthesis):
@@ -401,7 +415,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 return ["DESC" if info.endswith("DESC") else "ASC" for info in columns]
         return None
 
-    def _get_column_collations(self, cursor, table_name):
+    def _get_column_collations(
+        self, cursor: Any, table_name: str
+    ) -> dict[str, str | None]:
         row = cursor.execute(
             """
             SELECT sql
@@ -415,7 +431,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
 
         sql = row[0]
         columns = str(sqlparse.parse(sql)[0][-1]).strip("()").split(", ")
-        collations = {}
+        collations: dict[str, str | None] = {}
         for column in columns:
             tokens = column[1:].split()
             column_name = tokens[0].strip('"')

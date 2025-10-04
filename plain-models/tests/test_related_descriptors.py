@@ -1,5 +1,5 @@
 import pytest
-from app.examples.models import (
+from app.examples.models import (  # type: ignore[import-untyped]
     ChildCascade,
     ChildSetNull,
     DeleteParent,

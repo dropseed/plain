@@ -5,10 +5,7 @@ import inspect
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    pass
+from typing import Any
 
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -635,10 +632,10 @@ class Model(metaclass=ModelBase):
         Do an INSERT. If returning_fields is defined then this method should
         return the newly created data for the model.
         """
-        return manager._insert(
+        return manager._insert(  # type: ignore[return-value, arg-type]
             [self],
-            fields=fields,
-            returning_fields=returning_fields,
+            fields=fields,  # type: ignore[arg-type]
+            returning_fields=returning_fields,  # type: ignore[arg-type]
             raw=raw,
         )
 
