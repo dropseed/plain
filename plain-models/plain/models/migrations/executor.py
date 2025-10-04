@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import nullcontext
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..transaction import atomic
 from .loader import MigrationLoader
 from .migration import Migration
 from .recorder import MigrationRecorder
 from .state import ProjectState
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class MigrationExecutor:
@@ -18,7 +21,9 @@ class MigrationExecutor:
     """
 
     def __init__(
-        self, connection: Any, progress_callback: Callable[..., Any] | None = None
+        self,
+        connection: BaseDatabaseWrapper,
+        progress_callback: Callable[..., Any] | None = None,
     ) -> None:
         self.connection = connection
         self.loader = MigrationLoader(self.connection)

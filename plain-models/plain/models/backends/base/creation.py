@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.runtime import settings
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 # The prefix to put on the default database name when creating
 # the test database.
@@ -17,7 +20,7 @@ class BaseDatabaseCreation:
     destruction of the test database.
     """
 
-    def __init__(self, connection: Any):
+    def __init__(self, connection: BaseDatabaseWrapper):
         self.connection = connection
 
     def _nodb_cursor(self) -> Any:

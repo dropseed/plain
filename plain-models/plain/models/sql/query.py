@@ -50,7 +50,9 @@ from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.tree import Node
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.options import Options
+    from plain.models.sql.compiler import SQLCompiler
 
 
 __all__ = ["Query", "RawQuery"]
@@ -1133,7 +1135,9 @@ class Query(BaseExpression):
             return [wrapper or self]
         return external_cols
 
-    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, tuple[Any, ...]]:
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, tuple[Any, ...]]:
         # Some backends (e.g. Oracle) raise an error when a subquery contains
         # unnecessary ORDER BY clause.
         if (

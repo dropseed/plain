@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import click
 
@@ -16,7 +16,8 @@ from plain.utils.text import Truncator
 from . import migrations
 from .backups.cli import cli as backups_cli
 from .backups.cli import create_backup
-from .db import OperationalError, db_connection
+from .db import OperationalError
+from .db import db_connection as _db_connection
 from .migrations.autodetector import MigrationAutodetector
 from .migrations.executor import MigrationExecutor
 from .migrations.loader import AmbiguityError, MigrationLoader
@@ -30,6 +31,13 @@ from .migrations.recorder import MigrationRecorder
 from .migrations.state import ModelState, ProjectState
 from .migrations.writer import MigrationWriter
 from .registry import models_registry
+
+if TYPE_CHECKING:
+    from .backends.base.base import BaseDatabaseWrapper
+
+    db_connection = cast("BaseDatabaseWrapper", _db_connection)
+else:
+    db_connection = _db_connection
 
 
 @register_cli("models")
@@ -46,7 +54,7 @@ cli.add_command(backups_cli)
 def db_shell(parameters: tuple[str, ...]) -> None:
     """Runs the command-line client for specified database, or the default database if none is provided."""
     try:
-        db_connection.client.runshell(parameters)
+        db_connection.client.runshell(list(parameters))
     except FileNotFoundError:
         # Note that we're assuming the FileNotFoundError relates to the
         # command missing. It could be raised for some other reason, in

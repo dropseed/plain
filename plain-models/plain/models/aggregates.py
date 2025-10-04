@@ -12,6 +12,7 @@ from plain.models.functions.mixins import (
 )
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.expressions import Expression
     from plain.models.query_utils import Q
     from plain.models.sql.compiler import SQLCompiler
@@ -120,7 +121,10 @@ class Aggregate(Func):
         return []
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         extra_context["distinct"] = "DISTINCT " if self.distinct else ""
         if self.filter:

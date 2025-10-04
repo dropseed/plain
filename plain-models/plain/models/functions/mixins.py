@@ -7,12 +7,16 @@ from plain.models.fields import DecimalField, FloatField, IntegerField
 from plain.models.functions import Cast
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
 class FixDecimalInputMixin:
     def as_postgresql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         # Cast FloatField to DecimalField as PostgreSQL doesn't support the
         # following function signatures:
@@ -33,7 +37,10 @@ class FixDecimalInputMixin:
 
 class FixDurationInputMixin:
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         sql, params = super().as_sql(compiler, connection, **extra_context)  # type: ignore[misc]
         if self.output_field.get_internal_type() == "DurationField":  # type: ignore[attr-defined]

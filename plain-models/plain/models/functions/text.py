@@ -8,12 +8,16 @@ from plain.models.functions import Cast, Coalesce
 from plain.models.lookups import Transform
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
 class MySQLSHA2Mixin:
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(  # type: ignore[misc]
             compiler,
@@ -25,7 +29,10 @@ class MySQLSHA2Mixin:
 
 class PostgreSQLSHAMixin:
     def as_postgresql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(  # type: ignore[misc]
             compiler,
@@ -41,7 +48,10 @@ class Chr(Transform):
     lookup_name = "chr"
 
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(
             compiler,
@@ -52,7 +62,10 @@ class Chr(Transform):
         )
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="CHAR", **extra_context)
 
@@ -66,7 +79,10 @@ class ConcatPair(Func):
     function = "CONCAT"
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         coalesced = self.coalesce()
         return super(ConcatPair, coalesced).as_sql(
@@ -78,7 +94,10 @@ class ConcatPair(Func):
         )
 
     def as_postgresql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         copy = self.copy()
         copy.set_source_expressions(
@@ -94,7 +113,10 @@ class ConcatPair(Func):
         )
 
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         # Use CONCAT_WS with an empty separator so that NULLs are ignored.
         return super().as_sql(
@@ -161,7 +183,10 @@ class Left(Func):
         return Substr(self.source_expressions[0], Value(1), self.source_expressions[1])
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return self.get_substr().as_sqlite(compiler, connection, **extra_context)
 
@@ -174,7 +199,10 @@ class Length(Transform):
     output_field = IntegerField()
 
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(
             compiler, connection, function="CHAR_LENGTH", **extra_context
@@ -218,12 +246,18 @@ class Ord(Transform):
     output_field = IntegerField()
 
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="ORD", **extra_context)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="UNICODE", **extra_context)
 
@@ -311,7 +345,10 @@ class StrIndex(Func):
     output_field = IntegerField()
 
     def as_postgresql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="STRPOS", **extra_context)
 
@@ -337,7 +374,10 @@ class Substr(Func):
         super().__init__(*expressions, **extra)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="SUBSTR", **extra_context)
 

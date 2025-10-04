@@ -70,7 +70,7 @@ class BaseDatabaseWrapper:
     def __init__(self, settings_dict: dict[str, Any]):
         # Connection related attributes.
         # The underlying database connection.
-        self.connection: Any | None = None
+        self.connection: BaseDatabaseWrapper | None = None
         # `settings_dict` should be a dictionary containing keys such as
         # NAME, USER, etc. It's called `settings_dict` instead of `settings`
         # to disambiguate it from Plain settings modules.

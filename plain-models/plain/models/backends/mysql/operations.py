@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.backends.utils import split_tzname_delta
@@ -12,6 +12,9 @@ from plain.models.lookups import Lookup
 from plain.utils import timezone
 from plain.utils.encoding import force_str
 from plain.utils.regex_helper import _lazy_re_compile
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class DatabaseOperations(BaseDatabaseOperations):
@@ -313,21 +316,21 @@ class DatabaseOperations(BaseDatabaseOperations):
         return converters
 
     def convert_booleanfield_value(
-        self, value: Any, expression: Any, connection: Any
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
     ) -> Any:
         if value in (0, 1):
             value = bool(value)
         return value
 
     def convert_datetimefield_value(
-        self, value: Any, expression: Any, connection: Any
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
     ) -> datetime.datetime | None:
         if value is not None:
             value = timezone.make_aware(value, self.connection.timezone)
         return value
 
     def convert_uuidfield_value(
-        self, value: Any, expression: Any, connection: Any
+        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
     ) -> uuid.UUID | None:
         if value is not None:
             value = uuid.UUID(value)

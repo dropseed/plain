@@ -5,10 +5,14 @@ the SQL domain.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import FullResultSet
 from plain.models.sql.constants import INNER, LOUTER
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.sql.compiler import SQLCompiler
 
 
 class MultiJoin(Exception):
@@ -73,7 +77,9 @@ class Join:
         self.nullable = nullable
         self.filtered_relation = filtered_relation
 
-    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         """
         Generate the full
            LEFT OUTER JOIN sometable ON sometable.somecol = othertable.othercol, params
@@ -190,7 +196,9 @@ class BaseTable:
         self.table_name = table_name
         self.table_alias = alias
 
-    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         alias_str = (
             "" if self.table_alias == self.table_name else (f" {self.table_alias}")
         )

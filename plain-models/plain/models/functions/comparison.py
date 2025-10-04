@@ -11,6 +11,7 @@ from plain.models.fields.json import JSONField
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -24,13 +25,19 @@ class Cast(Func):
         super().__init__(expression, output_field=output_field)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         extra_context["db_type"] = self.output_field.cast_db_type(connection)
         return super().as_sql(compiler, connection, **extra_context)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         db_type = self.output_field.db_type(connection)
         if db_type in {"datetime", "time"}:
@@ -50,7 +57,10 @@ class Cast(Func):
         return self.as_sql(compiler, connection, **extra_context)
 
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         template = None
         output_type = self.output_field.get_internal_type()
@@ -58,12 +68,15 @@ class Cast(Func):
         if output_type == "FloatField":
             template = "(%(expressions)s + 0.0)"
         # MariaDB doesn't support explicit cast to JSON.
-        elif output_type == "JSONField" and connection.mysql_is_mariadb:
+        elif output_type == "JSONField" and connection.mysql_is_mariadb:  # type: ignore[attr-defined]
             template = "JSON_EXTRACT(%(expressions)s, '$')"
         return self.as_sql(compiler, connection, template=template, **extra_context)
 
     def as_postgresql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         # CAST would be valid too, but the :: shortcut syntax is more readable.
         # 'expressions' is wrapped in parentheses in case it's a complex
@@ -109,7 +122,10 @@ class Collate(Func):
         super().__init__(expression)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         extra_context.setdefault("collation", connection.ops.quote_name(self.collation))
         return super().as_sql(compiler, connection, **extra_context)
@@ -132,7 +148,10 @@ class Greatest(Func):
         super().__init__(*expressions, **extra)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         """Use the MAX function on SQLite."""
         return super().as_sqlite(compiler, connection, function="MAX", **extra_context)
@@ -149,7 +168,10 @@ class JSONObject(Func):
         super().__init__(*expressions)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         if not connection.features.has_json_object_function:
             raise NotSupportedError(
@@ -158,7 +180,10 @@ class JSONObject(Func):
         return super().as_sql(compiler, connection, **extra_context)
 
     def as_postgresql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         copy = self.copy()
         copy.set_source_expressions(
@@ -192,7 +217,10 @@ class Least(Func):
         super().__init__(*expressions, **extra)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         """Use the MIN function on SQLite."""
         return super().as_sqlite(compiler, connection, function="MIN", **extra_context)

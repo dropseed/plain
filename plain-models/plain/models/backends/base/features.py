@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class BaseDatabaseFeatures:
@@ -188,7 +191,7 @@ class BaseDatabaseFeatures:
     # Does the backend support unlimited character columns?
     supports_unlimited_charfield = False
 
-    def __init__(self, connection: Any):
+    def __init__(self, connection: BaseDatabaseWrapper):
         self.connection = connection
 
     @cached_property

@@ -4,12 +4,19 @@ import datetime
 import os
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.runtime import PLAIN_TEMP_PATH
 
-from .. import db_connection
+from .. import db_connection as _db_connection
 from .clients import PostgresBackupClient, SQLiteBackupClient
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
+
+    db_connection = cast("BaseDatabaseWrapper", _db_connection)
+else:
+    db_connection = _db_connection
 
 
 class DatabaseBackups:

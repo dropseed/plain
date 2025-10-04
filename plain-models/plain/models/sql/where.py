@@ -14,6 +14,7 @@ from plain.models.lookups import Exact
 from plain.utils import tree
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 # Connection types
@@ -119,7 +120,9 @@ class WhereNode(tree.Node):
         )
         return where_node, having_node, qualify_node
 
-    def as_sql(self, compiler: SQLCompiler, connection: Any) -> tuple[str, list[Any]]:
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         """
         Return the SQL version of the where clause and the value to be
         substituted in. Return '', [] if this node matches everything,
@@ -307,7 +310,7 @@ class WhereNode(tree.Node):
             sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
         return sql, params
 
-    def get_db_converters(self, connection: Any) -> list[Any]:
+    def get_db_converters(self, connection: BaseDatabaseWrapper) -> list[Any]:
         return self.output_field.get_db_converters(connection)
 
     def get_lookup(self, lookup: str) -> Any:
@@ -328,7 +331,9 @@ class NothingNode:
     contains_over_clause = False
 
     def as_sql(
-        self, compiler: SQLCompiler | None = None, connection: Any | None = None
+        self,
+        compiler: SQLCompiler | None = None,
+        connection: BaseDatabaseWrapper | None = None,
     ) -> tuple[str, list[Any]]:
         raise EmptyResultSet
 
@@ -343,7 +348,9 @@ class ExtraWhere:
         self.params = params
 
     def as_sql(
-        self, compiler: SQLCompiler | None = None, connection: Any | None = None
+        self,
+        compiler: SQLCompiler | None = None,
+        connection: BaseDatabaseWrapper | None = None,
     ) -> tuple[str, list[Any]]:
         sqls = [f"({sql})" for sql in self.sqls]
         return " AND ".join(sqls), list(self.params or ())
@@ -364,7 +371,9 @@ class SubqueryConstraint:
         query_object.clear_ordering(clear_default=True)
         self.query_object = query_object
 
-    def as_sql(self, compiler: SQLCompiler, connection: Any) -> tuple[str, list[Any]]:
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         query = self.query_object
         query.set_values(self.targets)
         query_compiler = query.get_compiler()

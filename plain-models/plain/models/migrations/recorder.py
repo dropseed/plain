@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models.db import DatabaseError
@@ -9,6 +9,9 @@ from plain.utils.functional import classproperty
 from plain.utils.timezone import now
 
 from .exceptions import MigrationSchemaMissing
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class MigrationRecorder:
@@ -52,7 +55,7 @@ class MigrationRecorder:
             cls._migration_class = Migration
         return cls._migration_class
 
-    def __init__(self, connection: Any) -> None:
+    def __init__(self, connection: BaseDatabaseWrapper) -> None:
         self.connection = connection
 
     @property

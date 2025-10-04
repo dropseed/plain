@@ -8,11 +8,14 @@ import time
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from hashlib import md5
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.db import NotSupportedError
 from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 logger = logging.getLogger("plain.models.backends")
 
@@ -157,7 +160,9 @@ class CursorDebugWrapper(CursorWrapper):
 
 
 @contextmanager
-def debug_transaction(connection: Any, sql: str) -> Generator[None, None, None]:
+def debug_transaction(
+    connection: BaseDatabaseWrapper, sql: str
+) -> Generator[None, None, None]:
     start = time.monotonic()
     try:
         yield

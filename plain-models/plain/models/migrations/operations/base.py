@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class Operation:
@@ -104,7 +107,7 @@ class Operation:
         """
         return self.references_model(model_name, package_label)
 
-    def allow_migrate_model(self, connection: Any, model: Any) -> bool:
+    def allow_migrate_model(self, connection: BaseDatabaseWrapper, model: Any) -> bool:
         """Return whether or not a model may be migrated."""
         if not model._meta.can_migrate(connection):
             return False

@@ -29,7 +29,7 @@ from math import (
     tan,
 )
 from re import search as re_search
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.utils import (
     split_tzname_delta,
@@ -39,10 +39,13 @@ from plain.models.backends.utils import (
 from plain.utils import timezone
 from plain.utils.duration import duration_microseconds
 
+if TYPE_CHECKING:
+    from plain.models.backends.sqlite3.base import DatabaseWrapper
 
-def register(connection: Any) -> None:
+
+def register(connection: DatabaseWrapper) -> None:
     create_deterministic_function = functools.partial(
-        connection.create_function,
+        connection.create_function,  # type: ignore[attr-defined]
         deterministic=True,
     )
     create_deterministic_function("plain_date_extract", 2, _sqlite_datetime_extract)
@@ -76,14 +79,14 @@ def register(connection: Any) -> None:
     create_deterministic_function("SIGN", 1, _sqlite_sign)
     # Don't use the built-in RANDOM() function because it returns a value
     # in the range [-1 * 2^63, 2^63 - 1] instead of [0, 1).
-    connection.create_function("RAND", 0, random.random)
-    connection.create_aggregate("STDDEV_POP", 1, StdDevPop)
-    connection.create_aggregate("STDDEV_SAMP", 1, StdDevSamp)
-    connection.create_aggregate("VAR_POP", 1, VarPop)
-    connection.create_aggregate("VAR_SAMP", 1, VarSamp)
+    connection.create_function("RAND", 0, random.random)  # type: ignore[attr-defined]
+    connection.create_aggregate("STDDEV_POP", 1, StdDevPop)  # type: ignore[attr-defined]
+    connection.create_aggregate("STDDEV_SAMP", 1, StdDevSamp)  # type: ignore[attr-defined]
+    connection.create_aggregate("VAR_POP", 1, VarPop)  # type: ignore[attr-defined]
+    connection.create_aggregate("VAR_SAMP", 1, VarSamp)  # type: ignore[attr-defined]
     # Some math functions are enabled by default in SQLite 3.35+.
     sql = "select sqlite_compileoption_used('ENABLE_MATH_FUNCTIONS')"
-    if not connection.execute(sql).fetchone()[0]:
+    if not connection.execute(sql).fetchone()[0]:  # type: ignore[union-attr]
         create_deterministic_function("ACOS", 1, _sqlite_acos)
         create_deterministic_function("ASIN", 1, _sqlite_asin)
         create_deterministic_function("ATAN", 1, _sqlite_atan)

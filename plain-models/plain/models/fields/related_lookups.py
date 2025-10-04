@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.lookups import (
     Exact,
@@ -11,6 +11,10 @@ from plain.models.lookups import (
     LessThan,
     LessThanOrEqual,
 )
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.sql.compiler import SQLCompiler
 
 
 class MultiColSource:
@@ -101,7 +105,9 @@ class RelatedIn(In):
                 self.rhs.set_values([target_field])
         return super().get_prep_lookup()
 
-    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:  # type: ignore[misc]
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:  # type: ignore[misc]
         if isinstance(self.lhs, MultiColSource):
             # For multicolumn lookups we need to build a multicolumn where clause.
             # This clause is either a SubqueryConstraint (for values that need
@@ -161,7 +167,9 @@ class RelatedLookupMixin:
 
         return super().get_prep_lookup()  # type: ignore[misc]
 
-    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:  # type: ignore[misc]
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:  # type: ignore[misc]
         if isinstance(self.lhs, MultiColSource):
             assert self.rhs_is_direct_value()
             self.rhs = get_normalized_value(self.rhs, self.lhs)

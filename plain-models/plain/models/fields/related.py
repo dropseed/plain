@@ -34,6 +34,7 @@ from .related_lookups import (
 from .reverse_related import ManyToManyRel, ManyToOneRel
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
 
 RECURSIVE_RELATIONSHIP_CONSTANT = "self"
@@ -311,7 +312,7 @@ class RelatedField(FieldCacheMixin, Field):
 
         return errors
 
-    def db_type(self, connection: Any) -> None:
+    def db_type(self, connection: BaseDatabaseWrapper) -> None:
         # By default related field will not have a column as it relates to
         # columns from another table.
         return None
@@ -738,7 +739,7 @@ class ForeignKey(RelatedField):
             return getattr(field_default, self.target_field.attname)  # type: ignore[attr-defined]
         return field_default
 
-    def get_db_prep_save(self, value: Any, connection: Any) -> Any:
+    def get_db_prep_save(self, value: Any, connection: BaseDatabaseWrapper) -> Any:
         if value is None or (
             value == "" and not self.target_field.empty_strings_allowed  # type: ignore[attr-defined]
         ):
@@ -747,23 +748,23 @@ class ForeignKey(RelatedField):
             return self.target_field.get_db_prep_save(value, connection=connection)  # type: ignore[attr-defined]
 
     def get_db_prep_value(
-        self, value: Any, connection: Any, prepared: bool = False
+        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
     ) -> Any:
         return self.target_field.get_db_prep_value(value, connection, prepared)  # type: ignore[attr-defined]
 
     def get_prep_value(self, value: Any) -> Any:
         return self.target_field.get_prep_value(value)  # type: ignore[attr-defined]
 
-    def db_check(self, connection: Any) -> None:
+    def db_check(self, connection: BaseDatabaseWrapper) -> None:
         return None
 
-    def db_type(self, connection: Any) -> str | None:
+    def db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         return self.target_field.rel_db_type(connection=connection)  # type: ignore[attr-defined]
 
-    def cast_db_type(self, connection: Any) -> str | None:
+    def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         return self.target_field.cast_db_type(connection=connection)  # type: ignore[attr-defined]
 
-    def db_parameters(self, connection: Any) -> dict[str, Any]:
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
         target_db_parameters = self.target_field.db_parameters(connection)  # type: ignore[attr-defined]
         return {
             "type": self.db_type(connection),
@@ -1320,13 +1321,13 @@ class ManyToManyField(RelatedField):
     def save_form_data(self, instance: Model, data: Any) -> None:
         getattr(instance, self.attname).set(data)  # type: ignore[attr-defined]
 
-    def db_check(self, connection: Any) -> None:
+    def db_check(self, connection: BaseDatabaseWrapper) -> None:
         return None
 
-    def db_type(self, connection: Any) -> None:
+    def db_type(self, connection: BaseDatabaseWrapper) -> None:
         # A ManyToManyField is not represented by a single column,
         # so return None.
         return None
 
-    def db_parameters(self, connection: Any) -> dict[str, None]:
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, None]:
         return {"type": None, "check": None}

@@ -13,12 +13,16 @@ import inspect
 import logging
 from collections import namedtuple
 from collections.abc import Generator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, db_connection
 from plain.models.exceptions import FieldError
 from plain.utils import tree
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.sql.compiler import SQLCompiler
 
 logger = logging.getLogger("plain.models")
 
@@ -437,7 +441,7 @@ class FilteredRelation:
         """
         raise NotImplementedError("FilteredRelation.resolve_expression() is unused.")
 
-    def as_sql(self, compiler: Any, connection: Any) -> Any:
+    def as_sql(self, compiler: SQLCompiler, connection: BaseDatabaseWrapper) -> Any:
         # Resolve the condition in Join.filtered_relation.
         query = compiler.query
         where = query.build_filtered_relation_q(self.condition, reuse=set(self.path))

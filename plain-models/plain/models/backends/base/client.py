@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import os
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class BaseDatabaseClient:
@@ -12,7 +15,7 @@ class BaseDatabaseClient:
     # (e.g., "psql"). Subclasses must override this.
     executable_name = None
 
-    def __init__(self, connection: Any) -> None:
+    def __init__(self, connection: BaseDatabaseWrapper) -> None:
         # connection is an instance of BaseDatabaseWrapper.
         self.connection = connection
 

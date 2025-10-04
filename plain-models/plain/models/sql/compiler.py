@@ -39,7 +39,7 @@ class PositionRef(Ref):
         super().__init__(refs, source)
 
     def as_sql(
-        self, compiler: Any, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple]:
         return str(self.ordinal), ()
 

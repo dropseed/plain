@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from plain.models.sql.compiler import SQLCompiler
 
 
 class Reference:
@@ -257,7 +260,7 @@ class Expressions(TableColumns):
         self,
         table: str,
         expressions: Any,
-        compiler: Any,
+        compiler: SQLCompiler,
         quote_value: Callable[[Any], str],
     ) -> None:
         self.compiler = compiler

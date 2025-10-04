@@ -12,6 +12,7 @@ from plain.models.functions.mixins import (
 from plain.models.lookups import Transform
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -40,11 +41,14 @@ class ATan2(NumericOutputFieldMixin, Func):
     arity = 2
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         if not getattr(
             connection.ops, "spatialite", False
-        ) or connection.ops.spatial_version >= (5, 0, 0):
+        ) or connection.ops.spatial_version >= (5, 0, 0):  # type: ignore[attr-defined]
             return self.as_sql(compiler, connection)
         # This function is usually ATan2(y, x), returning the inverse tangent
         # of y / x, but it's ATan2(x, y) on SpatiaLite < 5.0.0.
@@ -103,7 +107,10 @@ class Log(FixDecimalInputMixin, NumericOutputFieldMixin, Func):
     arity = 2
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         if not getattr(connection.ops, "spatialite", False):
             return self.as_sql(compiler, connection)
@@ -139,12 +146,18 @@ class Random(NumericOutputFieldMixin, Func):
     arity = 0
 
     def as_mysql(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="RAND", **extra_context)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         return super().as_sql(compiler, connection, function="RAND", **extra_context)
 
@@ -161,7 +174,10 @@ class Round(FixDecimalInputMixin, Transform):
         super().__init__(expression, precision, **extra)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         precision = self.get_source_expressions()[1]
         if isinstance(precision, Value) and precision.value < 0:

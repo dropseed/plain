@@ -17,6 +17,7 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.migrations.migration import Migration
 
 MIGRATIONS_MODULE_NAME = "migrations"
@@ -49,7 +50,7 @@ class MigrationLoader:
 
     def __init__(
         self,
-        connection: Any,
+        connection: BaseDatabaseWrapper | None,
         load: bool = True,
         ignore_no_migrations: bool = False,
         replace_migrations: bool = True,
@@ -315,7 +316,7 @@ class MigrationLoader:
             raise
         self.graph.ensure_not_cyclic()
 
-    def check_consistent_history(self, connection: Any) -> None:
+    def check_consistent_history(self, connection: BaseDatabaseWrapper) -> None:
         """
         Raise InconsistentMigrationHistory if any applied migrations have
         unapplied dependencies.

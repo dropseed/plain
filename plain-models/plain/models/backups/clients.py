@@ -4,11 +4,14 @@ import gzip
 import os
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
 class PostgresBackupClient:
-    def __init__(self, connection: Any) -> None:
+    def __init__(self, connection: BaseDatabaseWrapper) -> None:
         self.connection = connection
 
     def get_env(self) -> dict[str, str]:
@@ -124,7 +127,7 @@ class PostgresBackupClient:
 
 
 class SQLiteBackupClient:
-    def __init__(self, connection: Any) -> None:
+    def __init__(self, connection: BaseDatabaseWrapper) -> None:
         self.connection = connection
 
     def create_backup(self, backup_path: Path) -> None:

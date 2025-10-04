@@ -11,10 +11,12 @@ from plain.models.sql import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
     from plain.models.backends.ddl_references import Statement
     from plain.models.base import Model
     from plain.models.expressions import Expression
+    from plain.models.sql.compiler import SQLCompiler
 
 __all__ = ["Index"]
 
@@ -222,7 +224,9 @@ class IndexExpression(Func):
     template = "%(expressions)s"
     wrapper_classes = (OrderBy, Collate)
 
-    def set_wrapper_classes(self, connection: Any = None) -> None:
+    def set_wrapper_classes(
+        self, connection: BaseDatabaseWrapper | None = None
+    ) -> None:
         # Some databases (e.g. MySQL) treats COLLATE as an indexed expression.
         if connection and connection.features.collate_as_index_expression:
             self.wrapper_classes = tuple(
@@ -303,7 +307,10 @@ class IndexExpression(Func):
         )
 
     def as_sqlite(
-        self, compiler: Any, connection: Any, **extra_context: Any
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         # Casting to numeric is unnecessary.
         return self.as_sql(compiler, connection, **extra_context)

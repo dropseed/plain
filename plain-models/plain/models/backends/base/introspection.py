@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections import namedtuple
 from collections.abc import Generator
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 # Structure returned by DatabaseIntrospection.get_table_list()
 TableInfo = namedtuple("TableInfo", ["name", "type"])
@@ -20,7 +23,7 @@ class BaseDatabaseIntrospection:
 
     data_types_reverse: dict[Any, str] = {}
 
-    def __init__(self, connection: Any) -> None:
+    def __init__(self, connection: BaseDatabaseWrapper) -> None:
         self.connection = connection
 
     def get_field_type(self, data_type: Any, description: Any) -> str:

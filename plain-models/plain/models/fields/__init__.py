@@ -36,6 +36,7 @@ from ..registry import models_registry
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.sql.compiler import SQLCompiler
 
 __all__ = [
     "BLANK_CHOICE_DASH",
@@ -412,7 +413,9 @@ class Field(RegisterLookupMixin):
 
         return Col(self.model._meta.db_table, self)
 
-    def select_format(self, compiler: Any, sql: str, params: Any) -> tuple[str, Any]:
+    def select_format(
+        self, compiler: SQLCompiler, sql: str, params: Any
+    ) -> tuple[str, Any]:
         """
         Custom format for select clauses. For example, GIS columns need to be
         selected as AsText(table.col) on MySQL as the table.col data can't be
@@ -2044,7 +2047,7 @@ class BinaryField(Field):
         return "BinaryField"
 
     def get_placeholder(
-        self, value: Any, compiler: Any, connection: BaseDatabaseWrapper
+        self, value: Any, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> Any:
         return connection.ops.binary_placeholder_sql(value)
 

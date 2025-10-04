@@ -4,7 +4,7 @@ import bisect
 import inspect
 from collections import defaultdict
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models import models_registry
 from plain.models.constraints import UniqueConstraint
@@ -12,6 +12,9 @@ from plain.models.db import db_connection
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet
 from plain.utils.datastructures import ImmutableList
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
 
 PROXY_PARENTS = object()
 
@@ -190,7 +193,7 @@ class Options:
     def __str__(self) -> str:
         return self.label_lower
 
-    def can_migrate(self, connection: Any) -> bool:
+    def can_migrate(self, connection: BaseDatabaseWrapper) -> bool:
         """
         Return True if the model can/should be migrated on the given
         `connection` object.
