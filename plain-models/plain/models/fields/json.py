@@ -19,10 +19,8 @@ from .mixins import CheckFieldDefaultMixin
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.backends.mysql.base import DatabaseWrapper as MySQLDatabaseWrapper
-    from plain.models.backends.sqlite3.base import (
-        DatabaseWrapper as SQLiteDatabaseWrapper,
-    )
+    from plain.models.backends.mysql.base import MySQLDatabaseWrapper
+    from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
     from plain.preflight.results import PreflightResult
 
@@ -377,7 +375,7 @@ class KeyTransform(Transform):
     def as_sqlite(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
-        sqlite_connection = cast("SQLiteDatabaseWrapper", connection)
+        sqlite_connection = cast(SQLiteDatabaseWrapper, connection)
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
         json_path = compile_json_path(key_transforms)
         datatype_values = ",".join(
@@ -400,7 +398,7 @@ class KeyTextTransform(KeyTransform):
     def as_mysql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
-        mysql_connection = cast("MySQLDatabaseWrapper", connection)
+        mysql_connection = cast(MySQLDatabaseWrapper, connection)
         if mysql_connection.mysql_is_mariadb:
             # MariaDB doesn't support -> and ->> operators (see MDEV-13594).
             sql, params = super().as_mysql(compiler, connection)
@@ -481,11 +479,11 @@ class KeyTransformIn(lookups.In):
             if connection.vendor == "mysql":
                 sql = "JSON_EXTRACT(%s, '$')"
             elif connection.vendor == "sqlite":
-                sqlite_connection = cast("SQLiteDatabaseWrapper", connection)
+                sqlite_connection = cast(SQLiteDatabaseWrapper, connection)
                 if params[0] not in sqlite_connection.ops.jsonfield_datatype_values:  # type: ignore[attr-defined]
                     sql = "JSON_EXTRACT(%s, '$')"
         if connection.vendor == "mysql":
-            mysql_connection = cast("MySQLDatabaseWrapper", connection)
+            mysql_connection = cast(MySQLDatabaseWrapper, connection)
             if mysql_connection.mysql_is_mariadb:
                 sql = f"JSON_UNQUOTE({sql})"
         return sql, params
@@ -499,7 +497,7 @@ class KeyTransformExact(JSONExact):
             return super(lookups.Exact, self).process_rhs(compiler, connection)
         rhs, rhs_params = super().process_rhs(compiler, connection)
         if connection.vendor == "sqlite":
-            sqlite_connection = cast("SQLiteDatabaseWrapper", connection)
+            sqlite_connection = cast(SQLiteDatabaseWrapper, connection)
             func = []
             for value in rhs_params:
                 if value in sqlite_connection.ops.jsonfield_datatype_values:  # type: ignore[attr-defined]

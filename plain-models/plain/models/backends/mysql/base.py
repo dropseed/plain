@@ -87,7 +87,7 @@ class CursorWrapper:
         return iter(self.cursor)
 
 
-class DatabaseWrapper(BaseDatabaseWrapper):
+class MySQLDatabaseWrapper(BaseDatabaseWrapper):
     vendor = "mysql"
     # This dictionary maps Field objects to their associated MySQL column
     # types, as strings. Column-type strings can contain format strings; they'll

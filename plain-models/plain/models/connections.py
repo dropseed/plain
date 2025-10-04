@@ -61,7 +61,18 @@ class DatabaseConnection:
     def create_connection(self) -> BaseDatabaseWrapper:
         database_config = self.configure_settings()
         backend = import_module(f"{database_config['ENGINE']}.base")
-        return backend.DatabaseWrapper(database_config)  # type: ignore[attr-defined]
+
+        # Map vendor to wrapper class name
+        vendor_map = {
+            "plain.models.backends.sqlite3": "SQLiteDatabaseWrapper",
+            "plain.models.backends.mysql": "MySQLDatabaseWrapper",
+            "plain.models.backends.postgresql": "PostgreSQLDatabaseWrapper",
+        }
+        wrapper_class_name = vendor_map.get(
+            database_config["ENGINE"], "DatabaseWrapper"
+        )
+        wrapper_class = getattr(backend, wrapper_class_name)
+        return wrapper_class(database_config)
 
     def has_connection(self) -> bool:
         return hasattr(self._local, "conn")

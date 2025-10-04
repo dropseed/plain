@@ -40,10 +40,10 @@ from plain.utils import timezone
 from plain.utils.duration import duration_microseconds
 
 if TYPE_CHECKING:
-    from plain.models.backends.sqlite3.base import DatabaseWrapper
+    from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
 
 
-def register(connection: DatabaseWrapper) -> None:
+def register(connection: SQLiteDatabaseWrapper) -> None:
     create_deterministic_function = functools.partial(
         connection.create_function,  # type: ignore[attr-defined]
         deterministic=True,

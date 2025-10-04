@@ -59,7 +59,7 @@ Database.register_adapter(datetime.date, adapt_date)
 Database.register_adapter(datetime.datetime, adapt_datetime)
 
 
-class DatabaseWrapper(BaseDatabaseWrapper):
+class SQLiteDatabaseWrapper(BaseDatabaseWrapper):
     vendor = "sqlite"
     display_name = "SQLite"
     # SQLite doesn't actually support most of these types, but it "does the right

@@ -86,7 +86,7 @@ def _get_varchar_column(data: dict[str, Any]) -> str:
     return "varchar({max_length})".format(**data)
 
 
-class DatabaseWrapper(BaseDatabaseWrapper):
+class PostgreSQLDatabaseWrapper(BaseDatabaseWrapper):
     vendor = "postgresql"
     display_name = "PostgreSQL"
     # This dictionary maps Field objects to their associated PostgreSQL column
