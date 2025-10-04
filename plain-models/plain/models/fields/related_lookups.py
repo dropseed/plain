@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.models.lookups import (
     Exact,
     GreaterThan,
@@ -13,7 +17,7 @@ class MultiColSource:
     contains_aggregate = False
     contains_over_clause = False
 
-    def __init__(self, alias, targets, sources, field):
+    def __init__(self, alias: str, targets: Any, sources: Any, field: Any) -> None:
         self.targets, self.sources, self.field, self.alias = (
             targets,
             sources,
@@ -22,22 +26,22 @@ class MultiColSource:
         )
         self.output_field = self.field
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.alias}, {self.field})"
 
-    def relabeled_clone(self, relabels):
+    def relabeled_clone(self, relabels: dict[str, str]) -> MultiColSource:
         return self.__class__(
             relabels.get(self.alias, self.alias), self.targets, self.sources, self.field
         )
 
-    def get_lookup(self, lookup):
+    def get_lookup(self, lookup: str) -> Any:
         return self.output_field.get_lookup(lookup)
 
-    def resolve_expression(self, *args, **kwargs):
+    def resolve_expression(self, *args: Any, **kwargs: Any) -> MultiColSource:
         return self
 
 
-def get_normalized_value(value, lhs):
+def get_normalized_value(value: Any, lhs: Any) -> tuple[Any, ...]:
     from plain.models import Model
 
     if isinstance(value, Model):
@@ -63,7 +67,7 @@ def get_normalized_value(value, lhs):
 
 
 class RelatedIn(In):
-    def get_prep_lookup(self):
+    def get_prep_lookup(self) -> list[Any]:  # type: ignore[misc]
         if not isinstance(self.lhs, MultiColSource):
             if self.rhs_is_direct_value():
                 # If we get here, we are dealing with single-column relations.
@@ -97,7 +101,7 @@ class RelatedIn(In):
                 self.rhs.set_values([target_field])
         return super().get_prep_lookup()
 
-    def as_sql(self, compiler, connection):
+    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:  # type: ignore[misc]
         if isinstance(self.lhs, MultiColSource):
             # For multicolumn lookups we need to build a multicolumn where clause.
             # This clause is either a SubqueryConstraint (for values that need
@@ -139,7 +143,7 @@ class RelatedIn(In):
 
 
 class RelatedLookupMixin:
-    def get_prep_lookup(self):
+    def get_prep_lookup(self) -> Any:  # type: ignore[misc]
         if not isinstance(self.lhs, MultiColSource) and not hasattr(
             self.rhs, "resolve_expression"
         ):
@@ -155,9 +159,9 @@ class RelatedLookupMixin:
                 target_field = self.lhs.output_field.path_infos[-1].target_fields[-1]
                 self.rhs = target_field.get_prep_value(self.rhs)
 
-        return super().get_prep_lookup()
+        return super().get_prep_lookup()  # type: ignore[misc]
 
-    def as_sql(self, compiler, connection):
+    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:  # type: ignore[misc]
         if isinstance(self.lhs, MultiColSource):
             assert self.rhs_is_direct_value()
             self.rhs = get_normalized_value(self.rhs, self.lhs)

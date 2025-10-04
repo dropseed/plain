@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import datetime
 import importlib
 import os
 import sys
+from collections.abc import Callable
+from typing import Any
 
 import click
 
@@ -19,12 +23,17 @@ class MigrationQuestioner:
     interactive subclass is what the command-line arguments will use.
     """
 
-    def __init__(self, defaults=None, specified_packages=None, dry_run=None):
+    def __init__(
+        self,
+        defaults: dict[str, Any] | None = None,
+        specified_packages: set[str] | None = None,
+        dry_run: bool | None = None,
+    ) -> None:
         self.defaults = defaults or {}
         self.specified_packages = specified_packages or set()
         self.dry_run = dry_run
 
-    def ask_initial(self, package_label):
+    def ask_initial(self, package_label: str) -> bool:
         """Should we create an initial migration for the app?"""
         # If it was specified on the command line, definitely true
         if package_label in self.specified_packages:
@@ -49,52 +58,61 @@ class MigrationQuestioner:
             return self.defaults.get("ask_initial", False)
         else:
             if getattr(migrations_module, "__file__", None):
-                filenames = os.listdir(os.path.dirname(migrations_module.__file__))
+                filenames = os.listdir(os.path.dirname(migrations_module.__file__))  # type: ignore[arg-type]
             elif hasattr(migrations_module, "__path__"):
                 if len(migrations_module.__path__) > 1:
                     return False
                 filenames = os.listdir(list(migrations_module.__path__)[0])
             return not any(x.endswith(".py") for x in filenames if x != "__init__.py")
 
-    def ask_not_null_addition(self, field_name, model_name):
+    def ask_not_null_addition(self, field_name: str, model_name: str) -> Any:
         """Adding a NOT NULL field to a model."""
         # None means quit
         return None
 
-    def ask_not_null_alteration(self, field_name, model_name):
+    def ask_not_null_alteration(self, field_name: str, model_name: str) -> Any:
         """Changing a NULL field to NOT NULL."""
         # None means quit
         return None
 
-    def ask_rename(self, model_name, old_name, new_name, field_instance):
+    def ask_rename(
+        self, model_name: str, old_name: str, new_name: str, field_instance: Any
+    ) -> bool:
         """Was this field really renamed?"""
         return self.defaults.get("ask_rename", False)
 
-    def ask_rename_model(self, old_model_state, new_model_state):
+    def ask_rename_model(self, old_model_state: Any, new_model_state: Any) -> bool:
         """Was this model really renamed?"""
         return self.defaults.get("ask_rename_model", False)
 
-    def ask_auto_now_add_addition(self, field_name, model_name):
+    def ask_auto_now_add_addition(self, field_name: str, model_name: str) -> Any:
         """Adding an auto_now_add field to a model."""
         # None means quit
         return None
 
-    def ask_unique_callable_default_addition(self, field_name, model_name):
+    def ask_unique_callable_default_addition(
+        self, field_name: str, model_name: str
+    ) -> Any:
         """Adding a unique field with a callable default."""
         # None means continue.
         return None
 
 
 class InteractiveMigrationQuestioner(MigrationQuestioner):
-    def __init__(self, defaults=None, specified_packages=None, dry_run=None):
+    def __init__(
+        self,
+        defaults: dict[str, Any] | None = None,
+        specified_packages: set[str] | None = None,
+        dry_run: bool | None = None,
+    ) -> None:
         super().__init__(
             defaults=defaults, specified_packages=specified_packages, dry_run=dry_run
         )
 
-    def _boolean_input(self, question, default=None):
+    def _boolean_input(self, question: str, default: bool | None = None) -> bool:
         return click.confirm(question, default=default)
 
-    def _choice_input(self, question, choices):
+    def _choice_input(self, question: str, choices: list[str]) -> int:
         choice_map = {str(i + 1): choice for i, choice in enumerate(choices)}
         choice_map_str = "\n".join(
             [f"{i}) {choice}" for i, choice in choice_map.items()]
@@ -105,7 +123,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         )
         return int(choice)
 
-    def _ask_default(self, default=""):
+    def _ask_default(self, default: str = "") -> Any:
         """
         Prompt for a default value.
 
@@ -144,7 +162,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 except (SyntaxError, NameError) as e:
                     click.echo(f"Invalid input: {e}")
 
-    def ask_not_null_addition(self, field_name, model_name):
+    def ask_not_null_addition(self, field_name: str, model_name: str) -> Any:
         """Adding a NOT NULL field to a model."""
         if not self.dry_run:
             choice = self._choice_input(
@@ -167,7 +185,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 return self._ask_default()
         return None
 
-    def ask_not_null_alteration(self, field_name, model_name):
+    def ask_not_null_alteration(self, field_name: str, model_name: str) -> Any:
         """Changing a NULL field to NOT NULL."""
         if not self.dry_run:
             choice = self._choice_input(
@@ -195,7 +213,9 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 return self._ask_default()
         return None
 
-    def ask_rename(self, model_name, old_name, new_name, field_instance):
+    def ask_rename(
+        self, model_name: str, old_name: str, new_name: str, field_instance: Any
+    ) -> bool:
         """Was this field really renamed?"""
         msg = "Was %s.%s renamed to %s.%s (a %s)?"
         return self._boolean_input(
@@ -210,7 +230,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
             default=False,
         )
 
-    def ask_rename_model(self, old_model_state, new_model_state):
+    def ask_rename_model(self, old_model_state: Any, new_model_state: Any) -> bool:
         """Was this model really renamed?"""
         msg = "Was the model %s.%s renamed to %s?"
         return self._boolean_input(
@@ -223,7 +243,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
             default=False,
         )
 
-    def ask_auto_now_add_addition(self, field_name, model_name):
+    def ask_auto_now_add_addition(self, field_name: str, model_name: str) -> Any:
         """Adding an auto_now_add field to a model."""
         if not self.dry_run:
             choice = self._choice_input(
@@ -243,7 +263,9 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 return self._ask_default(default="timezone.now")
         return None
 
-    def ask_unique_callable_default_addition(self, field_name, model_name):
+    def ask_unique_callable_default_addition(
+        self, field_name: str, model_name: str
+    ) -> Any:
         """Adding a unique field with a callable default."""
         if not self.dry_run:
             choice = self._choice_input(
@@ -264,12 +286,12 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
 class NonInteractiveMigrationQuestioner(MigrationQuestioner):
     def __init__(
         self,
-        defaults=None,
-        specified_packages=None,
-        dry_run=None,
-        verbosity=1,
-        log=None,
-    ):
+        defaults: dict[str, Any] | None = None,
+        specified_packages: set[str] | None = None,
+        dry_run: bool | None = None,
+        verbosity: int = 1,
+        log: Callable[[str], Any] | None = None,
+    ) -> None:
         self.verbosity = verbosity
         self.log = log
         super().__init__(
@@ -278,13 +300,15 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
             dry_run=dry_run,
         )
 
-    def log_lack_of_migration(self, field_name, model_name, reason):
+    def log_lack_of_migration(
+        self, field_name: str, model_name: str, reason: str
+    ) -> None:
         if self.verbosity > 0:
-            self.log(
+            self.log(  # type: ignore[misc]
                 f"Field '{field_name}' on model '{model_name}' not migrated: {reason}."
             )
 
-    def ask_not_null_addition(self, field_name, model_name):
+    def ask_not_null_addition(self, field_name: str, model_name: str) -> Any:
         # We can't ask the user, so act like the user aborted.
         self.log_lack_of_migration(
             field_name,
@@ -293,15 +317,15 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
         )
         sys.exit(3)
 
-    def ask_not_null_alteration(self, field_name, model_name):
+    def ask_not_null_alteration(self, field_name: str, model_name: str) -> Any:
         # We can't ask the user, so set as not provided.
-        self.log(
+        self.log(  # type: ignore[misc]
             f"Field '{field_name}' on model '{model_name}' given a default of "
             f"NOT PROVIDED and must be corrected."
         )
         return NOT_PROVIDED
 
-    def ask_auto_now_add_addition(self, field_name, model_name):
+    def ask_auto_now_add_addition(self, field_name: str, model_name: str) -> Any:
         # We can't ask the user, so act like the user aborted.
         self.log_lack_of_migration(
             field_name,

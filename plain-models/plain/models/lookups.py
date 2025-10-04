@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import itertools
 import math
 from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Expression, Func, Value
@@ -16,18 +19,22 @@ from plain.models.query_utils import RegisterLookupMixin
 from plain.utils.datastructures import OrderedSet
 from plain.utils.hashable import make_hashable
 
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.sql.compiler import SQLCompiler
+
 
 class Lookup(Expression):
-    lookup_name = None
-    prepare_rhs = True
-    can_use_none_as_rhs = False
+    lookup_name: str | None = None
+    prepare_rhs: bool = True
+    can_use_none_as_rhs: bool = False
 
-    def __init__(self, lhs, rhs):
+    def __init__(self, lhs: Any, rhs: Any):
         self.lhs, self.rhs = lhs, rhs
         self.rhs = self.get_prep_lookup()
         self.lhs = self.get_prep_lhs()
         if hasattr(self.lhs, "get_bilateral_transforms"):
-            bilateral_transforms = self.lhs.get_bilateral_transforms()
+            bilateral_transforms = self.lhs.get_bilateral_transforms()  # type: ignore[attr-defined]
         else:
             bilateral_transforms = []
         if bilateral_transforms:
@@ -41,23 +48,25 @@ class Lookup(Expression):
                 )
         self.bilateral_transforms = bilateral_transforms
 
-    def apply_bilateral_transforms(self, value):
+    def apply_bilateral_transforms(self, value: Any) -> Any:
         for transform in self.bilateral_transforms:
             value = transform(value)
         return value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.lhs!r}, {self.rhs!r})"
 
-    def batch_process_rhs(self, compiler, connection, rhs=None):
+    def batch_process_rhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper, rhs: Any = None
+    ) -> tuple[list[str], list[Any]]:
         if rhs is None:
             rhs = self.rhs
         if self.bilateral_transforms:
             sqls, sqls_params = [], []
             for p in rhs:
-                value = Value(p, output_field=self.lhs.output_field)
+                value = Value(p, output_field=self.lhs.output_field)  # type: ignore[attr-defined]
                 value = self.apply_bilateral_transforms(value)
-                value = value.resolve_expression(compiler.query)
+                value = value.resolve_expression(compiler.query)  # type: ignore[attr-defined]
                 sql, sql_params = compiler.compile(value)
                 sqls.append(sql)
                 sqls_params.extend(sql_params)
@@ -66,54 +75,60 @@ class Lookup(Expression):
             sqls, sqls_params = ["%s"] * len(params), params
         return sqls, sqls_params
 
-    def get_source_expressions(self):
+    def get_source_expressions(self) -> list[Any]:
         if self.rhs_is_direct_value():
             return [self.lhs]
         return [self.lhs, self.rhs]
 
-    def set_source_expressions(self, new_exprs):
+    def set_source_expressions(self, new_exprs: list[Any]) -> None:
         if len(new_exprs) == 1:
             self.lhs = new_exprs[0]
         else:
             self.lhs, self.rhs = new_exprs
 
-    def get_prep_lookup(self):
+    def get_prep_lookup(self) -> Any:
         if not self.prepare_rhs or hasattr(self.rhs, "resolve_expression"):
             return self.rhs
         if hasattr(self.lhs, "output_field"):
-            if hasattr(self.lhs.output_field, "get_prep_value"):
-                return self.lhs.output_field.get_prep_value(self.rhs)
+            if hasattr(self.lhs.output_field, "get_prep_value"):  # type: ignore[attr-defined]
+                return self.lhs.output_field.get_prep_value(self.rhs)  # type: ignore[attr-defined]
         elif self.rhs_is_direct_value():
             return Value(self.rhs)
         return self.rhs
 
-    def get_prep_lhs(self):
+    def get_prep_lhs(self) -> Any:
         if hasattr(self.lhs, "resolve_expression"):
             return self.lhs
         return Value(self.lhs)
 
-    def get_db_prep_lookup(self, value, connection):
+    def get_db_prep_lookup(
+        self, value: Any, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         return ("%s", [value])
 
-    def process_lhs(self, compiler, connection, lhs=None):
+    def process_lhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper, lhs: Any = None
+    ) -> tuple[str, list[Any]]:
         lhs = lhs or self.lhs
         if hasattr(lhs, "resolve_expression"):
-            lhs = lhs.resolve_expression(compiler.query)
+            lhs = lhs.resolve_expression(compiler.query)  # type: ignore[attr-defined]
         sql, params = compiler.compile(lhs)
         if isinstance(lhs, Lookup):
             # Wrapped in parentheses to respect operator precedence.
             sql = f"({sql})"
-        return sql, params
+        return sql, list(params)
 
-    def process_rhs(self, compiler, connection):
+    def process_rhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         value = self.rhs
         if self.bilateral_transforms:
             if self.rhs_is_direct_value():
                 # Do not call get_db_prep_lookup here as the value will be
                 # transformed before being used for lookup
-                value = Value(value, output_field=self.lhs.output_field)
+                value = Value(value, output_field=self.lhs.output_field)  # type: ignore[attr-defined]
             value = self.apply_bilateral_transforms(value)
-            value = value.resolve_expression(compiler.query)
+            value = value.resolve_expression(compiler.query)  # type: ignore[attr-defined]
         if hasattr(value, "as_sql"):
             sql, params = compiler.compile(value)
             # Ensure expression is wrapped in parentheses to respect operator
@@ -121,50 +136,57 @@ class Lookup(Expression):
             # on some backends (e.g. subqueries on SQLite).
             if sql and sql[0] != "(":
                 sql = f"({sql})"
-            return sql, params
+            return sql, list(params)
         else:
             return self.get_db_prep_lookup(value, connection)
 
-    def rhs_is_direct_value(self):
+    def rhs_is_direct_value(self) -> bool:
         return not hasattr(self.rhs, "as_sql")
 
-    def get_group_by_cols(self):
+    def get_group_by_cols(self) -> list[Any]:
         cols = []
         for source in self.get_source_expressions():
-            cols.extend(source.get_group_by_cols())
+            cols.extend(source.get_group_by_cols())  # type: ignore[attr-defined]
         return cols
 
     @cached_property
-    def output_field(self):
+    def output_field(self) -> BooleanField:
         return BooleanField()
 
     @property
-    def identity(self):
+    def identity(self) -> tuple[type[Lookup], Any, Any]:
         return self.__class__, self.lhs, self.rhs
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Lookup):
             return NotImplemented
         return self.identity == other.identity
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(make_hashable(self.identity))
 
     def resolve_expression(
-        self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False
-    ):
-        c = self.copy()
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> Lookup:
+        c = self.copy()  # type: ignore[attr-defined]
         c.is_summary = summarize
-        c.lhs = self.lhs.resolve_expression(
+        c.lhs = self.lhs.resolve_expression(  # type: ignore[attr-defined]
             query, allow_joins, reuse, summarize, for_save
         )
         if hasattr(self.rhs, "resolve_expression"):
-            c.rhs = self.rhs.resolve_expression(
+            c.rhs = self.rhs.resolve_expression(  # type: ignore[attr-defined]
                 query, allow_joins, reuse, summarize, for_save
             )
         return c
 
-    def select_format(self, compiler, sql, params):
+    def select_format(
+        self, compiler: SQLCompiler, sql: str, params: list[Any]
+    ) -> tuple[str, list[Any]]:
         # Wrap filters with a CASE WHEN expression if a database backend
         # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
         # BY list.
@@ -179,16 +201,16 @@ class Transform(RegisterLookupMixin, Func):
     first examine self and then check output_field.
     """
 
-    bilateral = False
-    arity = 1
+    bilateral: bool = False
+    arity: int = 1
 
     @property
-    def lhs(self):
+    def lhs(self) -> Any:
         return self.get_source_expressions()[0]
 
-    def get_bilateral_transforms(self):
+    def get_bilateral_transforms(self) -> list[type[Transform]]:
         if hasattr(self.lhs, "get_bilateral_transforms"):
-            bilateral_transforms = self.lhs.get_bilateral_transforms()
+            bilateral_transforms = self.lhs.get_bilateral_transforms()  # type: ignore[attr-defined]
         else:
             bilateral_transforms = []
         if self.bilateral:
@@ -197,25 +219,29 @@ class Transform(RegisterLookupMixin, Func):
 
 
 class BuiltinLookup(Lookup):
-    def process_lhs(self, compiler, connection, lhs=None):
-        lhs_sql, params = super().process_lhs(compiler, connection, lhs)
-        field_internal_type = self.lhs.output_field.get_internal_type()
-        db_type = self.lhs.output_field.db_type(connection=connection)
+    def process_lhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper, lhs: Any = None
+    ) -> tuple[str, list[Any]]:
+        lhs_sql, params = super().process_lhs(compiler, connection, lhs)  # type: ignore[misc]
+        field_internal_type = self.lhs.output_field.get_internal_type()  # type: ignore[attr-defined]
+        db_type = self.lhs.output_field.db_type(connection=connection)  # type: ignore[attr-defined]
         lhs_sql = connection.ops.field_cast_sql(db_type, field_internal_type) % lhs_sql
         lhs_sql = (
-            connection.ops.lookup_cast(self.lookup_name, field_internal_type) % lhs_sql
+            connection.ops.lookup_cast(self.lookup_name, field_internal_type) % lhs_sql  # type: ignore[arg-type]
         )
         return lhs_sql, list(params)
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         lhs_sql, params = self.process_lhs(compiler, connection)
         rhs_sql, rhs_params = self.process_rhs(compiler, connection)
         params.extend(rhs_params)
         rhs_sql = self.get_rhs_op(connection, rhs_sql)
         return f"{lhs_sql} {rhs_sql}", params
 
-    def get_rhs_op(self, connection, rhs):
-        return connection.operators[self.lookup_name] % rhs
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
+        return connection.operators[self.lookup_name] % rhs  # type: ignore[index]
 
 
 class FieldGetDbPrepValueMixin:
@@ -224,15 +250,19 @@ class FieldGetDbPrepValueMixin:
     inputs.
     """
 
-    get_db_prep_lookup_value_is_iterable = False
+    get_db_prep_lookup_value_is_iterable: bool = False
+    lhs: Any
+    rhs: Any
 
-    def get_db_prep_lookup(self, value, connection):
+    def get_db_prep_lookup(
+        self, value: Any, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         # For relational fields, use the 'target_field' attribute of the
         # output_field.
-        field = getattr(self.lhs.output_field, "target_field", None)
+        field = getattr(self.lhs.output_field, "target_field", None)  # type: ignore[attr-defined]
         get_db_prep_value = (
             getattr(field, "get_db_prep_value", None)
-            or self.lhs.output_field.get_db_prep_value
+            or self.lhs.output_field.get_db_prep_value  # type: ignore[attr-defined]
         )
         return (
             "%s",
@@ -248,9 +278,10 @@ class FieldGetDbPrepValueIterableMixin(FieldGetDbPrepValueMixin):
     in an iterable.
     """
 
-    get_db_prep_lookup_value_is_iterable = True
+    get_db_prep_lookup_value_is_iterable: bool = True
+    prepare_rhs: bool
 
-    def get_prep_lookup(self):
+    def get_prep_lookup(self) -> Any:
         if hasattr(self.rhs, "resolve_expression"):
             return self.rhs
         prepared_values = []
@@ -259,29 +290,40 @@ class FieldGetDbPrepValueIterableMixin(FieldGetDbPrepValueMixin):
                 # An expression will be handled by the database but can coexist
                 # alongside real values.
                 pass
-            elif self.prepare_rhs and hasattr(self.lhs.output_field, "get_prep_value"):
-                rhs_value = self.lhs.output_field.get_prep_value(rhs_value)
+            elif self.prepare_rhs and hasattr(self.lhs.output_field, "get_prep_value"):  # type: ignore[attr-defined]
+                rhs_value = self.lhs.output_field.get_prep_value(rhs_value)  # type: ignore[attr-defined]
             prepared_values.append(rhs_value)
         return prepared_values
 
-    def process_rhs(self, compiler, connection):
-        if self.rhs_is_direct_value():
+    def process_rhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
+        if self.rhs_is_direct_value():  # type: ignore[attr-defined]
             # rhs should be an iterable of values. Use batch_process_rhs()
             # to prepare/transform those values.
-            return self.batch_process_rhs(compiler, connection)
+            return self.batch_process_rhs(compiler, connection)  # type: ignore[attr-defined]
         else:
-            return super().process_rhs(compiler, connection)
+            return super().process_rhs(compiler, connection)  # type: ignore[misc]
 
-    def resolve_expression_parameter(self, compiler, connection, sql, param):
-        params = [param]
+    def resolve_expression_parameter(
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        sql: str,
+        param: Any,
+    ) -> tuple[str, list[Any]]:
+        params: list[Any] = [param]
         if hasattr(param, "resolve_expression"):
-            param = param.resolve_expression(compiler.query)
+            param = param.resolve_expression(compiler.query)  # type: ignore[attr-defined]
         if hasattr(param, "as_sql"):
-            sql, params = compiler.compile(param)
+            sql, compiled_params = compiler.compile(param)
+            params = list(compiled_params)
         return sql, params
 
-    def batch_process_rhs(self, compiler, connection, rhs=None):
-        pre_processed = super().batch_process_rhs(compiler, connection, rhs)
+    def batch_process_rhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper, rhs: Any = None
+    ) -> tuple[tuple[str, ...], tuple[Any, ...]]:
+        pre_processed = super().batch_process_rhs(compiler, connection, rhs)  # type: ignore[misc]
         # The params list may contain expressions which compile to a
         # sql/param pair. Zip them to get sql and param pairs that refer to the
         # same argument and attempt to replace them with the result of
@@ -299,9 +341,11 @@ class FieldGetDbPrepValueIterableMixin(FieldGetDbPrepValueMixin):
 class PostgresOperatorLookup(Lookup):
     """Lookup defined by operators on PostgreSQL."""
 
-    postgres_operator = None
+    postgres_operator: str | None = None
 
-    def as_postgresql(self, compiler, connection):
+    def as_postgresql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, tuple[Any, ...]]:
         lhs, lhs_params = self.process_lhs(compiler, connection)
         rhs, rhs_params = self.process_rhs(compiler, connection)
         params = tuple(lhs_params) + tuple(rhs_params)
@@ -310,9 +354,9 @@ class PostgresOperatorLookup(Lookup):
 
 @Field.register_lookup
 class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name = "exact"
+    lookup_name: str = "exact"
 
-    def get_prep_lookup(self):
+    def get_prep_lookup(self) -> Any:
         from plain.models.sql.query import Query  # avoid circular import
 
         if isinstance(self.rhs, Query):
@@ -325,9 +369,11 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
                     "The QuerySet value for an exact lookup must be limited to "
                     "one result using slicing."
                 )
-        return super().get_prep_lookup()
+        return super().get_prep_lookup()  # type: ignore[misc]
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         # Avoid comparison against direct rhs if lhs is a boolean value. That
         # turns "boolfield__exact=True" into "WHERE boolean_field" instead of
         # "WHERE boolean_field = True" when allowed.
@@ -341,16 +387,18 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
             lhs_sql, params = self.process_lhs(compiler, connection)
             template = "%s" if self.rhs else "NOT %s"
             return template % lhs_sql, params
-        return super().as_sql(compiler, connection)
+        return super().as_sql(compiler, connection)  # type: ignore[misc]
 
 
 @Field.register_lookup
 class IExact(BuiltinLookup):
-    lookup_name = "iexact"
-    prepare_rhs = False
+    lookup_name: str = "iexact"
+    prepare_rhs: bool = False
 
-    def process_rhs(self, qn, connection):
-        rhs, params = super().process_rhs(qn, connection)
+    def process_rhs(
+        self, qn: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
+        rhs, params = super().process_rhs(qn, connection)  # type: ignore[misc]
         if params:
             params[0] = connection.ops.prep_for_iexact_query(params[0])
         return rhs, params
@@ -358,32 +406,36 @@ class IExact(BuiltinLookup):
 
 @Field.register_lookup
 class GreaterThan(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name = "gt"
+    lookup_name: str = "gt"
 
 
 @Field.register_lookup
 class GreaterThanOrEqual(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name = "gte"
+    lookup_name: str = "gte"
 
 
 @Field.register_lookup
 class LessThan(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name = "lt"
+    lookup_name: str = "lt"
 
 
 @Field.register_lookup
 class LessThanOrEqual(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name = "lte"
+    lookup_name: str = "lte"
 
 
 class IntegerFieldOverflow:
-    underflow_exception = EmptyResultSet
-    overflow_exception = EmptyResultSet
+    underflow_exception: type[Exception] = EmptyResultSet
+    overflow_exception: type[Exception] = EmptyResultSet
+    lhs: Any
+    rhs: Any
 
-    def process_rhs(self, compiler, connection):
+    def process_rhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         rhs = self.rhs
         if isinstance(rhs, int):
-            field_internal_type = self.lhs.output_field.get_internal_type()
+            field_internal_type = self.lhs.output_field.get_internal_type()  # type: ignore[attr-defined]
             min_value, max_value = connection.ops.integer_field_range(
                 field_internal_type
             )
@@ -391,7 +443,7 @@ class IntegerFieldOverflow:
                 raise self.underflow_exception
             if max_value is not None and rhs > max_value:
                 raise self.overflow_exception
-        return super().process_rhs(compiler, connection)
+        return super().process_rhs(compiler, connection)  # type: ignore[misc]
 
 
 class IntegerFieldFloatRounding:
@@ -400,10 +452,12 @@ class IntegerFieldFloatRounding:
     decimal portion of the float would always be discarded.
     """
 
-    def get_prep_lookup(self):
+    rhs: Any
+
+    def get_prep_lookup(self) -> Any:
         if isinstance(self.rhs, float):
             self.rhs = math.ceil(self.rhs)
-        return super().get_prep_lookup()
+        return super().get_prep_lookup()  # type: ignore[misc]
 
 
 @IntegerField.register_lookup
@@ -435,9 +489,9 @@ class IntegerLessThanOrEqual(IntegerFieldOverflow, LessThanOrEqual):
 
 @Field.register_lookup
 class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
-    lookup_name = "in"
+    lookup_name: str = "in"
 
-    def get_prep_lookup(self):
+    def get_prep_lookup(self) -> Any:
         from plain.models.sql.query import Query  # avoid circular import
 
         if isinstance(self.rhs, Query):
@@ -445,10 +499,12 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
             if not self.rhs.has_select_fields:
                 self.rhs.clear_select_clause()
                 self.rhs.add_fields(["id"])
-        return super().get_prep_lookup()
+        return super().get_prep_lookup()  # type: ignore[misc]
 
-    def process_rhs(self, compiler, connection):
-        if self.rhs_is_direct_value():
+    def process_rhs(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]] | tuple[str, tuple[Any, ...]]:
+        if self.rhs_is_direct_value():  # type: ignore[attr-defined]
             # Remove None from the list as NULL is never equal to anything.
             try:
                 rhs = OrderedSet(self.rhs)
@@ -461,39 +517,43 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
 
             # rhs should be an iterable; use batch_process_rhs() to
             # prepare/transform those values.
-            sqls, sqls_params = self.batch_process_rhs(compiler, connection, rhs)
+            sqls, sqls_params = self.batch_process_rhs(compiler, connection, rhs)  # type: ignore[attr-defined]
             placeholder = "(" + ", ".join(sqls) + ")"
             return (placeholder, sqls_params)
-        return super().process_rhs(compiler, connection)
+        return super().process_rhs(compiler, connection)  # type: ignore[misc]
 
-    def get_rhs_op(self, connection, rhs):
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
         return f"IN {rhs}"
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         max_in_list_size = connection.ops.max_in_list_size()
         if (
-            self.rhs_is_direct_value()
+            self.rhs_is_direct_value()  # type: ignore[attr-defined]
             and max_in_list_size
             and len(self.rhs) > max_in_list_size
         ):
             return self.split_parameter_list_as_sql(compiler, connection)
-        return super().as_sql(compiler, connection)
+        return super().as_sql(compiler, connection)  # type: ignore[misc]
 
-    def split_parameter_list_as_sql(self, compiler, connection):
+    def split_parameter_list_as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         # This is a special case for databases which limit the number of
         # elements which can appear in an 'IN' clause.
         max_in_list_size = connection.ops.max_in_list_size()
         lhs, lhs_params = self.process_lhs(compiler, connection)
-        rhs, rhs_params = self.batch_process_rhs(compiler, connection)
+        rhs, rhs_params = self.batch_process_rhs(compiler, connection)  # type: ignore[attr-defined]
         in_clause_elements = ["("]
         params = []
-        for offset in range(0, len(rhs_params), max_in_list_size):
+        for offset in range(0, len(rhs_params), max_in_list_size):  # type: ignore[arg-type]
             if offset > 0:
                 in_clause_elements.append(" OR ")
             in_clause_elements.append(f"{lhs} IN (")
             params.extend(lhs_params)
             sqls = rhs[offset : offset + max_in_list_size]
-            sqls_params = rhs_params[offset : offset + max_in_list_size]
+            sqls_params = rhs_params[offset : offset + max_in_list_size]  # type: ignore[index]
             param_group = ", ".join(sqls)
             in_clause_elements.append(param_group)
             in_clause_elements.append(")")
@@ -503,10 +563,11 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
 
 
 class PatternLookup(BuiltinLookup):
-    param_pattern = "%%%s%%"
-    prepare_rhs = False
+    param_pattern: str = "%%%s%%"
+    prepare_rhs: bool = False
+    bilateral_transforms: list[Any]
 
-    def get_rhs_op(self, connection, rhs):
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
         # Assume we are in startswith. We need to produce SQL like:
         #     col LIKE %s, ['thevalue%']
         # For python values we can (and should) do that directly in Python,
@@ -517,16 +578,18 @@ class PatternLookup(BuiltinLookup):
         # SQL reference values or SQL transformations we need the correct
         # pattern added.
         if hasattr(self.rhs, "as_sql") or self.bilateral_transforms:
-            pattern = connection.pattern_ops[self.lookup_name].format(
-                connection.pattern_esc
+            pattern = connection.pattern_ops[self.lookup_name].format(  # type: ignore[index]
+                connection.pattern_esc  # type: ignore[attr-defined]
             )
             return pattern.format(rhs)
         else:
             return super().get_rhs_op(connection, rhs)
 
-    def process_rhs(self, qn, connection):
-        rhs, params = super().process_rhs(qn, connection)
-        if self.rhs_is_direct_value() and params and not self.bilateral_transforms:
+    def process_rhs(
+        self, qn: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
+        rhs, params = super().process_rhs(qn, connection)  # type: ignore[misc]
+        if self.rhs_is_direct_value() and params and not self.bilateral_transforms:  # type: ignore[attr-defined]
             params[0] = self.param_pattern % connection.ops.prep_for_like_query(
                 params[0]
             )
@@ -535,50 +598,52 @@ class PatternLookup(BuiltinLookup):
 
 @Field.register_lookup
 class Contains(PatternLookup):
-    lookup_name = "contains"
+    lookup_name: str = "contains"
 
 
 @Field.register_lookup
 class IContains(Contains):
-    lookup_name = "icontains"
+    lookup_name: str = "icontains"
 
 
 @Field.register_lookup
 class StartsWith(PatternLookup):
-    lookup_name = "startswith"
-    param_pattern = "%s%%"
+    lookup_name: str = "startswith"
+    param_pattern: str = "%s%%"
 
 
 @Field.register_lookup
 class IStartsWith(StartsWith):
-    lookup_name = "istartswith"
+    lookup_name: str = "istartswith"
 
 
 @Field.register_lookup
 class EndsWith(PatternLookup):
-    lookup_name = "endswith"
-    param_pattern = "%%%s"
+    lookup_name: str = "endswith"
+    param_pattern: str = "%%%s"
 
 
 @Field.register_lookup
 class IEndsWith(EndsWith):
-    lookup_name = "iendswith"
+    lookup_name: str = "iendswith"
 
 
 @Field.register_lookup
 class Range(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
-    lookup_name = "range"
+    lookup_name: str = "range"
 
-    def get_rhs_op(self, connection, rhs):
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
         return f"BETWEEN {rhs[0]} AND {rhs[1]}"
 
 
 @Field.register_lookup
 class IsNull(BuiltinLookup):
-    lookup_name = "isnull"
-    prepare_rhs = False
+    lookup_name: str = "isnull"
+    prepare_rhs: bool = False
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         if not isinstance(self.rhs, bool):
             raise ValueError(
                 "The QuerySet value for an isnull lookup must be True or False."
@@ -592,12 +657,14 @@ class IsNull(BuiltinLookup):
 
 @Field.register_lookup
 class Regex(BuiltinLookup):
-    lookup_name = "regex"
-    prepare_rhs = False
+    lookup_name: str = "regex"
+    prepare_rhs: bool = False
 
-    def as_sql(self, compiler, connection):
-        if self.lookup_name in connection.operators:
-            return super().as_sql(compiler, connection)
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
+        if self.lookup_name in connection.operators:  # type: ignore[operator]
+            return super().as_sql(compiler, connection)  # type: ignore[misc]
         else:
             lhs, lhs_params = self.process_lhs(compiler, connection)
             rhs, rhs_params = self.process_rhs(compiler, connection)
@@ -607,15 +674,17 @@ class Regex(BuiltinLookup):
 
 @Field.register_lookup
 class IRegex(Regex):
-    lookup_name = "iregex"
+    lookup_name: str = "iregex"
 
 
 class YearLookup(Lookup):
-    def year_lookup_bounds(self, connection, year):
+    def year_lookup_bounds(
+        self, connection: BaseDatabaseWrapper, year: int
+    ) -> tuple[Any, Any]:
         from plain.models.functions import ExtractIsoYear
 
         iso_year = isinstance(self.lhs, ExtractIsoYear)
-        output_field = self.lhs.lhs.output_field
+        output_field = self.lhs.lhs.output_field  # type: ignore[attr-defined]
         if isinstance(output_field, DateTimeField):
             bounds = connection.ops.year_lookup_bounds_for_datetime_field(
                 year,
@@ -628,54 +697,56 @@ class YearLookup(Lookup):
             )
         return bounds
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         # Avoid the extract operation if the rhs is a direct value to allow
         # indexes to be used.
         if self.rhs_is_direct_value():
             # Skip the extract part by directly using the originating field,
             # that is self.lhs.lhs.
-            lhs_sql, params = self.process_lhs(compiler, connection, self.lhs.lhs)
+            lhs_sql, params = self.process_lhs(compiler, connection, self.lhs.lhs)  # type: ignore[attr-defined]
             rhs_sql, _ = self.process_rhs(compiler, connection)
             rhs_sql = self.get_direct_rhs_sql(connection, rhs_sql)
             start, finish = self.year_lookup_bounds(connection, self.rhs)
             params.extend(self.get_bound_params(start, finish))
             return f"{lhs_sql} {rhs_sql}", params
-        return super().as_sql(compiler, connection)
+        return super().as_sql(compiler, connection)  # type: ignore[misc]
 
-    def get_direct_rhs_sql(self, connection, rhs):
-        return connection.operators[self.lookup_name] % rhs
+    def get_direct_rhs_sql(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
+        return connection.operators[self.lookup_name] % rhs  # type: ignore[index]
 
-    def get_bound_params(self, start, finish):
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]:
         raise NotImplementedError(
             "subclasses of YearLookup must provide a get_bound_params() method"
         )
 
 
 class YearExact(YearLookup, Exact):
-    def get_direct_rhs_sql(self, connection, rhs):
+    def get_direct_rhs_sql(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
         return "BETWEEN %s AND %s"
 
-    def get_bound_params(self, start, finish):
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, Any]:
         return (start, finish)
 
 
 class YearGt(YearLookup, GreaterThan):
-    def get_bound_params(self, start, finish):
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any]:
         return (finish,)
 
 
 class YearGte(YearLookup, GreaterThanOrEqual):
-    def get_bound_params(self, start, finish):
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any]:
         return (start,)
 
 
 class YearLt(YearLookup, LessThan):
-    def get_bound_params(self, start, finish):
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any]:
         return (start,)
 
 
 class YearLte(YearLookup, LessThanOrEqual):
-    def get_bound_params(self, start, finish):
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any]:
         return (finish,)
 
 
@@ -685,16 +756,20 @@ class UUIDTextMixin:
     a native datatype for UUID.
     """
 
-    def process_rhs(self, qn, connection):
+    rhs: Any
+
+    def process_rhs(
+        self, qn: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, list[Any]]:
         if not connection.features.has_native_uuid_field:
             from plain.models.functions import Replace
 
-            if self.rhs_is_direct_value():
+            if self.rhs_is_direct_value():  # type: ignore[attr-defined]
                 self.rhs = Value(self.rhs)
             self.rhs = Replace(
                 self.rhs, Value("-"), Value(""), output_field=CharField()
             )
-        rhs, params = super().process_rhs(qn, connection)
+        rhs, params = super().process_rhs(qn, connection)  # type: ignore[misc]
         return rhs, params
 
 

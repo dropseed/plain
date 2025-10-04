@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import os
 import re
 from importlib import import_module
+from typing import Any
 
 from plain.models import migrations
 from plain.models.migrations.loader import MigrationLoader
@@ -14,13 +17,13 @@ from plain.utils.timezone import now
 
 
 class OperationWriter:
-    def __init__(self, operation, indentation=2):
+    def __init__(self, operation: Any, indentation: int = 2) -> None:
         self.operation = operation
-        self.buff = []
+        self.buff: list[str] = []
         self.indentation = indentation
 
-    def serialize(self):
-        def _write(_arg_name, _arg_value):
+    def serialize(self) -> tuple[str, set[str]]:
+        def _write(_arg_name: str, _arg_value: Any) -> None:
             if _arg_name in self.operation.serialization_expand_args and isinstance(
                 _arg_value, list | tuple | dict
             ):
@@ -100,16 +103,16 @@ class OperationWriter:
         self.feed("),")
         return self.render(), imports
 
-    def indent(self):
+    def indent(self) -> None:
         self.indentation += 1
 
-    def unindent(self):
+    def unindent(self) -> None:
         self.indentation -= 1
 
-    def feed(self, line):
+    def feed(self, line: str) -> None:
         self.buff.append(" " * (self.indentation * 4) + line)
 
-    def render(self):
+    def render(self) -> str:
         return "\n".join(self.buff)
 
 
@@ -119,12 +122,12 @@ class MigrationWriter:
     of the migration file from it.
     """
 
-    def __init__(self, migration, include_header=True):
+    def __init__(self, migration: Any, include_header: bool = True) -> None:
         self.migration = migration
         self.include_header = include_header
         self.needs_manual_porting = False
 
-    def as_string(self):
+    def as_string(self) -> str:
         """Return a string of the file contents."""
         items = {
             "replaces_str": "",
@@ -198,7 +201,7 @@ class MigrationWriter:
         return MIGRATION_TEMPLATE % items
 
     @property
-    def basedir(self):
+    def basedir(self) -> str:
         migrations_package_name, _ = MigrationLoader.migrations_module(
             self.migration.package_label
         )
@@ -266,15 +269,15 @@ class MigrationWriter:
         return final_dir
 
     @property
-    def filename(self):
+    def filename(self) -> str:
         return f"{self.migration.name}.py"
 
     @property
-    def path(self):
+    def path(self) -> str:
         return os.path.join(self.basedir, self.filename)
 
     @classmethod
-    def serialize(cls, value):
+    def serialize(cls, value: Any) -> tuple[str, set[str]]:
         return serializer_factory(value).serialize()
 
 

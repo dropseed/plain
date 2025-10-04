@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain.models.db import DatabaseError
 
 
@@ -34,15 +38,15 @@ class InvalidBasesError(ValueError):
 class NodeNotFoundError(LookupError):
     """An attempt on a node is made that is not available in the graph."""
 
-    def __init__(self, message, node, origin=None):
+    def __init__(self, message: str, node: Any, origin: Any = None) -> None:
         self.message = message
         self.origin = origin
         self.node = node
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.message
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"NodeNotFoundError({self.node!r})"
 
 

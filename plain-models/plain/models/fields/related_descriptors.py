@@ -46,7 +46,10 @@ reverse many-to-one relation.
    ``ReverseManyToManyDescriptor``, use ``ManyToManyDescriptor`` instead.
 """
 
+from __future__ import annotations
+
 from functools import cached_property
+from typing import Any
 
 from plain.models.query import QuerySet
 from plain.models.query_utils import DeferredAttribute
@@ -60,7 +63,7 @@ from .related_managers import (
 
 
 class ForeignKeyDeferredAttribute(DeferredAttribute):
-    def __set__(self, instance, value):
+    def __set__(self, instance: Any, value: Any) -> None:
         if instance.__dict__.get(self.field.attname) != value and self.field.is_cached(
             instance
         ):
@@ -80,11 +83,11 @@ class ForwardManyToOneDescriptor:
     ``Child.parent`` is a ``ForwardManyToOneDescriptor`` instance.
     """
 
-    def __init__(self, field_with_rel):
+    def __init__(self, field_with_rel: Any) -> None:
         self.field = field_with_rel
 
     @cached_property
-    def RelatedObjectDoesNotExist(self):
+    def RelatedObjectDoesNotExist(self) -> type:
         # The exception can't be created at initialization time since the
         # related model might not be resolved yet; `self.field.model` might
         # still be a string model reference.
@@ -97,14 +100,16 @@ class ForwardManyToOneDescriptor:
             },
         )
 
-    def is_cached(self, instance):
+    def is_cached(self, instance: Any) -> bool:
         return self.field.is_cached(instance)
 
     def get_queryset(self) -> QuerySet:
         qs = self.field.remote_field.model._meta.base_queryset
         return qs.all()
 
-    def get_prefetch_queryset(self, instances, queryset=None):
+    def get_prefetch_queryset(
+        self, instances: list[Any], queryset: QuerySet | None = None
+    ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
         if queryset is None:
             queryset = self.get_queryset()
 
@@ -145,12 +150,14 @@ class ForwardManyToOneDescriptor:
             False,
         )
 
-    def get_object(self, instance):
+    def get_object(self, instance: Any) -> Any:
         qs = self.get_queryset()
         # Assuming the database enforces foreign keys, this won't fail.
         return qs.get(self.field.get_reverse_related_filter(instance))
 
-    def __get__(self, instance, cls=None):
+    def __get__(
+        self, instance: Any | None, cls: type | None = None
+    ) -> ForwardManyToOneDescriptor | Any | None:
         """
         Get the related instance through the forward relation.
 
@@ -189,7 +196,7 @@ class ForwardManyToOneDescriptor:
         else:
             return rel_obj
 
-    def __set__(self, instance, value):
+    def __set__(self, instance: Any, value: Any) -> None:
         """
         Set the related instance through the forward relation.
 
@@ -250,7 +257,7 @@ class ForwardManyToOneDescriptor:
         if value is not None and not remote_field.multiple:
             remote_field.set_cached_value(value, instance)
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple[Any, tuple[Any, str]]:
         """
         Pickling should return the instance attached by self.field on the
         model, not a new copy of that descriptor. Use getattr() to retrieve
@@ -268,11 +275,13 @@ class RelationDescriptorBase:
     this because they allow direct assignment.
     """
 
-    def __init__(self, rel):
+    def __init__(self, rel: Any) -> None:
         self.rel = rel
         self.field = rel.field
 
-    def __get__(self, instance, cls=None):
+    def __get__(
+        self, instance: Any | None, cls: type | None = None
+    ) -> RelationDescriptorBase | Any:
         """
         Get the related manager when the descriptor is accessed.
 
@@ -282,19 +291,19 @@ class RelationDescriptorBase:
             return self
         return self.get_related_manager(instance)
 
-    def get_related_manager(self, instance):
+    def get_related_manager(self, instance: Any) -> Any:
         """Return the appropriate manager for this relation."""
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement get_related_manager()"
         )
 
-    def _get_set_deprecation_msg_params(self):
+    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
         """Return parameters for the error message when direct assignment is attempted."""
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement _get_set_deprecation_msg_params()"
         )
 
-    def __set__(self, instance, value):
+    def __set__(self, instance: Any, value: Any) -> None:
         """Prevent direct assignment to the relation."""
         raise TypeError(
             "Direct assignment to the {} is prohibited. Use {}.set() instead.".format(
@@ -318,11 +327,11 @@ class ReverseManyToOneDescriptor(RelationDescriptorBase):
     Most of the implementation is delegated to the ReverseManyToOneManager class.
     """
 
-    def get_related_manager(self, instance):
+    def get_related_manager(self, instance: Any) -> ReverseManyToOneManager:
         """Return the ReverseManyToOneManager for this relation."""
         return ReverseManyToOneManager(instance, self.rel)
 
-    def _get_set_deprecation_msg_params(self):
+    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
         return (
             "reverse side of a related set",
             self.rel.get_accessor_name(),
@@ -343,17 +352,17 @@ class ForwardManyToManyDescriptor(RelationDescriptorBase):
     """
 
     @property
-    def through(self):
+    def through(self) -> Any:
         # through is provided so that you have easy access to the through
         # model (Book.authors.through) for inlines, etc. This is done as
         # a property to ensure that the fully resolved value is returned.
         return self.rel.through
 
-    def get_related_manager(self, instance):
+    def get_related_manager(self, instance: Any) -> ForwardManyToManyManager:
         """Return the ForwardManyToManyManager for this relation."""
         return ForwardManyToManyManager(instance, self.rel)
 
-    def _get_set_deprecation_msg_params(self):
+    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
         return (
             "forward side of a many-to-many set",
             self.field.name,
@@ -374,17 +383,17 @@ class ReverseManyToManyDescriptor(RelationDescriptorBase):
     """
 
     @property
-    def through(self):
+    def through(self) -> Any:
         # through is provided so that you have easy access to the through
         # model (Book.authors.through) for inlines, etc. This is done as
         # a property to ensure that the fully resolved value is returned.
         return self.rel.through
 
-    def get_related_manager(self, instance):
+    def get_related_manager(self, instance: Any) -> ReverseManyToManyManager:
         """Return the ReverseManyToManyManager for this relation."""
         return ReverseManyToManyManager(instance, self.rel)
 
-    def _get_set_deprecation_msg_params(self):
+    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
         return (
             "reverse side of a many-to-many set",
             self.rel.get_accessor_name(),

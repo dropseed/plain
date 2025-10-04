@@ -1,7 +1,14 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import warnings
+from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    pass
 
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -31,10 +38,10 @@ from plain.utils.hashable import make_hashable
 
 
 class Deferred:
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Deferred field>"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<Deferred field>"
 
 
@@ -44,7 +51,9 @@ DEFERRED = Deferred()
 class ModelBase(type):
     """Metaclass for all models."""
 
-    def __new__(cls, name, bases, attrs, **kwargs):
+    def __new__(
+        cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any], **kwargs: Any
+    ) -> type:
         # Don't do any of this for the root models.Model class.
         if not bases:
             return super().__new__(cls, name, bases, attrs)
@@ -93,7 +102,7 @@ class ModelBase(type):
 
         return new_class
 
-    def _setup_meta(cls):
+    def _setup_meta(cls) -> None:
         name = cls.__name__
         module = cls.__module__
 
@@ -123,7 +132,9 @@ class ModelBase(type):
 
 
 class ModelStateFieldsCacheDescriptor:
-    def __get__(self, instance, cls=None):
+    def __get__(
+        self, instance: ModelState | None, cls: type | None = None
+    ) -> ModelStateFieldsCacheDescriptor | dict[str, Any]:
         if instance is None:
             return self
         res = instance.fields_cache = {}
@@ -151,7 +162,7 @@ class Model(metaclass=ModelBase):
     # Every model gets an automatic id field
     id = PrimaryKeyField()
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
         opts = self._meta
@@ -261,7 +272,7 @@ class Model(metaclass=ModelBase):
         super().__init__()
 
     @classmethod
-    def from_db(cls, field_names, values):
+    def from_db(cls, field_names: Iterable[str], values: Sequence[Any]) -> Model:
         if len(values) != len(cls._meta.concrete_fields):
             values_iter = iter(values)
             values = [
@@ -272,13 +283,13 @@ class Model(metaclass=ModelBase):
         new._state.adding = False
         return new
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__} object ({self.id})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Model):
             return NotImplemented
         if self.__class__ != other.__class__:
@@ -288,18 +299,18 @@ class Model(metaclass=ModelBase):
             return self is other
         return my_id == other.id
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if self.id is None:
             raise TypeError("Model instances without primary key value are unhashable")
         return hash(self.id)
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple[Any, tuple[Any, ...], dict[str, Any]]:
         data = self.__getstate__()
         data[PLAIN_VERSION_PICKLE_KEY] = plain.runtime.__version__
         class_id = self._meta.package_label, self._meta.object_name
         return model_unpickle, (class_id,), data
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         """Hook to allow choosing the attributes to pickle."""
         state = self.__dict__.copy()
         state["_state"] = copy.copy(state["_state"])
@@ -316,7 +327,7 @@ class Model(metaclass=ModelBase):
                 state.pop(attr)
         return state
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         pickled_version = state.get(PLAIN_VERSION_PICKLE_KEY)
         if pickled_version:
             if pickled_version != plain.runtime.__version__:
@@ -337,7 +348,7 @@ class Model(metaclass=ModelBase):
                 state[attr] = memoryview(value)
         self.__dict__.update(state)
 
-    def get_deferred_fields(self):
+    def get_deferred_fields(self) -> set[str]:
         """
         Return a set containing names of deferred fields for this instance.
         """
@@ -347,7 +358,7 @@ class Model(metaclass=ModelBase):
             if f.attname not in self.__dict__
         }
 
-    def refresh_from_db(self, fields=None):
+    def refresh_from_db(self, fields: list[str] | None = None) -> None:
         """
         Reload field values from the database.
 
@@ -368,7 +379,7 @@ class Model(metaclass=ModelBase):
             prefetched_objects_cache = getattr(self, "_prefetched_objects_cache", ())
             for field in fields:
                 if field in prefetched_objects_cache:
-                    del prefetched_objects_cache[field]
+                    del prefetched_objects_cache[field]  # type: ignore[misc]
                     fields.remove(field)
             if not fields:
                 return
@@ -409,7 +420,7 @@ class Model(metaclass=ModelBase):
             if field.is_cached(self):
                 field.delete_cached_value(self)
 
-    def serializable_value(self, field_name):
+    def serializable_value(self, field_name: str) -> Any:
         """
         Return the value of the field name for this instance. If the field is
         a foreign key, return the id value instead of the object. If there's
@@ -429,11 +440,11 @@ class Model(metaclass=ModelBase):
     def save(
         self,
         *,
-        clean_and_validate=True,
-        force_insert=False,
-        force_update=False,
-        update_fields=None,
-    ):
+        clean_and_validate: bool = True,
+        force_insert: bool = False,
+        force_update: bool = False,
+        update_fields: Iterable[str] | None = None,
+    ) -> None:
         """
         Save the current instance. Override this in a subclass if you want to
         control the saving process.
@@ -490,11 +501,11 @@ class Model(metaclass=ModelBase):
     def save_base(
         self,
         *,
-        raw=False,
-        force_insert=False,
-        force_update=False,
-        update_fields=None,
-    ):
+        raw: bool = False,
+        force_insert: bool = False,
+        force_update: bool = False,
+        update_fields: Iterable[str] | None = None,
+    ) -> None:
         """
         Handle the parts of saving which should be done only once per save,
         yet need to be done in raw saves, too. This includes some sanity
@@ -521,17 +532,17 @@ class Model(metaclass=ModelBase):
 
     def _save_table(
         self,
-        raw=False,
-        cls=None,
-        force_insert=False,
-        force_update=False,
-        update_fields=None,
-    ):
+        raw: bool = False,
+        cls: type[Model] | None = None,
+        force_insert: bool = False,
+        force_update: bool = False,
+        update_fields: Iterable[str] | None = None,
+    ) -> bool:
         """
         Do the heavy-lifting involved in saving. Update or insert the data
         for a single table.
         """
-        meta = cls._meta
+        meta = cls._meta  # type: ignore[union-attr]
         non_pks = [f for f in meta.local_concrete_fields if not f.primary_key]
 
         if update_fields:
@@ -591,7 +602,14 @@ class Model(metaclass=ModelBase):
                     setattr(self, field.attname, value)
         return updated
 
-    def _do_update(self, base_qs, id_val, values, update_fields, forced_update):
+    def _do_update(
+        self,
+        base_qs: QuerySet,
+        id_val: Any,
+        values: list[tuple[Any, Any, Any]],
+        update_fields: Iterable[str] | None,
+        forced_update: bool,
+    ) -> bool:
         """
         Try to update the model. Return True if the model was updated (if an
         update query was done and a matching row was found in the DB).
@@ -606,7 +624,13 @@ class Model(metaclass=ModelBase):
             return update_fields is not None or filtered.exists()
         return filtered._update(values) > 0
 
-    def _do_insert(self, manager, fields, returning_fields, raw):
+    def _do_insert(
+        self,
+        manager: QuerySet,
+        fields: Sequence[Any],
+        returning_fields: Sequence[Any],
+        raw: bool,
+    ) -> list[Any]:
         """
         Do an INSERT. If returning_fields is defined then this method should
         return the newly created data for the model.
@@ -618,7 +642,9 @@ class Model(metaclass=ModelBase):
             raw=raw,
         )
 
-    def _prepare_related_fields_for_save(self, operation_name, fields=None):
+    def _prepare_related_fields_for_save(
+        self, operation_name: str, fields: Sequence[Any] | None = None
+    ) -> None:
         # Ensure that a model instance without a PK hasn't been assigned to
         # a ForeignKey on this model. If the field is nullable, allowing the save would result in silent data loss.
         for field in self._meta.concrete_fields:
@@ -655,7 +681,7 @@ class Model(metaclass=ModelBase):
                 ):
                     field.delete_cached_value(self)
 
-    def delete(self):
+    def delete(self) -> tuple[int, dict[str, int]]:
         if self.id is None:
             raise ValueError(
                 f"{self._meta.object_name} object can't be deleted because its id attribute is set "
@@ -681,7 +707,9 @@ class Model(metaclass=ModelBase):
             choices_dict.get(make_hashable(value), value), strings_only=True
         )
 
-    def _get_field_value_map(self, meta, exclude=None):
+    def _get_field_value_map(
+        self, meta: Options | None, exclude: set[str] | None = None
+    ) -> dict[str, Value]:
         if exclude is None:
             exclude = set()
         meta = meta or self._meta
@@ -691,14 +719,14 @@ class Model(metaclass=ModelBase):
             if field.name not in exclude
         }
 
-    def prepare_database_save(self, field):
+    def prepare_database_save(self, field: Any) -> Any:
         if self.id is None:
             raise ValueError(
                 f"Unsaved model instance {self!r} cannot be used in an ORM query."
             )
         return getattr(self, field.remote_field.get_related_field().attname)
 
-    def clean(self):
+    def clean(self) -> None:
         """
         Hook for doing any extra model-wide validation after clean() has been
         called on every field by self.clean_fields. Any ValidationError raised
@@ -707,7 +735,7 @@ class Model(metaclass=ModelBase):
         """
         pass
 
-    def validate_unique(self, exclude=None):
+    def validate_unique(self, exclude: set[str] | None = None) -> None:
         """
         Check unique constraints on the model and raise ValidationError if any
         failed.
@@ -717,7 +745,9 @@ class Model(metaclass=ModelBase):
         if errors := self._perform_unique_checks(unique_checks):
             raise ValidationError(errors)
 
-    def _get_unique_checks(self, exclude=None):
+    def _get_unique_checks(
+        self, exclude: set[str] | None = None
+    ) -> list[tuple[type, tuple[str, ...]]]:
         """
         Return a list of checks to perform. Since validate_unique() could be
         called from a ModelForm, some fields may have been excluded; we can't
@@ -744,7 +774,9 @@ class Model(metaclass=ModelBase):
 
         return unique_checks
 
-    def _perform_unique_checks(self, unique_checks):
+    def _perform_unique_checks(
+        self, unique_checks: list[tuple[type, tuple[str, ...]]]
+    ) -> dict[str, list[ValidationError]]:
         errors = {}
 
         for model_class, unique_check in unique_checks:
@@ -768,7 +800,7 @@ class Model(metaclass=ModelBase):
             if len(unique_check) != len(lookup_kwargs):
                 continue
 
-            qs = model_class.query.filter(**lookup_kwargs)
+            qs = model_class.query.filter(**lookup_kwargs)  # type: ignore[attr-defined]
 
             # Exclude the current object from the query if we are editing an
             # instance (as opposed to creating a new one)
@@ -788,8 +820,10 @@ class Model(metaclass=ModelBase):
 
         return errors
 
-    def unique_error_message(self, model_class, unique_check):
-        opts = model_class._meta
+    def unique_error_message(
+        self, model_class: type, unique_check: tuple[str, ...]
+    ) -> ValidationError:
+        opts = model_class._meta  # type: ignore[attr-defined]
 
         params = {
             "model": self,
@@ -828,11 +862,11 @@ class Model(metaclass=ModelBase):
                 params=params,
             )
 
-    def get_constraints(self):
+    def get_constraints(self) -> list[tuple[type, list[Any]]]:
         constraints = [(self.__class__, self._meta.constraints)]
         return constraints
 
-    def validate_constraints(self, exclude=None):
+    def validate_constraints(self, exclude: set[str] | None = None) -> None:
         constraints = self.get_constraints()
 
         errors = {}
@@ -852,8 +886,12 @@ class Model(metaclass=ModelBase):
             raise ValidationError(errors)
 
     def full_clean(
-        self, *, exclude=None, validate_unique=True, validate_constraints=True
-    ):
+        self,
+        *,
+        exclude: set[str] | Iterable[str] | None = None,
+        validate_unique: bool = True,
+        validate_constraints: bool = True,
+    ) -> None:
         """
         Call clean_fields(), clean(), validate_unique(), and
         validate_constraints() on the model. Raise a ValidationError for any
@@ -900,7 +938,7 @@ class Model(metaclass=ModelBase):
         if errors:
             raise ValidationError(errors)
 
-    def clean_fields(self, exclude=None):
+    def clean_fields(self, exclude: set[str] | None = None) -> None:
         """
         Clean all fields and raise a ValidationError containing a dict
         of all validation errors if any occur.
@@ -926,7 +964,7 @@ class Model(metaclass=ModelBase):
             raise ValidationError(errors)
 
     @classmethod
-    def preflight(cls):
+    def preflight(cls) -> list[PreflightResult]:
         errors = []
 
         errors += [
@@ -956,7 +994,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_db_table_comment(cls):
+    def _check_db_table_comment(cls) -> list[PreflightResult]:
         if not cls._meta.db_table_comment:
             return []
         errors = []
@@ -976,7 +1014,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_fields(cls):
+    def _check_fields(cls) -> list[PreflightResult]:
         """Perform all field checks."""
         errors = []
         for field in cls._meta.local_fields:
@@ -986,7 +1024,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_m2m_through_same_relationship(cls):
+    def _check_m2m_through_same_relationship(cls) -> list[PreflightResult]:
         """Check if no relationship model is used by more than one m2m field."""
 
         errors = []
@@ -1021,7 +1059,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_id_field(cls):
+    def _check_id_field(cls) -> list[PreflightResult]:
         """Disallow user-defined fields named ``id``."""
         if any(
             f for f in cls._meta.local_fields if f.name == "id" and not f.auto_created
@@ -1036,7 +1074,7 @@ class Model(metaclass=ModelBase):
         return []
 
     @classmethod
-    def _check_field_name_clashes(cls):
+    def _check_field_name_clashes(cls) -> list[PreflightResult]:
         """Forbid field shadowing in multi-table inheritance."""
         errors = []
         used_fields = {}  # name or attname -> field
@@ -1065,7 +1103,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_column_name_clashes(cls):
+    def _check_column_name_clashes(cls) -> list[PreflightResult]:
         # Store a list of column names which have already been used by other fields.
         used_column_names = []
         errors = []
@@ -1089,7 +1127,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_model_name_db_lookup_clashes(cls):
+    def _check_model_name_db_lookup_clashes(cls) -> list[PreflightResult]:
         errors = []
         model_name = cls.__name__
         if model_name.startswith("_") or model_name.endswith("_"):
@@ -1113,7 +1151,9 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_property_name_related_field_accessor_clashes(cls):
+    def _check_property_name_related_field_accessor_clashes(
+        cls,
+    ) -> list[PreflightResult]:
         errors = []
         property_names = cls._meta._property_names
         related_field_accessors = (
@@ -1134,7 +1174,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_single_primary_key(cls):
+    def _check_single_primary_key(cls) -> list[PreflightResult]:
         errors = []
         if sum(1 for f in cls._meta.local_fields if f.primary_key) > 1:
             errors.append(
@@ -1148,7 +1188,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_indexes(cls):
+    def _check_indexes(cls) -> list[PreflightResult]:
         """Check fields, names, and conditions of indexes."""
         errors = []
         references = set()
@@ -1229,7 +1269,9 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_local_fields(cls, fields, option):
+    def _check_local_fields(
+        cls, fields: Iterable[str], option: str
+    ) -> list[PreflightResult]:
         from plain import models
 
         # In order to avoid hitting the relation tree prematurely, we use our
@@ -1274,7 +1316,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_ordering(cls):
+    def _check_ordering(cls) -> list[PreflightResult]:
         """
         Check "ordering" option -- is it a list of strings and do all fields
         exist?
@@ -1365,7 +1407,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _check_long_column_names(cls):
+    def _check_long_column_names(cls) -> list[PreflightResult]:
         """
         Check that any auto-generated column names are shorter than the limits
         for each database in which the model will be created.
@@ -1428,7 +1470,7 @@ class Model(metaclass=ModelBase):
         return errors
 
     @classmethod
-    def _get_expr_references(cls, expr):
+    def _get_expr_references(cls, expr: Any) -> Iterator[tuple[str, ...]]:
         if isinstance(expr, Q):
             for child in expr.children:
                 if isinstance(child, tuple):
@@ -1444,7 +1486,7 @@ class Model(metaclass=ModelBase):
                 yield from cls._get_expr_references(src_expr)
 
     @classmethod
-    def _check_constraints(cls):
+    def _check_constraints(cls) -> list[PreflightResult]:
         errors = []
         if not (
             db_connection.features.supports_table_check_constraints
@@ -1617,7 +1659,7 @@ class Model(metaclass=ModelBase):
 ########
 
 
-def model_unpickle(model_id):
+def model_unpickle(model_id: tuple[str, str] | type[Model]) -> Model:
     """Used to unpickle Model subclasses with deferred fields."""
     if isinstance(model_id, tuple):
         model = models_registry.get_model(*model_id)
@@ -1627,4 +1669,4 @@ def model_unpickle(model_id):
     return model.__new__(model)
 
 
-model_unpickle.__safe_for_unpickle__ = True
+model_unpickle.__safe_for_unpickle__ = True  # type: ignore[attr-defined]

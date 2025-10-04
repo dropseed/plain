@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from collections import namedtuple
+from collections.abc import Generator
+from typing import Any
 
 # Structure returned by DatabaseIntrospection.get_table_list()
 TableInfo = namedtuple("TableInfo", ["name", "type"])
@@ -14,12 +18,12 @@ FieldInfo = namedtuple(
 class BaseDatabaseIntrospection:
     """Encapsulate backend-specific introspection utilities."""
 
-    data_types_reverse = {}
+    data_types_reverse: dict[Any, str] = {}
 
-    def __init__(self, connection):
+    def __init__(self, connection: Any) -> None:
         self.connection = connection
 
-    def get_field_type(self, data_type, description):
+    def get_field_type(self, data_type: Any, description: Any) -> str:
         """
         Hook for a database backend to use the cursor description to
         match a Plain field type to a database column.
@@ -29,7 +33,7 @@ class BaseDatabaseIntrospection:
         """
         return self.data_types_reverse[data_type]
 
-    def identifier_converter(self, name):
+    def identifier_converter(self, name: str) -> str:
         """
         Apply a conversion to the identifier for the purposes of comparison.
 
@@ -37,7 +41,7 @@ class BaseDatabaseIntrospection:
         """
         return name
 
-    def table_names(self, cursor=None, include_views=False):
+    def table_names(self, cursor: Any = None, include_views: bool = False) -> list[str]:
         """
         Return a list of names of all tables that exist in the database.
         Sort the returned table list by Python's default sorting. Do NOT use
@@ -45,7 +49,7 @@ class BaseDatabaseIntrospection:
         order between databases.
         """
 
-        def get_names(cursor):
+        def get_names(cursor: Any) -> list[str]:
             return sorted(
                 ti.name
                 for ti in self.get_table_list(cursor)
@@ -57,7 +61,7 @@ class BaseDatabaseIntrospection:
                 return get_names(cursor)
         return get_names(cursor)
 
-    def get_table_list(self, cursor):
+    def get_table_list(self, cursor: Any) -> list[TableInfo]:
         """
         Return an unsorted list of TableInfo named tuples of all tables and
         views that exist in the database.
@@ -67,7 +71,7 @@ class BaseDatabaseIntrospection:
             "method"
         )
 
-    def get_table_description(self, cursor, table_name):
+    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.
@@ -77,7 +81,7 @@ class BaseDatabaseIntrospection:
             "get_table_description() method."
         )
 
-    def get_migratable_models(self):
+    def get_migratable_models(self) -> Generator[Any, None, None]:
         from plain.models import models_registry
         from plain.packages import packages_registry
 
@@ -90,7 +94,9 @@ class BaseDatabaseIntrospection:
             if model._meta.can_migrate(self.connection)
         )
 
-    def plain_table_names(self, only_existing=False, include_views=True):
+    def plain_table_names(
+        self, only_existing: bool = False, include_views: bool = True
+    ) -> list[str]:
         """
         Return a list of all table names that have associated Plain models and
         are in INSTALLED_PACKAGES.
@@ -109,7 +115,7 @@ class BaseDatabaseIntrospection:
             ]
         return tables
 
-    def sequence_list(self):
+    def sequence_list(self) -> list[dict[str, Any]]:
         """
         Return a list of information about all DB sequences for all models in
         all packages.
@@ -124,7 +130,9 @@ class BaseDatabaseIntrospection:
                 )
         return sequence_list
 
-    def get_sequences(self, cursor, table_name, table_fields=()):
+    def get_sequences(
+        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+    ) -> list[dict[str, Any]]:
         """
         Return a list of introspected sequences for table_name. Each sequence
         is a dict: {'table': <table_name>, 'column': <column_name>}. An optional
@@ -135,7 +143,7 @@ class BaseDatabaseIntrospection:
             "method"
         )
 
-    def get_relations(self, cursor, table_name):
+    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all foreign keys in the given table.
@@ -145,21 +153,23 @@ class BaseDatabaseIntrospection:
             "get_relations() method."
         )
 
-    def get_primary_key_column(self, cursor, table_name):
+    def get_primary_key_column(self, cursor: Any, table_name: str) -> str | None:
         """
         Return the name of the primary key column for the given table.
         """
         columns = self.get_primary_key_columns(cursor, table_name)
         return columns[0] if columns else None
 
-    def get_primary_key_columns(self, cursor, table_name):
+    def get_primary_key_columns(self, cursor: Any, table_name: str) -> list[str] | None:
         """Return a list of primary key columns for the given table."""
         for constraint in self.get_constraints(cursor, table_name).values():
             if constraint["primary_key"]:
                 return constraint["columns"]
         return None
 
-    def get_constraints(self, cursor, table_name):
+    def get_constraints(
+        self, cursor: Any, table_name: str
+    ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index)
         across one or more columns.

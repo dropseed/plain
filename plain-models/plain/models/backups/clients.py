@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 import gzip
 import os
 import subprocess
+from pathlib import Path
+from typing import Any
 
 
 class PostgresBackupClient:
-    def __init__(self, connection):
+    def __init__(self, connection: Any) -> None:
         self.connection = connection
 
-    def get_env(self):
+    def get_env(self) -> dict[str, str]:
         settings_dict = self.connection.settings_dict
         options = settings_dict.get("OPTIONS", {})
         env = {}
@@ -27,7 +31,7 @@ class PostgresBackupClient:
             env["PGSSLKEY"] = str(options.get("sslkey"))
         return env
 
-    def create_backup(self, backup_path, *, pg_dump="pg_dump"):
+    def create_backup(self, backup_path: Path, *, pg_dump: str = "pg_dump") -> None:
         settings_dict = self.connection.settings_dict
 
         args = pg_dump.split()
@@ -64,7 +68,9 @@ class PostgresBackupClient:
             cmd, env={**os.environ, **self.get_env()}, check=True, shell=True
         )
 
-    def restore_backup(self, backup_path, *, pg_restore="pg_restore", psql="psql"):
+    def restore_backup(
+        self, backup_path: Path, *, pg_restore: str = "pg_restore", psql: str = "psql"
+    ) -> None:
         settings_dict = self.connection.settings_dict
 
         host = settings_dict.get("HOST")
@@ -118,17 +124,17 @@ class PostgresBackupClient:
 
 
 class SQLiteBackupClient:
-    def __init__(self, connection):
+    def __init__(self, connection: Any) -> None:
         self.connection = connection
 
-    def create_backup(self, backup_path):
+    def create_backup(self, backup_path: Path) -> None:
         self.connection.ensure_connection()
         src_conn = self.connection.connection
         dump = "\n".join(src_conn.iterdump())
         with gzip.open(backup_path, "wt") as f:
             f.write(dump)
 
-    def restore_backup(self, backup_path):
+    def restore_backup(self, backup_path: Path) -> None:
         with gzip.open(backup_path, "rt") as f:
             sql = f.read()
 

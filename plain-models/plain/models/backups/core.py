@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import datetime
 import os
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 from plain.runtime import PLAIN_TEMP_PATH
 
@@ -9,10 +13,10 @@ from .clients import PostgresBackupClient, SQLiteBackupClient
 
 
 class DatabaseBackups:
-    def __init__(self):
+    def __init__(self) -> None:
         self.path = PLAIN_TEMP_PATH / "backups"
 
-    def find_backups(self):
+    def find_backups(self) -> list[DatabaseBackup]:
         if not self.path.exists():
             return []
 
@@ -27,20 +31,20 @@ class DatabaseBackups:
 
         return backups
 
-    def create(self, name, **create_kwargs):
+    def create(self, name: str, **create_kwargs: Any) -> Path:
         backup = DatabaseBackup(name, backups_path=self.path)
         if backup.exists():
             raise Exception(f"Backup {name} already exists")
         backup_dir = backup.create(**create_kwargs)
         return backup_dir
 
-    def restore(self, name, **restore_kwargs):
+    def restore(self, name: str, **restore_kwargs: Any) -> None:
         backup = DatabaseBackup(name, backups_path=self.path)
         if not backup.exists():
             raise Exception(f"Backup {name} not found")
         backup.restore(**restore_kwargs)
 
-    def delete(self, name):
+    def delete(self, name: str) -> None:
         backup = DatabaseBackup(name, backups_path=self.path)
         if not backup.exists():
             raise Exception(f"Backup {name} not found")
@@ -48,17 +52,17 @@ class DatabaseBackups:
 
 
 class DatabaseBackup:
-    def __init__(self, name: str, *, backups_path: Path):
+    def __init__(self, name: str, *, backups_path: Path) -> None:
         self.name = name
         self.path = backups_path / name
 
         if not self.name:
             raise ValueError("Backup name is required")
 
-    def exists(self):
+    def exists(self) -> bool:
         return self.path.exists()
 
-    def create(self, **create_kwargs):
+    def create(self, **create_kwargs: Any) -> Path:
         self.path.mkdir(parents=True, exist_ok=True)
 
         backup_path = self.path / "default.backup"
@@ -75,7 +79,7 @@ class DatabaseBackup:
 
         return self.path
 
-    def iter_files(self):
+    def iter_files(self) -> Generator[Path, None, None]:
         for backup_file in self.path.iterdir():
             if not backup_file.is_file():
                 continue
@@ -83,7 +87,7 @@ class DatabaseBackup:
                 continue
             yield backup_file
 
-    def restore(self, **restore_kwargs):
+    def restore(self, **restore_kwargs: Any) -> None:
         for backup_file in self.iter_files():
             if db_connection.vendor == "postgresql":
                 PostgresBackupClient(db_connection).restore_backup(
@@ -95,12 +99,12 @@ class DatabaseBackup:
             else:
                 raise Exception("Unsupported database vendor")
 
-    def delete(self):
+    def delete(self) -> None:
         for backup_file in self.iter_files():
             backup_file.unlink()
 
         self.path.rmdir()
 
-    def updated_at(self):
+    def updated_at(self) -> datetime.datetime:
         mtime = os.path.getmtime(self.path)
         return datetime.datetime.fromtimestamp(mtime)

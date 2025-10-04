@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from plain import models
 from plain.models.db import DatabaseError
 from plain.models.registry import ModelsRegistry
@@ -20,10 +24,10 @@ class MigrationRecorder:
     a row in the table always means a migration is applied.
     """
 
-    _migration_class = None
+    _migration_class: type[models.Model] | None = None
 
     @classproperty
-    def Migration(cls):
+    def Migration(cls) -> type[models.Model]:  # type: ignore[misc]
         """
         Lazy load to avoid PackageRegistryNotReady if installed packages import
         MigrationRecorder.
@@ -42,26 +46,26 @@ class MigrationRecorder:
                     package_label = "migrations"
                     db_table = "plainmigrations"
 
-                def __str__(self):
+                def __str__(self) -> str:
                     return f"Migration {self.name} for {self.app}"
 
             cls._migration_class = Migration
         return cls._migration_class
 
-    def __init__(self, connection):
+    def __init__(self, connection: Any) -> None:
         self.connection = connection
 
     @property
-    def migration_qs(self):
+    def migration_qs(self) -> Any:
         return self.Migration.query.all()
 
-    def has_table(self):
+    def has_table(self) -> bool:
         """Return True if the plainmigrations table exists."""
         with self.connection.cursor() as cursor:
             tables = self.connection.introspection.table_names(cursor)
         return self.Migration._meta.db_table in tables
 
-    def ensure_schema(self):
+    def ensure_schema(self) -> None:
         """Ensure the table exists and has the correct schema."""
         # If the table's there, that's fine - we've never changed its schema
         # in the codebase.
@@ -76,7 +80,7 @@ class MigrationRecorder:
                 f"Unable to create the plainmigrations table ({exc})"
             )
 
-    def applied_migrations(self):
+    def applied_migrations(self) -> dict[tuple[str, str], Any]:
         """
         Return a dict mapping (package_name, migration_name) to Migration instances
         for all applied migrations.
@@ -91,16 +95,16 @@ class MigrationRecorder:
             # are applied.
             return {}
 
-    def record_applied(self, app, name):
+    def record_applied(self, app: str, name: str) -> None:
         """Record that a migration was applied."""
         self.ensure_schema()
         self.migration_qs.create(app=app, name=name)
 
-    def record_unapplied(self, app, name):
+    def record_unapplied(self, app: str, name: str) -> None:
         """Record that a migration was unapplied."""
         self.ensure_schema()
         self.migration_qs.filter(app=app, name=name).delete()
 
-    def flush(self):
+    def flush(self) -> None:
         """Delete all migration records. Useful for testing migrations."""
         self.migration_qs.all().delete()

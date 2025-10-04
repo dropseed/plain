@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import signal
+from typing import Any
 
 from plain.models.backends.base.client import BaseDatabaseClient
 
@@ -7,7 +10,9 @@ class DatabaseClient(BaseDatabaseClient):
     executable_name = "mysql"
 
     @classmethod
-    def settings_to_cmd_args_env(cls, settings_dict, parameters):
+    def settings_to_cmd_args_env(
+        cls, settings_dict: dict[str, Any], parameters: list[str]
+    ) -> tuple[list[str], dict[str, str] | None]:
         args = [cls.executable_name]
         env = None
         database = settings_dict["OPTIONS"].get(
@@ -61,7 +66,7 @@ class DatabaseClient(BaseDatabaseClient):
         args.extend(parameters)
         return args, env
 
-    def runshell(self, parameters):
+    def runshell(self, parameters: list[str]) -> None:
         sigint_handler = signal.getsignal(signal.SIGINT)
         try:
             # Allow SIGINT to pass to mysql to abort queries.

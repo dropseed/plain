@@ -1,16 +1,21 @@
-import sys
+from __future__ import annotations
 
-from psycopg import errors
+import sys
+from typing import Any
+
+from psycopg import errors  # type: ignore[import-untyped]
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends.base.creation import BaseDatabaseCreation
 
 
 class DatabaseCreation(BaseDatabaseCreation):
-    def _quote_name(self, name):
+    def _quote_name(self, name: str) -> str:
         return self.connection.ops.quote_name(name)
 
-    def _get_database_create_suffix(self, encoding=None, template=None):
+    def _get_database_create_suffix(
+        self, encoding: str | None = None, template: str | None = None
+    ) -> str:
         suffix = ""
         if encoding:
             suffix += f" ENCODING '{encoding}'"
@@ -18,7 +23,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             suffix += f" TEMPLATE {self._quote_name(template)}"
         return suffix and "WITH" + suffix
 
-    def sql_table_creation_suffix(self):
+    def sql_table_creation_suffix(self) -> str:
         test_settings = self.connection.settings_dict["TEST"]
         if test_settings.get("COLLATION") is not None:
             raise ImproperlyConfigured(
@@ -30,7 +35,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             template=test_settings.get("TEMPLATE"),
         )
 
-    def _execute_create_test_db(self, cursor, parameters):
+    def _execute_create_test_db(self, cursor: Any, parameters: dict[str, Any]) -> None:
         try:
             super()._execute_create_test_db(cursor, parameters)
         except Exception as e:

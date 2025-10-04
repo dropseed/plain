@@ -44,17 +44,68 @@ FULLY_TYPED_PATHS = [
     "plain-models/plain/models/functions",
     # plain-models: Fully typed individual files
     "plain-models/plain/models/aggregates.py",
+    "plain-models/plain/models/backups/cli.py",
+    "plain-models/plain/models/backups/clients.py",
+    "plain-models/plain/models/backups/core.py",
+    "plain-models/plain/models/base.py",
+    "plain-models/plain/models/backends/base/base.py",
+    "plain-models/plain/models/backends/base/client.py",
+    "plain-models/plain/models/backends/base/introspection.py",
+    "plain-models/plain/models/backends/base/validation.py",
+    "plain-models/plain/models/backends/ddl_references.py",
+    "plain-models/plain/models/backends/utils.py",
+    "plain-models/plain/models/backends/mysql/client.py",
+    "plain-models/plain/models/backends/mysql/compiler.py",
+    "plain-models/plain/models/backends/mysql/creation.py",
+    "plain-models/plain/models/backends/mysql/validation.py",
+    "plain-models/plain/models/backends/postgresql/client.py",
+    "plain-models/plain/models/backends/postgresql/creation.py",
+    "plain-models/plain/models/backends/sqlite3/client.py",
+    "plain-models/plain/models/backends/sqlite3/creation.py",
+    "plain-models/plain/models/backends/sqlite3/features.py",
     "plain-models/plain/models/config.py",
     "plain-models/plain/models/connections.py",
     "plain-models/plain/models/constants.py",
+    "plain-models/plain/models/constraints.py",
     "plain-models/plain/models/database_url.py",
     "plain-models/plain/models/db.py",
+    "plain-models/plain/models/deletion.py",
+    "plain-models/plain/models/entrypoints.py",
     "plain-models/plain/models/enums.py",
     "plain-models/plain/models/exceptions.py",
+    "plain-models/plain/models/fields/json.py",
+    "plain-models/plain/models/fields/mixins.py",
+    "plain-models/plain/models/fields/related.py",
+    "plain-models/plain/models/fields/related_descriptors.py",
+    "plain-models/plain/models/fields/related_lookups.py",
+    "plain-models/plain/models/fields/related_managers.py",
+    "plain-models/plain/models/fields/reverse_related.py",
+    "plain-models/plain/models/forms.py",
     "plain-models/plain/models/indexes.py",
+    "plain-models/plain/models/lookups.py",
+    "plain-models/plain/models/migrations/exceptions.py",
+    "plain-models/plain/models/migrations/executor.py",
+    "plain-models/plain/models/migrations/migration.py",
+    "plain-models/plain/models/migrations/operations/base.py",
+    "plain-models/plain/models/migrations/operations/fields.py",
+    "plain-models/plain/models/migrations/operations/special.py",
+    "plain-models/plain/models/migrations/optimizer.py",
+    "plain-models/plain/models/migrations/questioner.py",
+    "plain-models/plain/models/migrations/recorder.py",
+    "plain-models/plain/models/migrations/serializer.py",
+    "plain-models/plain/models/migrations/utils.py",
+    "plain-models/plain/models/migrations/writer.py",
+    "plain-models/plain/models/options.py",
     "plain-models/plain/models/otel.py",
     "plain-models/plain/models/preflight.py",
+    "plain-models/plain/models/query_utils.py",
     "plain-models/plain/models/registry.py",
+    "plain-models/plain/models/sql/compiler.py",
+    "plain-models/plain/models/sql/datastructures.py",
+    "plain-models/plain/models/sql/subqueries.py",
+    "plain-models/plain/models/sql/where.py",
+    "plain-models/plain/models/test/pytest.py",
+    "plain-models/plain/models/test/utils.py",
     "plain-models/plain/models/transaction.py",
     "plain-models/plain/models/utils.py",
 ]
@@ -111,25 +162,22 @@ def main():
             print(f"⚠️  {path} does not exist, skipping")
             continue
 
-        print(f"Checking {path}...")
-
         # Check coverage
         coverage, typed, total = check_type_coverage(path)
-
-        if coverage < 100.0:
-            print(f"  ✗ Coverage: {coverage:.1f}% ({typed}/{total}) - Expected 100%")
-            failed_items.append((path, f"coverage {coverage:.1f}%"))
-        else:
-            print(f"  ✓ Coverage: 100% ({typed}/{total})")
+        coverage_status = "✓" if coverage == 100.0 else "✗"
 
         # Run type checker
-        if not run_type_check(path):
-            print(f"  ✗ Type check failed")
-            failed_items.append((path, "type check failed"))
-        else:
-            print(f"  ✓ Type check passed")
+        type_check_passed = run_type_check(path)
+        type_check_status = "✓" if type_check_passed else "✗"
 
-        print()
+        # Print single line
+        print(f"{coverage_status} {type_check_status} {path} - Coverage: {coverage:.1f}% ({typed}/{total})")
+
+        # Track failures
+        if coverage < 100.0:
+            failed_items.append((path, f"coverage {coverage:.1f}%"))
+        if not type_check_passed:
+            failed_items.append((path, "type check failed"))
 
     if failed_items:
         print("❌ Type validation failed for the following paths:")

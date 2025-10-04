@@ -5,6 +5,10 @@ These managers provide the API for working with collections of related objects
 through foreign key and many-to-many relationships.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from plain.models import transaction
 from plain.models.db import NotSupportedError, db_connection
 from plain.models.expressions import Window
@@ -15,7 +19,9 @@ from plain.models.query_utils import Q
 from plain.models.utils import resolve_callables
 
 
-def _filter_prefetch_queryset(queryset, field_name, instances):
+def _filter_prefetch_queryset(
+    queryset: QuerySet, field_name: str, instances: Any
+) -> QuerySet:
     predicate = Q(**{f"{field_name}__in": instances})
     if queryset.sql_query.is_sliced:
         if not db_connection.features.supports_over_clause:
@@ -28,9 +34,9 @@ def _filter_prefetch_queryset(queryset, field_name, instances):
             expr for expr, _ in queryset.sql_query.get_compiler().get_order_by()
         ]
         window = Window(RowNumber(), partition_by=field_name, order_by=order_by)
-        predicate &= GreaterThan(window, low_mark)
+        predicate &= GreaterThan(window, low_mark)  # type: ignore[unsupported-operator]
         if high_mark is not None:
-            predicate &= LessThanOrEqual(window, high_mark)
+            predicate &= LessThanOrEqual(window, high_mark)  # type: ignore[unsupported-operator]
         queryset.sql_query.clear_limits()
     return queryset.filter(predicate)
 
@@ -59,7 +65,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
     This manager adds behaviors specific to many-to-one relations.
     """
 
-    def __init__(self, instance, rel):
+    def __init__(self, instance: Any, rel: Any):
         self.model = rel.related_model
         self.instance = instance
         self.field = rel.field
@@ -68,7 +74,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
         self.base_queryset_class = rel.related_model._meta.queryset.__class__
         self.allow_null = rel.field.allow_null
 
-    def _check_fk_val(self):
+    def _check_fk_val(self) -> None:
         for field in self.field.foreign_related_fields:
             if getattr(self.instance, field.attname) is None:
                 raise ValueError(
@@ -76,7 +82,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
                     f'"{field.attname}" before this relationship can be used.'
                 )
 
-    def _apply_rel_filters(self, queryset):
+    def _apply_rel_filters(self, queryset: QuerySet) -> QuerySet:
         """
         Filter the queryset for the instance this manager is bound to.
         """
@@ -109,7 +115,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
             queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}
         return queryset
 
-    def _remove_prefetched_objects(self):
+    def _remove_prefetched_objects(self) -> None:
         try:
             self.instance._prefetched_objects_cache.pop(
                 self.field.remote_field.get_cache_name()
@@ -117,7 +123,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
         except (AttributeError, KeyError):
             pass  # nothing to clear from cache
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         # Even if this relation is not to primary key, we require still primary key value.
         # The wish is that the instance has been already saved to DB,
         # although having a primary key value isn't a guarantee of that.
@@ -135,7 +141,9 @@ class ReverseManyToOneManager(BaseRelatedManager):
             queryset = self.base_queryset_class(model=self.model)
             return self._apply_rel_filters(queryset)
 
-    def get_prefetch_queryset(self, instances, queryset=None):
+    def get_prefetch_queryset(
+        self, instances: Any, queryset: QuerySet | None = None
+    ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
         if queryset is None:
             queryset = self.base_queryset_class(model=self.model)
 
@@ -153,11 +161,11 @@ class ReverseManyToOneManager(BaseRelatedManager):
         cache_name = self.field.remote_field.get_cache_name()
         return queryset, rel_obj_attr, instance_attr, False, cache_name, False
 
-    def add(self, *objs, bulk=True):
+    def add(self, *objs: Any, bulk: bool = True) -> None:
         self._check_fk_val()
         self._remove_prefetched_objects()
 
-        def check_and_update_obj(obj):
+        def check_and_update_obj(obj: Any) -> None:
             if not isinstance(obj, self.model):
                 raise TypeError(
                     f"'{self.model._meta.object_name}' instance expected, got {obj!r}"
@@ -185,22 +193,22 @@ class ReverseManyToOneManager(BaseRelatedManager):
                     check_and_update_obj(obj)
                     obj.save()
 
-    def create(self, **kwargs):
+    def create(self, **kwargs: Any) -> Any:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.base_queryset_class(model=self.model).create(**kwargs)
 
-    def get_or_create(self, **kwargs):
+    def get_or_create(self, **kwargs: Any) -> tuple[Any, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.base_queryset_class(model=self.model).get_or_create(**kwargs)
 
-    def update_or_create(self, **kwargs):
+    def update_or_create(self, **kwargs: Any) -> tuple[Any, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.base_queryset_class(model=self.model).update_or_create(**kwargs)
 
-    def remove(self, *objs, bulk=True):
+    def remove(self, *objs: Any, bulk: bool = True) -> None:
         # remove() is only provided if the ForeignKey can have a value of null
         if not self.allow_null:
             raise AttributeError(
@@ -226,7 +234,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
                 )
         self._clear(self.query.filter(id__in=old_ids), bulk)
 
-    def clear(self, *, bulk=True):
+    def clear(self, *, bulk: bool = True) -> None:
         # clear() is only provided if the ForeignKey can have a value of null
         if not self.allow_null:
             raise AttributeError(
@@ -236,7 +244,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
         self._check_fk_val()
         self._clear(self.query, bulk)
 
-    def _clear(self, queryset, bulk):
+    def _clear(self, queryset: QuerySet, bulk: bool) -> None:
         self._remove_prefetched_objects()
         if bulk:
             # `QuerySet.update()` is intrinsically atomic.
@@ -247,7 +255,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
                     setattr(obj, self.field.name, None)
                     obj.save(update_fields=[self.field.name])
 
-    def set(self, objs, *, bulk=True, clear=False):
+    def set(self, objs: Any, *, bulk: bool = True, clear: bool = False) -> None:
         self._check_fk_val()
         # Force evaluation of `objs` in case it's a queryset whose value
         # could be affected by `manager.clear()`. Refs #19816.
@@ -286,7 +294,7 @@ class BaseManyToManyManager(BaseRelatedManager):
     - symmetrical (for forward relations)
     """
 
-    def __init__(self, instance, rel):
+    def __init__(self, instance: Any, rel: Any):
         self.instance = instance
         self.through = rel.through
         # Subclasses must set model before calling super().__init__
@@ -315,12 +323,12 @@ class BaseManyToManyManager(BaseRelatedManager):
                 "a many-to-many relationship can be used."
             )
 
-    def _apply_rel_filters(self, queryset):
+    def _apply_rel_filters(self, queryset: QuerySet) -> QuerySet:
         """Filter the queryset for the instance this manager is bound to."""
         queryset._defer_next_filter = True
         return queryset._next_is_sticky().filter(**self.core_filters)
 
-    def _remove_prefetched_objects(self):
+    def _remove_prefetched_objects(self) -> None:
         try:
             self.instance._prefetched_objects_cache.pop(self.prefetch_cache_name)
         except (AttributeError, KeyError):
@@ -333,7 +341,9 @@ class BaseManyToManyManager(BaseRelatedManager):
             queryset = self.base_queryset_class(model=self.model)
             return self._apply_rel_filters(queryset)
 
-    def get_prefetch_queryset(self, instances, queryset=None):
+    def get_prefetch_queryset(
+        self, instances: Any, queryset: QuerySet | None = None
+    ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
         if queryset is None:
             queryset = self.base_queryset_class(model=self.model)
 
@@ -367,7 +377,7 @@ class BaseManyToManyManager(BaseRelatedManager):
             False,
         )
 
-    def clear(self):
+    def clear(self) -> None:
         with transaction.atomic(savepoint=False):
             self._remove_prefetched_objects()
             filters = self._build_remove_filters(
@@ -375,7 +385,13 @@ class BaseManyToManyManager(BaseRelatedManager):
             )
             self.through.query.filter(filters).delete()
 
-    def set(self, objs, *, clear=False, through_defaults=None):
+    def set(
+        self,
+        objs: Any,
+        *,
+        clear: bool = False,
+        through_defaults: dict[str, Any] | None = None,
+    ) -> None:
         # Force evaluation of `objs` in case it's a queryset whose value
         # could be affected by `manager.clear()`. Refs #19816.
         objs = tuple(objs)
@@ -406,12 +422,16 @@ class BaseManyToManyManager(BaseRelatedManager):
                 self.remove(*old_ids)
                 self.add(*new_objs, through_defaults=through_defaults)
 
-    def create(self, *, through_defaults=None, **kwargs):
+    def create(
+        self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> Any:
         new_obj = self.base_queryset_class(model=self.model).create(**kwargs)
         self.add(new_obj, through_defaults=through_defaults)
         return new_obj
 
-    def get_or_create(self, *, through_defaults=None, **kwargs):
+    def get_or_create(
+        self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> tuple[Any, bool]:
         obj, created = self.base_queryset_class(model=self.model).get_or_create(
             **kwargs
         )
@@ -421,7 +441,9 @@ class BaseManyToManyManager(BaseRelatedManager):
             self.add(obj, through_defaults=through_defaults)
         return obj, created
 
-    def update_or_create(self, *, through_defaults=None, **kwargs):
+    def update_or_create(
+        self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> tuple[Any, bool]:
         obj, created = self.base_queryset_class(model=self.model).update_or_create(
             **kwargs
         )
@@ -431,7 +453,7 @@ class BaseManyToManyManager(BaseRelatedManager):
             self.add(obj, through_defaults=through_defaults)
         return obj, created
 
-    def _get_target_ids(self, target_field_name, objs):
+    def _get_target_ids(self, target_field_name: str, objs: Any) -> set[Any]:
         """Return the set of ids of `objs` that the target field references."""
         from plain.models import Model
 
@@ -453,7 +475,9 @@ class BaseManyToManyManager(BaseRelatedManager):
                 target_ids.add(target_field.get_prep_value(obj))
         return target_ids
 
-    def _get_missing_target_ids(self, source_field_name, target_field_name, target_ids):
+    def _get_missing_target_ids(
+        self, source_field_name: str, target_field_name: str, target_ids: set[Any]
+    ) -> set[Any]:
         """Return the subset of ids of `objs` that aren't already assigned to this relationship."""
         vals = self.through.query.values_list(target_field_name, flat=True).filter(
             **{
@@ -464,8 +488,12 @@ class BaseManyToManyManager(BaseRelatedManager):
         return target_ids.difference(vals)
 
     def _add_items(
-        self, source_field_name, target_field_name, *objs, through_defaults=None
-    ):
+        self,
+        source_field_name: str,
+        target_field_name: str,
+        *objs: Any,
+        through_defaults: dict[str, Any] | None = None,
+    ) -> None:
         if not objs:
             return
 
@@ -490,7 +518,9 @@ class BaseManyToManyManager(BaseRelatedManager):
                 ],
             )
 
-    def _remove_items(self, source_field_name, target_field_name, *objs):
+    def _remove_items(
+        self, source_field_name: str, target_field_name: str, *objs: Any
+    ) -> None:
         if not objs:
             return
 
@@ -515,13 +545,13 @@ class BaseManyToManyManager(BaseRelatedManager):
             self.through.query.filter(filters).delete()
 
     # Subclasses must implement these methods:
-    def _build_remove_filters(self, removed_vals):
+    def _build_remove_filters(self, removed_vals: Any) -> Any:
         raise NotImplementedError
 
-    def add(self, *objs, through_defaults=None):
+    def add(self, *objs: Any, through_defaults: dict[str, Any] | None = None) -> None:
         raise NotImplementedError
 
-    def remove(self, *objs):
+    def remove(self, *objs: Any) -> None:
         raise NotImplementedError
 
 
@@ -532,7 +562,7 @@ class ForwardManyToManyManager(BaseManyToManyManager):
     This manager adds behaviors specific to many-to-many relations.
     """
 
-    def __init__(self, instance, rel):
+    def __init__(self, instance: Any, rel: Any):
         # Set required attributes before calling super().__init__
         self.model = rel.model
         self.query_field_name = rel.field.related_query_name()
@@ -543,7 +573,7 @@ class ForwardManyToManyManager(BaseManyToManyManager):
 
         super().__init__(instance, rel)
 
-    def _build_remove_filters(self, removed_vals):
+    def _build_remove_filters(self, removed_vals: Any) -> Any:
         filters = Q.create([(self.source_field_name, self.related_val)])
         # No need to add a subquery condition if removed_vals is a QuerySet without
         # filters.
@@ -551,17 +581,19 @@ class ForwardManyToManyManager(BaseManyToManyManager):
             not isinstance(removed_vals, QuerySet) or removed_vals._has_filters()
         )
         if removed_vals_filters:
-            filters &= Q.create([(f"{self.target_field_name}__in", removed_vals)])
+            filters = filters & Q.create(  # type: ignore[unsupported-operator]
+                [(f"{self.target_field_name}__in", removed_vals)]
+            )
         if self.symmetrical:
             symmetrical_filters = Q.create([(self.target_field_name, self.related_val)])
             if removed_vals_filters:
-                symmetrical_filters &= Q.create(
+                symmetrical_filters = symmetrical_filters & Q.create(  # type: ignore[unsupported-operator]
                     [(f"{self.source_field_name}__in", removed_vals)]
                 )
-            filters |= symmetrical_filters
+            filters = filters | symmetrical_filters  # type: ignore[unsupported-operator]
         return filters
 
-    def add(self, *objs, through_defaults=None):
+    def add(self, *objs: Any, through_defaults: dict[str, Any] | None = None) -> None:
         self._remove_prefetched_objects()
         with transaction.atomic(savepoint=False):
             self._add_items(
@@ -580,7 +612,7 @@ class ForwardManyToManyManager(BaseManyToManyManager):
                     through_defaults=through_defaults,
                 )
 
-    def remove(self, *objs):
+    def remove(self, *objs: Any) -> None:
         self._remove_prefetched_objects()
         self._remove_items(self.source_field_name, self.target_field_name, *objs)
 
@@ -592,7 +624,7 @@ class ReverseManyToManyManager(BaseManyToManyManager):
     This manager adds behaviors specific to many-to-many relations.
     """
 
-    def __init__(self, instance, rel):
+    def __init__(self, instance: Any, rel: Any):
         # Set required attributes before calling super().__init__
         self.model = rel.related_model
         self.query_field_name = rel.field.name
@@ -603,7 +635,7 @@ class ReverseManyToManyManager(BaseManyToManyManager):
 
         super().__init__(instance, rel)
 
-    def _build_remove_filters(self, removed_vals):
+    def _build_remove_filters(self, removed_vals: Any) -> Any:
         filters = Q.create([(self.source_field_name, self.related_val)])
         # No need to add a subquery condition if removed_vals is a QuerySet without
         # filters.
@@ -611,11 +643,13 @@ class ReverseManyToManyManager(BaseManyToManyManager):
             not isinstance(removed_vals, QuerySet) or removed_vals._has_filters()
         )
         if removed_vals_filters:
-            filters &= Q.create([(f"{self.target_field_name}__in", removed_vals)])
+            filters = filters & Q.create(  # type: ignore[unsupported-operator]
+                [(f"{self.target_field_name}__in", removed_vals)]
+            )
         # Note: reverse relations are never symmetrical, so no symmetrical logic here
         return filters
 
-    def add(self, *objs, through_defaults=None):
+    def add(self, *objs: Any, through_defaults: dict[str, Any] | None = None) -> None:
         self._remove_prefetched_objects()
         with transaction.atomic(savepoint=False):
             self._add_items(
@@ -626,6 +660,6 @@ class ReverseManyToManyManager(BaseManyToManyManager):
             )
             # Reverse relations are never symmetrical, so no mirror entry logic
 
-    def remove(self, *objs):
+    def remove(self, *objs: Any) -> None:
         self._remove_prefetched_objects()
         self._remove_items(self.source_field_name, self.target_field_name, *objs)

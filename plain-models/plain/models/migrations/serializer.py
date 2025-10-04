@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import builtins
 import collections.abc
 import datetime
@@ -10,6 +12,7 @@ import pathlib
 import re
 import types
 import uuid
+from typing import Any
 
 from plain import models
 from plain.models.migrations.operations.base import Operation
@@ -19,23 +22,23 @@ from plain.utils.functional import LazyObject, Promise
 
 
 class BaseSerializer:
-    def __init__(self, value):
+    def __init__(self, value: Any) -> None:
         self.value = value
 
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         raise NotImplementedError(
             "Subclasses of BaseSerializer must implement the serialize() method."
         )
 
 
 class BaseSequenceSerializer(BaseSerializer):
-    def _format(self):
+    def _format(self) -> str:
         raise NotImplementedError(
             "Subclasses of BaseSequenceSerializer must implement the _format() method."
         )
 
-    def serialize(self):
-        imports = set()
+    def serialize(self) -> tuple[str, set[str]]:
+        imports: set[str] = set()
         strings = []
         for item in self.value:
             item_string, item_imports = serializer_factory(item).serialize()
@@ -46,26 +49,26 @@ class BaseSequenceSerializer(BaseSerializer):
 
 
 class BaseSimpleSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         return repr(self.value), set()
 
 
 class ChoicesSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         return serializer_factory(self.value.value).serialize()
 
 
 class DateTimeSerializer(BaseSerializer):
     """For datetime.*, except datetime.datetime."""
 
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         return repr(self.value), {"import datetime"}
 
 
 class DatetimeDatetimeSerializer(BaseSerializer):
     """For datetime.datetime."""
 
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         if self.value.tzinfo is not None and self.value.tzinfo != datetime.UTC:
             self.value = self.value.astimezone(datetime.UTC)
         imports = ["import datetime"]
@@ -73,13 +76,15 @@ class DatetimeDatetimeSerializer(BaseSerializer):
 
 
 class DecimalSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         return repr(self.value), {"from decimal import Decimal"}
 
 
 class DeconstructableSerializer(BaseSerializer):
     @staticmethod
-    def serialize_deconstructed(path, args, kwargs):
+    def serialize_deconstructed(
+        path: str, args: tuple[Any, ...], kwargs: dict[str, Any]
+    ) -> tuple[str, set[str]]:
         name, imports = DeconstructableSerializer._serialize_path(path)
         strings = []
         for arg in args:
@@ -93,23 +98,23 @@ class DeconstructableSerializer(BaseSerializer):
         return "{}({})".format(name, ", ".join(strings)), imports
 
     @staticmethod
-    def _serialize_path(path):
+    def _serialize_path(path: str) -> tuple[str, set[str]]:
         module, name = path.rsplit(".", 1)
         if module == "plain.models":
-            imports = {"from plain import models"}
+            imports: set[str] = {"from plain import models"}
             name = f"models.{name}"
         else:
             imports = {f"import {module}"}
             name = path
         return name, imports
 
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         return self.serialize_deconstructed(*self.value.deconstruct())
 
 
 class DictionarySerializer(BaseSerializer):
-    def serialize(self):
-        imports = set()
+    def serialize(self) -> tuple[str, set[str]]:
+        imports: set[str] = set()
         strings = []
         for k, v in sorted(self.value.items()):
             k_string, k_imports = serializer_factory(k).serialize()
@@ -121,7 +126,7 @@ class DictionarySerializer(BaseSerializer):
 
 
 class EnumSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         enum_class = self.value.__class__
         module = enum_class.__module__
         if issubclass(enum_class, enum.Flag):
@@ -140,19 +145,19 @@ class EnumSerializer(BaseSerializer):
 
 
 class FloatSerializer(BaseSimpleSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         if math.isnan(self.value) or math.isinf(self.value):
             return f'float("{self.value}")', set()
         return super().serialize()
 
 
 class FrozensetSerializer(BaseSequenceSerializer):
-    def _format(self):
+    def _format(self) -> str:
         return "frozenset([%s])"
 
 
 class FunctionTypeSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         if getattr(self.value, "__self__", None) and isinstance(
             self.value.__self__, type
         ):
@@ -180,7 +185,7 @@ class FunctionTypeSerializer(BaseSerializer):
 
 
 class FunctoolsPartialSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         # Serialize functools.partial() arguments
         func_string, func_imports = serializer_factory(self.value.func).serialize()
         args_string, args_imports = serializer_factory(self.value.args).serialize()
@@ -188,7 +193,12 @@ class FunctoolsPartialSerializer(BaseSerializer):
             self.value.keywords
         ).serialize()
         # Add any imports needed by arguments
-        imports = {"import functools", *func_imports, *args_imports, *keywords_imports}
+        imports: set[str] = {
+            "import functools",
+            *func_imports,
+            *args_imports,
+            *keywords_imports,
+        }
         return (
             f"functools.{self.value.__class__.__name__}({func_string}, *{args_string}, **{keywords_string})",
             imports,
@@ -196,8 +206,8 @@ class FunctoolsPartialSerializer(BaseSerializer):
 
 
 class IterableSerializer(BaseSerializer):
-    def serialize(self):
-        imports = set()
+    def serialize(self) -> tuple[str, set[str]]:
+        imports: set[str] = set()
         strings = []
         for item in self.value:
             item_string, item_imports = serializer_factory(item).serialize()
@@ -210,13 +220,13 @@ class IterableSerializer(BaseSerializer):
 
 
 class ModelFieldSerializer(DeconstructableSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         attr_name, path, args, kwargs = self.value.deconstruct()
         return self.serialize_deconstructed(path, args, kwargs)
 
 
 class OperationSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         from plain.models.migrations.writer import OperationWriter
 
         string, imports = OperationWriter(self.value, indentation=0).serialize()
@@ -225,12 +235,12 @@ class OperationSerializer(BaseSerializer):
 
 
 class PathLikeSerializer(BaseSerializer):
-    def serialize(self):
-        return repr(os.fspath(self.value)), {}
+    def serialize(self) -> tuple[str, set[str]]:
+        return repr(os.fspath(self.value)), set()
 
 
 class PathSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         # Convert concrete paths to pure paths to avoid issues with migrations
         # generated on one platform being used on a different platform.
         prefix = "Pure" if isinstance(self.value, pathlib.Path) else ""
@@ -238,7 +248,7 @@ class PathSerializer(BaseSerializer):
 
 
 class RegexSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         regex_pattern, pattern_imports = serializer_factory(
             self.value.pattern
         ).serialize()
@@ -246,7 +256,7 @@ class RegexSerializer(BaseSerializer):
         # same implicit and explicit flags aren't equal.
         flags = self.value.flags ^ re.compile("").flags
         regex_flags, flag_imports = serializer_factory(flags).serialize()
-        imports = {"import re", *pattern_imports, *flag_imports}
+        imports: set[str] = {"import re", *pattern_imports, *flag_imports}
         args = [regex_pattern]
         if flags:
             args.append(regex_flags)
@@ -254,33 +264,33 @@ class RegexSerializer(BaseSerializer):
 
 
 class SequenceSerializer(BaseSequenceSerializer):
-    def _format(self):
+    def _format(self) -> str:
         return "[%s]"
 
 
 class SetSerializer(BaseSequenceSerializer):
-    def _format(self):
+    def _format(self) -> str:
         # Serialize as a set literal except when value is empty because {}
         # is an empty dict.
         return "{%s}" if self.value else "set(%s)"
 
 
 class SettingsReferenceSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         return f"settings.{self.value.setting_name}", {
             "from plain.runtime import settings"
         }
 
 
 class TupleSerializer(BaseSequenceSerializer):
-    def _format(self):
+    def _format(self) -> str:
         # When len(value)==0, the empty tuple should be serialized as "()",
         # not "(,)" because (,) is invalid Python syntax.
         return "(%s)" if len(self.value) != 1 else "(%s,)"
 
 
 class TypeSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         special_cases = [
             (models.Model, "models.Model", ["from plain import models"]),
             (types.NoneType, "types.NoneType", ["import types"]),
@@ -294,10 +304,11 @@ class TypeSerializer(BaseSerializer):
                 return self.value.__name__, set()
             else:
                 return f"{module}.{self.value.__qualname__}", {f"import {module}"}
+        return "", set()
 
 
 class UUIDSerializer(BaseSerializer):
-    def serialize(self):
+    def serialize(self) -> tuple[str, set[str]]:
         return f"uuid.{repr(self.value)}", {"import uuid"}
 
 
@@ -331,7 +342,7 @@ class Serializer:
     }
 
     @classmethod
-    def register(cls, type_, serializer):
+    def register(cls, type_: type[Any], serializer: type[BaseSerializer]) -> None:
         if not issubclass(serializer, BaseSerializer):
             raise ValueError(
                 f"'{serializer.__name__}' must inherit from 'BaseSerializer'."
@@ -339,7 +350,7 @@ class Serializer:
         cls._registry[type_] = serializer
 
 
-def serializer_factory(value):
+def serializer_factory(value: Any) -> BaseSerializer:
     if isinstance(value, Promise):
         value = str(value)
     elif isinstance(value, LazyObject):

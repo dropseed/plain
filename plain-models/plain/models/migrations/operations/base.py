@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from typing import Any
+
+
 class Operation:
     """
     Base class for migration operations.
@@ -24,15 +29,15 @@ class Operation:
     # Should this operation be considered safe to elide and optimize across?
     elidable = False
 
-    serialization_expand_args = []
+    serialization_expand_args: list[str] = []
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Operation:
         # We capture the arguments to make returning them trivial
         self = object.__new__(cls)
-        self._constructor_args = (args, kwargs)
-        return self
+        self._constructor_args = (args, kwargs)  # type: ignore[attr-defined]
+        return self  # type: ignore[return-value]
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         """
         Return a 3-tuple of class import path (or just name if it lives
         under plain.models.migrations), positional arguments, and keyword
@@ -40,11 +45,11 @@ class Operation:
         """
         return (
             self.__class__.__name__,
-            self._constructor_args[0],
-            self._constructor_args[1],
+            self._constructor_args[0],  # type: ignore[attr-defined]
+            self._constructor_args[1],  # type: ignore[attr-defined]
         )
 
-    def state_forwards(self, package_label, state):
+    def state_forwards(self, package_label: str, state: Any) -> None:
         """
         Take the state from the previous migration, and mutate it
         so that it matches what this migration would perform.
@@ -53,7 +58,9 @@ class Operation:
             "subclasses of Operation must provide a state_forwards() method"
         )
 
-    def database_forwards(self, package_label, schema_editor, from_state, to_state):
+    def database_forwards(
+        self, package_label: str, schema_editor: Any, from_state: Any, to_state: Any
+    ) -> None:
         """
         Perform the mutation on the database schema in the normal
         (forwards) direction.
@@ -62,21 +69,21 @@ class Operation:
             "subclasses of Operation must provide a database_forwards() method"
         )
 
-    def describe(self):
+    def describe(self) -> str:
         """
         Output a brief summary of what the action does.
         """
-        return f"{self.__class__.__name__}: {self._constructor_args}"
+        return f"{self.__class__.__name__}: {self._constructor_args}"  # type: ignore[attr-defined]
 
     @property
-    def migration_name_fragment(self):
+    def migration_name_fragment(self) -> str | None:
         """
         A filename part suitable for automatically naming a migration
         containing this operation, or None if not applicable.
         """
         return None
 
-    def references_model(self, name, package_label):
+    def references_model(self, name: str, package_label: str) -> bool:
         """
         Return True if there is a chance this operation references the given
         model name (as a string), with an app label for accuracy.
@@ -88,7 +95,7 @@ class Operation:
         """
         return True
 
-    def references_field(self, model_name, name, package_label):
+    def references_field(self, model_name: str, name: str, package_label: str) -> bool:
         """
         Return True if there is a chance this operation references the given
         field name, with an app label for accuracy.
@@ -97,14 +104,16 @@ class Operation:
         """
         return self.references_model(model_name, package_label)
 
-    def allow_migrate_model(self, connection, model):
+    def allow_migrate_model(self, connection: Any, model: Any) -> bool:
         """Return whether or not a model may be migrated."""
         if not model._meta.can_migrate(connection):
             return False
 
         return True
 
-    def reduce(self, operation, package_label):
+    def reduce(
+        self, operation: Operation, package_label: str
+    ) -> list[Operation] | bool:
         """
         Return either a list of operations the actual operation should be
         replaced with or a boolean that indicates whether or not the specified
@@ -116,9 +125,9 @@ class Operation:
             return [self]
         return False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<{} {}{}>".format(
             self.__class__.__name__,
-            ", ".join(map(repr, self._constructor_args[0])),
-            ",".join(" {}={!r}".format(*x) for x in self._constructor_args[1].items()),
+            ", ".join(map(repr, self._constructor_args[0])),  # type: ignore[attr-defined]
+            ",".join(" {}={!r}".format(*x) for x in self._constructor_args[1].items()),  # type: ignore[attr-defined]
         )

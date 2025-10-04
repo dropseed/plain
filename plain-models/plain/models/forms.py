@@ -3,7 +3,10 @@ Helper functions for creating Form classes from Plain models
 and database field objects.
 """
 
+from __future__ import annotations
+
 from itertools import chain
+from typing import Any
 
 from plain.exceptions import (
     NON_FIELD_ERRORS,
@@ -25,7 +28,11 @@ __all__ = (
 )
 
 
-def construct_instance(form, instance, fields=None):
+def construct_instance(
+    form: BaseModelForm,
+    instance: Any,
+    fields: list[str] | tuple[str, ...] | None = None,
+) -> Any:
     """
     Construct and return a model instance from the bound ``form``'s
     ``cleaned_data``, but do not save the returned instance to the database.
@@ -65,7 +72,9 @@ def construct_instance(form, instance, fields=None):
 # ModelForms #################################################################
 
 
-def model_to_dict(instance, fields=None):
+def model_to_dict(
+    instance: Any, fields: list[str] | tuple[str, ...] | None = None
+) -> dict[str, Any]:
     """
     Return a dict containing the data in ``instance`` suitable for passing as
     a Form's ``initial`` keyword argument.
@@ -83,12 +92,12 @@ def model_to_dict(instance, fields=None):
 
 
 def fields_for_model(
-    model,
-    fields=None,
-    formfield_callback=None,
-    error_messages=None,
-    field_classes=None,
-):
+    model: type[Any],
+    fields: list[str] | tuple[str, ...] | None = None,
+    formfield_callback: Any = None,
+    error_messages: dict[str, Any] | None = None,
+    field_classes: dict[str, type[Field]] | None = None,
+) -> dict[str, Field | None]:
     """
     Return a dictionary containing form fields for the given model.
 
@@ -135,17 +144,28 @@ def fields_for_model(
 
 
 class ModelFormOptions:
-    def __init__(self, options=None):
-        self.model = getattr(options, "model", None)
-        self.fields = getattr(options, "fields", None)
-        self.error_messages = getattr(options, "error_messages", None)
-        self.field_classes = getattr(options, "field_classes", None)
-        self.formfield_callback = getattr(options, "formfield_callback", None)
+    def __init__(self, options: Any = None) -> None:
+        self.model: type[Any] | None = getattr(options, "model", None)
+        self.fields: list[str] | tuple[str, ...] | None = getattr(
+            options, "fields", None
+        )
+        self.error_messages: dict[str, Any] | None = getattr(
+            options, "error_messages", None
+        )
+        self.field_classes: dict[str, type[Field]] | None = getattr(
+            options, "field_classes", None
+        )
+        self.formfield_callback: Any = getattr(options, "formfield_callback", None)
 
 
 class ModelFormMetaclass(DeclarativeFieldsMetaclass):
-    def __new__(mcs, name, bases, attrs):
-        new_class = super().__new__(mcs, name, bases, attrs)
+    def __new__(
+        mcs: type[ModelFormMetaclass],
+        name: str,
+        bases: tuple[type, ...],
+        attrs: dict[str, Any],
+    ) -> type[BaseModelForm]:
+        new_class = super().__new__(mcs, name, bases, attrs)  # type: ignore[invalid-super-argument]
 
         if bases == (BaseModelForm,):
             return new_class
@@ -203,12 +223,12 @@ class BaseModelForm(BaseForm):
     def __init__(
         self,
         *,
-        request,
-        auto_id="id_%s",
-        prefix=None,
-        initial=None,
-        instance=None,
-    ):
+        request: Any,
+        auto_id: str = "id_%s",
+        prefix: str | None = None,
+        initial: dict[str, Any] | None = None,
+        instance: Any = None,
+    ) -> None:
         opts = self._meta
         if opts.model is None:
             raise ValueError("ModelForm has no model class specified.")
@@ -233,7 +253,7 @@ class BaseModelForm(BaseForm):
             initial=object_data,
         )
 
-    def _get_validation_exclusions(self):
+    def _get_validation_exclusions(self) -> set[str]:
         """
         For backwards-compatibility, exclude several types of fields from model
         validation. See tickets #12507, #12521, #12553.
@@ -276,11 +296,11 @@ class BaseModelForm(BaseForm):
                     exclude.add(f.name)
         return exclude
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
         self._validate_unique = True
         return self.cleaned_data
 
-    def _update_errors(self, errors):
+    def _update_errors(self, errors: ValidationError) -> None:
         # Override any validation error messages defined at the model level
         # with those defined at the form level.
         opts = self._meta
@@ -313,7 +333,7 @@ class BaseModelForm(BaseForm):
 
         self.add_error(None, errors)
 
-    def _post_clean(self):
+    def _post_clean(self) -> None:
         opts = self._meta
 
         exclude = self._get_validation_exclusions()
@@ -332,7 +352,7 @@ class BaseModelForm(BaseForm):
         if self._validate_unique:
             self.validate_unique()
 
-    def validate_unique(self):
+    def validate_unique(self) -> None:
         """
         Call the instance's validate_unique() method and update the form's
         validation errors if any were raised.
@@ -343,7 +363,7 @@ class BaseModelForm(BaseForm):
         except ValidationError as e:
             self._update_errors(e)
 
-    def _save_m2m(self):
+    def _save_m2m(self) -> None:
         """
         Save the many-to-many fields and generic relations for this form.
         """
@@ -359,7 +379,7 @@ class BaseModelForm(BaseForm):
             if f.name in cleaned_data:
                 f.save_form_data(self.instance, cleaned_data[f.name])
 
-    def save(self, commit=True):
+    def save(self, commit: bool = True) -> Any:
         """
         Save this form's self.instance object if commit=True. Otherwise, add
         a save_m2m() method to the form which can be called after the instance
@@ -391,28 +411,28 @@ class ModelForm(BaseModelForm, metaclass=ModelFormMetaclass):
 
 
 class ModelChoiceIteratorValue:
-    def __init__(self, value, instance):
+    def __init__(self, value: Any, instance: Any) -> None:
         self.value = value
         self.instance = instance
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.value)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.value)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, ModelChoiceIteratorValue):
             other = other.value
         return self.value == other
 
 
 class ModelChoiceIterator:
-    def __init__(self, field):
+    def __init__(self, field: ModelChoiceField) -> None:
         self.field = field
         self.queryset = field.queryset
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         if self.field.empty_label is not None:
             yield ("", self.field.empty_label)
         queryset = self.queryset
@@ -422,16 +442,16 @@ class ModelChoiceIterator:
         for obj in queryset:
             yield self.choice(obj)
 
-    def __len__(self):
+    def __len__(self) -> int:
         # count() adds a query but uses less memory since the QuerySet results
         # won't be cached. In most cases, the choices will only be iterated on,
         # and __len__() won't be called.
         return self.queryset.count() + (1 if self.field.empty_label is not None else 0)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return self.field.empty_label is not None or self.queryset.exists()
 
-    def choice(self, obj):
+    def choice(self, obj: Any) -> tuple[ModelChoiceIteratorValue, str]:
         return (
             ModelChoiceIteratorValue(self.field.prepare_value(obj), obj),
             str(obj),
@@ -450,13 +470,13 @@ class ModelChoiceField(ChoiceField):
 
     def __init__(
         self,
-        queryset,
+        queryset: Any,
         *,
-        empty_label="---------",
-        required=True,
-        initial=None,
-        **kwargs,
-    ):
+        empty_label: str | None = "---------",
+        required: bool = True,
+        initial: Any = None,
+        **kwargs: Any,
+    ) -> None:
         # Call Field instead of ChoiceField __init__() because we don't need
         # ChoiceField.__init__().
         Field.__init__(
@@ -471,22 +491,22 @@ class ModelChoiceField(ChoiceField):
             self.empty_label = empty_label
         self.queryset = queryset
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> ModelChoiceField:
         result = super(ChoiceField, self).__deepcopy__(memo)
         # Need to force a new ModelChoiceIterator to be created, bug #11183
         if self.queryset is not None:
             result.queryset = self.queryset.all()
         return result
 
-    def _get_queryset(self):
+    def _get_queryset(self) -> Any:
         return self._queryset
 
-    def _set_queryset(self, queryset):
+    def _set_queryset(self, queryset: Any) -> None:
         self._queryset = None if queryset is None else queryset.all()
 
     queryset = property(_get_queryset, _set_queryset)
 
-    def _get_choices(self):
+    def _get_choices(self) -> ModelChoiceIterator:
         # If self._choices is set, then somebody must have manually set
         # the property self.choices. In this case, just return self._choices.
         if hasattr(self, "_choices"):
@@ -503,12 +523,12 @@ class ModelChoiceField(ChoiceField):
 
     choices = property(_get_choices, ChoiceField._set_choices)
 
-    def prepare_value(self, value):
+    def prepare_value(self, value: Any) -> Any:
         if hasattr(value, "_meta"):
             return value.id
         return super().prepare_value(value)
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> Any:
         if value in self.empty_values:
             return None
         try:
@@ -524,10 +544,10 @@ class ModelChoiceField(ChoiceField):
             )
         return value
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         return Field.validate(self, value)
 
-    def has_changed(self, initial, data):
+    def has_changed(self, initial: Any, data: Any) -> bool:
         initial_value = initial if initial is not None else ""
         data_value = data if data is not None else ""
         return str(self.prepare_value(initial_value)) != str(data_value)
@@ -542,15 +562,15 @@ class ModelMultipleChoiceField(ModelChoiceField):
         "invalid_id_value": "'%(id)s' is not a valid value.",
     }
 
-    def __init__(self, queryset, **kwargs):
+    def __init__(self, queryset: Any, **kwargs: Any) -> None:
         super().__init__(queryset, empty_label=None, **kwargs)
 
-    def to_python(self, value):
+    def to_python(self, value: Any) -> list[Any]:
         if not value:
             return []
         return list(self._check_values(value))
 
-    def clean(self, value):
+    def clean(self, value: Any) -> Any:
         value = self.prepare_value(value)
         if self.required and not value:
             raise ValidationError(self.error_messages["required"], code="required")
@@ -567,7 +587,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
         self.run_validators(value)
         return qs
 
-    def _check_values(self, value):
+    def _check_values(self, value: Any) -> Any:
         """
         Given a list of possible PK values, return a QuerySet of the
         corresponding objects. Raise a ValidationError if a given value is
@@ -603,7 +623,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
                 )
         return qs
 
-    def prepare_value(self, value):
+    def prepare_value(self, value: Any) -> Any:
         if (
             hasattr(value, "__iter__")
             and not isinstance(value, str)
@@ -613,7 +633,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
             return [prepare_value(v) for v in value]
         return super().prepare_value(value)
 
-    def has_changed(self, initial, data):
+    def has_changed(self, initial: Any, data: Any) -> bool:
         if initial is None:
             initial = []
         if data is None:
@@ -624,13 +644,16 @@ class ModelMultipleChoiceField(ModelChoiceField):
         data_set = {str(value) for value in data}
         return data_set != initial_set
 
-    def value_from_form_data(self, data, files, html_name):
+    def value_from_form_data(self, data: Any, files: Any, html_name: str) -> Any:
         return data.getlist(html_name)
 
 
 def modelfield_to_formfield(
-    modelfield, form_class=None, choices_form_class=None, **kwargs
-):
+    modelfield: Any,
+    form_class: type[Field] | None = None,
+    choices_form_class: type[Field] | None = None,
+    **kwargs: Any,
+) -> Field | None:
     defaults = {
         "required": modelfield.required,
     }
@@ -694,7 +717,7 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    if issubclass(modelfield.__class__, models.fields.PositiveIntegerRelDbTypeMixin):
+    if issubclass(modelfield.__class__, models.fields.PositiveIntegerRelDbTypeMixin):  # type: ignore[attr-defined]
         return fields.IntegerField(min_value=0, **defaults)
 
     if isinstance(modelfield, models.TextField):

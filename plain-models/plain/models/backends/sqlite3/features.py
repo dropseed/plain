@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import operator
 from functools import cached_property
 
@@ -34,11 +36,11 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_unlimited_charfield = True
 
     @cached_property
-    def supports_atomic_references_rename(self):
+    def supports_atomic_references_rename(self) -> bool:
         return Database.sqlite_version_info >= (3, 26, 0)
 
     @cached_property
-    def supports_json_field(self):
+    def supports_json_field(self) -> bool:
         with self.connection.cursor() as cursor:
             try:
                 with transaction.atomic():
@@ -51,7 +53,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_json_object_function = property(operator.attrgetter("supports_json_field"))
 
     @cached_property
-    def can_return_columns_from_insert(self):
+    def can_return_columns_from_insert(self) -> bool:
         return Database.sqlite_version_info >= (3, 35)
 
     can_return_rows_from_bulk_insert = property(

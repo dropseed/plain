@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import time
 from pathlib import Path
@@ -11,13 +13,13 @@ from .core import DatabaseBackups
 
 @register_cli("backups")
 @click.group("backups")
-def cli():
+def cli() -> None:
     """Local database backups"""
     pass
 
 
 @cli.command("list")
-def list_backups():
+def list_backups() -> None:
     backups_handler = DatabaseBackups()
     backups = backups_handler.find_backups()
     if not backups:
@@ -40,7 +42,7 @@ def list_backups():
 @cli.command("create")
 @click.option("--pg-dump", default="pg_dump", envvar="PG_DUMP")
 @click.argument("backup_name", default="")
-def create_backup(backup_name, pg_dump):
+def create_backup(backup_name: str, pg_dump: str) -> None:
     backups_handler = DatabaseBackups()
 
     if not backup_name:
@@ -62,7 +64,7 @@ def create_backup(backup_name, pg_dump):
 @click.option("--latest", is_flag=True)
 @click.option("--pg-restore", default="pg_restore", envvar="PG_RESTORE")
 @click.argument("backup_name", default="")
-def restore_backup(backup_name, latest, pg_restore):
+def restore_backup(backup_name: str, latest: bool, pg_restore: str) -> None:
     backups_handler = DatabaseBackups()
 
     if backup_name and latest:
@@ -89,7 +91,7 @@ def restore_backup(backup_name, latest, pg_restore):
 
 @cli.command("delete")
 @click.argument("backup_name")
-def delete_backup(backup_name):
+def delete_backup(backup_name: str) -> None:
     backups_handler = DatabaseBackups()
     try:
         backups_handler.delete(backup_name)
@@ -101,7 +103,7 @@ def delete_backup(backup_name):
 
 @cli.command("clear")
 @click.confirmation_option(prompt="Are you sure you want to delete all backups?")
-def clear_backups():
+def clear_backups() -> None:
     backups_handler = DatabaseBackups()
     backups = backups_handler.find_backups()
     for backup in backups:

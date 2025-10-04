@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from typing import Any
+
+
 class MigrationOptimizer:
     """
     Power the optimization process, where you provide a list of Operations
@@ -9,7 +14,7 @@ class MigrationOptimizer:
     nothing.
     """
 
-    def optimize(self, operations, package_label):
+    def optimize(self, operations: list[Any], package_label: str) -> list[Any]:
         """
         Main optimization entry point. Pass in a list of Operation instances,
         get out a new list of Operation instances.
@@ -35,7 +40,7 @@ class MigrationOptimizer:
                 return result
             operations = result
 
-    def optimize_inner(self, operations, package_label):
+    def optimize_inner(self, operations: list[Any], package_label: str) -> list[Any]:
         """Inner optimization loop."""
         new_operations = []
         for i, operation in enumerate(operations):

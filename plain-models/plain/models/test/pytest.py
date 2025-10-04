@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import re
+from collections.abc import Generator
+from typing import Any
 
 import pytest
 
@@ -15,25 +19,25 @@ from .utils import (
 
 
 @pytest.fixture(autouse=True)
-def _db_disabled():
+def _db_disabled() -> Generator[None, None, None]:
     """
     Every test should use this fixture by default to prevent
     access to the normal database.
     """
 
-    def cursor_disabled(self):
+    def cursor_disabled(self: Any) -> None:
         pytest.fail("Database access not allowed without the `db` fixture")
 
-    BaseDatabaseWrapper._enabled_cursor = BaseDatabaseWrapper.cursor
-    BaseDatabaseWrapper.cursor = cursor_disabled
+    BaseDatabaseWrapper._enabled_cursor = BaseDatabaseWrapper.cursor  # type: ignore[attr-defined]
+    BaseDatabaseWrapper.cursor = cursor_disabled  # type: ignore[method-assign]
 
     yield
 
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor  # type: ignore[method-assign]
 
 
 @pytest.fixture(scope="session")
-def setup_db(request):
+def setup_db(request: Any) -> Generator[None, None, None]:
     """
     This fixture is called automatically by `db`,
     so a test database will only be setup if the `db` fixture is used.
@@ -58,19 +62,19 @@ def setup_db(request):
 
 
 @pytest.fixture
-def db(setup_db, request):
+def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
     if "isolated_db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
 
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor  # type: ignore[method-assign]
 
     if not db_connection.features.supports_transactions:
         pytest.fail("Database does not support transactions")
 
     with suppress_db_tracing():
         atomic = transaction.atomic()
-        atomic._from_testcase = True  # TODO remove this somehow?
+        atomic._from_testcase = True  # type: ignore[attr-defined]  # TODO remove this somehow?
         atomic.__enter__()
 
     yield
@@ -90,7 +94,7 @@ def db(setup_db, request):
 
 
 @pytest.fixture
-def isolated_db(request):
+def isolated_db(request: Any) -> Generator[None, None, None]:
     """
     Create and destroy a unique test database for each test, using a prefix
     derived from the test function name to ensure isolation from the default
@@ -99,7 +103,7 @@ def isolated_db(request):
     if "db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor  # type: ignore[method-assign]
 
     verbosity = 1
 

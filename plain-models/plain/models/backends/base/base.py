@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import _thread
 import copy
 import datetime
@@ -7,8 +9,10 @@ import time
 import warnings
 import zoneinfo
 from collections import deque
+from collections.abc import Generator
 from contextlib import contextmanager
 from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
 from plain.models.backends import utils
 from plain.models.backends.base.validation import BaseDatabaseValidation
@@ -21,6 +25,14 @@ from plain.models.db import (
 from plain.models.transaction import TransactionManagementError
 from plain.runtime import settings
 
+if TYPE_CHECKING:
+    from plain.models.backends.base.client import BaseDatabaseClient
+    from plain.models.backends.base.creation import BaseDatabaseCreation
+    from plain.models.backends.base.features import BaseDatabaseFeatures
+    from plain.models.backends.base.introspection import BaseDatabaseIntrospection
+    from plain.models.backends.base.operations import BaseDatabaseOperations
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+
 RAN_DB_VERSION_CHECK = False
 
 logger = logging.getLogger("plain.models.backends.base")
@@ -30,96 +42,96 @@ class BaseDatabaseWrapper:
     """Represent a database connection."""
 
     # Mapping of Field objects to their column types.
-    data_types = {}
+    data_types: dict[str, str] = {}
     # Mapping of Field objects to their SQL suffix such as AUTOINCREMENT.
-    data_types_suffix = {}
+    data_types_suffix: dict[str, str] = {}
     # Mapping of Field objects to their SQL for CHECK constraints.
-    data_type_check_constraints = {}
-    ops = None
-    vendor = "unknown"
-    display_name = "unknown"
-    SchemaEditorClass = None
+    data_type_check_constraints: dict[str, str] = {}
+    ops: BaseDatabaseOperations | None = None
+    vendor: str = "unknown"
+    display_name: str = "unknown"
+    SchemaEditorClass: type[BaseDatabaseSchemaEditor] | None = None
     # Classes instantiated in __init__().
-    client_class = None
-    creation_class = None
-    features_class = None
-    introspection_class = None
-    ops_class = None
-    validation_class = BaseDatabaseValidation
+    client_class: type[BaseDatabaseClient] | None = None
+    creation_class: type[BaseDatabaseCreation] | None = None
+    features_class: type[BaseDatabaseFeatures] | None = None
+    introspection_class: type[BaseDatabaseIntrospection] | None = None
+    ops_class: type[BaseDatabaseOperations] | None = None
+    validation_class: type[BaseDatabaseValidation] = BaseDatabaseValidation
 
-    queries_limit = 9000
+    queries_limit: int = 9000
 
-    def __init__(self, settings_dict):
+    def __init__(self, settings_dict: dict[str, Any]):
         # Connection related attributes.
         # The underlying database connection.
-        self.connection = None
+        self.connection: Any | None = None
         # `settings_dict` should be a dictionary containing keys such as
         # NAME, USER, etc. It's called `settings_dict` instead of `settings`
         # to disambiguate it from Plain settings modules.
-        self.settings_dict = settings_dict
+        self.settings_dict: dict[str, Any] = settings_dict
         # Query logging in debug mode or when explicitly enabled.
-        self.queries_log = deque(maxlen=self.queries_limit)
-        self.force_debug_cursor = False
+        self.queries_log: deque[dict[str, Any]] = deque(maxlen=self.queries_limit)
+        self.force_debug_cursor: bool = False
 
         # Transaction related attributes.
         # Tracks if the connection is in autocommit mode. Per PEP 249, by
         # default, it isn't.
-        self.autocommit = False
+        self.autocommit: bool = False
         # Tracks if the connection is in a transaction managed by 'atomic'.
-        self.in_atomic_block = False
+        self.in_atomic_block: bool = False
         # Increment to generate unique savepoint ids.
-        self.savepoint_state = 0
+        self.savepoint_state: int = 0
         # List of savepoints created by 'atomic'.
-        self.savepoint_ids = []
+        self.savepoint_ids: list[str] = []
         # Stack of active 'atomic' blocks.
-        self.atomic_blocks = []
+        self.atomic_blocks: list[Any] = []
         # Tracks if the outermost 'atomic' block should commit on exit,
         # ie. if autocommit was active on entry.
-        self.commit_on_exit = True
+        self.commit_on_exit: bool = True
         # Tracks if the transaction should be rolled back to the next
         # available savepoint because of an exception in an inner block.
-        self.needs_rollback = False
-        self.rollback_exc = None
+        self.needs_rollback: bool = False
+        self.rollback_exc: Exception | None = None
 
         # Connection termination related attributes.
-        self.close_at = None
-        self.closed_in_transaction = False
-        self.errors_occurred = False
-        self.health_check_enabled = False
-        self.health_check_done = False
+        self.close_at: float | None = None
+        self.closed_in_transaction: bool = False
+        self.errors_occurred: bool = False
+        self.health_check_enabled: bool = False
+        self.health_check_done: bool = False
 
         # Thread-safety related attributes.
-        self._thread_sharing_lock = threading.Lock()
-        self._thread_sharing_count = 0
-        self._thread_ident = _thread.get_ident()
+        self._thread_sharing_lock: threading.Lock = threading.Lock()
+        self._thread_sharing_count: int = 0
+        self._thread_ident: int = _thread.get_ident()
 
         # A list of no-argument functions to run when the transaction commits.
         # Each entry is an (sids, func, robust) tuple, where sids is a set of
         # the active savepoint IDs when this function was registered and robust
         # specifies whether it's allowed for the function to fail.
-        self.run_on_commit = []
+        self.run_on_commit: list[tuple[set[str], Any, bool]] = []
 
         # Should we run the on-commit hooks the next time set_autocommit(True)
         # is called?
-        self.run_commit_hooks_on_set_autocommit_on = False
+        self.run_commit_hooks_on_set_autocommit_on: bool = False
 
         # A stack of wrappers to be invoked around execute()/executemany()
         # calls. Each entry is a function taking five arguments: execute, sql,
         # params, many, and context. It's the function's responsibility to
         # call execute(sql, params, many, context).
-        self.execute_wrappers = []
+        self.execute_wrappers: list[Any] = []
 
-        self.client = self.client_class(self)
-        self.creation = self.creation_class(self)
-        self.features = self.features_class(self)
-        self.introspection = self.introspection_class(self)
-        self.ops = self.ops_class(self)
-        self.validation = self.validation_class(self)
+        self.client: BaseDatabaseClient = self.client_class(self)  # type: ignore[misc]
+        self.creation: BaseDatabaseCreation = self.creation_class(self)  # type: ignore[misc]
+        self.features: BaseDatabaseFeatures = self.features_class(self)  # type: ignore[misc]
+        self.introspection: BaseDatabaseIntrospection = self.introspection_class(self)  # type: ignore[misc]
+        self.ops: BaseDatabaseOperations = self.ops_class(self)  # type: ignore[misc]
+        self.validation: BaseDatabaseValidation = self.validation_class(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__qualname__} vendor={self.vendor!r}>"
 
-    def ensure_timezone(self):
+    def ensure_timezone(self) -> bool:
         """
         Ensure the connection's timezone is set to `self.timezone_name` and
         return whether it changed or not.
@@ -127,7 +139,7 @@ class BaseDatabaseWrapper:
         return False
 
     @cached_property
-    def timezone(self):
+    def timezone(self) -> datetime.tzinfo:
         """
         Return a tzinfo of the database connection time zone.
 
@@ -148,7 +160,7 @@ class BaseDatabaseWrapper:
             return zoneinfo.ZoneInfo(self.settings_dict["TIME_ZONE"])
 
     @cached_property
-    def timezone_name(self):
+    def timezone_name(self) -> str:
         """
         Name of the time zone of the database connection.
         """
@@ -158,11 +170,11 @@ class BaseDatabaseWrapper:
             return self.settings_dict["TIME_ZONE"]
 
     @property
-    def queries_logged(self):
+    def queries_logged(self) -> bool:
         return self.force_debug_cursor or settings.DEBUG
 
     @property
-    def queries(self):
+    def queries(self) -> list[dict[str, Any]]:
         if len(self.queries_log) == self.queries_log.maxlen:
             warnings.warn(
                 f"Limit for query logging exceeded, only the last {self.queries_log.maxlen} queries "
@@ -170,14 +182,14 @@ class BaseDatabaseWrapper:
             )
         return list(self.queries_log)
 
-    def get_database_version(self):
+    def get_database_version(self) -> tuple[int, ...]:
         """Return a tuple of the database's version."""
         raise NotImplementedError(
             "subclasses of BaseDatabaseWrapper may require a get_database_version() "
             "method."
         )
 
-    def check_database_version_supported(self):
+    def check_database_version_supported(self) -> None:
         """
         Raise an error if the database version isn't supported by this
         version of Plain.
@@ -195,28 +207,28 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific methods for creating connections and cursors #####
 
-    def get_connection_params(self):
+    def get_connection_params(self) -> dict[str, Any]:
         """Return a dict of parameters suitable for get_new_connection."""
         raise NotImplementedError(
             "subclasses of BaseDatabaseWrapper may require a get_connection_params() "
             "method"
         )
 
-    def get_new_connection(self, conn_params):
+    def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
         """Open a connection to the database."""
         raise NotImplementedError(
             "subclasses of BaseDatabaseWrapper may require a get_new_connection() "
             "method"
         )
 
-    def init_connection_state(self):
+    def init_connection_state(self) -> None:
         """Initialize the database connection settings."""
         global RAN_DB_VERSION_CHECK
         if not RAN_DB_VERSION_CHECK:
             self.check_database_version_supported()
             RAN_DB_VERSION_CHECK = True
 
-    def create_cursor(self, name=None):
+    def create_cursor(self, name: str | None = None) -> Any:
         """Create a cursor. Assume that a connection is established."""
         raise NotImplementedError(
             "subclasses of BaseDatabaseWrapper may require a create_cursor() method"
@@ -224,7 +236,7 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific methods for creating connections #####
 
-    def connect(self):
+    def connect(self) -> None:
         """Connect to the database. Assume that the connection is closed."""
         # In case the previous connection was closed while in an atomic block
         self.in_atomic_block = False
@@ -247,7 +259,7 @@ class BaseDatabaseWrapper:
 
         self.run_on_commit = []
 
-    def ensure_connection(self):
+    def ensure_connection(self) -> None:
         """Guarantee that a connection to the database is established."""
         if self.connection is None:
             with self.wrap_database_errors:
@@ -255,7 +267,7 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific wrappers for PEP-249 connection methods #####
 
-    def _prepare_cursor(self, cursor):
+    def _prepare_cursor(self, cursor: Any) -> utils.CursorWrapper:
         """
         Validate the connection is usable and perform database cursor wrapping.
         """
@@ -266,34 +278,34 @@ class BaseDatabaseWrapper:
             wrapped_cursor = self.make_cursor(cursor)
         return wrapped_cursor
 
-    def _cursor(self, name=None):
+    def _cursor(self, name: str | None = None) -> utils.CursorWrapper:
         self.close_if_health_check_failed()
         self.ensure_connection()
         with self.wrap_database_errors:
             return self._prepare_cursor(self.create_cursor(name))
 
-    def _commit(self):
+    def _commit(self) -> None:
         if self.connection is not None:
             with debug_transaction(self, "COMMIT"), self.wrap_database_errors:
                 return self.connection.commit()
 
-    def _rollback(self):
+    def _rollback(self) -> None:
         if self.connection is not None:
             with debug_transaction(self, "ROLLBACK"), self.wrap_database_errors:
                 return self.connection.rollback()
 
-    def _close(self):
+    def _close(self) -> None:
         if self.connection is not None:
             with self.wrap_database_errors:
                 return self.connection.close()
 
     # ##### Generic wrappers for PEP-249 connection methods #####
 
-    def cursor(self):
+    def cursor(self) -> utils.CursorWrapper:
         """Create a cursor, opening a connection if necessary."""
         return self._cursor()
 
-    def commit(self):
+    def commit(self) -> None:
         """Commit a transaction and reset the dirty flag."""
         self.validate_thread_sharing()
         self.validate_no_atomic_block()
@@ -302,7 +314,7 @@ class BaseDatabaseWrapper:
         self.errors_occurred = False
         self.run_commit_hooks_on_set_autocommit_on = True
 
-    def rollback(self):
+    def rollback(self) -> None:
         """Roll back a transaction and reset the dirty flag."""
         self.validate_thread_sharing()
         self.validate_no_atomic_block()
@@ -312,7 +324,7 @@ class BaseDatabaseWrapper:
         self.needs_rollback = False
         self.run_on_commit = []
 
-    def close(self):
+    def close(self) -> None:
         """Close the connection to the database."""
         self.validate_thread_sharing()
         self.run_on_commit = []
@@ -333,32 +345,32 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific savepoint management methods #####
 
-    def _savepoint(self, sid):
+    def _savepoint(self, sid: str) -> None:
         with self.cursor() as cursor:
             cursor.execute(self.ops.savepoint_create_sql(sid))
 
-    def _savepoint_rollback(self, sid):
+    def _savepoint_rollback(self, sid: str) -> None:
         with self.cursor() as cursor:
             cursor.execute(self.ops.savepoint_rollback_sql(sid))
 
-    def _savepoint_commit(self, sid):
+    def _savepoint_commit(self, sid: str) -> None:
         with self.cursor() as cursor:
             cursor.execute(self.ops.savepoint_commit_sql(sid))
 
-    def _savepoint_allowed(self):
+    def _savepoint_allowed(self) -> bool:
         # Savepoints cannot be created outside a transaction
         return self.features.uses_savepoints and not self.get_autocommit()
 
     # ##### Generic savepoint management methods #####
 
-    def savepoint(self):
+    def savepoint(self) -> str | None:
         """
         Create a savepoint inside the current transaction. Return an
         identifier for the savepoint that will be used for the subsequent
         rollback or commit. Do nothing if savepoints are not supported.
         """
         if not self._savepoint_allowed():
-            return
+            return None
 
         thread_ident = _thread.get_ident()
         tid = str(thread_ident).replace("-", "")
@@ -371,7 +383,7 @@ class BaseDatabaseWrapper:
 
         return sid
 
-    def savepoint_rollback(self, sid):
+    def savepoint_rollback(self, sid: str) -> None:
         """
         Roll back to a savepoint. Do nothing if savepoints are not supported.
         """
@@ -388,7 +400,7 @@ class BaseDatabaseWrapper:
             if sid not in sids
         ]
 
-    def savepoint_commit(self, sid):
+    def savepoint_commit(self, sid: str) -> None:
         """
         Release a savepoint. Do nothing if savepoints are not supported.
         """
@@ -398,7 +410,7 @@ class BaseDatabaseWrapper:
         self.validate_thread_sharing()
         self._savepoint_commit(sid)
 
-    def clean_savepoints(self):
+    def clean_savepoints(self) -> None:
         """
         Reset the counter used to generate unique savepoint ids in this thread.
         """
@@ -406,7 +418,7 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific transaction management methods #####
 
-    def _set_autocommit(self, autocommit):
+    def _set_autocommit(self, autocommit: bool) -> None:
         """
         Backend-specific implementation to enable or disable autocommit.
         """
@@ -416,14 +428,16 @@ class BaseDatabaseWrapper:
 
     # ##### Generic transaction management methods #####
 
-    def get_autocommit(self):
+    def get_autocommit(self) -> bool:
         """Get the autocommit state."""
         self.ensure_connection()
         return self.autocommit
 
     def set_autocommit(
-        self, autocommit, force_begin_transaction_with_broken_autocommit=False
-    ):
+        self,
+        autocommit: bool,
+        force_begin_transaction_with_broken_autocommit: bool = False,
+    ) -> None:
         """
         Enable or disable autocommit.
 
@@ -446,7 +460,7 @@ class BaseDatabaseWrapper:
         )
 
         if start_transaction_under_autocommit:
-            self._start_transaction_under_autocommit()
+            self._start_transaction_under_autocommit()  # type: ignore[attr-defined]
         elif autocommit:
             self._set_autocommit(autocommit)
         else:
@@ -458,7 +472,7 @@ class BaseDatabaseWrapper:
             self.run_and_clear_commit_hooks()
             self.run_commit_hooks_on_set_autocommit_on = False
 
-    def get_rollback(self):
+    def get_rollback(self) -> bool:
         """Get the "needs rollback" flag -- for *advanced use* only."""
         if not self.in_atomic_block:
             raise TransactionManagementError(
@@ -466,7 +480,7 @@ class BaseDatabaseWrapper:
             )
         return self.needs_rollback
 
-    def set_rollback(self, rollback):
+    def set_rollback(self, rollback: bool) -> None:
         """
         Set or unset the "needs rollback" flag -- for *advanced use* only.
         """
@@ -476,14 +490,14 @@ class BaseDatabaseWrapper:
             )
         self.needs_rollback = rollback
 
-    def validate_no_atomic_block(self):
+    def validate_no_atomic_block(self) -> None:
         """Raise an error if an atomic block is active."""
         if self.in_atomic_block:
             raise TransactionManagementError(
                 "This is forbidden when an 'atomic' block is active."
             )
 
-    def validate_no_broken_transaction(self):
+    def validate_no_broken_transaction(self) -> None:
         if self.needs_rollback:
             raise TransactionManagementError(
                 "An error occurred in the current transaction. You can't "
@@ -492,7 +506,7 @@ class BaseDatabaseWrapper:
 
     # ##### Foreign key constraints checks handling #####
 
-    def disable_constraint_checking(self):
+    def disable_constraint_checking(self) -> bool:
         """
         Backends can implement as needed to temporarily disable foreign key
         constraint checking. Should return True if the constraints were
@@ -500,14 +514,14 @@ class BaseDatabaseWrapper:
         """
         return False
 
-    def enable_constraint_checking(self):
+    def enable_constraint_checking(self) -> None:
         """
         Backends can implement as needed to re-enable foreign key constraint
         checking.
         """
         pass
 
-    def check_constraints(self, table_names=None):
+    def check_constraints(self, table_names: list[str] | None = None) -> None:
         """
         Backends can override this method if they can apply constraint
         checking (e.g. via "SET CONSTRAINTS ALL IMMEDIATE"). Should raise an
@@ -517,7 +531,7 @@ class BaseDatabaseWrapper:
 
     # ##### Connection termination handling #####
 
-    def is_usable(self):
+    def is_usable(self) -> bool:
         """
         Test if the database connection is usable.
 
@@ -530,7 +544,7 @@ class BaseDatabaseWrapper:
             "subclasses of BaseDatabaseWrapper may require an is_usable() method"
         )
 
-    def close_if_health_check_failed(self):
+    def close_if_health_check_failed(self) -> None:
         """Close existing connection if it fails a health check."""
         if (
             self.connection is None
@@ -543,7 +557,7 @@ class BaseDatabaseWrapper:
             self.close()
         self.health_check_done = True
 
-    def close_if_unusable_or_obsolete(self):
+    def close_if_unusable_or_obsolete(self) -> None:
         """
         Close the current connection if unrecoverable errors have occurred
         or if it outlived its maximum age.
@@ -573,11 +587,11 @@ class BaseDatabaseWrapper:
     # ##### Thread safety handling #####
 
     @property
-    def allow_thread_sharing(self):
+    def allow_thread_sharing(self) -> bool:
         with self._thread_sharing_lock:
             return self._thread_sharing_count > 0
 
-    def validate_thread_sharing(self):
+    def validate_thread_sharing(self) -> None:
         """
         Validate that the connection isn't accessed by another thread than the
         one which originally created it, unless the connection was explicitly
@@ -594,7 +608,7 @@ class BaseDatabaseWrapper:
 
     # ##### Miscellaneous #####
 
-    def prepare_database(self):
+    def prepare_database(self) -> None:
         """
         Hook to do any database check or preparation, generally called before
         migrating a project or an app.
@@ -602,30 +616,30 @@ class BaseDatabaseWrapper:
         pass
 
     @cached_property
-    def wrap_database_errors(self):
+    def wrap_database_errors(self) -> DatabaseErrorWrapper:
         """
         Context manager and decorator that re-throws backend-specific database
         exceptions using Plain's common wrappers.
         """
         return DatabaseErrorWrapper(self)
 
-    def chunked_cursor(self):
+    def chunked_cursor(self) -> utils.CursorWrapper:
         """
         Return a cursor that tries to avoid caching in the database (if
         supported by the database), otherwise return a regular cursor.
         """
         return self.cursor()
 
-    def make_debug_cursor(self, cursor):
+    def make_debug_cursor(self, cursor: Any) -> utils.CursorDebugWrapper:
         """Create a cursor that logs all queries in self.queries_log."""
         return utils.CursorDebugWrapper(cursor, self)
 
-    def make_cursor(self, cursor):
+    def make_cursor(self, cursor: Any) -> utils.CursorWrapper:
         """Create a cursor without debug logging."""
         return utils.CursorWrapper(cursor, self)
 
     @contextmanager
-    def temporary_connection(self):
+    def temporary_connection(self) -> Generator[utils.CursorWrapper, None, None]:
         """
         Context manager that ensures that a connection is established, and
         if it opened one, closes it to avoid leaving a dangling connection.
@@ -642,7 +656,7 @@ class BaseDatabaseWrapper:
                 self.close()
 
     @contextmanager
-    def _nodb_cursor(self):
+    def _nodb_cursor(self) -> Generator[utils.CursorWrapper, None, None]:
         """
         Return a cursor from an alternative connection to be used when there is
         no need to access the main database, specifically for test db
@@ -657,7 +671,7 @@ class BaseDatabaseWrapper:
         finally:
             conn.close()
 
-    def schema_editor(self, *args, **kwargs):
+    def schema_editor(self, *args: Any, **kwargs: Any) -> BaseDatabaseSchemaEditor:
         """
         Return a new instance of this backend's SchemaEditor.
         """
@@ -667,7 +681,7 @@ class BaseDatabaseWrapper:
             )
         return self.SchemaEditorClass(self, *args, **kwargs)
 
-    def on_commit(self, func, robust=False):
+    def on_commit(self, func: Any, robust: bool = False) -> None:
         if not callable(func):
             raise TypeError("on_commit()'s callback must be a callable.")
         if self.in_atomic_block:
@@ -692,7 +706,7 @@ class BaseDatabaseWrapper:
             else:
                 func()
 
-    def run_and_clear_commit_hooks(self):
+    def run_and_clear_commit_hooks(self) -> None:
         self.validate_no_atomic_block()
         current_run_on_commit = self.run_on_commit
         self.run_on_commit = []
@@ -712,7 +726,7 @@ class BaseDatabaseWrapper:
                 func()
 
     @contextmanager
-    def execute_wrapper(self, wrapper):
+    def execute_wrapper(self, wrapper: Any) -> Generator[None, None, None]:
         """
         Return a context manager under which the wrapper is applied to suitable
         database query executions.
@@ -723,7 +737,7 @@ class BaseDatabaseWrapper:
         finally:
             self.execute_wrappers.pop()
 
-    def copy(self):
+    def copy(self) -> BaseDatabaseWrapper:
         """
         Return a copy of this connection.
 

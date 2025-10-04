@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import datetime
 import decimal
 import functools
 import logging
 import time
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from hashlib import md5
+from typing import Any
 
 from plain.models.db import NotSupportedError
 from plain.models.otel import db_span
@@ -14,39 +18,39 @@ logger = logging.getLogger("plain.models.backends")
 
 
 class CursorWrapper:
-    def __init__(self, cursor, db):
+    def __init__(self, cursor: Any, db: Any) -> None:
         self.cursor = cursor
         self.db = db
 
     WRAP_ERROR_ATTRS = frozenset(["fetchone", "fetchmany", "fetchall", "nextset"])
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> Any:
         cursor_attr = getattr(self.cursor, attr)
         if attr in CursorWrapper.WRAP_ERROR_ATTRS:
             return self.db.wrap_database_errors(cursor_attr)
         else:
             return cursor_attr
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         with self.db.wrap_database_errors:
             yield from self.cursor
 
-    def __enter__(self):
+    def __enter__(self) -> CursorWrapper:
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type: Any, value: Any, traceback: Any) -> None:
         # Close instead of passing through to avoid backend-specific behavior
         # (#17671). Catch errors liberally because errors in cleanup code
         # aren't useful.
         try:
-            self.close()
+            self.close()  # type: ignore[attr-defined]
         except self.db.Database.Error:
             pass
 
     # The following methods cannot be implemented in __getattr__, because the
     # code must run when the method is invoked, not just when it is accessed.
 
-    def callproc(self, procname, params=None, kparams=None):
+    def callproc(self, procname: str, params: Any = None, kparams: Any = None) -> Any:
         # Keyword parameters for callproc aren't supported in PEP 249, but the
         # database driver may support them (e.g. cx_Oracle).
         if kparams is not None and not self.db.features.supports_callproc_kwargs:
@@ -64,23 +68,25 @@ class CursorWrapper:
                 params = params or ()
                 return self.cursor.callproc(procname, params, kparams)
 
-    def execute(self, sql, params=None):
+    def execute(self, sql: str, params: Any = None) -> Any:
         return self._execute_with_wrappers(
             sql, params, many=False, executor=self._execute
         )
 
-    def executemany(self, sql, param_list):
+    def executemany(self, sql: str, param_list: Any) -> Any:
         return self._execute_with_wrappers(
             sql, param_list, many=True, executor=self._executemany
         )
 
-    def _execute_with_wrappers(self, sql, params, many, executor):
-        context = {"connection": self.db, "cursor": self}
+    def _execute_with_wrappers(
+        self, sql: str, params: Any, many: bool, executor: Any
+    ) -> Any:
+        context: dict[str, Any] = {"connection": self.db, "cursor": self}
         for wrapper in reversed(self.db.execute_wrappers):
             executor = functools.partial(wrapper, executor)
         return executor(sql, params, many, context)
 
-    def _execute(self, sql, params, *ignored_wrapper_args):
+    def _execute(self, sql: str, params: Any, *ignored_wrapper_args: Any) -> Any:
         # Wrap in an OpenTelemetry span with standard attributes.
         with db_span(self.db, sql, params=params):
             self.db.validate_no_broken_transaction()
@@ -90,7 +96,9 @@ class CursorWrapper:
                 else:
                     return self.cursor.execute(sql, params)
 
-    def _executemany(self, sql, param_list, *ignored_wrapper_args):
+    def _executemany(
+        self, sql: str, param_list: Any, *ignored_wrapper_args: Any
+    ) -> Any:
         with db_span(self.db, sql, many=True, params=param_list):
             self.db.validate_no_broken_transaction()
             with self.db.wrap_database_errors:
@@ -100,18 +108,22 @@ class CursorWrapper:
 class CursorDebugWrapper(CursorWrapper):
     # XXX callproc isn't instrumented at this time.
 
-    def execute(self, sql, params=None):
+    def execute(self, sql: str, params: Any = None) -> Any:
         with self.debug_sql(sql, params, use_last_executed_query=True):
             return super().execute(sql, params)
 
-    def executemany(self, sql, param_list):
+    def executemany(self, sql: str, param_list: Any) -> Any:
         with self.debug_sql(sql, param_list, many=True):
             return super().executemany(sql, param_list)
 
     @contextmanager
     def debug_sql(
-        self, sql=None, params=None, use_last_executed_query=False, many=False
-    ):
+        self,
+        sql: str | None = None,
+        params: Any = None,
+        use_last_executed_query: bool = False,
+        many: bool = False,
+    ) -> Generator[None, None, None]:
         start = time.monotonic()
         try:
             yield
@@ -121,7 +133,7 @@ class CursorDebugWrapper(CursorWrapper):
             if use_last_executed_query:
                 sql = self.db.ops.last_executed_query(self.cursor, sql, params)
             try:
-                times = len(params) if many else ""
+                times = len(params) if many else ""  # type: ignore[arg-type]
             except TypeError:
                 # params could be an iterator.
                 times = "?"
@@ -145,7 +157,7 @@ class CursorDebugWrapper(CursorWrapper):
 
 
 @contextmanager
-def debug_transaction(connection, sql):
+def debug_transaction(connection: Any, sql: str) -> Generator[None, None, None]:
     start = time.monotonic()
     try:
         yield
@@ -171,7 +183,7 @@ def debug_transaction(connection, sql):
             )
 
 
-def split_tzname_delta(tzname):
+def split_tzname_delta(tzname: str) -> tuple[str, str | None, str | None]:
     """
     Split a time zone name into a 3-tuple of (name, sign, offset).
     """
@@ -188,13 +200,15 @@ def split_tzname_delta(tzname):
 ###############################################
 
 
-def typecast_date(s):
+def typecast_date(s: str | None) -> datetime.date | None:
     return (
         datetime.date(*map(int, s.split("-"))) if s else None
     )  # return None if s is null
 
 
-def typecast_time(s):  # does NOT store time zone information
+def typecast_time(
+    s: str | None,
+) -> datetime.time | None:  # does NOT store time zone information
     if not s:
         return None
     hour, minutes, seconds = s.split(":")
@@ -207,7 +221,9 @@ def typecast_time(s):  # does NOT store time zone information
     )
 
 
-def typecast_timestamp(s):  # does NOT store time zone information
+def typecast_timestamp(
+    s: str | None,
+) -> datetime.date | datetime.datetime | None:  # does NOT store time zone information
     # "2005-07-29 15:48:00.590358-05"
     # "2005-07-29 09:56:00-05"
     if not s:
@@ -243,7 +259,7 @@ def typecast_timestamp(s):  # does NOT store time zone information
 ###############################################
 
 
-def split_identifier(identifier):
+def split_identifier(identifier: str) -> tuple[str, str]:
     """
     Split an SQL identifier into a two element tuple of (namespace, name).
 
@@ -257,7 +273,7 @@ def split_identifier(identifier):
     return namespace.strip('"'), name.strip('"')
 
 
-def truncate_name(identifier, length=None, hash_len=4):
+def truncate_name(identifier: str, length: int | None = None, hash_len: int = 4) -> str:
     """
     Shorten an SQL identifier to a repeatable mangled version with the given
     length.
@@ -278,7 +294,7 @@ def truncate_name(identifier, length=None, hash_len=4):
     )
 
 
-def names_digest(*args, length):
+def names_digest(*args: str, length: int) -> str:
     """
     Generate a 32-bit digest of a set of arguments that can be used to shorten
     identifying names.
@@ -289,7 +305,9 @@ def names_digest(*args, length):
     return h.hexdigest()[:length]
 
 
-def format_number(value, max_digits, decimal_places):
+def format_number(
+    value: decimal.Decimal | None, max_digits: int | None, decimal_places: int | None
+) -> str | None:
     """
     Format a number into a string with the requisite number of digits and
     decimal places.
@@ -304,12 +322,12 @@ def format_number(value, max_digits, decimal_places):
             decimal.Decimal(1).scaleb(-decimal_places), context=context
         )
     else:
-        context.traps[decimal.Rounded] = 1
+        context.traps[decimal.Rounded] = 1  # type: ignore[assignment]
         value = context.create_decimal(value)
     return f"{value:f}"
 
 
-def strip_quotes(table_name):
+def strip_quotes(table_name: str) -> str:
     """
     Strip quotes off of quoted table names to make them safe for use in index
     names, sequence names, etc. For example '"USER"."TABLE"' (an Oracle naming

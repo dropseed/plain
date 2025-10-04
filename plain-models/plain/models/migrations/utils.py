@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import datetime
 import re
 from collections import namedtuple
+from collections.abc import Generator
+from typing import Any
 
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 
@@ -10,21 +14,23 @@ COMPILED_REGEX_TYPE = type(re.compile(""))
 
 
 class RegexObject:
-    def __init__(self, obj):
+    def __init__(self, obj: Any) -> None:
         self.pattern = obj.pattern
         self.flags = obj.flags
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, RegexObject):
             return NotImplemented
         return self.pattern == other.pattern and self.flags == other.flags
 
 
-def get_migration_name_timestamp():
+def get_migration_name_timestamp() -> str:
     return datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
 
-def resolve_relation(model, package_label=None, model_name=None):
+def resolve_relation(
+    model: str | Any, package_label: str | None = None, model_name: str | None = None
+) -> tuple[str, str]:
     """
     Turn a model class or model reference string and return a model tuple.
 
@@ -51,12 +57,12 @@ def resolve_relation(model, package_label=None, model_name=None):
 
 
 def field_references(
-    model_tuple,
-    field,
-    reference_model_tuple,
-    reference_field_name=None,
-    reference_field=None,
-):
+    model_tuple: tuple[str, str],
+    field: Any,
+    reference_model_tuple: tuple[str, str],
+    reference_field_name: str | None = None,
+    reference_field: Any = None,
+) -> FieldReference | bool:
     """
     Return either False or a FieldReference if `field` references provided
     context.
@@ -97,7 +103,9 @@ def field_references(
     return FieldReference(references_to, references_through)
 
 
-def get_references(state, model_tuple, field_tuple=()):
+def get_references(
+    state: Any, model_tuple: tuple[str, str], field_tuple: tuple[Any, ...] = ()
+) -> Generator[tuple[Any, str, Any, FieldReference], None, None]:
     """
     Generator of (model_state, name, field, reference) referencing
     provided context.
@@ -114,6 +122,8 @@ def get_references(state, model_tuple, field_tuple=()):
                 yield model_state, name, field, reference
 
 
-def field_is_referenced(state, model_tuple, field_tuple):
+def field_is_referenced(
+    state: Any, model_tuple: tuple[str, str], field_tuple: tuple[Any, ...]
+) -> bool:
     """Return whether `field_tuple` is referenced by any state models."""
     return next(get_references(state, model_tuple, field_tuple), None) is not None

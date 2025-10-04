@@ -1,7 +1,12 @@
+from __future__ import annotations
+
+from collections.abc import Callable
 from contextlib import nullcontext
+from typing import Any
 
 from ..transaction import atomic
 from .loader import MigrationLoader
+from .migration import Migration
 from .recorder import MigrationRecorder
 from .state import ProjectState
 
@@ -12,13 +17,17 @@ class MigrationExecutor:
     to a specified set of targets.
     """
 
-    def __init__(self, connection, progress_callback=None):
+    def __init__(
+        self, connection: Any, progress_callback: Callable[..., Any] | None = None
+    ) -> None:
         self.connection = connection
         self.loader = MigrationLoader(self.connection)
         self.recorder = MigrationRecorder(self.connection)
         self.progress_callback = progress_callback
 
-    def migration_plan(self, targets, clean_start=False):
+    def migration_plan(
+        self, targets: list[tuple[str, str]], clean_start: bool = False
+    ) -> list[Migration]:
         """
         Given a set of targets, return a list of Migration instances.
         """
@@ -34,7 +43,9 @@ class MigrationExecutor:
                     applied[migration] = self.loader.graph.nodes[migration]
         return plan
 
-    def _create_project_state(self, with_applied_migrations=False):
+    def _create_project_state(
+        self, with_applied_migrations: bool = False
+    ) -> ProjectState:
         """
         Create a project state including all the applications without
         migrations and applied migrations if with_applied_migrations=True.
@@ -55,7 +66,14 @@ class MigrationExecutor:
                     migration.mutate_state(state, preserve=False)
         return state
 
-    def migrate(self, targets, plan=None, state=None, fake=False, atomic_batch=False):
+    def migrate(
+        self,
+        targets: list[tuple[str, str]],
+        plan: list[Migration] | None = None,
+        state: ProjectState | None = None,
+        fake: bool = False,
+        atomic_batch: bool = False,
+    ) -> ProjectState:
         """
         Migrate the database up to the given targets.
 
@@ -113,9 +131,12 @@ class MigrationExecutor:
 
         self.check_replacements()
 
+        assert state is not None
         return state
 
-    def apply_migration(self, state, migration, fake=False):
+    def apply_migration(
+        self, state: ProjectState, migration: Migration, fake: bool = False
+    ) -> ProjectState:
         """Run a migration forwards."""
         migration_recorded = False
         if self.progress_callback:
@@ -136,7 +157,7 @@ class MigrationExecutor:
             self.progress_callback("apply_success", migration, fake)
         return state
 
-    def record_migration(self, migration):
+    def record_migration(self, migration: Migration) -> None:
         # For replacement migrations, record individual statuses
         if migration.replaces:
             for package_label, name in migration.replaces:
@@ -144,7 +165,7 @@ class MigrationExecutor:
         else:
             self.recorder.record_applied(migration.package_label, migration.name)
 
-    def check_replacements(self):
+    def check_replacements(self) -> None:
         """
         Mark replacement migrations applied if their replaced set all are.
 

@@ -1,13 +1,18 @@
+from __future__ import annotations
+
+from typing import Any
+
+
 class BaseDatabaseValidation:
     """Encapsulate backend-specific validation."""
 
-    def __init__(self, connection):
+    def __init__(self, connection: Any) -> None:
         self.connection = connection
 
-    def preflight(self):
+    def preflight(self) -> list[Any]:
         return []
 
-    def check_field(self, field, **kwargs):
+    def check_field(self, field: Any, **kwargs: Any) -> list[Any]:
         errors = []
         # Backends may implement a check_field_type() method.
         if (

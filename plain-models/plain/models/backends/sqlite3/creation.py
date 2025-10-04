@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
@@ -7,12 +9,12 @@ from plain.models.backends.base.creation import BaseDatabaseCreation
 
 class DatabaseCreation(BaseDatabaseCreation):
     @staticmethod
-    def is_in_memory_db(database_name):
+    def is_in_memory_db(database_name: str | Path) -> bool:
         return not isinstance(database_name, Path) and (
             database_name == ":memory:" or "mode=memory" in database_name
         )
 
-    def _get_test_db_name(self, prefix=""):
+    def _get_test_db_name(self, prefix: str = "") -> str:
         raw_name = self.connection.settings_dict["TEST"]["NAME"] or ":memory:"
         # Special in-memory case
         if raw_name == ":memory:":
@@ -25,7 +27,9 @@ class DatabaseCreation(BaseDatabaseCreation):
 
         return test_database_name
 
-    def _create_test_db(self, *, test_database_name, verbosity, autoclobber):
+    def _create_test_db(
+        self, *, test_database_name: str, verbosity: int, autoclobber: bool
+    ) -> str:
         """
         Internal implementation - delete existing SQLite test DB file if needed.
         """
@@ -50,12 +54,12 @@ class DatabaseCreation(BaseDatabaseCreation):
                     sys.exit(1)
         return test_database_name
 
-    def _destroy_test_db(self, test_database_name, verbosity):
+    def _destroy_test_db(self, test_database_name: str, verbosity: int) -> None:
         if test_database_name and not self.is_in_memory_db(test_database_name):
             # Remove the SQLite database file
             os.remove(test_database_name)
 
-    def test_db_signature(self, prefix=""):
+    def test_db_signature(self, prefix: str = "") -> tuple[str, str]:
         """
         Return a tuple that uniquely identifies a test database.
 

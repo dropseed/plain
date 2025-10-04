@@ -6,10 +6,14 @@ large and/or so that they can be used by other modules without getting into
 circular import difficulties.
 """
 
+from __future__ import annotations
+
 import functools
 import inspect
 import logging
 from collections import namedtuple
+from collections.abc import Generator
+from typing import Any
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, db_connection
@@ -27,7 +31,7 @@ PathInfo = namedtuple(
 )
 
 
-def subclasses(cls):
+def subclasses(cls: type) -> Generator[type, None, None]:
     yield cls
     for subclass in cls.__subclasses__():
         yield from subclasses(subclass)
@@ -46,14 +50,20 @@ class Q(tree.Node):
     default = AND
     conditional = True
 
-    def __init__(self, *args, _connector=None, _negated=False, **kwargs):
+    def __init__(
+        self,
+        *args: Any,
+        _connector: str | None = None,
+        _negated: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(
             children=[*args, *sorted(kwargs.items())],
             connector=_connector,
             negated=_negated,
         )
 
-    def _combine(self, other, conn):
+    def _combine(self, other: Any, conn: str) -> Q:
         if getattr(other, "conditional", False) is False:
             raise TypeError(other)
         if not self:
@@ -66,26 +76,31 @@ class Q(tree.Node):
         obj.add(other, conn)
         return obj
 
-    def __or__(self, other):
+    def __or__(self, other: Any) -> Q:
         return self._combine(other, self.OR)
 
-    def __and__(self, other):
+    def __and__(self, other: Any) -> Q:
         return self._combine(other, self.AND)
 
-    def __xor__(self, other):
+    def __xor__(self, other: Any) -> Q:
         return self._combine(other, self.XOR)
 
-    def __invert__(self):
+    def __invert__(self) -> Q:
         obj = self.copy()
         obj.negate()
         return obj
 
     def resolve_expression(
-        self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False
-    ):
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> Any:
         # We must promote any new joins to left outer joins so that when Q is
         # used as an expression, rows aren't filtered due to joins.
-        clause, joins = query._add_q(
+        clause, joins = query._add_q(  # type: ignore[union-attr]
             self,
             reuse,
             allow_joins=allow_joins,
@@ -93,10 +108,10 @@ class Q(tree.Node):
             check_filterable=False,
             summarize=summarize,
         )
-        query.promote_joins(joins)
+        query.promote_joins(joins)  # type: ignore[union-attr]
         return clause
 
-    def flatten(self):
+    def flatten(self) -> Generator[Any, None, None]:
         """
         Recursively yield this Q object and all subexpressions, in depth-first
         order.
@@ -111,7 +126,7 @@ class Q(tree.Node):
             else:
                 yield child
 
-    def check(self, against):
+    def check(self, against: dict[str, Any]) -> bool:
         """
         Do a database query to check if the expressions of the Q instance
         matches against the expressions.
@@ -141,12 +156,12 @@ class Q(tree.Node):
             logger.warning("Got a database error calling check() on %r: %s", self, e)
             return True
 
-    def deconstruct(self):
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         if path.startswith("plain.models.query_utils"):
             path = path.replace("plain.models.query_utils", "plain.models")
         args = tuple(self.children)
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if self.connector != self.default:
             kwargs["_connector"] = self.connector
         if self.negated:
@@ -160,10 +175,10 @@ class DeferredAttribute:
     object the first time, the query is executed.
     """
 
-    def __init__(self, field):
+    def __init__(self, field: Any) -> None:
         self.field = field
 
-    def __get__(self, instance, cls=None):
+    def __get__(self, instance: Any, cls: type | None = None) -> Any:
         """
         Retrieve and caches the value from the datastore on the first lookup.
         Return the cached value.
@@ -183,37 +198,37 @@ class class_or_instance_method:
     the caller type (instance or class of models.Field).
     """
 
-    def __init__(self, class_method, instance_method):
+    def __init__(self, class_method: Any, instance_method: Any) -> None:
         self.class_method = class_method
         self.instance_method = instance_method
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance: Any, owner: type) -> Any:
         if instance is None:
             return functools.partial(self.class_method, owner)
         return functools.partial(self.instance_method, instance)
 
 
 class RegisterLookupMixin:
-    def _get_lookup(self, lookup_name):
+    def _get_lookup(self, lookup_name: str) -> type | None:
         return self.get_lookups().get(lookup_name, None)
 
     @functools.cache
-    def get_class_lookups(cls):
+    def get_class_lookups(cls: type) -> dict[str, type]:
         class_lookups = [
             parent.__dict__.get("class_lookups", {}) for parent in inspect.getmro(cls)
         ]
-        return cls.merge_dicts(class_lookups)
+        return cls.merge_dicts(class_lookups)  # type: ignore[attr-defined]
 
-    def get_instance_lookups(self):
+    def get_instance_lookups(self) -> dict[str, type]:
         class_lookups = self.get_class_lookups()
         if instance_lookups := getattr(self, "instance_lookups", None):
             return {**class_lookups, **instance_lookups}
         return class_lookups
 
     get_lookups = class_or_instance_method(get_class_lookups, get_instance_lookups)
-    get_class_lookups = classmethod(get_class_lookups)
+    get_class_lookups = classmethod(get_class_lookups)  # type: ignore[assignment]
 
-    def get_lookup(self, lookup_name):
+    def get_lookup(self, lookup_name: str) -> type | None:
         from plain.models.lookups import Lookup
 
         found = self._get_lookup(lookup_name)
@@ -223,7 +238,7 @@ class RegisterLookupMixin:
             return None
         return found
 
-    def get_transform(self, lookup_name):
+    def get_transform(self, lookup_name: str) -> type | None:
         from plain.models.lookups import Transform
 
         found = self._get_lookup(lookup_name)
@@ -234,33 +249,37 @@ class RegisterLookupMixin:
         return found
 
     @staticmethod
-    def merge_dicts(dicts):
+    def merge_dicts(dicts: list[dict[str, type]]) -> dict[str, type]:
         """
         Merge dicts in reverse to preference the order of the original list. e.g.,
         merge_dicts([a, b]) will preference the keys in 'a' over those in 'b'.
         """
-        merged = {}
+        merged: dict[str, type] = {}
         for d in reversed(dicts):
             merged.update(d)
         return merged
 
     @classmethod
-    def _clear_cached_class_lookups(cls):
+    def _clear_cached_class_lookups(cls) -> None:
         for subclass in subclasses(cls):
-            subclass.get_class_lookups.cache_clear()
+            subclass.get_class_lookups.cache_clear()  # type: ignore[attr-defined]
 
-    def register_class_lookup(cls, lookup, lookup_name=None):
+    def register_class_lookup(
+        cls: type, lookup: type, lookup_name: str | None = None
+    ) -> type:
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
         if "class_lookups" not in cls.__dict__:
-            cls.class_lookups = {}
-        cls.class_lookups[lookup_name] = lookup
-        cls._clear_cached_class_lookups()
+            cls.class_lookups = {}  # type: ignore[attr-defined]
+        cls.class_lookups[lookup_name] = lookup  # type: ignore[attr-defined]
+        cls._clear_cached_class_lookups()  # type: ignore[attr-defined]
         return lookup
 
-    def register_instance_lookup(self, lookup, lookup_name=None):
+    def register_instance_lookup(
+        self, lookup: type, lookup_name: str | None = None
+    ) -> type:
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
         if "instance_lookups" not in self.__dict__:
             self.instance_lookups = {}
         self.instance_lookups[lookup_name] = lookup
@@ -269,34 +288,44 @@ class RegisterLookupMixin:
     register_lookup = class_or_instance_method(
         register_class_lookup, register_instance_lookup
     )
-    register_class_lookup = classmethod(register_class_lookup)
+    register_class_lookup = classmethod(register_class_lookup)  # type: ignore[assignment]
 
-    def _unregister_class_lookup(cls, lookup, lookup_name=None):
+    def _unregister_class_lookup(
+        cls: type, lookup: type, lookup_name: str | None = None
+    ) -> None:
         """
         Remove given lookup from cls lookups. For use in tests only as it's
         not thread-safe.
         """
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
-        del cls.class_lookups[lookup_name]
-        cls._clear_cached_class_lookups()
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
+        del cls.class_lookups[lookup_name]  # type: ignore[attr-defined]
+        cls._clear_cached_class_lookups()  # type: ignore[attr-defined]
 
-    def _unregister_instance_lookup(self, lookup, lookup_name=None):
+    def _unregister_instance_lookup(
+        self, lookup: type, lookup_name: str | None = None
+    ) -> None:
         """
         Remove given lookup from instance lookups. For use in tests only as
         it's not thread-safe.
         """
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
         del self.instance_lookups[lookup_name]
 
     _unregister_lookup = class_or_instance_method(
         _unregister_class_lookup, _unregister_instance_lookup
     )
-    _unregister_class_lookup = classmethod(_unregister_class_lookup)
+    _unregister_class_lookup = classmethod(_unregister_class_lookup)  # type: ignore[assignment]
 
 
-def select_related_descend(field, restricted, requested, select_mask, reverse=False):
+def select_related_descend(
+    field: Any,
+    restricted: bool,
+    requested: dict[str, Any],
+    select_mask: Any,
+    reverse: bool = False,
+) -> bool:
     """
     Return True if this field should be used to descend deeper for
     select_related() purposes. Used by both the query construction code
@@ -333,7 +362,9 @@ def select_related_descend(field, restricted, requested, select_mask, reverse=Fa
     return True
 
 
-def refs_expression(lookup_parts, annotations):
+def refs_expression(
+    lookup_parts: list[str], annotations: dict[str, Any]
+) -> tuple[str | None, tuple[str, ...]]:
     """
     Check if the lookup_parts contains references to the given annotations set.
     Because the LOOKUP_SEP is contained in the default annotation names, check
@@ -342,11 +373,11 @@ def refs_expression(lookup_parts, annotations):
     for n in range(1, len(lookup_parts) + 1):
         level_n_lookup = LOOKUP_SEP.join(lookup_parts[0:n])
         if annotations.get(level_n_lookup):
-            return level_n_lookup, lookup_parts[n:]
+            return level_n_lookup, tuple(lookup_parts[n:])
     return None, ()
 
 
-def check_rel_lookup_compatibility(model, target_opts, field):
+def check_rel_lookup_compatibility(model: type, target_opts: Any, field: Any) -> bool:
     """
     Check that self.model is compatible with target_opts. Compatibility
     is OK if:
@@ -354,7 +385,7 @@ def check_rel_lookup_compatibility(model, target_opts, field):
       2) model is parent of opts' model or the other way around
     """
 
-    def check(opts):
+    def check(opts: Any) -> bool:
         return model == opts.model
 
     # If the field is a primary key, then doing a query against the field's
@@ -374,17 +405,17 @@ def check_rel_lookup_compatibility(model, target_opts, field):
 class FilteredRelation:
     """Specify custom filtering in the ON clause of SQL joins."""
 
-    def __init__(self, relation_name, *, condition=Q()):
+    def __init__(self, relation_name: str, *, condition: Q = Q()) -> None:
         if not relation_name:
             raise ValueError("relation_name cannot be empty.")
         self.relation_name = relation_name
-        self.alias = None
+        self.alias: str | None = None
         if not isinstance(condition, Q):
             raise ValueError("condition argument must be a Q() instance.")
         self.condition = condition
-        self.path = []
+        self.path: list[str] = []
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):
             return NotImplemented
         return (
@@ -393,20 +424,20 @@ class FilteredRelation:
             and self.condition == other.condition
         )
 
-    def clone(self):
+    def clone(self) -> FilteredRelation:
         clone = FilteredRelation(self.relation_name, condition=self.condition)
         clone.alias = self.alias
         clone.path = self.path[:]
         return clone
 
-    def resolve_expression(self, *args, **kwargs):
+    def resolve_expression(self, *args: Any, **kwargs: Any) -> Any:
         """
         QuerySet.annotate() only accepts expression-like arguments
         (with a resolve_expression() method).
         """
         raise NotImplementedError("FilteredRelation.resolve_expression() is unused.")
 
-    def as_sql(self, compiler, connection):
+    def as_sql(self, compiler: Any, connection: Any) -> Any:
         # Resolve the condition in Join.filtered_relation.
         query = compiler.query
         where = query.build_filtered_relation_q(self.condition, reuse=set(self.path))

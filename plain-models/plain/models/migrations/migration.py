@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import re
+from typing import Any
 
 from plain.models.migrations.utils import get_migration_name_timestamp
 from plain.models.transaction import atomic
@@ -22,29 +25,29 @@ class Migration:
     """
 
     # Operations to apply during this migration, in order.
-    operations = []
+    operations: list[Any] = []
 
     # Other migrations that should be run before this migration.
     # Should be a list of (app, migration_name).
-    dependencies = []
+    dependencies: list[tuple[str, str]] = []
 
     # Migration names in this app that this migration replaces. If this is
     # non-empty, this migration will only be applied if all these migrations
     # are not applied.
-    replaces = []
+    replaces: list[str] = []
 
     # Is this an initial migration? Initial migrations are skipped on
     # --fake-initial if the table or fields already exist. If None, check if
     # the migration has any dependencies to determine if there are dependencies
     # to tell if db introspection needs to be done. If True, always perform
     # introspection. If False, never perform introspection.
-    initial = None
+    initial: bool | None = None
 
     # Whether to wrap the whole migration in a transaction. Only has an effect
     # on database backends which support transactional DDL.
-    atomic = True
+    atomic: bool = True
 
-    def __init__(self, name, package_label):
+    def __init__(self, name: str, package_label: str) -> None:
         self.name = name
         self.package_label = package_label
         # Copy dependencies & other attrs as we might mutate them at runtime
@@ -52,23 +55,23 @@ class Migration:
         self.dependencies = list(self.__class__.dependencies)
         self.replaces = list(self.__class__.replaces)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, Migration)
             and self.name == other.name
             and self.package_label == other.package_label
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Migration {self.package_label}.{self.name}>"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.package_label}.{self.name}"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(f"{self.package_label}.{self.name}")
 
-    def mutate_state(self, project_state, preserve=True):
+    def mutate_state(self, project_state: Any, preserve: bool = True) -> Any:
         """
         Take a ProjectState and return a new one with the migration's
         operations applied to it. Preserve the original object state by
@@ -82,7 +85,9 @@ class Migration:
             operation.state_forwards(self.package_label, new_state)
         return new_state
 
-    def apply(self, project_state, schema_editor, collect_sql=False):
+    def apply(
+        self, project_state: Any, schema_editor: Any, collect_sql: bool = False
+    ) -> Any:
         """
         Take a project_state representing all migrations prior to this one
         and a schema_editor for a live database and apply the migration
@@ -127,7 +132,7 @@ class Migration:
                 schema_editor.collected_sql.append("-- (no-op)")
         return project_state
 
-    def suggest_name(self):
+    def suggest_name(self) -> str:
         """
         Suggest a name for the operations this migration might represent. Names
         are not guaranteed to be unique, but put some effort into the fallback
@@ -152,18 +157,18 @@ class Migration:
         return name
 
 
-class SettingsTuple(tuple):
+class SettingsTuple(tuple):  # type: ignore[type-arg]
     """
     Subclass of tuple so Plain can tell this was originally a settings
     dependency when it reads the migration file.
     """
 
-    def __new__(cls, value, setting):
+    def __new__(cls, value: tuple[str, str], setting: str) -> SettingsTuple:
         self = tuple.__new__(cls, value)
-        self.setting = setting
-        return self
+        self.setting = setting  # type: ignore[attr-defined]
+        return self  # type: ignore[return-value]
 
 
-def settings_dependency(value):
+def settings_dependency(value: str) -> SettingsTuple:
     """Turn a setting value into a dependency."""
     return SettingsTuple((value.split(".", 1)[0], "__first__"), value)

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import os
 import subprocess
+from typing import Any
 
 
 class BaseDatabaseClient:
@@ -9,18 +12,20 @@ class BaseDatabaseClient:
     # (e.g., "psql"). Subclasses must override this.
     executable_name = None
 
-    def __init__(self, connection):
+    def __init__(self, connection: Any) -> None:
         # connection is an instance of BaseDatabaseWrapper.
         self.connection = connection
 
     @classmethod
-    def settings_to_cmd_args_env(cls, settings_dict, parameters):
+    def settings_to_cmd_args_env(
+        cls, settings_dict: dict[str, Any], parameters: list[str]
+    ) -> tuple[list[str], dict[str, str] | None]:
         raise NotImplementedError(
             "subclasses of BaseDatabaseClient must provide a "
             "settings_to_cmd_args_env() method or override a runshell()."
         )
 
-    def runshell(self, parameters):
+    def runshell(self, parameters: list[str]) -> None:
         args, env = self.settings_to_cmd_args_env(
             self.connection.settings_dict, parameters
         )

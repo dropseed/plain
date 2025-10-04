@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import collections
 import json
 import re
+from collections.abc import Generator, Iterable
 from functools import cached_property, partial
 from itertools import chain
+from typing import TYPE_CHECKING, Any
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, NotSupportedError
@@ -25,13 +29,18 @@ from plain.models.transaction import TransactionManagementError
 from plain.utils.hashable import make_hashable
 from plain.utils.regex_helper import _lazy_re_compile
 
+if TYPE_CHECKING:
+    from plain.models.backends.base.base import BaseDatabaseWrapper
+
 
 class PositionRef(Ref):
-    def __init__(self, ordinal, refs, source):
+    def __init__(self, ordinal: int, refs: str, source: Any):
         self.ordinal = ordinal
         super().__init__(refs, source)
 
-    def as_sql(self, compiler, connection):
+    def as_sql(
+        self, compiler: Any, connection: BaseDatabaseWrapper
+    ) -> tuple[str, tuple]:
         return str(self.ordinal), ()
 
 
@@ -42,30 +51,32 @@ class SQLCompiler:
         re.MULTILINE | re.DOTALL,
     )
 
-    def __init__(self, query, connection, elide_empty=True):
+    def __init__(
+        self, query: Query, connection: BaseDatabaseWrapper, elide_empty: bool = True
+    ):
         self.query = query
         self.connection = connection
         # Some queries, e.g. coalesced aggregation, need to be executed even if
         # they would return an empty result set.
         self.elide_empty = elide_empty
-        self.quote_cache = {"*": "*"}
+        self.quote_cache: dict[str, str] = {"*": "*"}
         # The select, klass_info, and annotations are needed by QuerySet.iterator()
         # these are set as a side-effect of executing the query. Note that we calculate
         # separately a list of extra select columns needed for grammatical correctness
         # of the query, but these columns are not included in self.select.
-        self.select = None
-        self.annotation_col_map = None
-        self.klass_info = None
-        self._meta_ordering = None
+        self.select: list[tuple[Any, tuple[str, tuple], str | None]] | None = None
+        self.annotation_col_map: dict[str, int] | None = None
+        self.klass_info: dict[str, Any] | None = None
+        self._meta_ordering: list[str] | None = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<{self.__class__.__qualname__} "
             f"model={self.query.model.__qualname__} "
             f"connection={self.connection!r}>"
         )
 
-    def setup_query(self, with_col_aliases=False):
+    def setup_query(self, with_col_aliases: bool = False) -> None:
         if all(self.query.alias_refcount[a] == 0 for a in self.query.alias_map):
             self.query.get_initial_alias()
         self.select, self.klass_info, self.annotation_col_map = self.get_select(
@@ -73,7 +84,9 @@ class SQLCompiler:
         )
         self.col_count = len(self.select)
 
-    def pre_sql_setup(self, with_col_aliases=False):
+    def pre_sql_setup(
+        self, with_col_aliases: bool = False
+    ) -> tuple[list[Any], list[Any], list[tuple[str, tuple]]]:
         """
         Do any necessary class setup immediately prior to producing SQL. This
         is for things that can't necessarily be done in __init__ because we
@@ -81,7 +94,7 @@ class SQLCompiler:
         """
         self.setup_query(with_col_aliases=with_col_aliases)
         order_by = self.get_order_by()
-        self.where, self.having, self.qualify = self.query.where.split_having_qualify(
+        self.where, self.having, self.qualify = self.query.where.split_having_qualify(  # type: ignore[attr-defined]
             must_group_by=self.query.group_by is not None
         )
         extra_select = self.get_extra_select(order_by, self.select)
@@ -89,7 +102,9 @@ class SQLCompiler:
         group_by = self.get_group_by(self.select + extra_select, order_by)
         return extra_select, order_by, group_by
 
-    def get_group_by(self, select, order_by):
+    def get_group_by(
+        self, select: list[Any], order_by: list[Any]
+    ) -> list[tuple[str, tuple]]:
         """
         Return a list of 2-tuples of form (sql, params).
 
@@ -192,7 +207,7 @@ class SQLCompiler:
                 seen.add((sql, params_hash))
         return result
 
-    def collapse_group_by(self, expressions, having):
+    def collapse_group_by(self, expressions: list[Any], having: list[Any]) -> list[Any]:
         # If the database supports group by functional dependence reduction,
         # then the expressions can be reduced to the set of selected table
         # primary keys as all other columns are functionally dependent on them.
@@ -222,7 +237,13 @@ class SQLCompiler:
             ]
         return expressions
 
-    def get_select(self, with_col_aliases=False):
+    def get_select(
+        self, with_col_aliases: bool = False
+    ) -> tuple[
+        list[tuple[Any, tuple[str, tuple], str | None]],
+        dict[str, Any] | None,
+        dict[str, int],
+    ]:
         """
         Return three values:
         - a list of 3-tuples of (expression, (sql, params), alias)
@@ -273,7 +294,7 @@ class SQLCompiler:
 
         if self.query.select_related:
             related_klass_infos = self.get_related_selections(select, select_mask)
-            klass_info["related_klass_infos"] = related_klass_infos
+            klass_info["related_klass_infos"] = related_klass_infos  # type: ignore[index]
 
         ret = []
         col_idx = 1
@@ -299,7 +320,7 @@ class SQLCompiler:
             ret.append((col, (sql, params), alias))
         return ret, klass_info, annotations
 
-    def _order_by_pairs(self):
+    def _order_by_pairs(self) -> Generator[tuple[OrderBy, bool], None, None]:
         if self.query.extra_order_by:
             ordering = self.query.extra_order_by
         elif not self.query.default_ordering:
@@ -427,7 +448,7 @@ class SQLCompiler:
                         default_order=default_order,
                     )
 
-    def get_order_by(self):
+    def get_order_by(self) -> list[tuple[Any, tuple[str, tuple, bool]]]:
         """
         Return a list of 2-tuples of the form (expr, (sql, params, is_ref)) for
         the ORDER BY clause.
@@ -488,7 +509,9 @@ class SQLCompiler:
             result.append((resolved, (sql, params, is_ref)))
         return result
 
-    def get_extra_select(self, order_by, select):
+    def get_extra_select(
+        self, order_by: list[Any], select: list[Any]
+    ) -> list[tuple[Any, tuple[str, tuple], None]]:
         extra_select = []
         if self.query.distinct and not self.query.distinct_fields:
             select_sql = [t[1] for t in select]
@@ -498,7 +521,7 @@ class SQLCompiler:
                     extra_select.append((expr, (without_ordering, params), None))
         return extra_select
 
-    def quote_name_unless_alias(self, name):
+    def quote_name_unless_alias(self, name: str) -> str:
         """
         A wrapper around connection.ops.quote_name that doesn't quote aliases
         for table names. This avoids problems with some SQL dialects that treat
@@ -520,7 +543,7 @@ class SQLCompiler:
         self.quote_cache[name] = r
         return r
 
-    def compile(self, node):
+    def compile(self, node: Any) -> tuple[str, tuple]:
         vendor_impl = getattr(node, "as_" + self.connection.vendor, None)
         if vendor_impl:
             sql, params = vendor_impl(self, self.connection)
@@ -528,7 +551,7 @@ class SQLCompiler:
             sql, params = node.as_sql(self, self.connection)
         return sql, params
 
-    def get_combinator_sql(self, combinator, all):
+    def get_combinator_sql(self, combinator: str, all: bool) -> tuple[list[str], list]:
         features = self.connection.features
         compilers = [
             query.get_compiler(elide_empty=self.elide_empty)
@@ -608,7 +631,7 @@ class SQLCompiler:
             params.extend(part)
         return result, params
 
-    def get_qualify_sql(self):
+    def get_qualify_sql(self) -> tuple[list[str], list]:
         where_parts = []
         if self.where:
             where_parts.append(self.where)
@@ -628,7 +651,7 @@ class SQLCompiler:
         qual_aliases = set()
         replacements = {}
 
-        def collect_replacements(expressions):
+        def collect_replacements(expressions: list[Any]) -> None:
             while expressions:
                 expr = expressions.pop()
                 if expr in replacements:
@@ -702,7 +725,9 @@ class SQLCompiler:
             result.extend(["ORDER BY", ", ".join(ordering_sqls)])
         return result, params
 
-    def as_sql(self, with_limits=True, with_col_aliases=False):
+    def as_sql(
+        self, with_limits: bool = True, with_col_aliases: bool = False
+    ) -> tuple[str, tuple]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -921,7 +946,9 @@ class SQLCompiler:
             # Finally do cleanup - get rid of the joins we created above.
             self.query.reset_refcounts(refcounts_before)
 
-    def get_default_columns(self, select_mask, start_alias=None, opts=None):
+    def get_default_columns(
+        self, select_mask: Any, start_alias: str | None = None, opts: Any = None
+    ) -> list[Any]:
         """
         Compute the default columns for selecting every field in the base
         model. Will sometimes be called to pull in related models (e.g. via
@@ -952,7 +979,7 @@ class SQLCompiler:
             result.append(column)
         return result
 
-    def get_distinct(self):
+    def get_distinct(self) -> tuple[list[str], list]:
         """
         Return a quoted list of fields to use in DISTINCT ON part of the query.
 
@@ -979,8 +1006,13 @@ class SQLCompiler:
         return result, params
 
     def find_ordering_name(
-        self, name, opts, alias=None, default_order="ASC", already_seen=None
-    ):
+        self,
+        name: str,
+        opts: Any,
+        alias: str | None = None,
+        default_order: str = "ASC",
+        already_seen: set | None = None,
+    ) -> list[tuple[OrderBy, bool]]:
         """
         Return the table alias (the name might be ambiguous, the alias will
         not be) and column name for ordering by the given 'name' parameter.
@@ -1042,7 +1074,9 @@ class SQLCompiler:
             for t in targets
         ]
 
-    def _setup_joins(self, pieces, opts, alias):
+    def _setup_joins(
+        self, pieces: list[str], opts: Any, alias: str | None
+    ) -> tuple[Any, Any, str, list, Any, Any, Any]:
         """
         Helper method for get_order_by() and get_distinct().
 
@@ -1057,7 +1091,7 @@ class SQLCompiler:
         alias = joins[-1]
         return field, targets, alias, joins, path, opts, transform_function
 
-    def get_from_clause(self):
+    def get_from_clause(self) -> tuple[list[str], list]:
         """
         Return a list of strings that are joined together to go after the
         "FROM" part of the query, as well as a list any extra parameters that
@@ -1096,14 +1130,14 @@ class SQLCompiler:
 
     def get_related_selections(
         self,
-        select,
-        select_mask,
-        opts=None,
-        root_alias=None,
-        cur_depth=1,
-        requested=None,
-        restricted=None,
-    ):
+        select: list[Any],
+        select_mask: Any,
+        opts: Any = None,
+        root_alias: str | None = None,
+        cur_depth: int = 1,
+        requested: dict | None = None,
+        restricted: bool | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Fill in the information needed for a select_related query. The current
         depth is measured as the number of connections away from the root model
@@ -1111,11 +1145,11 @@ class SQLCompiler:
         connections to the root model).
         """
 
-        def _get_field_choices():
-            direct_choices = (f.name for f in opts.fields if f.is_relation)
+        def _get_field_choices() -> chain:
+            direct_choices = (f.name for f in opts.fields if f.is_relation)  # type: ignore[attr-defined]
             reverse_choices = (
                 f.field.related_query_name()
-                for f in opts.related_objects
+                for f in opts.related_objects  # type: ignore[attr-defined]
                 if f.field.primary_key
             )
             return chain(
@@ -1139,18 +1173,20 @@ class SQLCompiler:
             if restricted:
                 requested = self.query.select_related
 
-        def get_related_klass_infos(klass_info, related_klass_infos):
+        def get_related_klass_infos(
+            klass_info: dict, related_klass_infos: list
+        ) -> None:
             klass_info["related_klass_infos"] = related_klass_infos
 
         for f in opts.fields:
             fields_found.add(f.name)
 
             if restricted:
-                next = requested.get(f.name, {})
+                next = requested.get(f.name, {})  # type: ignore[union-attr]
                 if not f.is_relation:
                     # If a non-related field is used like a relation,
                     # or if a single non-relational field is given.
-                    if next or f.name in requested:
+                    if next or f.name in requested:  # type: ignore[operator]
                         raise FieldError(
                             "Non-relational field given in select_related: '{}'. "
                             "Choices are: {}".format(
@@ -1161,7 +1197,7 @@ class SQLCompiler:
             else:
                 next = False
 
-            if not select_related_descend(f, restricted, requested, select_mask):
+            if not select_related_descend(f, restricted, requested, select_mask):  # type: ignore[arg-type]
                 continue
             related_select_mask = select_mask.get(f) or {}
             klass_info = {
@@ -1203,10 +1239,11 @@ class SQLCompiler:
             ]
             for related_field, model in related_fields:
                 related_select_mask = select_mask.get(related_field) or {}
+                # type: ignore[arg-type]
                 if not select_related_descend(
                     related_field,
                     restricted,
-                    requested,
+                    requested,  # type: ignore[arg-type]
                     related_select_mask,
                     reverse=True,
                 ):
@@ -1237,7 +1274,7 @@ class SQLCompiler:
                     select_fields.append(len(select))
                     select.append((col, None))
                 klass_info["select_fields"] = select_fields
-                next = requested.get(related_field.related_query_name(), {})
+                next = requested.get(related_field.related_query_name(), {})  # type: ignore[union-attr]
                 next_klass_infos = self.get_related_selections(
                     select,
                     related_select_mask,
@@ -1249,18 +1286,18 @@ class SQLCompiler:
                 )
                 get_related_klass_infos(klass_info, next_klass_infos)
 
-            def local_setter(final_field, obj, from_obj):
+            def local_setter(final_field: Any, obj: Any, from_obj: Any) -> None:
                 # Set a reverse fk object when relation is non-empty.
                 if from_obj:
                     final_field.remote_field.set_cached_value(from_obj, obj)
 
-            def local_setter_noop(obj, from_obj):
+            def local_setter_noop(obj: Any, from_obj: Any) -> None:
                 pass
 
-            def remote_setter(name, obj, from_obj):
+            def remote_setter(name: str, obj: Any, from_obj: Any) -> None:
                 setattr(from_obj, name, obj)
 
-            for name in list(requested):
+            for name in list(requested):  # type: ignore[arg-type]
                 # Filtered relations work only on the topmost level.
                 if cur_depth > 1:
                     break
@@ -1294,7 +1331,7 @@ class SQLCompiler:
                         select_fields.append(len(select))
                         select.append((col, None))
                     klass_info["select_fields"] = select_fields
-                    next_requested = requested.get(name, {})
+                    next_requested = requested.get(name, {})  # type: ignore[union-attr]
                     next_klass_infos = self.get_related_selections(
                         select,
                         field_select_mask,
@@ -1305,7 +1342,7 @@ class SQLCompiler:
                         restricted=restricted,
                     )
                     get_related_klass_infos(klass_info, next_klass_infos)
-            fields_not_found = set(requested).difference(fields_found)
+            fields_not_found = set(requested).difference(fields_found)  # type: ignore[arg-type]
             if fields_not_found:
                 invalid_fields = (f"'{s}'" for s in fields_not_found)
                 raise FieldError(
@@ -1317,13 +1354,13 @@ class SQLCompiler:
                 )
         return related_klass_infos
 
-    def get_select_for_update_of_arguments(self):
+    def get_select_for_update_of_arguments(self) -> list[str]:
         """
         Return a quoted list of arguments for the SELECT FOR UPDATE OF part of
         the query.
         """
 
-        def _get_first_selected_col_from_model(klass_info):
+        def _get_first_selected_col_from_model(klass_info: dict) -> Any | None:
             """
             Find the first selected column from a model. If it doesn't exist,
             don't lock a model.
@@ -1333,10 +1370,11 @@ class SQLCompiler:
             """
             model = klass_info["model"]
             for select_index in klass_info["select_fields"]:
-                if self.select[select_index][0].target.model == model:
-                    return self.select[select_index][0]
+                if self.select[select_index][0].target.model == model:  # type: ignore[index]
+                    return self.select[select_index][0]  # type: ignore[index]
+            return None
 
-        def _get_field_choices():
+        def _get_field_choices() -> Generator[str, None, None]:
             """Yield all allowed field paths in breadth-first search order."""
             queue = collections.deque([(None, self.klass_info)])
             while queue:
@@ -1396,7 +1434,7 @@ class SQLCompiler:
             )
         return result
 
-    def get_converters(self, expressions):
+    def get_converters(self, expressions: list[Any]) -> dict[int, tuple[list, Any]]:
         converters = {}
         for i, expression in enumerate(expressions):
             if expression:
@@ -1406,11 +1444,13 @@ class SQLCompiler:
                     converters[i] = (backend_converters + field_converters, expression)
         return converters
 
-    def apply_converters(self, rows, converters):
+    def apply_converters(
+        self, rows: Iterable, converters: dict
+    ) -> Generator[list, None, None]:
         connection = self.connection
-        converters = list(converters.items())
+        converters_list = list(converters.items())
         for row in map(list, rows):
-            for pos, (convs, expression) in converters:
+            for pos, (convs, expression) in converters_list:
                 value = row[pos]
                 for converter in convs:
                     value = converter(value, expression, connection)
@@ -1419,11 +1459,11 @@ class SQLCompiler:
 
     def results_iter(
         self,
-        results=None,
-        tuple_expected=False,
-        chunked_fetch=False,
-        chunk_size=GET_ITERATOR_CHUNK_SIZE,
-    ):
+        results: Any = None,
+        tuple_expected: bool = False,
+        chunked_fetch: bool = False,
+        chunk_size: int = GET_ITERATOR_CHUNK_SIZE,
+    ) -> Iterable:
         """Return an iterator over the results from executing this query."""
         if results is None:
             results = self.execute_sql(
@@ -1438,7 +1478,7 @@ class SQLCompiler:
                 rows = map(tuple, rows)
         return rows
 
-    def has_results(self):
+    def has_results(self) -> bool:
         """
         Backends (e.g. NoSQL) can override this in order to use optimized
         versions of "query has any results."
@@ -1446,8 +1486,11 @@ class SQLCompiler:
         return bool(self.execute_sql(SINGLE))
 
     def execute_sql(
-        self, result_type=MULTI, chunked_fetch=False, chunk_size=GET_ITERATOR_CHUNK_SIZE
-    ):
+        self,
+        result_type: str = MULTI,
+        chunked_fetch: bool = False,
+        chunk_size: int = GET_ITERATOR_CHUNK_SIZE,
+    ) -> Any:
         """
         Run the query against the database and return the result(s). The
         return value is a single data item if result_type is SINGLE, or an
@@ -1511,7 +1554,9 @@ class SQLCompiler:
             return list(result)
         return result
 
-    def as_subquery_condition(self, alias, columns, compiler):
+    def as_subquery_condition(
+        self, alias: str, columns: list[str], compiler: SQLCompiler
+    ) -> tuple[str, tuple]:
         qn = compiler.quote_name_unless_alias
         qn2 = self.connection.ops.quote_name
 
@@ -1523,7 +1568,7 @@ class SQLCompiler:
         sql, params = self.as_sql()
         return f"EXISTS ({sql})", params
 
-    def explain_query(self):
+    def explain_query(self) -> Generator[str, None, None]:
         result = list(self.execute_sql())
         # Some backends return 1 item tuples with strings, and others return
         # tuples with integers and strings. Flatten them out into strings.
@@ -1537,10 +1582,10 @@ class SQLCompiler:
 
 
 class SQLInsertCompiler(SQLCompiler):
-    returning_fields = None
-    returning_params = ()
+    returning_fields: list | None = None
+    returning_params: tuple = ()
 
-    def field_as_sql(self, field, val):
+    def field_as_sql(self, field: Any, val: Any) -> tuple[str, list]:
         """
         Take a field and a value intended to be saved on that field, and
         return placeholder SQL and accompanying params. Check for raw values,
@@ -1572,7 +1617,7 @@ class SQLInsertCompiler(SQLCompiler):
 
         return sql, params
 
-    def prepare_value(self, field, value):
+    def prepare_value(self, field: Any, value: Any) -> Any:
         """
         Prepare a value to be used in a query by resolving it if it is an
         expression and otherwise calling the field's get_db_prep_save().
@@ -1600,7 +1645,7 @@ class SQLInsertCompiler(SQLCompiler):
                 )
         return field.get_db_prep_save(value, connection=self.connection)
 
-    def pre_save_val(self, field, obj):
+    def pre_save_val(self, field: Any, obj: Any) -> Any:
         """
         Get the given field's value off the given obj. pre_save() is used for
         things like auto_now on DateTimeField. Skip it if this is a raw query.
@@ -1609,7 +1654,9 @@ class SQLInsertCompiler(SQLCompiler):
             return getattr(obj, field.attname)
         return field.pre_save(obj, add=True)
 
-    def assemble_as_sql(self, fields, value_rows):
+    def assemble_as_sql(
+        self, fields: list[Any], value_rows: list[list[Any]]
+    ) -> tuple[list[list[str]], list[list]]:
         """
         Take a sequence of N fields and a sequence of M rows of values, and
         generate placeholder SQL and parameters for each field and value.
@@ -1644,7 +1691,7 @@ class SQLInsertCompiler(SQLCompiler):
 
         return placeholder_rows, param_rows
 
-    def as_sql(self):
+    def as_sql(self) -> list[tuple[str, tuple]]:
         # We don't need quote_name_unless_alias() here, since these are all
         # going to be column names (so we can avoid the extra overhead).
         qn = self.connection.ops.quote_name
@@ -1724,7 +1771,7 @@ class SQLInsertCompiler(SQLCompiler):
                 for p, vals in zip(placeholder_rows, param_rows)
             ]
 
-    def execute_sql(self, returning_fields=None):
+    def execute_sql(self, returning_fields: list | None = None) -> list:
         assert not (
             returning_fields
             and len(self.query.objs) != 1
@@ -1769,13 +1816,13 @@ class SQLInsertCompiler(SQLCompiler):
 
 class SQLDeleteCompiler(SQLCompiler):
     @cached_property
-    def single_alias(self):
+    def single_alias(self) -> bool:
         # Ensure base table is in aliases.
         self.query.get_initial_alias()
         return sum(self.query.alias_refcount[t] > 0 for t in self.query.alias_map) == 1
 
     @classmethod
-    def _expr_refs_base_model(cls, expr, base_model):
+    def _expr_refs_base_model(cls, expr: Any, base_model: Any) -> bool:
         if isinstance(expr, Query):
             return expr.model == base_model
         if not hasattr(expr, "get_source_expressions"):
@@ -1786,7 +1833,7 @@ class SQLDeleteCompiler(SQLCompiler):
         )
 
     @cached_property
-    def contains_self_reference_subquery(self):
+    def contains_self_reference_subquery(self) -> bool:
         return any(
             self._expr_refs_base_model(expr, self.query.model)
             for expr in chain(
@@ -1794,7 +1841,7 @@ class SQLDeleteCompiler(SQLCompiler):
             )
         )
 
-    def _as_sql(self, query):
+    def _as_sql(self, query: Query) -> tuple[str, tuple]:
         delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"
         try:
             where, params = self.compile(query.where)
@@ -1802,7 +1849,7 @@ class SQLDeleteCompiler(SQLCompiler):
             return delete, ()
         return f"{delete} WHERE {where}", tuple(params)
 
-    def as_sql(self):
+    def as_sql(self) -> tuple[str, tuple]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -1825,7 +1872,7 @@ class SQLDeleteCompiler(SQLCompiler):
 
 
 class SQLUpdateCompiler(SQLCompiler):
-    def as_sql(self):
+    def as_sql(self) -> tuple[str, tuple]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -1888,7 +1935,7 @@ class SQLUpdateCompiler(SQLCompiler):
             result.append(f"WHERE {where}")
         return " ".join(result), tuple(update_params + params)
 
-    def execute_sql(self, result_type):
+    def execute_sql(self, result_type: str) -> int:
         """
         Execute the specified update. Return the number of rows affected by
         the primary update query. The "primary update query" is the first
@@ -1909,7 +1956,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 is_empty = False
         return rows
 
-    def pre_sql_setup(self):
+    def pre_sql_setup(self) -> None:
         """
         If the update depends on results from other tables, munge the "where"
         conditions to match the format required for (portable) SQL updates.
@@ -1965,7 +2012,7 @@ class SQLUpdateCompiler(SQLCompiler):
 
 
 class SQLAggregateCompiler(SQLCompiler):
-    def as_sql(self):
+    def as_sql(self) -> tuple[str, tuple]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -1988,7 +2035,9 @@ class SQLAggregateCompiler(SQLCompiler):
         return sql, params
 
 
-def cursor_iter(cursor, sentinel, col_count, itersize):
+def cursor_iter(
+    cursor: Any, sentinel: Any, col_count: int | None, itersize: int
+) -> Generator[list, None, None]:
     """
     Yield blocks of rows from a cursor and ensure the cursor is closed when
     done.

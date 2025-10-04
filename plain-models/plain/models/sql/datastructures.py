@@ -3,6 +3,10 @@ Useful auxiliary data structures for query construction. Not useful outside
 the SQL domain.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from plain.models.exceptions import FullResultSet
 from plain.models.sql.constants import INNER, LOUTER
 
@@ -14,7 +18,7 @@ class MultiJoin(Exception):
     exceptionally).
     """
 
-    def __init__(self, names_pos, path_with_names):
+    def __init__(self, names_pos: int, path_with_names: list[str]) -> None:
         self.level = names_pos
         # The path travelled, this includes the path to the multijoin.
         self.names_with_path = path_with_names
@@ -45,14 +49,14 @@ class Join:
 
     def __init__(
         self,
-        table_name,
-        parent_alias,
-        table_alias,
-        join_type,
-        join_field,
-        nullable,
-        filtered_relation=None,
-    ):
+        table_name: str,
+        parent_alias: str,
+        table_alias: str,
+        join_type: str,
+        join_field: Any,
+        nullable: bool,
+        filtered_relation: Any = None,
+    ) -> None:
         # Join table
         self.table_name = table_name
         self.parent_alias = parent_alias
@@ -69,7 +73,7 @@ class Join:
         self.nullable = nullable
         self.filtered_relation = filtered_relation
 
-    def as_sql(self, compiler, connection):
+    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:
         """
         Generate the full
            LEFT OUTER JOIN sometable ON sometable.somecol = othertable.othercol, params
@@ -117,7 +121,7 @@ class Join:
         sql = f"{self.join_type} {qn(self.table_name)}{alias_str} ON ({on_clause_sql})"
         return sql, params
 
-    def relabeled_clone(self, change_map):
+    def relabeled_clone(self, change_map: dict[str, str]) -> Join:
         new_parent_alias = change_map.get(self.parent_alias, self.parent_alias)
         new_table_alias = change_map.get(self.table_alias, self.table_alias)
         if self.filtered_relation is not None:
@@ -138,7 +142,7 @@ class Join:
         )
 
     @property
-    def identity(self):
+    def identity(self) -> tuple[type[Join], str, str, Any, Any]:
         return (
             self.__class__,
             self.table_name,
@@ -147,24 +151,24 @@ class Join:
             self.filtered_relation,
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Join):
             return NotImplemented
         return self.identity == other.identity
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.identity)
 
-    def equals(self, other):
+    def equals(self, other: Join) -> bool:
         # Ignore filtered_relation in equality check.
         return self.identity[:-1] == other.identity[:-1]
 
-    def demote(self):
+    def demote(self) -> Join:
         new = self.relabeled_clone({})
         new.join_type = INNER
         return new
 
-    def promote(self):
+    def promote(self) -> Join:
         new = self.relabeled_clone({})
         new.join_type = LOUTER
         return new
@@ -182,33 +186,33 @@ class BaseTable:
     parent_alias = None
     filtered_relation = None
 
-    def __init__(self, table_name, alias):
+    def __init__(self, table_name: str, alias: str) -> None:
         self.table_name = table_name
         self.table_alias = alias
 
-    def as_sql(self, compiler, connection):
+    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:
         alias_str = (
             "" if self.table_alias == self.table_name else (f" {self.table_alias}")
         )
         base_sql = compiler.quote_name_unless_alias(self.table_name)
         return base_sql + alias_str, []
 
-    def relabeled_clone(self, change_map):
+    def relabeled_clone(self, change_map: dict[str, str]) -> BaseTable:
         return self.__class__(
             self.table_name, change_map.get(self.table_alias, self.table_alias)
         )
 
     @property
-    def identity(self):
+    def identity(self) -> tuple[type[BaseTable], str, str]:
         return self.__class__, self.table_name, self.table_alias
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, BaseTable):
             return NotImplemented
         return self.identity == other.identity
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.identity)
 
-    def equals(self, other):
+    def equals(self, other: BaseTable) -> bool:
         return self.identity == other.identity
