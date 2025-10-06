@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.9.1](https://github.com/dropseed/plain/releases/plain-observer@0.9.1) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the package for improved IDE support and type checking ([ffb8624](https://github.com/dropseed/plain/commit/ffb8624d6f))
+- Package has been validated with 100% type coverage and added to the type validation script ([ffb8624](https://github.com/dropseed/plain/commit/ffb8624d6f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-observer@0.9.0) (2025-09-30)
 
 ### What's changed
