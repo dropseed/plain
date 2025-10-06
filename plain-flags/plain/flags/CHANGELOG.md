@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.25.3](https://github.com/dropseed/plain/releases/plain-flags@0.25.3) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the package to improve IDE and type checker support ([f05463f](https://github.com/dropseed/plain/commit/f05463f285))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.2](https://github.com/dropseed/plain/releases/plain-flags@0.25.2) (2025-10-02)
 
 ### What's changed
