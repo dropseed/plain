@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.72.2](https://github.com/dropseed/plain/releases/plain@0.72.2) (2025-10-06)
+
+### What's changed
+
+- Improved type annotations for test client responses with new `ClientResponse` wrapper class ([369353f9d6](https://github.com/dropseed/plain/commit/369353f9d6))
+- Enhanced internal type checking for WSGI handler and request/response types ([50463b00c3](https://github.com/dropseed/plain/commit/50463b00c3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.72.1](https://github.com/dropseed/plain/releases/plain@0.72.1) (2025-10-02)
 
 ### What's changed
