@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.29.2](https://github.com/dropseed/plain/releases/plain-oauth@0.29.2) (2025-10-06)
+
+### What's changed
+
+- Added type annotations to improve IDE and type checker friendliness ([35fb8c4](https://github.com/dropseed/plain/commit/35fb8c4))
+- Updated provider examples (Bitbucket, GitHub, GitLab) with proper type annotations ([50463b0](https://github.com/dropseed/plain/commit/50463b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.29.1](https://github.com/dropseed/plain/releases/plain-oauth@0.29.1) (2025-10-02)
 
 ### What's changed
