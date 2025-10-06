@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.10.2](https://github.com/dropseed/plain/releases/plain-code@0.10.2) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the codebase for improved IDE support and type checking ([7455fa0](https://github.com/dropseed/plain/commit/7455fa0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.1](https://github.com/dropseed/plain/releases/plain-code@0.10.1) (2025-09-25)
 
 ### What's changed
