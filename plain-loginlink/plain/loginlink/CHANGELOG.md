@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.13.1](https://github.com/dropseed/plain/releases/plain-loginlink@0.13.1) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations to improve IDE and type checker support ([634489d](https://github.com/dropseed/plain/commit/634489db6b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.13.0) (2025-10-02)
 
 ### What's changed
