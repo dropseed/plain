@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.32.2](https://github.com/dropseed/plain/releases/plain-sessions@0.32.2) (2025-10-06)
+
+### What's changed
+
+- Type annotations have been added throughout the package for improved IDE support and type checking ([f3a7cdd](https://github.com/dropseed/plain/commit/f3a7cddefb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.32.1](https://github.com/dropseed/plain/releases/plain-sessions@0.32.1) (2025-10-02)
 
 ### What's changed
