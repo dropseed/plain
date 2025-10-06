@@ -88,8 +88,7 @@ class CustomQuerySetModel(models.Model):
 
     name = models.CharField(max_length=100)
 
-    class Meta:
-        queryset_class = CustomQuerySet
+    query = CustomQuerySet()
 
 
 @models.register_model
@@ -98,5 +97,4 @@ class CustomSpecialQuerySetModel(models.Model):
 
     name = models.CharField(max_length=100)
 
-    class Meta:
-        queryset_class = CustomSpecialQuerySet
+    query = CustomSpecialQuerySet()

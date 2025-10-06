@@ -4,6 +4,7 @@ import datetime
 import logging
 import traceback
 import uuid
+from typing import Self
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.code_attributes import (
@@ -117,11 +118,11 @@ class JobRequest(models.Model):
         return result
 
 
-class JobQuerySet(models.QuerySet):
-    def running(self) -> JobQuerySet:
+class JobQuerySet(models.QuerySet["JobProcess"]):
+    def running(self) -> Self:
         return self.filter(started_at__isnull=False)
 
-    def waiting(self) -> JobQuerySet:
+    def waiting(self) -> Self:
         return self.filter(started_at__isnull=True)
 
     def mark_lost_jobs(self) -> None:
@@ -166,8 +167,9 @@ class JobProcess(models.Model):
     trace_id = models.CharField(max_length=34, required=False, allow_null=True)
     span_id = models.CharField(max_length=18, required=False, allow_null=True)
 
+    query = JobQuerySet()
+
     class Meta:
-        queryset_class = JobQuerySet
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),
@@ -291,26 +293,26 @@ class JobProcess(models.Model):
         }
 
 
-class JobResultQuerySet(models.QuerySet):
-    def successful(self) -> JobResultQuerySet:
+class JobResultQuerySet(models.QuerySet["JobResult"]):
+    def successful(self) -> Self:
         return self.filter(status=JobResultStatuses.SUCCESSFUL)
 
-    def cancelled(self) -> JobResultQuerySet:
+    def cancelled(self) -> Self:
         return self.filter(status=JobResultStatuses.CANCELLED)
 
-    def lost(self) -> JobResultQuerySet:
+    def lost(self) -> Self:
         return self.filter(status=JobResultStatuses.LOST)
 
-    def errored(self) -> JobResultQuerySet:
+    def errored(self) -> Self:
         return self.filter(status=JobResultStatuses.ERRORED)
 
-    def retried(self) -> JobResultQuerySet:
+    def retried(self) -> Self:
         return self.filter(
             models.Q(retry_job_request_uuid__isnull=False)
             | models.Q(retry_attempt__gt=0)
         )
 
-    def failed(self) -> JobResultQuerySet:
+    def failed(self) -> Self:
         return self.filter(
             status__in=[
                 JobResultStatuses.ERRORED,
@@ -319,7 +321,7 @@ class JobResultQuerySet(models.QuerySet):
             ]
         )
 
-    def retryable(self) -> JobResultQuerySet:
+    def retryable(self) -> Self:
         return self.failed().filter(
             retry_job_request_uuid__isnull=True,
             retries__gt=0,
@@ -388,8 +390,9 @@ class JobResult(models.Model):
     trace_id = models.CharField(max_length=34, required=False, allow_null=True)
     span_id = models.CharField(max_length=18, required=False, allow_null=True)
 
+    query = JobResultQuerySet()
+
     class Meta:
-        queryset_class = JobResultQuerySet
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),

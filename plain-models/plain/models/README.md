@@ -213,18 +213,18 @@ class User(models.Model):
 
 ## Custom QuerySets
 
-With the Manager functionality now merged into QuerySet, you can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. There are several ways to use custom QuerySets:
+With the Manager functionality now merged into QuerySet, you can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods.
 
-### Setting a default QuerySet for a model
-
-Use `Meta.queryset_class` to set a custom QuerySet that will be used by `Model.query`:
+Define a custom QuerySet and assign it to your model's `query` attribute:
 
 ```python
-class PublishedQuerySet(models.QuerySet):
-    def published_only(self):
+from typing import Self
+
+class PublishedQuerySet(models.QuerySet["Article"]):
+    def published_only(self) -> Self:
         return self.filter(status="published")
 
-    def draft_only(self):
+    def draft_only(self) -> Self:
         return self.filter(status="draft")
 
 @models.register_model
@@ -232,50 +232,33 @@ class Article(models.Model):
     title = models.CharField(max_length=200)
     status = models.CharField(max_length=20)
 
-    class Meta:
-        queryset_class = PublishedQuerySet
+    query = PublishedQuerySet()
 
-# Usage - all methods available on Article.objects
+# Usage - all methods available on Article.query
 all_articles = Article.query.all()
 published_articles = Article.query.published_only()
 draft_articles = Article.query.draft_only()
 ```
 
-### Using custom QuerySets without formal attachment
-
-You can also use custom QuerySets manually without setting them as the default:
+Custom methods can be chained with built-in QuerySet methods:
 
 ```python
-class SpecialQuerySet(models.QuerySet):
-    def special_filter(self):
-        return self.filter(special=True)
-
-# Create and use the QuerySet manually
-special_qs = SpecialQuerySet(model=Article)
-special_articles = special_qs.special_filter()
+# Chaining works naturally
+recent_published = Article.query.published_only().order_by("-created_at")[:10]
 ```
 
-### Using classmethods for convenience
+### Programmatic QuerySet usage
 
-For even cleaner API, add classmethods to your model:
+For internal code that needs to create QuerySet instances programmatically, use `from_model()`:
 
 ```python
-@models.register_model
-class Article(models.Model):
-    title = models.CharField(max_length=200)
-    status = models.CharField(max_length=20)
+class SpecialQuerySet(models.QuerySet["Article"]):
+    def special_filter(self) -> Self:
+        return self.filter(special=True)
 
-    @classmethod
-    def published(cls):
-        return PublishedQuerySet(model=cls).published_only()
-
-    @classmethod
-    def drafts(cls):
-        return PublishedQuerySet(model=cls).draft_only()
-
-# Usage
-published_articles = Article.published()
-draft_articles = Article.drafts()
+# Create and use the QuerySet programmatically
+special_qs = SpecialQuerySet.from_model(Article)
+special_articles = special_qs.special_filter()
 ```
 
 ## Forms

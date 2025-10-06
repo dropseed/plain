@@ -122,11 +122,6 @@ class ModelBase(type):
 
         Options(meta, package_label).contribute_to_class(cls, "_meta")
 
-    @property
-    def query(cls) -> QuerySet:
-        """Create a new QuerySet for this model."""
-        return cls._meta.queryset
-
 
 class ModelStateFieldsCacheDescriptor:
     def __get__(
@@ -158,6 +153,9 @@ class Model(metaclass=ModelBase):
 
     # Every model gets an automatic id field
     id = PrimaryKeyField()
+
+    # QuerySet descriptor for model queries
+    query = QuerySet()
 
     def __init__(self, *args: Any, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups

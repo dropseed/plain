@@ -70,8 +70,6 @@ class ReverseManyToOneManager(BaseRelatedManager):
         self.instance = instance
         self.field = rel.field
         self.core_filters = {self.field.name: instance}
-        # Store the base queryset class for this model
-        self.base_queryset_class = rel.related_model._meta.queryset.__class__
         self.allow_null = rel.field.allow_null
 
     def _check_fk_val(self) -> None:
@@ -137,15 +135,14 @@ class ReverseManyToOneManager(BaseRelatedManager):
                 self.field.remote_field.get_cache_name()
             ]
         except (AttributeError, KeyError):
-            # Use the base queryset class for this model
-            queryset = self.base_queryset_class(model=self.model)
+            queryset = self.model.query
             return self._apply_rel_filters(queryset)
 
     def get_prefetch_queryset(
         self, instances: Any, queryset: QuerySet | None = None
     ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
         if queryset is None:
-            queryset = self.base_queryset_class(model=self.model)
+            queryset = self.model.query
 
         rel_obj_attr = self.field.get_local_related_value
         instance_attr = self.field.get_foreign_related_value
@@ -196,17 +193,17 @@ class ReverseManyToOneManager(BaseRelatedManager):
     def create(self, **kwargs: Any) -> Any:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.base_queryset_class(model=self.model).create(**kwargs)
+        return self.model.query.create(**kwargs)
 
     def get_or_create(self, **kwargs: Any) -> tuple[Any, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.base_queryset_class(model=self.model).get_or_create(**kwargs)
+        return self.model.query.get_or_create(**kwargs)
 
     def update_or_create(self, **kwargs: Any) -> tuple[Any, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.base_queryset_class(model=self.model).update_or_create(**kwargs)
+        return self.model.query.update_or_create(**kwargs)
 
     def remove(self, *objs: Any, bulk: bool = True) -> None:
         # remove() is only provided if the ForeignKey can have a value of null
@@ -297,8 +294,6 @@ class BaseManyToManyManager(BaseRelatedManager):
     def __init__(self, instance: Any, rel: Any):
         self.instance = instance
         self.through = rel.through
-        # Subclasses must set model before calling super().__init__
-        self.base_queryset_class = self.model._meta.queryset.__class__
 
         self.source_field = self.through._meta.get_field(self.source_field_name)
         self.target_field = self.through._meta.get_field(self.target_field_name)
@@ -338,14 +333,14 @@ class BaseManyToManyManager(BaseRelatedManager):
         try:
             return self.instance._prefetched_objects_cache[self.prefetch_cache_name]
         except (AttributeError, KeyError):
-            queryset = self.base_queryset_class(model=self.model)
+            queryset = self.model.query
             return self._apply_rel_filters(queryset)
 
     def get_prefetch_queryset(
         self, instances: Any, queryset: QuerySet | None = None
     ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
         if queryset is None:
-            queryset = self.base_queryset_class(model=self.model)
+            queryset = self.model.query
 
         queryset = _filter_prefetch_queryset(
             queryset._next_is_sticky(), self.query_field_name, instances
@@ -380,9 +375,7 @@ class BaseManyToManyManager(BaseRelatedManager):
     def clear(self) -> None:
         with transaction.atomic(savepoint=False):
             self._remove_prefetched_objects()
-            filters = self._build_remove_filters(
-                self.base_queryset_class(model=self.model)
-            )
+            filters = self._build_remove_filters(self.model.query)
             self.through.query.filter(filters).delete()
 
     def set(
@@ -425,16 +418,14 @@ class BaseManyToManyManager(BaseRelatedManager):
     def create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
     ) -> Any:
-        new_obj = self.base_queryset_class(model=self.model).create(**kwargs)
+        new_obj = self.model.query.create(**kwargs)
         self.add(new_obj, through_defaults=through_defaults)
         return new_obj
 
     def get_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
     ) -> tuple[Any, bool]:
-        obj, created = self.base_queryset_class(model=self.model).get_or_create(
-            **kwargs
-        )
+        obj, created = self.model.query.get_or_create(**kwargs)
         # We only need to add() if created because if we got an object back
         # from get() then the relationship already exists.
         if created:
@@ -444,9 +435,7 @@ class BaseManyToManyManager(BaseRelatedManager):
     def update_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
     ) -> tuple[Any, bool]:
-        obj, created = self.base_queryset_class(model=self.model).update_or_create(
-            **kwargs
-        )
+        obj, created = self.model.query.update_or_create(**kwargs)
         # We only need to add() if created because if we got an object back
         # from get() then the relationship already exists.
         if created:
@@ -534,7 +523,7 @@ class BaseManyToManyManager(BaseRelatedManager):
                 old_ids.add(obj)
 
         with transaction.atomic(savepoint=False):
-            target_model_qs = self.base_queryset_class(model=self.model)
+            target_model_qs = self.model.query
             if target_model_qs._has_filters():
                 old_vals = target_model_qs.filter(
                     **{f"{self.target_field.target_field.attname}__in": old_ids}

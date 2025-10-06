@@ -15,9 +15,7 @@ def test_model_has_default_query_queryset():
     assert hasattr(DefaultQuerySetModel, "query")
     assert isinstance(DefaultQuerySetModel.query, QuerySet)
 
-    # query should be a QuerySet instance
-    assert isinstance(DefaultQuerySetModel._meta.queryset, QuerySet)
-    # base_queryset may be different - it's used for internal operations
+    # base_queryset is used for internal operations
     assert DefaultQuerySetModel._meta.base_queryset is not None
     assert isinstance(DefaultQuerySetModel._meta.base_queryset, QuerySet)
 
@@ -30,9 +28,7 @@ def test_model_with_custom_queryset():
     assert isinstance(CustomQuerySetModel.query, CustomQuerySet)
     assert hasattr(CustomQuerySetModel.query, "get_custom")
 
-    # Custom QuerySet should be the manager
-    assert isinstance(CustomQuerySetModel._meta.queryset, CustomQuerySet)
-    # base_queryset may be different - it's used for internal operations
+    # base_queryset is used for internal operations and always returns base QuerySet
     assert CustomQuerySetModel._meta.base_queryset is not None
     assert isinstance(CustomQuerySetModel._meta.base_queryset, QuerySet)
 
@@ -58,16 +54,13 @@ def test_field_named_objects_validation():
 
 
 def test_base_queryset_consistency():
-    """Test that base_queryset and queryset work consistently."""
+    """Test that base_queryset works correctly."""
 
-    # Should have working base and queryset
+    # Should have working base_queryset
     base_queryset = DefaultQuerySetModel._meta.base_queryset
-    queryset = DefaultQuerySetModel._meta.queryset
 
     assert base_queryset is not None
     assert isinstance(base_queryset, QuerySet)
-    assert queryset is not None
-    assert isinstance(queryset, QuerySet)
 
 
 def test_query_queryset_contributes_to_class():
@@ -78,16 +71,12 @@ def test_query_queryset_contributes_to_class():
 
 
 def test_model_with_custom_special_queryset():
-    """Test that QuerySet classes work as queryset_class directly."""
+    """Test that custom QuerySet classes work as descriptors."""
 
     # Should have QuerySet with custom methods
     assert hasattr(CustomSpecialQuerySetModel, "query")
     assert isinstance(CustomSpecialQuerySetModel.query, QuerySet)
     assert hasattr(CustomSpecialQuerySetModel.query, "get_custom_qs")
-
-    # The manager should be the custom QuerySet
-    assert isinstance(CustomSpecialQuerySetModel._meta.queryset, QuerySet)
-    assert hasattr(CustomSpecialQuerySetModel._meta.queryset, "get_custom_qs")
 
 
 def test_query_validation():

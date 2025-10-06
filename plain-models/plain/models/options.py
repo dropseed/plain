@@ -29,7 +29,6 @@ IMMUTABLE_WARNING = (
 DEFAULT_NAMES = (
     "db_table",
     "db_table_comment",
-    "queryset_class",
     "ordering",
     "package_label",
     "models_registry",
@@ -53,7 +52,6 @@ class Options:
         "_non_pk_concrete_field_names",
         "_forward_fields_map",
         "base_queryset",
-        "queryset",
     }
     REVERSE_PROPERTIES = {"related_objects", "fields_map", "_relation_tree"}
 
@@ -63,7 +61,6 @@ class Options:
         self._get_fields_cache: dict[tuple[bool, bool, bool, bool], Any] = {}
         self.local_fields: list[Field] = []
         self.local_many_to_many: list[Field] = []
-        self.queryset_class: type[QuerySet] | None = None
         self.model_name: str | None = None
         self.db_table: str = ""
         self.db_table_comment: str = ""
@@ -220,13 +217,7 @@ class Options:
         objects), the base queryset must never filter out rows to prevent
         incomplete results in related queries.
         """
-        return QuerySet(model=self.model)
-
-    @property
-    def queryset(self) -> QuerySet:
-        if self.queryset_class:
-            return self.queryset_class(model=self.model)
-        return QuerySet(model=self.model)
+        return QuerySet.from_model(self.model)
 
     @cached_property
     def fields(self) -> ImmutableList:

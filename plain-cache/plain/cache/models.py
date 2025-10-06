@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from typing import Self
+
 from plain import models
 from plain.utils import timezone
 
 
-class CachedItemQuerySet(models.QuerySet):
-    def expired(self) -> CachedItemQuerySet:
+class CachedItemQuerySet(models.QuerySet["CachedItem"]):
+    def expired(self) -> Self:
         return self.filter(expires_at__lt=timezone.now())
 
-    def unexpired(self) -> CachedItemQuerySet:
+    def unexpired(self) -> Self:
         return self.filter(expires_at__gte=timezone.now())
 
-    def forever(self) -> CachedItemQuerySet:
+    def forever(self) -> Self:
         return self.filter(expires_at=None)
 
 
@@ -23,8 +25,9 @@ class CachedItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    query = CachedItemQuerySet()
+
     class Meta:
-        queryset_class = CachedItemQuerySet
         indexes = [
             models.Index(fields=["expires_at"]),
         ]

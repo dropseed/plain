@@ -43,7 +43,7 @@ class SuccessfulJobsCard(Card):
     text = "View"
 
     def get_number(self) -> int:
-        return JobResult.query.successful().count()  # type: ignore[unresolved-attribute]
+        return JobResult.query.successful().count()
 
     def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Successful"
@@ -54,7 +54,7 @@ class ErroredJobsCard(Card):
     text = "View"
 
     def get_number(self) -> int:
-        return JobResult.query.errored().count()  # type: ignore[unresolved-attribute]
+        return JobResult.query.errored().count()
 
     def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Errored"
@@ -69,7 +69,7 @@ class LostJobsCard(Card):
         return f"Jobs are considered lost after {_td_format(delta)}"
 
     def get_number(self) -> int:
-        return JobResult.query.lost().count()  # type: ignore[unresolved-attribute]
+        return JobResult.query.lost().count()
 
     def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Lost"
@@ -80,7 +80,7 @@ class RetriedJobsCard(Card):
     text = "View"  # TODO make not required - just an icon?
 
     def get_number(self) -> int:
-        return JobResult.query.retried().count()  # type: ignore[unresolved-attribute]
+        return JobResult.query.retried().count()
 
     def get_link(self) -> str:
         return JobResultViewset.ListView.get_view_url() + "?display=Retried"
@@ -90,14 +90,14 @@ class WaitingJobsCard(Card):
     title = "Waiting Jobs"
 
     def get_number(self) -> int:
-        return JobProcess.query.waiting().count()  # type: ignore[unresolved-attribute]
+        return JobProcess.query.waiting().count()
 
 
 class RunningJobsCard(Card):
     title = "Running Jobs"
 
     def get_number(self) -> int:
-        return JobProcess.query.running().count()  # type: ignore[unresolved-attribute]
+        return JobProcess.query.running().count()
 
 
 @register_viewset

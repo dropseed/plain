@@ -109,9 +109,9 @@ def stats() -> None:
     pending = JobRequest.query.count()
     processing = JobProcess.query.count()
 
-    successful = JobResult.query.successful().count()  # type: ignore[unresolved-attribute]
-    errored = JobResult.query.errored().count()  # type: ignore[unresolved-attribute]
-    lost = JobResult.query.lost().count()  # type: ignore[unresolved-attribute]
+    successful = JobResult.query.successful().count()
+    errored = JobResult.query.errored().count()
+    lost = JobResult.query.lost().count()
 
     click.secho(f"Pending: {pending}", bold=True)
     click.secho(f"Processing: {processing}", bold=True)

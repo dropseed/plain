@@ -233,8 +233,8 @@ class Worker:
     def rescue_job_results(self) -> None:
         """Find any lost or failed jobs on this worker's queues and handle them."""
         # TODO return results and log them if there are any?
-        JobProcess.query.filter(queue__in=self.queues).mark_lost_jobs()  # type: ignore[attr-defined]
-        JobResult.query.filter(queue__in=self.queues).retry_failed_jobs()  # type: ignore[attr-defined]
+        JobProcess.query.filter(queue__in=self.queues).mark_lost_jobs()
+        JobResult.query.filter(queue__in=self.queues).retry_failed_jobs()
 
 
 def future_finished_callback(job_process_uuid: str, future: Future) -> None:

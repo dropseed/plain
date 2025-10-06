@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Iterator
 from functools import cached_property
 from itertools import chain, islice
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 import plain.runtime
 from plain.exceptions import ValidationError
@@ -270,25 +270,72 @@ class FlatValuesListIterable(BaseIterable):
 
 
 class QuerySet(Generic[T]):
-    """Represent a lazy database lookup for a set of objects."""
+    """
+    Represent a lazy database lookup for a set of objects.
 
-    def __init__(self, *, model: type[T], query: sql.Query | None = None):
-        self.model = model
-        self._query = query or sql.Query(self.model)
-        self._result_cache: list[T] | None = None
-        self._sticky_filter = False
-        self._for_write = False
-        self._prefetch_related_lookups: tuple[Any, ...] = ()
-        self._prefetch_done = False
-        self._known_related_objects: dict[
-            Any, dict[Any, Any]
-        ] = {}  # {rel_field: {id: rel_obj}}
-        self._iterable_class: type[BaseIterable] = ModelIterable
-        self._fields: tuple[str, ...] | None = None
-        self._defer_next_filter = False
-        self._deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None = (
-            None
-        )
+    Usage:
+        MyModel.query.filter(name="test").all()
+
+    Custom QuerySets:
+        from typing import Self
+
+        class TaskQuerySet(QuerySet["Task"]):
+            def active(self) -> Self:
+                return self.filter(is_active=True)
+
+        class Task(Model):
+            is_active = BooleanField(default=True)
+            query = TaskQuerySet()
+
+        Task.query.active().filter(name="test")  # Full type inference
+
+    Custom methods should return `Self` to preserve type through method chaining.
+    """
+
+    # Instance attributes (set in from_model())
+    model: type[T]
+    _query: sql.Query
+    _result_cache: list[T] | None
+    _sticky_filter: bool
+    _for_write: bool
+    _prefetch_related_lookups: tuple[Any, ...]
+    _prefetch_done: bool
+    _known_related_objects: dict[Any, dict[Any, Any]]
+    _iterable_class: type[BaseIterable]
+    _fields: tuple[str, ...] | None
+    _defer_next_filter: bool
+    _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
+
+    def __init__(self):
+        """Minimal init for descriptor mode. Use from_model() to create instances."""
+        pass
+
+    @classmethod
+    def from_model(cls, model: type[T], query: sql.Query | None = None) -> Self:
+        """Create a QuerySet instance bound to a model."""
+        instance = cls()
+        instance.model = model
+        instance._query = query or sql.Query(model)
+        instance._result_cache = None
+        instance._sticky_filter = False
+        instance._for_write = False
+        instance._prefetch_related_lookups = ()
+        instance._prefetch_done = False
+        instance._known_related_objects = {}
+        instance._iterable_class = ModelIterable
+        instance._fields = None
+        instance._defer_next_filter = False
+        instance._deferred_filter = None
+        return instance
+
+    def __get__(self, instance: Any, owner: type[T]) -> Self:
+        """Descriptor protocol - return a new QuerySet bound to the model."""
+        if instance is not None:
+            raise AttributeError(
+                f"QuerySet is only accessible from the model class, not instances. "
+                f"Use {owner.__name__}.query instead."
+            )
+        return self.from_model(owner)
 
     @property
     def sql_query(self) -> sql.Query:
@@ -310,7 +357,7 @@ class QuerySet(Generic[T]):
 
     def __deepcopy__(self, memo: dict[int, Any]) -> QuerySet[T]:
         """Don't populate the QuerySet's cache."""
-        obj = self.__class__(model=self.model)
+        obj = self.__class__.from_model(self.model)
         for k, v in self.__dict__.items():
             if k == "_result_cache":
                 obj.__dict__[k] = None
@@ -1241,14 +1288,14 @@ class QuerySet(Generic[T]):
     # PUBLIC METHODS THAT ALTER ATTRIBUTES AND RETURN A NEW QUERYSET #
     ##################################################################
 
-    def all(self) -> QuerySet[T]:
+    def all(self) -> Self:
         """
         Return a new QuerySet that is a copy of the current one. This allows a
         QuerySet to proxy for a model queryset in some cases.
         """
         return self._chain()
 
-    def filter(self, *args: Any, **kwargs: Any) -> QuerySet[T]:
+    def filter(self, *args: Any, **kwargs: Any) -> Self:
         """
         Return a new QuerySet instance with the args ANDed to the existing
         set.
@@ -1256,7 +1303,7 @@ class QuerySet(Generic[T]):
         self._not_support_combined_queries("filter")
         return self._filter_or_exclude(False, args, kwargs)
 
-    def exclude(self, *args: Any, **kwargs: Any) -> QuerySet[T]:
+    def exclude(self, *args: Any, **kwargs: Any) -> Self:
         """
         Return a new QuerySet instance with NOT (args) ANDed to the existing
         set.
@@ -1266,7 +1313,7 @@ class QuerySet(Generic[T]):
 
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
-    ) -> QuerySet[T]:
+    ) -> Self:
         if (args or kwargs) and self.sql_query.is_sliced:
             raise TypeError("Cannot filter a query once a slice has been taken.")
         clone = self._chain()
@@ -1365,7 +1412,7 @@ class QuerySet(Generic[T]):
         obj.sql_query.select_for_no_key_update = no_key
         return obj
 
-    def select_related(self, *fields: str | None) -> QuerySet[T]:
+    def select_related(self, *fields: str | None) -> Self:
         """
         Return a new QuerySet instance that will select related objects.
 
@@ -1389,7 +1436,7 @@ class QuerySet(Generic[T]):
             obj.sql_query.select_related = True
         return obj
 
-    def prefetch_related(self, *lookups: str | Prefetch | None) -> QuerySet[T]:
+    def prefetch_related(self, *lookups: str | Prefetch | None) -> Self:
         """
         Return a new QuerySet instance that will prefetch the specified
         Many-To-One and Many-To-Many related objects when the QuerySet is
@@ -1417,7 +1464,7 @@ class QuerySet(Generic[T]):
             clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
         return clone
 
-    def annotate(self, *args: Any, **kwargs: Any) -> QuerySet[T]:
+    def annotate(self, *args: Any, **kwargs: Any) -> Self:
         """
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
@@ -1425,7 +1472,7 @@ class QuerySet(Generic[T]):
         self._not_support_combined_queries("annotate")
         return self._annotate(args, kwargs, select=True)
 
-    def alias(self, *args: Any, **kwargs: Any) -> QuerySet[T]:
+    def alias(self, *args: Any, **kwargs: Any) -> Self:
         """
         Return a query set with added aliases for extra data or aggregations.
         """
@@ -1434,7 +1481,7 @@ class QuerySet(Generic[T]):
 
     def _annotate(
         self, args: tuple[Any, ...], kwargs: dict[str, Any], select: bool = True
-    ) -> QuerySet[T]:
+    ) -> Self:
         self._validate_values_are_expressions(
             args + tuple(kwargs.values()), method_name="annotate"
         )
@@ -1487,7 +1534,7 @@ class QuerySet(Generic[T]):
 
         return clone
 
-    def order_by(self, *field_names: str) -> QuerySet[T]:
+    def order_by(self, *field_names: str) -> Self:
         """Return a new QuerySet instance with the ordering changed."""
         if self.sql_query.is_sliced:
             raise TypeError("Cannot reorder a query once a slice has been taken.")
@@ -1496,7 +1543,7 @@ class QuerySet(Generic[T]):
         obj.sql_query.add_ordering(*field_names)
         return obj
 
-    def distinct(self, *field_names: str) -> QuerySet[T]:
+    def distinct(self, *field_names: str) -> Self:
         """
         Return a new QuerySet instance that will select only distinct results.
         """
@@ -1663,7 +1710,7 @@ class QuerySet(Generic[T]):
                 )
         return inserted_rows
 
-    def _chain(self) -> QuerySet[T]:
+    def _chain(self) -> Self:
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -1674,12 +1721,12 @@ class QuerySet(Generic[T]):
             obj._sticky_filter = False
         return obj
 
-    def _clone(self) -> QuerySet[T]:
+    def _clone(self) -> Self:
         """
         Return a copy of the current QuerySet. A lightweight alternative
         to deepcopy().
         """
-        c = self.__class__(
+        c = self.__class__.from_model(
             model=self.model,
             query=self.sql_query.chain(),
         )
@@ -2308,7 +2355,7 @@ def prefetch_one_level(
                     # We need a QuerySet instance to cache the prefetched values
                     if isinstance(queryset, QuerySet):
                         # It's already a QuerySet, create a new instance
-                        qs = queryset.__class__(model=queryset.model)
+                        qs = queryset.__class__.from_model(queryset.model)
                     else:
                         # It's a related manager, get its QuerySet
                         # The manager's query property returns a properly filtered QuerySet

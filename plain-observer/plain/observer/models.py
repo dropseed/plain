@@ -268,7 +268,7 @@ class Trace(models.Model):
         return sorted(events, key=lambda x: x["timestamp"])
 
 
-class SpanQuerySet(models.QuerySet):
+class SpanQuerySet(models.QuerySet["Span"]):
     def annotate_spans(self) -> list[Span]:
         """Annotate spans with nesting levels and duplicate query warnings."""
         spans: list[Span] = list(self.order_by("start_time"))
@@ -329,8 +329,9 @@ class Span(models.Model):
     status = models.CharField(max_length=50, default="", required=False)
     span_data = models.JSONField(default=dict, required=False)
 
+    query = SpanQuerySet()
+
     class Meta:
-        queryset_class = SpanQuerySet
         ordering = ["-start_time"]
         constraints = [
             models.UniqueConstraint(
