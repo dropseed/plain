@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.18.1](https://github.com/dropseed/plain/releases/plain-cache@0.18.1) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the package, achieving 100% type coverage ([154d4c4](https://github.com/dropseed/plain/commit/154d4c44fc))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-cache@0.18.0) (2025-09-12)
 
 ### What's changed
