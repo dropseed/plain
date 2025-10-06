@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.20.2](https://github.com/dropseed/plain/releases/plain-auth@0.20.2) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations across the entire package for improved IDE support and type checking ([786c1db](https://github.com/dropseed/plain/commit/786c1dbdbd))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.1](https://github.com/dropseed/plain/releases/plain-auth@0.20.1) (2025-10-02)
 
 ### What's changed
