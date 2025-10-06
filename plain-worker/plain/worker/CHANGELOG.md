@@ -1,5 +1,15 @@
 # plain-worker changelog
 
+## [0.31.1](https://github.com/dropseed/plain/releases/plain-worker@0.31.1) (2025-10-06)
+
+### What's changed
+
+- Updated dependency resolution to use newer compatible versions of `plain` and `plain.models`
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-worker@0.31.0) (2025-09-25)
 
 ### What's changed
