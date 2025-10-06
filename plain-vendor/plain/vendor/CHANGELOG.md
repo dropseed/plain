@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.9.1](https://github.com/dropseed/plain/releases/plain-vendor@0.9.1) (2025-10-06)
+
+### What's changed
+
+- Added type annotations throughout the codebase for improved type checking support ([c87ca27](https://github.com/dropseed/plain/commit/c87ca27ed2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-vendor@0.9.0) (2025-09-19)
 
 ### What's changed
