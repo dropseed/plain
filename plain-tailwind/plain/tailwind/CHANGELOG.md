@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.15.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.15.2) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations to improve IDE and type checker support ([9b6882b](https://github.com/dropseed/plain/commit/9b6882bae7))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.15.1) (2025-09-25)
 
 ### What's changed
