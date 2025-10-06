@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.14.2](https://github.com/dropseed/plain/releases/plain-pages@0.14.2) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the package for improved type checking and IDE support ([c87ca27](https://github.com/dropseed/plain/commit/c87ca27ed2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.1](https://github.com/dropseed/plain/releases/plain-pages@0.14.1) (2025-10-02)
 
 ### What's changed
