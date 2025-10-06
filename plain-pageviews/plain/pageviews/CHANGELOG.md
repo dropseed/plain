@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.23.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.23.2) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the package for better IDE support and type checking ([c87ca27](https://github.com/dropseed/plain/commit/c87ca27ed2caff71d862d28a7e489031cb7beeb0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.23.1) (2025-10-02)
 
 ### What's changed
