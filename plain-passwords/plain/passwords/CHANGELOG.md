@@ -1,5 +1,17 @@
 # plain-passwords changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-passwords@0.14.0) (2025-10-06)
+
+### What's changed
+
+- Removed unused password hashers (`PBKDF2SHA1PasswordHasher`, `Argon2PasswordHasher`, `BCryptSHA256PasswordHasher`, `BCryptPasswordHasher`, and `ScryptPasswordHasher`) - only `PBKDF2PasswordHasher` remains ([a9acb74](https://github.com/dropseed/plain/commit/a9acb74268))
+- Added comprehensive type annotations throughout the package for better IDE support and type checking ([a9acb74](https://github.com/dropseed/plain/commit/a9acb74268))
+
+### Upgrade instructions
+
+- If you were using a non-default password hasher (`pbkdf2_sha1`, `argon2`, `bcrypt_sha256`, `bcrypt`, or `scrypt`), you'll need to implement your own custom hasher class or migrate existing passwords to use the default `PBKDF2PasswordHasher`
+- If you have custom code that referenced the removed hasher classes, you'll need to update those imports
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-passwords@0.13.0) (2025-10-02)
 
 ### What's changed
