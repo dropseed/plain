@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.12.2](https://github.com/dropseed/plain/releases/plain-pytest@0.12.2) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations to all public methods and functions ([c87ca27e](https://github.com/dropseed/plain/commit/c87ca27e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.1](https://github.com/dropseed/plain/releases/plain-pytest@0.12.1) (2025-09-25)
 
 ### What's changed
