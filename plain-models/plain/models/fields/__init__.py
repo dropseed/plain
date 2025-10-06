@@ -9,7 +9,7 @@ import operator
 import uuid
 import warnings
 from base64 import b64decode, b64encode
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import cached_property, total_ordering
 from typing import TYPE_CHECKING, Any
 
@@ -173,7 +173,7 @@ class Field(RegisterLookupMixin):
         default: Any = NOT_PROVIDED,
         choices: Any = None,
         db_column: str | None = None,
-        validators: tuple[Callable[..., Any], ...] = (),
+        validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
         db_comment: str | None = None,
     ):
