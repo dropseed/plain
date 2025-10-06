@@ -57,7 +57,7 @@ class Options:
 
     default_models_registry = models_registry
 
-    def __init__(self, meta: Any, package_label: str | None = None):
+    def __init__(self, meta: Any, package_label: str):
         self._get_fields_cache: dict[tuple[bool, bool, bool, bool], Any] = {}
         self.local_fields: list[Field] = []
         self.local_many_to_many: list[Field] = []
@@ -68,7 +68,7 @@ class Options:
         self.indexes: list[Any] = []
         self.constraints: list[Any] = []
         self.object_name: str | None = None
-        self.package_label: str | None = package_label
+        self.package_label: str = package_label
         self.required_db_features: list[str] = []
         self.required_db_vendor: str | None = None
         self.meta: Any = meta
