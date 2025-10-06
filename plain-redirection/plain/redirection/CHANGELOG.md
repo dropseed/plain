@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-redirection@0.21.1) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations for improved IDE support and type checking ([c87ca27e](https://github.com/dropseed/plain/commit/c87ca27e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-redirection@0.21.0) (2025-09-12)
 
 ### What's changed
