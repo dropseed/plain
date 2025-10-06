@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.8.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.8.0) (2025-10-06)
+
+### What's changed
+
+- Added type annotations to all functions and methods for improved IDE/type checker support ([c87ca27](https://github.com/dropseed/plain/commit/c87ca27ed2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.7.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.7.0) (2025-09-22)
 
 ### What's changed
