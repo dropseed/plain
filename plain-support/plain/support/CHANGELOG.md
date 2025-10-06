@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.19.1](https://github.com/dropseed/plain/releases/plain-support@0.19.1) (2025-10-06)
+
+### What's changed
+
+- Added type annotations throughout the package for improved IDE support and type checking ([c87ca27](https://github.com/dropseed/plain/commit/c87ca27ed2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-support@0.19.0) (2025-10-02)
 
 ### What's changed
