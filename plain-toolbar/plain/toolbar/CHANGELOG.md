@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.5.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.2) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations to improve IDE support and type checking ([c87ca27](https://github.com/dropseed/plain/commit/c87ca27ed2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.5.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.1) (2025-10-02)
 
 ### What's changed
