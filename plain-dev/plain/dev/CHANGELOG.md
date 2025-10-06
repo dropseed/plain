@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.39.1](https://github.com/dropseed/plain/releases/plain-dev@0.39.1) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations across the entire package to improve IDE support and type checking ([1d00e9f](https://github.com/dropseed/plain/commit/1d00e9f6f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.39.0](https://github.com/dropseed/plain/releases/plain-dev@0.39.0) (2025-09-30)
 
 ### What's changed
