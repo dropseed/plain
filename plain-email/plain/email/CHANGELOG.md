@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.11.1](https://github.com/dropseed/plain/releases/plain-email@0.11.1) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout the package for improved IDE support and type checking ([5a32120](https://github.com/dropseed/plain/commit/5a3212020c473d3a10763cedd0b0b7ca778911de))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-email@0.11.0) (2025-09-19)
 
 ### What's changed
