@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.15.2](https://github.com/dropseed/plain/releases/plain-api@0.15.2) (2025-10-06)
+
+### What's changed
+
+- Added type annotations throughout the package for improved IDE and type checker support ([41f6429](https://github.com/dropseed/plain/commit/41f6429892))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.1](https://github.com/dropseed/plain/releases/plain-api@0.15.1) (2025-10-02)
 
 ### What's changed
