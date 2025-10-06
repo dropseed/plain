@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.10.3](https://github.com/dropseed/plain/releases/plain-htmx@0.10.3) (2025-10-06)
+
+### What's changed
+
+- Added type annotations for improved IDE and type checker support ([8cdda13](https://github.com/dropseed/plain/commit/8cdda13a6c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.2](https://github.com/dropseed/plain/releases/plain-htmx@0.10.2) (2025-10-02)
 
 ### What's changed
