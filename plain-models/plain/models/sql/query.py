@@ -50,6 +50,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.tree import Node
 
 if TYPE_CHECKING:
+    from plain.models import Model
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.options import Options
     from plain.models.sql.compiler import SQLCompiler
@@ -236,7 +237,7 @@ class Query(BaseExpression):
 
     explain_info = None
 
-    def __init__(self, model: type[Any], alias_cols: bool = True):
+    def __init__(self, model: type[Model], alias_cols: bool = True):
         self.model = model
         self.alias_refcount = {}
         # alias_map is the most important data structure regarding joins.

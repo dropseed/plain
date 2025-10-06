@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from plain.models import Model
 
 # Type variable for QuerySet generic
-T = TypeVar("T")
+T = TypeVar("T", bound="Model")
 
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21
@@ -272,7 +272,7 @@ class FlatValuesListIterable(BaseIterable):
 class QuerySet(Generic[T]):
     """Represent a lazy database lookup for a set of objects."""
 
-    def __init__(self, *, model: type[T] | None = None, query: sql.Query | None = None):
+    def __init__(self, *, model: type[T], query: sql.Query | None = None):
         self.model = model
         self._query = query or sql.Query(self.model)
         self._result_cache: list[T] | None = None
@@ -310,7 +310,7 @@ class QuerySet(Generic[T]):
 
     def __deepcopy__(self, memo: dict[int, Any]) -> QuerySet[T]:
         """Don't populate the QuerySet's cache."""
-        obj = self.__class__()
+        obj = self.__class__(model=self.model)
         for k, v in self.__dict__.items():
             if k == "_result_cache":
                 obj.__dict__[k] = None
