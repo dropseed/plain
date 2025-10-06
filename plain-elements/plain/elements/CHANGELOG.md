@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.10.1](https://github.com/dropseed/plain/releases/plain-elements@0.10.1) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations to improve IDE support and type checking ([f7855bf](https://github.com/dropseed/plain/commit/f7855bf567b5ae2eb362a04ed7df390489b488c4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-elements@0.10.0) (2025-09-19)
 
 ### What's changed
