@@ -1,5 +1,18 @@
 # plain-models changelog
 
+## [0.50.0](https://github.com/dropseed/plain/releases/plain-models@0.50.0) (2025-10-06)
+
+### What's changed
+
+- Added comprehensive type annotations throughout plain-models, improving IDE support and type checking capabilities ([ea1a7df](https://github.com/dropseed/plain/commit/ea1a7df622), [f49ee32](https://github.com/dropseed/plain/commit/f49ee32a90), [369353f](https://github.com/dropseed/plain/commit/369353f9d6), [13b7d16](https://github.com/dropseed/plain/commit/13b7d16f8d), [e23a0ca](https://github.com/dropseed/plain/commit/e23a0cae7c), [02d8551](https://github.com/dropseed/plain/commit/02d85518f0))
+- The `QuerySet` class is now generic and the `model` parameter is now required in the `__init__` method ([719e792](https://github.com/dropseed/plain/commit/719e792c96))
+- Database wrapper classes have been renamed for consistency: `DatabaseWrapper` classes are now named `MySQLDatabaseWrapper`, `PostgreSQLDatabaseWrapper`, and `SQLiteDatabaseWrapper` ([5a39e85](https://github.com/dropseed/plain/commit/5a39e851e5))
+- The plain-models package now has 100% type annotation coverage and is validated in CI to prevent regressions
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.49.2](https://github.com/dropseed/plain/releases/plain-models@0.49.2) (2025-10-02)
 
 ### What's changed
