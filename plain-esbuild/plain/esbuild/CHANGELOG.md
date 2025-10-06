@@ -1,5 +1,15 @@
 # plain-esbuild changelog
 
+## [0.6.1](https://github.com/dropseed/plain/releases/plain-esbuild@0.6.1) (2025-10-06)
+
+### What's changed
+
+- Added type annotations throughout the package for improved IDE and type checker support ([968193c](https://github.com/dropseed/plain/commit/968193c55af3254b848a6c9ebe9406b3e86efd64))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.6.0) (2025-09-19)
 
 ### What's changed
