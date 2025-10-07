@@ -33,18 +33,19 @@ class Redirect(models.Model):
     # logged in or not? auth not required necessarily...
     # headers?
 
-    class Meta:
-        ordering = ["order", "-created_at"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["order", "-created_at"],
+        indexes=[
             models.Index(fields=["order"]),
             models.Index(fields=["created_at"]),
-        ]
-        constraints = [
+        ],
+        constraints=[
             models.UniqueConstraint(
                 fields=["from_pattern"],
                 name="plainredirects_redirect_unique_from_pattern",
             ),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return f"{self.from_pattern}"
@@ -96,11 +97,12 @@ class RedirectLog(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        ordering = ["-created_at"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["-created_at"],
+        indexes=[
             models.Index(fields=["created_at"]),
-        ]
+        ],
+    )
 
     @classmethod
     def from_redirect(cls, redirect: Redirect, request: Request) -> RedirectLog:
@@ -135,11 +137,12 @@ class NotFoundLog(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        ordering = ["-created_at"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["-created_at"],
+        indexes=[
             models.Index(fields=["created_at"]),
-        ]
+        ],
+    )
 
     @classmethod
     def from_request(cls, request: Request) -> NotFoundLog:

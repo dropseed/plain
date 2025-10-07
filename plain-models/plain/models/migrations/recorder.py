@@ -44,10 +44,11 @@ class MigrationRecorder:
                 name = models.CharField(max_length=255)
                 applied = models.DateTimeField(default=now)
 
-                class Meta:
-                    models_registry = _models_registry
-                    package_label = "migrations"
-                    db_table = "plainmigrations"
+                _meta = models.Options(
+                    models_registry=_models_registry,
+                    package_label="migrations",
+                    db_table="plainmigrations",
+                )
 
                 def __str__(self) -> str:
                     return f"Migration {self.name} for {self.app}"

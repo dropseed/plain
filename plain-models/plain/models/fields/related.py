@@ -206,7 +206,7 @@ class RelatedField(FieldCacheMixin, Field):
         from plain.models.base import ModelBase
 
         errors: list[PreflightResult] = []
-        opts = self.model._meta  # type: ignore[attr-defined]
+        opts = self.model._meta
 
         # f.remote_field.model may be a string instead of a model. Skip if
         # model name is not resolved.
@@ -225,7 +225,7 @@ class RelatedField(FieldCacheMixin, Field):
         #         m2m = models.ManyToManyField(Target)
 
         # rel_opts.object_name == "Target"
-        rel_opts = self.remote_field.model._meta  # type: ignore[attr-defined]
+        rel_opts = self.remote_field.model._meta
         # If the field doesn't install a backward relation on the target model
         # (so `is_hidden` returns True), then there are no clashes to check
         # and we can skip these fields.
@@ -320,7 +320,7 @@ class RelatedField(FieldCacheMixin, Field):
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         super().contribute_to_class(cls, name)  # type: ignore[misc]
 
-        self.opts = cls._meta  # type: ignore[attr-defined]
+        self.opts = cls._meta
 
         if self.remote_field.related_name:  # type: ignore[attr-defined]
             related_name = self.remote_field.related_name  # type: ignore[attr-defined]
@@ -565,8 +565,8 @@ class ForeignKey(RelatedField):
 
     def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
         """Get path from this field to the related model."""
-        opts = self.remote_field.model._meta  # type: ignore[attr-defined]
-        from_opts = self.model._meta  # type: ignore[attr-defined]
+        opts = self.remote_field.model._meta
+        from_opts = self.model._meta
         return [
             PathInfo(
                 from_opts=from_opts,
@@ -585,8 +585,8 @@ class ForeignKey(RelatedField):
 
     def get_reverse_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
         """Get path from the related model to this field's model."""
-        opts = self.model._meta  # type: ignore[attr-defined]
-        from_opts = self.remote_field.model._meta  # type: ignore[attr-defined]
+        opts = self.model._meta
+        from_opts = self.remote_field.model._meta
         return [
             PathInfo(
                 from_opts=from_opts,
@@ -824,7 +824,7 @@ class ManyToManyField(RelatedField):
         **kwargs: Any,
     ):
         try:
-            to._meta  # type: ignore[attr-defined]
+            to._meta
         except AttributeError:
             if not isinstance(to, str):
                 raise TypeError(

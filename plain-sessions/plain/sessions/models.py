@@ -8,13 +8,14 @@ class Session(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(allow_null=True)
 
-    class Meta:
-        indexes = [
+    _meta = models.Options(
+        indexes=[
             models.Index(fields=["expires_at"]),
-        ]
-        constraints = [
+        ],
+        constraints=[
             models.UniqueConstraint(fields=["session_key"], name="unique_session_key")
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return self.session_key

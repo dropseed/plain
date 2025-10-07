@@ -972,7 +972,7 @@ class QuerySet(Generic[T]):
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with in_bulk().")
-        opts = self.model._meta  # type: ignore[attr-defined]
+        opts = self.model._meta
         unique_fields = [
             constraint.fields[0]
             for constraint in opts.total_unique_constraints

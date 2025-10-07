@@ -6,10 +6,11 @@ class Car(models.Model):
     make = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
 
-    class Meta:
-        constraints = [
+    _meta = models.Options(
+        constraints=[
             models.UniqueConstraint(fields=["make", "model"], name="unique_make_model"),
         ]
+    )
 
 
 class UnregisteredModel(models.Model):
@@ -98,3 +99,22 @@ class CustomSpecialQuerySetModel(models.Model):
     name = models.CharField(max_length=100)
 
     query = CustomSpecialQuerySet()
+
+
+# Test mixin pattern for field inheritance
+class TimestampMixin:
+    """Mixin that provides timestamp fields."""
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+@models.register_model
+class MixinTestModel(TimestampMixin, models.Model):
+    """Model that inherits fields from a mixin."""
+
+    name = models.CharField(max_length=100)
+
+    _meta = models.Options(
+        ordering=["-created_at"],
+    )

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import copy
-import inspect
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from plain.models.options import OptionsInstance
 
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -28,7 +30,6 @@ from plain.models.fields import NOT_PROVIDED, PrimaryKeyField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.options import Options
 from plain.models.query import F, Q, QuerySet
-from plain.packages import packages_registry
 from plain.preflight import PreflightResult
 from plain.utils.encoding import force_str
 from plain.utils.hashable import make_hashable
@@ -61,66 +62,8 @@ class ModelBase(type):
                 raise TypeError(
                     f"A model can't extend another model: {name} extends {base}"
                 )
-            # Meta has to be defined on the model itself.
-            if hasattr(base, "Meta"):
-                raise TypeError(
-                    "Meta can only be defined on a model itself, not a parent class: "
-                    f"{name} extends {base}"
-                )
 
-        new_class = super().__new__(cls, name, bases, attrs, **kwargs)
-
-        new_class._setup_meta()
-
-        # Now go back over all the attrs on this class see if they have a contribute_to_class() method.
-        # Attributes with contribute_to_class are fields and meta options.
-        for attr_name, attr_value in inspect.getmembers(new_class):
-            if attr_name.startswith("_"):
-                continue
-
-            if not inspect.isclass(attr_value) and hasattr(
-                attr_value, "contribute_to_class"
-            ):
-                if attr_name not in attrs:
-                    # If the field came from an inherited class/mixin,
-                    # we need to make a copy of it to avoid altering the
-                    # original class and other classes that inherit from it.
-                    field = copy.deepcopy(attr_value)
-                else:
-                    field = attr_value
-                field.contribute_to_class(new_class, attr_name)
-
-        # Set the name of _meta.indexes. This can't be done in
-        # Options.contribute_to_class() because fields haven't been added to
-        # the model at that point.
-        for index in new_class._meta.indexes:
-            if not index.name:
-                index.set_name_with_model(new_class)
-
-        return new_class
-
-    def _setup_meta(cls) -> None:
-        name = cls.__name__
-        module = cls.__module__
-
-        # The model's Meta class, if it has one.
-        meta = getattr(cls, "Meta", None)
-
-        # Look for an application configuration to attach the model to.
-        package_config = packages_registry.get_containing_package_config(module)
-
-        package_label = getattr(meta, "package_label", None)
-        if package_label is None:
-            if package_config is None:
-                raise RuntimeError(
-                    f"Model class {module}.{name} doesn't declare an explicit "
-                    "package_label and isn't in an application in "
-                    "INSTALLED_PACKAGES."
-                )
-            else:
-                package_label = package_config.package_label
-
-        Options(meta, package_label).contribute_to_class(cls, "_meta")
+        return super().__new__(cls, name, bases, attrs, **kwargs)
 
 
 class ModelStateFieldsCacheDescriptor:
@@ -145,7 +88,7 @@ class ModelState:
 
 
 class Model(metaclass=ModelBase):
-    _meta: Options
+    _meta: OptionsInstance = Options()  # type: ignore[assignment]
 
     # Use descriptors for exception classes instead of metaclass generation
     DoesNotExist = DoesNotExistDescriptor()
@@ -160,7 +103,7 @@ class Model(metaclass=ModelBase):
     def __init__(self, *args: Any, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
-        opts = self._meta
+        opts = cls._meta
         _setattr = setattr
         _DEFERRED = DEFERRED
 
@@ -302,7 +245,7 @@ class Model(metaclass=ModelBase):
     def __reduce__(self) -> tuple[Any, tuple[Any, ...], dict[str, Any]]:
         data = self.__getstate__()
         data[PLAIN_VERSION_PICKLE_KEY] = plain.runtime.__version__
-        class_id = self._meta.package_label, self._meta.object_name
+        class_id = self.__class__._meta.package_label, self.__class__._meta.object_name
         return model_unpickle, (class_id,), data
 
     def __getstate__(self) -> dict[str, Any]:
@@ -349,7 +292,7 @@ class Model(metaclass=ModelBase):
         """
         return {
             f.attname
-            for f in self._meta.concrete_fields
+            for f in self.__class__._meta.concrete_fields
             if f.attname not in self.__dict__
         }
 
@@ -394,14 +337,14 @@ class Model(metaclass=ModelBase):
         elif deferred_fields:
             fields = [
                 f.attname
-                for f in self._meta.concrete_fields
+                for f in self.__class__._meta.concrete_fields
                 if f.attname not in deferred_fields
             ]
             db_instance_qs = db_instance_qs.only(*fields)
 
         db_instance = db_instance_qs.get()
         non_loaded_fields = db_instance.get_deferred_fields()
-        for field in self._meta.concrete_fields:
+        for field in self.__class__._meta.concrete_fields:
             if field.attname in non_loaded_fields:
                 # This field wasn't refreshed - skip ahead.
                 continue
@@ -411,7 +354,7 @@ class Model(metaclass=ModelBase):
                 field.delete_cached_value(self)
 
         # Clear cached relations.
-        for field in self._meta.related_objects:
+        for field in self.__class__._meta.related_objects:
             if field.is_cached(self):
                 field.delete_cached_value(self)
 
@@ -427,7 +370,7 @@ class Model(metaclass=ModelBase):
         and not use this method.
         """
         try:
-            field = self._meta.get_field(field_name)
+            field = self.__class__._meta.get_field(field_name)
         except FieldDoesNotExist:
             return getattr(self, field_name)
         return getattr(self, field.attname)
@@ -462,7 +405,7 @@ class Model(metaclass=ModelBase):
                 return
 
             update_fields = frozenset(update_fields)
-            field_names = self._meta._non_pk_concrete_field_names
+            field_names = self.__class__._meta._non_pk_concrete_field_names
             non_model_fields = update_fields.difference(field_names)
 
             if non_model_fields:
@@ -477,7 +420,7 @@ class Model(metaclass=ModelBase):
         # on the loaded fields.
         elif not force_insert and deferred_fields:
             field_names = set()
-            for field in self._meta.concrete_fields:
+            for field in self.__class__._meta.concrete_fields:
                 if not field.primary_key and not hasattr(field, "through"):
                     field_names.add(field.attname)
             loaded_fields = field_names.difference(deferred_fields)
@@ -642,7 +585,7 @@ class Model(metaclass=ModelBase):
     ) -> None:
         # Ensure that a model instance without a PK hasn't been assigned to
         # a ForeignKey on this model. If the field is nullable, allowing the save would result in silent data loss.
-        for field in self._meta.concrete_fields:
+        for field in self.__class__._meta.concrete_fields:
             if fields and field not in fields:
                 continue
             # If the related field isn't cached, then an instance hasn't been
@@ -679,7 +622,7 @@ class Model(metaclass=ModelBase):
     def delete(self) -> tuple[int, dict[str, int]]:
         if self.id is None:
             raise ValueError(
-                f"{self._meta.object_name} object can't be deleted because its id attribute is set "
+                f"{self.__class__._meta.object_name} object can't be deleted because its id attribute is set "
                 "to None."
             )
         collector = Collector(origin=self)
@@ -689,7 +632,7 @@ class Model(metaclass=ModelBase):
     def get_field_display(self, field_name: str) -> str:
         """Get the display value for a field, especially useful for fields with choices."""
         # Get the field object from the field name
-        field = self._meta.get_field(field_name)
+        field = self.__class__._meta.get_field(field_name)
         value = getattr(self, field.attname)
 
         # If field has no choices, just return the value as string
@@ -703,11 +646,11 @@ class Model(metaclass=ModelBase):
         )
 
     def _get_field_value_map(
-        self, meta: Options | None, exclude: set[str] | None = None
+        self, meta: OptionsInstance | None, exclude: set[str] | None = None
     ) -> dict[str, Value]:
         if exclude is None:
             exclude = set()
-        meta = meta or self._meta
+        meta = meta or self.__class__._meta
         return {
             field.name: Value(getattr(self, field.attname), field)
             for field in meta.local_concrete_fields
@@ -757,7 +700,7 @@ class Model(metaclass=ModelBase):
         # Gather a list of checks for fields declared as unique and add them to
         # the list of checks.
 
-        fields_with_class = [(self.__class__, self._meta.local_fields)]
+        fields_with_class = [(self.__class__, self.__class__._meta.local_fields)]
 
         for model_class, fields in fields_with_class:
             for f in fields:
@@ -780,7 +723,7 @@ class Model(metaclass=ModelBase):
 
             lookup_kwargs = {}
             for field_name in unique_check:
-                f = self._meta.get_field(field_name)
+                f = self.__class__._meta.get_field(field_name)
                 lookup_value = getattr(self, f.attname)
                 # TODO: Handle multiple backends with different feature flags.
                 if lookup_value is None:
@@ -816,9 +759,9 @@ class Model(metaclass=ModelBase):
         return errors
 
     def unique_error_message(
-        self, model_class: type, unique_check: tuple[str, ...]
+        self, model_class: type[Model], unique_check: tuple[str, ...]
     ) -> ValidationError:
-        opts = model_class._meta  # type: ignore[attr-defined]
+        opts = model_class._meta
 
         params = {
             "model": self,
@@ -858,7 +801,7 @@ class Model(metaclass=ModelBase):
             )
 
     def get_constraints(self) -> list[tuple[type, list[Any]]]:
-        constraints = [(self.__class__, self._meta.constraints)]
+        constraints = [(self.__class__, self.__class__._meta.constraints)]
         return constraints
 
     def validate_constraints(self, exclude: set[str] | None = None) -> None:
@@ -942,7 +885,7 @@ class Model(metaclass=ModelBase):
             exclude = set()
 
         errors = {}
-        for f in self._meta.fields:
+        for f in self.__class__._meta.fields:
             if f.name in exclude:
                 continue
             # Skip validation for empty fields with required=False. The developer

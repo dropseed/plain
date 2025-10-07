@@ -23,15 +23,16 @@ class APIKey(models.Model):
 
     api_version = models.CharField(max_length=255, required=False)
 
-    class Meta:
-        constraints = [
+    _meta = models.Options(
+        constraints=[
             models.UniqueConstraint(
                 fields=["uuid"], name="plainapi_apikey_unique_uuid"
             ),
             models.UniqueConstraint(
                 fields=["token"], name="plainapi_apikey_unique_token"
             ),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return self.name or str(self.uuid)

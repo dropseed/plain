@@ -23,12 +23,13 @@ class FlagResult(models.Model):
     key = models.CharField(max_length=255)
     value = models.JSONField()
 
-    class Meta:
-        constraints = [
+    _meta = models.Options(
+        constraints=[
             models.UniqueConstraint(
                 fields=["flag", "key"], name="plainflags_flagresult_unique_key"
             ),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return self.key
@@ -50,12 +51,13 @@ class Flag(models.Model):
     # To provide an easier way to see if a flag is still being used
     used_at = models.DateTimeField(required=False, allow_null=True)
 
-    class Meta:
-        constraints = [
+    _meta = models.Options(
+        constraints=[
             models.UniqueConstraint(
                 fields=["name"], name="plainflags_flag_unique_name"
             ),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return self.name

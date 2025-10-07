@@ -52,7 +52,7 @@ from plain.utils.tree import Node
 if TYPE_CHECKING:
     from plain.models import Model
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.options import Options
+    from plain.models.options import OptionsInstance
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -67,7 +67,7 @@ FORBIDDEN_ALIAS_PATTERN = _lazy_re_compile(r"['`\"\]\[;\s]|--|/\*|\*/")
 EXPLAIN_OPTIONS_PATTERN = _lazy_re_compile(r"[\w\-]+")
 
 
-def get_field_names_from_opts(opts: Options | None) -> set[str]:
+def get_field_names_from_opts(opts: OptionsInstance | None) -> set[str]:
     if opts is None:
         return set()
     return set(
@@ -307,14 +307,13 @@ class Query(BaseExpression):
             self, db_connection, elide_empty
         )
 
-    def get_meta(self) -> Options | None:
+    def get_meta(self) -> OptionsInstance:
         """
         Return the Options instance (the model._meta) from which to start
         processing. Normally, this is self.model._meta, but it can be changed
         by subclasses.
         """
-        if self.model:
-            return self.model._meta  # type: ignore[attr-defined,return-value]
+        return self.model._meta
 
     def clone(self) -> Query:
         """
@@ -703,7 +702,7 @@ class Query(BaseExpression):
 
     def _get_defer_select_mask(
         self,
-        opts: Options,
+        opts: OptionsInstance,
         mask: dict[str, Any],
         select_mask: dict[Any, Any] | None = None,
     ) -> dict[Any, Any]:
@@ -745,7 +744,7 @@ class Query(BaseExpression):
 
     def _get_only_select_mask(
         self,
-        opts: Options,
+        opts: OptionsInstance,
         mask: dict[str, Any],
         select_mask: dict[Any, Any] | None = None,
     ) -> dict[Any, Any]:
@@ -1199,7 +1198,9 @@ class Query(BaseExpression):
             )
         return lookup_parts, field_parts, False  # type: ignore[return-value]
 
-    def check_query_object_type(self, value: Any, opts: Options, field: Field) -> None:
+    def check_query_object_type(
+        self, value: Any, opts: OptionsInstance, field: Field
+    ) -> None:
         """
         Check whether the object passed while querying is of the correct type.
         If not, raise a ValueError specifying the wrong object.
@@ -1210,7 +1211,9 @@ class Query(BaseExpression):
                     f'Cannot query "{value}": Must be "{opts.object_name}" instance.'
                 )
 
-    def check_related_objects(self, field: Field, value: Any, opts: Options) -> None:
+    def check_related_objects(
+        self, field: Field, value: Any, opts: OptionsInstance
+    ) -> None:
         """Check the type of object passed to query relations."""
         if field.is_relation:
             # Check that the field and the queryset use the same model in a
@@ -1602,7 +1605,7 @@ class Query(BaseExpression):
     def names_to_path(
         self,
         names: list[str],
-        opts: Options | None,
+        opts: OptionsInstance,
         allow_many: bool = True,
         fail_on_missing: bool = False,
     ) -> tuple[list[Any], Field, tuple[Field, ...], list[str]]:
@@ -1708,7 +1711,7 @@ class Query(BaseExpression):
     def setup_joins(
         self,
         names: list[str],
-        opts: Options,
+        opts: OptionsInstance,
         alias: str,
         can_reuse: set[str] | None = None,
         allow_many: bool = True,

@@ -217,7 +217,7 @@ class ForwardManyToOneDescriptor:
         # An object must be an instance of the related class.
         if value is not None and not isinstance(value, self.field.remote_field.model):
             raise ValueError(
-                f'Cannot assign "{value!r}": "{instance._meta.object_name}.{self.field.name}" must be a "{self.field.remote_field.model._meta.object_name}" instance.'
+                f'Cannot assign "{value!r}": "{instance.__class__._meta.object_name}.{self.field.name}" must be a "{self.field.remote_field.model._meta.object_name}" instance.'
             )
         remote_field = self.field.remote_field
         # If we're setting the value of a OneToOneField to None, we need to clear

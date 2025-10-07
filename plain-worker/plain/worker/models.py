@@ -61,9 +61,9 @@ class JobRequest(models.Model):
 
     # expires_at = models.DateTimeField(required=False, allow_null=True)
 
-    class Meta:
-        ordering = ["priority", "-created_at"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["priority", "-created_at"],
+        indexes=[
             models.Index(fields=["priority"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["queue"]),
@@ -75,10 +75,10 @@ class JobRequest(models.Model):
             models.Index(
                 name="job_request_class_unique_key", fields=["job_class", "unique_key"]
             ),
-        ]
+        ],
         # The job_class and unique_key should be unique at the db-level,
         # but only if unique_key is not ""
-        constraints = [
+        constraints=[
             models.UniqueConstraint(
                 fields=["job_class", "unique_key"],
                 condition=models.Q(unique_key__gt="", retry_attempt=0),
@@ -87,7 +87,8 @@ class JobRequest(models.Model):
             models.UniqueConstraint(
                 fields=["uuid"], name="plainworker_jobrequest_unique_uuid"
             ),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return f"{self.job_class} [{self.uuid}]"
@@ -169,9 +170,9 @@ class JobProcess(models.Model):
 
     query = JobQuerySet()
 
-    class Meta:
-        ordering = ["-created_at"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["-created_at"],
+        indexes=[
             models.Index(fields=["created_at"]),
             models.Index(fields=["queue"]),
             models.Index(fields=["unique_key"]),
@@ -183,12 +184,13 @@ class JobProcess(models.Model):
             models.Index(
                 name="job_class_unique_key", fields=["job_class", "unique_key"]
             ),
-        ]
-        constraints = [
+        ],
+        constraints=[
             models.UniqueConstraint(
                 fields=["uuid"], name="plainworker_job_unique_uuid"
             ),
-        ]
+        ],
+    )
 
     def run(self) -> JobResult:
         links = []
@@ -392,9 +394,9 @@ class JobResult(models.Model):
 
     query = JobResultQuerySet()
 
-    class Meta:
-        ordering = ["-created_at"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["-created_at"],
+        indexes=[
             models.Index(fields=["created_at"]),
             models.Index(fields=["job_process_uuid"]),
             models.Index(fields=["started_at"]),
@@ -404,12 +406,13 @@ class JobResult(models.Model):
             models.Index(fields=["job_class"]),
             models.Index(fields=["queue"]),
             models.Index(fields=["trace_id"]),
-        ]
-        constraints = [
+        ],
+        constraints=[
             models.UniqueConstraint(
                 fields=["uuid"], name="plainworker_jobresult_unique_uuid"
             ),
-        ]
+        ],
+    )
 
     def retry_job(self, delay: int | None = None) -> JobRequest:
         retry_attempt = self.retry_attempt + 1

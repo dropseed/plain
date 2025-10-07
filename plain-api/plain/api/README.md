@@ -221,14 +221,15 @@ class User(models.Model):
         required=False,
     )
 
-    class Meta:
-        constraints = [
+    _meta = models.Options(
+        constraints=[
             models.UniqueConstraint(
                 fields=["api_key"],
                 condition=models.Q(api_key__isnull=False),
                 name="unique_user_api_key",
             ),
-        ]
+        ],
+    )
 ```
 
 Generating API keys is something you will need to do in your own code, wherever it makes sense to do so.

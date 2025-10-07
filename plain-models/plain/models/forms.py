@@ -42,7 +42,7 @@ def construct_instance(
     """
     from plain import models
 
-    opts = instance._meta
+    opts = instance.__class__._meta
 
     cleaned_data = form.cleaned_data
     file_field_list = []
@@ -85,7 +85,7 @@ def model_to_dict(
     ``fields`` is an optional list of field names. If provided, return only the
     named.
     """
-    opts = instance._meta
+    opts = instance.__class__._meta
     data = {}
     for f in chain(opts.concrete_fields, opts.many_to_many):
         if fields is not None and f.name not in fields:
@@ -264,7 +264,7 @@ class BaseModelForm(BaseForm):
         exclude = set()
         # Build up a list of fields that should be excluded from model field
         # validation and unique checks.
-        for f in self.instance._meta.fields:
+        for f in self.instance.__class__._meta.fields:
             field = f.name
             # Exclude fields that aren't on the form. The developer may be
             # adding these values to the model after form validation.
@@ -372,7 +372,7 @@ class BaseModelForm(BaseForm):
         """
         cleaned_data = self.cleaned_data
         fields = self._meta.fields
-        opts = self.instance._meta
+        opts = self.instance.__class__._meta
 
         for f in opts.many_to_many:
             if not hasattr(f, "save_form_data"):
@@ -391,7 +391,7 @@ class BaseModelForm(BaseForm):
         if self.errors:
             raise ValueError(
                 "The {} could not be {} because the data didn't validate.".format(
-                    self.instance._meta.object_name,
+                    self.instance.__class__._meta.object_name,
                     "created" if self.instance._state.adding else "changed",
                 )
             )

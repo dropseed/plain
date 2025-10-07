@@ -1,21 +1,28 @@
 from __future__ import annotations
 
 import bisect
+import copy
 import inspect
 from collections import defaultdict
+from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.models import models_registry
+from plain.models import models_registry as default_models_registry
+from plain.models.backends.utils import truncate_name
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import db_connection
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet
+from plain.packages import packages_registry
 from plain.utils.datastructures import ImmutableList
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.base import Model
+    from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
+    from plain.models.indexes import Index
 
 PROXY_PARENTS = object()
 
@@ -26,24 +33,116 @@ IMMUTABLE_WARNING = (
     "list for your own use, make a copy first."
 )
 
-DEFAULT_NAMES = (
-    "db_table",
-    "db_table_comment",
-    "ordering",
-    "package_label",
-    "models_registry",
-    "required_db_features",
-    "required_db_vendor",
-    "indexes",
-    "constraints",
-)
-
 
 def make_immutable_fields_list(name: str, data: Any) -> ImmutableList:
     return ImmutableList(data, warning=IMMUTABLE_WARNING % name)
 
 
 class Options:
+    """Descriptor for model metadata. Creates OptionsInstance on first access."""
+
+    def __init__(
+        self,
+        *,
+        db_table: str | None = None,
+        db_table_comment: str | None = None,
+        ordering: Sequence[str] | None = None,
+        indexes: Sequence[Index] | None = None,
+        constraints: Sequence[BaseConstraint] | None = None,
+        required_db_features: Sequence[str] | None = None,
+        required_db_vendor: str | None = None,
+        models_registry: Any | None = None,
+        package_label: str | None = None,
+    ):
+        """Store template configuration for creating OptionsInstance."""
+        self.db_table = db_table
+        self.db_table_comment = db_table_comment
+        self.ordering = ordering
+        self.indexes = indexes
+        self.constraints = constraints
+        self.required_db_features = required_db_features
+        self.required_db_vendor = required_db_vendor
+        self.models_registry = models_registry
+        self.package_label = package_label
+
+    def __get__(self, instance: Any, owner: type[Any]) -> OptionsInstance:
+        """Create OptionsInstance for the model class on first access."""
+
+        # _meta is only accessible from the class, not instances
+        if instance is not None:
+            raise AttributeError(
+                f"_meta is only accessible from the model class, not instances. "
+                f"Use {owner.__name__}._meta instead of self._meta"
+            )
+
+        # Skip for the base Model class - return descriptor
+        if owner.__name__ == "Model" and owner.__module__ == "plain.models.base":
+            return self  # type: ignore
+
+        # Resolve package_label
+        package_label = self.package_label
+        if package_label is None:
+            module = owner.__module__
+            package_config = packages_registry.get_containing_package_config(module)
+            if package_config is None:
+                raise RuntimeError(
+                    f"Model class {module}.{owner.__name__} doesn't declare an explicit "
+                    "package_label and isn't in an application in INSTALLED_PACKAGES."
+                )
+            package_label = package_config.package_label
+
+        # Create the OptionsInstance from this template
+        opts = OptionsInstance(
+            model=owner,
+            package_label=package_label,
+            db_table=self.db_table,
+            db_table_comment=self.db_table_comment,
+            ordering=self.ordering,
+            indexes=self.indexes,
+            constraints=self.constraints,
+            required_db_features=self.required_db_features,
+            required_db_vendor=self.required_db_vendor,
+            models_registry=self.models_registry,
+        )
+
+        # Replace the descriptor with the OptionsInstance on this class
+        # Future accesses go directly to OptionsInstance (no descriptor overhead)
+        setattr(owner, "_meta", opts)
+
+        # Process all fields that have contribute_to_class
+        # Manually collect attributes from class hierarchy to avoid triggering descriptors via inspect.getmembers
+        seen_attrs = set()
+        for klass in owner.__mro__:
+            # Convert to list to avoid "dictionary changed size during iteration" error
+            for attr_name in list(klass.__dict__.keys()):
+                if attr_name.startswith("_") or attr_name in seen_attrs:
+                    continue
+                seen_attrs.add(attr_name)
+
+                # Get the raw value from __dict__ to avoid triggering descriptors
+                attr_value = klass.__dict__[attr_name]
+
+                if not inspect.isclass(attr_value) and hasattr(
+                    attr_value, "contribute_to_class"
+                ):
+                    if attr_name not in owner.__dict__:
+                        # Inherited field - make a copy
+                        field = copy.deepcopy(attr_value)
+                    else:
+                        field = attr_value
+                    field.contribute_to_class(owner, attr_name)
+
+        # Set index names (must happen after setattr so indexes can access owner._meta)
+        for index in opts.indexes:
+            if not index.name:
+                index.set_name_with_model(owner)
+
+        return opts
+
+
+class OptionsInstance:
+    """Fully initialized options for a model class. Not a descriptor."""
+
     FORWARD_PROPERTIES = {
         "fields",
         "many_to_many",
@@ -55,30 +154,86 @@ class Options:
     }
     REVERSE_PROPERTIES = {"related_objects", "fields_map", "_relation_tree"}
 
-    default_models_registry = models_registry
+    def __init__(
+        self,
+        *,
+        model: type[Model],
+        package_label: str,
+        db_table: str | None = None,
+        db_table_comment: str | None = None,
+        ordering: Sequence[str] | None = None,
+        indexes: Sequence[Index] | None = None,
+        constraints: Sequence[BaseConstraint] | None = None,
+        required_db_features: Sequence[str] | None = None,
+        required_db_vendor: str | None = None,
+        models_registry: Any | None = None,
+    ):
+        """Create a fully initialized OptionsInstance for a model."""
+        # Track which options were explicitly provided by user (not internal ones)
+        self._provided_options = {
+            k
+            for k, v in [
+                ("db_table", db_table),
+                ("db_table_comment", db_table_comment),
+                ("ordering", ordering),
+                ("indexes", indexes),
+                ("constraints", constraints),
+                ("required_db_features", required_db_features),
+                ("required_db_vendor", required_db_vendor),
+            ]
+            if v is not None
+        }
 
-    def __init__(self, meta: Any, package_label: str):
-        self._get_fields_cache: dict[tuple[bool, bool, bool, bool], Any] = {}
-        self.local_fields: list[Field] = []
-        self.local_many_to_many: list[Field] = []
-        self.model_name: str | None = None
-        self.db_table: str = ""
-        self.db_table_comment: str = ""
-        self.ordering: list[Any] = []
-        self.indexes: list[Any] = []
-        self.constraints: list[Any] = []
-        self.object_name: str | None = None
-        self.package_label: str = package_label
-        self.required_db_features: list[str] = []
-        self.required_db_vendor: str | None = None
-        self.meta: Any = meta
+        self._get_fields_cache = {}
+        self.local_fields = []
+        self.local_many_to_many = []
+        self.related_fkey_lookups = []
 
-        # List of all lookups defined in ForeignKey 'limit_choices_to' options
-        # from *other* models. Needed for some admin checks. Internal use only.
-        self.related_fkey_lookups: list[Any] = []
+        self.model = model
+        self.object_name = model.__name__
+        self.model_name = self.object_name.lower()
+        self.package_label = package_label
 
-        # A custom app registry to use, if you're making a separate model set.
-        self.models_registry: Any = self.default_models_registry
+        # Apply values
+        if db_table:
+            self.db_table = db_table
+        else:
+            # Generate and truncate table name if not provided
+            self.db_table = f"{package_label}_{self.model_name}"
+            self.db_table = truncate_name(
+                self.db_table,
+                db_connection.ops.max_name_length(),
+            )
+        self.db_table_comment = db_table_comment or ""
+        self.ordering = ordering or []
+        self.indexes = indexes or []
+        self.constraints = constraints or []
+        self.required_db_features = required_db_features or []
+        self.required_db_vendor = required_db_vendor
+        self.models_registry = models_registry or default_models_registry
+
+        # Format names with class interpolation
+        self.constraints = self._format_names_with_class(self.constraints)
+        self.indexes = self._format_names_with_class(self.indexes)
+
+    def export_for_migrations(self) -> dict[str, Any]:
+        """Export user-provided options for migrations."""
+        options = {}
+        for name in self._provided_options:
+            if name == "indexes":
+                # Clone indexes and ensure names are set
+                indexes = [idx.clone() for idx in self.indexes]
+                for index in indexes:
+                    if not index.name:
+                        index.set_name_with_model(self.model)
+                options["indexes"] = indexes
+            elif name == "constraints":
+                # Clone constraints
+                options["constraints"] = [con.clone() for con in self.constraints]
+            else:
+                # Use current attribute value
+                options[name] = getattr(self, name)
+        return options
 
     @property
     def label(self) -> str:
@@ -88,68 +243,14 @@ class Options:
     def label_lower(self) -> str:
         return f"{self.package_label}.{self.model_name}"
 
-    def contribute_to_class(self, cls: type[Any], name: str) -> None:
-        from plain.models.backends.utils import truncate_name
-
-        cls._meta = self
-        self.model: type[Any] = cls
-        # First, construct the default values for these options.
-        self.object_name = cls.__name__
-        self.model_name = self.object_name.lower()
-
-        # Store the original user-defined values for each option,
-        # for use when serializing the model definition
-        self.original_attrs = {}
-
-        # Next, apply any overridden values from 'class Meta'.
-        if self.meta:
-            meta_attrs = self.meta.__dict__.copy()
-            for name in self.meta.__dict__:
-                # Ignore any private attributes that Plain doesn't care about.
-                # NOTE: We can't modify a dictionary's contents while looping
-                # over it, so we loop over the *original* dictionary instead.
-                if name.startswith("_"):
-                    del meta_attrs[name]
-            for attr_name in DEFAULT_NAMES:
-                if attr_name in meta_attrs:
-                    setattr(self, attr_name, meta_attrs.pop(attr_name))
-                    self.original_attrs[attr_name] = getattr(self, attr_name)
-                elif hasattr(self.meta, attr_name):
-                    setattr(self, attr_name, getattr(self.meta, attr_name))
-                    self.original_attrs[attr_name] = getattr(self, attr_name)
-
-            # Package label/class name interpolation for names of constraints and
-            # indexes.
-            for attr_name in {"constraints", "indexes"}:
-                objs = getattr(self, attr_name, [])
-                setattr(self, attr_name, self._format_names_with_class(cls, objs))
-
-            # Any leftover attributes must be invalid.
-            if meta_attrs != {}:
-                raise TypeError(
-                    "'class Meta' got invalid attribute(s): {}".format(
-                        ",".join(meta_attrs)
-                    )
-                )
-
-        del self.meta
-
-        # If the db_table wasn't provided, use the package_label + model_name.
-        if not self.db_table:
-            self.db_table = f"{self.package_label}_{self.model_name}"
-            self.db_table = truncate_name(
-                self.db_table,
-                db_connection.ops.max_name_length(),
-            )
-
-    def _format_names_with_class(self, cls: type[Any], objs: list[Any]) -> list[Any]:
+    def _format_names_with_class(self, objs: list[Any]) -> list[Any]:
         """Package label/class name interpolation for object names."""
         new_objs = []
         for obj in objs:
             obj = obj.clone()
             obj.name = obj.name % {
-                "package_label": cls._meta.package_label.lower(),
-                "class": cls.__name__.lower(),
+                "package_label": self.package_label.lower(),
+                "class": self.model.__name__.lower(),
             }
             new_objs.append(obj)
         return new_objs

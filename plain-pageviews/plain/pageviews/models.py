@@ -46,16 +46,17 @@ class Pageview(models.Model):
     medium = models.CharField(max_length=200, required=False)
     campaign = models.CharField(max_length=200, required=False)
 
-    class Meta:
-        ordering = ["-timestamp"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["-timestamp"],
+        indexes=[
             models.Index(fields=["timestamp"]),
             models.Index(fields=["user_id"]),
             models.Index(fields=["session_id"]),
             models.Index(fields=["url"]),
             models.Index(fields=["source"]),
             models.Index(fields=["medium"]),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return self.url

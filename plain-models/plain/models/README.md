@@ -200,15 +200,16 @@ class User(models.Model):
     username = models.CharField(max_length=150)
     age = models.IntegerField()
 
-    class Meta:
-        indexes = [
+    _meta = models.Options(
+        indexes=[
             models.Index(fields=["email"]),
             models.Index(fields=["-created_at"], name="user_created_idx"),
-        ]
-        constraints = [
+        ],
+        constraints=[
             models.UniqueConstraint(fields=["email", "username"], name="unique_user"),
             models.CheckConstraint(check=models.Q(age__gte=0), name="age_positive"),
-        ]
+        ],
+    )
 ```
 
 ## Custom QuerySets

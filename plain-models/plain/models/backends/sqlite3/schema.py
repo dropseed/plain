@@ -4,7 +4,7 @@ import copy
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from plain.models import register_model
+from plain.models import Options, register_model
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import Statement
 from plain.models.backends.utils import strip_quotes
@@ -288,29 +288,27 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # table and solely exists for foreign key reference resolution purposes.
         # This wouldn't be required if the schema editor was operating on model
         # states instead of rendered models.
-        meta_contents = {
-            "package_label": model._meta.package_label,
-            "db_table": model._meta.db_table,
-            "indexes": indexes,
-            "constraints": constraints,
-            "models_registry": models_registry,
-        }
-        meta = type("Meta", (), meta_contents)
-        body_copy["Meta"] = meta
+        meta_options = Options(
+            package_label=model._meta.package_label,
+            db_table=model._meta.db_table,
+            indexes=indexes,
+            constraints=constraints,
+            models_registry=models_registry,
+        )
+        body_copy["_meta"] = meta_options
         body_copy["__module__"] = model.__module__
         register_model(type(model._meta.object_name, model.__bases__, body_copy))  # type: ignore[arg-type]
 
         # Construct a model with a renamed table name.
         body_copy = copy.deepcopy(body)
-        meta_contents = {
-            "package_label": model._meta.package_label,
-            "db_table": f"new__{strip_quotes(model._meta.db_table)}",
-            "indexes": indexes,
-            "constraints": constraints,
-            "models_registry": models_registry,
-        }
-        meta = type("Meta", (), meta_contents)
-        body_copy["Meta"] = meta
+        meta_options = Options(
+            package_label=model._meta.package_label,
+            db_table=f"new__{strip_quotes(model._meta.db_table)}",
+            indexes=indexes,
+            constraints=constraints,
+            models_registry=models_registry,
+        )
+        body_copy["_meta"] = meta_options
         body_copy["__module__"] = model.__module__
         new_model = type(f"New{model._meta.object_name}", model.__bases__, body_copy)
         register_model(new_model)  # type: ignore[arg-type]

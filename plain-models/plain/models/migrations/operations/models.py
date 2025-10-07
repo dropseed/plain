@@ -70,8 +70,10 @@ class CreateModel(ModelOperation):
         _check_for_duplicates(
             "bases",
             (
-                base._meta.label_lower  # type: ignore[attr-defined]
-                if hasattr(base, "_meta")
+                base._meta.label_lower
+                if not isinstance(base, str)
+                and base is not models.Model
+                and hasattr(base, "_meta")
                 else base.lower()
                 if isinstance(base, str)
                 else base

@@ -63,21 +63,22 @@ class Trace(models.Model):
         spans: BaseRelatedManager
         logs: BaseRelatedManager
 
-    class Meta:
-        ordering = ["-start_time"]
-        constraints = [
+    _meta = models.Options(
+        ordering=["-start_time"],
+        constraints=[
             models.UniqueConstraint(
                 fields=["trace_id"],
                 name="observer_unique_trace_id",
             )
-        ]
-        indexes = [
+        ],
+        indexes=[
             models.Index(fields=["trace_id"]),
             models.Index(fields=["start_time"]),
             models.Index(fields=["request_id"]),
             models.Index(fields=["share_id"]),
             models.Index(fields=["session_id"]),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return self.trace_id
@@ -331,20 +332,21 @@ class Span(models.Model):
 
     query = SpanQuerySet()
 
-    class Meta:
-        ordering = ["-start_time"]
-        constraints = [
+    _meta = models.Options(
+        ordering=["-start_time"],
+        constraints=[
             models.UniqueConstraint(
                 fields=["trace", "span_id"],
                 name="observer_unique_span_id",
             )
-        ]
-        indexes = [
+        ],
+        indexes=[
             models.Index(fields=["span_id"]),
             models.Index(fields=["trace", "span_id"]),
             models.Index(fields=["trace"]),
             models.Index(fields=["start_time"]),
-        ]
+        ],
+    )
 
     if TYPE_CHECKING:
         level: int
@@ -514,11 +516,12 @@ class Log(models.Model):
     level = models.CharField(max_length=20)
     message = models.TextField()
 
-    class Meta:
-        ordering = ["timestamp"]
-        indexes = [
+    _meta = models.Options(
+        ordering=["timestamp"],
+        indexes=[
             models.Index(fields=["trace", "timestamp"]),
             models.Index(fields=["trace", "span"]),
             models.Index(fields=["timestamp"]),
             models.Index(fields=["trace"]),
-        ]
+        ],
+    )

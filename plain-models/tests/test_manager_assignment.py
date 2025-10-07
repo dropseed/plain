@@ -45,8 +45,7 @@ def test_field_named_objects_validation():
         )  # This field exists but won't override query property
         name = models.CharField(max_length=100)
 
-        class Meta:
-            package_label = "test_app"
+        _meta = models.Options(package_label="test_app")
 
     # The query property takes precedence over the field
     assert hasattr(FieldObjectsModel, "objects")
@@ -89,8 +88,7 @@ def test_query_validation():
         objects = "not a manager"  # This won't affect the query property
         name = models.CharField(max_length=100)
 
-        class Meta:
-            package_label = "test_app"
+        _meta = models.Options(package_label="test_app")
 
     # Should have the default QuerySet, not the string
     assert isinstance(BadObjectsModel.query, QuerySet)

@@ -41,14 +41,15 @@ class OAuthConnection(models.Model):
     access_token_expires_at = models.DateTimeField(required=False, allow_null=True)
     refresh_token_expires_at = models.DateTimeField(required=False, allow_null=True)
 
-    class Meta:
-        constraints = [
+    _meta = models.Options(
+        constraints=[
             models.UniqueConstraint(
                 fields=["provider_key", "provider_user_id"],
                 name="plainoauth_oauthconnection_unique_provider_key_user_id",
             )
-        ]
-        ordering = ("provider_key",)
+        ],
+        ordering=("provider_key",),
+    )
 
     def __str__(self) -> str:
         return f"{self.provider_key}[{self.user}:{self.provider_user_id}]"

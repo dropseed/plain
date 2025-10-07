@@ -962,8 +962,7 @@ class SQLCompiler:
         """
         result = []
         if opts is None:
-            if (opts := self.query.get_meta()) is None:
-                return result
+            opts = self.query.get_meta()
         start_alias = start_alias or self.query.get_initial_alias()
 
         for field in opts.concrete_fields:

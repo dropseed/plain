@@ -11,7 +11,6 @@ from plain.models.exceptions import FieldDoesNotExist
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from plain.models.migrations.utils import field_is_referenced, get_references
-from plain.models.options import DEFAULT_NAMES
 from plain.models.registry import ModelsRegistry
 from plain.models.registry import models_registry as global_models
 from plain.packages import packages_registry
@@ -721,7 +720,7 @@ class ModelState:
         """Given a model, return a ModelState representing it."""
         # Deconstruct the fields
         fields = []
-        for field in model._meta.local_fields:  # type: ignore[attr-defined]
+        for field in model._meta.local_fields:
             if getattr(field, "remote_field", None) and exclude_rels:
                 continue
             name = field.name  # type: ignore[attr-defined]
@@ -729,7 +728,7 @@ class ModelState:
                 fields.append((name, field.clone()))  # type: ignore[attr-defined]
             except TypeError as e:
                 raise TypeError(
-                    f"Couldn't reconstruct field {name} on {model._meta.label}: {e}"  # type: ignore[attr-defined]
+                    f"Couldn't reconstruct field {name} on {model._meta.label}: {e}"
                 )
         if not exclude_rels:
             for field in model._meta.local_many_to_many:  # type: ignore[attr-defined]
@@ -738,28 +737,8 @@ class ModelState:
                     fields.append((name, field.clone()))  # type: ignore[attr-defined]
                 except TypeError as e:
                     raise TypeError(
-                        f"Couldn't reconstruct m2m field {name} on {model._meta.object_name}: {e}"  # type: ignore[attr-defined]
+                        f"Couldn't reconstruct m2m field {name} on {model._meta.object_name}: {e}"
                     )
-        # Extract the options
-        options = {}
-        for name in DEFAULT_NAMES:
-            # Ignore some special options
-            if name in ["models_registry", "package_label"]:
-                continue
-            elif name in model._meta.original_attrs:  # type: ignore[attr-defined]
-                if name == "indexes":
-                    indexes = [idx.clone() for idx in model._meta.indexes]  # type: ignore[attr-defined]
-                    for index in indexes:
-                        if not index.name:  # type: ignore[attr-defined]
-                            index.set_name_with_model(model)  # type: ignore[attr-defined]
-                    options["indexes"] = indexes
-                elif name == "constraints":
-                    options["constraints"] = [
-                        con.clone()
-                        for con in model._meta.constraints  # type: ignore[attr-defined]
-                    ]
-                else:
-                    options[name] = model._meta.original_attrs[name]  # type: ignore[attr-defined]
 
         def flatten_bases(model: type[models.Model]) -> list[type[models.Model]]:
             bases = []
@@ -778,7 +757,13 @@ class ModelState:
 
         # Make our record
         bases = tuple(
-            (base._meta.label_lower if hasattr(base, "_meta") else base)  # type: ignore[attr-defined]
+            (
+                base._meta.label_lower
+                if not isinstance(base, str)
+                and base is not models.Model
+                and hasattr(base, "_meta")
+                else base
+            )
             for base in flattened_bases
         )
         # Ensure at least one base inherits from models.Model
@@ -789,10 +774,10 @@ class ModelState:
 
         # Construct the new ModelState
         return cls(
-            model._meta.package_label,  # type: ignore[attr-defined]
-            model._meta.object_name,  # type: ignore[attr-defined]
+            model._meta.package_label,
+            model._meta.object_name,
             fields,
-            options,
+            model._meta.export_for_migrations(),
             bases,
         )
 
@@ -811,13 +796,12 @@ class ModelState:
 
     def render(self, models_registry: ModelsRegistry) -> type[models.Model]:
         """Create a Model object from our current state into the given packages."""
-        # First, make a Meta object
-        meta_contents = {
-            "package_label": self.package_label,
-            "models_registry": models_registry,
+        # Create Options instance with metadata
+        meta_options = models.Options(
+            package_label=self.package_label,
+            models_registry=models_registry,
             **self.options,
-        }
-        meta = type("Meta", (), meta_contents)
+        )
         # Then, work out our bases
         try:
             bases = tuple(
@@ -830,7 +814,7 @@ class ModelState:
             )
         # Clone fields for the body, add other bits.
         body = {name: field.clone() for name, field in self.fields.items()}  # type: ignore[attr-defined]
-        body["Meta"] = meta
+        body["_meta"] = meta_options
         body["__module__"] = "__fake__"
 
         # Then, make a Model object (models_registry.register_model is called in __new__)

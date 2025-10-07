@@ -27,15 +27,16 @@ class CachedItem(models.Model):
 
     query = CachedItemQuerySet()
 
-    class Meta:
-        indexes = [
+    _meta = models.Options(
+        indexes=[
             models.Index(fields=["expires_at"]),
-        ]
-        constraints = [
+        ],
+        constraints=[
             models.UniqueConstraint(
                 fields=["key"], name="plaincache_cacheditem_unique_key"
             ),
-        ]
+        ],
+    )
 
     def __str__(self) -> str:
         return self.key

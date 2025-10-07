@@ -63,6 +63,7 @@ from .registry import models_registry, register_model
 
 # Imports that would create circular imports if sorted
 from .base import DEFERRED, Model  # isort:skip
+from .options import Options  # isort:skip
 from .fields.related import (  # isort:skip
     ForeignKey,
     ManyToManyField,
@@ -104,6 +105,7 @@ __all__ += [
     "JSONField",
     "Lookup",
     "Transform",
+    "Options",
     "Prefetch",
     "Q",
     "QuerySet",
