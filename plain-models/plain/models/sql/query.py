@@ -999,7 +999,7 @@ class Query(BaseExpression):
             alias = self.base_table
             self.ref_alias(alias)
         elif self.model:
-            alias = self.join(self.base_table_class(self.get_meta().db_table, None))  # type: ignore[arg-type]
+            alias = self.join(self.base_table_class(self.get_meta().db_table, None))
         else:
             alias = None
         return alias

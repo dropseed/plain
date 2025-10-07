@@ -31,7 +31,7 @@ def _get_package_label_and_model_name(
         split = model.split(".", 1)
         return tuple(split) if len(split) == 2 else (package_label, split[0])  # type: ignore[return-value]
     else:
-        return model._meta.package_label, model._meta.model_name  # type: ignore[attr-defined]
+        return model._meta.package_label, model._meta.model_name
 
 
 def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
@@ -42,7 +42,7 @@ def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
         if issubclass(subclass, models.Model)
     ]
     related_fields_models = set()
-    for f in m._meta.get_fields(include_hidden=True):  # type: ignore[attr-defined]
+    for f in m._meta.get_fields(include_hidden=True):
         if (
             f.is_relation  # type: ignore[attr-defined]
             and f.related_model is not None  # type: ignore[attr-defined]
@@ -59,7 +59,7 @@ def get_related_models_tuples(model: type[models.Model]) -> set[tuple[str, str]]
     models for the given model.
     """
     return {
-        (rel_mod._meta.package_label, rel_mod._meta.model_name)  # type: ignore[attr-defined]
+        (rel_mod._meta.package_label, rel_mod._meta.model_name)
         for rel_mod in _get_related_models(model)
     }
 
@@ -77,14 +77,14 @@ def get_related_models_recursive(model: type[models.Model]) -> set[tuple[str, st
     queue = _get_related_models(model)
     for rel_mod in queue:
         rel_package_label, rel_model_name = (
-            rel_mod._meta.package_label,  # type: ignore[attr-defined]
-            rel_mod._meta.model_name,  # type: ignore[attr-defined]
+            rel_mod._meta.package_label,
+            rel_mod._meta.model_name,
         )
         if (rel_package_label, rel_model_name) in seen:
             continue
         seen.add((rel_package_label, rel_model_name))
         queue.extend(_get_related_models(rel_mod))
-    return seen - {(model._meta.package_label, model._meta.model_name)}  # type: ignore[attr-defined]
+    return seen - {(model._meta.package_label, model._meta.model_name)}
 
 
 class ProjectState:
@@ -644,7 +644,7 @@ class StateModelsRegistry(ModelsRegistry):
         return clone
 
     def register_model(self, package_label: str, model: type[models.Model]) -> None:
-        self.all_models[package_label][model._meta.model_name] = model  # type: ignore[attr-defined]
+        self.all_models[package_label][model._meta.model_name] = model
         self.do_pending_operations(model)
         self.clear_cache()
 
@@ -688,12 +688,12 @@ class ModelState:
                     f'ModelState.fields cannot be bound to a model - "{name}" is.'
                 )
             # Sanity-check that relation fields are NOT referring to a model class.
-            if field.is_relation and hasattr(field.related_model, "_meta"):  # type: ignore[attr-defined]
+            if field.is_relation and hasattr(field.related_model, "_meta"):
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.to" does. '
                     "Use a string reference instead."
                 )
-            if field.many_to_many and hasattr(field.remote_field.through, "_meta"):  # type: ignore[attr-defined]
+            if field.many_to_many and hasattr(field.remote_field.through, "_meta"):
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.through" '
                     "does. Use a string reference instead."
@@ -731,7 +731,7 @@ class ModelState:
                     f"Couldn't reconstruct field {name} on {model._meta.label}: {e}"
                 )
         if not exclude_rels:
-            for field in model._meta.local_many_to_many:  # type: ignore[attr-defined]
+            for field in model._meta.local_many_to_many:
                 name = field.name  # type: ignore[attr-defined]
                 try:
                     fields.append((name, field.clone()))  # type: ignore[attr-defined]

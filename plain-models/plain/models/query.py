@@ -481,12 +481,12 @@ class QuerySet(Generic[T]):
         query = (
             self
             if self.sql_query.can_filter()
-            else self.model._meta.base_queryset.filter(id__in=self.values("id"))  # type: ignore[attr-defined]
+            else self.model._meta.base_queryset.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.sql_query.can_filter():
-            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))  # type: ignore[attr-defined]
+            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))
         combined.sql_query.combine(other.sql_query, sql.OR)
         return combined
 
@@ -500,12 +500,12 @@ class QuerySet(Generic[T]):
         query = (
             self
             if self.sql_query.can_filter()
-            else self.model._meta.base_queryset.filter(id__in=self.values("id"))  # type: ignore[attr-defined]
+            else self.model._meta.base_queryset.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.sql_query.can_filter():
-            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))  # type: ignore[attr-defined]
+            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))
         combined.sql_query.combine(other.sql_query, sql.XOR)
         return combined
 
@@ -642,7 +642,7 @@ class QuerySet(Generic[T]):
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
-        id_field = self.model._meta.get_field("id")  # type: ignore[attr-defined]
+        id_field = self.model._meta.get_field("id")
         for obj in objs:
             if obj.id is None:  # type: ignore[attr-defined]
                 # Populate new primary key values.
@@ -793,7 +793,7 @@ class QuerySet(Generic[T]):
         objs_tuple = tuple(objs)
         if any(obj.id is None for obj in objs_tuple):  # type: ignore[attr-defined]
             raise ValueError("All bulk_update() objects must have a primary key set.")
-        fields_list = [self.model._meta.get_field(name) for name in fields]  # type: ignore[attr-defined]
+        fields_list = [self.model._meta.get_field(name) for name in fields]
         if any(not f.concrete or f.many_to_many for f in fields_list):
             raise ValueError("bulk_update() can only be used with concrete fields.")
         if any(f.primary_key for f in fields_list):
@@ -903,14 +903,14 @@ class QuerySet(Generic[T]):
                 setattr(obj, k, v)
 
             update_fields = set(update_defaults)
-            concrete_field_names = self.model._meta._non_pk_concrete_field_names  # type: ignore[attr-defined]
+            concrete_field_names = self.model._meta._non_pk_concrete_field_names
             # update_fields does not support non-concrete fields.
             if concrete_field_names.issuperset(update_fields):
                 # Add fields which are set on pre_save(), e.g. auto_now fields.
                 # This is to maintain backward compatibility as these fields
                 # are not updated unless explicitly specified in the
                 # update_fields list.
-                for field in self.model._meta.local_concrete_fields:  # type: ignore[attr-defined]
+                for field in self.model._meta.local_concrete_fields:
                     if not (
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
@@ -932,11 +932,11 @@ class QuerySet(Generic[T]):
         defaults = defaults or {}
         params = {k: v for k, v in kwargs.items() if LOOKUP_SEP not in k}
         params.update(defaults)
-        property_names = self.model._meta._property_names  # type: ignore[attr-defined]
+        property_names = self.model._meta._property_names
         invalid_params = []
         for param in params:
             try:
-                self.model._meta.get_field(param)  # type: ignore[attr-defined]
+                self.model._meta.get_field(param)
             except FieldDoesNotExist:
                 # It's okay to use a model's property if it has a setter.
                 if not (param in property_names and getattr(self.model, param).fset):
@@ -944,7 +944,7 @@ class QuerySet(Generic[T]):
         if invalid_params:
             raise FieldError(
                 "Invalid field name(s) for model {}: '{}'.".format(
-                    self.model._meta.object_name,  # type: ignore[attr-defined]
+                    self.model._meta.object_name,
                     "', '".join(sorted(invalid_params)),
                 )
             )
@@ -1507,7 +1507,7 @@ class QuerySet(Generic[T]):
                     (field.name, field.attname)
                     if hasattr(field, "attname")
                     else (field.name,)
-                    for field in self.model._meta.get_fields()  # type: ignore[attr-defined]
+                    for field in self.model._meta.get_fields()
                 )
             )
 
@@ -1697,7 +1697,7 @@ class QuerySet(Generic[T]):
                     self._insert(
                         item,
                         fields=fields,
-                        returning_fields=self.model._meta.db_returning_fields,  # type: ignore[attr-defined]
+                        returning_fields=self.model._meta.db_returning_fields,
                     )
                 )
             else:
@@ -1863,9 +1863,7 @@ class RawQuerySet:
         """Resolve the init field names and value positions."""
         converter = db_connection.introspection.identifier_converter
         model_init_fields = [
-            f
-            for f in self.model._meta.fields  # type: ignore[attr-defined]
-            if converter(f.column) in self.columns
+            f for f in self.model._meta.fields if converter(f.column) in self.columns
         ]
         annotation_fields = [
             (column, pos)
@@ -1953,7 +1951,7 @@ class RawQuerySet:
         """A dict mapping column names to model field names."""
         converter = db_connection.introspection.identifier_converter
         model_fields = {}
-        for field in self.model._meta.fields:  # type: ignore[attr-defined]
+        for field in self.model._meta.fields:
             name, column = field.get_attname_column()
             model_fields[converter(column)] = field
         return model_fields

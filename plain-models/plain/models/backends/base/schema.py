@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
+    from plain.models.fields.related import ForeignKey, ManyToManyField
+    from plain.models.fields.reverse_related import ManyToManyRel
 
 logger = logging.getLogger("plain.models.backends.schema")
 
@@ -51,7 +53,7 @@ def _is_relevant_relation(relation: Any, altered_field: Field) -> bool:
 def _all_related_fields(model: type[Model]) -> list[Any]:
     # Related fields must be returned in a deterministic order.
     return sorted(
-        model._meta._get_fields(  # type: ignore[attr-defined]
+        model._meta._get_fields(
             forward=False,
             reverse=True,
             include_hidden=True,
@@ -1210,37 +1212,42 @@ class BaseDatabaseSchemaEditor:
         return self.quote_value(comment or "")
 
     def _alter_many_to_many(
-        self, model: type[Model], old_field: Field, new_field: Field, strict: bool
+        self,
+        model: type[Model],
+        old_field: ManyToManyField,
+        new_field: ManyToManyField,
+        strict: bool,
     ) -> None:
         """Alter M2Ms to repoint their to= endpoints."""
+        # Type narrow for ManyToManyField.remote_field
+        old_rel: ManyToManyRel = old_field.remote_field  # type: ignore[assignment]
+        new_rel: ManyToManyRel = new_field.remote_field  # type: ignore[assignment]
+
         # Rename the through table
-        if (
-            old_field.remote_field.through._meta.db_table  # type: ignore[attr-defined]
-            != new_field.remote_field.through._meta.db_table  # type: ignore[attr-defined]
-        ):
+        if old_rel.through._meta.db_table != new_rel.through._meta.db_table:
             self.alter_db_table(
-                old_field.remote_field.through,  # type: ignore[attr-defined]
-                old_field.remote_field.through._meta.db_table,  # type: ignore[attr-defined]
-                new_field.remote_field.through._meta.db_table,  # type: ignore[attr-defined]
+                old_rel.through,
+                old_rel.through._meta.db_table,
+                new_rel.through._meta.db_table,
             )
         # Repoint the FK to the other side
         self.alter_field(
-            new_field.remote_field.through,  # type: ignore[attr-defined]
+            new_rel.through,
             # The field that points to the target model is needed, so we can
             # tell alter_field to change it - this is m2m_reverse_field_name()
             # (as opposed to m2m_field_name(), which points to our model).
-            old_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+            old_rel.through._meta.get_field(
                 old_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
             ),
-            new_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+            new_rel.through._meta.get_field(
                 new_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
             ),
         )
         self.alter_field(
-            new_field.remote_field.through,  # type: ignore[attr-defined]
+            new_rel.through,
             # for self-referential models we need to alter field from the other end too
-            old_field.remote_field.through._meta.get_field(old_field.m2m_field_name()),  # type: ignore[attr-defined]
-            new_field.remote_field.through._meta.get_field(new_field.m2m_field_name()),  # type: ignore[attr-defined]
+            old_rel.through._meta.get_field(old_field.m2m_field_name()),
+            new_rel.through._meta.get_field(new_field.m2m_field_name()),
         )
 
     def _create_index_name(
@@ -1430,14 +1437,14 @@ class BaseDatabaseSchemaEditor:
         }
 
     def _create_fk_sql(
-        self, model: type[Model], field: Field, suffix: str
+        self, model: type[Model], field: ForeignKey, suffix: str
     ) -> Statement:
         table = Table(model._meta.db_table, self.quote_name)
         name = self._fk_constraint_name(model, field, suffix)
         column = Columns(model._meta.db_table, [field.column], self.quote_name)
-        to_table = Table(field.target_field.model._meta.db_table, self.quote_name)  # type: ignore[attr-defined]
+        to_table = Table(field.target_field.model._meta.db_table, self.quote_name)
         to_column = Columns(
-            field.target_field.model._meta.db_table,  # type: ignore[attr-defined]
+            field.target_field.model._meta.db_table,
             [field.target_field.column],  # type: ignore[attr-defined]
             self.quote_name,
         )
@@ -1453,7 +1460,7 @@ class BaseDatabaseSchemaEditor:
         )
 
     def _fk_constraint_name(
-        self, model: type[Model], field: Field, suffix: str
+        self, model: type[Model], field: ForeignKey, suffix: str
     ) -> ForeignKeyName:
         def create_fk_name(*args: Any, **kwargs: Any) -> str:
             return self.quote_name(self._create_index_name(*args, **kwargs))
@@ -1461,7 +1468,7 @@ class BaseDatabaseSchemaEditor:
         return ForeignKeyName(
             model._meta.db_table,
             [field.column],
-            split_identifier(field.target_field.model._meta.db_table)[1],  # type: ignore[attr-defined]
+            split_identifier(field.target_field.model._meta.db_table)[1],
             [field.target_field.column],  # type: ignore[attr-defined]
             suffix,
             create_fk_name,

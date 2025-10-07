@@ -4,7 +4,7 @@ import copy
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from plain.models import Options, register_model
+from plain.models import Options
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import Statement
 from plain.models.backends.utils import strip_quotes
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
+    from plain.models.fields.related import ManyToManyField
+    from plain.models.fields.reverse_related import ManyToManyRel
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -297,7 +299,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         body_copy["_meta"] = meta_options
         body_copy["__module__"] = model.__module__
-        register_model(type(model._meta.object_name, model.__bases__, body_copy))  # type: ignore[arg-type]
+        temp_model: type[Model] = type(  # type: ignore[assignment]
+            model._meta.object_name, model.__bases__, body_copy
+        )
+        models_registry.register_model(model._meta.package_label, temp_model)
 
         # Construct a model with a renamed table name.
         body_copy = copy.deepcopy(body)
@@ -310,8 +315,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         body_copy["_meta"] = meta_options
         body_copy["__module__"] = model.__module__
-        new_model = type(f"New{model._meta.object_name}", model.__bases__, body_copy)
-        register_model(new_model)  # type: ignore[arg-type]
+        new_model: type[Model] = type(  # type: ignore[assignment]
+            f"New{model._meta.object_name}", model.__bases__, body_copy
+        )
+        models_registry.register_model(model._meta.package_label, new_model)
 
         # Create a new table with the updated schema.
         self.create_model(new_model)
@@ -319,7 +326,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Copy data from the old table into the new table
         self.execute(
             "INSERT INTO {} ({}) SELECT {} FROM {}".format(
-                self.quote_name(new_model._meta.db_table),  # type: ignore[attr-defined]
+                self.quote_name(new_model._meta.db_table),
                 ", ".join(self.quote_name(x) for x in mapping),
                 ", ".join(mapping.values()),
                 self.quote_name(model._meta.db_table),
@@ -332,7 +339,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Rename the new table to take way for the old
         self.alter_db_table(
             new_model,  # type: ignore[arg-type]
-            new_model._meta.db_table,  # type: ignore[attr-defined]
+            new_model._meta.db_table,
             model._meta.db_table,
             disable_constraints=False,
         )
@@ -461,26 +468,31 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 self._remake_table(related_model)
 
     def _alter_many_to_many(
-        self, model: type[Model], old_field: Field, new_field: Field, strict: bool
+        self,
+        model: type[Model],
+        old_field: ManyToManyField,
+        new_field: ManyToManyField,
+        strict: bool,
     ) -> None:
         """Alter M2Ms to repoint their to= endpoints."""
-        if (
-            old_field.remote_field.through._meta.db_table  # type: ignore[attr-defined]
-            == new_field.remote_field.through._meta.db_table  # type: ignore[attr-defined]
-        ):
+        # Type narrow for ManyToManyField.remote_field
+        old_rel: ManyToManyRel = old_field.remote_field  # type: ignore[assignment]
+        new_rel: ManyToManyRel = new_field.remote_field  # type: ignore[assignment]
+
+        if old_rel.through._meta.db_table == new_rel.through._meta.db_table:
             # The field name didn't change, but some options did, so we have to
             # propagate this altering.
             self._remake_table(
-                old_field.remote_field.through,  # type: ignore[attr-defined]
+                old_rel.through,
                 alter_fields=[
                     (
                         # The field that points to the target model is needed,
                         # so that table can be remade with the new m2m field -
                         # this is m2m_reverse_field_name().
-                        old_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                        old_rel.through._meta.get_field(
                             old_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
                         ),
-                        new_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                        new_rel.through._meta.get_field(
                             new_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
                         ),
                     ),
@@ -488,10 +500,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         # The field that points to the model itself is needed,
                         # so that table can be remade with the new self field -
                         # this is m2m_field_name().
-                        old_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                        old_rel.through._meta.get_field(
                             old_field.m2m_field_name()  # type: ignore[attr-defined]
                         ),
-                        new_field.remote_field.through._meta.get_field(  # type: ignore[attr-defined]
+                        new_rel.through._meta.get_field(
                             new_field.m2m_field_name()  # type: ignore[attr-defined]
                         ),
                     ),
@@ -500,11 +512,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return
 
         # Make a new through table
-        self.create_model(new_field.remote_field.through)  # type: ignore[attr-defined]
+        self.create_model(new_rel.through)
         # Copy the data across
         self.execute(
             "INSERT INTO {} ({}) SELECT {} FROM {}".format(
-                self.quote_name(new_field.remote_field.through._meta.db_table),  # type: ignore[attr-defined]
+                self.quote_name(new_rel.through._meta.db_table),
                 ", ".join(
                     [
                         "id",
@@ -519,11 +531,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         old_field.m2m_reverse_name(),  # type: ignore[attr-defined]
                     ]
                 ),
-                self.quote_name(old_field.remote_field.through._meta.db_table),  # type: ignore[attr-defined]
+                self.quote_name(old_rel.through._meta.db_table),
             )
         )
         # Delete the old through table
-        self.delete_model(old_field.remote_field.through)  # type: ignore[attr-defined]
+        self.delete_model(old_rel.through)
 
     def add_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
         if isinstance(constraint, UniqueConstraint) and (

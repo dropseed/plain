@@ -36,6 +36,7 @@ from ..registry import models_registry
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.sql.compiler import SQLCompiler
 
 __all__ = [
@@ -169,7 +170,7 @@ class Field(RegisterLookupMixin):
         max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
-        rel: Any = None,
+        rel: ForeignObjectRel | None = None,
         default: Any = NOT_PROVIDED,
         choices: Any = None,
         db_column: str | None = None,

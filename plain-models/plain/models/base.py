@@ -459,19 +459,20 @@ class Model(metaclass=ModelBase):
 
         with transaction.mark_for_rollback_on_error():
             self._save_table(
-                raw,
-                cls,
-                force_insert,
-                force_update,
-                update_fields,
+                raw=raw,
+                cls=cls,
+                force_insert=force_insert,
+                force_update=force_update,
+                update_fields=update_fields,
             )
         # Once saved, this is no longer a to-be-added instance.
         self._state.adding = False
 
     def _save_table(
         self,
-        raw: bool = False,
-        cls: type[Model] | None = None,
+        *,
+        raw: bool,
+        cls: type[Model],
         force_insert: bool = False,
         force_update: bool = False,
         update_fields: Iterable[str] | None = None,
@@ -480,7 +481,7 @@ class Model(metaclass=ModelBase):
         Do the heavy-lifting involved in saving. Update or insert the data
         for a single table.
         """
-        meta = cls._meta  # type: ignore[union-attr]
+        meta = cls._meta
         non_pks = [f for f in meta.local_concrete_fields if not f.primary_key]
 
         if update_fields:

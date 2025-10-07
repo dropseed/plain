@@ -62,7 +62,7 @@ def resolve_relation(
     # Look for an "app.Model" relation
     if isinstance(relation, str):
         if "." not in relation:
-            relation = f"{scope_model._meta.package_label}.{relation}"  # type: ignore[attr-defined]
+            relation = f"{scope_model._meta.package_label}.{relation}"
 
     return relation
 
@@ -86,7 +86,7 @@ def lazy_related_operation(
     """
     models = [model] + [resolve_relation(model, rel) for rel in related_models]
     model_keys = (make_model_tuple(m) for m in models)
-    models_registry = model._meta.models_registry  # type: ignore[attr-defined]
+    models_registry = model._meta.models_registry
     return models_registry.lazy_model_operation(
         partial(function, **kwargs), *model_keys
     )
@@ -140,7 +140,7 @@ class RelatedField(FieldCacheMixin, Field):
         if not is_valid_id:
             return [
                 PreflightResult(
-                    fix=f"The name '{self.remote_field.related_name}' is invalid related_name for field {self.model._meta.object_name}.{self.name}. Related name must be a valid Python identifier.",  # type: ignore[attr-defined]
+                    fix=f"The name '{self.remote_field.related_name}' is invalid related_name for field {self.model._meta.object_name}.{self.name}. Related name must be a valid Python identifier.",
                     obj=self,
                     id="fields.invalid_related_name",
                 )
@@ -186,7 +186,7 @@ class RelatedField(FieldCacheMixin, Field):
         model_name = (
             self.remote_field.model  # type: ignore[attr-defined]
             if rel_is_string
-            else self.remote_field.model._meta.object_name  # type: ignore[attr-defined]
+            else self.remote_field.model._meta.object_name
         )
         if rel_is_missing and rel_is_string:
             return [
@@ -326,15 +326,15 @@ class RelatedField(FieldCacheMixin, Field):
             related_name = self.remote_field.related_name  # type: ignore[attr-defined]
             related_name %= {
                 "class": cls.__name__.lower(),
-                "model_name": cls._meta.model_name.lower(),  # type: ignore[union-attr]
-                "package_label": cls._meta.package_label.lower(),  # type: ignore[union-attr]
+                "model_name": cls._meta.model_name.lower(),
+                "package_label": cls._meta.package_label.lower(),
             }
             self.remote_field.related_name = related_name  # type: ignore[attr-defined]
 
         if self.remote_field.related_query_name:  # type: ignore[attr-defined]
             related_query_name = self.remote_field.related_query_name % {  # type: ignore[attr-defined]
                 "class": cls.__name__.lower(),
-                "package_label": cls._meta.package_label.lower(),  # type: ignore[union-attr]
+                "package_label": cls._meta.package_label.lower(),
             }
             self.remote_field.related_query_name = related_query_name  # type: ignore[attr-defined]
 
@@ -389,7 +389,7 @@ class RelatedField(FieldCacheMixin, Field):
         )
 
     def set_attributes_from_rel(self) -> None:
-        self.name = self.name or (self.remote_field.model._meta.model_name + "_" + "id")  # type: ignore[attr-defined]
+        self.name = self.name or (self.remote_field.model._meta.model_name + "_" + "id")
         self.remote_field.set_field_name()  # type: ignore[attr-defined]
 
     def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
@@ -469,10 +469,10 @@ class ForeignKey(RelatedField):
         db_constraint: bool = True,
         **kwargs: Any,
     ):
-        try:
-            to._meta.model_name  # type: ignore[attr-defined]
-        except AttributeError:
-            if not isinstance(to, str):
+        if not isinstance(to, str):
+            try:
+                to._meta.model_name
+            except AttributeError:
                 raise TypeError(
                     f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKey must be "
                     f"either a model, a model name, or the string {RECURSIVE_RELATIONSHIP_CONSTANT!r}"
@@ -669,7 +669,7 @@ class ForeignKey(RelatedField):
             else:
                 kwargs["to"] = self.remote_field.model.lower()  # type: ignore[attr-defined]
         else:
-            kwargs["to"] = self.remote_field.model._meta.label_lower  # type: ignore[attr-defined]
+            kwargs["to"] = self.remote_field.model._meta.label_lower
 
         if self.db_index is not True:
             kwargs["db_index"] = self.db_index
@@ -691,7 +691,7 @@ class ForeignKey(RelatedField):
         if value is None:
             return None
 
-        qs = self.remote_field.model._meta.base_queryset.filter(  # type: ignore[attr-defined]
+        qs = self.remote_field.model._meta.base_queryset.filter(
             **{self.remote_field.field_name: value}  # type: ignore[attr-defined]
         )
         qs = qs.complex_filter(self.get_limit_choices_to())
@@ -700,7 +700,7 @@ class ForeignKey(RelatedField):
                 self.error_messages["invalid"],  # type: ignore[attr-defined]
                 code="invalid",
                 params={
-                    "model": self.remote_field.model._meta.model_name,  # type: ignore[attr-defined]
+                    "model": self.remote_field.model._meta.model_name,
                     "id": value,
                     "field": self.remote_field.field_name,  # type: ignore[attr-defined]
                     "value": value,
@@ -713,14 +713,14 @@ class ForeignKey(RelatedField):
                 f"Related model {self.remote_field.model!r} cannot be resolved"  # type: ignore[attr-defined]
             )
         from_field = self
-        to_field = self.remote_field.model._meta.get_field("id")  # type: ignore[attr-defined]
+        to_field = self.remote_field.model._meta.get_field("id")
         related_fields: list[tuple[ForeignKey, Field]] = [(from_field, to_field)]
 
         for from_field, to_field in related_fields:
             if to_field and to_field.model != self.remote_field.model:  # type: ignore[attr-defined]
                 raise FieldError(
-                    f"'{self.model._meta.label}.{self.name}' refers to field '{to_field.name}' which is not local to model "  # type: ignore[attr-defined]
-                    f"'{self.remote_field.model._meta.label}'."  # type: ignore[attr-defined]
+                    f"'{self.model._meta.label}.{self.name}' refers to field '{to_field.name}' which is not local to model "
+                    f"'{self.remote_field.model._meta.label}'."
                 )
         return related_fields
 
@@ -823,10 +823,10 @@ class ManyToManyField(RelatedField):
         symmetrical: bool | None = None,
         **kwargs: Any,
     ):
-        try:
-            to._meta
-        except AttributeError:
-            if not isinstance(to, str):
+        if not isinstance(to, str):
+            try:
+                to._meta
+            except AttributeError:
                 raise TypeError(
                     f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ManyToManyField "
                     f"must be either a model, a model name, or the string {RECURSIVE_RELATIONSHIP_CONSTANT!r}"
@@ -1161,12 +1161,12 @@ class ManyToManyField(RelatedField):
             else:
                 kwargs["to"] = self.remote_field.model.lower()  # type: ignore[attr-defined]
         else:
-            kwargs["to"] = self.remote_field.model._meta.label_lower  # type: ignore[attr-defined]
+            kwargs["to"] = self.remote_field.model._meta.label_lower
 
         if isinstance(self.remote_field.through, str):  # type: ignore[attr-defined]
             kwargs["through"] = self.remote_field.through  # type: ignore[attr-defined]
         else:
-            kwargs["through"] = self.remote_field.through._meta.label  # type: ignore[attr-defined]
+            kwargs["through"] = self.remote_field.through._meta.label
 
         return name, path, args, kwargs
 
@@ -1175,8 +1175,8 @@ class ManyToManyField(RelatedField):
     ) -> list[PathInfo]:
         """Called by both direct and indirect m2m traversal."""
         int_model = self.remote_field.through  # type: ignore[attr-defined]
-        linkfield1 = int_model._meta.get_field(self.m2m_field_name())  # type: ignore[attr-defined]
-        linkfield2 = int_model._meta.get_field(self.m2m_reverse_field_name())  # type: ignore[attr-defined]
+        linkfield1 = int_model._meta.get_field(self.m2m_field_name())
+        linkfield2 = int_model._meta.get_field(self.m2m_reverse_field_name())
         if direct:
             join1infos = linkfield1.reverse_path_infos  # type: ignore[attr-defined]
             if filtered_relation:
@@ -1211,7 +1211,7 @@ class ManyToManyField(RelatedField):
         Function that can be curried to provide the m2m table name for this
         relation.
         """
-        return self.remote_field.through._meta.db_table  # type: ignore[attr-defined]
+        return self.remote_field.through._meta.db_table
 
     def _get_m2m_attr(self, related: Any, attr: str) -> Any:
         """
@@ -1225,7 +1225,7 @@ class ManyToManyField(RelatedField):
             link_field_name: str | None = self.remote_field.through_fields[0]  # type: ignore[attr-defined]
         else:
             link_field_name = None
-        for f in self.remote_field.through._meta.fields:  # type: ignore[attr-defined]
+        for f in self.remote_field.through._meta.fields:
             if (
                 f.is_relation  # type: ignore[attr-defined]
                 and f.remote_field.model == related.related_model  # type: ignore[attr-defined]
@@ -1248,7 +1248,7 @@ class ManyToManyField(RelatedField):
             link_field_name: str | None = self.remote_field.through_fields[1]  # type: ignore[attr-defined]
         else:
             link_field_name = None
-        for f in self.remote_field.through._meta.fields:  # type: ignore[attr-defined]
+        for f in self.remote_field.through._meta.fields:
             if f.is_relation and f.remote_field.model == related.model:  # type: ignore[attr-defined]
                 if link_field_name is None and related.related_model == related.model:
                     # If this is an m2m-intermediate to self,
