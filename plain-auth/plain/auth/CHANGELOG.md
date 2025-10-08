@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.20.3](https://github.com/dropseed/plain/releases/plain-auth@0.20.3) (2025-10-07)
+
+### What's changed
+
+- Updated 0.20.0 changelog with additional upgrade instructions about `login_required` default ([221591e](https://github.com/dropseed/plain/commit/221591e48a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.2](https://github.com/dropseed/plain/releases/plain-auth@0.20.2) (2025-10-06)
 
 ### What's changed
