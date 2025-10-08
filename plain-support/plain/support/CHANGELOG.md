@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-support@0.20.0) (2025-10-07)
+
+### What's changed
+
+- Model configuration now uses `model_options` descriptor instead of `class Meta` ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb), [73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.1](https://github.com/dropseed/plain/releases/plain-support@0.19.1) (2025-10-06)
 
 ### What's changed
