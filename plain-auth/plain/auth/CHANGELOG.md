@@ -33,6 +33,7 @@
 
 - Remove `plain.auth.middleware.AuthenticationMiddleware` from your `MIDDLEWARE` setting
 - In views, use `AuthViewMixin` for access to `self.user` instead of `self.request.user`
+- The default for `login_required` in `AuthViewMixin` is now `False`, so explicitly set `login_required = True` if needed
 - Replace `request.user` with `get_request_user(request)` in code outside of `AuthViewMixin` views
 - In templates, replace `{{ request.user }}` with `{{ user }}` (from `AuthViewMixin`) or with `{{ get_current_user() }}`
 
