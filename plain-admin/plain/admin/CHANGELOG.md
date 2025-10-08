@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.50.0](https://github.com/dropseed/plain/releases/plain-admin@0.50.0) (2025-10-07)
+
+### What's changed
+
+- Admin model views now use `model.model_options` instead of `model._meta` for accessing model metadata like `model_name` ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+- Admin model detail views now use `object._model_meta` instead of `object._meta` for accessing field metadata ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.49.1](https://github.com/dropseed/plain/releases/plain-admin@0.49.1) (2025-10-06)
 
 ### What's changed
