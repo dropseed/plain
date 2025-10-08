@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.73.0](https://github.com/dropseed/plain/releases/plain@0.73.0) (2025-10-07)
+
+### What's changed
+
+- Internal preflight result handling updated to use `model_options` instead of `_meta` for model label retrieval ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.72.2](https://github.com/dropseed/plain/releases/plain@0.72.2) (2025-10-06)
 
 ### What's changed
