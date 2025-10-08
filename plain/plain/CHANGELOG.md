@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.74.0](https://github.com/dropseed/plain/releases/plain@0.74.0) (2025-10-08)
+
+### What's changed
+
+- The `plain agent request` command now displays request ID in the response output ([4a20cfa3fc](https://github.com/dropseed/plain/commit/4a20cfa3fc))
+- Request headers are now included in OpenTelemetry tracing baggage for improved observability ([08a3376d06](https://github.com/dropseed/plain/commit/08a3376d06))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.73.0](https://github.com/dropseed/plain/releases/plain@0.73.0) (2025-10-07)
 
 ### What's changed
