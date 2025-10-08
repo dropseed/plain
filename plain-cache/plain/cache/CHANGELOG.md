@@ -1,5 +1,17 @@
 # plain-cache changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-cache@0.19.0) (2025-10-07)
+
+### What's changed
+
+- Model configuration updated from `class Meta` to `model_options` descriptor for improved type safety ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb))
+- QuerySet is now a proper descriptor with enhanced type annotations ([2578301](https://github.com/dropseed/plain/commit/2578301819))
+- Improved type safety by removing `type: ignore` comments throughout the package ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.1](https://github.com/dropseed/plain/releases/plain-cache@0.18.1) (2025-10-06)
 
 ### What's changed
