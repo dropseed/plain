@@ -1,5 +1,16 @@
 # plain-flags changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-flags@0.26.0) (2025-10-07)
+
+### What's changed
+
+- Model definitions now use `model_options = models.Options()` instead of `class Meta:` ([17a378d](https://github.com/dropseed/plain/commit/17a378d), [73ba469](https://github.com/dropseed/plain/commit/73ba469))
+- Internal model metadata access updated to use `model_options` and `_model_meta` properties ([73ba469](https://github.com/dropseed/plain/commit/73ba469))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.3](https://github.com/dropseed/plain/releases/plain-flags@0.25.3) (2025-10-06)
 
 ### What's changed
