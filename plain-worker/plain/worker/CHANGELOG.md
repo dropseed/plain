@@ -1,5 +1,18 @@
 # plain-worker changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-worker@0.32.0) (2025-10-07)
+
+### What's changed
+
+- Models now use `model_options` instead of `_meta` for accessing model configuration like `package_label` and `model_name` ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+- Model configuration now uses `model_options = models.Options()` instead of `class Meta` ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb))
+- QuerySet types now properly use `Self` return type for better type checking ([2578301](https://github.com/dropseed/plain/commit/2578301819))
+- Removed unnecessary type ignore comments now that QuerySet is properly typed ([2578301](https://github.com/dropseed/plain/commit/2578301819))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.1](https://github.com/dropseed/plain/releases/plain-worker@0.31.1) (2025-10-06)
 
 ### What's changed
