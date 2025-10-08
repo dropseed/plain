@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.10.1](https://github.com/dropseed/plain/releases/plain-observer@0.10.1) (2025-10-08)
+
+### What's changed
+
+- Fixed content negotiation priority in trace detail and shared views to prefer HTML over JSON by default ([00212835aa](https://github.com/dropseed/plain/commit/00212835aa))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-observer@0.10.0) (2025-10-07)
 
 ### What's changed
