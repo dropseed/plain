@@ -94,6 +94,9 @@ class BaseHandler:
             span_attributes[url_attributes.URL_QUERY] = query_string
 
         span_context = baggage.set_baggage("http.request.cookies", request.cookies)
+        span_context = baggage.set_baggage(
+            "http.request.headers", request.headers, span_context
+        )
 
         with tracer.start_as_current_span(
             f"{request.method} {request.path_info}",
