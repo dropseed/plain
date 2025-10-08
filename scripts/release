@@ -105,6 +105,8 @@ def main():
 
     packages = args.packages if args.packages else discover_packages(repo_path)
 
+    # Phase 1: Collect version bump choices
+    release_plan = []
     for package in packages:
         pkg_path = repo_path / package
         commits = get_commits_since_version_change(repo_path, pkg_path)
@@ -128,21 +130,79 @@ def main():
         if choice == "skip":
             continue
 
+        release_plan.append({
+            "package": package,
+            "path": pkg_path,
+            "bump_type": choice,
+        })
+
+    if not release_plan:
+        print("\nNo packages to release.")
+        sys.exit(0)
+
+    # Phase 2: Bump versions
+    print(f"\n{BOLD}Bumping versions...{END}")
+    for item in release_plan:
+        package = item["package"]
+        pkg_path = item["path"]
+        bump_type = item["bump_type"]
+
         old_version = get_current_version(pkg_path)
-        new_version = bump_version_with_uv(pkg_path, choice)
-        run("uv sync", repo_path)
+        new_version = bump_version_with_uv(pkg_path, bump_type)
+        item["old_version"] = old_version
+        item["new_version"] = new_version
+        print(f"{package}: {old_version} → {new_version}")
 
-        # Need to update the changelog here so it's in the commit
-        print("Generating release notes...")
-        subprocess.check_call(["./scripts/generate-release-notes", package, new_version])
+    # Phase 3: Generate release notes in parallel
+    print(f"\n{BOLD}Generating release notes in parallel...{END}")
+    processes = []
+    for item in release_plan:
+        package = item["package"]
+        new_version = item["new_version"]
+        proc = subprocess.Popen(
+            ["./scripts/generate-release-notes", package, new_version],
+            cwd=repo_path
+        )
+        processes.append((package, proc))
 
-        # Ask if they are ready to commit
-        confirm = input("Are you ready to commit? (y/n): ")
+    # Wait for all processes to complete
+    for package, proc in processes:
+        print(f"Generating release notes for {package}...")
+        proc.wait()
+        if proc.returncode != 0:
+            print(f"Error generating release notes for {package}")
+            sys.exit(1)
+        print(f"✓ {package}")
+
+    # Phase 4: Run sync and fix once after all changes
+    print(f"\n{BOLD}Running uv sync and formatting...{END}")
+    run("uv sync", repo_path, capture=False)
+    subprocess.check_call(["./scripts/fix"], cwd=repo_path)
+
+    # Phase 5: Commit each package individually
+    print(f"\n{BOLD}Ready to commit releases...{END}")
+    for item in release_plan:
+        package = item["package"]
+        pkg_path = item["path"]
+        new_version = item["new_version"]
+
+        print(f"\n{BOLD}{package} {new_version}{END}")
+
+        # Show the diff of changes for this package
+        print("\nChanges for this release:")
+        diff_output = run(
+            f"git diff {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'}",
+            repo_path
+        )
+        if diff_output:
+            print(diff_output)
+
+        confirm = input("\nCommit this release? (y/n) [y]: ").strip()
+        if not confirm:
+            confirm = "y"
         if confirm.lower() != "y":
-            print("Aborting release.")
+            print("Skipping.")
             continue
-
-        subprocess.check_call(["./scripts/fix"], cwd=repo_path)
 
         run(f"git add {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'} uv.lock", repo_path, capture=False)
         run(
@@ -153,7 +213,7 @@ def main():
             repo_path,
             capture=False,
         )
-        print(f"Released {package} {new_version}")
+        print(f"Committed {package} {new_version}")
 
     # Push all changes
     confirm = input("Push all changes? (y/n): ")
