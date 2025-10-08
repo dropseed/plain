@@ -72,9 +72,6 @@ def request(
                 try:
                     user = User.query.get(id=user_id)
                     client.force_login(user)
-                    click.secho(
-                        f"Authenticated as user {user_id}", fg="green", dim=True
-                    )
                 except User.DoesNotExist:
                     click.secho(f"User {user_id} not found", fg="red", err=True)
                     return
@@ -134,23 +131,28 @@ def request(
             return
 
         # Display response information
-        click.secho(
-            f"HTTP {response.status_code}",
-            fg="green" if response.status_code < 400 else "red",
-            bold=True,
-        )
+        click.secho("Response:", fg="yellow", bold=True)
 
-        # Show additional response info first
-        if hasattr(response, "user"):
-            click.secho(f"Authenticated user: {response.user}", fg="blue", dim=True)
+        # Status code
+        click.echo(f"  Status: {response.status_code}")
 
-        if hasattr(response, "resolver_match") and response.resolver_match:
+        # Request ID
+        click.echo(f"  Request ID: {response.wsgi_request.unique_id}")
+
+        # User
+        if response.user:
+            click.echo(f"  Authenticated user: {response.user}")
+
+        # URL pattern
+        if response.resolver_match:
             match = response.resolver_match
             namespaced_url_name = getattr(match, "namespaced_url_name", None)
             url_name_attr = getattr(match, "url_name", None)
             url_name = namespaced_url_name or url_name_attr
             if url_name:
-                click.secho(f"URL pattern matched: {url_name}", fg="blue", dim=True)
+                click.echo(f"  URL pattern: {url_name}")
+
+        click.echo()
 
         # Show headers
         if response.headers:
