@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.24.0) (2025-10-07)
+
+### What's changed
+
+- Model metadata definition changed from `class Meta` to `model_options` descriptor ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb295f6de3fa1e9b2f476d3c11e3f21c), [73ba469](https://github.com/dropseed/plain/commit/73ba469ba052e054ac9cce4a054250b82e9206fb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.23.2) (2025-10-06)
 
 ### What's changed
