@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.51.1](https://github.com/dropseed/plain/releases/plain-models@0.51.1) (2025-10-08)
+
+### What's changed
+
+- Fixed a bug in `Subquery` and `Exists` expressions that was using the old `query` attribute name instead of `sql_query` when extracting the SQL query from a QuerySet ([79ca52d](https://github.com/dropseed/plain/commit/79ca52d32e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.51.0](https://github.com/dropseed/plain/releases/plain-models@0.51.0) (2025-10-07)
 
 ### What's changed
