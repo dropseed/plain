@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-redirection@0.22.0) (2025-10-07)
+
+### What's changed
+
+- Model configuration changed from `class Meta` to `_meta` descriptor, then to `model_options` attribute ([17a378dc](https://github.com/dropseed/plain/commit/17a378dc), [73ba469b](https://github.com/dropseed/plain/commit/73ba469b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.1](https://github.com/dropseed/plain/releases/plain-redirection@0.21.1) (2025-10-06)
 
 ### What's changed
