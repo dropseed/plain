@@ -1,5 +1,18 @@
 # plain-observer changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-observer@0.11.0) (2025-10-08)
+
+### What's changed
+
+- Observer can now be enabled in DEBUG mode using an `Observer` HTTP header (e.g., `Observer: persist` or `Observer: summary`), which takes precedence over cookies ([cba149a](https://github.com/dropseed/plain/commit/cba149a40e))
+- Added validation for observer mode values that raises helpful errors in DEBUG mode when invalid values are provided ([cba149a](https://github.com/dropseed/plain/commit/cba149a40e))
+- Refactored `Observer` class to accept cookies and headers as constructor parameters, with new `from_request()` and `from_otel_context()` factory methods for improved testability ([cba149a](https://github.com/dropseed/plain/commit/cba149a40e))
+- Added AGENTS.md file with helpful commands for AI agents working with Plain Observer ([cba149a](https://github.com/dropseed/plain/commit/cba149a40e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.1](https://github.com/dropseed/plain/releases/plain-observer@0.10.1) (2025-10-08)
 
 ### What's changed
