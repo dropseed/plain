@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-api@0.16.0) (2025-10-07)
+
+### What's changed
+
+- Model configuration changed from `class Meta` to `model_options = models.Options()` descriptor ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.2](https://github.com/dropseed/plain/releases/plain-api@0.15.2) (2025-10-06)
 
 ### What's changed
