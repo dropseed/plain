@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-sessions@0.33.0) (2025-10-07)
+
+### What's changed
+
+- The `Session` model now uses `model_options` instead of an inner `Meta` class for model configuration ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.32.2](https://github.com/dropseed/plain/releases/plain-sessions@0.32.2) (2025-10-06)
 
 ### What's changed
