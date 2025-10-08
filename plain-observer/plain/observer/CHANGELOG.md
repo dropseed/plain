@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-observer@0.10.0) (2025-10-07)
+
+### What's changed
+
+- Model configuration now uses `model_options` descriptor instead of `class Meta` for improved consistency with Plain framework patterns ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb))
+- Custom QuerySet classes are now defined as descriptors on the model class instead of being configured in Meta ([2578301](https://github.com/dropseed/plain/commit/2578301819))
+- Internal model metadata split into separate `model_options` and `_model_meta` attributes for better organization ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.1](https://github.com/dropseed/plain/releases/plain-observer@0.9.1) (2025-10-06)
 
 ### What's changed
