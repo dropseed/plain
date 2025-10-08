@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-oauth@0.30.0) (2025-10-07)
+
+### What's changed
+
+- Model metadata is now defined using `model_options = models.Options(...)` instead of `class Meta` ([17a378d](https://github.com/dropseed/plain/commit/17a378d), [73ba469](https://github.com/dropseed/plain/commit/73ba469))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.29.2](https://github.com/dropseed/plain/releases/plain-oauth@0.29.2) (2025-10-06)
 
 ### What's changed
