@@ -1,5 +1,19 @@
 # plain-models changelog
 
+## [0.51.0](https://github.com/dropseed/plain/releases/plain-models@0.51.0) (2025-10-07)
+
+### What's changed
+
+- Model metadata has been split into two separate descriptors: `model_options` for user-defined configuration and `_model_meta` for internal metadata ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0), [17a378d](https://github.com/dropseed/plain/commit/17a378dcfb))
+- The `_meta` attribute has been replaced with `model_options` for user-defined options like indexes, constraints, and database settings ([17a378d](https://github.com/dropseed/plain/commit/17a378dcfb))
+- Custom QuerySets are now assigned directly to the `query` class attribute instead of using `Meta.queryset_class` ([2578301](https://github.com/dropseed/plain/commit/2578301819))
+- Added comprehensive type improvements to model metadata and related fields for better IDE support ([3b477a0](https://github.com/dropseed/plain/commit/3b477a0d43))
+
+### Upgrade instructions
+
+- Replace `Meta.queryset_class = CustomQuerySet` with `query = CustomQuerySet()` as a class attribute on your models
+- Replace `class Meta:` with `model_options = models.Options(...)` in your models
+
 ## [0.50.0](https://github.com/dropseed/plain/releases/plain-models@0.50.0) (2025-10-06)
 
 ### What's changed
