@@ -17,7 +17,7 @@ class ObserverToolbarItem(ToolbarItem):
     @cached_property
     def observer(self) -> Observer:
         """Get the Observer instance for this request."""
-        return Observer(self.request)
+        return Observer.from_request(self.request)
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()

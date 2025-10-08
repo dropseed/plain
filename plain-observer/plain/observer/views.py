@@ -37,13 +37,13 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
-        context["observer"] = Observer(self.request)
+        context["observer"] = Observer.from_request(self.request)
         return context
 
     def htmx_put_mode(self) -> Response:
         """Set observer mode via HTMX PUT."""
         mode = self.request.data.get("mode")
-        observer = Observer(self.request)
+        observer = Observer.from_request(self.request)
 
         response = Response(status_code=204)
         response.headers["HX-Refresh"] = "true"
@@ -70,7 +70,7 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
         """Handle POST requests to set observer mode."""
         action = self.request.data.get("observe_action")
         if action == "summary":
-            observer = Observer(self.request)
+            observer = Observer.from_request(self.request)
             response = Response(status_code=204)
             observer.enable_summary_mode(response)
             return response

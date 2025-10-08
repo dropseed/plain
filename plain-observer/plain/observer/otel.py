@@ -8,7 +8,7 @@ from collections.abc import MutableMapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import opentelemetry.context as context_api
-from opentelemetry import baggage, trace
+from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, sampling
 from opentelemetry.semconv.attributes import url_attributes
@@ -20,7 +20,6 @@ from opentelemetry.trace import (
     format_trace_id,
 )
 
-from plain.http.cookie import unsign_cookie_value
 from plain.logs import app_logger
 from plain.models.otel import suppress_db_tracing
 from plain.runtime import settings
@@ -105,28 +104,20 @@ class ObserverSampler(sampling.Sampler):
                             attributes=attributes,
                         )
 
-        # If no processor decision, check cookies directly for root spans
+        # If no processor decision, check headers and cookies directly for root spans
         decision: sampling.Decision | None = None
         if parent_context:
-            # Check cookies for sampling decision
-            cookies = cast(
-                MutableMapping[str, str] | None,
-                baggage.get_baggage("http.request.cookies", parent_context),
-            )
-            if cookies and (observer_cookie := cookies.get(Observer.COOKIE_NAME)):
-                unsigned_value = unsign_cookie_value(
-                    Observer.COOKIE_NAME, observer_cookie, default=None
-                )
+            # Check Observer header (DEBUG only) and cookies
+            mode = Observer.from_otel_context(parent_context).mode()
 
-                if unsigned_value in (
-                    ObserverMode.PERSIST.value,
-                    ObserverMode.SUMMARY.value,
-                ):
-                    # Always use RECORD_AND_SAMPLE so ParentBased works correctly
-                    # The processor will check the mode to decide whether to export
-                    decision = sampling.Decision.RECORD_AND_SAMPLE
-                else:
-                    decision = sampling.Decision.DROP
+            # Set decision based on mode
+            if mode in (ObserverMode.PERSIST.value, ObserverMode.SUMMARY.value):
+                # Always use RECORD_AND_SAMPLE so ParentBased works correctly
+                # The processor will check the mode to decide whether to export
+                decision = sampling.Decision.RECORD_AND_SAMPLE
+            elif mode == ObserverMode.DISABLED.value:
+                # Explicitly disabled - never sample even with remote parent
+                decision = sampling.Decision.DROP
 
         # If there are links, assume it is to another trace/span that we are keeping
         if links:
@@ -441,25 +432,12 @@ class ObserverSpanProcessor(SpanProcessor):
         if not (context := parent_context or context_api.get_current()):
             return None
 
-        cookies = cast(
-            MutableMapping[str, str] | None,
-            baggage.get_baggage("http.request.cookies", context),
-        )
-        if not cookies:
-            return None
+        # Check Observer header (DEBUG only) and cookies
+        mode = Observer.from_otel_context(context).mode()
 
-        observer_cookie = cookies.get(Observer.COOKIE_NAME)
-        if not observer_cookie:
-            return None
-
-        try:
-            mode = unsign_cookie_value(
-                Observer.COOKIE_NAME, observer_cookie, default=None
-            )
-            if mode in (ObserverMode.SUMMARY.value, ObserverMode.PERSIST.value):
-                return mode
-        except Exception as e:
-            logger.warning("Failed to unsign observer cookie: %s", e)
+        # Only return valid recording modes (summary/persist), not disabled
+        if mode in (ObserverMode.SUMMARY.value, ObserverMode.PERSIST.value):
+            return mode
 
         return None
 
