@@ -39,7 +39,7 @@ class ModelParameter(JobParameter):
     @classmethod
     def serialize(cls, value: Any) -> str | None:
         if isinstance(value, Model):
-            return f"{cls.STR_PREFIX}{value._meta.package_label}/{value._meta.model_name}/{value.id}"
+            return f"{cls.STR_PREFIX}{value.model_options.package_label}/{value.model_options.model_name}/{value.id}"
         return None
 
     @classmethod

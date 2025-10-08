@@ -53,7 +53,7 @@ class AdminModelListView(AdminListView):
         if title := super().get_title():
             return title
 
-        return self.model._meta.model_name.capitalize() + "s"
+        return self.model.model_options.model_name.capitalize() + "s"
 
     @classmethod
     def get_nav_title(cls) -> str:
@@ -63,14 +63,14 @@ class AdminModelListView(AdminListView):
         if cls.title:
             return cls.title
 
-        return cls.model._meta.model_name.capitalize() + "s"
+        return cls.model.model_options.model_name.capitalize() + "s"
 
     @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/"
+        return f"{cls.model.model_options.model_name}/"
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
@@ -167,20 +167,20 @@ class AdminModelDetailView(AdminDetailView):
         if cls.title:
             return cls.title
 
-        return cls.model._meta.model_name.capitalize()
+        return cls.model.model_options.model_name.capitalize()
 
     @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/<int:id>/"
+        return f"{cls.model.model_options.model_name}/<int:id>/"
 
     def get_fields(self) -> list[str]:
         if fields := super().get_fields():
             return fields
 
-        return [f.name for f in self.object._meta.get_fields() if f.concrete]
+        return [f.name for f in self.object._model_meta.get_fields() if f.concrete]
 
     def get_field_value(self, obj: Any, field: str) -> Any:
         try:
@@ -204,14 +204,14 @@ class AdminModelCreateView(AdminCreateView):
         if title := super().get_title():
             return title
 
-        return f"New {self.model._meta.model_name}"
+        return f"New {self.model.model_options.model_name}"
 
     @classmethod
     def get_path(cls) -> str:
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/create/"
+        return f"{cls.model.model_options.model_name}/create/"
 
 
 class AdminModelUpdateView(AdminUpdateView):
@@ -230,7 +230,7 @@ class AdminModelUpdateView(AdminUpdateView):
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/<int:id>/update/"
+        return f"{cls.model.model_options.model_name}/<int:id>/update/"
 
     def get_object(self) -> models.Model:
         return self.model.query.get(id=self.url_kwargs["id"])
@@ -247,7 +247,7 @@ class AdminModelDeleteView(AdminDeleteView):
         if path := super().get_path():
             return path
 
-        return f"{cls.model._meta.model_name}/<int:id>/delete/"
+        return f"{cls.model.model_options.model_name}/<int:id>/delete/"
 
     def get_object(self) -> models.Model:
         return self.model.query.get(id=self.url_kwargs["id"])

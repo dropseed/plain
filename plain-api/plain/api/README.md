@@ -221,7 +221,7 @@ class User(models.Model):
         required=False,
     )
 
-    _meta = models.Options(
+    model_options = models.Options(
         constraints=[
             models.UniqueConstraint(
                 fields=["api_key"],

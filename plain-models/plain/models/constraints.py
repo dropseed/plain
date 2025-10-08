@@ -115,7 +115,7 @@ class CheckConstraint(BaseConstraint):
     def validate(
         self, model: Any, instance: Any, exclude: set[str] | None = None
     ) -> None:
-        against = instance._get_field_value_map(meta=model._meta, exclude=exclude)
+        against = instance._get_field_value_map(meta=model._model_meta, exclude=exclude)
         try:
             if not Q(self.check).check(against):
                 raise ValidationError(
@@ -260,9 +260,10 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def constraint_sql(self, model: Any, schema_editor: Any) -> str:
-        fields = [model._meta.get_field(field_name) for field_name in self.fields]
+        fields = [model._model_meta.get_field(field_name) for field_name in self.fields]
         include = [
-            model._meta.get_field(field_name).column for field_name in self.include
+            model._model_meta.get_field(field_name).column
+            for field_name in self.include
         ]
         condition = self._get_condition_sql(model, schema_editor)
         expressions = self._get_index_expressions(model, schema_editor)
@@ -278,9 +279,10 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def create_sql(self, model: Any, schema_editor: Any) -> str:
-        fields = [model._meta.get_field(field_name) for field_name in self.fields]
+        fields = [model._model_meta.get_field(field_name) for field_name in self.fields]
         include = [
-            model._meta.get_field(field_name).column for field_name in self.include
+            model._model_meta.get_field(field_name).column
+            for field_name in self.include
         ]
         condition = self._get_condition_sql(model, schema_editor)
         expressions = self._get_index_expressions(model, schema_editor)
@@ -298,7 +300,8 @@ class UniqueConstraint(BaseConstraint):
     def remove_sql(self, model: Any, schema_editor: Any) -> str:
         condition = self._get_condition_sql(model, schema_editor)
         include = [
-            model._meta.get_field(field_name).column for field_name in self.include
+            model._model_meta.get_field(field_name).column
+            for field_name in self.include
         ]
         expressions = self._get_index_expressions(model, schema_editor)
         return schema_editor._delete_unique_sql(
@@ -372,7 +375,7 @@ class UniqueConstraint(BaseConstraint):
             for field_name in self.fields:
                 if exclude and field_name in exclude:
                     return
-                field = model._meta.get_field(field_name)
+                field = model._model_meta.get_field(field_name)
                 lookup_value = getattr(instance, field.attname)
                 if lookup_value is None:
                     # A composite constraint containing NULL value cannot cause
@@ -393,7 +396,7 @@ class UniqueConstraint(BaseConstraint):
             replacements = {
                 F(field): value
                 for field, value in instance._get_field_value_map(
-                    meta=model._meta, exclude=exclude
+                    meta=model._model_meta, exclude=exclude
                 ).items()
             }
             expressions = []
@@ -422,7 +425,9 @@ class UniqueConstraint(BaseConstraint):
                                 instance.unique_error_message(model, self.fields),
                             )
         else:
-            against = instance._get_field_value_map(meta=model._meta, exclude=exclude)
+            against = instance._get_field_value_map(
+                meta=model._model_meta, exclude=exclude
+            )
             try:
                 if (self.condition & Exists(queryset.filter(self.condition))).check(
                     against

@@ -56,7 +56,7 @@ def resolve_relation(
                 "package_label must be provided to resolve unscoped model relationships."
             )
         return package_label, model.lower()
-    return model._meta.package_label, model._meta.model_name
+    return model.model_options.package_label, model.model_options.model_name
 
 
 def field_references(

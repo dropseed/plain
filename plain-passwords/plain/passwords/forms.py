@@ -102,7 +102,7 @@ class PasswordSetForm(forms.Form):
             )
 
         # Clean it as if it were being put into the model directly
-        self.user._meta.get_field("password").clean(password2, self.user)
+        self.user._model_meta.get_field("password").clean(password2, self.user)
 
         return password2
 

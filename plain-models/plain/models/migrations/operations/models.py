@@ -70,10 +70,10 @@ class CreateModel(ModelOperation):
         _check_for_duplicates(
             "bases",
             (
-                base._meta.label_lower
+                base.model_options.label_lower
                 if not isinstance(base, str)
                 and base is not models.Model
-                and hasattr(base, "_meta")
+                and hasattr(base, "_model_meta")
                 else base.lower()
                 if isinstance(base, str)
                 else base
@@ -314,23 +314,23 @@ class RenameModel(ModelOperation):
             # Move the main table
             schema_editor.alter_db_table(
                 new_model,
-                old_model._meta.db_table,
-                new_model._meta.db_table,
+                old_model.model_options.db_table,
+                new_model.model_options.db_table,
             )
             # Alter the fields pointing to us
-            for related_object in old_model._meta.related_objects:
+            for related_object in old_model._model_meta.related_objects:
                 if related_object.related_model == old_model:  # type: ignore[attr-defined]
                     model = new_model
                     related_key = (package_label, self.new_name_lower)
                 else:
                     model = related_object.related_model  # type: ignore[attr-defined]
                     related_key = (
-                        related_object.related_model._meta.package_label,
-                        related_object.related_model._meta.model_name,
+                        related_object.related_model.model_options.package_label,
+                        related_object.related_model.model_options.model_name,
                     )
                 to_field = to_state.models_registry.get_model(
                     *related_key
-                )._meta.get_field(related_object.field.name)
+                )._model_meta.get_field(related_object.field.name)
                 schema_editor.alter_field(
                     model,
                     related_object.field,
@@ -412,8 +412,8 @@ class AlterModelTable(ModelOptionOperation):
             old_model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
             schema_editor.alter_db_table(
                 new_model,
-                old_model._meta.db_table,
-                new_model._meta.db_table,
+                old_model.model_options.db_table,
+                new_model.model_options.db_table,
             )
 
     def describe(self) -> str:
@@ -456,8 +456,8 @@ class AlterModelTableComment(ModelOptionOperation):
             old_model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
             schema_editor.alter_db_table_comment(
                 new_model,
-                old_model._meta.db_table_comment,
-                new_model._meta.db_table_comment,
+                old_model.model_options.db_table_comment,
+                new_model.model_options.db_table_comment,
             )
 
     def describe(self) -> str:
@@ -695,7 +695,8 @@ class RenameIndex(IndexOperation):
                 package_label, self.model_name
             )
             columns = [
-                from_model._meta.get_field(field).column for field in self.old_fields
+                from_model._model_meta.get_field(field).column
+                for field in self.old_fields
             ]
             matching_index_name = schema_editor._constraint_names(
                 from_model, column_names=columns, index=True
@@ -704,7 +705,7 @@ class RenameIndex(IndexOperation):
                 raise ValueError(
                     "Found wrong number ({}) of indexes for {}({}).".format(
                         len(matching_index_name),
-                        from_model._meta.db_table,
+                        from_model.model_options.db_table,
                         ", ".join(columns),
                     )
                 )

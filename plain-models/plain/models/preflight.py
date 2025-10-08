@@ -30,7 +30,9 @@ class CheckAllModels(PreflightCheck):
         errors = []
         models = models_registry.get_models()
         for model in models:
-            db_table_models[model._meta.db_table].append(model._meta.label)
+            db_table_models[model.model_options.db_table].append(
+                model.model_options.label
+            )
             if not inspect.ismethod(model.preflight):
                 errors.append(
                     PreflightResult(
@@ -41,10 +43,10 @@ class CheckAllModels(PreflightCheck):
                 )
             else:
                 errors.extend(model.preflight())
-            for model_index in model._meta.indexes:
-                indexes[model_index.name].append(model._meta.label)
-            for model_constraint in model._meta.constraints:
-                constraints[model_constraint.name].append(model._meta.label)
+            for model_index in model.model_options.indexes:
+                indexes[model_index.name].append(model.model_options.label)
+            for model_constraint in model.model_options.constraints:
+                constraints[model_constraint.name].append(model.model_options.label)
         for db_table, model_labels in db_table_models.items():
             if len(model_labels) != 1:
                 model_labels_str = ", ".join(model_labels)

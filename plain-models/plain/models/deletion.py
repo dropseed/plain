@@ -13,6 +13,7 @@ from plain.models import (
     transaction,
 )
 from plain.models.db import IntegrityError, db_connection
+from plain.models.meta import Meta
 from plain.models.query import QuerySet
 
 if TYPE_CHECKING:
@@ -89,12 +90,12 @@ def DO_NOTHING(collector: Collector, field: Field, sub_objs: Any) -> None:
     pass
 
 
-def get_candidate_relations_to_delete(opts: Any) -> Generator[Any, None, None]:
+def get_candidate_relations_to_delete(meta: Meta) -> Generator[Any, None, None]:
     # The candidate relations are the ones that come from N-1 and 1-1 relations.
     # N-N  (i.e., many-to-many) relations aren't candidates for deletion.
     return (
         f
-        for f in opts.get_fields(include_hidden=True)
+        for f in meta.get_fields(include_hidden=True)
         if f.auto_created and not f.concrete and f.one_to_many
     )
 
@@ -208,8 +209,8 @@ class Collector:
         """
         if from_field and from_field.remote_field.on_delete is not CASCADE:
             return False
-        if hasattr(objs, "_meta"):
-            model = objs._meta.model
+        if hasattr(objs, "_model_meta"):
+            model = objs._model_meta.model
         elif hasattr(objs, "model") and hasattr(objs, "_raw_delete"):
             model = objs.model
         else:
@@ -217,12 +218,12 @@ class Collector:
 
         # The use of from_field comes from the need to avoid cascade back to
         # parent when parent delete is cascading to child.
-        opts = model._meta
+        meta = model._model_meta
         return (
             # Foreign keys pointing to this model.
             all(
                 related.field.remote_field.on_delete is DO_NOTHING
-                for related in get_candidate_relations_to_delete(opts)
+                for related in get_candidate_relations_to_delete(meta)
             )
         )
 
@@ -289,7 +290,7 @@ class Collector:
 
         model_fast_deletes = defaultdict(list)
         protected_objects = defaultdict(list)
-        for related in get_candidate_relations_to_delete(model._meta):
+        for related in get_candidate_relations_to_delete(model._model_meta):
             field = related.field
             on_delete = field.remote_field.on_delete
             if on_delete == DO_NOTHING:
@@ -312,7 +313,7 @@ class Collector:
                         chain.from_iterable(
                             (rf.attname for rf in rel.field.foreign_related_fields)
                             for rel in get_candidate_relations_to_delete(
-                                related_model._meta
+                                related_model._model_meta
                             )
                         )
                     )
@@ -373,7 +374,7 @@ class Collector:
             [(f"{related_field.name}__in", objs) for related_field in related_fields],
             connector=query_utils.Q.OR,
         )
-        return related_model._meta.base_queryset.filter(predicate)
+        return related_model._model_meta.base_queryset.filter(predicate)
 
     def sort(self) -> None:
         sorted_models = []
@@ -411,15 +412,15 @@ class Collector:
             if self.can_fast_delete(instance):
                 with transaction.mark_for_rollback_on_error():
                     count = sql.DeleteQuery(model).delete_batch([instance.id])
-                setattr(instance, model._meta.get_field("id").attname, None)
-                return count, {model._meta.label: count}
+                setattr(instance, model._model_meta.get_field("id").attname, None)
+                return count, {model.model_options.label: count}
 
         with transaction.atomic(savepoint=False):
             # fast deletes
             for qs in self.fast_deletes:
                 count = qs._raw_delete()
                 if count:
-                    deleted_counter[qs.model._meta.label] += count
+                    deleted_counter[qs.model.model_options.label] += count
 
             # update fields
             for (field, value), instances_list in self.field_updates.items():
@@ -453,9 +454,9 @@ class Collector:
                 id_list = [obj.id for obj in instances]
                 count = query.delete_batch(id_list)
                 if count:
-                    deleted_counter[model._meta.label] += count
+                    deleted_counter[model.model_options.label] += count
 
         for model, instances in self.data.items():
             for instance in instances:
-                setattr(instance, model._meta.get_field("id").attname, None)
+                setattr(instance, model._model_meta.get_field("id").attname, None)
         return sum(deleted_counter.values()), dict(deleted_counter)

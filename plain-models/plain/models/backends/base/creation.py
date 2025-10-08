@@ -98,7 +98,7 @@ class BaseDatabaseCreation:
     #                 and package_config.package_label in loader.migrated_packages
     #             ):
     #                 for model in package_config.get_models():
-    #                     if model._meta.can_migrate(
+    #                     if model.model_options.can_migrate(
     #                         self.connection
     #                     ) and router.allow_migrate_model(self.connection.alias, model):
     #                         queryset = model._base_manager.using(
@@ -127,7 +127,7 @@ class BaseDatabaseCreation:
     #                 "json", data, using=self.connection.alias
     #             ):
     #                 obj.save()
-    #                 table_names.add(obj.object.__class__._meta.db_table)
+    #                 table_names.add(obj.object.model_options.db_table)
     #         # Manually check for any invalid keys that might have been added,
     #         # because constraint checks were disabled.
     #         self.connection.check_constraints(table_names=table_names)

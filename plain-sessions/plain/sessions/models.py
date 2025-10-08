@@ -8,7 +8,7 @@ class Session(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(allow_null=True)
 
-    _meta = models.Options(
+    model_options = models.Options(
         indexes=[
             models.Index(fields=["expires_at"]),
         ],

@@ -94,7 +94,7 @@ class BaseDatabaseIntrospection:
             for model in models_registry.get_models(
                 package_label=package_config.package_label
             )
-            if model._meta.can_migrate(self.connection)
+            if model.model_options.can_migrate(self.connection)
         )
 
     def plain_table_names(
@@ -108,8 +108,10 @@ class BaseDatabaseIntrospection:
         """
         tables = set()
         for model in self.get_migratable_models():
-            tables.add(model._meta.db_table)
-            tables.update(f.m2m_db_table() for f in model._meta.local_many_to_many)
+            tables.add(model.model_options.db_table)
+            tables.update(
+                f.m2m_db_table() for f in model._model_meta.local_many_to_many
+            )
         tables = list(tables)
         if only_existing:
             existing_tables = set(self.table_names(include_views=include_views))
@@ -128,7 +130,9 @@ class BaseDatabaseIntrospection:
             for model in self.get_migratable_models():
                 sequence_list.extend(
                     self.get_sequences(
-                        cursor, model._meta.db_table, model._meta.local_fields
+                        cursor,
+                        model.model_options.db_table,
+                        model._model_meta.local_fields,
                     )
                 )
         return sequence_list

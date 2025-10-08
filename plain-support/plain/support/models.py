@@ -19,7 +19,7 @@ class SupportFormEntry(models.Model):
     # referrer? source? session?
     # extra_data
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-created_at"],
         indexes=[
             models.Index(fields=["created_at"]),

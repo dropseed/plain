@@ -59,13 +59,13 @@ class JSONField(CheckFieldDefaultMixin, Field):
         errors = []
 
         if (
-            self.model._meta.required_db_vendor
-            and self.model._meta.required_db_vendor != db_connection.vendor
+            self.model.model_options.required_db_vendor
+            and self.model.model_options.required_db_vendor != db_connection.vendor
         ):
             return errors
 
         if not (
-            "supports_json_field" in self.model._meta.required_db_features
+            "supports_json_field" in self.model.model_options.required_db_features
             or db_connection.features.supports_json_field
         ):
             errors.append(

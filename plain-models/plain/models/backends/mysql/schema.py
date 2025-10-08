@@ -125,7 +125,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if self.skip_default(field) and field.default not in (None, NOT_PROVIDED):
             effective_default = self.effective_default(field)
             self.execute(
-                f"UPDATE {self.quote_name(model._meta.db_table)} SET {self.quote_name(field.column)} = %s",
+                f"UPDATE {self.quote_name(model.model_options.db_table)} SET {self.quote_name(field.column)} = %s",
                 [effective_default],
             )
 
@@ -154,7 +154,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return False
 
         storage = self.connection.introspection.get_storage_engine(
-            self.connection.cursor(), model._meta.db_table
+            self.connection.cursor(), model.model_options.db_table
         )
         # No need to create an index for ForeignKey fields except if
         # db_constraint=False because the index from that constraint won't be
@@ -197,7 +197,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if not first_field_name:
             return
 
-        first_field = model._meta.get_field(first_field_name)
+        first_field = model._model_meta.get_field(first_field_name)
         if first_field.get_internal_type() == "ForeignKey":
             column = self.connection.introspection.identifier_converter(
                 first_field.column
@@ -206,7 +206,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 constraint_names = [
                     name
                     for name, infodict in self.connection.introspection.get_constraints(
-                        cursor, model._meta.db_table
+                        cursor, model.model_options.db_table
                     ).items()
                     if infodict["index"] and infodict["columns"][0] == column
                 ]

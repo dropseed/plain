@@ -22,16 +22,19 @@ from plain.utils import tree
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.base import Model
+    from plain.models.fields import Field
+    from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler
 
 logger = logging.getLogger("plain.models")
 
 # PathInfo is used when converting lookups (fk__somecol). The contents
-# describe the relation in Model terms (model Options and Fields for both
-# sides of the relation. The join_field is the field backing the relation.
+# describe the relation in Model terms (Meta and Fields for both
+# sides of the relation). The join_field is the field backing the relation.
 PathInfo = namedtuple(
     "PathInfo",
-    "from_opts to_opts target_fields join_field m2m direct filtered_relation",
+    "from_meta to_meta target_fields join_field m2m direct filtered_relation",
 )
 
 
@@ -360,7 +363,7 @@ def select_related_descend(
         and field not in select_mask
     ):
         raise FieldError(
-            f"Field {field.model._meta.object_name}.{field.name} cannot be both "
+            f"Field {field.model.model_options.object_name}.{field.name} cannot be both "
             "deferred and traversed using select_related at the same time."
         )
     return True
@@ -381,16 +384,18 @@ def refs_expression(
     return None, ()
 
 
-def check_rel_lookup_compatibility(model: type, target_opts: Any, field: Any) -> bool:
+def check_rel_lookup_compatibility(
+    model: type[Model], target_meta: Meta, field: Field
+) -> bool:
     """
-    Check that self.model is compatible with target_opts. Compatibility
+    Check that model is compatible with target_meta. Compatibility
     is OK if:
-      1) model and opts match (where proxy inheritance is removed)
-      2) model is parent of opts' model or the other way around
+      1) model and meta.model match (where proxy inheritance is removed)
+      2) model is parent of meta's model or the other way around
     """
 
-    def check(opts: Any) -> bool:
-        return model == opts.model
+    def check(meta: Meta) -> bool:
+        return model == meta.model
 
     # If the field is a primary key, then doing a query against the field's
     # model is ok, too. Consider the case:
@@ -398,11 +403,11 @@ def check_rel_lookup_compatibility(model: type, target_opts: Any, field: Any) ->
     #     place = OneToOneField(Place, primary_key=True):
     # Restaurant.query.filter(id__in=Restaurant.query.all()).
     # If we didn't have the primary key check, then id__in (== place__in) would
-    # give Place's opts as the target opts, but Restaurant isn't compatible
+    # give Place's meta as the target meta, but Restaurant isn't compatible
     # with that. This logic applies only to primary keys, as when doing __in=qs,
     # we are going to turn this into __in=qs.values('id') later on.
-    return check(target_opts) or (
-        getattr(field, "primary_key", False) and check(field.model._meta)
+    return check(target_meta) or (
+        getattr(field, "primary_key", False) and check(field.model._model_meta)
     )
 
 

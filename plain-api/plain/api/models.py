@@ -23,7 +23,7 @@ class APIKey(models.Model):
 
     api_version = models.CharField(max_length=255, required=False)
 
-    _meta = models.Options(
+    model_options = models.Options(
         constraints=[
             models.UniqueConstraint(
                 fields=["uuid"], name="plainapi_apikey_unique_uuid"

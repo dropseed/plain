@@ -55,7 +55,7 @@ def get_normalized_value(value: Any, lhs: Any) -> tuple[Any, ...]:
         sources = lhs.output_field.path_infos[-1].target_fields
         for source in sources:
             while not isinstance(value, source.model) and source.remote_field:
-                source = source.remote_field.model._meta.get_field(
+                source = source.remote_field.model._model_meta.get_field(
                     source.remote_field.field_name
                 )
             try:

@@ -42,11 +42,11 @@ def construct_instance(
     """
     from plain import models
 
-    opts = instance.__class__._meta
+    meta = instance._model_meta
 
     cleaned_data = form.cleaned_data
     file_field_list = []
-    for f in opts.fields:
+    for f in meta.fields:
         if isinstance(f, models.PrimaryKeyField) or f.name not in cleaned_data:
             continue
         if fields is not None and f.name not in fields:
@@ -85,9 +85,9 @@ def model_to_dict(
     ``fields`` is an optional list of field names. If provided, return only the
     named.
     """
-    opts = instance.__class__._meta
+    meta = instance._model_meta
     data = {}
-    for f in chain(opts.concrete_fields, opts.many_to_many):
+    for f in chain(meta.concrete_fields, meta.many_to_many):
         if fields is not None and f.name not in fields:
             continue
         data[f.name] = f.value_from_object(instance)
@@ -118,9 +118,9 @@ def fields_for_model(
     """
     field_dict = {}
     ignored = []
-    opts = model._meta
+    meta = model._model_meta
 
-    for f in sorted(chain(opts.concrete_fields, opts.many_to_many)):
+    for f in sorted(chain(meta.concrete_fields, meta.many_to_many)):
         if fields is not None and f.name not in fields:
             continue
 
@@ -264,7 +264,7 @@ class BaseModelForm(BaseForm):
         exclude = set()
         # Build up a list of fields that should be excluded from model field
         # validation and unique checks.
-        for f in self.instance.__class__._meta.fields:
+        for f in self.instance._model_meta.fields:
             field = f.name
             # Exclude fields that aren't on the form. The developer may be
             # adding these values to the model after form validation.
@@ -372,9 +372,9 @@ class BaseModelForm(BaseForm):
         """
         cleaned_data = self.cleaned_data
         fields = self._meta.fields
-        opts = self.instance.__class__._meta
+        meta = self.instance._model_meta
 
-        for f in opts.many_to_many:
+        for f in meta.many_to_many:
             if not hasattr(f, "save_form_data"):
                 continue
             if fields and f.name not in fields:
@@ -391,7 +391,7 @@ class BaseModelForm(BaseForm):
         if self.errors:
             raise ValueError(
                 "The {} could not be {} because the data didn't validate.".format(
-                    self.instance.__class__._meta.object_name,
+                    self.instance.model_options.object_name,
                     "created" if self.instance._state.adding else "changed",
                 )
             )
@@ -527,7 +527,7 @@ class ModelChoiceField(ChoiceField):
     choices = property(_get_choices, ChoiceField._set_choices)
 
     def prepare_value(self, value: Any) -> Any:
-        if hasattr(value, "_meta"):
+        if hasattr(value, "_model_meta"):
             return value.id
         return super().prepare_value(value)
 
@@ -630,7 +630,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
         if (
             hasattr(value, "__iter__")
             and not isinstance(value, str)
-            and not hasattr(value, "_meta")
+            and not hasattr(value, "_model_meta")
         ):
             prepare_value = super().prepare_value
             return [prepare_value(v) for v in value]

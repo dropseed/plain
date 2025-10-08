@@ -36,14 +36,14 @@ class DeleteQuery(Query):
         """
         # number of objects deleted
         num_deleted = 0
-        field = self.get_meta().get_field("id")
+        field = self.get_model_meta().get_field("id")
         for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
             self.add_filter(
                 f"{field.attname}__in",
                 id_list[offset : offset + GET_ITERATOR_CHUNK_SIZE],
             )
-            num_deleted += self.do_query(self.get_meta().db_table, self.where)
+            num_deleted += self.do_query(self.model.model_options.db_table, self.where)
         return num_deleted
 
 
@@ -87,7 +87,7 @@ class UpdateQuery(Query):
         """
         values_seq = []
         for name, val in values.items():
-            field = self.get_meta().get_field(name)
+            field = self.get_model_meta().get_field(name)
             direct = (
                 not (field.auto_created and not field.concrete) or not field.concrete
             )
@@ -97,7 +97,7 @@ class UpdateQuery(Query):
                     f"Cannot update model field {field!r} (only non-relations and "
                     "foreign keys permitted)."
                 )
-            if model is not self.get_meta().model:
+            if model is not self.get_model_meta().model:
                 self.add_related_update(model, field, val)
                 continue
             values_seq.append((field, model, val))

@@ -27,7 +27,7 @@ class CachedItem(models.Model):
 
     query = CachedItemQuerySet()
 
-    _meta = models.Options(
+    model_options = models.Options(
         indexes=[
             models.Index(fields=["expires_at"]),
         ],

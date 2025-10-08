@@ -518,7 +518,7 @@ class Expression(BaseExpression, Combinable):
         for arg, value in arguments:
             if isinstance(value, fields.Field):
                 if value.name and value.model:
-                    value = (value.model._meta.label, value.name)
+                    value = (value.model.model_options.label, value.name)
                 else:
                     value = type(value)
             else:

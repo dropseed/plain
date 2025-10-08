@@ -46,7 +46,7 @@ class Pageview(models.Model):
     medium = models.CharField(max_length=200, required=False)
     campaign = models.CharField(max_length=200, required=False)
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-timestamp"],
         indexes=[
             models.Index(fields=["timestamp"]),

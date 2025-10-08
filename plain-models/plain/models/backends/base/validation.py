@@ -28,7 +28,7 @@ class BaseDatabaseValidation:
             # Ignore fields with unsupported features.
             db_supports_all_required_features = all(
                 getattr(self.connection.features, feature, False)
-                for feature in field.model._meta.required_db_features
+                for feature in field.model.model_options.required_db_features
             )
             if db_supports_all_required_features:
                 field_type = field.db_type(self.connection)

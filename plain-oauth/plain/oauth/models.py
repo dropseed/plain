@@ -41,7 +41,7 @@ class OAuthConnection(models.Model):
     access_token_expires_at = models.DateTimeField(required=False, allow_null=True)
     refresh_token_expires_at = models.DateTimeField(required=False, allow_null=True)
 
-    _meta = models.Options(
+    model_options = models.Options(
         constraints=[
             models.UniqueConstraint(
                 fields=["provider_key", "provider_user_id"],

@@ -200,7 +200,7 @@ class User(models.Model):
     username = models.CharField(max_length=150)
     age = models.IntegerField()
 
-    _meta = models.Options(
+    model_options = models.Options(
         indexes=[
             models.Index(fields=["email"]),
             models.Index(fields=["-created_at"], name="user_created_idx"),

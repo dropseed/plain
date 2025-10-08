@@ -118,19 +118,19 @@ def list_models(package_labels: tuple[str, ...], app_only: bool) -> None:
 
     for model in sorted(
         models_registry.get_models(),
-        key=lambda m: (m._meta.package_label, m._meta.model_name),
+        key=lambda m: (m.model_options.package_label, m.model_options.model_name),
     ):
-        pkg = model._meta.package_label
+        pkg = model.model_options.package_label
         pkg_name = packages_registry.get_package_config(pkg).name
         if app_only and not pkg_name.startswith("app"):
             continue
         if packages and pkg not in packages:
             continue
-        fields = ", ".join(f.name for f in model._meta.get_fields())
+        fields = ", ".join(f.name for f in model._model_meta.get_fields())
         click.echo(
             f"{click.style(pkg, fg='cyan')}.{click.style(model.__name__, fg='blue')}"
         )
-        click.echo(f"  table: {model._meta.db_table}")
+        click.echo(f"  table: {model.model_options.db_table}")
         click.echo(f"  fields: {fields}")
         click.echo(f"  package: {pkg_name}\n")
 

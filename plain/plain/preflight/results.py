@@ -23,9 +23,11 @@ class PreflightResult:
     def __str__(self) -> str:
         if self.obj is None:
             obj = ""
-        elif hasattr(self.obj, "_meta") and hasattr(self.obj._meta, "label"):
+        elif hasattr(self.obj, "model_options") and hasattr(
+            self.obj.model_options, "label"
+        ):
             # Duck type for model objects - use their meta label
-            obj = self.obj._meta.label
+            obj = self.obj.model_options.label
         else:
             obj = str(self.obj)
         id_part = f"({self.id}) " if self.id else ""

@@ -61,7 +61,7 @@ class JobRequest(models.Model):
 
     # expires_at = models.DateTimeField(required=False, allow_null=True)
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["priority", "-created_at"],
         indexes=[
             models.Index(fields=["priority"]),
@@ -170,7 +170,7 @@ class JobProcess(models.Model):
 
     query = JobQuerySet()
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-created_at"],
         indexes=[
             models.Index(fields=["created_at"]),
@@ -394,7 +394,7 @@ class JobResult(models.Model):
 
     query = JobResultQuerySet()
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-created_at"],
         indexes=[
             models.Index(fields=["created_at"]),

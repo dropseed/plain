@@ -16,8 +16,8 @@ def test_model_has_default_query_queryset():
     assert isinstance(DefaultQuerySetModel.query, QuerySet)
 
     # base_queryset is used for internal operations
-    assert DefaultQuerySetModel._meta.base_queryset is not None
-    assert isinstance(DefaultQuerySetModel._meta.base_queryset, QuerySet)
+    assert DefaultQuerySetModel._model_meta.base_queryset is not None
+    assert isinstance(DefaultQuerySetModel._model_meta.base_queryset, QuerySet)
 
 
 def test_model_with_custom_queryset():
@@ -29,8 +29,8 @@ def test_model_with_custom_queryset():
     assert hasattr(CustomQuerySetModel.query, "get_custom")
 
     # base_queryset is used for internal operations and always returns base QuerySet
-    assert CustomQuerySetModel._meta.base_queryset is not None
-    assert isinstance(CustomQuerySetModel._meta.base_queryset, QuerySet)
+    assert CustomQuerySetModel._model_meta.base_queryset is not None
+    assert isinstance(CustomQuerySetModel._model_meta.base_queryset, QuerySet)
 
 
 def test_field_named_objects_validation():
@@ -45,7 +45,7 @@ def test_field_named_objects_validation():
         )  # This field exists but won't override query property
         name = models.CharField(max_length=100)
 
-        _meta = models.Options(package_label="test_app")
+        model_options = models.Options(package_label="test_app")
 
     # The query property takes precedence over the field
     assert hasattr(FieldObjectsModel, "objects")
@@ -56,7 +56,7 @@ def test_base_queryset_consistency():
     """Test that base_queryset works correctly."""
 
     # Should have working base_queryset
-    base_queryset = DefaultQuerySetModel._meta.base_queryset
+    base_queryset = DefaultQuerySetModel._model_meta.base_queryset
 
     assert base_queryset is not None
     assert isinstance(base_queryset, QuerySet)
@@ -88,7 +88,7 @@ def test_query_validation():
         objects = "not a manager"  # This won't affect the query property
         name = models.CharField(max_length=100)
 
-        _meta = models.Options(package_label="test_app")
+        model_options = models.Options(package_label="test_app")
 
     # Should have the default QuerySet, not the string
     assert isinstance(BadObjectsModel.query, QuerySet)

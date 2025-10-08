@@ -82,7 +82,7 @@ BLANK_CHOICE_DASH = [("", "---------")]
 
 
 def _load_field(package_label: str, model_name: str, field_name: str) -> Field:
-    return models_registry.get_model(package_label, model_name)._meta.get_field(
+    return models_registry.get_model(package_label, model_name)._model_meta.get_field(
         field_name
     )
 
@@ -213,7 +213,7 @@ class Field(RegisterLookupMixin):
         if not hasattr(self, "model"):
             return super().__str__()
         model = self.model
-        return f"{model._meta.label}.{self.name}"
+        return f"{model.model_options.label}.{self.name}"
 
     def __repr__(self) -> str:
         """Display the module, class, and name of the field."""
@@ -347,7 +347,7 @@ class Field(RegisterLookupMixin):
         errors = []
         if not (
             db_connection.features.supports_comments
-            or "supports_comments" in self.model._meta.required_db_features
+            or "supports_comments" in self.model.model_options.required_db_features
         ):
             errors.append(
                 PreflightResult(
@@ -400,7 +400,7 @@ class Field(RegisterLookupMixin):
         return errors
 
     def get_col(self, alias: str, output_field: Field | None = None) -> Any:
-        if alias == self.model._meta.db_table and (
+        if alias == self.model.model_options.db_table and (
             output_field is None or output_field == self
         ):
             return self.cached_col
@@ -412,7 +412,7 @@ class Field(RegisterLookupMixin):
     def cached_col(self) -> Any:
         from plain.models.expressions import Col
 
-        return Col(self.model._meta.db_table, self)
+        return Col(self.model.model_options.db_table, self)
 
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Any
@@ -529,9 +529,12 @@ class Field(RegisterLookupMixin):
                 return not hasattr(self, "model")  # Order no-model fields first
             else:
                 # creation_counter's are equal, compare only models.
-                return (self.model._meta.package_label, self.model._meta.model_name) < (
-                    other.model._meta.package_label,
-                    other.model._meta.model_name,
+                return (
+                    self.model.model_options.package_label,
+                    self.model.model_options.model_name,
+                ) < (
+                    other.model.model_options.package_label,
+                    other.model.model_options.model_name,
                 )
         return NotImplemented
 
@@ -564,7 +567,7 @@ class Field(RegisterLookupMixin):
         | tuple[Callable[..., Field], tuple[str, str, str]]
     ):
         """
-        Pickling should return the model._meta.fields instance of the field,
+        Pickling should return the model._model_meta.fields instance of the field,
         not a new copy of that field. So, use the app registry to load the
         model and then the field back.
         """
@@ -580,8 +583,8 @@ class Field(RegisterLookupMixin):
             state.pop("_get_default", None)
             return _empty, (self.__class__,), state
         return _load_field, (
-            self.model._meta.package_label,
-            self.model._meta.object_name,
+            self.model.model_options.package_label,
+            self.model.model_options.object_name,
             self.name,
         )
 
@@ -783,7 +786,7 @@ class Field(RegisterLookupMixin):
         """
         self.set_attributes_from_name(name)
         self.model = cls
-        cls._meta.add_field(self)
+        cls._model_meta.add_field(self)
         if self.column:
             setattr(cls, self.attname, self.descriptor_class(self))
 
@@ -968,7 +971,7 @@ class CharField(Field):
             if (
                 db_connection.features.supports_unlimited_charfield
                 or "supports_unlimited_charfield"
-                in self.model._meta.required_db_features
+                in self.model.model_options.required_db_features
             ):
                 return []
             return [
@@ -998,7 +1001,7 @@ class CharField(Field):
         if not (
             self.db_collation is None
             or "supports_collation_on_charfield"
-            in self.model._meta.required_db_features
+            in self.model.model_options.required_db_features
             or db_connection.features.supports_collation_on_charfield
         ):
             errors.append(
@@ -1864,7 +1867,7 @@ class TextField(Field):
         if not (
             self.db_collation is None
             or "supports_collation_on_textfield"
-            in self.model._meta.required_db_features
+            in self.model.model_options.required_db_features
             or db_connection.features.supports_collation_on_textfield
         ):
             errors.append(

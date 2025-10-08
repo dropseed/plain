@@ -14,6 +14,7 @@ from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import F, OrderBy, RawSQL, Ref, Value
 from plain.models.functions import Cast, Random
 from plain.models.lookups import Lookup
+from plain.models.meta import Meta
 from plain.models.query_utils import select_related_descend
 from plain.models.sql.constants import (
     CURSOR,
@@ -327,8 +328,12 @@ class SQLCompiler:
             ordering = self.query.order_by
         elif self.query.order_by:
             ordering = self.query.order_by
-        elif (meta := self.query.get_meta()) and meta.ordering:
-            ordering = meta.ordering
+        elif (
+            self.query.model
+            and (options := self.query.model.model_options)
+            and options.ordering
+        ):
+            ordering = options.ordering
             self._meta_ordering = ordering
         else:
             ordering = []
@@ -444,7 +449,7 @@ class SQLCompiler:
                     # '-field1__field2__field', etc.
                     yield from self.find_ordering_name(
                         field,
-                        self.query.get_meta(),
+                        self.query.get_model_meta(),
                         default_order=default_order,
                     )
 
@@ -947,12 +952,15 @@ class SQLCompiler:
             self.query.reset_refcounts(refcounts_before)
 
     def get_default_columns(
-        self, select_mask: Any, start_alias: str | None = None, opts: Any = None
+        self,
+        select_mask: Any,
+        start_alias: str | None = None,
+        opts: Meta | None = None,
     ) -> list[Any]:
         """
         Compute the default columns for selecting every field in the base
         model. Will sometimes be called to pull in related models (e.g. via
-        select_related), in which case "opts" and "start_alias" will be given
+        select_related), in which case "opts" (Meta) and "start_alias" will be given
         to provide a starting point for the traversal.
 
         Return a list of strings, quoted appropriately for use in SQL
@@ -962,7 +970,7 @@ class SQLCompiler:
         """
         result = []
         if opts is None:
-            opts = self.query.get_meta()
+            opts = self.query.get_model_meta()
         start_alias = start_alias or self.query.get_initial_alias()
 
         for field in opts.concrete_fields:
@@ -987,7 +995,7 @@ class SQLCompiler:
         """
         result = []
         params = []
-        opts = self.query.get_meta()
+        opts = self.query.get_model_meta()
 
         for name in self.query.distinct_fields:
             parts = name.split(LOOKUP_SEP)
@@ -1007,7 +1015,7 @@ class SQLCompiler:
     def find_ordering_name(
         self,
         name: str,
-        opts: Any,
+        meta: Meta,
         alias: str | None = None,
         default_order: str = "ASC",
         already_seen: set | None = None,
@@ -1026,9 +1034,9 @@ class SQLCompiler:
             alias,
             joins,
             path,
-            opts,
+            meta,
             transform_function,
-        ) = self._setup_joins(pieces, opts, alias)
+        ) = self._setup_joins(pieces, meta, alias)
 
         # If we get to this point and the field is a relation to another model,
         # append the default ordering for that model unless it is the
@@ -1036,7 +1044,7 @@ class SQLCompiler:
         # there are transforms to process.
         if (
             field.is_relation
-            and opts.ordering
+            and meta.model.model_options.ordering
             and getattr(field, "attname", None) != pieces[-1]
             and not getattr(transform_function, "has_transforms", False)
         ):
@@ -1050,7 +1058,7 @@ class SQLCompiler:
             already_seen.add(join_tuple)
 
             results = []
-            for item in opts.ordering:
+            for item in meta.model.model_options.ordering:
                 if hasattr(item, "resolve_expression") and not isinstance(
                     item, OrderBy
                 ):
@@ -1063,7 +1071,7 @@ class SQLCompiler:
                 results.extend(
                     (expr.prefix_references(f"{name}{LOOKUP_SEP}"), is_ref)
                     for expr, is_ref in self.find_ordering_name(
-                        item, opts, alias, order, already_seen
+                        item, meta, alias, order, already_seen
                     )
                 )
             return results
@@ -1074,8 +1082,8 @@ class SQLCompiler:
         ]
 
     def _setup_joins(
-        self, pieces: list[str], opts: Any, alias: str | None
-    ) -> tuple[Any, Any, str, list, Any, Any, Any]:
+        self, pieces: list[str], meta: Meta, alias: str | None
+    ) -> tuple[Any, Any, str, list, Any, Meta, Any]:
         """
         Helper method for get_order_by() and get_distinct().
 
@@ -1084,11 +1092,11 @@ class SQLCompiler:
         match. Executing SQL where this is not true is an error.
         """
         alias = alias or self.query.get_initial_alias()
-        field, targets, opts, joins, path, transform_function = self.query.setup_joins(
-            pieces, opts, alias
+        field, targets, meta, joins, path, transform_function = self.query.setup_joins(
+            pieces, meta, alias
         )
         alias = joins[-1]
-        return field, targets, alias, joins, path, opts, transform_function
+        return field, targets, alias, joins, path, meta, transform_function
 
     def get_from_clause(self) -> tuple[list[str], list]:
         """
@@ -1131,7 +1139,7 @@ class SQLCompiler:
         self,
         select: list[Any],
         select_mask: Any,
-        opts: Any = None,
+        opts: Meta | None = None,
         root_alias: str | None = None,
         cur_depth: int = 1,
         requested: dict | None = None,
@@ -1142,13 +1150,16 @@ class SQLCompiler:
         depth is measured as the number of connections away from the root model
         (for example, cur_depth=1 means we are looking at models with direct
         connections to the root model).
+
+        Args:
+            opts: Meta for the model being queried (internal metadata)
         """
 
         def _get_field_choices() -> chain:
-            direct_choices = (f.name for f in opts.fields if f.is_relation)  # type: ignore[attr-defined]
+            direct_choices = (f.name for f in opts.fields if f.is_relation)  # type: ignore[union-attr]
             reverse_choices = (
                 f.field.related_query_name()
-                for f in opts.related_objects  # type: ignore[attr-defined]
+                for f in opts.related_objects  # type: ignore[union-attr]
                 if f.field.primary_key
             )
             return chain(
@@ -1161,7 +1172,7 @@ class SQLCompiler:
             return related_klass_infos
 
         if not opts:
-            opts = self.query.get_meta()
+            opts = self.query.get_model_meta()
             root_alias = self.query.get_initial_alias()
 
         # Setup for the case when only particular related fields should be
@@ -1213,7 +1224,9 @@ class SQLCompiler:
             _, _, _, joins, _, _ = self.query.setup_joins([f.name], opts, root_alias)
             alias = joins[-1]
             columns = self.get_default_columns(
-                related_select_mask, start_alias=alias, opts=f.remote_field.model._meta
+                related_select_mask,
+                start_alias=alias,
+                opts=f.remote_field.model._model_meta,
             )
             for col in columns:
                 select_fields.append(len(select))
@@ -1222,7 +1235,7 @@ class SQLCompiler:
             next_klass_infos = self.get_related_selections(
                 select,
                 related_select_mask,
-                f.remote_field.model._meta,
+                f.remote_field.model._model_meta,
                 alias,
                 cur_depth + 1,
                 next,
@@ -1267,7 +1280,7 @@ class SQLCompiler:
                 columns = self.get_default_columns(
                     related_select_mask,
                     start_alias=alias,
-                    opts=model._meta,
+                    opts=model._model_meta,
                 )
                 for col in columns:
                     select_fields.append(len(select))
@@ -1277,7 +1290,7 @@ class SQLCompiler:
                 next_klass_infos = self.get_related_selections(
                     select,
                     related_select_mask,
-                    model._meta,
+                    model._model_meta,
                     alias,
                     cur_depth + 1,
                     next,
@@ -1324,7 +1337,7 @@ class SQLCompiler:
                     columns = self.get_default_columns(
                         field_select_mask,
                         start_alias=alias,
-                        opts=model._meta,
+                        opts=model._model_meta,
                     )
                     for col in columns:
                         select_fields.append(len(select))
@@ -1334,7 +1347,7 @@ class SQLCompiler:
                     next_klass_infos = self.get_related_selections(
                         select,
                         field_select_mask,
-                        opts=model._meta,
+                        opts=model._model_meta,
                         root_alias=alias,
                         cur_depth=cur_depth + 1,
                         requested=next_requested,
@@ -1694,12 +1707,13 @@ class SQLInsertCompiler(SQLCompiler):
         # We don't need quote_name_unless_alias() here, since these are all
         # going to be column names (so we can avoid the extra overhead).
         qn = self.connection.ops.quote_name
-        opts = self.query.get_meta()
+        meta = self.query.get_model_meta()
+        options = self.query.model.model_options
         insert_statement = self.connection.ops.insert_statement(
             on_conflict=self.query.on_conflict,
         )
-        result = [f"{insert_statement} {qn(opts.db_table)}"]
-        fields = self.query.fields or [opts.get_field("id")]
+        result = [f"{insert_statement} {qn(options.db_table)}"]
+        fields = self.query.fields or [meta.get_field("id")]
         result.append("({})".format(", ".join(qn(f.column) for f in fields)))
 
         if self.query.fields:
@@ -1776,7 +1790,8 @@ class SQLInsertCompiler(SQLCompiler):
             and len(self.query.objs) != 1
             and not self.connection.features.can_return_rows_from_bulk_insert
         )
-        opts = self.query.get_meta()
+        meta = self.query.get_model_meta()
+        options = self.query.model.model_options
         self.returning_fields = returning_fields
         with self.connection.cursor() as cursor:
             for sql, params in self.as_sql():
@@ -1801,12 +1816,12 @@ class SQLInsertCompiler(SQLCompiler):
                     (
                         self.connection.ops.last_insert_id(
                             cursor,
-                            opts.db_table,
-                            opts.get_field("id").column,
+                            options.db_table,
+                            meta.get_field("id").column,
                         ),
                     )
                 ]
-        cols = [field.get_col(opts.db_table) for field in self.returning_fields]
+        cols = [field.get_col(options.db_table) for field in self.returning_fields]
         converters = self.get_converters(cols)
         if converters:
             rows = list(self.apply_converters(rows, converters))
@@ -1858,7 +1873,7 @@ class SQLDeleteCompiler(SQLCompiler):
         innerq = self.query.clone()
         innerq.__class__ = Query
         innerq.clear_select_clause()
-        id_field = self.query.model._meta.get_field("id")
+        id_field = self.query.model._model_meta.get_field("id")
         innerq.select = [id_field.get_col(self.query.get_initial_alias())]
         outerq = Query(self.query.model)
         if not self.connection.features.update_can_self_select:

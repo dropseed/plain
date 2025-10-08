@@ -7,7 +7,8 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from plain.models.options import OptionsInstance
+    from plain.models.meta import Meta
+    from plain.models.options import Options
 
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -28,6 +29,7 @@ from plain.models.exceptions import (
 from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED, PrimaryKeyField
 from plain.models.fields.reverse_related import ForeignObjectRel
+from plain.models.meta import Meta
 from plain.models.options import Options
 from plain.models.query import F, Q, QuerySet
 from plain.preflight import PreflightResult
@@ -88,22 +90,20 @@ class ModelState:
 
 
 class Model(metaclass=ModelBase):
-    _meta: OptionsInstance = Options()  # type: ignore[assignment]
-
-    # Use descriptors for exception classes instead of metaclass generation
-    DoesNotExist = DoesNotExistDescriptor()
-    MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
-
     # Every model gets an automatic id field
     id = PrimaryKeyField()
 
-    # QuerySet descriptor for model queries
+    # Descriptors for other model behavior
     query = QuerySet()
+    model_options = Options()
+    _model_meta = Meta()
+    DoesNotExist = DoesNotExistDescriptor()
+    MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 
     def __init__(self, *args: Any, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
-        opts = cls._meta
+        meta = cls._model_meta
         _setattr = setattr
         _DEFERRED = DEFERRED
 
@@ -114,12 +114,12 @@ class Model(metaclass=ModelBase):
         # overrides it. It should be one or the other; don't duplicate the work
         # The reason for the kwargs check is that standard iterator passes in by
         # args, and instantiation for iteration is 33% faster.
-        if len(args) > len(opts.concrete_fields):
+        if len(args) > len(meta.concrete_fields):
             # Daft, but matches old exception sans the err msg.
             raise IndexError("Number of args exceeds number of fields")
 
         if not kwargs:
-            fields_iter = iter(opts.concrete_fields)
+            fields_iter = iter(meta.concrete_fields)
             # The ordering of the zip calls matter - zip throws StopIteration
             # when an iter throws it. So if the first iter throws it, the second
             # is *not* consumed. We rely on this, so don't change the order
@@ -130,7 +130,7 @@ class Model(metaclass=ModelBase):
                 _setattr(self, field.attname, val)
         else:
             # Slower, kwargs-ready version.
-            fields_iter = iter(opts.fields)
+            fields_iter = iter(meta.fields)
             for val, field in zip(args, fields_iter):
                 if val is _DEFERRED:
                     continue
@@ -185,7 +185,7 @@ class Model(metaclass=ModelBase):
                     _setattr(self, field.attname, val)
 
         if kwargs:
-            property_names = opts._property_names
+            property_names = meta._property_names
             unexpected = ()
             for prop, value in kwargs.items():
                 # Any remaining kwargs must correspond to properties or virtual
@@ -195,7 +195,7 @@ class Model(metaclass=ModelBase):
                         _setattr(self, prop, value)
                 else:
                     try:
-                        opts.get_field(prop)
+                        meta.get_field(prop)
                     except FieldDoesNotExist:
                         unexpected += (prop,)
                     else:
@@ -211,11 +211,11 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def from_db(cls, field_names: Iterable[str], values: Sequence[Any]) -> Model:
-        if len(values) != len(cls._meta.concrete_fields):
+        if len(values) != len(cls._model_meta.concrete_fields):
             values_iter = iter(values)
             values = [
                 next(values_iter) if f.attname in field_names else DEFERRED
-                for f in cls._meta.concrete_fields
+                for f in cls._model_meta.concrete_fields
             ]
         new = cls(*values)
         new._state.adding = False
@@ -245,7 +245,10 @@ class Model(metaclass=ModelBase):
     def __reduce__(self) -> tuple[Any, tuple[Any, ...], dict[str, Any]]:
         data = self.__getstate__()
         data[PLAIN_VERSION_PICKLE_KEY] = plain.runtime.__version__
-        class_id = self.__class__._meta.package_label, self.__class__._meta.object_name
+        class_id = (
+            self.model_options.package_label,
+            self.model_options.object_name,
+        )
         return model_unpickle, (class_id,), data
 
     def __getstate__(self) -> dict[str, Any]:
@@ -292,7 +295,7 @@ class Model(metaclass=ModelBase):
         """
         return {
             f.attname
-            for f in self.__class__._meta.concrete_fields
+            for f in self._model_meta.concrete_fields
             if f.attname not in self.__dict__
         }
 
@@ -327,7 +330,7 @@ class Model(metaclass=ModelBase):
                     "are not allowed in fields."
                 )
 
-        db_instance_qs = self.__class__._meta.base_queryset.filter(id=self.id)
+        db_instance_qs = self._model_meta.base_queryset.filter(id=self.id)
 
         # Use provided fields, if not set then reload all non-deferred fields.
         deferred_fields = self.get_deferred_fields()
@@ -337,14 +340,14 @@ class Model(metaclass=ModelBase):
         elif deferred_fields:
             fields = [
                 f.attname
-                for f in self.__class__._meta.concrete_fields
+                for f in self._model_meta.concrete_fields
                 if f.attname not in deferred_fields
             ]
             db_instance_qs = db_instance_qs.only(*fields)
 
         db_instance = db_instance_qs.get()
         non_loaded_fields = db_instance.get_deferred_fields()
-        for field in self.__class__._meta.concrete_fields:
+        for field in self._model_meta.concrete_fields:
             if field.attname in non_loaded_fields:
                 # This field wasn't refreshed - skip ahead.
                 continue
@@ -354,7 +357,7 @@ class Model(metaclass=ModelBase):
                 field.delete_cached_value(self)
 
         # Clear cached relations.
-        for field in self.__class__._meta.related_objects:
+        for field in self._model_meta.related_objects:
             if field.is_cached(self):
                 field.delete_cached_value(self)
 
@@ -370,7 +373,7 @@ class Model(metaclass=ModelBase):
         and not use this method.
         """
         try:
-            field = self.__class__._meta.get_field(field_name)
+            field = self._model_meta.get_field(field_name)
         except FieldDoesNotExist:
             return getattr(self, field_name)
         return getattr(self, field.attname)
@@ -405,7 +408,7 @@ class Model(metaclass=ModelBase):
                 return
 
             update_fields = frozenset(update_fields)
-            field_names = self.__class__._meta._non_pk_concrete_field_names
+            field_names = self._model_meta._non_pk_concrete_field_names
             non_model_fields = update_fields.difference(field_names)
 
             if non_model_fields:
@@ -420,7 +423,7 @@ class Model(metaclass=ModelBase):
         # on the loaded fields.
         elif not force_insert and deferred_fields:
             field_names = set()
-            for field in self.__class__._meta.concrete_fields:
+            for field in self._model_meta.concrete_fields:
                 if not field.primary_key and not hasattr(field, "through"):
                     field_names.add(field.attname)
             loaded_fields = field_names.difference(deferred_fields)
@@ -481,7 +484,7 @@ class Model(metaclass=ModelBase):
         Do the heavy-lifting involved in saving. Update or insert the data
         for a single table.
         """
-        meta = cls._meta
+        meta = cls._model_meta
         non_pks = [f for f in meta.local_concrete_fields if not f.primary_key]
 
         if update_fields:
@@ -586,7 +589,7 @@ class Model(metaclass=ModelBase):
     ) -> None:
         # Ensure that a model instance without a PK hasn't been assigned to
         # a ForeignKey on this model. If the field is nullable, allowing the save would result in silent data loss.
-        for field in self.__class__._meta.concrete_fields:
+        for field in self._model_meta.concrete_fields:
             if fields and field not in fields:
                 continue
             # If the related field isn't cached, then an instance hasn't been
@@ -623,7 +626,7 @@ class Model(metaclass=ModelBase):
     def delete(self) -> tuple[int, dict[str, int]]:
         if self.id is None:
             raise ValueError(
-                f"{self.__class__._meta.object_name} object can't be deleted because its id attribute is set "
+                f"{self.model_options.object_name} object can't be deleted because its id attribute is set "
                 "to None."
             )
         collector = Collector(origin=self)
@@ -633,7 +636,7 @@ class Model(metaclass=ModelBase):
     def get_field_display(self, field_name: str) -> str:
         """Get the display value for a field, especially useful for fields with choices."""
         # Get the field object from the field name
-        field = self.__class__._meta.get_field(field_name)
+        field = self._model_meta.get_field(field_name)
         value = getattr(self, field.attname)
 
         # If field has no choices, just return the value as string
@@ -647,11 +650,11 @@ class Model(metaclass=ModelBase):
         )
 
     def _get_field_value_map(
-        self, meta: OptionsInstance | None, exclude: set[str] | None = None
+        self, meta: Meta | None, exclude: set[str] | None = None
     ) -> dict[str, Value]:
         if exclude is None:
             exclude = set()
-        meta = meta or self.__class__._meta
+        meta = meta or self._model_meta
         return {
             field.name: Value(getattr(self, field.attname), field)
             for field in meta.local_concrete_fields
@@ -701,7 +704,7 @@ class Model(metaclass=ModelBase):
         # Gather a list of checks for fields declared as unique and add them to
         # the list of checks.
 
-        fields_with_class = [(self.__class__, self.__class__._meta.local_fields)]
+        fields_with_class = [(self.__class__, self._model_meta.local_fields)]
 
         for model_class, fields in fields_with_class:
             for f in fields:
@@ -724,7 +727,7 @@ class Model(metaclass=ModelBase):
 
             lookup_kwargs = {}
             for field_name in unique_check:
-                f = self.__class__._meta.get_field(field_name)
+                f = self._model_meta.get_field(field_name)
                 lookup_value = getattr(self, f.attname)
                 # TODO: Handle multiple backends with different feature flags.
                 if lookup_value is None:
@@ -762,17 +765,17 @@ class Model(metaclass=ModelBase):
     def unique_error_message(
         self, model_class: type[Model], unique_check: tuple[str, ...]
     ) -> ValidationError:
-        opts = model_class._meta
+        meta = model_class._model_meta
 
         params = {
             "model": self,
             "model_class": model_class,
-            "model_name": opts.model_name,
+            "model_name": model_class.model_options.model_name,
             "unique_check": unique_check,
         }
 
         if len(unique_check) == 1:
-            field = opts.get_field(unique_check[0])
+            field = meta.get_field(unique_check[0])
             params["field_label"] = field.name
             return ValidationError(
                 message=field.error_messages["unique"],
@@ -780,7 +783,7 @@ class Model(metaclass=ModelBase):
                 params=params,
             )
         else:
-            field_names = [opts.get_field(f).name for f in unique_check]
+            field_names = [meta.get_field(f).name for f in unique_check]
 
             # Put an "and" before the last one
             field_names[-1] = f"and {field_names[-1]}"
@@ -793,7 +796,7 @@ class Model(metaclass=ModelBase):
                 params["field_label"] = " ".join(field_names)
 
             # Use the first field as the message format...
-            message = opts.get_field(unique_check[0]).error_messages["unique"]
+            message = meta.get_field(unique_check[0]).error_messages["unique"]
 
             return ValidationError(
                 message=message,
@@ -802,7 +805,7 @@ class Model(metaclass=ModelBase):
             )
 
     def get_constraints(self) -> list[tuple[type, list[Any]]]:
-        constraints = [(self.__class__, self.__class__._meta.constraints)]
+        constraints = [(self.__class__, self.model_options.constraints)]
         return constraints
 
     def validate_constraints(self, exclude: set[str] | None = None) -> None:
@@ -886,7 +889,7 @@ class Model(metaclass=ModelBase):
             exclude = set()
 
         errors = {}
-        for f in self.__class__._meta.fields:
+        for f in self._model_meta.fields:
             if f.name in exclude:
                 continue
             # Skip validation for empty fields with required=False. The developer
@@ -934,12 +937,12 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_db_table_comment(cls) -> list[PreflightResult]:
-        if not cls._meta.db_table_comment:
+        if not cls.model_options.db_table_comment:
             return []
         errors = []
         if not (
             db_connection.features.supports_comments
-            or "supports_comments" in cls._meta.required_db_features
+            or "supports_comments" in cls.model_options.required_db_features
         ):
             errors.append(
                 PreflightResult(
@@ -956,9 +959,9 @@ class Model(metaclass=ModelBase):
     def _check_fields(cls) -> list[PreflightResult]:
         """Perform all field checks."""
         errors = []
-        for field in cls._meta.local_fields:
+        for field in cls._model_meta.local_fields:
             errors.extend(field.preflight(from_model=cls))
-        for field in cls._meta.local_many_to_many:
+        for field in cls._model_meta.local_many_to_many:
             errors.extend(field.preflight(from_model=cls))
         return errors
 
@@ -969,7 +972,7 @@ class Model(metaclass=ModelBase):
         errors = []
         seen_intermediary_signatures = []
 
-        fields = cls._meta.local_many_to_many
+        fields = cls._model_meta.local_many_to_many
 
         # Skip when the target model wasn't found.
         fields = (f for f in fields if isinstance(f.remote_field.model, ModelBase))
@@ -988,7 +991,7 @@ class Model(metaclass=ModelBase):
                 errors.append(
                     PreflightResult(
                         fix="The model has two identical many-to-many relations "
-                        f"through the intermediate model '{f.remote_field.through._meta.label}'.",
+                        f"through the intermediate model '{f.remote_field.through.model_options.label}'.",
                         obj=cls,
                         id="models.duplicate_many_to_many_relations",
                     )
@@ -1001,7 +1004,9 @@ class Model(metaclass=ModelBase):
     def _check_id_field(cls) -> list[PreflightResult]:
         """Disallow user-defined fields named ``id``."""
         if any(
-            f for f in cls._meta.local_fields if f.name == "id" and not f.auto_created
+            f
+            for f in cls._model_meta.local_fields
+            if f.name == "id" and not f.auto_created
         ):
             return [
                 PreflightResult(
@@ -1018,7 +1023,7 @@ class Model(metaclass=ModelBase):
         errors = []
         used_fields = {}  # name or attname -> field
 
-        for f in cls._meta.local_fields:
+        for f in cls._model_meta.local_fields:
             clash = used_fields.get(f.name) or used_fields.get(f.attname) or None
             # Note that we may detect clash between user-defined non-unique
             # field "id" and automatically added unique field "id", both
@@ -1031,7 +1036,7 @@ class Model(metaclass=ModelBase):
                 errors.append(
                     PreflightResult(
                         fix=f"The field '{f.name}' clashes with the field '{clash.name}' "
-                        f"from model '{clash.model._meta}'.",
+                        f"from model '{clash.model.model_options}'.",
                         obj=f,
                         id="models.field_name_clash",
                     )
@@ -1047,7 +1052,7 @@ class Model(metaclass=ModelBase):
         used_column_names = []
         errors = []
 
-        for f in cls._meta.local_fields:
+        for f in cls._model_meta.local_fields:
             _, column_name = f.get_attname_column()
 
             # Ensure the column name is not already in use.
@@ -1094,10 +1099,10 @@ class Model(metaclass=ModelBase):
         cls,
     ) -> list[PreflightResult]:
         errors = []
-        property_names = cls._meta._property_names
+        property_names = cls._model_meta._property_names
         related_field_accessors = (
             f.get_attname()
-            for f in cls._meta._get_fields(reverse=False)
+            for f in cls._model_meta._get_fields(reverse=False)
             if f.is_relation and f.related_model is not None
         )
         for accessor in related_field_accessors:
@@ -1115,7 +1120,7 @@ class Model(metaclass=ModelBase):
     @classmethod
     def _check_single_primary_key(cls) -> list[PreflightResult]:
         errors = []
-        if sum(1 for f in cls._meta.local_fields if f.primary_key) > 1:
+        if sum(1 for f in cls._model_meta.local_fields if f.primary_key) > 1:
             errors.append(
                 PreflightResult(
                     fix="The model cannot have more than one field with "
@@ -1131,7 +1136,7 @@ class Model(metaclass=ModelBase):
         """Check fields, names, and conditions of indexes."""
         errors = []
         references = set()
-        for index in cls._meta.indexes:
+        for index in cls.model_options.indexes:
             # Index name can't start with an underscore or a number, restricted
             # for cross-database compatibility with Oracle.
             if index.name[0] == "_" or index.name[0].isdigit():
@@ -1159,8 +1164,8 @@ class Model(metaclass=ModelBase):
                     )
         if not (
             db_connection.features.supports_partial_indexes
-            or "supports_partial_indexes" in cls._meta.required_db_features
-        ) and any(index.condition is not None for index in cls._meta.indexes):
+            or "supports_partial_indexes" in cls.model_options.required_db_features
+        ) and any(index.condition is not None for index in cls.model_options.indexes):
             errors.append(
                 PreflightResult(
                     fix=f"{db_connection.display_name} does not support indexes with conditions. "
@@ -1173,8 +1178,8 @@ class Model(metaclass=ModelBase):
             )
         if not (
             db_connection.features.supports_covering_indexes
-            or "supports_covering_indexes" in cls._meta.required_db_features
-        ) and any(index.include for index in cls._meta.indexes):
+            or "supports_covering_indexes" in cls.model_options.required_db_features
+        ) and any(index.include for index in cls.model_options.indexes):
             errors.append(
                 PreflightResult(
                     fix=f"{db_connection.display_name} does not support indexes with non-key columns. "
@@ -1187,8 +1192,8 @@ class Model(metaclass=ModelBase):
             )
         if not (
             db_connection.features.supports_expression_indexes
-            or "supports_expression_indexes" in cls._meta.required_db_features
-        ) and any(index.contains_expressions for index in cls._meta.indexes):
+            or "supports_expression_indexes" in cls.model_options.required_db_features
+        ) and any(index.contains_expressions for index in cls.model_options.indexes):
             errors.append(
                 PreflightResult(
                     fix=f"{db_connection.display_name} does not support indexes on expressions. "
@@ -1200,9 +1205,13 @@ class Model(metaclass=ModelBase):
                 )
             )
         fields = [
-            field for index in cls._meta.indexes for field, _ in index.fields_orders
+            field
+            for index in cls.model_options.indexes
+            for field, _ in index.fields_orders
         ]
-        fields += [include for index in cls._meta.indexes for include in index.include]
+        fields += [
+            include for index in cls.model_options.indexes for include in index.include
+        ]
         fields += references
         errors.extend(cls._check_local_fields(fields, "indexes"))
         return errors
@@ -1216,7 +1225,7 @@ class Model(metaclass=ModelBase):
         # In order to avoid hitting the relation tree prematurely, we use our
         # own fields_map instead of using get_field()
         forward_fields_map = {}
-        for field in cls._meta._get_fields(reverse=False):
+        for field in cls._model_meta._get_fields(reverse=False):
             forward_fields_map[field.name] = field
             if hasattr(field, "attname"):
                 forward_fields_map[field.attname] = field
@@ -1243,11 +1252,11 @@ class Model(metaclass=ModelBase):
                             id="models.m2m_field_in_meta_option",
                         )
                     )
-                elif field not in cls._meta.local_fields:
+                elif field not in cls._model_meta.local_fields:
                     errors.append(
                         PreflightResult(
                             fix=f"'{option}' refers to field '{field_name}' which is not local to model "
-                            f"'{cls._meta.object_name}'. This issue may be caused by multi-table inheritance.",
+                            f"'{cls.model_options.object_name}'. This issue may be caused by multi-table inheritance.",
                             obj=cls,
                             id="models.non_local_field_reference",
                         )
@@ -1261,10 +1270,10 @@ class Model(metaclass=ModelBase):
         exist?
         """
 
-        if not cls._meta.ordering:
+        if not cls.model_options.ordering:
             return []
 
-        if not isinstance(cls._meta.ordering, list | tuple):
+        if not isinstance(cls.model_options.ordering, list | tuple):
             return [
                 PreflightResult(
                     fix="'ordering' must be a tuple or list (even if you want to order by "
@@ -1275,7 +1284,7 @@ class Model(metaclass=ModelBase):
             ]
 
         errors = []
-        fields = cls._meta.ordering
+        fields = cls.model_options.ordering
 
         # Skip expressions and '?' fields.
         fields = (f for f in fields if isinstance(f, str) and f != "?")
@@ -1299,9 +1308,9 @@ class Model(metaclass=ModelBase):
             fld = None
             for part in field.split(LOOKUP_SEP):
                 try:
-                    fld = _cls._meta.get_field(part)
+                    fld = _cls._model_meta.get_field(part)
                     if fld.is_relation:
-                        _cls = fld.path_infos[-1].to_opts.model
+                        _cls = fld.path_infos[-1].to_meta.model
                     else:
                         _cls = None
                 except (FieldDoesNotExist, AttributeError):
@@ -1322,13 +1331,13 @@ class Model(metaclass=ModelBase):
 
         # Any field name that is not present in field_names does not exist.
         # Also, ordering by m2m fields is not allowed.
-        opts = cls._meta
+        meta = cls._model_meta
         valid_fields = set(
             chain.from_iterable(
                 (f.name, f.attname)
                 if not (f.auto_created and not f.concrete)
                 else (f.field.related_query_name(),)
-                for f in chain(opts.fields, opts.related_objects)
+                for f in chain(meta.fields, meta.related_objects)
             )
         )
 
@@ -1361,7 +1370,7 @@ class Model(metaclass=ModelBase):
         if allowed_len is None:
             return errors
 
-        for f in cls._meta.local_fields:
+        for f in cls._model_meta.local_fields:
             _, column_name = f.get_attname_column()
 
             # Check if auto-generated name for the field is too long
@@ -1381,14 +1390,14 @@ class Model(metaclass=ModelBase):
                     )
                 )
 
-        for f in cls._meta.local_many_to_many:
+        for f in cls._model_meta.local_many_to_many:
             # Skip nonexistent models.
             if isinstance(f.remote_field.through, str):
                 continue
 
             # Check if auto-generated name for the M2M field is too long
             # for the database.
-            for m2m in f.remote_field.through._meta.local_fields:
+            for m2m in f.remote_field.through._model_meta.local_fields:
                 _, rel_name = m2m.get_attname_column()
                 if (
                     m2m.db_column is None
@@ -1429,10 +1438,11 @@ class Model(metaclass=ModelBase):
         errors = []
         if not (
             db_connection.features.supports_table_check_constraints
-            or "supports_table_check_constraints" in cls._meta.required_db_features
+            or "supports_table_check_constraints"
+            in cls.model_options.required_db_features
         ) and any(
             isinstance(constraint, CheckConstraint)
-            for constraint in cls._meta.constraints
+            for constraint in cls.model_options.constraints
         ):
             errors.append(
                 PreflightResult(
@@ -1447,11 +1457,11 @@ class Model(metaclass=ModelBase):
 
         if not (
             db_connection.features.supports_partial_indexes
-            or "supports_partial_indexes" in cls._meta.required_db_features
+            or "supports_partial_indexes" in cls.model_options.required_db_features
         ) and any(
             isinstance(constraint, UniqueConstraint)
             and constraint.condition is not None
-            for constraint in cls._meta.constraints
+            for constraint in cls.model_options.constraints
         ):
             errors.append(
                 PreflightResult(
@@ -1467,11 +1477,11 @@ class Model(metaclass=ModelBase):
         if not (
             db_connection.features.supports_deferrable_unique_constraints
             or "supports_deferrable_unique_constraints"
-            in cls._meta.required_db_features
+            in cls.model_options.required_db_features
         ) and any(
             isinstance(constraint, UniqueConstraint)
             and constraint.deferrable is not None
-            for constraint in cls._meta.constraints
+            for constraint in cls.model_options.constraints
         ):
             errors.append(
                 PreflightResult(
@@ -1486,10 +1496,10 @@ class Model(metaclass=ModelBase):
 
         if not (
             db_connection.features.supports_covering_indexes
-            or "supports_covering_indexes" in cls._meta.required_db_features
+            or "supports_covering_indexes" in cls.model_options.required_db_features
         ) and any(
             isinstance(constraint, UniqueConstraint) and constraint.include
-            for constraint in cls._meta.constraints
+            for constraint in cls.model_options.constraints
         ):
             errors.append(
                 PreflightResult(
@@ -1504,10 +1514,10 @@ class Model(metaclass=ModelBase):
 
         if not (
             db_connection.features.supports_expression_indexes
-            or "supports_expression_indexes" in cls._meta.required_db_features
+            or "supports_expression_indexes" in cls.model_options.required_db_features
         ) and any(
             isinstance(constraint, UniqueConstraint) and constraint.contains_expressions
-            for constraint in cls._meta.constraints
+            for constraint in cls.model_options.constraints
         ):
             errors.append(
                 PreflightResult(
@@ -1522,22 +1532,23 @@ class Model(metaclass=ModelBase):
         fields = set(
             chain.from_iterable(
                 (*constraint.fields, *constraint.include)
-                for constraint in cls._meta.constraints
+                for constraint in cls.model_options.constraints
                 if isinstance(constraint, UniqueConstraint)
             )
         )
         references = set()
-        for constraint in cls._meta.constraints:
+        for constraint in cls.model_options.constraints:
             if isinstance(constraint, UniqueConstraint):
                 if (
                     db_connection.features.supports_partial_indexes
-                    or "supports_partial_indexes" not in cls._meta.required_db_features
+                    or "supports_partial_indexes"
+                    not in cls.model_options.required_db_features
                 ) and isinstance(constraint.condition, Q):
                     references.update(cls._get_expr_references(constraint.condition))
                 if (
                     db_connection.features.supports_expression_indexes
                     or "supports_expression_indexes"
-                    not in cls._meta.required_db_features
+                    not in cls.model_options.required_db_features
                 ) and constraint.contains_expressions:
                     for expression in constraint.expressions:
                         references.update(cls._get_expr_references(expression))
@@ -1545,7 +1556,7 @@ class Model(metaclass=ModelBase):
                 if (
                     db_connection.features.supports_table_check_constraints
                     or "supports_table_check_constraints"
-                    not in cls._meta.required_db_features
+                    not in cls.model_options.required_db_features
                 ):
                     if isinstance(constraint.check, Q):
                         references.update(cls._get_expr_references(constraint.check))
@@ -1569,7 +1580,7 @@ class Model(metaclass=ModelBase):
                 # If it has no lookups it cannot result in a JOIN.
                 continue
             try:
-                field = cls._meta.get_field(field_name)
+                field = cls._model_meta.get_field(field_name)
                 if not field.is_relation or field.many_to_many or field.one_to_many:
                     continue
             except FieldDoesNotExist:

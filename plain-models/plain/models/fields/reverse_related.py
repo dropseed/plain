@@ -25,7 +25,7 @@ class ForeignObjectRel(FieldCacheMixin):
     """
     Used by ForeignKey to store information about the relation.
 
-    ``_meta.get_fields()`` returns this class to provide access to the field
+    ``_model_meta.get_fields()`` returns this class to provide access to the field
     flags for the reverse relation.
     """
 
@@ -117,7 +117,7 @@ class ForeignObjectRel(FieldCacheMixin):
         return self.field.db_type
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__}: {self.related_model._meta.package_label}.{self.related_model._meta.model_name}>"
+        return f"<{type(self).__name__}: {self.related_model.model_options.package_label}.{self.related_model.model_options.model_name}>"
 
     @property
     def identity(self) -> tuple[Any, ...]:
@@ -229,7 +229,7 @@ class ManyToOneRel(ForeignObjectRel):
     """
     Used by the ForeignKey field to store information about the relation.
 
-    ``_meta.get_fields()`` returns this class to provide access to the field
+    ``_model_meta.get_fields()`` returns this class to provide access to the field
     flags for the reverse relation.
 
     Note: Because we somewhat abuse the Rel objects by using them as reverse
@@ -273,7 +273,7 @@ class ManyToOneRel(ForeignObjectRel):
         """
         Return the Field in the 'to' object to which this relationship is tied.
         """
-        field = self.model._meta.get_field("id")
+        field = self.model._model_meta.get_field("id")
         if not field.concrete:
             raise FieldDoesNotExist("No related field named 'id'")
         return field
@@ -286,7 +286,7 @@ class ManyToManyRel(ForeignObjectRel):
     """
     Used by ManyToManyField to store information about the relation.
 
-    ``_meta.get_fields()`` returns this class to provide access to the field
+    ``_model_meta.get_fields()`` returns this class to provide access to the field
     flags for the reverse relation.
     """
 
@@ -329,11 +329,11 @@ class ManyToManyRel(ForeignObjectRel):
         Return the field in the 'to' object to which this relationship is tied.
         Provided for symmetry with ManyToOneRel.
         """
-        opts = self.through._meta
+        meta = self.through._model_meta
         if self.through_fields:
-            field = opts.get_field(self.through_fields[0])
+            field = meta.get_field(self.through_fields[0])
         else:
-            for field in opts.fields:
+            for field in meta.fields:
                 rel = getattr(field, "remote_field", None)
                 if rel and rel.model == self.model:
                     break

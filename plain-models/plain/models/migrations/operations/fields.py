@@ -117,7 +117,7 @@ class AddField(FieldOperation):
             from_model = from_state.models_registry.get_model(
                 package_label, self.model_name
             )
-            field = to_model._meta.get_field(self.name)
+            field = to_model._model_meta.get_field(self.name)
             if not self.preserve_default:
                 field.default = self.field.default
             schema_editor.add_field(
@@ -187,7 +187,7 @@ class RemoveField(FieldOperation):
         )
         if self.allow_migrate_model(schema_editor.connection, from_model):
             schema_editor.remove_field(
-                from_model, from_model._meta.get_field(self.name)
+                from_model, from_model._model_meta.get_field(self.name)
             )
 
     def describe(self) -> str:
@@ -253,8 +253,8 @@ class AlterField(FieldOperation):
             from_model = from_state.models_registry.get_model(
                 package_label, self.model_name
             )
-            from_field = from_model._meta.get_field(self.name)
-            to_field = to_model._meta.get_field(self.name)
+            from_field = from_model._model_meta.get_field(self.name)
+            to_field = to_model._model_meta.get_field(self.name)
             if not self.preserve_default:
                 to_field.default = self.field.default
             schema_editor.alter_field(from_model, from_field, to_field)
@@ -334,8 +334,8 @@ class RenameField(FieldOperation):
             )
             schema_editor.alter_field(
                 from_model,
-                from_model._meta.get_field(self.old_name),
-                to_model._meta.get_field(self.new_name),
+                from_model._model_meta.get_field(self.old_name),
+                to_model._model_meta.get_field(self.new_name),
             )
 
     def describe(self) -> str:

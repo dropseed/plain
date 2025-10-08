@@ -12,6 +12,8 @@ def coerce_key(key: Any) -> str:
         return key
 
     if isinstance(key, models.Model):
-        return f"{key._meta.package_label}.{key._meta.model_name}:{key.id}"
+        return (
+            f"{key.model_options.package_label}.{key.model_options.model_name}:{key.id}"
+        )
 
     return str(key)

@@ -151,7 +151,10 @@ class RawModelIterable(BaseIterable):
                 raise FieldDoesNotExist("Raw query must include the primary key")
             fields = [self.queryset.model_fields.get(c) for c in self.queryset.columns]
             converters = compiler.get_converters(
-                [f.get_col(f.model._meta.db_table) if f else None for f in fields]
+                [
+                    f.get_col(f.model.model_options.db_table) if f else None
+                    for f in fields
+                ]
             )
             if converters:
                 query_iterator = compiler.apply_converters(query_iterator, converters)
@@ -481,12 +484,14 @@ class QuerySet(Generic[T]):
         query = (
             self
             if self.sql_query.can_filter()
-            else self.model._meta.base_queryset.filter(id__in=self.values("id"))
+            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.sql_query.can_filter():
-            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))
+            other = other.model._model_meta.base_queryset.filter(
+                id__in=other.values("id")
+            )
         combined.sql_query.combine(other.sql_query, sql.OR)
         return combined
 
@@ -500,12 +505,14 @@ class QuerySet(Generic[T]):
         query = (
             self
             if self.sql_query.can_filter()
-            else self.model._meta.base_queryset.filter(id__in=self.values("id"))
+            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.sql_query.can_filter():
-            other = other.model._meta.base_queryset.filter(id__in=other.values("id"))
+            other = other.model._model_meta.base_queryset.filter(
+                id__in=other.values("id")
+            )
         combined.sql_query.combine(other.sql_query, sql.XOR)
         return combined
 
@@ -612,11 +619,11 @@ class QuerySet(Generic[T]):
             return clone._result_cache[0]
         if not num:
             raise self.model.DoesNotExist(
-                f"{self.model._meta.object_name} matching query does not exist."
+                f"{self.model.model_options.object_name} matching query does not exist."
             )
         raise self.model.MultipleObjectsReturned(
             "get() returned more than one {} -- it returned {}!".format(
-                self.model._meta.object_name,
+                self.model.model_options.object_name,
                 num if not limit or num < limit else "more than %s" % (limit - 1),
             )
         )
@@ -642,7 +649,7 @@ class QuerySet(Generic[T]):
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
-        id_field = self.model._meta.get_field("id")
+        id_field = self.model._model_meta.get_field("id")
         for obj in objs:
             if obj.id is None:  # type: ignore[attr-defined]
                 # Populate new primary key values.
@@ -726,18 +733,18 @@ class QuerySet(Generic[T]):
 
         if not objs:
             return objs
-        opts = self.model._meta
+        meta = self.model._model_meta
         if unique_fields:
-            unique_fields = [self.model._meta.get_field(name) for name in unique_fields]
+            unique_fields = [meta.get_field(name) for name in unique_fields]
         if update_fields:
-            update_fields = [self.model._meta.get_field(name) for name in update_fields]
+            update_fields = [meta.get_field(name) for name in update_fields]
         on_conflict = self._check_bulk_create_options(
             update_conflicts,
             update_fields,
             unique_fields,
         )
         self._for_write = True
-        fields = opts.concrete_fields
+        fields = meta.concrete_fields
         objs = list(objs)
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
@@ -751,9 +758,9 @@ class QuerySet(Generic[T]):
                     update_fields=update_fields,
                     unique_fields=unique_fields,
                 )
-                id_field = opts.get_field("id")
+                id_field = meta.get_field("id")
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
-                    for result, field in zip(results, opts.db_returning_fields):
+                    for result, field in zip(results, meta.db_returning_fields):
                         if field != id_field:
                             setattr(obj_with_id, field.attname, result)
                 for obj_with_id in objs_with_id:
@@ -774,7 +781,7 @@ class QuerySet(Generic[T]):
                 ):
                     assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
-                    for result, field in zip(results, opts.db_returning_fields):
+                    for result, field in zip(results, meta.db_returning_fields):
                         setattr(obj_without_id, field.attname, result)
                     obj_without_id._state.adding = False
 
@@ -793,7 +800,7 @@ class QuerySet(Generic[T]):
         objs_tuple = tuple(objs)
         if any(obj.id is None for obj in objs_tuple):  # type: ignore[attr-defined]
             raise ValueError("All bulk_update() objects must have a primary key set.")
-        fields_list = [self.model._meta.get_field(name) for name in fields]
+        fields_list = [self.model._model_meta.get_field(name) for name in fields]
         if any(not f.concrete or f.many_to_many for f in fields_list):
             raise ValueError("bulk_update() can only be used with concrete fields.")
         if any(f.primary_key for f in fields_list):
@@ -903,14 +910,14 @@ class QuerySet(Generic[T]):
                 setattr(obj, k, v)
 
             update_fields = set(update_defaults)
-            concrete_field_names = self.model._meta._non_pk_concrete_field_names
+            concrete_field_names = self.model._model_meta._non_pk_concrete_field_names
             # update_fields does not support non-concrete fields.
             if concrete_field_names.issuperset(update_fields):
                 # Add fields which are set on pre_save(), e.g. auto_now fields.
                 # This is to maintain backward compatibility as these fields
                 # are not updated unless explicitly specified in the
                 # update_fields list.
-                for field in self.model._meta.local_concrete_fields:
+                for field in self.model._model_meta.local_concrete_fields:
                     if not (
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
@@ -932,11 +939,11 @@ class QuerySet(Generic[T]):
         defaults = defaults or {}
         params = {k: v for k, v in kwargs.items() if LOOKUP_SEP not in k}
         params.update(defaults)
-        property_names = self.model._meta._property_names
+        property_names = self.model._model_meta._property_names
         invalid_params = []
         for param in params:
             try:
-                self.model._meta.get_field(param)
+                self.model._model_meta.get_field(param)
             except FieldDoesNotExist:
                 # It's okay to use a model's property if it has a setter.
                 if not (param in property_names and getattr(self.model, param).fset):
@@ -944,7 +951,7 @@ class QuerySet(Generic[T]):
         if invalid_params:
             raise FieldError(
                 "Invalid field name(s) for model {}: '{}'.".format(
-                    self.model._meta.object_name,
+                    self.model.model_options.object_name,
                     "', '".join(sorted(invalid_params)),
                 )
             )
@@ -972,15 +979,15 @@ class QuerySet(Generic[T]):
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with in_bulk().")
-        opts = self.model._meta
+        meta = self.model._model_meta
         unique_fields = [
             constraint.fields[0]
-            for constraint in opts.total_unique_constraints
+            for constraint in self.model.model_options.total_unique_constraints
             if len(constraint.fields) == 1
         ]
         if (
             field_name != "id"
-            and not opts.get_field(field_name).primary_key
+            and not meta.get_field(field_name).primary_key
             and field_name not in unique_fields
             and self.sql_query.distinct_fields != (field_name,)
         ):
@@ -1507,7 +1514,7 @@ class QuerySet(Generic[T]):
                     (field.name, field.attname)
                     if hasattr(field, "attname")
                     else (field.name,)
-                    for field in self.model._meta.get_fields()
+                    for field in self.model._model_meta.get_fields()
                 )
             )
 
@@ -1637,7 +1644,7 @@ class QuerySet(Generic[T]):
             return True
         elif (
             self.sql_query.default_ordering
-            and self.sql_query.get_meta().ordering
+            and self.sql_query.get_model_meta().ordering
             and
             # A default ordering doesn't affect GROUP BY queries.
             not self.sql_query.group_by
@@ -1697,7 +1704,7 @@ class QuerySet(Generic[T]):
                     self._insert(
                         item,
                         fields=fields,
-                        returning_fields=self.model._meta.db_returning_fields,
+                        returning_fields=self.model._model_meta.db_returning_fields,
                     )
                 )
             else:
@@ -1863,7 +1870,9 @@ class RawQuerySet:
         """Resolve the init field names and value positions."""
         converter = db_connection.introspection.identifier_converter
         model_init_fields = [
-            f for f in self.model._meta.fields if converter(f.column) in self.columns
+            f
+            for f in self.model._model_meta.fields
+            if converter(f.column) in self.columns
         ]
         annotation_fields = [
             (column, pos)
@@ -1951,7 +1960,7 @@ class RawQuerySet:
         """A dict mapping column names to model field names."""
         converter = db_connection.introspection.identifier_converter
         model_fields = {}
-        for field in self.model._meta.fields:
+        for field in self.model._model_meta.fields:
             name, column = field.get_attname_column()
             model_fields[converter(column)] = field
         return model_fields
@@ -2313,7 +2322,7 @@ def prefetch_one_level(
         # of prefetch_related), so what applies to first object applies to all.
         model = instances[0].__class__
         try:
-            model._meta.get_field(to_attr)
+            model._model_meta.get_field(to_attr)
         except FieldDoesNotExist:
             pass
         else:

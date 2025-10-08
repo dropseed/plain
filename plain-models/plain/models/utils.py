@@ -19,7 +19,10 @@ def make_model_tuple(model: Any) -> tuple[str, str]:
             package_label, model_name = model.split(".")
             model_tuple = package_label, model_name.lower()
         else:
-            model_tuple = model._meta.package_label, model._meta.model_name
+            model_tuple = (
+                model.model_options.package_label,
+                model.model_options.model_name,
+            )
         assert len(model_tuple) == 2
         return model_tuple
     except (ValueError, AssertionError):

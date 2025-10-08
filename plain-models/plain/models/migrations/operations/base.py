@@ -115,7 +115,7 @@ class Operation:
 
     def allow_migrate_model(self, connection: BaseDatabaseWrapper, model: Any) -> bool:
         """Return whether or not a model may be migrated."""
-        if not model._meta.can_migrate(connection):
+        if not model.model_options.can_migrate(connection):
             return False
 
         return True

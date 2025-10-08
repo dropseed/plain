@@ -173,7 +173,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             or (old_type.startswith("citext") and not new_type.startswith("citext"))
         ):
             index_name = self._create_index_name(
-                model._meta.db_table, [old_field.column], suffix="_like"
+                model.model_options.db_table, [old_field.column], suffix="_like"
             )
             self.execute(self._delete_index_sql(model, index_name))
 
@@ -186,7 +186,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         new_internal_type = new_field.get_internal_type()
         old_internal_type = old_field.get_internal_type()
         # Make ALTER TYPE with IDENTITY make sense.
-        table = strip_quotes(model._meta.db_table)
+        table = strip_quotes(model.model_options.db_table)
         auto_field_types = {"PrimaryKeyField"}
         old_is_auto = old_internal_type in auto_field_types
         new_is_auto = new_internal_type in auto_field_types
@@ -306,7 +306,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             or new_field.primary_key
         ):
             index_to_remove = self._create_index_name(
-                model._meta.db_table, [old_field.column], suffix="_like"
+                model.model_options.db_table, [old_field.column], suffix="_like"
             )
             self.execute(self._delete_index_sql(model, index_to_remove))
 

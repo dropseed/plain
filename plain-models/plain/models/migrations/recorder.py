@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models.db import DatabaseError
+from plain.models.meta import Meta
 from plain.models.registry import ModelsRegistry
 from plain.utils.functional import classproperty
 from plain.utils.timezone import now
@@ -44,8 +45,10 @@ class MigrationRecorder:
                 name = models.CharField(max_length=255)
                 applied = models.DateTimeField(default=now)
 
-                _meta = models.Options(
-                    models_registry=_models_registry,
+                # Use isolated models registry for migrations
+                _model_meta = Meta(models_registry=_models_registry)
+
+                model_options = models.Options(
                     package_label="migrations",
                     db_table="plainmigrations",
                 )
@@ -67,7 +70,7 @@ class MigrationRecorder:
         """Return True if the plainmigrations table exists."""
         with self.connection.cursor() as cursor:
             tables = self.connection.introspection.table_names(cursor)
-        return self.Migration._meta.db_table in tables
+        return self.Migration.model_options.db_table in tables
 
     def ensure_schema(self) -> None:
         """Ensure the table exists and has the correct schema."""

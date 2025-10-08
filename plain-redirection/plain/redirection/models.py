@@ -33,7 +33,7 @@ class Redirect(models.Model):
     # logged in or not? auth not required necessarily...
     # headers?
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["order", "-created_at"],
         indexes=[
             models.Index(fields=["order"]),
@@ -97,7 +97,7 @@ class RedirectLog(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-created_at"],
         indexes=[
             models.Index(fields=["created_at"]),
@@ -137,7 +137,7 @@ class NotFoundLog(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-created_at"],
         indexes=[
             models.Index(fields=["created_at"]),

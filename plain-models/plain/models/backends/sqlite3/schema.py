@@ -141,7 +141,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if not self._field_should_be_altered(old_field, new_field):
             return
         old_field_name = old_field.name
-        table_name = model._meta.db_table
+        table_name = model.model_options.db_table
         _, old_column_name = old_field.get_attname_column()
         if (
             new_field.name != old_field_name
@@ -152,7 +152,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         ):
             if self.connection.in_atomic_block:
                 raise NotSupportedError(
-                    f"Renaming the {model._meta.db_table!r}.{old_field_name!r} column while in a transaction is not "
+                    f"Renaming the {model.model_options.db_table!r}.{old_field_name!r} column while in a transaction is not "
                     "supported on SQLite < 3.26 because it would break referential "
                     "integrity. Try adding `atomic = False` to the Migration class."
                 )
@@ -219,13 +219,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Work out the new fields dict / mapping
         body = {
             f.name: f.clone() if is_self_referential(f) else f
-            for f in model._meta.local_concrete_fields
+            for f in model._model_meta.local_concrete_fields
         }
         # Since mapping might mix column names and default values,
         # its values must be already quoted.
         mapping = {
             f.column: self.quote_name(f.column)
-            for f in model._meta.local_concrete_fields
+            for f in model._model_meta.local_concrete_fields
         }
         # If any of the new or altered fields is introducing a new PK,
         # remove the old one
@@ -272,13 +272,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Work inside a new app registry
         models_registry = ModelsRegistry()
 
-        indexes = model._meta.indexes
+        indexes = model.model_options.indexes
         if delete_field:
             indexes = [
                 index for index in indexes if delete_field.name not in index.fields
             ]
 
-        constraints = list(model._meta.constraints)
+        constraints = list(model.model_options.constraints)
 
         # Provide isolated instances of the fields to the new model body so
         # that the existing model's internals aren't interfered with when
@@ -291,34 +291,32 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # This wouldn't be required if the schema editor was operating on model
         # states instead of rendered models.
         meta_options = Options(
-            package_label=model._meta.package_label,
-            db_table=model._meta.db_table,
+            package_label=model.model_options.package_label,
+            db_table=model.model_options.db_table,
             indexes=indexes,
             constraints=constraints,
-            models_registry=models_registry,
         )
-        body_copy["_meta"] = meta_options
+        body_copy["model_options"] = meta_options
         body_copy["__module__"] = model.__module__
         temp_model: type[Model] = type(  # type: ignore[assignment]
-            model._meta.object_name, model.__bases__, body_copy
+            model.model_options.object_name, model.__bases__, body_copy
         )
-        models_registry.register_model(model._meta.package_label, temp_model)
+        models_registry.register_model(model.model_options.package_label, temp_model)
 
         # Construct a model with a renamed table name.
         body_copy = copy.deepcopy(body)
         meta_options = Options(
-            package_label=model._meta.package_label,
-            db_table=f"new__{strip_quotes(model._meta.db_table)}",
+            package_label=model.model_options.package_label,
+            db_table=f"new__{strip_quotes(model.model_options.db_table)}",
             indexes=indexes,
             constraints=constraints,
-            models_registry=models_registry,
         )
-        body_copy["_meta"] = meta_options
+        body_copy["model_options"] = meta_options
         body_copy["__module__"] = model.__module__
         new_model: type[Model] = type(  # type: ignore[assignment]
-            f"New{model._meta.object_name}", model.__bases__, body_copy
+            f"New{model.model_options.object_name}", model.__bases__, body_copy
         )
-        models_registry.register_model(model._meta.package_label, new_model)
+        models_registry.register_model(model.model_options.package_label, new_model)
 
         # Create a new table with the updated schema.
         self.create_model(new_model)
@@ -326,10 +324,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Copy data from the old table into the new table
         self.execute(
             "INSERT INTO {} ({}) SELECT {} FROM {}".format(
-                self.quote_name(new_model._meta.db_table),
+                self.quote_name(new_model.model_options.db_table),
                 ", ".join(self.quote_name(x) for x in mapping),
                 ", ".join(mapping.values()),
-                self.quote_name(model._meta.db_table),
+                self.quote_name(model.model_options.db_table),
             )
         )
 
@@ -339,8 +337,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Rename the new table to take way for the old
         self.alter_db_table(
             new_model,  # type: ignore[arg-type]
-            new_model._meta.db_table,
-            model._meta.db_table,
+            new_model.model_options.db_table,
+            model.model_options.db_table,
             disable_constraints=False,
         )
 
@@ -360,13 +358,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             self.execute(
                 self.sql_delete_table
                 % {
-                    "table": self.quote_name(model._meta.db_table),
+                    "table": self.quote_name(model.model_options.db_table),
                 }
             )
             # Remove all deferred statements referencing the deleted table.
             for sql in list(self.deferred_sql):
                 if isinstance(sql, Statement) and sql.references_table(
-                    model._meta.db_table
+                    model.model_options.db_table
                 ):
                     self.deferred_sql.remove(sql)
 
@@ -439,7 +437,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         ):
             return self.execute(
                 self._rename_field_sql(
-                    model._meta.db_table, old_field, new_field, new_type
+                    model.model_options.db_table, old_field, new_field, new_type
                 )
             )
         # Alter by remaking table
@@ -451,8 +449,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             old_type != new_type or old_collation != new_collation
         ):
             related_models = set()
-            opts = new_field.model._meta
-            for remote_field in opts.related_objects:
+            meta = new_field.model._model_meta
+            for remote_field in meta.related_objects:
                 # Ignore self-relationship since the table was already rebuilt.
                 if remote_field.related_model == model:
                     continue
@@ -460,7 +458,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     if remote_field.field_name == new_field.name:
                         related_models.add(remote_field.related_model)
             if new_field.primary_key:
-                for many_to_many in opts.many_to_many:
+                for many_to_many in meta.many_to_many:
                     # Ignore self-relationship since the table was already rebuilt.
                     if many_to_many.related_model == model:
                         continue
@@ -479,7 +477,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         old_rel: ManyToManyRel = old_field.remote_field  # type: ignore[assignment]
         new_rel: ManyToManyRel = new_field.remote_field  # type: ignore[assignment]
 
-        if old_rel.through._meta.db_table == new_rel.through._meta.db_table:
+        if (
+            old_rel.through.model_options.db_table
+            == new_rel.through.model_options.db_table
+        ):
             # The field name didn't change, but some options did, so we have to
             # propagate this altering.
             self._remake_table(
@@ -489,10 +490,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         # The field that points to the target model is needed,
                         # so that table can be remade with the new m2m field -
                         # this is m2m_reverse_field_name().
-                        old_rel.through._meta.get_field(
+                        old_rel.through._model_meta.get_field(
                             old_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
                         ),
-                        new_rel.through._meta.get_field(
+                        new_rel.through._model_meta.get_field(
                             new_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
                         ),
                     ),
@@ -500,10 +501,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         # The field that points to the model itself is needed,
                         # so that table can be remade with the new self field -
                         # this is m2m_field_name().
-                        old_rel.through._meta.get_field(
+                        old_rel.through._model_meta.get_field(
                             old_field.m2m_field_name()  # type: ignore[attr-defined]
                         ),
-                        new_rel.through._meta.get_field(
+                        new_rel.through._model_meta.get_field(
                             new_field.m2m_field_name()  # type: ignore[attr-defined]
                         ),
                     ),
@@ -516,7 +517,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Copy the data across
         self.execute(
             "INSERT INTO {} ({}) SELECT {} FROM {}".format(
-                self.quote_name(new_rel.through._meta.db_table),
+                self.quote_name(new_rel.through.model_options.db_table),
                 ", ".join(
                     [
                         "id",
@@ -531,7 +532,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         old_field.m2m_reverse_name(),  # type: ignore[attr-defined]
                     ]
                 ),
-                self.quote_name(old_rel.through._meta.db_table),
+                self.quote_name(old_rel.through.model_options.db_table),
             )
         )
         # Delete the old through table

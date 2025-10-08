@@ -66,7 +66,7 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler, SQLCompiler):
         if self.query.order_by:
             order_by_sql = []
             order_by_params = []
-            db_table = self.query.get_meta().db_table
+            db_table = self.query.get_model_meta().db_table
             try:
                 for resolved, (sql, params, _) in self.get_order_by():
                     if (

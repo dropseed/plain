@@ -63,7 +63,7 @@ class Trace(models.Model):
         spans: BaseRelatedManager
         logs: BaseRelatedManager
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-start_time"],
         constraints=[
             models.UniqueConstraint(
@@ -332,7 +332,7 @@ class Span(models.Model):
 
     query = SpanQuerySet()
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-start_time"],
         constraints=[
             models.UniqueConstraint(
@@ -516,7 +516,7 @@ class Log(models.Model):
     level = models.CharField(max_length=20)
     message = models.TextField()
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["timestamp"],
         indexes=[
             models.Index(fields=["trace", "timestamp"]),

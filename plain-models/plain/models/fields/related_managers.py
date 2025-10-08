@@ -165,7 +165,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
         def check_and_update_obj(obj: Any) -> None:
             if not isinstance(obj, self.model):
                 raise TypeError(
-                    f"'{self.model._meta.object_name}' instance expected, got {obj!r}"
+                    f"'{self.model.model_options.object_name}' instance expected, got {obj!r}"
                 )
             setattr(obj, self.field.name, self.instance)
 
@@ -179,7 +179,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
                         "the object first."
                     )
                 ids.append(obj.id)
-            self.model._meta.base_queryset.filter(id__in=ids).update(
+            self.model._model_meta.base_queryset.filter(id__in=ids).update(
                 **{
                     self.field.name: self.instance,
                 }
@@ -220,7 +220,7 @@ class ReverseManyToOneManager(BaseRelatedManager):
         for obj in objs:
             if not isinstance(obj, self.model):
                 raise TypeError(
-                    f"'{self.model._meta.object_name}' instance expected, got {obj!r}"
+                    f"'{self.model.model_options.object_name}' instance expected, got {obj!r}"
                 )
             # Is obj actually part of this descriptor set?
             if self.field.get_local_related_value(obj) == val:
@@ -295,8 +295,8 @@ class BaseManyToManyManager(BaseRelatedManager):
         self.instance = instance
         self.through = rel.through
 
-        self.source_field = self.through._meta.get_field(self.source_field_name)
-        self.target_field = self.through._meta.get_field(self.target_field_name)
+        self.source_field = self.through._model_meta.get_field(self.source_field_name)
+        self.target_field = self.through._model_meta.get_field(self.target_field_name)
 
         self.core_filters = {}
         self.id_field_names = {}
@@ -348,8 +348,8 @@ class BaseManyToManyManager(BaseRelatedManager):
 
         # M2M: need to annotate the query in order to get the primary model
         # that the secondary model was actually related to.
-        fk = self.through._meta.get_field(self.source_field_name)
-        join_table = fk.model._meta.db_table
+        fk = self.through._model_meta.get_field(self.source_field_name)
+        join_table = fk.model.model_options.db_table
         qn = db_connection.ops.quote_name
         queryset = queryset.extra(
             select={
@@ -447,7 +447,7 @@ class BaseManyToManyManager(BaseRelatedManager):
         from plain.models import Model
 
         target_ids = set()
-        target_field = self.through._meta.get_field(target_field_name)
+        target_field = self.through._model_meta.get_field(target_field_name)
         for obj in objs:
             if isinstance(obj, self.model):
                 target_id = target_field.get_foreign_related_value(obj)[0]
@@ -458,7 +458,7 @@ class BaseManyToManyManager(BaseRelatedManager):
                 target_ids.add(target_id)
             elif isinstance(obj, Model):
                 raise TypeError(
-                    f"'{self.model._meta.object_name}' instance expected, got {obj!r}"
+                    f"'{self.model.model_options.object_name}' instance expected, got {obj!r}"
                 )
             else:
                 target_ids.add(target_field.get_prep_value(obj))

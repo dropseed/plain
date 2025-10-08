@@ -6,7 +6,7 @@ class Car(models.Model):
     make = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
 
-    _meta = models.Options(
+    model_options = models.Options(
         constraints=[
             models.UniqueConstraint(fields=["make", "model"], name="unique_make_model"),
         ]
@@ -115,6 +115,6 @@ class MixinTestModel(TimestampMixin, models.Model):
 
     name = models.CharField(max_length=100)
 
-    _meta = models.Options(
+    model_options = models.Options(
         ordering=["-created_at"],
     )

@@ -52,7 +52,7 @@ from plain.utils.tree import Node
 if TYPE_CHECKING:
     from plain.models import Model
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.options import OptionsInstance
+    from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -67,12 +67,12 @@ FORBIDDEN_ALIAS_PATTERN = _lazy_re_compile(r"['`\"\]\[;\s]|--|/\*|\*/")
 EXPLAIN_OPTIONS_PATTERN = _lazy_re_compile(r"[\w\-]+")
 
 
-def get_field_names_from_opts(opts: OptionsInstance | None) -> set[str]:
-    if opts is None:
+def get_field_names_from_opts(meta: Meta | None) -> set[str]:
+    if meta is None:
         return set()
     return set(
         chain.from_iterable(
-            (f.name, f.attname) if f.concrete else (f.name,) for f in opts.get_fields()
+            (f.name, f.attname) if f.concrete else (f.name,) for f in meta.get_fields()
         )
     )
 
@@ -87,7 +87,7 @@ def get_children_from_q(q: Q) -> TypingIterator[tuple[str, Any]]:
 
 JoinInfo = namedtuple(
     "JoinInfo",
-    ("final_field", "targets", "opts", "joins", "path", "transform_function"),
+    ("final_field", "targets", "meta", "joins", "path", "transform_function"),
 )
 
 
@@ -115,7 +115,10 @@ class RawQuery:
         if self.cursor is None:
             self._execute_query()
         converter = db_connection.introspection.identifier_converter
-        return [converter(column_meta[0]) for column_meta in self.cursor.description]
+        return [
+            converter(column_model_meta[0])
+            for column_model_meta in self.cursor.description
+        ]
 
     def __iter__(self) -> TypingIterator[Any]:
         # Always execute a new query for a new iterator.
@@ -307,13 +310,13 @@ class Query(BaseExpression):
             self, db_connection, elide_empty
         )
 
-    def get_meta(self) -> OptionsInstance:
+    def get_model_meta(self) -> Meta:
         """
-        Return the Options instance (the model._meta) from which to start
-        processing. Normally, this is self.model._meta, but it can be changed
+        Return the Meta instance (the model._model_meta) from which to start
+        processing. Normally, this is self.model._model_meta, but it can be changed
         by subclasses.
         """
-        return self.model._meta
+        return self.model._model_meta
 
     def clone(self) -> Query:
         """
@@ -448,7 +451,7 @@ class Query(BaseExpression):
                 # used.
                 if inner_query.default_cols and has_existing_aggregation:
                     inner_query.group_by = (
-                        self.model._meta.get_field("id").get_col(
+                        self.model._model_meta.get_field("id").get_col(
                             inner_query.get_initial_alias()
                         ),
                     )
@@ -492,7 +495,7 @@ class Query(BaseExpression):
                 # field selected in the inner query, yet we must use a subquery.
                 # So, make sure at least one field is selected.
                 inner_query.select = (
-                    self.model._meta.get_field("id").get_col(
+                    self.model._model_meta.get_field("id").get_col(
                         inner_query.get_initial_alias()
                     ),
                 )
@@ -551,7 +554,7 @@ class Query(BaseExpression):
         if not (q.distinct and q.is_sliced):
             if q.group_by is True:
                 q.add_fields(
-                    (f.attname for f in self.model._meta.concrete_fields), False
+                    (f.attname for f in self.model._model_meta.concrete_fields), False
                 )
                 # Disable GROUP BY aliases to avoid orphaning references to the
                 # SELECT clause which is about to be cleared.
@@ -702,18 +705,18 @@ class Query(BaseExpression):
 
     def _get_defer_select_mask(
         self,
-        opts: OptionsInstance,
+        meta: Meta,
         mask: dict[str, Any],
         select_mask: dict[Any, Any] | None = None,
     ) -> dict[Any, Any]:
         if select_mask is None:
             select_mask = {}
-        select_mask[opts.get_field("id")] = {}
+        select_mask[meta.get_field("id")] = {}
         # All concrete fields that are not part of the defer mask must be
         # loaded. If a relational field is encountered it gets added to the
         # mask for it be considered if `select_related` and the cycle continues
         # by recursively calling this function.
-        for field in opts.concrete_fields:
+        for field in meta.concrete_fields:
             field_mask = mask.pop(field.name, None)
             if field_mask is None:
                 select_mask.setdefault(field, {})
@@ -723,44 +726,44 @@ class Query(BaseExpression):
                 field_select_mask = select_mask.setdefault(field, {})
                 related_model = field.remote_field.model
                 self._get_defer_select_mask(
-                    related_model._meta, field_mask, field_select_mask
+                    related_model._model_meta, field_mask, field_select_mask
                 )
         # Remaining defer entries must be references to reverse relationships.
         # The following code is expected to raise FieldError if it encounters
         # a malformed defer entry.
         for field_name, field_mask in mask.items():
             if filtered_relation := self._filtered_relations.get(field_name):
-                relation = opts.get_field(filtered_relation.relation_name)
+                relation = meta.get_field(filtered_relation.relation_name)
                 field_select_mask = select_mask.setdefault((field_name, relation), {})
                 field = relation.field
             else:
-                field = opts.get_field(field_name).field
+                field = meta.get_field(field_name).field
                 field_select_mask = select_mask.setdefault(field, {})
             related_model = field.model
             self._get_defer_select_mask(
-                related_model._meta, field_mask, field_select_mask
+                related_model._model_meta, field_mask, field_select_mask
             )
         return select_mask
 
     def _get_only_select_mask(
         self,
-        opts: OptionsInstance,
+        meta: Meta,
         mask: dict[str, Any],
         select_mask: dict[Any, Any] | None = None,
     ) -> dict[Any, Any]:
         if select_mask is None:
             select_mask = {}
-        select_mask[opts.get_field("id")] = {}
+        select_mask[meta.get_field("id")] = {}
         # Only include fields mentioned in the mask.
         for field_name, field_mask in mask.items():
-            field = opts.get_field(field_name)
+            field = meta.get_field(field_name)
             field_select_mask = select_mask.setdefault(field, {})
             if field_mask:
                 if not field.is_relation:
                     raise FieldError(next(iter(field_mask)))
                 related_model = field.remote_field.model
                 self._get_only_select_mask(
-                    related_model._meta, field_mask, field_select_mask
+                    related_model._model_meta, field_mask, field_select_mask
                 )
         return select_mask
 
@@ -781,10 +784,10 @@ class Query(BaseExpression):
             part_mask = mask
             for part in field_name.split(LOOKUP_SEP):
                 part_mask = part_mask.setdefault(part, {})
-        opts = self.get_meta()
+        meta = self.get_model_meta()
         if defer:
-            return self._get_defer_select_mask(opts, mask)
-        return self._get_only_select_mask(opts, mask)
+            return self._get_defer_select_mask(meta, mask)
+        return self._get_only_select_mask(meta, mask)
 
     def table_alias(
         self, table_name: str, create: bool = False, filtered_relation: Any = None
@@ -999,7 +1002,9 @@ class Query(BaseExpression):
             alias = self.base_table
             self.ref_alias(alias)
         elif self.model:
-            alias = self.join(self.base_table_class(self.get_meta().db_table, None))
+            alias = self.join(
+                self.base_table_class(self.model.model_options.db_table, None)
+            )
         else:
             alias = None
         return alias
@@ -1109,7 +1114,7 @@ class Query(BaseExpression):
         for alias, table in query.alias_map.items():
             clone.external_aliases[alias] = (
                 isinstance(table, Join)
-                and table.join_field.related_model._meta.db_table != alias
+                and table.join_field.related_model.model_options.db_table != alias
             ) or (
                 isinstance(table, BaseTable) and table.table_name != table.table_alias
             )
@@ -1190,50 +1195,48 @@ class Query(BaseExpression):
                 if summarize:
                     expression = Ref(annotation, expression)
                 return expression_lookups, (), expression
-        _, field, _, lookup_parts = self.names_to_path(lookup_splitted, self.get_meta())
+        _, field, _, lookup_parts = self.names_to_path(
+            lookup_splitted, self.get_model_meta()
+        )
         field_parts = lookup_splitted[0 : len(lookup_splitted) - len(lookup_parts)]
         if len(lookup_parts) > 1 and not field_parts:
             raise FieldError(
-                f'Invalid lookup "{lookup}" for model {self.get_meta().model.__name__}".'
+                f'Invalid lookup "{lookup}" for model {self.get_model_meta().model.__name__}".'
             )
         return lookup_parts, field_parts, False  # type: ignore[return-value]
 
-    def check_query_object_type(
-        self, value: Any, opts: OptionsInstance, field: Field
-    ) -> None:
+    def check_query_object_type(self, value: Any, meta: Meta, field: Field) -> None:
         """
         Check whether the object passed while querying is of the correct type.
         If not, raise a ValueError specifying the wrong object.
         """
-        if hasattr(value, "_meta"):
-            if not check_rel_lookup_compatibility(value._meta.model, opts, field):
+        if hasattr(value, "_model_meta"):
+            if not check_rel_lookup_compatibility(value._model_meta.model, meta, field):
                 raise ValueError(
-                    f'Cannot query "{value}": Must be "{opts.object_name}" instance.'
+                    f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
                 )
 
-    def check_related_objects(
-        self, field: Field, value: Any, opts: OptionsInstance
-    ) -> None:
+    def check_related_objects(self, field: Field, value: Any, meta: Meta) -> None:
         """Check the type of object passed to query relations."""
         if field.is_relation:
             # Check that the field and the queryset use the same model in a
             # query like .filter(author=Author.query.all()). For example, the
-            # opts would be Author's (from the author field) and value.model
+            # meta would be Author's (from the author field) and value.model
             # would be Author.query.all() queryset's .model (Author also).
             # The field is the related field on the lhs side.
             if (
                 isinstance(value, Query)
                 and not value.has_select_fields
-                and not check_rel_lookup_compatibility(value.model, opts, field)
+                and not check_rel_lookup_compatibility(value.model, meta, field)
             ):
                 raise ValueError(
-                    f'Cannot use QuerySet for "{value.model._meta.object_name}": Use a QuerySet for "{opts.object_name}".'
+                    f'Cannot use QuerySet for "{value.model.model_options.object_name}": Use a QuerySet for "{meta.model.model_options.object_name}".'
                 )
-            elif hasattr(value, "_meta"):
-                self.check_query_object_type(value, opts, field)
+            elif hasattr(value, "_model_meta"):
+                self.check_query_object_type(value, meta, field)
             elif hasattr(value, "__iter__"):
                 for v in value:
-                    self.check_query_object_type(v, opts, field)
+                    self.check_query_object_type(v, meta, field)
 
     def check_filterable(self, expression: Any) -> None:
         """Raise an error if expression cannot be used in a WHERE clause."""
@@ -1394,14 +1397,14 @@ class Query(BaseExpression):
             condition = self.build_lookup(lookups, reffed_expression, value)
             return WhereNode([condition], connector=AND), []  # type: ignore[return-value]
 
-        opts = self.get_meta()
+        meta = self.get_model_meta()
         alias = self.get_initial_alias()
         allow_many = not branch_negated or not split_subq
 
         try:
             join_info = self.setup_joins(
                 parts,
-                opts,
+                meta,
                 alias,
                 can_reuse=can_reuse,
                 allow_many=allow_many,
@@ -1411,7 +1414,7 @@ class Query(BaseExpression):
             # Prevent iterator from being consumed by check_related_objects()
             if isinstance(value, Iterator):
                 value = list(value)
-            self.check_related_objects(join_info.final_field, value, join_info.opts)
+            self.check_related_objects(join_info.final_field, value, join_info.meta)
 
             # split_exclude() needs to know which joins were generated for the
             # lookup parts
@@ -1605,7 +1608,7 @@ class Query(BaseExpression):
     def names_to_path(
         self,
         names: list[str],
-        opts: OptionsInstance,
+        meta: Meta,
         allow_many: bool = True,
         fail_on_missing: bool = False,
     ) -> tuple[list[Any], Field, tuple[Field, ...], list[str]]:
@@ -1613,7 +1616,7 @@ class Query(BaseExpression):
         Walk the list of names and turns them into PathInfo tuples. A single
         name in 'names' can generate multiple PathInfos (m2m, for example).
 
-        'names' is the path of names to travel, 'opts' is the model Options we
+        'names' is the path of names to travel, 'meta' is the Meta we
         start the name resolving from, 'allow_many' is as for setup_joins().
         If fail_on_missing is set to True, then a name that can't be resolved
         will generate a FieldError.
@@ -1630,9 +1633,9 @@ class Query(BaseExpression):
             field = None
             filtered_relation = None
             try:
-                if opts is None:
+                if meta is None:
                     raise FieldDoesNotExist
-                field = opts.get_field(name)
+                field = meta.get_field(name)
             except FieldDoesNotExist:
                 if name in self.annotation_select:
                     field = self.annotation_select[name].output_field
@@ -1642,13 +1645,13 @@ class Query(BaseExpression):
                         parts = filtered_relation.relation_name.split(LOOKUP_SEP)
                         filtered_relation_path, field, _, _ = self.names_to_path(
                             parts,
-                            opts,
+                            meta,
                             allow_many,
                             fail_on_missing,
                         )
                         path.extend(filtered_relation_path[:-1])
                     else:
-                        field = opts.get_field(filtered_relation.relation_name)  # type: ignore[attr-defined]
+                        field = meta.get_field(filtered_relation.relation_name)  # type: ignore[attr-defined]
             if field is not None:
                 # Fields that contain one-to-many relations with a generic
                 # model (like a GenericForeignKey) cannot generate reverse
@@ -1667,7 +1670,7 @@ class Query(BaseExpression):
                 if pos == -1 or fail_on_missing:
                     available = sorted(
                         [
-                            *get_field_names_from_opts(opts),
+                            *get_field_names_from_opts(meta),
                             *self.annotation_select,
                             *self._filtered_relations,
                         ]
@@ -1692,7 +1695,7 @@ class Query(BaseExpression):
                 last = pathinfos[-1]
                 path.extend(pathinfos)
                 final_field = last.join_field
-                opts = last.to_opts
+                meta = last.to_meta
                 targets = last.target_fields
                 cur_names_with_path[1].extend(pathinfos)
                 names_with_path.append(cur_names_with_path)
@@ -1711,7 +1714,7 @@ class Query(BaseExpression):
     def setup_joins(
         self,
         names: list[str],
-        opts: OptionsInstance,
+        meta: Meta,
         alias: str,
         can_reuse: set[str] | None = None,
         allow_many: bool = True,
@@ -1719,7 +1722,7 @@ class Query(BaseExpression):
     ) -> JoinInfo:
         """
         Compute the necessary table joins for the passage through the fields
-        given in 'names'. 'opts' is the Options class for the current model
+        given in 'names'. 'meta' is the Meta for the current model
         (which gives the table we are starting from), 'alias' is the alias for
         the table to start the joining from.
 
@@ -1765,7 +1768,7 @@ class Query(BaseExpression):
             try:
                 path, final_field, targets, rest = self.names_to_path(
                     names[:pivot],
-                    opts,
+                    meta,
                     allow_many,
                     fail_on_missing=True,
                 )
@@ -1810,13 +1813,13 @@ class Query(BaseExpression):
             else:
                 filtered_relation = None
                 table_alias = None
-            opts = join.to_opts
+            meta = join.to_meta
             if join.direct:
                 nullable = self.is_nullable(join.join_field)
             else:
                 nullable = True
             connection = self.join_class(
-                opts.db_table,
+                meta.model.model_options.db_table,
                 alias,
                 table_alias,
                 INNER,
@@ -1833,7 +1836,7 @@ class Query(BaseExpression):
             joins.append(alias)
             if filtered_relation:
                 filtered_relation.path = joins[:]
-        return JoinInfo(final_field, targets, opts, joins, path, final_transformer)
+        return JoinInfo(final_field, targets, meta, joins, path, final_transformer)
 
     def trim_joins(
         self, targets: tuple[Field, ...], joins: list[str], path: list[Any]
@@ -1932,7 +1935,10 @@ class Query(BaseExpression):
                     annotation = self.try_transform(annotation, transform)
                 return annotation
             join_info = self.setup_joins(
-                field_list, self.get_meta(), self.get_initial_alias(), can_reuse=reuse
+                field_list,
+                self.get_model_meta(),
+                self.get_initial_alias(),
+                can_reuse=reuse,
             )
             targets, final_alias, join_list = self.trim_joins(
                 join_info.targets, join_info.joins, join_info.path
@@ -1994,7 +2000,7 @@ class Query(BaseExpression):
         select_field = col.target
         alias = col.alias
         if alias in can_reuse:
-            id_field = select_field.model._meta.get_field("id")
+            id_field = select_field.model._model_meta.get_field("id")
             # Need to add a restriction so that outer query's filters are in effect for
             # the subquery, too.
             query.bump_prefix(self)
@@ -2118,7 +2124,7 @@ class Query(BaseExpression):
         the order specified.
         """
         alias = self.get_initial_alias()
-        opts = self.get_meta()
+        meta = self.get_model_meta()
 
         try:
             cols = []
@@ -2126,7 +2132,7 @@ class Query(BaseExpression):
                 # Join promotion note - we must not remove any rows here, so
                 # if there is no existing joins, use outer join.
                 join_info = self.setup_joins(
-                    name.split(LOOKUP_SEP), opts, alias, allow_many=allow_m2m
+                    name.split(LOOKUP_SEP), meta, alias, allow_many=allow_m2m
                 )
                 targets, final_alias, joins = self.trim_joins(
                     join_info.targets,
@@ -2151,7 +2157,7 @@ class Query(BaseExpression):
             else:
                 names = sorted(
                     [
-                        *get_field_names_from_opts(opts),
+                        *get_field_names_from_opts(meta),
                         *self.extra,
                         *self.annotation_select,
                         *self._filtered_relations,
@@ -2184,7 +2190,7 @@ class Query(BaseExpression):
                     continue
                 # names_to_path() validates the lookup. A descriptive
                 # FieldError will be raise if it's not.
-                self.names_to_path(item.split(LOOKUP_SEP), self.model._meta)
+                self.names_to_path(item.split(LOOKUP_SEP), self.model._model_meta)
             elif not hasattr(item, "resolve_expression"):
                 errors.append(item)
             if getattr(item, "contains_aggregate", False):
@@ -2407,13 +2413,13 @@ class Query(BaseExpression):
             self.set_annotation_mask(annotation_names)
             selected = frozenset(field_names + extra_names + annotation_names)
         else:
-            field_names = [f.attname for f in self.model._meta.concrete_fields]
+            field_names = [f.attname for f in self.model._model_meta.concrete_fields]
             selected = frozenset(field_names)
         # Selected annotations must be known before setting the GROUP BY
         # clause.
         if self.group_by is True:
             self.add_fields(
-                (f.attname for f in self.model._meta.concrete_fields), False
+                (f.attname for f in self.model._model_meta.concrete_fields), False
             )
             # Disable GROUP BY aliases to avoid orphaning references to the
             # SELECT clause which is about to be cleared.

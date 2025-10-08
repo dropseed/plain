@@ -107,7 +107,7 @@ class ModelsRegistry:
         # Since this method is called when models are imported, it cannot
         # perform imports because of the risk of import loops. It mustn't
         # call get_package_config().
-        model_name = model._meta.model_name
+        model_name = model.model_options.model_name
         app_models = self.all_models[package_label]
         if model_name in app_models:
             if (
@@ -156,7 +156,7 @@ class ModelsRegistry:
             # This particularly prevents that an empty value is cached while cloning.
             for package_models in self.all_models.values():
                 for model in package_models.values():
-                    model._meta._expire_cache()
+                    model._model_meta._expire_cache()
 
     def lazy_model_operation(
         self, function: Callable[..., None], *model_keys: tuple[str, str]
@@ -205,7 +205,7 @@ class ModelsRegistry:
         Take a newly-prepared model and pass it to each function waiting for
         it. This is called at the very end of Models.register_model().
         """
-        key = model._meta.package_label, model._meta.model_name
+        key = model.model_options.package_label, model.model_options.model_name
         for function in self._pending_operations.pop(key, []):
             function(model)
 
@@ -215,8 +215,8 @@ models_registry = ModelsRegistry()
 
 # Decorator to register a model (using the internal registry for the correct state).
 def register_model(model_class: M) -> M:
-    model_class._meta.models_registry.register_model(
-        model_class._meta.package_label,
+    model_class._model_meta.models_registry.register_model(
+        model_class.model_options.package_label,
         model_class,  # type: ignore[arg-type]
     )
     return model_class

@@ -10,6 +10,7 @@ from plain import models
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
+from plain.models.meta import Meta
 from plain.models.migrations.utils import field_is_referenced, get_references
 from plain.models.registry import ModelsRegistry
 from plain.models.registry import models_registry as global_models
@@ -31,7 +32,7 @@ def _get_package_label_and_model_name(
         split = model.split(".", 1)
         return tuple(split) if len(split) == 2 else (package_label, split[0])  # type: ignore[return-value]
     else:
-        return model._meta.package_label, model._meta.model_name
+        return model.model_options.package_label, model.model_options.model_name
 
 
 def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
@@ -42,7 +43,7 @@ def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
         if issubclass(subclass, models.Model)
     ]
     related_fields_models = set()
-    for f in m._meta.get_fields(include_hidden=True):
+    for f in m._model_meta.get_fields(include_hidden=True):
         if (
             f.is_relation  # type: ignore[attr-defined]
             and f.related_model is not None  # type: ignore[attr-defined]
@@ -59,7 +60,7 @@ def get_related_models_tuples(model: type[models.Model]) -> set[tuple[str, str]]
     models for the given model.
     """
     return {
-        (rel_mod._meta.package_label, rel_mod._meta.model_name)
+        (rel_mod.model_options.package_label, rel_mod.model_options.model_name)
         for rel_mod in _get_related_models(model)
     }
 
@@ -77,14 +78,14 @@ def get_related_models_recursive(model: type[models.Model]) -> set[tuple[str, st
     queue = _get_related_models(model)
     for rel_mod in queue:
         rel_package_label, rel_model_name = (
-            rel_mod._meta.package_label,
-            rel_mod._meta.model_name,
+            rel_mod.model_options.package_label,
+            rel_mod.model_options.model_name,
         )
         if (rel_package_label, rel_model_name) in seen:
             continue
         seen.add((rel_package_label, rel_model_name))
         queue.extend(_get_related_models(rel_mod))
-    return seen - {(model._meta.package_label, model._meta.model_name)}
+    return seen - {(model.model_options.package_label, model.model_options.model_name)}
 
 
 class ProjectState:
@@ -361,7 +362,7 @@ class ProjectState:
             pass
         else:
             # Get all relations to and from the old model before reloading,
-            # as _meta.models_registry may change
+            # as _model_meta.models_registry may change
             if delay:
                 related_models = get_related_models_tuples(old_model)
             else:
@@ -644,7 +645,7 @@ class StateModelsRegistry(ModelsRegistry):
         return clone
 
     def register_model(self, package_label: str, model: type[models.Model]) -> None:
-        self.all_models[package_label][model._meta.model_name] = model
+        self.all_models[package_label][model.model_options.model_name] = model
         self.do_pending_operations(model)
         self.clear_cache()
 
@@ -688,12 +689,14 @@ class ModelState:
                     f'ModelState.fields cannot be bound to a model - "{name}" is.'
                 )
             # Sanity-check that relation fields are NOT referring to a model class.
-            if field.is_relation and hasattr(field.related_model, "_meta"):
+            if field.is_relation and hasattr(field.related_model, "_model_meta"):
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.to" does. '
                     "Use a string reference instead."
                 )
-            if field.many_to_many and hasattr(field.remote_field.through, "_meta"):
+            if field.many_to_many and hasattr(
+                field.remote_field.through, "_model_meta"
+            ):
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.through" '
                     "does. Use a string reference instead."
@@ -720,7 +723,7 @@ class ModelState:
         """Given a model, return a ModelState representing it."""
         # Deconstruct the fields
         fields = []
-        for field in model._meta.local_fields:
+        for field in model._model_meta.local_fields:
             if getattr(field, "remote_field", None) and exclude_rels:
                 continue
             name = field.name  # type: ignore[attr-defined]
@@ -728,16 +731,16 @@ class ModelState:
                 fields.append((name, field.clone()))  # type: ignore[attr-defined]
             except TypeError as e:
                 raise TypeError(
-                    f"Couldn't reconstruct field {name} on {model._meta.label}: {e}"
+                    f"Couldn't reconstruct field {name} on {model.model_options.label}: {e}"
                 )
         if not exclude_rels:
-            for field in model._meta.local_many_to_many:
+            for field in model._model_meta.local_many_to_many:
                 name = field.name  # type: ignore[attr-defined]
                 try:
                     fields.append((name, field.clone()))  # type: ignore[attr-defined]
                 except TypeError as e:
                     raise TypeError(
-                        f"Couldn't reconstruct m2m field {name} on {model._meta.object_name}: {e}"
+                        f"Couldn't reconstruct m2m field {name} on {model.model_options.object_name}: {e}"
                     )
 
         def flatten_bases(model: type[models.Model]) -> list[type[models.Model]]:
@@ -758,10 +761,10 @@ class ModelState:
         # Make our record
         bases = tuple(
             (
-                base._meta.label_lower
+                base.model_options.label_lower
                 if not isinstance(base, str)
                 and base is not models.Model
-                and hasattr(base, "_meta")
+                and hasattr(base, "_model_meta")
                 else base
             )
             for base in flattened_bases
@@ -774,10 +777,10 @@ class ModelState:
 
         # Construct the new ModelState
         return cls(
-            model._meta.package_label,
-            model._meta.object_name,
+            model.model_options.package_label,
+            model.model_options.object_name,
             fields,
-            model._meta.export_for_migrations(),
+            model.model_options.export_for_migrations(),
             bases,
         )
 
@@ -799,7 +802,6 @@ class ModelState:
         # Create Options instance with metadata
         meta_options = models.Options(
             package_label=self.package_label,
-            models_registry=models_registry,
             **self.options,
         )
         # Then, work out our bases
@@ -814,7 +816,10 @@ class ModelState:
             )
         # Clone fields for the body, add other bits.
         body = {name: field.clone() for name, field in self.fields.items()}  # type: ignore[attr-defined]
-        body["_meta"] = meta_options
+        body["model_options"] = meta_options
+        body["_model_meta"] = Meta(
+            models_registry=models_registry
+        )  # Use custom registry
         body["__module__"] = "__fake__"
 
         # Then, make a Model object (models_registry.register_model is called in __new__)
