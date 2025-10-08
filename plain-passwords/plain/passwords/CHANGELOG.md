@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-passwords@0.15.0) (2025-10-07)
+
+### What's changed
+
+- Updated internal model metadata access to use `_model_meta` instead of `_meta` ([73ba469](https://github.com/dropseed/plain/commit/73ba469ba0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-passwords@0.14.0) (2025-10-06)
 
 ### What's changed
