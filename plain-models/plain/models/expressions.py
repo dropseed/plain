@@ -28,7 +28,9 @@ if TYPE_CHECKING:
 
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.fields import Field
+    from plain.models.query import QuerySet
     from plain.models.sql.compiler import SQLCompiler
+    from plain.models.sql.query import Query
 
 
 class SQLiteNumericMixin:
@@ -1635,9 +1637,23 @@ class Subquery(BaseExpression, Combinable):
     contains_aggregate = False
     empty_result_set_value = None
 
-    def __init__(self, queryset: Any, output_field: Field | None = None, **extra: Any):
+    def __init__(
+        self,
+        query: QuerySet[Any] | Query,
+        output_field: Field | None = None,
+        **extra: Any,
+    ):
+        # Import here to avoid circular import
+        from plain.models.sql.query import Query
+
         # Allow the usage of both QuerySet and sql.Query objects.
-        self.query = getattr(queryset, "query", queryset).clone()
+        if isinstance(query, Query):
+            # It's already a Query object, use it directly
+            sql_query = query
+        else:
+            # It's a QuerySet, extract the sql.Query
+            sql_query = query.sql_query
+        self.query = sql_query.clone()
         self.query.subquery = True
         self.extra = extra
         super().__init__(output_field)
@@ -1688,8 +1704,8 @@ class Exists(Subquery):
     output_field = fields.BooleanField()
     empty_result_set_value = False
 
-    def __init__(self, queryset: Any, **kwargs: Any):
-        super().__init__(queryset, **kwargs)
+    def __init__(self, query: QuerySet[Any] | Query, **kwargs: Any):
+        super().__init__(query, **kwargs)
         self.query = self.query.exists()
 
     def select_format(
