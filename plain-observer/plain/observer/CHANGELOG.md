@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.11.1](https://github.com/dropseed/plain/releases/plain-observer@0.11.1) (2025-10-10)
+
+### What's changed
+
+- Trace list items now update the URL when clicked, allowing direct linking to specific traces ([9f29b68](https://github.com/dropseed/plain/commit/9f29b68a87))
+- Improved trace sidebar layout by moving the timestamp to the bottom right and creating better visual hierarchy ([9f29b68](https://github.com/dropseed/plain/commit/9f29b68a87))
+- Updated diagnose command prompt text to be less personal in tone ([c82d67b](https://github.com/dropseed/plain/commit/c82d67bfcf))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-observer@0.11.0) (2025-10-08)
 
 ### What's changed

@@ -711,7 +711,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.11.0"
+version = "0.11.1"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
@@ -755,7 +755,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.24.0"
+version = "0.24.1"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -817,7 +817,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-sessions"
-version = "0.33.0"
+version = "0.34.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
