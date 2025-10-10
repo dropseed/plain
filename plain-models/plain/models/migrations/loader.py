@@ -317,7 +317,9 @@ class MigrationLoader:
             raise
         self.graph.ensure_not_cyclic()
 
-    def check_consistent_history(self, connection: BaseDatabaseWrapper) -> None:
+    def check_consistent_history(
+        self, connection: BaseDatabaseWrapper | DatabaseConnection
+    ) -> None:
         """
         Raise InconsistentMigrationHistory if any applied migrations have
         unapplied dependencies.

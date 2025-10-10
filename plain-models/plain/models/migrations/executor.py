@@ -4,6 +4,8 @@ from collections.abc import Callable
 from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
+from plain.models.connections import DatabaseConnection
+
 from ..transaction import atomic
 from .loader import MigrationLoader
 from .migration import Migration
@@ -22,7 +24,7 @@ class MigrationExecutor:
 
     def __init__(
         self,
-        connection: BaseDatabaseWrapper,
+        connection: BaseDatabaseWrapper | DatabaseConnection,
         progress_callback: Callable[..., Any] | None = None,
     ) -> None:
         self.connection = connection
