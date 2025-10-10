@@ -1,6 +1,18 @@
-# plain-worker changelog
+# plain-jobs changelog
 
-## [0.32.0](https://github.com/dropseed/plain/releases/plain-worker@0.32.0) (2025-10-07)
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-jobs@0.33.0) (2025-10-10)
+
+### What's changed
+
+- Renamed package from `plain.worker` to `plain.jobs` ([24219856e0](https://github.com/dropseed/plain/commit/24219856e0))
+
+### Upgrade instructions
+
+- Update any imports from `plain.worker` to `plain.jobs` (e.g., `from plain.worker import Job` becomes `from plain.jobs import Job`)
+- Change worker commands from `plain worker run` to `plain jobs worker`
+- Check updated settings names
+
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-jobs@0.32.0) (2025-10-07)
 
 ### What's changed
 
@@ -13,7 +25,7 @@
 
 - No changes required
 
-## [0.31.1](https://github.com/dropseed/plain/releases/plain-worker@0.31.1) (2025-10-06)
+## [0.31.1](https://github.com/dropseed/plain/releases/plain-jobs@0.31.1) (2025-10-06)
 
 ### What's changed
 
@@ -23,7 +35,7 @@
 
 - No changes required
 
-## [0.31.0](https://github.com/dropseed/plain/releases/plain-worker@0.31.0) (2025-09-25)
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-jobs@0.31.0) (2025-09-25)
 
 ### What's changed
 
@@ -33,7 +45,7 @@
 
 - No changes required
 
-## [0.30.0](https://github.com/dropseed/plain/releases/plain-worker@0.30.0) (2025-09-19)
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-jobs@0.30.0) (2025-09-19)
 
 ### What's changed
 
@@ -47,7 +59,7 @@
 - If you have any custom code that directly references the `Job` model (different than the `Job` base class for job type definitions), update it to use `JobProcess` instead
 - If you have any code that accesses the `job_uuid` field on JobResult instances, update it to use `job_process_uuid`
 
-## [0.29.0](https://github.com/dropseed/plain/releases/plain-worker@0.29.0) (2025-09-12)
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-jobs@0.29.0) (2025-09-12)
 
 ### What's changed
 
@@ -59,7 +71,7 @@
 
 - Update all model queries to use `.query` instead of `.objects` (e.g., `Job.query.all()` becomes `Job.query.all()`)
 
-## [0.28.1](https://github.com/dropseed/plain/releases/plain-worker@0.28.1) (2025-09-10)
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-jobs@0.28.1) (2025-09-10)
 
 ### What's changed
 
@@ -69,7 +81,7 @@
 
 - No changes required
 
-## [0.28.0](https://github.com/dropseed/plain/releases/plain-worker@0.28.0) (2025-09-09)
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-jobs@0.28.0) (2025-09-09)
 
 ### What's changed
 
@@ -81,7 +93,7 @@
 
 - No changes required
 
-## [0.27.1](https://github.com/dropseed/plain/releases/plain-worker@0.27.1) (2025-08-27)
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-jobs@0.27.1) (2025-08-27)
 
 ### What's changed
 
@@ -91,7 +103,7 @@
 
 - No changes required
 
-## [0.27.0](https://github.com/dropseed/plain/releases/plain-worker@0.27.0) (2025-08-22)
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-jobs@0.27.0) (2025-08-22)
 
 ### What's changed
 
@@ -104,7 +116,7 @@
 
 - No changes required
 
-## [0.26.0](https://github.com/dropseed/plain/releases/plain-worker@0.26.0) (2025-08-19)
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-jobs@0.26.0) (2025-08-19)
 
 ### What's changed
 
@@ -116,7 +128,7 @@
 
 - No changes required
 
-## [0.25.1](https://github.com/dropseed/plain/releases/plain-worker@0.25.1) (2025-07-23)
+## [0.25.1](https://github.com/dropseed/plain/releases/plain-jobs@0.25.1) (2025-07-23)
 
 ### What's changed
 
@@ -127,7 +139,7 @@
 
 - No changes required
 
-## [0.25.0](https://github.com/dropseed/plain/releases/plain-worker@0.25.0) (2025-07-22)
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-jobs@0.25.0) (2025-07-22)
 
 ### What's changed
 
@@ -140,7 +152,7 @@
 
 - No changes required
 
-## [0.24.0](https://github.com/dropseed/plain/releases/plain-worker@0.24.0) (2025-07-18)
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-jobs@0.24.0) (2025-07-18)
 
 ### What's changed
 
@@ -153,7 +165,7 @@
 
 - Run `plain migrate` to apply new database migration that adds trace context fields to worker tables
 
-## [0.23.0](https://github.com/dropseed/plain/releases/plain-worker@0.23.0) (2025-07-18)
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-jobs@0.23.0) (2025-07-18)
 
 ### What's changed
 
@@ -163,7 +175,7 @@
 
 - Run `plain migrate --prune plainworker` to remove old migration records and apply the consolidated migration
 
-## [0.22.5](https://github.com/dropseed/plain/releases/plain-worker@0.22.5) (2025-06-24)
+## [0.22.5](https://github.com/dropseed/plain/releases/plain-jobs@0.22.5) (2025-06-24)
 
 ### What's changed
 
