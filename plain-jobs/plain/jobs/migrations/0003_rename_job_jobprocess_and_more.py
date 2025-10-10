@@ -6,7 +6,7 @@ from plain.models import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("plainworker", "0002_job_span_id_job_trace_id_jobrequest_span_id_and_more"),
+        ("plainjobs", "0002_job_span_id_job_trace_id_jobrequest_span_id_and_more"),
     ]
 
     operations = [
@@ -63,5 +63,18 @@ class Migration(migrations.Migration):
             index=models.Index(
                 fields=["job_process_uuid"], name="plainworker_job_pro_ceabfb_idx"
             ),
+        ),
+        # To fix subsequent migrations...
+        migrations.AlterModelTable(
+            name="JobRequest",
+            table="plainworker_jobrequest",
+        ),
+        migrations.AlterModelTable(
+            name="JobProcess",
+            table="plainworker_jobprocess",
+        ),
+        migrations.AlterModelTable(
+            name="JobResult",
+            table="plainworker_jobresult",
         ),
     ]

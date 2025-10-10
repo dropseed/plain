@@ -61,7 +61,7 @@ postgres = {cmd = "docker run --name app-postgres --rm -p 54321:5432 -v $(pwd)/.
 
 #### Custom processes
 
-Unlike [services](#services), custom processes are _only_ run during `plain dev`. This is a good place to run something like [ngrok](https://ngrok.com/) or a [Plain worker](../../../plain-worker), which you might need to use your local site, but don't need running for executing tests, for example.
+Unlike [services](#services), custom processes are _only_ run during `plain dev`. This is a good place to run something like [ngrok](https://ngrok.com/) or a [Plain job worker](../../../plain-jobs), which you might need to use your local site, but don't need running for executing tests, for example.
 
 ```toml
 # pyproject.toml

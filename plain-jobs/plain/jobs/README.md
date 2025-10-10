@@ -1,6 +1,6 @@
-# plain.worker
+# plain.jobs
 
-**Process background jobs with a database-driven worker.**
+**Process background jobs with a database-driven job queue.**
 
 - [Overview](#overview)
 - [Local development](#local-development)
@@ -18,7 +18,7 @@
 Jobs are defined using the [`Job`](./jobs.py#Job) base class and the `run()` method at a minimum.
 
 ```python
-from plain.worker import Job, register_job
+from plain.jobs import Job, register_job
 from plain.email import send_mail
 
 
@@ -43,7 +43,7 @@ user = User.query.get(id=1)
 WelcomeUserJob(user).run_in_worker()
 ```
 
-Workers are run using the `plain worker run` command.
+Workers are run using the `plain jobs worker` command.
 
 Jobs can be defined in any Python file, but it is suggested to use `app/jobs.py` or `app/{pkg}/jobs.py` as those will be imported automatically so the [`@register_job`](./registry.py#register_job) decorator will fire.
 
@@ -60,8 +60,8 @@ In development, you will typically want to run the worker alongside your app. Wi
 ```toml
 # pyproject.toml
 [tool.plain.dev.run]
-worker = {cmd = "watchfiles --filter python \"plain worker run --stats-every 0 --max-processes 2\" ."}
-worker-slow = {cmd = "watchfiles --filter python \"plain worker run --queue slow --stats-every 0 --max-processes 2\" ."}
+worker = {cmd = "watchfiles --filter python \"plain jobs worker --stats-every 0 --max-processes 2\" ."}
+worker-slow = {cmd = "watchfiles --filter python \"plain jobs worker --queue slow --stats-every 0 --max-processes 2\" ."}
 ```
 
 ## Job parameters
@@ -118,8 +118,8 @@ class MyJob(Job):
 You can schedule jobs to run at specific times using the [`Schedule`](./scheduling.py#Schedule) class:
 
 ```python
-from plain.worker import Job, register_job
-from plain.worker.scheduling import Schedule
+from plain.jobs import Job, register_job
+from plain.jobs.scheduling import Schedule
 
 @register_job
 class DailyReportJob(Job):
@@ -142,13 +142,13 @@ For custom schedules, see [`Schedule`](./scheduling.py#Schedule).
 
 ## Admin interface
 
-The worker package includes admin views for monitoring jobs. The admin interface provides:
+The jobs package includes admin views for monitoring jobs under the "Jobs" section. The admin interface provides:
 
-- **Job Requests**: View pending jobs in the queue
-- **Jobs**: Monitor currently running jobs
-- **Job Results**: Review completed and failed job history
+- **Requests**: View pending jobs in the queue
+- **Processes**: Monitor currently running jobs
+- **Results**: Review completed and failed job history
 
-Dashboard cards show at-a-glance statistics for successful and errored jobs.
+Dashboard cards show at-a-glance statistics for successful, errored, lost, and retried jobs.
 
 ## Job history
 
@@ -160,11 +160,18 @@ Job execution history is stored in the [`JobResult`](./models.py#JobResult) mode
 - Error messages and tracebacks for failed jobs
 - Worker information
 
-History retention can be configured in your settings:
+History retention is controlled by the `JOBS_RESULTS_RETENTION` setting (defaults to 7 days):
 
 ```python
 # app/settings.py
-WORKER_JOB_HISTORY_DAYS = 30
+JOBS_RESULTS_RETENTION = 60 * 60 * 24 * 30  # 30 days (in seconds)
+```
+
+Job timeout can be configured with `JOBS_TIMEOUT` (defaults to 1 day):
+
+```python
+# app/settings.py
+JOBS_TIMEOUT = 60 * 60 * 24  # 1 day (in seconds)
 ```
 
 ## Monitoring
@@ -173,7 +180,7 @@ Workers report statistics and can be monitored using the `--stats-every` option:
 
 ```bash
 # Report stats every 60 seconds
-plain worker run --stats-every 60
+plain jobs worker --stats-every 60
 ```
 
 The worker integrates with OpenTelemetry for distributed tracing. Spans are created for:
@@ -204,13 +211,13 @@ class ProcessUserDataJob(Job):
 Yes, you can run multiple worker processes:
 
 ```bash
-plain worker run --max-processes 4
+plain jobs worker --max-processes 4
 ```
 
 Or run workers for specific queues:
 
 ```bash
-plain worker run --queue slow --max-processes 2
+plain jobs worker --queue slow --max-processes 2
 ```
 
 #### How do I handle job failures?
@@ -229,10 +236,10 @@ class MyJob(Job):
 
 ## Installation
 
-Install the `plain.worker` package from [PyPI](https://pypi.org/project/plain.worker/):
+Install the `plain.jobs` package from [PyPI](https://pypi.org/project/plain.jobs/):
 
 ```bash
-uv add plain.worker
+uv add plain.jobs
 ```
 
 Add to your `INSTALLED_PACKAGES`:
@@ -241,6 +248,6 @@ Add to your `INSTALLED_PACKAGES`:
 # app/settings.py
 INSTALLED_PACKAGES = [
     ...
-    "plain.worker",
+    "plain.jobs",
 ]
 ```

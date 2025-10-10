@@ -15,6 +15,7 @@ dependencies = [
     "plain-esbuild",
     "plain-flags",
     "plain-htmx",
+    "plain-jobs",
     "plain-loginlink",
     "plain-email",
     "plain-models",
@@ -30,7 +31,6 @@ dependencies = [
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
-    "plain-worker",
     "plain-observer",
 ]
 

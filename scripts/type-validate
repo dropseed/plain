@@ -40,7 +40,7 @@ FULLY_TYPED_PATHS = [
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
-    "plain-worker",
+    "plain-jobs",
     "plain-models",
 ]
 

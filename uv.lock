@@ -17,6 +17,7 @@ members = [
     "plain-esbuild",
     "plain-flags",
     "plain-htmx",
+    "plain-jobs",
     "plain-loginlink",
     "plain-models",
     "plain-oauth",
@@ -32,7 +33,6 @@ members = [
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
-    "plain-worker",
     "plain-workspace",
 ]
 
@@ -482,6 +482,7 @@ dependencies = [
     { name = "plain-esbuild" },
     { name = "plain-flags" },
     { name = "plain-htmx" },
+    { name = "plain-jobs" },
     { name = "plain-loginlink" },
     { name = "plain-models" },
     { name = "plain-oauth" },
@@ -497,7 +498,6 @@ dependencies = [
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
-    { name = "plain-worker" },
 ]
 
 [package.metadata]
@@ -514,6 +514,7 @@ requires-dist = [
     { name = "plain-esbuild", editable = "plain-esbuild" },
     { name = "plain-flags", editable = "plain-flags" },
     { name = "plain-htmx", editable = "plain-htmx" },
+    { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-models", editable = "plain-models" },
     { name = "plain-oauth", editable = "plain-oauth" },
@@ -529,7 +530,6 @@ requires-dist = [
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
-    { name = "plain-worker", editable = "plain-worker" },
 ]
 
 [[package]]
@@ -643,6 +643,29 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
+[[package]]
+name = "plain-jobs"
+version = "0.32.0"
+source = { editable = "plain-jobs" }
+dependencies = [
+    { name = "plain" },
+    { name = "plain-models" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-models", editable = "plain-models" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-loginlink"
@@ -920,29 +943,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "plain-worker"
-version = "0.32.0"
-source = { editable = "plain-worker" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-models" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-models", editable = "plain-models" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0.0" }]
-
-[[package]]
 name = "plain-workspace"
 version = "0.0.0"
 source = { virtual = "." }
@@ -961,6 +961,7 @@ dev = [
     { name = "plain-esbuild" },
     { name = "plain-flags" },
     { name = "plain-htmx" },
+    { name = "plain-jobs" },
     { name = "plain-loginlink" },
     { name = "plain-models" },
     { name = "plain-oauth" },
@@ -976,7 +977,6 @@ dev = [
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
-    { name = "plain-worker" },
     { name = "ty" },
 ]
 
@@ -996,6 +996,7 @@ dev = [
     { name = "plain-esbuild", editable = "plain-esbuild" },
     { name = "plain-flags", editable = "plain-flags" },
     { name = "plain-htmx", editable = "plain-htmx" },
+    { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-models", editable = "plain-models" },
     { name = "plain-oauth", editable = "plain-oauth" },
@@ -1011,7 +1012,6 @@ dev = [
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
-    { name = "plain-worker", editable = "plain-worker" },
     { name = "ty", specifier = ">=0.0.1a21" },
 ]
 

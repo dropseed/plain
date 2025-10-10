@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from .models import JobProcess, JobRequest
 
 logger = logging.getLogger(__name__)
-tracer = trace.get_tracer("plain.worker")
+tracer = trace.get_tracer("plain.jobs")
 
 
 class JobType(type):
@@ -72,7 +72,7 @@ class Job(metaclass=JobType):
             f"run_in_worker {job_class_name}",
             kind=SpanKind.PRODUCER,
             attributes={
-                MESSAGING_SYSTEM: "plain.worker",
+                MESSAGING_SYSTEM: "plain.jobs",
                 MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.SEND.value,
                 MESSAGING_OPERATION_NAME: "run_in_worker",
                 MESSAGING_DESTINATION_NAME: queue,

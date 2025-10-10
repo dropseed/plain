@@ -39,7 +39,7 @@ def _td_format(td_object: timedelta) -> str:
 
 
 class SuccessfulJobsCard(Card):
-    title = "Successful Jobs"
+    title = "Successful"
     text = "View"
 
     def get_number(self) -> int:
@@ -50,7 +50,7 @@ class SuccessfulJobsCard(Card):
 
 
 class ErroredJobsCard(Card):
-    title = "Errored Jobs"
+    title = "Errored"
     text = "View"
 
     def get_number(self) -> int:
@@ -61,11 +61,11 @@ class ErroredJobsCard(Card):
 
 
 class LostJobsCard(Card):
-    title = "Lost Jobs"
+    title = "Lost"
     text = "View"  # TODO make not required - just an icon?
 
     def get_description(self) -> str:
-        delta = timedelta(seconds=settings.WORKER_JOBS_LOST_AFTER)
+        delta = timedelta(seconds=settings.JOBS_TIMEOUT)
         return f"Jobs are considered lost after {_td_format(delta)}"
 
     def get_number(self) -> int:
@@ -76,7 +76,7 @@ class LostJobsCard(Card):
 
 
 class RetriedJobsCard(Card):
-    title = "Retried Jobs"
+    title = "Retried"
     text = "View"  # TODO make not required - just an icon?
 
     def get_number(self) -> int:
@@ -87,14 +87,14 @@ class RetriedJobsCard(Card):
 
 
 class WaitingJobsCard(Card):
-    title = "Waiting Jobs"
+    title = "Waiting"
 
     def get_number(self) -> int:
         return JobProcess.query.waiting().count()
 
 
 class RunningJobsCard(Card):
-    title = "Running Jobs"
+    title = "Running"
 
     def get_number(self) -> int:
         return JobProcess.query.running().count()
@@ -103,10 +103,10 @@ class RunningJobsCard(Card):
 @register_viewset
 class JobRequestViewset(AdminViewset):
     class ListView(AdminModelListView):
-        nav_section = "Worker"
+        nav_section = "Jobs"
         nav_icon = "gear"
         model = JobRequest
-        title = "Job requests"
+        title = "Requests"
         fields = ["id", "job_class", "priority", "created_at", "start_at", "unique_key"]
         actions = ["Delete"]
 
@@ -116,16 +116,16 @@ class JobRequestViewset(AdminViewset):
 
     class DetailView(AdminModelDetailView):
         model = JobRequest
-        title = "Job Request"
+        title = "Request"
 
 
 @register_viewset
 class JobProcessViewset(AdminViewset):
     class ListView(AdminModelListView):
-        nav_section = "Worker"
+        nav_section = "Jobs"
         nav_icon = "gear"
         model = JobProcess
-        title = "Job processes"
+        title = "Processes"
         fields = [
             "id",
             "job_class",
@@ -146,15 +146,16 @@ class JobProcessViewset(AdminViewset):
 
     class DetailView(AdminModelDetailView):
         model = JobProcess
+        title = "Process"
 
 
 @register_viewset
 class JobResultViewset(AdminViewset):
     class ListView(AdminModelListView):
-        nav_section = "Worker"
+        nav_section = "Jobs"
         nav_icon = "gear"
         model = JobResult
-        title = "Job results"
+        title = "Results"
         fields = [
             "id",
             "job_class",
@@ -230,7 +231,7 @@ class JobResultViewset(AdminViewset):
 
     class DetailView(AdminModelDetailView):
         model = JobResult
-        title = "Job result"
+        title = "Result"
 
         def post(self) -> ResponseRedirect:
             self.object.retry_job(delay=0)

@@ -2,7 +2,7 @@ import datetime
 
 import pytest
 
-from plain.worker.scheduling import Schedule
+from plain.jobs.scheduling import Schedule
 
 
 def test_schedule():

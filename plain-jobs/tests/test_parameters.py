@@ -1,6 +1,6 @@
 import datetime
 
-from plain.worker.parameters import (
+from plain.jobs.parameters import (
     DateParameter,
     DateTimeParameter,
     JobParameters,

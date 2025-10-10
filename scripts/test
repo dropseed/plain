@@ -14,7 +14,7 @@ ALL_PACKAGES="$(cat <<EOF
 plain
 plain-models
 plain-sessions
-plain-worker
+plain-jobs
 plain-flags
 plain-admin
 plain-oauth

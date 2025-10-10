@@ -19,7 +19,7 @@ from plain.utils.module_loading import import_string
 from .models import JobProcess, JobRequest, JobResult, JobResultStatuses
 from .registry import jobs_registry
 
-logger = logging.getLogger("plain.worker")
+logger = logging.getLogger("plain.jobs")
 
 
 class Worker:
@@ -284,7 +284,7 @@ def process_job(job_process_uuid: str) -> None:
         def middleware_chain(job: JobProcess) -> JobResult:
             return job.run()
 
-        for middleware_path in reversed(settings.WORKER_MIDDLEWARE):
+        for middleware_path in reversed(settings.JOBS_MIDDLEWARE):
             middleware_class = import_string(middleware_path)
             middleware_instance = middleware_class(middleware_chain)
             middleware_chain = middleware_instance

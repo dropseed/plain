@@ -38,7 +38,7 @@ The `plain chores run` command will execute all registered chores. When and how 
 There are several ways you can run chores depending on your needs:
 
 - on deploy
-- as a [`plain.worker` scheduled job](/plain-worker/plain/worker/README.md#scheduled-jobs)
+- as a [`plain.jobs` scheduled job](/plain-jobs/plain/jobs/README.md#scheduled-jobs)
 - as a cron job (using any cron-like system where your app is hosted)
 - manually as needed
 

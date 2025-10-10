@@ -31,7 +31,7 @@ With the official Plain ecosystem packages you can:
 - Style with [Tailwind CSS](https://plainframework.com/docs/plain-tailwind/plain/tailwind/README.md)
 - Add [OAuth login](https://plainframework.com/docs/plain-oauth/plain/oauth/README.md) and API access
 - Run tests with [pytest](https://plainframework.com/docs/plain-pytest/plain/pytest/README.md)
-- Run a [background job worker](https://plainframework.com/docs/plain-worker/plain/worker/README.md)
+- Run a [background job worker](https://plainframework.com/docs/plain-jobs/plain/jobs/README.md)
 - Build [admin dashboard and tools](https://plainframework.com/docs/plain-admin/plain/admin/README.md)
 
 Learn more at [plainframework.com](https://plainframework.com).

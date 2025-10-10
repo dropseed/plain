@@ -29,8 +29,8 @@ from plain.utils import timezone
 
 from .registry import jobs_registry
 
-logger = logging.getLogger("plain.worker")
-tracer = trace.get_tracer("plain.worker")
+logger = logging.getLogger("plain.jobs")
+tracer = trace.get_tracer("plain.jobs")
 
 
 @models.register_model
@@ -82,10 +82,10 @@ class JobRequest(models.Model):
             models.UniqueConstraint(
                 fields=["job_class", "unique_key"],
                 condition=models.Q(unique_key__gt="", retry_attempt=0),
-                name="plainworker_jobrequest_unique_job_class_key",
+                name="plainjobs_jobrequest_unique_job_class_key",
             ),
             models.UniqueConstraint(
-                fields=["uuid"], name="plainworker_jobrequest_unique_uuid"
+                fields=["uuid"], name="plainjobs_jobrequest_unique_uuid"
             ),
         ],
     )
@@ -132,7 +132,7 @@ class JobQuerySet(models.QuerySet["JobProcess"]):
         # In theory we could save a timeout per-job and mark them timed-out more quickly,
         # but if they're still running, we can't actually send a signal to cancel it...
         now = timezone.now()
-        cutoff = now - datetime.timedelta(seconds=settings.WORKER_JOBS_LOST_AFTER)
+        cutoff = now - datetime.timedelta(seconds=settings.JOBS_TIMEOUT)
         lost_jobs = self.filter(
             created_at__lt=cutoff
         )  # Doesn't matter whether it started or not -- it shouldn't take this long.
@@ -186,9 +186,7 @@ class JobProcess(models.Model):
             ),
         ],
         constraints=[
-            models.UniqueConstraint(
-                fields=["uuid"], name="plainworker_job_unique_uuid"
-            ),
+            models.UniqueConstraint(fields=["uuid"], name="plainjobs_job_unique_uuid"),
         ],
     )
 
@@ -213,7 +211,7 @@ class JobProcess(models.Model):
                 f"run {self.job_class}",
                 kind=SpanKind.CONSUMER,
                 attributes={
-                    MESSAGING_SYSTEM: "plain.worker",
+                    MESSAGING_SYSTEM: "plain.jobs",
                     MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
                     MESSAGING_OPERATION_NAME: "run",
                     MESSAGING_MESSAGE_ID: str(self.uuid),
@@ -409,7 +407,7 @@ class JobResult(models.Model):
         ],
         constraints=[
             models.UniqueConstraint(
-                fields=["uuid"], name="plainworker_jobresult_unique_uuid"
+                fields=["uuid"], name="plainjobs_jobresult_unique_uuid"
             ),
         ],
     )

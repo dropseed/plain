@@ -16,10 +16,10 @@ from .registry import jobs_registry
 from .scheduling import load_schedule
 from .workers import Worker
 
-logger = logging.getLogger("plain.worker")
+logger = logging.getLogger("plain.jobs")
 
 
-@register_cli("worker")
+@register_cli("jobs")
 @click.group()
 def cli() -> None:
     pass
@@ -39,37 +39,38 @@ def cli() -> None:
     "max_processes",
     default=None,
     type=int,
-    envvar="PLAIN_WORKER_MAX_PROCESSES",
+    envvar="PLAIN_JOBS_WORKER_MAX_PROCESSES",
 )
 @click.option(
     "--max-jobs-per-process",
     "max_jobs_per_process",
     default=None,
     type=int,
-    envvar="PLAIN_WORKER_MAX_JOBS_PER_PROCESS",
+    envvar="PLAIN_JOBS_WORKER_MAX_JOBS_PER_PROCESS",
 )
 @click.option(
     "--max-pending-per-process",
     "max_pending_per_process",
     default=10,
     type=int,
-    envvar="PLAIN_WORKER_MAX_PENDING_PER_PROCESS",
+    envvar="PLAIN_JOBS_WORKER_MAX_PENDING_PER_PROCESS",
 )
 @click.option(
     "--stats-every",
     "stats_every",
     default=60,
     type=int,
-    envvar="PLAIN_WORKER_STATS_EVERY",
+    envvar="PLAIN_JOBS_WORKER_STATS_EVERY",
 )
-def run(
+def worker(
     queues: tuple[str, ...],
     max_processes: int | None,
     max_jobs_per_process: int | None,
     max_pending_per_process: int,
     stats_every: int,
 ) -> None:
-    jobs_schedule = load_schedule(settings.WORKER_JOBS_SCHEDULE)
+    """Run the job worker."""
+    jobs_schedule = load_schedule(settings.JOBS_SCHEDULE)
 
     worker = Worker(
         queues=list(queues),
@@ -93,10 +94,10 @@ def run(
 
 
 @cli.command()
-def clear_completed() -> None:
+def clear() -> None:
     """Clear all completed job results in all queues."""
     cutoff = timezone.now() - datetime.timedelta(
-        seconds=settings.WORKER_JOBS_CLEARABLE_AFTER
+        seconds=settings.JOBS_RESULTS_RETENTION
     )
     click.echo(f"Clearing job results created before {cutoff}")
     results = JobResult.query.filter(created_at__lt=cutoff).delete()
@@ -121,7 +122,7 @@ def stats() -> None:
 
 
 @cli.command()
-def purge_processing() -> None:
+def purge() -> None:
     """Delete all running and pending jobs regardless of queue."""
     if not click.confirm(
         "Are you sure you want to clear all running and pending jobs? This will delete all current Jobs and JobRequests"
@@ -137,7 +138,7 @@ def purge_processing() -> None:
 
 @cli.command()
 @click.argument("job_class_name", type=str)
-def run_job(job_class_name: str) -> None:
+def run(job_class_name: str) -> None:
     """Run a job class directly (and not using a worker)."""
     job = jobs_registry.load_job(job_class_name, {"args": [], "kwargs": {}})
     click.secho("Loaded job: ", bold=True, nl=False)
@@ -145,8 +146,8 @@ def run_job(job_class_name: str) -> None:
     job.run()
 
 
-@cli.command()
-def registered_jobs() -> None:
+@cli.command("list")
+def list_jobs() -> None:
     """List all registered jobs."""
     for name, job_class in jobs_registry.jobs.items():
         click.echo(f"{click.style(name, fg='blue')}: {job_class}")

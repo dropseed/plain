@@ -16,6 +16,7 @@ dev-dependencies = [
     "plain-esbuild",
     "plain-flags",
     "plain-htmx",
+    "plain-jobs",
     "plain-loginlink",
     "plain-email",
     "plain-models",
@@ -32,7 +33,6 @@ dev-dependencies = [
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
-    "plain-worker",
     "ty>=0.0.1a21",
 ]
 
@@ -48,6 +48,7 @@ dev-dependencies = [
 "plain-esbuild" = { workspace = true }
 "plain-flags" = { workspace = true }
 "plain-htmx" = { workspace = true }
+"plain-jobs" = { workspace = true }
 "plain-loginlink" = { workspace = true }
 "plain-email" = { workspace = true }
 "plain-models" = { workspace = true }
@@ -64,7 +65,6 @@ dev-dependencies = [
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }
-"plain-worker" = { workspace = true }
 
 [tool.uv.workspace]
 members = [
