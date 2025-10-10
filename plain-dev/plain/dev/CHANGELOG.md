@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.40.0](https://github.com/dropseed/plain/releases/plain-dev@0.40.0) (2025-10-10)
+
+### What's changed
+
+- Updated documentation to reference `plain-jobs` instead of the deprecated `plain-worker` package name ([24219856e0](https://github.com/dropseed/plain/commit/24219856e0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.39.1](https://github.com/dropseed/plain/releases/plain-dev@0.39.1) (2025-10-06)
 
 ### What's changed
