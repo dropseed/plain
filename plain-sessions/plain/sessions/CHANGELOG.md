@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.34.0](https://github.com/dropseed/plain/releases/plain-sessions@0.34.0) (2025-10-10)
+
+### What's changed
+
+- A new `SessionNotAvailable` exception is now raised when attempting to access a session before `SessionMiddleware` has run, providing clearer error messages instead of a generic `KeyError` ([fe47d8d](https://github.com/dropseed/plain/commit/fe47d8d8f8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-sessions@0.33.0) (2025-10-07)
 
 ### What's changed
