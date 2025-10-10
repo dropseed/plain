@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.75.0](https://github.com/dropseed/plain/releases/plain@0.75.0) (2025-10-10)
+
+### What's changed
+
+- Documentation references updated from `plain-worker` to `plain-jobs` following the package rename ([24219856e0](https://github.com/dropseed/plain/commit/24219856e0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.74.0](https://github.com/dropseed/plain/releases/plain@0.74.0) (2025-10-08)
 
 ### What's changed
