@@ -367,11 +367,6 @@ def makemigrations(
     help="Explicitly enable/disable pre-migration backups.",
 )
 @click.option(
-    "--prune",
-    is_flag=True,
-    help="Delete nonexistent migrations from the plainmigrations table.",
-)
-@click.option(
     "--no-input",
     "--noinput",
     "no_input",
@@ -395,7 +390,6 @@ def migrate(
     plan: bool,
     check_unapplied: bool,
     backup: bool | None,
-    prune: bool,
     no_input: bool,
     atomic_batch: bool | None,
     quiet: bool,
@@ -519,58 +513,6 @@ def migrate(
     else:
         targets = list(executor.loader.graph.leaf_nodes())
 
-    if prune:
-        if not package_label:
-            raise click.ClickException(
-                "Migrations can be pruned only when a package is specified."
-            )
-        if not quiet:
-            click.secho("Pruning migrations:", bold=True)
-        to_prune = set(executor.loader.applied_migrations) - set(  # type: ignore[arg-type]
-            executor.loader.disk_migrations  # type: ignore[arg-type]
-        )
-        squashed_migrations_with_deleted_replaced_migrations = [
-            migration_key
-            for migration_key, migration_obj in executor.loader.replacements.items()
-            if any(replaced in to_prune for replaced in migration_obj.replaces)
-        ]
-        if squashed_migrations_with_deleted_replaced_migrations:
-            if not quiet:
-                click.echo(
-                    click.style(
-                        "  Cannot use --prune because the following squashed "
-                        "migrations have their 'replaces' attributes and may not "
-                        "be recorded as applied:",
-                        fg="yellow",
-                    )
-                )
-                for migration in squashed_migrations_with_deleted_replaced_migrations:
-                    package, name = migration
-                    click.echo(f"    {package}.{name}")
-                click.echo(
-                    click.style(
-                        "  Re-run `plain migrate` if they are not marked as "
-                        "applied, and remove 'replaces' attributes in their "
-                        "Migration classes.",
-                        fg="yellow",
-                    )
-                )
-        else:
-            to_prune = sorted(
-                migration for migration in to_prune if migration[0] == package_label
-            )
-            if to_prune:
-                for migration in to_prune:
-                    package, name = migration
-                    if not quiet:
-                        click.echo(f"  Pruning {package}.{name}...", nl=False)
-                    executor.recorder.record_unapplied(package, name)
-                    if not quiet:
-                        click.echo(" OK")
-            else:
-                if not quiet:
-                    click.echo("  No migrations to prune.")
-
     migration_plan = executor.migration_plan(targets)
 
     if plan:
@@ -594,9 +536,6 @@ def migrate(
     if check_unapplied:
         if migration_plan:
             sys.exit(1)
-        return
-
-    if prune:
         return
 
     # Print some useful info
@@ -825,35 +764,6 @@ def show_migrations(
             if not shown:
                 click.secho(" (no migrations)", fg="red")
 
-        # Find recorded migrations that aren't in the graph (prunable)
-        prunable_migrations = [
-            migration
-            for migration in recorded_migrations
-            if (
-                migration not in loader.disk_migrations  # type: ignore[operator]
-                and (not package_names_list or migration[0] in package_names_list)
-            )
-        ]
-
-        if prunable_migrations:
-            click.echo()
-            click.secho(
-                "Recorded migrations not in migration files (candidates for pruning):",
-                fg="yellow",
-                bold=True,
-            )
-            prunable_by_package = {}
-            for migration in prunable_migrations:
-                package, name = migration
-                if package not in prunable_by_package:
-                    prunable_by_package[package] = []
-                prunable_by_package[package].append(name)
-
-            for package in sorted(prunable_by_package.keys()):
-                click.secho(f"  {package}:", fg="yellow")
-                for name in sorted(prunable_by_package[package]):
-                    click.echo(f"    - {name}")
-
     def show_plan(db_connection: Any, package_names: tuple[str, ...]) -> None:
         """
         Show all known migrations (or only those of the specified package_names)
@@ -904,6 +814,108 @@ def show_migrations(
         show_plan(db_connection, package_labels)
     else:
         show_list(db_connection, package_labels)
+
+
+@cli.command()
+@click.option(
+    "--yes",
+    is_flag=True,
+    help="Skip confirmation prompt (for non-interactive use).",
+)
+def prune_migrations(yes: bool) -> None:
+    """Show and optionally remove stale migration records from the database."""
+    # Load migrations from disk and database
+    loader = MigrationLoader(db_connection, ignore_no_migrations=True)
+    recorder = MigrationRecorder(db_connection)
+    recorded_migrations = recorder.applied_migrations()
+
+    # Find all prunable migrations (recorded but not on disk)
+    all_prunable = [
+        migration
+        for migration in recorded_migrations
+        if migration not in loader.disk_migrations  # type: ignore[operator]
+    ]
+
+    if not all_prunable:
+        click.echo("No stale migration records found.")
+        return
+
+    # Separate into existing packages vs orphaned packages
+    existing_packages = set(loader.migrated_packages)
+    prunable_existing: dict[str, list[str]] = {}
+    prunable_orphaned: dict[str, list[str]] = {}
+
+    for migration in all_prunable:
+        package, name = migration
+        if package in existing_packages:
+            if package not in prunable_existing:
+                prunable_existing[package] = []
+            prunable_existing[package].append(name)
+        else:
+            if package not in prunable_orphaned:
+                prunable_orphaned[package] = []
+            prunable_orphaned[package].append(name)
+
+    # Display what was found
+    if prunable_existing:
+        click.secho(
+            "Stale migration records (from existing packages):",
+            fg="yellow",
+            bold=True,
+        )
+        for package in sorted(prunable_existing.keys()):
+            click.secho(f"  {package}:", fg="yellow")
+            for name in sorted(prunable_existing[package]):
+                click.echo(f"    - {name}")
+        click.echo()
+
+    if prunable_orphaned:
+        click.secho(
+            "Orphaned migration records (from removed packages):",
+            fg="red",
+            bold=True,
+        )
+        for package in sorted(prunable_orphaned.keys()):
+            click.secho(f"  {package}:", fg="red")
+            for name in sorted(prunable_orphaned[package]):
+                click.echo(f"    - {name}")
+        click.echo()
+
+    total_count = sum(len(migs) for migs in prunable_existing.values()) + sum(
+        len(migs) for migs in prunable_orphaned.values()
+    )
+
+    if not yes:
+        click.echo(
+            f"Found {total_count} stale migration record{'s' if total_count != 1 else ''}."
+        )
+        click.echo()
+
+        # Prompt for confirmation if interactive
+        if not click.confirm(
+            "Do you want to remove these migrations from the database?"
+        ):
+            return
+
+    # Actually prune the migrations
+    click.secho("Pruning migrations...", bold=True)
+
+    for package, migration_names in prunable_existing.items():
+        for name in sorted(migration_names):
+            click.echo(f"  Pruning {package}.{name}...", nl=False)
+            recorder.record_unapplied(package, name)
+            click.echo(" OK")
+
+    for package, migration_names in prunable_orphaned.items():
+        for name in sorted(migration_names):
+            click.echo(f"  Pruning {package}.{name} (orphaned)...", nl=False)
+            recorder.record_unapplied(package, name)
+            click.echo(" OK")
+
+    click.secho(
+        f"✓ Removed {total_count} stale migration record{'s' if total_count != 1 else ''}.",
+        fg="green",
+    )
 
 
 @cli.command()
