@@ -244,3 +244,83 @@ class CheckDatabaseTables(PreflightCheck):
             )
 
         return errors
+
+
+@register_check("models.prunable_migrations")
+class CheckPrunableMigrations(PreflightCheck):
+    """Warns about stale migration records in the database."""
+
+    def run(self) -> list[PreflightResult]:
+        # Import here to avoid circular import issues
+        from plain.models.migrations.loader import MigrationLoader
+        from plain.models.migrations.recorder import MigrationRecorder
+
+        errors = []
+
+        # Load migrations from disk and database
+        loader = MigrationLoader(db_connection, ignore_no_migrations=True)
+        recorder = MigrationRecorder(db_connection)
+        recorded_migrations = recorder.applied_migrations()
+
+        # disk_migrations should not be None after MigrationLoader initialization,
+        # but check to satisfy type checker
+        if loader.disk_migrations is None:
+            return errors
+
+        # Find all prunable migrations (recorded but not on disk)
+        all_prunable = [
+            migration
+            for migration in recorded_migrations
+            if migration not in loader.disk_migrations
+        ]
+
+        if not all_prunable:
+            return errors
+
+        # Separate into existing packages vs orphaned packages
+        existing_packages = set(loader.migrated_packages)
+        prunable_existing: list[tuple[str, str]] = []
+        prunable_orphaned: list[tuple[str, str]] = []
+
+        for migration in all_prunable:
+            package, name = migration
+            if package in existing_packages:
+                prunable_existing.append(migration)
+            else:
+                prunable_orphaned.append(migration)
+
+        # Build the warning message
+        total_count = len(all_prunable)
+        message_parts = [
+            f"Found {total_count} stale migration record{'s' if total_count != 1 else ''} in the database."
+        ]
+
+        if prunable_existing:
+            existing_list = ", ".join(
+                f"{pkg}.{name}" for pkg, name in prunable_existing[:3]
+            )
+            if len(prunable_existing) > 3:
+                existing_list += f" (and {len(prunable_existing) - 3} more)"
+            message_parts.append(f"From existing packages: {existing_list}.")
+
+        if prunable_orphaned:
+            orphaned_list = ", ".join(
+                f"{pkg}.{name}" for pkg, name in prunable_orphaned[:3]
+            )
+            if len(prunable_orphaned) > 3:
+                orphaned_list += f" (and {len(prunable_orphaned) - 3} more)"
+            message_parts.append(f"From removed packages: {orphaned_list}.")
+
+        message_parts.append(
+            "Run 'plain models prune-migrations' to review and remove them."
+        )
+
+        errors.append(
+            PreflightResult(
+                fix=" ".join(message_parts),
+                id="models.prunable_migrations",
+                warning=True,
+            )
+        )
+
+        return errors

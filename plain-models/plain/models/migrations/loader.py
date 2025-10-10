@@ -5,6 +5,7 @@ import sys
 from importlib import import_module, reload
 from typing import TYPE_CHECKING, Any
 
+from plain.models.connections import DatabaseConnection
 from plain.models.migrations.graph import MigrationGraph
 from plain.models.migrations.recorder import MigrationRecorder
 from plain.packages import packages_registry
@@ -50,7 +51,7 @@ class MigrationLoader:
 
     def __init__(
         self,
-        connection: BaseDatabaseWrapper | None,
+        connection: BaseDatabaseWrapper | DatabaseConnection | None,
         load: bool = True,
         ignore_no_migrations: bool = False,
         replace_migrations: bool = True,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain import models
+from plain.models.connections import DatabaseConnection
 from plain.models.db import DatabaseError
 from plain.models.meta import Meta
 from plain.models.registry import ModelsRegistry
@@ -59,7 +60,7 @@ class MigrationRecorder:
             cls._migration_class = Migration
         return cls._migration_class
 
-    def __init__(self, connection: BaseDatabaseWrapper) -> None:
+    def __init__(self, connection: BaseDatabaseWrapper | DatabaseConnection) -> None:
         self.connection = connection
 
     @property
