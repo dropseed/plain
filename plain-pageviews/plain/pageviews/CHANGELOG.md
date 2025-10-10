@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.24.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.24.1) (2025-10-10)
+
+### What's changed
+
+- Updated session handling to use the new `SessionNotAvailable` exception from `plain-sessions` for better error messaging ([fe47d8d](https://github.com/dropseed/plain/commit/fe47d8d8f805c770b7aa9cbad67b5a51faddffc4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.24.0) (2025-10-07)
 
 ### What's changed
