@@ -191,7 +191,7 @@ def main():
         # Show the diff of changes for this package
         print("\nChanges for this release:")
         diff_output = run(
-            f"git diff {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'}",
+            f"git diff --color=always {pkg_path / 'pyproject.toml'} {pkg_path / '**' / 'CHANGELOG.md'}",
             repo_path
         )
         if diff_output:
