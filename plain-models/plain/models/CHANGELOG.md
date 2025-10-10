@@ -1,5 +1,17 @@
 # plain-models changelog
 
+## [0.52.0](https://github.com/dropseed/plain/releases/plain-models@0.52.0) (2025-10-10)
+
+### What's changed
+
+- The `plain migrate` command now shows detailed operation descriptions and SQL statements for each migration step, replacing the previous verbosity levels with a cleaner `--quiet` flag ([d6b041bd24](https://github.com/dropseed/plain/commit/d6b041bd24))
+- Migration output format has been improved to display each operation's description and the actual SQL being executed, making it easier to understand what changes are being made to the database ([d6b041bd24](https://github.com/dropseed/plain/commit/d6b041bd24))
+- The `-v/--verbosity` option has been removed from `plain migrate` in favor of the simpler `--quiet` flag for suppressing output ([d6b041bd24](https://github.com/dropseed/plain/commit/d6b041bd24))
+
+### Upgrade instructions
+
+- Replace any usage of `-v` or `--verbosity` flags in `plain migrate` commands with `--quiet` if you want to suppress migration output
+
 ## [0.51.1](https://github.com/dropseed/plain/releases/plain-models@0.51.1) (2025-10-08)
 
 ### What's changed
