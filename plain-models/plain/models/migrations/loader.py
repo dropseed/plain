@@ -370,23 +370,3 @@ class MigrationLoader:
         return self.graph.make_state(
             nodes=nodes, at_end=at_end, real_packages=self.unmigrated_packages
         )
-
-    def collect_sql(self, plan: list[Migration]) -> list[str]:
-        """
-        Take a migration plan and return a list of collected SQL statements
-        that represent the best-efforts version of that plan.
-        """
-        statements = []
-        state = None
-        for migration in plan:
-            with self.connection.schema_editor(
-                collect_sql=True, atomic=migration.atomic
-            ) as schema_editor:
-                if state is None:
-                    state = self.project_state(
-                        (migration.package_label, migration.name), at_end=False
-                    )
-
-                state = migration.apply(state, schema_editor, collect_sql=True)
-            statements.extend(schema_editor.collected_sql)
-        return statements

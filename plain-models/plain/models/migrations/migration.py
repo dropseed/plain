@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from plain.models.migrations.utils import get_migration_name_timestamp
 from plain.models.transaction import atomic
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.migrations.state import ProjectState
 
 
 class Migration:
@@ -86,8 +91,11 @@ class Migration:
         return new_state
 
     def apply(
-        self, project_state: Any, schema_editor: Any, collect_sql: bool = False
-    ) -> Any:
+        self,
+        project_state: ProjectState,
+        schema_editor: BaseDatabaseSchemaEditor,
+        operation_callback: Callable[..., Any] | None = None,
+    ) -> ProjectState:
         """
         Take a project_state representing all migrations prior to this one
         and a schema_editor for a live database and apply the migration
@@ -97,18 +105,11 @@ class Migration:
         Migrations.
         """
         for operation in self.operations:
-            # If this operation cannot be represented as SQL, place a comment
-            # there instead
-            if collect_sql:
-                schema_editor.collected_sql.append("--")
-                schema_editor.collected_sql.append(f"-- {operation.describe()}")
-                schema_editor.collected_sql.append("--")
-                if not operation.reduces_to_sql:
-                    schema_editor.collected_sql.append(
-                        "-- THIS OPERATION CANNOT BE WRITTEN AS SQL"
-                    )
-                    continue
-                collected_sql_before = len(schema_editor.collected_sql)
+            # Clear any previous SQL statements before starting this operation
+            schema_editor.executed_sql = []
+
+            if operation_callback:
+                operation_callback("operation_start", operation=operation)
             # Save the state before the operation has run
             old_state = project_state.clone()
             operation.state_forwards(self.package_label, project_state)
@@ -128,8 +129,13 @@ class Migration:
                 operation.database_forwards(
                     self.package_label, schema_editor, old_state, project_state
                 )
-            if collect_sql and collected_sql_before == len(schema_editor.collected_sql):
-                schema_editor.collected_sql.append("-- (no-op)")
+            if operation_callback:
+                # Pass the accumulated SQL statements for this operation
+                operation_callback(
+                    "operation_success",
+                    operation=operation,
+                    sql_statements=schema_editor.executed_sql,
+                )
         return project_state
 
     def suggest_name(self) -> str:

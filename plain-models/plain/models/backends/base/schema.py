@@ -159,19 +159,16 @@ class BaseDatabaseSchemaEditor:
     def __init__(
         self,
         connection: BaseDatabaseWrapper,
-        collect_sql: bool = False,
         atomic: bool = True,
     ):
         self.connection = connection
-        self.collect_sql = collect_sql
-        if self.collect_sql:
-            self.collected_sql: list[str] = []
         self.atomic_migration = self.connection.features.can_rollback_ddl and atomic
 
     # State-managing methods
 
     def __enter__(self) -> BaseDatabaseSchemaEditor:
         self.deferred_sql: list[Any] = []
+        self.executed_sql: list[str] = []
         if self.atomic_migration:
             self.atomic = atomic()
             self.atomic.__enter__()
@@ -190,11 +187,8 @@ class BaseDatabaseSchemaEditor:
         self, sql: str | Statement, params: tuple[Any, ...] | list[Any] | None = ()
     ) -> None:
         """Execute the given SQL statement, with optional parameters."""
-        # Don't perform the transactional DDL check if SQL is being collected
-        # as it's not going to be executed anyway.
         if (
-            not self.collect_sql
-            and self.connection.in_atomic_block
+            self.connection.in_atomic_block
             and not self.connection.features.can_rollback_ddl
         ):
             raise TransactionManagementError(
@@ -207,17 +201,16 @@ class BaseDatabaseSchemaEditor:
         logger.debug(
             "%s; (params %r)", sql, params, extra={"params": params, "sql": sql}
         )
-        if self.collect_sql:
-            ending = "" if sql.rstrip().endswith(";") else ";"
-            if params is not None:
-                self.collected_sql.append(
-                    (sql % tuple(map(self.quote_value, params))) + ending
-                )
-            else:
-                self.collected_sql.append(sql + ending)
+
+        # Track executed SQL for display in migration output
+        # Store the SQL for display (interpolate params for readability)
+        if params:
+            self.executed_sql.append(sql % tuple(map(self.quote_value, params)))
         else:
-            with self.connection.cursor() as cursor:
-                cursor.execute(sql, params)
+            self.executed_sql.append(sql)
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, params)
 
     def quote_name(self, name: str) -> str:
         return self.connection.ops.quote_name(name)

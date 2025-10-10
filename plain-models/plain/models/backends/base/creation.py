@@ -52,9 +52,6 @@ class BaseDatabaseCreation:
         settings.DATABASE["NAME"] = test_database_name
         self.connection.settings_dict["NAME"] = test_database_name
 
-        # We report migrate messages at one level lower than that
-        # requested. This ensures we don't get flooded with messages during
-        # testing (unless you really ask to be flooded).
         migrate.callback(
             package_label=None,
             migration_name=None,
@@ -64,8 +61,8 @@ class BaseDatabaseCreation:
             backup=False,
             prune=False,
             no_input=True,
-            verbosity=max(verbosity - 1, 0),
             atomic_batch=False,  # No need for atomic batch when creating test database
+            quiet=verbosity < 2,  # Show migration output when verbosity is 2+
         )
 
         # Ensure a connection for the side effect of initializing the test database.

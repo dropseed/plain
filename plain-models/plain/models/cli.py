@@ -15,7 +15,7 @@ from plain.utils.text import Truncator
 
 from . import migrations
 from .backups.cli import cli as backups_cli
-from .backups.cli import create_backup
+from .backups.core import DatabaseBackups
 from .db import OperationalError
 from .db import db_connection as _db_connection
 from .migrations.autodetector import MigrationAutodetector
@@ -34,6 +34,7 @@ from .registry import models_registry
 
 if TYPE_CHECKING:
     from .backends.base.base import BaseDatabaseWrapper
+    from .migrations.operations.base import Operation
 
     db_connection = cast("BaseDatabaseWrapper", _db_connection)
 else:
@@ -378,16 +379,14 @@ def makemigrations(
     help="Tells Plain to NOT prompt the user for input of any kind.",
 )
 @click.option(
-    "-v",
-    "--verbosity",
-    type=int,
-    default=1,
-    help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
-)
-@click.option(
     "--atomic-batch/--no-atomic-batch",
     default=None,
     help="Run migrations in a single transaction (auto-detected by default)",
+)
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Suppress migration output (used for test database creation).",
 )
 def migrate(
     package_label: str | None,
@@ -398,26 +397,42 @@ def migrate(
     backup: bool | None,
     prune: bool,
     no_input: bool,
-    verbosity: int,
     atomic_batch: bool | None,
+    quiet: bool,
 ) -> None:
     """Updates database schema. Manages both packages with migrations and those without."""
 
     def migration_progress_callback(
-        action: str, migration: Migration | None = None, fake: bool = False
+        action: str,
+        *,
+        migration: Migration | None = None,
+        fake: bool = False,
+        operation: Operation | None = None,
+        sql_statements: list[str] | None = None,
     ) -> None:
-        if verbosity >= 1:
-            if action == "apply_start":
-                click.echo(f"  Applying {migration}...", nl=False)
-            elif action == "apply_success":
-                if fake:
-                    click.echo(click.style(" FAKED", fg="green"))
-                else:
-                    click.echo(click.style(" OK", fg="green"))
-            elif action == "render_start":
-                click.echo("  Rendering model states...", nl=False)
-            elif action == "render_success":
-                click.echo(click.style(" DONE", fg="green"))
+        if quiet:
+            return
+
+        if action == "apply_start":
+            click.echo()  # Always add newline between migrations
+            if fake:
+                click.secho(f"{migration} (faked)", fg="cyan")
+            else:
+                click.secho(f"{migration}", fg="cyan")
+        elif action == "apply_success":
+            pass  # Already shown via operations
+        elif action == "operation_start":
+            click.echo(f"  {operation.describe()}", nl=False)
+            click.secho("... ", dim=True, nl=False)
+        elif action == "operation_success":
+            # Show SQL statements (no OK needed, SQL implies success)
+            if sql_statements:
+                click.echo()  # newline after "..."
+                for sql in sql_statements:
+                    click.secho(f"    {sql}", dim=True)
+            else:
+                # No SQL: just add a newline
+                click.echo()
 
     def describe_operation(operation: Any) -> tuple[str, bool]:
         """Return a string that describes a migration operation for --plan."""
@@ -509,8 +524,8 @@ def migrate(
             raise click.ClickException(
                 "Migrations can be pruned only when a package is specified."
             )
-        if verbosity > 0:
-            click.secho("Pruning migrations:", fg="cyan")
+        if not quiet:
+            click.secho("Pruning migrations:", bold=True)
         to_prune = set(executor.loader.applied_migrations) - set(  # type: ignore[arg-type]
             executor.loader.disk_migrations  # type: ignore[arg-type]
         )
@@ -520,25 +535,26 @@ def migrate(
             if any(replaced in to_prune for replaced in migration_obj.replaces)
         ]
         if squashed_migrations_with_deleted_replaced_migrations:
-            click.echo(
-                click.style(
-                    "  Cannot use --prune because the following squashed "
-                    "migrations have their 'replaces' attributes and may not "
-                    "be recorded as applied:",
-                    fg="yellow",
+            if not quiet:
+                click.echo(
+                    click.style(
+                        "  Cannot use --prune because the following squashed "
+                        "migrations have their 'replaces' attributes and may not "
+                        "be recorded as applied:",
+                        fg="yellow",
+                    )
                 )
-            )
-            for migration in squashed_migrations_with_deleted_replaced_migrations:
-                package, name = migration
-                click.echo(f"    {package}.{name}")
-            click.echo(
-                click.style(
-                    "  Re-run `plain migrate` if they are not marked as "
-                    "applied, and remove 'replaces' attributes in their "
-                    "Migration classes.",
-                    fg="yellow",
+                for migration in squashed_migrations_with_deleted_replaced_migrations:
+                    package, name = migration
+                    click.echo(f"    {package}.{name}")
+                click.echo(
+                    click.style(
+                        "  Re-run `plain migrate` if they are not marked as "
+                        "applied, and remove 'replaces' attributes in their "
+                        "Migration classes.",
+                        fg="yellow",
+                    )
                 )
-            )
         else:
             to_prune = sorted(
                 migration for migration in to_prune if migration[0] == package_label
@@ -546,32 +562,31 @@ def migrate(
             if to_prune:
                 for migration in to_prune:
                     package, name = migration
-                    if verbosity > 0:
-                        click.echo(
-                            click.style(f"  Pruning {package}.{name}", fg="yellow"),
-                            nl=False,
-                        )
+                    if not quiet:
+                        click.echo(f"  Pruning {package}.{name}...", nl=False)
                     executor.recorder.record_unapplied(package, name)
-                    if verbosity > 0:
-                        click.echo(click.style(" OK", fg="green"))
-            elif verbosity > 0:
-                click.echo("  No migrations to prune.")
+                    if not quiet:
+                        click.echo(" OK")
+            else:
+                if not quiet:
+                    click.echo("  No migrations to prune.")
 
     migration_plan = executor.migration_plan(targets)
 
     if plan:
-        click.secho("Planned operations:", fg="cyan")
-        if not migration_plan:
-            click.echo("  No planned migration operations.")
-        else:
-            for migration in migration_plan:
-                click.secho(str(migration), fg="cyan")
-                for operation in migration.operations:
-                    message, is_error = describe_operation(operation)
-                    if is_error:
-                        click.secho("    " + message, fg="yellow")
-                    else:
-                        click.echo("    " + message)
+        if not quiet:
+            click.secho("Planned operations:", fg="cyan")
+            if not migration_plan:
+                click.echo("  No planned migration operations.")
+            else:
+                for migration in migration_plan:
+                    click.secho(str(migration), fg="cyan")
+                    for operation in migration.operations:
+                        message, is_error = describe_operation(operation)
+                        if is_error:
+                            click.secho("    " + message, fg="yellow")
+                        else:
+                            click.echo("    " + message)
         if check_unapplied:
             sys.exit(1)
         return
@@ -585,29 +600,23 @@ def migrate(
         return
 
     # Print some useful info
-    if verbosity >= 1:
-        click.secho("Operations to perform:", fg="cyan")
-
+    if not quiet:
         if target_package_labels_only:
-            click.secho(
-                "  Apply all migrations: "
-                + (", ".join(sorted({a for a, n in targets})) or "(none)"),
-                fg="yellow",
-            )
+            packages = ", ".join(sorted({a for a, n in targets})) or "(none)"
+            click.secho("Packages: ", bold=True, nl=False)
+            click.secho(packages, dim=True)
+            click.echo()  # Add newline after packages
         else:
-            click.secho(
-                f"  Target specific migration: {targets[0][1]}, from {targets[0][0]}",
-                fg="yellow",
-            )
+            click.secho("Target: ", bold=True, nl=False)
+            click.secho(f"{targets[0][1]} from {targets[0][0]}", dim=True)
+            click.echo()  # Add newline after target
 
     pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
-
-    # sql = executor.loader.collect_sql(migration_plan)
-    # pprint(sql)
 
     if migration_plan:
         # Determine whether to use atomic batch
         use_atomic_batch = False
+        atomic_batch_message = None
         if len(migration_plan) > 1:
             # Check database capabilities
             can_rollback_ddl = db_connection.features.can_rollback_ddl
@@ -632,58 +641,62 @@ def migrate(
                         f"--atomic-batch requested but these migrations have atomic=False: {names}"
                     )
                 use_atomic_batch = True
-                if verbosity >= 1:
-                    click.echo(
-                        f"  Running {len(migration_plan)} migrations in atomic batch (all-or-nothing)"
-                    )
+                atomic_batch_message = (
+                    f"Running {len(migration_plan)} migrations in atomic batch"
+                )
             elif atomic_batch is False:
                 # User explicitly disabled atomic batch
                 use_atomic_batch = False
-                if verbosity >= 1:
-                    click.echo(f"  Running {len(migration_plan)} migrations separately")
+                if len(migration_plan) > 1:
+                    atomic_batch_message = (
+                        f"Running {len(migration_plan)} migrations separately"
+                    )
             else:
                 # Auto-detect (atomic_batch is None)
                 if can_rollback_ddl and not non_atomic_migrations:
                     use_atomic_batch = True
-                    if verbosity >= 1:
-                        click.echo(
-                            f"  Running {len(migration_plan)} migrations in atomic batch (all-or-nothing)"
-                        )
+                    atomic_batch_message = (
+                        f"Running {len(migration_plan)} migrations in atomic batch"
+                    )
                 else:
                     use_atomic_batch = False
-                    if verbosity >= 1:
+                    if len(migration_plan) > 1:
                         if not can_rollback_ddl:
-                            click.echo(
-                                f"  Running {len(migration_plan)} migrations separately ({db_connection.vendor} doesn't support batch transactions)"
-                            )
+                            atomic_batch_message = f"Running {len(migration_plan)} migrations separately ({db_connection.vendor} doesn't support batch)"
                         elif non_atomic_migrations:
-                            click.echo(
-                                f"  Running {len(migration_plan)} migrations separately (some migrations have atomic=False)"
-                            )
+                            atomic_batch_message = f"Running {len(migration_plan)} migrations separately (some have atomic=False)"
                         else:
-                            click.echo(
-                                f"  Running {len(migration_plan)} migrations separately"
+                            atomic_batch_message = (
+                                f"Running {len(migration_plan)} migrations separately"
                             )
 
         if backup or (backup is None and settings.DEBUG):
             backup_name = f"migrate_{time.strftime('%Y%m%d_%H%M%S')}"
-            click.secho(
-                f"Creating backup before applying migrations: {backup_name}",
-                bold=True,
-            )
-            # Can't use ctx.invoke because this is called by the test db creation currently,
-            # which doesn't have a context.
-            create_backup.callback(
-                backup_name=backup_name,
-                pg_dump=os.environ.get(
-                    "PG_DUMP", "pg_dump"
-                ),  # Have to pass this in manually
-            )
-            print()
+            if not quiet:
+                click.secho("Creating backup: ", bold=True, nl=False)
+                click.secho(f"{backup_name}", dim=True, nl=False)
+                click.secho("... ", dim=True, nl=False)
 
-        if verbosity >= 1:
-            click.secho("Running migrations:", fg="cyan")
+            backups_handler = DatabaseBackups()
+            backups_handler.create(
+                backup_name,
+                pg_dump=os.environ.get("PG_DUMP", "pg_dump"),
+            )
 
+            if not quiet:
+                click.echo(click.style("OK", fg="green"))
+                click.echo()  # Add blank line after backup output
+        else:
+            if not quiet:
+                click.echo()  # Add blank line after packages/target info
+
+        if not quiet:
+            if atomic_batch_message:
+                click.secho(
+                    f"Applying migrations ({atomic_batch_message.lower()}):", bold=True
+                )
+            else:
+                click.secho("Applying migrations:", bold=True)
         post_migrate_state = executor.migrate(
             targets,
             plan=migration_plan,
@@ -712,31 +725,24 @@ def migrate(
             ]
         )
 
-    elif verbosity >= 1:
-        click.echo("  No migrations to apply.")
-        # If there's changes that aren't in migrations yet, tell them
-        # how to fix it.
-        autodetector = MigrationAutodetector(
-            executor.loader.project_state(),
-            ProjectState.from_models_registry(models_registry),
-        )
-        changes = autodetector.changes(graph=executor.loader.graph)
-        if changes:
-            click.echo(
-                click.style(
-                    f"  Your models in package(s): {', '.join(repr(package) for package in sorted(changes))} "
-                    "have changes that are not yet reflected in a migration, and so won't be applied.",
-                    fg="yellow",
-                )
+    else:
+        if not quiet:
+            click.echo("No migrations to apply.")
+            # If there's changes that aren't in migrations yet, tell them
+            # how to fix it.
+            autodetector = MigrationAutodetector(
+                executor.loader.project_state(),
+                ProjectState.from_models_registry(models_registry),
             )
-            click.echo(
-                click.style(
-                    "  Run `plain makemigrations` to make new "
-                    "migrations, and then re-run `plain migrate` to "
-                    "apply them.",
-                    fg="yellow",
+            changes = autodetector.changes(graph=executor.loader.graph)
+            if changes:
+                packages = ", ".join(sorted(changes))
+                click.echo(
+                    f"Your models have changes that are not yet reflected in migrations ({packages})."
                 )
-            )
+                click.echo(
+                    "Run 'plain makemigrations' to create migrations for these changes."
+                )
 
 
 @cli.command()

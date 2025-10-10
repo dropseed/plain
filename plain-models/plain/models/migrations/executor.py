@@ -126,11 +126,7 @@ class MigrationExecutor:
                         break
                     if migration in migrations_to_run:
                         if "models_registry" not in state.__dict__:
-                            if self.progress_callback:
-                                self.progress_callback("render_start")
                             state.models_registry  # Render all -- performance critical
-                            if self.progress_callback:
-                                self.progress_callback("render_success")
                         state = self.apply_migration(state, migration, fake=fake)
                         migrations_to_run.remove(migration)
 
@@ -145,13 +141,15 @@ class MigrationExecutor:
         """Run a migration forwards."""
         migration_recorded = False
         if self.progress_callback:
-            self.progress_callback("apply_start", migration, fake)
+            self.progress_callback("apply_start", migration=migration, fake=fake)
         if not fake:
             # Alright, do it normally
             with self.connection.schema_editor(
                 atomic=migration.atomic
             ) as schema_editor:
-                state = migration.apply(state, schema_editor)
+                state = migration.apply(
+                    state, schema_editor, operation_callback=self.progress_callback
+                )
                 if not schema_editor.deferred_sql:
                     self.record_migration(migration)
                     migration_recorded = True
@@ -159,7 +157,7 @@ class MigrationExecutor:
             self.record_migration(migration)
         # Report progress
         if self.progress_callback:
-            self.progress_callback("apply_success", migration, fake)
+            self.progress_callback("apply_success", migration=migration, fake=fake)
         return state
 
     def record_migration(self, migration: Migration) -> None:
