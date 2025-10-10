@@ -120,10 +120,7 @@ class Pageview(models.Model):
         user_id = user.id if user else ""
 
         if get_request_session:
-            try:
-                session = get_request_session(request)
-            except KeyError:
-                session = None
+            session = get_request_session(request)
         else:
             session = None
 

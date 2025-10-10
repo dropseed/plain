@@ -1,6 +1,9 @@
+import pytest
+
+from plain.sessions import SessionNotAvailable, get_request_session
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
-from plain.test import Client
+from plain.test import Client, RequestFactory
 
 
 def test_session_created(db):
@@ -47,3 +50,16 @@ def test_mapping_attributes(db):
     store.clear()
     assert store.is_empty()
     assert store.modified is True
+
+
+def test_session_not_available():
+    """Test that SessionNotAvailable is raised when session hasn't been set up."""
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    # Session hasn't been set up by middleware yet
+    with pytest.raises(SessionNotAvailable) as exc_info:
+        get_request_session(request)
+
+    assert "Session is not available" in str(exc_info.value)
+    assert "SessionMiddleware" in str(exc_info.value)
