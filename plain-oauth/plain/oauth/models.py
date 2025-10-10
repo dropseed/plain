@@ -4,8 +4,7 @@ from plain import models
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.models import transaction
-from plain.models.db import IntegrityError, OperationalError, ProgrammingError
-from plain.preflight import PreflightResult
+from plain.models.db import IntegrityError
 from plain.runtime import SettingsReference
 from plain.utils import timezone
 
@@ -13,9 +12,6 @@ from .exceptions import OAuthUserAlreadyExistsError
 
 if TYPE_CHECKING:
     from .providers import OAuthToken, OAuthUser
-
-
-# TODO preflight check for deploy that ensures all provider keys in db are also in settings?
 
 
 @models.register_model
@@ -154,35 +150,3 @@ class OAuthConnection(models.Model):
         connection.save()
 
         return connection
-
-    @classmethod
-    def preflight(cls) -> list[PreflightResult]:
-        """
-        A system check for ensuring that provider_keys in the database are also present in settings.
-        """
-        errors = super().preflight()
-
-        from .providers import get_provider_keys
-
-        try:
-            keys_in_db = set(
-                cls.query.values_list("provider_key", flat=True).distinct()
-            )
-        except (OperationalError, ProgrammingError):
-            # Check runs on plain migrate, and the table may not exist yet
-            # or it may not be installed on the particular database intentionally
-            return errors
-
-        keys_in_settings = set(get_provider_keys())
-
-        if keys_in_db - keys_in_settings:
-            errors.append(
-                PreflightResult(
-                    fix="The following OAuth providers are in the database but not in the settings: {}. Add these providers to your OAUTH_LOGIN_PROVIDERS setting or remove the corresponding OAuthConnection records.".format(
-                        ", ".join(keys_in_db - keys_in_settings)
-                    ),
-                    id="oauth.provider_in_db_not_in_settings",
-                )
-            )
-
-        return errors

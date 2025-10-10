@@ -1,5 +1,6 @@
 from plain.auth import get_user_model
 from plain.oauth.models import OAuthConnection
+from plain.oauth.preflight import CheckOAuthProviderKeys
 
 
 def test_oauth_provider_keys_check_pass(db, settings):
@@ -23,7 +24,8 @@ def test_oauth_provider_keys_check_pass(db, settings):
         access_token="test",
     )
 
-    errors = OAuthConnection.preflight()
+    check = CheckOAuthProviderKeys()
+    errors = check.run()
     assert len(errors) == 0
 
 
@@ -54,7 +56,8 @@ def test_oauth_provider_keys_check_fail(db, settings):
         access_token="test",
     )
 
-    errors = OAuthConnection.preflight()
+    check = CheckOAuthProviderKeys()
+    errors = check.run()
     assert len(errors) == 1
     assert (
         errors[0].fix
