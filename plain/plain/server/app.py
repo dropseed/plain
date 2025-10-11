@@ -11,9 +11,8 @@ import os
 import sys
 import traceback
 
-from .. import debug, util
-from ..arbiter import Arbiter
-from ..config import Config, get_default_config_file
+from .arbiter import Arbiter
+from .config import Config, get_default_config_file
 
 
 class BaseApplication:
@@ -61,8 +60,6 @@ class BaseApplication:
 
     def reload(self):
         self.do_load_config()
-        if self.cfg.spew:
-            debug.spew()
 
     def wsgi(self):
         if self.callable is None:
@@ -215,17 +212,6 @@ class Application(BaseApplication):
                 sys.stderr.flush()
                 sys.exit(1)
             sys.exit(0)
-
-        if self.cfg.spew:
-            debug.spew()
-
-        if self.cfg.daemon:
-            if os.environ.get('NOTIFY_SOCKET'):
-                msg = "Warning: you shouldn't specify `daemon = True`" \
-                      " when launching by systemd with `Type = notify`"
-                print(msg, file=sys.stderr, flush=True)
-
-            util.daemonize(self.cfg.enable_stdio_inheritance)
 
         # set python paths
         if self.cfg.pythonpath:

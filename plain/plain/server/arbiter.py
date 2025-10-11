@@ -17,7 +17,7 @@ import traceback
 
 import plain.runtime
 
-from . import SERVER_SOFTWARE, sock, systemd, util
+from . import SERVER_SOFTWARE, sock, util
 from .errors import AppImportError, HaltServer
 from .pidfile import Pidfile
 
@@ -62,7 +62,6 @@ class Arbiter:
         self.setup(app)
 
         self.pidfile = None
-        self.systemd = False
         self.worker_age = 0
         self.reexec_pid = 0
         self.master_pid = 0
@@ -145,13 +144,8 @@ class Arbiter:
 
         if not self.LISTENERS:
             fds = None
-            listen_fds = systemd.listen_fds()
-            if listen_fds:
-                self.systemd = True
-                fds = range(systemd.SD_LISTEN_FDS_START,
-                            systemd.SD_LISTEN_FDS_START + listen_fds)
 
-            elif self.master_pid:
+            if self.master_pid:
                 fds = []
                 for fd in os.environ.pop('GUNICORN_FD').split(','):
                     fds.append(int(fd))
@@ -163,7 +157,6 @@ class Arbiter:
         self.log.debug("Arbiter booted")
         self.log.info("Listening at: %s (%s)", listeners_str, self.pid)
         self.log.info("Using worker: %s", self.cfg.worker_class_str)
-        systemd.sd_notify("READY=1\nSTATUS=Gunicorn arbiter booted", self.log)
 
         # check worker class requirements
         if hasattr(self.worker_class, "check_config"):
@@ -308,12 +301,9 @@ class Arbiter:
 
     def handle_winch(self):
         """SIGWINCH handling"""
-        if self.cfg.daemon:
-            self.log.info("graceful stop of workers")
-            self.num_workers = 0
-            self.kill_workers(signal.SIGTERM)
-        else:
-            self.log.debug("SIGWINCH ignored. Not daemonized")
+        # SIGWINCH is typically used to gracefully stop workers when running as daemon
+        # Since we don't support daemon mode, just log that it's ignored
+        self.log.debug("SIGWINCH ignored")
 
     def maybe_promote_master(self):
         if self.master_pid == 0:
@@ -384,7 +374,6 @@ class Arbiter:
         """
         unlink = (
             self.reexec_pid == self.master_pid == 0
-            and not self.systemd
             and not self.cfg.reuse_port
         )
         sock.close_sockets(self.LISTENERS, unlink)
@@ -423,13 +412,8 @@ class Arbiter:
 
         environ = self.cfg.env_orig.copy()
         environ['GUNICORN_PID'] = str(master_pid)
-
-        if self.systemd:
-            environ['LISTEN_PID'] = str(os.getpid())
-            environ['LISTEN_FDS'] = str(len(self.LISTENERS))
-        else:
-            environ['GUNICORN_FD'] = ','.join(
-                str(lnr.fileno()) for lnr in self.LISTENERS)
+        environ['GUNICORN_FD'] = ','.join(
+            str(lnr.fileno()) for lnr in self.LISTENERS)
 
         os.chdir(self.START_CTX['cwd'])
 

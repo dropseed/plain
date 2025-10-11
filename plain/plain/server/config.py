@@ -158,11 +158,6 @@ class Config:
             # support the default
             uri = LoggerClass.default
 
-        # if default logger is in use, and statsd is on, automagically switch
-        # to the statsd logger
-        if uri == LoggerClass.default:
-            if 'statsd_host' in self.settings and self.settings['statsd_host'].value is not None:
-                uri = "plain.server.instrument.statsd.Statsd"
 
         logger_class = util.load_class(
             uri,
@@ -218,26 +213,6 @@ class Config:
     @property
     def reuse_port(self):
         return self.settings['reuse_port'].get()
-
-    @property
-    def paste_global_conf(self):
-        raw_global_conf = self.settings['raw_paste_global_conf'].get()
-        if raw_global_conf is None:
-            return None
-
-        global_conf = {}
-        for e in raw_global_conf:
-            s = util.bytes_to_str(e)
-            try:
-                k, v = re.split(r'(?<!\\)=', s, 1)
-            except ValueError:
-                raise RuntimeError(f"environment setting {s!r} invalid")
-            k = k.replace('\\=', '=')
-            v = v.replace('\\=', '=')
-            global_conf[k] = v
-
-        return global_conf
-
 
 class SettingMeta(type):
     def __new__(cls, name, bases, attrs):
@@ -509,11 +484,6 @@ def validate_chdir(val):
 
     return path
 
-
-def validate_statsd_address(val):
-    val = validate_string(val)
-    if val is None:
-        return None
 
     # As of major release 20, util.parse_address would recognize unix:PORT
     # as a UDS address, breaking backwards compatibility. We defend against
@@ -962,20 +932,6 @@ class ReloadExtraFiles(Setting):
         """
 
 
-class Spew(Setting):
-    name = "spew"
-    section = "Debugging"
-    cli = ["--spew"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-        Install a trace function that spews every line executed by the server.
-
-        This is the nuclear option.
-        """
-
-
 class ConfigCheck(Setting):
     name = "check_config"
     section = "Debugging"
@@ -1065,21 +1021,6 @@ class Chdir(Setting):
     default_doc = "``'.'``"
     desc = """\
         Change directory to specified directory before loading apps.
-        """
-
-
-class Daemon(Setting):
-    name = "daemon"
-    section = "Server Mechanics"
-    cli = ["-D", "--daemon"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-        Daemonize the Gunicorn process.
-
-        Detaches the server from the controlling terminal and enters the
-        background.
         """
 
 
@@ -1634,61 +1575,10 @@ class EnableStdioInheritance(Setting):
     desc = """\
     Enable stdio inheritance.
 
-    Enable inheritance for stdio file descriptors in daemon mode.
+    Enable inheritance for stdio file descriptors.
 
     Note: To disable the Python stdout buffering, you can to set the user
     environment variable ``PYTHONUNBUFFERED`` .
-    """
-
-
-# statsD monitoring
-class StatsdHost(Setting):
-    name = "statsd_host"
-    section = "Logging"
-    cli = ["--statsd-host"]
-    meta = "STATSD_ADDR"
-    default = None
-    validator = validate_statsd_address
-    desc = """\
-    The address of the StatsD server to log to.
-
-    Address is a string of the form:
-
-    * ``unix://PATH`` : for a unix domain socket.
-    * ``HOST:PORT`` : for a network address
-
-    .. versionadded:: 19.1
-    """
-
-
-# Datadog Statsd (dogstatsd) tags. https://docs.datadoghq.com/developers/dogstatsd/
-class DogstatsdTags(Setting):
-    name = "dogstatsd_tags"
-    section = "Logging"
-    cli = ["--dogstatsd-tags"]
-    meta = "DOGSTATSD_TAGS"
-    default = ""
-    validator = validate_string
-    desc = """\
-    A comma-delimited list of datadog statsd (dogstatsd) tags to append to
-    statsd metrics.
-
-    .. versionadded:: 20
-    """
-
-
-class StatsdPrefix(Setting):
-    name = "statsd_prefix"
-    section = "Logging"
-    cli = ["--statsd-prefix"]
-    meta = "STATSD_PREFIX"
-    default = ""
-    validator = validate_string
-    desc = """\
-    Prefix to use when emitting statsd metrics (a trailing ``.`` is added,
-    if not provided).
-
-    .. versionadded:: 19.2
     """
 
 
@@ -1733,23 +1623,6 @@ class PythonPath(Setting):
 
         e.g.
         ``'/home/djangoprojects/myproject,/home/python/mylibrary'``.
-        """
-
-
-class Paste(Setting):
-    name = "paste"
-    section = "Server Mechanics"
-    cli = ["--paste", "--paster"]
-    meta = "STRING"
-    validator = validate_string
-    default = None
-    desc = """\
-        Load a PasteDeploy config file. The argument may contain a ``#``
-        symbol followed by the name of an app section from the config file,
-        e.g. ``production.ini#admin``.
-
-        At this time, using alternate server blocks is not supported. Use the
-        command line arguments to control server configuration instead.
         """
 
 
@@ -2241,28 +2114,6 @@ class Ciphers(Setting):
     <https://www.openssl.org/docs/manmaster/man1/ciphers.html#CIPHER-LIST-FORMAT>`_
     for details on the format of an OpenSSL cipher list.
     """
-
-
-class PasteGlobalConf(Setting):
-    name = "raw_paste_global_conf"
-    action = "append"
-    section = "Server Mechanics"
-    cli = ["--paste-global"]
-    meta = "CONF"
-    validator = validate_list_string
-    default = []
-
-    desc = """\
-        Set a PasteDeploy global config variable in ``key=value`` form.
-
-        The option can be specified multiple times.
-
-        The variables are passed to the PasteDeploy entrypoint. Example::
-
-            $ gunicorn -b 127.0.0.1:8000 --paste development.ini --paste-global FOO=1 --paste-global BAR=2
-
-        .. versionadded:: 19.7
-        """
 
 
 class PermitObsoleteFolding(Setting):
