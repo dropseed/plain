@@ -323,14 +323,6 @@ def validate_pos_int(val):
     return val
 
 
-def validate_ssl_version(val):
-    if val != SSLVersion.default:
-        sys.stderr.write(
-            "Warning: option `ssl_version` is deprecated and it is ignored. Use ssl_context instead.\n"
-        )
-    return val
-
-
 def validate_string(val):
     if val is None:
         return None
@@ -428,20 +420,6 @@ def validate_post_request(val):
         return lambda worker, req, _e, _r: val(worker, req)
     else:
         raise TypeError("Value must have an arity of: 4")
-
-
-def validate_chdir(val):
-    # valid if the value is a string
-    val = validate_string(val)
-
-    # transform relative paths
-    path = os.path.abspath(os.path.normpath(os.path.join(util.getcwd(), val)))
-
-    # test if the path exists
-    if not os.path.exists(path):
-        raise ConfigError(f"can't chdir to {val!r}")
-
-    return path
 
 
 def validate_reload_engine(val):
@@ -957,23 +935,6 @@ class WorkerTmpDir(Setting):
         """
 
 
-class TmpUploadDir(Setting):
-    name = "tmp_upload_dir"
-    section = "Server Mechanics"
-    meta = "DIR"
-    validator = validate_string
-    default = None
-    desc = """\
-        Directory to store temporary request data as they are read.
-
-        This may disappear in the near future.
-
-        This path should be writable by the process permissions set for Gunicorn
-        workers. If not specified, Gunicorn will choose a system generated
-        temporary directory.
-        """
-
-
 class SecureSchemeHeader(Setting):
     name = "secure_scheme_headers"
     section = "Server Mechanics"
@@ -1366,23 +1327,6 @@ class SyslogFacility(Setting):
     """
 
 
-class EnableStdioInheritance(Setting):
-    name = "enable_stdio_inheritance"
-    section = "Logging"
-    cli = ["-R", "--enable-stdio-inheritance"]
-    validator = validate_bool
-    default = False
-    action = "store_true"
-    desc = """\
-    Enable stdio inheritance.
-
-    Enable inheritance for stdio file descriptors.
-
-    Note: To disable the Python stdout buffering, you can to set the user
-    environment variable ``PYTHONUNBUFFERED`` .
-    """
-
-
 class Procname(Setting):
     name = "proc_name"
     section = "Process Naming"
@@ -1409,21 +1353,6 @@ class DefaultProcName(Setting):
     default = "gunicorn"
     desc = """\
         Internal setting that is adjusted for each type of application.
-        """
-
-
-class PythonPath(Setting):
-    name = "pythonpath"
-    section = "Server Mechanics"
-    cli = ["--pythonpath"]
-    meta = "STRING"
-    validator = validate_string
-    default = None
-    desc = """\
-        A comma-separated list of directories to add to the Python path.
-
-        e.g.
-        ``'/home/djangoprojects/myproject,/home/python/mylibrary'``.
         """
 
 
@@ -1754,51 +1683,6 @@ class CertFile(Setting):
     default = None
     desc = """\
     SSL certificate file
-    """
-
-
-class SSLVersion(Setting):
-    name = "ssl_version"
-    section = "SSL"
-    cli = ["--ssl-version"]
-    validator = validate_ssl_version
-
-    if hasattr(ssl, "PROTOCOL_TLS"):
-        default = ssl.PROTOCOL_TLS
-    else:
-        default = ssl.PROTOCOL_SSLv23
-
-    default = ssl.PROTOCOL_SSLv23
-    desc = """\
-    SSL version to use (see stdlib ssl module's).
-
-    .. deprecated:: 21.0
-       The option is deprecated and it is currently ignored. Use :ref:`ssl-context` instead.
-
-    ============= ============
-    --ssl-version Description
-    ============= ============
-    SSLv3         SSLv3 is not-secure and is strongly discouraged.
-    SSLv23        Alias for TLS. Deprecated in Python 3.6, use TLS.
-    TLS           Negotiate highest possible version between client/server.
-                  Can yield SSL. (Python 3.6+)
-    TLSv1         TLS 1.0
-    TLSv1_1       TLS 1.1 (Python 3.4+)
-    TLSv1_2       TLS 1.2 (Python 3.4+)
-    TLS_SERVER    Auto-negotiate the highest protocol version like TLS,
-                  but only support server-side SSLSocket connections.
-                  (Python 3.6+)
-    ============= ============
-
-    .. versionchanged:: 19.7
-       The default value has been changed from ``ssl.PROTOCOL_TLSv1`` to
-       ``ssl.PROTOCOL_SSLv23``.
-    .. versionchanged:: 20.0
-       This setting now accepts string names based on ``ssl.PROTOCOL_``
-       constants.
-    .. versionchanged:: 20.0.1
-       The default value has been changed from ``ssl.PROTOCOL_SSLv23`` to
-       ``ssl.PROTOCOL_TLS`` when Python >= 3.6 .
     """
 
 

@@ -5,7 +5,6 @@
 #
 # Vendored and modified for Plain.
 
-import os
 import sys
 
 from .arbiter import Arbiter
@@ -90,13 +89,5 @@ class Application(BaseApplication):
                 sys.stderr.flush()
                 sys.exit(1)
             sys.exit(0)
-
-        # set python paths
-        if self.cfg.pythonpath:
-            paths = self.cfg.pythonpath.split(",")
-            for path in paths:
-                pythonpath = os.path.abspath(path)
-                if pythonpath not in sys.path:
-                    sys.path.insert(0, pythonpath)
 
         super().run()
