@@ -104,10 +104,6 @@ class Worker:
             for k, v in self.cfg.env.items():
                 os.environ[k] = v
 
-        util.set_owner_process(
-            self.cfg.uid, self.cfg.gid, initgroups=self.cfg.initgroups
-        )
-
         # Reseed the random number generator
         util.seed()
 

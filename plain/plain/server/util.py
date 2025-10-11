@@ -15,7 +15,6 @@ import inspect
 import io
 import logging
 import os
-import pwd
 import random
 import re
 import socket
@@ -90,34 +89,6 @@ def get_arity(f):
             arity += 1
 
     return arity
-
-
-def get_username(uid):
-    """get the username for a user id"""
-    return pwd.getpwuid(uid).pw_name
-
-
-def set_owner_process(uid, gid, initgroups=False):
-    """set user and group of workers processes"""
-
-    if gid:
-        if uid:
-            try:
-                username = get_username(uid)
-            except KeyError:
-                initgroups = False
-
-        if initgroups:
-            os.initgroups(username, gid)
-        elif gid != os.getgid():
-            os.setgid(gid)
-
-    if uid and uid != os.getuid():
-        os.setuid(uid)
-
-
-def chown(path, uid, gid):
-    os.chown(path, uid, gid)
 
 
 if sys.platform.startswith("win"):

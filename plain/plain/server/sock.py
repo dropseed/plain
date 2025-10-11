@@ -118,10 +118,7 @@ class UnixSocket(BaseSocket):
         return f"unix:{self.cfg_addr}"
 
     def bind(self, sock):
-        old_umask = os.umask(self.conf.umask)
         sock.bind(self.cfg_addr)
-        util.chown(self.cfg_addr, self.conf.uid, self.conf.gid)
-        os.umask(old_umask)
 
 
 def _sock_type(addr):

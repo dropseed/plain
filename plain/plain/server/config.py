@@ -9,11 +9,9 @@
 
 import argparse
 import copy
-import grp
 import inspect
 import ipaddress
 import os
-import pwd
 import re
 import ssl
 import sys
@@ -128,14 +126,6 @@ class Config:
     def address(self):
         s = self.settings["bind"].get()
         return [util.parse_address(util.bytes_to_str(bind)) for bind in s]
-
-    @property
-    def uid(self):
-        return self.settings["user"].get()
-
-    @property
-    def gid(self):
-        return self.settings["group"].get()
 
     @property
     def proc_name(self):
@@ -424,35 +414,6 @@ def validate_callable(arity):
         return val
 
     return _validate_callable
-
-
-def validate_user(val):
-    if val is None:
-        return os.geteuid()
-    if isinstance(val, int):
-        return val
-    elif val.isdigit():
-        return int(val)
-    else:
-        try:
-            return pwd.getpwnam(val).pw_uid
-        except KeyError:
-            raise ConfigError(f"No such user: '{val}'")
-
-
-def validate_group(val):
-    if val is None:
-        return os.getegid()
-
-    if isinstance(val, int):
-        return val
-    elif val.isdigit():
-        return int(val)
-    else:
-        try:
-            return grp.getgrnam(val).gr_gid
-        except KeyError:
-            raise ConfigError(f"No such group: '{val}'")
 
 
 def validate_post_request(val):
@@ -1022,77 +983,6 @@ class WorkerTmpDir(Setting):
 
            See :ref:`blocking-os-fchmod` for more detailed information
            and a solution for avoiding this problem.
-        """
-
-
-class User(Setting):
-    name = "user"
-    section = "Server Mechanics"
-    cli = ["-u", "--user"]
-    meta = "USER"
-    validator = validate_user
-    default = os.geteuid()
-    default_doc = "``os.geteuid()``"
-    desc = """\
-        Switch worker processes to run as this user.
-
-        A valid user id (as an integer) or the name of a user that can be
-        retrieved with a call to ``pwd.getpwnam(value)`` or ``None`` to not
-        change the worker process user.
-        """
-
-
-class Group(Setting):
-    name = "group"
-    section = "Server Mechanics"
-    cli = ["-g", "--group"]
-    meta = "GROUP"
-    validator = validate_group
-    default = os.getegid()
-    default_doc = "``os.getegid()``"
-    desc = """\
-        Switch worker process to run as this group.
-
-        A valid group id (as an integer) or the name of a user that can be
-        retrieved with a call to ``grp.getgrnam(value)`` or ``None`` to not
-        change the worker processes group.
-        """
-
-
-class Umask(Setting):
-    name = "umask"
-    section = "Server Mechanics"
-    cli = ["-m", "--umask"]
-    meta = "INT"
-    validator = validate_pos_int
-    type = auto_int
-    default = 0
-    desc = """\
-        A bit mask for the file mode on files written by Gunicorn.
-
-        Note that this affects unix socket permissions.
-
-        A valid value for the ``os.umask(mode)`` call or a string compatible
-        with ``int(value, 0)`` (``0`` means Python guesses the base, so values
-        like ``0``, ``0xFF``, ``0022`` are valid for decimal, hex, and octal
-        representations)
-        """
-
-
-class Initgroups(Setting):
-    name = "initgroups"
-    section = "Server Mechanics"
-    cli = ["--initgroups"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-
-    desc = """\
-        If true, set the worker process's group access list with all of the
-        groups of which the specified username is a member, plus the specified
-        group id.
-
-        .. versionadded:: 19.7
         """
 
 
