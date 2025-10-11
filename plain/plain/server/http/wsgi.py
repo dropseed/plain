@@ -96,21 +96,6 @@ def default_environ(req, sock, cfg):
     return env
 
 
-def proxy_environ(req):
-    info = req.proxy_protocol_info
-
-    if not info:
-        return {}
-
-    return {
-        "PROXY_PROTOCOL": info["proxy_protocol"],
-        "REMOTE_ADDR": info["client_addr"],
-        "REMOTE_PORT": str(info["client_port"]),
-        "PROXY_ADDR": info["proxy_addr"],
-        "PROXY_PORT": str(info["proxy_port"]),
-    }
-
-
 def create(req, sock, client, server, cfg):
     resp = Response(req, sock, cfg)
 
@@ -195,9 +180,6 @@ def create(req, sock, client, server, cfg):
     environ["PATH_INFO"] = util.unquote_to_wsgi_str(path_info)
     environ["SCRIPT_NAME"] = script_name
 
-    # override the environ with the correct remote and server address if
-    # we are behind a proxy using the proxy protocol.
-    environ.update(proxy_environ(req))
     return resp, environ
 
 

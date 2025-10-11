@@ -18,11 +18,9 @@ from ssl import SSLError
 from .. import util
 from ..http.errors import (
     ConfigurationProblem,
-    ForbiddenProxyRequest,
     InvalidHeader,
     InvalidHeaderName,
     InvalidHTTPVersion,
-    InvalidProxyLine,
     InvalidRequestLine,
     InvalidRequestMethod,
     InvalidSchemeHeaders,
@@ -223,8 +221,6 @@ class Worker:
             | InvalidHeaderName
             | LimitRequestLine
             | LimitRequestHeaders
-            | InvalidProxyLine
-            | ForbiddenProxyRequest
             | InvalidSchemeHeaders
             | UnsupportedTransferCoding
             | ConfigurationProblem
@@ -258,12 +254,6 @@ class Worker:
                 reason = "Request Header Fields Too Large"
                 mesg = f"Error parsing headers: '{str(exc)}'"
                 status_int = 431
-            elif isinstance(exc, InvalidProxyLine):
-                mesg = f"'{str(exc)}'"
-            elif isinstance(exc, ForbiddenProxyRequest):
-                reason = "Forbidden"
-                mesg = "Request forbidden"
-                status_int = 403
             elif isinstance(exc, InvalidSchemeHeaders):
                 mesg = f"{str(exc)}"
             elif isinstance(exc, SSLError):

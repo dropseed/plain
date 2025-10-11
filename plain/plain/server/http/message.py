@@ -7,16 +7,13 @@
 
 import io
 import re
-import socket
 
 from ..util import bytes_to_str, split_request_uri
 from .body import Body, ChunkedReader, EOFReader, LengthReader
 from .errors import (
-    ForbiddenProxyRequest,
     InvalidHeader,
     InvalidHeaderName,
     InvalidHTTPVersion,
-    InvalidProxyLine,
     InvalidRequestLine,
     InvalidRequestMethod,
     InvalidSchemeHeaders,
@@ -259,7 +256,6 @@ class Request(Message):
             self.limit_request_line = MAX_REQUEST_LINE
 
         self.req_number = req_number
-        self.proxy_protocol_info = None
         super().__init__(cfg, unreader, peer_addr)
 
     def get_data(self, unreader, buf, stop=False):
@@ -276,13 +272,6 @@ class Request(Message):
 
         # get request line
         line, rbuf = self.read_line(unreader, buf, self.limit_request_line)
-
-        # proxy protocol
-        if self.proxy_protocol(bytes_to_str(line)):
-            # get next request line
-            buf = io.BytesIO()
-            buf.write(rbuf)
-            line, rbuf = self.read_line(unreader, buf, self.limit_request_line)
 
         self.parse_request_line(line)
         buf = io.BytesIO()
@@ -334,81 +323,6 @@ class Request(Message):
             data[:idx],  # request line,
             data[idx + 2 :],
         )  # residue in the buffer, skip \r\n
-
-    def proxy_protocol(self, line):
-        """\
-        Detect, check and parse proxy protocol.
-
-        :raises: ForbiddenProxyRequest, InvalidProxyLine.
-        :return: True for proxy protocol line else False
-        """
-        if not self.cfg.proxy_protocol:
-            return False
-
-        if self.req_number != 1:
-            return False
-
-        if not line.startswith("PROXY"):
-            return False
-
-        self.proxy_protocol_access_check()
-        self.parse_proxy_protocol(line)
-
-        return True
-
-    def proxy_protocol_access_check(self):
-        # check in allow list
-        if (
-            "*" not in self.cfg.proxy_allow_ips
-            and isinstance(self.peer_addr, tuple)
-            and self.peer_addr[0] not in self.cfg.proxy_allow_ips
-        ):
-            raise ForbiddenProxyRequest(self.peer_addr[0])
-
-    def parse_proxy_protocol(self, line):
-        bits = line.split(" ")
-
-        if len(bits) != 6:
-            raise InvalidProxyLine(line)
-
-        # Extract data
-        proto = bits[1]
-        s_addr = bits[2]
-        d_addr = bits[3]
-
-        # Validation
-        if proto not in ["TCP4", "TCP6"]:
-            raise InvalidProxyLine(f"protocol '{proto}' not supported")
-        if proto == "TCP4":
-            try:
-                socket.inet_pton(socket.AF_INET, s_addr)
-                socket.inet_pton(socket.AF_INET, d_addr)
-            except OSError:
-                raise InvalidProxyLine(line)
-        elif proto == "TCP6":
-            try:
-                socket.inet_pton(socket.AF_INET6, s_addr)
-                socket.inet_pton(socket.AF_INET6, d_addr)
-            except OSError:
-                raise InvalidProxyLine(line)
-
-        try:
-            s_port = int(bits[4])
-            d_port = int(bits[5])
-        except ValueError:
-            raise InvalidProxyLine(f"invalid port {line}")
-
-        if not ((0 <= s_port <= 65535) and (0 <= d_port <= 65535)):
-            raise InvalidProxyLine(f"invalid port {line}")
-
-        # Set data
-        self.proxy_protocol_info = {
-            "proxy_protocol": proto,
-            "client_addr": s_addr,
-            "client_port": s_port,
-            "proxy_addr": d_addr,
-            "proxy_port": d_port,
-        }
 
     def parse_request_line(self, line_bytes):
         bits = [bytes_to_str(bit) for bit in line_bytes.split(b" ", 2)]

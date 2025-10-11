@@ -855,23 +855,6 @@ class PrintConfig(Setting):
         """
 
 
-class PreloadApp(Setting):
-    name = "preload_app"
-    section = "Server Mechanics"
-    cli = ["--preload"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-        Load application code before the worker processes are forked.
-
-        By preloading an application you can save some RAM resources as well as
-        speed up server boot times. Although, if you defer application loading
-        to each worker process, you can reload your application code easily by
-        restarting workers.
-        """
-
-
 class Sendfile(Setting):
     name = "sendfile"
     section = "Server Mechanics"
@@ -907,18 +890,6 @@ class ReusePort(Setting):
         Set the ``SO_REUSEPORT`` flag on the listening socket.
 
         .. versionadded:: 19.8
-        """
-
-
-class Chdir(Setting):
-    name = "chdir"
-    section = "Server Mechanics"
-    cli = ["--chdir"]
-    validator = validate_chdir
-    default = util.getcwd()
-    default_doc = "``'.'``"
-    desc = """\
-        Change directory to specified directory before loading apps.
         """
 
 
@@ -1759,53 +1730,6 @@ class NewSSLContext(Setting):
                 return context
 
         .. versionadded:: 21.0
-        """
-
-
-class ProxyProtocol(Setting):
-    name = "proxy_protocol"
-    section = "Server Mechanics"
-    cli = ["--proxy-protocol"]
-    validator = validate_bool
-    default = False
-    action = "store_true"
-    desc = """\
-        Enable detect PROXY protocol (PROXY mode).
-
-        Allow using HTTP and Proxy together. It may be useful for work with
-        stunnel as HTTPS frontend and Gunicorn as HTTP server.
-
-        PROXY protocol: http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt
-
-        Example for stunnel config::
-
-            [https]
-            protocol = proxy
-            accept  = 443
-            connect = 80
-            cert = /etc/ssl/certs/stunnel.pem
-            key = /etc/ssl/certs/stunnel.key
-        """
-
-
-class ProxyAllowFrom(Setting):
-    name = "proxy_allow_ips"
-    section = "Server Mechanics"
-    cli = ["--proxy-allow-from"]
-    validator = validate_string_to_addr_list
-    default = "127.0.0.1,::1"
-    desc = """\
-        Front-end's IPs from which allowed accept proxy requests (comma separated).
-
-        Set to ``*`` to disable checking of front-end IPs. This is useful for setups
-        where you don't know in advance the IP address of front-end, but
-        instead have ensured via other means that only your
-        authorized front-ends can access Gunicorn.
-
-        .. note::
-
-            This option does not affect UNIX socket connections. Connections not associated with
-            an IP address are treated as allowed, unconditionally.
         """
 
 

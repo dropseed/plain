@@ -77,15 +77,6 @@ class Application(BaseApplication):
     # 'init' and 'load' methods are implemented by WSGIApplication.
     # pylint: disable=abstract-method
 
-    def chdir(self):
-        # chdir to the configured path before loading,
-        # default is the current dir
-        os.chdir(self.cfg.chdir)
-
-        # add the path to sys.path
-        if self.cfg.chdir not in sys.path:
-            sys.path.insert(0, self.cfg.chdir)
-
     def run(self):
         if self.cfg.print_config:
             print(self.cfg)

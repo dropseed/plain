@@ -121,9 +121,6 @@ class Arbiter:
             for k, v in self.cfg.env.items():
                 os.environ[k] = v
 
-        if self.cfg.preload_app:
-            self.app.wsgi()
-
     def start(self):
         """\
         Initialize the arbiter. Start listening and set pidfile if needed.
