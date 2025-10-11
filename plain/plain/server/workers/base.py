@@ -97,11 +97,6 @@ class Worker:
         super().init_process() so that the ``run()`` loop is initiated.
         """
 
-        # set environment' variables
-        if self.cfg.env:
-            for k, v in self.cfg.env.items():
-                os.environ[k] = v
-
         # Reseed the random number generator
         util.seed()
 
@@ -129,7 +124,6 @@ class Worker:
                 self.log.info("Worker reloading: %s modified", fname)
                 self.alive = False
                 os.write(self.PIPE[1], b"1")
-                self.cfg.worker_int(self)
                 time.sleep(0.1)
                 sys.exit(0)
 
@@ -141,8 +135,6 @@ class Worker:
         self.load_wsgi()
         if self.reloader:
             self.reloader.start()
-
-        self.cfg.post_worker_init(self)
 
         # Enter main run loop
         self.booted = True
@@ -199,14 +191,11 @@ class Worker:
 
     def handle_quit(self, sig, frame):
         self.alive = False
-        # worker_int callback
-        self.cfg.worker_int(self)
         time.sleep(0.1)
         sys.exit(0)
 
     def handle_abort(self, sig, frame):
         self.alive = False
-        self.cfg.worker_abort(self)
         sys.exit(1)
 
     def handle_error(self, req, client, addr, exc):

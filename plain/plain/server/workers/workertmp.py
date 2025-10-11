@@ -18,10 +18,7 @@ IS_CYGWIN = PLATFORM.startswith("CYGWIN")
 
 class WorkerTmp:
     def __init__(self, cfg):
-        fdir = cfg.worker_tmp_dir
-        if fdir and not os.path.isdir(fdir):
-            raise RuntimeError(f"{fdir} doesn't exist. Can't create workertmp.")
-        fd, name = tempfile.mkstemp(prefix="wgunicorn-", dir=fdir)
+        fd, name = tempfile.mkstemp(prefix="wgunicorn-")
 
         # unlink the file so we don't leak temporary files
         try:

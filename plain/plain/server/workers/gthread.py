@@ -100,8 +100,6 @@ class ThreadWorker(base.Worker):
 
     def handle_quit(self, sig, frame):
         self.alive = False
-        # worker_int callback
-        self.cfg.worker_int(self)
         self.tpool.shutdown(False)
         time.sleep(0.1)
         sys.exit(0)
@@ -321,7 +319,6 @@ class ThreadWorker(base.Worker):
         environ = {}
         resp = None
         try:
-            self.cfg.pre_request(self, req)
             request_start = datetime.now()
             resp, environ = wsgi.create(
                 req, conn.sock, conn.client, conn.server, self.cfg
@@ -372,10 +369,5 @@ class ThreadWorker(base.Worker):
                     pass
                 raise StopIteration()
             raise
-        finally:
-            try:
-                self.cfg.post_request(self, req, environ, resp)
-            except Exception:
-                self.log.exception("Exception in post_request hook")
 
         return True

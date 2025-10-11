@@ -13,7 +13,6 @@ import time
 
 logging.Logger.manager.emittedNoHandlerWarning = 1  # noqa
 import os  # noqa: E402
-import socket  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402
 import traceback  # noqa: E402
@@ -22,30 +21,6 @@ from logging.config import dictConfig, fileConfig  # noqa: E402
 from . import util  # noqa: E402
 
 # syslog facility codes
-SYSLOG_FACILITIES = {
-    "auth": 4,
-    "authpriv": 10,
-    "cron": 9,
-    "daemon": 3,
-    "ftp": 11,
-    "kern": 0,
-    "lpr": 6,
-    "mail": 2,
-    "news": 7,
-    "security": 4,  # DEPRECATED
-    "syslog": 5,
-    "user": 1,
-    "uucp": 8,
-    "local0": 16,
-    "local1": 17,
-    "local2": 18,
-    "local3": 19,
-    "local4": 20,
-    "local5": 21,
-    "local6": 22,
-    "local7": 23,
-}
-
 CONFIG_DEFAULTS = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -115,51 +90,6 @@ class SafeAtoms(dict):
             return "-"
 
 
-def parse_syslog_address(addr):
-    # unix domain socket type depends on backend
-    # SysLogHandler will try both when given None
-    if addr.startswith("unix://"):
-        sock_type = None
-
-        # set socket type only if explicitly requested
-        parts = addr.split("#", 1)
-        if len(parts) == 2:
-            addr = parts[0]
-            if parts[1] == "dgram":
-                sock_type = socket.SOCK_DGRAM
-
-        return (sock_type, addr.split("unix://")[1])
-
-    if addr.startswith("udp://"):
-        addr = addr.split("udp://")[1]
-        socktype = socket.SOCK_DGRAM
-    elif addr.startswith("tcp://"):
-        addr = addr.split("tcp://")[1]
-        socktype = socket.SOCK_STREAM
-    else:
-        raise RuntimeError("invalid syslog address")
-
-    if "[" in addr and "]" in addr:
-        host = addr.split("]")[0][1:].lower()
-    elif ":" in addr:
-        host = addr.split(":")[0].lower()
-    elif addr == "":
-        host = "localhost"
-    else:
-        host = addr.lower()
-
-    addr = addr.split("]")[-1]
-    if ":" in addr:
-        port = addr.split(":", 1)[1]
-        if not port.isdigit():
-            raise RuntimeError(f"{port!r} is not a valid port number.")
-        port = int(port)
-    else:
-        port = 514
-
-    return (socktype, (host, port))
-
-
 class Logger:
     LOG_LEVELS = {
         "critical": logging.CRITICAL,
@@ -218,14 +148,6 @@ class Logger:
                 fmt=logging.Formatter(self.access_fmt),
                 stream=sys.stdout,
             )
-
-        # set syslog handler
-        if cfg.syslog:
-            self._set_syslog_handler(self.error_log, cfg, self.syslog_fmt, "error")
-            if not cfg.disable_redirect_access_to_syslog:
-                self._set_syslog_handler(
-                    self.access_log, cfg, self.syslog_fmt, "access"
-                )
 
         if cfg.logconfig_dict:
             config = CONFIG_DEFAULTS.copy()
@@ -349,7 +271,6 @@ class Logger:
             or self.cfg.logconfig
             or self.cfg.logconfig_dict
             or self.cfg.logconfig_json
-            or (self.cfg.syslog and not self.cfg.disable_redirect_access_to_syslog)
         ):
             return
 
@@ -424,33 +345,6 @@ class Logger:
             h.setFormatter(fmt)
             h._gunicorn = True
             log.addHandler(h)
-
-    def _set_syslog_handler(self, log, cfg, fmt, name):
-        # setup format
-        prefix = cfg.syslog_prefix or cfg.proc_name.replace(":", ".")
-
-        prefix = f"plain.server.{prefix}.{name}"
-
-        # set format
-        fmt = logging.Formatter(rf"{prefix}: {fmt}")
-
-        # syslog facility
-        try:
-            facility = SYSLOG_FACILITIES[cfg.syslog_facility.lower()]
-        except KeyError:
-            raise RuntimeError("unknown facility name")
-
-        # parse syslog address
-        socktype, addr = parse_syslog_address(cfg.syslog_addr)
-
-        # finally setup the syslog handler
-        h = logging.handlers.SysLogHandler(
-            address=addr, facility=facility, socktype=socktype
-        )
-
-        h.setFormatter(fmt)
-        h._gunicorn = True
-        log.addHandler(h)
 
     def _get_user(self, environ):
         user = None

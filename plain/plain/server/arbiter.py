@@ -82,9 +82,7 @@ class Arbiter:
         return self._num_workers
 
     def _set_num_workers(self, value):
-        old_value = self._num_workers
         self._num_workers = value
-        self.cfg.nworkers_changed(self, value, old_value)
 
     num_workers = property(_get_num_workers, _set_num_workers)
 
@@ -116,11 +114,6 @@ class Arbiter:
             )
         )
 
-        # set environment' variables
-        if self.cfg.env:
-            for k, v in self.cfg.env.items():
-                os.environ[k] = v
-
     def start(self):
         """\
         Initialize the arbiter. Start listening and set pidfile if needed.
@@ -139,7 +132,6 @@ class Arbiter:
                 pidname += ".2"
             self.pidfile = Pidfile(pidname)
             self.pidfile.create(self.pid)
-        self.cfg.on_starting(self)
 
         self.init_signals()
 
@@ -162,8 +154,6 @@ class Arbiter:
         # check worker class requirements
         if hasattr(self.worker_class, "check_config"):
             self.worker_class.check_config(self.cfg, self.log)
-
-        self.cfg.when_ready(self)
 
     def init_signals(self):
         """\
@@ -340,7 +330,6 @@ class Arbiter:
 
         if self.pidfile is not None:
             self.pidfile.unlink()
-        self.cfg.on_exit(self)
         sys.exit(exit_status)
 
     def sleep(self):
@@ -402,8 +391,6 @@ class Arbiter:
         if self.reexec_pid != 0:
             return
 
-        self.cfg.pre_exec(self)
-
         environ = self.cfg.env_orig.copy()
         environ["GUNICORN_PID"] = str(master_pid)
         environ["GUNICORN_FD"] = ",".join(str(lnr.fileno()) for lnr in self.LISTENERS)
@@ -415,19 +402,6 @@ class Arbiter:
 
     def reload(self):
         old_address = self.cfg.address
-
-        # reset old environment
-        for k in self.cfg.env:
-            if k in self.cfg.env_orig:
-                # reset the key to the value it had before
-                # we launched gunicorn
-                os.environ[k] = self.cfg.env_orig[k]
-            else:
-                # delete the value set by gunicorn
-                try:
-                    del os.environ[k]
-                except KeyError:
-                    pass
 
         # reload conf
         self.app.reload()
@@ -445,9 +419,6 @@ class Arbiter:
             self.LISTENERS = sock.create_sockets(self.cfg, self.log)
             listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
             self.log.info("Listening at: %s", listeners_str)
-
-        # do some actions on reload
-        self.cfg.on_reload(self)
 
         # unlink pidfile
         if self.pidfile is not None:
@@ -538,7 +509,6 @@ class Arbiter:
                     if not worker:
                         continue
                     worker.tmp.close()
-                    self.cfg.child_exit(self, worker)
         except OSError as e:
             if e.errno != errno.ECHILD:
                 raise
@@ -580,7 +550,6 @@ class Arbiter:
             self.cfg,
             self.log,
         )
-        self.cfg.pre_fork(self, worker)
         pid = os.fork()
         if pid != 0:
             worker.pid = pid
@@ -597,7 +566,6 @@ class Arbiter:
             self.log.info("Booting worker with pid: %s", worker.pid)
             if self.cfg.reuse_port:
                 worker.sockets = sock.create_sockets(self.cfg, self.log)
-            self.cfg.post_fork(self, worker)
             worker.init_process()
             sys.exit(0)
         except SystemExit:
@@ -616,7 +584,6 @@ class Arbiter:
             self.log.info("Worker exiting (pid: %s)", worker.pid)
             try:
                 worker.tmp.close()
-                self.cfg.worker_exit(self, worker)
             except Exception:
                 self.log.warning(
                     "Exception during worker exit:\n%s", traceback.format_exc()
@@ -657,7 +624,6 @@ class Arbiter:
                 try:
                     worker = self.WORKERS.pop(pid)
                     worker.tmp.close()
-                    self.cfg.worker_exit(self, worker)
                     return
                 except (KeyError, OSError):
                     return

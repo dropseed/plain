@@ -70,24 +70,3 @@ class BaseApplication:
             print(f"\nError: {e}\n", file=sys.stderr)
             sys.stderr.flush()
             sys.exit(1)
-
-
-class Application(BaseApplication):
-    # 'init' and 'load' methods are implemented by WSGIApplication.
-    # pylint: disable=abstract-method
-
-    def run(self):
-        if self.cfg.print_config:
-            print(self.cfg)
-
-        if self.cfg.print_config or self.cfg.check_config:
-            try:
-                self.load()
-            except Exception:
-                msg = "\nError while loading the application:\n"
-                print(msg, file=sys.stderr)
-                sys.stderr.flush()
-                sys.exit(1)
-            sys.exit(0)
-
-        super().run()

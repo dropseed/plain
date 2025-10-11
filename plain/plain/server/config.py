@@ -13,7 +13,6 @@ import inspect
 import ipaddress
 import os
 import re
-import ssl
 import sys
 import textwrap
 
@@ -161,25 +160,6 @@ class Config:
             if value.section == "SSL":
                 opts[name] = value.get()
         return opts
-
-    @property
-    def env(self):
-        raw_env = self.settings["raw_env"].get()
-        env = {}
-
-        if not raw_env:
-            return env
-
-        for e in raw_env:
-            s = util.bytes_to_str(e)
-            try:
-                k, v = s.split("=", 1)
-            except ValueError:
-                raise RuntimeError(f"environment setting {s!r} invalid")
-
-            env[k] = v
-
-        return env
 
     @property
     def sendfile(self):
@@ -406,20 +386,6 @@ def validate_callable(arity):
         return val
 
     return _validate_callable
-
-
-def validate_post_request(val):
-    val = validate_callable(-1)(val)
-
-    largs = util.get_arity(val)
-    if largs == 4:
-        return val
-    elif largs == 3:
-        return lambda worker, req, env, _r: val(worker, req, env)
-    elif largs == 2:
-        return lambda worker, req, _e, _r: val(worker, req)
-    else:
-        raise TypeError("Value must have an arity of: 4")
 
 
 def validate_reload_engine(val):
@@ -808,31 +774,6 @@ class ReloadExtraFiles(Setting):
         """
 
 
-class ConfigCheck(Setting):
-    name = "check_config"
-    section = "Debugging"
-    cli = ["--check-config"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-        Check the configuration and exit. The exit status is 0 if the
-        configuration is correct, and 1 if the configuration is incorrect.
-        """
-
-
-class PrintConfig(Setting):
-    name = "print_config"
-    section = "Debugging"
-    cli = ["--print-config"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-        Print the configuration settings as fully resolved. Implies :ref:`check-config`.
-        """
-
-
 class Sendfile(Setting):
     name = "sendfile"
     section = "Server Mechanics"
@@ -871,34 +812,6 @@ class ReusePort(Setting):
         """
 
 
-class Env(Setting):
-    name = "raw_env"
-    action = "append"
-    section = "Server Mechanics"
-    cli = ["-e", "--env"]
-    meta = "ENV"
-    validator = validate_list_string
-    default = []
-
-    desc = """\
-        Set environment variables in the execution environment.
-
-        Should be a list of strings in the ``key=value`` format.
-
-        For example on the command line:
-
-        .. code-block:: console
-
-            $ gunicorn -b 127.0.0.1:8000 --env FOO=1 test:app
-
-        Or in the configuration file:
-
-        .. code-block:: python
-
-            raw_env = ["FOO=1"]
-        """
-
-
 class Pidfile(Setting):
     name = "pidfile"
     section = "Server Mechanics"
@@ -910,28 +823,6 @@ class Pidfile(Setting):
         A filename to use for the PID file.
 
         If not set, no PID file will be written.
-        """
-
-
-class WorkerTmpDir(Setting):
-    name = "worker_tmp_dir"
-    section = "Server Mechanics"
-    cli = ["--worker-tmp-dir"]
-    meta = "DIR"
-    validator = validate_string
-    default = None
-    desc = """\
-        A directory to use for the worker heartbeat temporary file.
-
-        If not set, the default temporary directory will be used.
-
-        .. note::
-           The current heartbeat system involves calling ``os.fchmod`` on
-           temporary file handlers and may block a worker for arbitrary time
-           if the directory is on a disk-backed filesystem.
-
-           See :ref:`blocking-os-fchmod` for more detailed information
-           and a solution for avoiding this problem.
         """
 
 
@@ -1070,20 +961,6 @@ class AccessLog(Setting):
 
         ``'-'`` means log to stdout.
         """
-
-
-class DisableRedirectAccessToSyslog(Setting):
-    name = "disable_redirect_access_to_syslog"
-    section = "Logging"
-    cli = ["--disable-redirect-access-to-syslog"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-    Disable redirect access logs to syslog.
-
-    .. versionadded:: 19.8
-    """
 
 
 class AccessLogFormat(Setting):
@@ -1251,82 +1128,6 @@ class LogConfigJson(Setting):
     """
 
 
-class SyslogTo(Setting):
-    name = "syslog_addr"
-    section = "Logging"
-    cli = ["--log-syslog-to"]
-    meta = "SYSLOG_ADDR"
-    validator = validate_string
-
-    if PLATFORM == "darwin":
-        default = "unix:///var/run/syslog"
-    elif PLATFORM in (
-        "freebsd",
-        "dragonfly",
-    ):
-        default = "unix:///var/run/log"
-    elif PLATFORM == "openbsd":
-        default = "unix:///dev/log"
-    else:
-        default = "udp://localhost:514"
-
-    desc = """\
-    Address to send syslog messages.
-
-    Address is a string of the form:
-
-    * ``unix://PATH#TYPE`` : for unix domain socket. ``TYPE`` can be ``stream``
-      for the stream driver or ``dgram`` for the dgram driver.
-      ``stream`` is the default.
-    * ``udp://HOST:PORT`` : for UDP sockets
-    * ``tcp://HOST:PORT`` : for TCP sockets
-
-    """
-
-
-class Syslog(Setting):
-    name = "syslog"
-    section = "Logging"
-    cli = ["--log-syslog"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-    Send *Gunicorn* logs to syslog.
-
-    .. versionchanged:: 19.8
-       You can now disable sending access logs by using the
-       :ref:`disable-redirect-access-to-syslog` setting.
-    """
-
-
-class SyslogPrefix(Setting):
-    name = "syslog_prefix"
-    section = "Logging"
-    cli = ["--log-syslog-prefix"]
-    meta = "SYSLOG_PREFIX"
-    validator = validate_string
-    default = None
-    desc = """\
-    Makes Gunicorn use the parameter as program-name in the syslog entries.
-
-    All entries will be prefixed by ``plain.server.<prefix>``. By default the
-    program name is the name of the process.
-    """
-
-
-class SyslogFacility(Setting):
-    name = "syslog_facility"
-    section = "Logging"
-    cli = ["--log-syslog-facility"]
-    meta = "SYSLOG_FACILITY"
-    validator = validate_string
-    default = "user"
-    desc = """\
-    Syslog facility name
-    """
-
-
 class Procname(Setting):
     name = "proc_name"
     section = "Process Naming"
@@ -1353,277 +1154,6 @@ class DefaultProcName(Setting):
     default = "gunicorn"
     desc = """\
         Internal setting that is adjusted for each type of application.
-        """
-
-
-class OnStarting(Setting):
-    name = "on_starting"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-    type = callable
-
-    def on_starting(server):
-        pass
-
-    default = staticmethod(on_starting)
-    desc = """\
-        Called just before the master process is initialized.
-
-        The callable needs to accept a single instance variable for the Arbiter.
-        """
-
-
-class OnReload(Setting):
-    name = "on_reload"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-    type = callable
-
-    def on_reload(server):
-        pass
-
-    default = staticmethod(on_reload)
-    desc = """\
-        Called to recycle workers during a reload via SIGHUP.
-
-        The callable needs to accept a single instance variable for the Arbiter.
-        """
-
-
-class WhenReady(Setting):
-    name = "when_ready"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-    type = callable
-
-    def when_ready(server):
-        pass
-
-    default = staticmethod(when_ready)
-    desc = """\
-        Called just after the server is started.
-
-        The callable needs to accept a single instance variable for the Arbiter.
-        """
-
-
-class Prefork(Setting):
-    name = "pre_fork"
-    section = "Server Hooks"
-    validator = validate_callable(2)
-    type = callable
-
-    def pre_fork(server, worker):
-        pass
-
-    default = staticmethod(pre_fork)
-    desc = """\
-        Called just before a worker is forked.
-
-        The callable needs to accept two instance variables for the Arbiter and
-        new Worker.
-        """
-
-
-class Postfork(Setting):
-    name = "post_fork"
-    section = "Server Hooks"
-    validator = validate_callable(2)
-    type = callable
-
-    def post_fork(server, worker):
-        pass
-
-    default = staticmethod(post_fork)
-    desc = """\
-        Called just after a worker has been forked.
-
-        The callable needs to accept two instance variables for the Arbiter and
-        new Worker.
-        """
-
-
-class PostWorkerInit(Setting):
-    name = "post_worker_init"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-    type = callable
-
-    def post_worker_init(worker):
-        pass
-
-    default = staticmethod(post_worker_init)
-    desc = """\
-        Called just after a worker has initialized the application.
-
-        The callable needs to accept one instance variable for the initialized
-        Worker.
-        """
-
-
-class WorkerInt(Setting):
-    name = "worker_int"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-    type = callable
-
-    def worker_int(worker):
-        pass
-
-    default = staticmethod(worker_int)
-    desc = """\
-        Called just after a worker exited on SIGINT or SIGQUIT.
-
-        The callable needs to accept one instance variable for the initialized
-        Worker.
-        """
-
-
-class WorkerAbort(Setting):
-    name = "worker_abort"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-    type = callable
-
-    def worker_abort(worker):
-        pass
-
-    default = staticmethod(worker_abort)
-    desc = """\
-        Called when a worker received the SIGABRT signal.
-
-        This call generally happens on timeout.
-
-        The callable needs to accept one instance variable for the initialized
-        Worker.
-        """
-
-
-class PreExec(Setting):
-    name = "pre_exec"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-    type = callable
-
-    def pre_exec(server):
-        pass
-
-    default = staticmethod(pre_exec)
-    desc = """\
-        Called just before a new master process is forked.
-
-        The callable needs to accept a single instance variable for the Arbiter.
-        """
-
-
-class PreRequest(Setting):
-    name = "pre_request"
-    section = "Server Hooks"
-    validator = validate_callable(2)
-    type = callable
-
-    def pre_request(worker, req):
-        worker.log.debug("%s %s", req.method, req.path)
-
-    default = staticmethod(pre_request)
-    desc = """\
-        Called just before a worker processes the request.
-
-        The callable needs to accept two instance variables for the Worker and
-        the Request.
-        """
-
-
-class PostRequest(Setting):
-    name = "post_request"
-    section = "Server Hooks"
-    validator = validate_post_request
-    type = callable
-
-    def post_request(worker, req, environ, resp):
-        pass
-
-    default = staticmethod(post_request)
-    desc = """\
-        Called after a worker processes the request.
-
-        The callable needs to accept two instance variables for the Worker and
-        the Request.
-        """
-
-
-class ChildExit(Setting):
-    name = "child_exit"
-    section = "Server Hooks"
-    validator = validate_callable(2)
-    type = callable
-
-    def child_exit(server, worker):
-        pass
-
-    default = staticmethod(child_exit)
-    desc = """\
-        Called just after a worker has been exited, in the master process.
-
-        The callable needs to accept two instance variables for the Arbiter and
-        the just-exited Worker.
-
-        .. versionadded:: 19.7
-        """
-
-
-class WorkerExit(Setting):
-    name = "worker_exit"
-    section = "Server Hooks"
-    validator = validate_callable(2)
-    type = callable
-
-    def worker_exit(server, worker):
-        pass
-
-    default = staticmethod(worker_exit)
-    desc = """\
-        Called just after a worker has been exited, in the worker process.
-
-        The callable needs to accept two instance variables for the Arbiter and
-        the just-exited Worker.
-        """
-
-
-class NumWorkersChanged(Setting):
-    name = "nworkers_changed"
-    section = "Server Hooks"
-    validator = validate_callable(3)
-    type = callable
-
-    def nworkers_changed(server, new_value, old_value):
-        pass
-
-    default = staticmethod(nworkers_changed)
-    desc = """\
-        Called just after *num_workers* has been changed.
-
-        The callable needs to accept an instance variable of the Arbiter and
-        two integers of number of workers after and before change.
-
-        If the number of workers is set for the first time, *old_value* would
-        be ``None``.
-        """
-
-
-class OnExit(Setting):
-    name = "on_exit"
-    section = "Server Hooks"
-    validator = validate_callable(1)
-
-    def on_exit(server):
-        pass
-
-    default = staticmethod(on_exit)
-    desc = """\
-        Called just before exiting Gunicorn.
-
-        The callable needs to accept a single instance variable for the Arbiter.
         """
 
 
@@ -1683,85 +1213,6 @@ class CertFile(Setting):
     default = None
     desc = """\
     SSL certificate file
-    """
-
-
-class CertReqs(Setting):
-    name = "cert_reqs"
-    section = "SSL"
-    cli = ["--cert-reqs"]
-    validator = validate_pos_int
-    default = ssl.CERT_NONE
-    desc = """\
-    Whether client certificate is required (see stdlib ssl module's)
-
-    ===========  ===========================
-    --cert-reqs      Description
-    ===========  ===========================
-    `0`          no client verification
-    `1`          ssl.CERT_OPTIONAL
-    `2`          ssl.CERT_REQUIRED
-    ===========  ===========================
-    """
-
-
-class CACerts(Setting):
-    name = "ca_certs"
-    section = "SSL"
-    cli = ["--ca-certs"]
-    meta = "FILE"
-    validator = validate_string
-    default = None
-    desc = """\
-    CA certificates file
-    """
-
-
-class SuppressRaggedEOFs(Setting):
-    name = "suppress_ragged_eofs"
-    section = "SSL"
-    cli = ["--suppress-ragged-eofs"]
-    action = "store_true"
-    default = True
-    validator = validate_bool
-    desc = """\
-    Suppress ragged EOFs (see stdlib ssl module's)
-    """
-
-
-class DoHandshakeOnConnect(Setting):
-    name = "do_handshake_on_connect"
-    section = "SSL"
-    cli = ["--do-handshake-on-connect"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-    Whether to perform SSL handshake on socket connect (see stdlib ssl module's)
-    """
-
-
-class Ciphers(Setting):
-    name = "ciphers"
-    section = "SSL"
-    cli = ["--ciphers"]
-    validator = validate_string
-    default = None
-    desc = """\
-    SSL Cipher suite to use, in the format of an OpenSSL cipher list.
-
-    By default we use the default cipher list from Python's ``ssl`` module,
-    which contains ciphers considered strong at the time of each Python
-    release.
-
-    As a recommended alternative, the Open Web App Security Project (OWASP)
-    offers `a vetted set of strong cipher strings rated A+ to C-
-    <https://www.owasp.org/index.php/TLS_Cipher_String_Cheat_Sheet>`_.
-    OWASP provides details on user-agent compatibility at each security level.
-
-    See the `OpenSSL Cipher List Format Documentation
-    <https://www.openssl.org/docs/manmaster/man1/ciphers.html#CIPHER-LIST-FORMAT>`_
-    for details on the format of an OpenSSL cipher list.
     """
 
 
