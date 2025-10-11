@@ -23,14 +23,8 @@ import sys
 import textwrap
 import time
 import traceback
-import warnings
-
-try:
-    import importlib.metadata as importlib_metadata
-except (ModuleNotFoundError, ImportError):
-    import importlib_metadata
-
 import urllib.parse
+import warnings
 
 from .errors import AppImportError
 from .workers import SUPPORTED_WORKERS
@@ -53,72 +47,34 @@ hop_headers = set(
     """.split()
 )
 
-try:
-    from setproctitle import setproctitle
-
-    def _setproctitle(title):
-        setproctitle(f"gunicorn: {title}")
-except ImportError:
-
-    def _setproctitle(title):
-        pass
-
-
-def load_entry_point(distribution, group, name):
-    dist_obj = importlib_metadata.distribution(distribution)
-    eps = [ep for ep in dist_obj.entry_points if ep.group == group and ep.name == name]
-    if not eps:
-        raise ImportError(f"Entry point {(group, name)!r} not found")
-    return eps[0].load()
-
 
 def load_class(
     uri, default="plain.server.workers.sync.SyncWorker", section="plain.server.workers"
 ):
     if inspect.isclass(uri):
         return uri
-    if uri.startswith("egg:"):
-        # uses entry points
-        entry_str = uri.split("egg:")[1]
-        try:
-            dist, name = entry_str.rsplit("#", 1)
-        except ValueError:
-            dist = entry_str
-            name = default
 
-        try:
-            return load_entry_point(dist, section, name)
-        except Exception:
-            exc = traceback.format_exc()
-            msg = "class uri %r invalid or not found: \n\n[%s]"
-            raise RuntimeError(msg % (uri, exc))
-    else:
-        components = uri.split(".")
-        if len(components) == 1:
-            while True:
-                if uri.startswith("#"):
-                    uri = uri[1:]
+    components = uri.split(".")
+    if len(components) == 1:
+        # Handle short names like "sync" or "gthread"
+        if uri.startswith("#"):
+            uri = uri[1:]
 
-                if uri in SUPPORTED_WORKERS:
-                    components = SUPPORTED_WORKERS[uri].split(".")
-                    break
+        if uri in SUPPORTED_WORKERS:
+            components = SUPPORTED_WORKERS[uri].split(".")
+        else:
+            exc_msg = f"Worker type {uri!r} not found in SUPPORTED_WORKERS"
+            raise RuntimeError(exc_msg)
 
-                try:
-                    return load_entry_point("gunicorn", section, uri)
-                except Exception:
-                    exc = traceback.format_exc()
-                    msg = "class uri %r invalid or not found: \n\n[%s]"
-                    raise RuntimeError(msg % (uri, exc))
+    klass = components.pop(-1)
 
-        klass = components.pop(-1)
-
-        try:
-            mod = importlib.import_module(".".join(components))
-        except Exception:
-            exc = traceback.format_exc()
-            msg = "class uri %r invalid or not found: \n\n[%s]"
-            raise RuntimeError(msg % (uri, exc))
-        return getattr(mod, klass)
+    try:
+        mod = importlib.import_module(".".join(components))
+    except Exception:
+        exc = traceback.format_exc()
+        msg = "class uri %r invalid or not found: \n\n[%s]"
+        raise RuntimeError(msg % (uri, exc))
+    return getattr(mod, klass)
 
 
 positionals = (

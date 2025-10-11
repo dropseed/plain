@@ -5,15 +5,11 @@
 #
 # Vendored and modified for Plain.
 
-import importlib.machinery
-import importlib.util
 import os
 import sys
-import traceback
 
-from . import util
 from .arbiter import Arbiter
-from .config import Config, get_default_config_file
+from .config import Config
 
 
 class BaseApplication:
@@ -90,116 +86,6 @@ class Application(BaseApplication):
         if self.cfg.chdir not in sys.path:
             sys.path.insert(0, self.cfg.chdir)
 
-    def get_config_from_filename(self, filename):
-        if not os.path.exists(filename):
-            raise RuntimeError(f"{filename!r} doesn't exist")
-
-        ext = os.path.splitext(filename)[1]
-
-        try:
-            module_name = "__config__"
-            if ext in [".py", ".pyc"]:
-                spec = importlib.util.spec_from_file_location(module_name, filename)
-            else:
-                msg = "configuration file should have a valid Python extension.\n"
-                util.warn(msg)
-                loader_ = importlib.machinery.SourceFileLoader(module_name, filename)
-                spec = importlib.util.spec_from_file_location(
-                    module_name, filename, loader=loader_
-                )
-            mod = importlib.util.module_from_spec(spec)
-            sys.modules[module_name] = mod
-            spec.loader.exec_module(mod)
-        except Exception:
-            print(f"Failed to read config file: {filename}", file=sys.stderr)
-            traceback.print_exc()
-            sys.stderr.flush()
-            sys.exit(1)
-
-        return vars(mod)
-
-    def get_config_from_module_name(self, module_name):
-        return vars(importlib.import_module(module_name))
-
-    def load_config_from_module_name_or_filename(self, location):
-        """
-        Loads the configuration file: the file is a python file, otherwise raise an RuntimeError
-        Exception or stop the process if the configuration file contains a syntax error.
-        """
-
-        if location.startswith("python:"):
-            module_name = location[len("python:") :]
-            cfg = self.get_config_from_module_name(module_name)
-        else:
-            if location.startswith("file:"):
-                filename = location[len("file:") :]
-            else:
-                filename = location
-            cfg = self.get_config_from_filename(filename)
-
-        for k, v in cfg.items():
-            # Ignore unknown names
-            if k not in self.cfg.settings:
-                continue
-            try:
-                self.cfg.set(k.lower(), v)
-            except Exception:
-                print(f"Invalid value for {k}: {v}\n", file=sys.stderr)
-                sys.stderr.flush()
-                raise
-
-        return cfg
-
-    def load_config_from_file(self, filename):
-        return self.load_config_from_module_name_or_filename(location=filename)
-
-    def load_config(self):
-        # parse console args
-        parser = self.cfg.parser()
-        args = parser.parse_args()
-
-        # optional settings from apps
-        cfg = self.init(parser, args, args.args)
-
-        # set up import paths and follow symlinks
-        self.chdir()
-
-        # Load up the any app specific configuration
-        if cfg:
-            for k, v in cfg.items():
-                self.cfg.set(k.lower(), v)
-
-        env_args = parser.parse_args(self.cfg.get_cmd_args_from_env())
-
-        if args.config:
-            self.load_config_from_file(args.config)
-        elif env_args.config:
-            self.load_config_from_file(env_args.config)
-        else:
-            default_config = get_default_config_file()
-            if default_config is not None:
-                self.load_config_from_file(default_config)
-
-        # Load up environment configuration
-        for k, v in vars(env_args).items():
-            if v is None:
-                continue
-            if k == "args":
-                continue
-            self.cfg.set(k.lower(), v)
-
-        # Lastly, update the configuration with any command line settings.
-        for k, v in vars(args).items():
-            if v is None:
-                continue
-            if k == "args":
-                continue
-            self.cfg.set(k.lower(), v)
-
-        # current directory might be changed by the config now
-        # set up import paths and follow symlinks
-        self.chdir()
-
     def run(self):
         if self.cfg.print_config:
             print(self.cfg)
@@ -210,7 +96,6 @@ class Application(BaseApplication):
             except Exception:
                 msg = "\nError while loading the application:\n"
                 print(msg, file=sys.stderr)
-                traceback.print_exc()
                 sys.stderr.flush()
                 sys.exit(1)
             sys.exit(0)

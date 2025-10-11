@@ -511,37 +511,6 @@ def validate_reload_engine(val):
     return val
 
 
-def get_default_config_file():
-    config_path = os.path.join(os.path.abspath(os.getcwd()), "plain.server.conf.py")
-    if os.path.exists(config_path):
-        return config_path
-    return None
-
-
-class ConfigFile(Setting):
-    name = "config"
-    section = "Config File"
-    cli = ["-c", "--config"]
-    meta = "CONFIG"
-    validator = validate_string
-    default = "./plain.server.conf.py"
-    desc = """\
-        :ref:`The Gunicorn config file<configuration_file>`.
-
-        A string of the form ``PATH``, ``file:PATH``, or ``python:MODULE_NAME``.
-
-        Only has an effect when specified on the command line or as part of an
-        application specific configuration.
-
-        By default, a file named ``plain.server.conf.py`` will be read from the same
-        directory where gunicorn is being run.
-
-        .. versionchanged:: 19.4
-           Loading the config from a Python module requires the ``python:``
-           prefix.
-        """
-
-
 class WSGIApp(Setting):
     name = "wsgi_app"
     section = "Config File"

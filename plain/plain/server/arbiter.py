@@ -17,7 +17,7 @@ import traceback
 
 import plain.runtime
 
-from . import SERVER_SOFTWARE, sock, util
+from . import sock, util
 from .errors import AppImportError, HaltServer
 from .pidfile import Pidfile
 
@@ -56,7 +56,7 @@ class Arbiter:
     }
 
     def __init__(self, app):
-        os.environ["SERVER_SOFTWARE"] = SERVER_SOFTWARE
+        os.environ["SERVER_SOFTWARE"] = f"plain/{plain.runtime.__version__}"
 
         self._num_workers = None
         self._last_logged_active_worker_count = None
@@ -198,7 +198,6 @@ class Arbiter:
     def run(self):
         "Main master loop."
         self.start()
-        util._setproctitle(f"master [{self.proc_name}]")
 
         try:
             self.manage_workers()
@@ -322,8 +321,6 @@ class Arbiter:
             # rename the pidfile
             if self.pidfile is not None:
                 self.pidfile.rename(self.cfg.pidfile)
-            # reset proctitle
-            util._setproctitle(f"master [{self.proc_name}]")
 
     def wakeup(self):
         """\
@@ -464,9 +461,6 @@ class Arbiter:
             self.pidfile = Pidfile(self.cfg.pidfile)
             self.pidfile.create(self.pid)
 
-        # set new proc_name
-        util._setproctitle(f"master [{self.proc_name}]")
-
         # spawn new workers
         for _ in range(self.cfg.workers):
             self.spawn_worker()
@@ -603,7 +597,6 @@ class Arbiter:
         # Process Child
         worker.pid = os.getpid()
         try:
-            util._setproctitle(f"worker [{self.proc_name}]")
             self.log.info("Booting worker with pid: %s", worker.pid)
             if self.cfg.reuse_port:
                 worker.sockets = sock.create_sockets(self.cfg, self.log)
