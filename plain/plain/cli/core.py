@@ -19,6 +19,7 @@ from .install import install
 from .preflight import preflight_cli
 from .registry import cli_registry
 from .scaffold import create
+from .server import server
 from .settings import setting
 from .shell import run, shell
 from .upgrade import upgrade
@@ -45,6 +46,7 @@ plain_cli.add_command(shell)
 plain_cli.add_command(run)
 plain_cli.add_command(install)
 plain_cli.add_command(upgrade)
+plain_cli.add_command(server)
 
 
 class CLIRegistryGroup(click.Group):
@@ -68,26 +70,33 @@ class PlainCommandCollection(click.CommandCollection):
     context_class = PlainContext
 
     def __init__(self, *args: Any, **kwargs: Any):
-        sources = []
+        # Start with only built-in commands (no setup needed)
+        sources = [plain_cli]
+
+        super().__init__(*args, **kwargs)
+        self.sources = sources
+        self._registry_group = None
+        self._setup_attempted = False
+
+    def _ensure_registry_loaded(self) -> None:
+        """Lazy load the registry group (requires setup)."""
+        if self._registry_group is not None or self._setup_attempted:
+            return
+
+        self._setup_attempted = True
 
         try:
             plain.runtime.setup()
-
-            sources = [
-                CLIRegistryGroup(),
-                plain_cli,
-            ]
+            self._registry_group = CLIRegistryGroup()
+            # Add registry group to sources
+            self.sources.insert(0, self._registry_group)
         except plain.runtime.AppPathNotFound:
-            # Allow some commands to work regardless of being in a valid app
+            # Allow built-in commands to work regardless of being in a valid app
             click.secho(
                 "Plain `app` directory not found. Some commands may be missing.",
                 fg="yellow",
                 err=True,
             )
-
-            sources = [
-                plain_cli,
-            ]
         except ImproperlyConfigured as e:
             # Show what was configured incorrectly and exit
             click.secho(
@@ -95,7 +104,6 @@ class PlainCommandCollection(click.CommandCollection):
                 fg="red",
                 err=True,
             )
-
             exit(1)
         except Exception as e:
             # Show the exception and exit
@@ -108,19 +116,29 @@ class PlainCommandCollection(click.CommandCollection):
                 fg="red",
                 err=True,
             )
-
             exit(1)
 
-        super().__init__(*args, **kwargs)
-
-        self.sources = sources
-
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
+        # Try built-in commands first
         cmd = super().get_command(ctx, cmd_name)
+
+        if cmd is None:
+            # Command not found in built-ins, try registry (requires setup)
+            self._ensure_registry_loaded()
+            cmd = super().get_command(ctx, cmd_name)
+        elif not getattr(cmd, "without_runtime_setup", False):
+            # Command found but needs setup - ensure registry is loaded
+            self._ensure_registry_loaded()
+
         if cmd:
             # Pass the formatting down to subcommands automatically
             cmd.context_class = self.context_class
         return cmd
+
+    def list_commands(self, ctx: Context) -> list[str]:
+        # For help listing, we need to show registry commands too
+        self._ensure_registry_loaded()
+        return super().list_commands(ctx)
 
 
 cli = PlainCommandCollection()
