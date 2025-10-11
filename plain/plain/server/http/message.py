@@ -114,8 +114,6 @@ class Message:
             if curr.find(":") <= 0:
                 raise InvalidHeader(curr)
             name, value = curr.split(":", 1)
-            if self.cfg.strip_header_spaces:
-                name = name.rstrip(" \t")
             if not TOKEN_RE.fullmatch(name):
                 raise InvalidHeaderName(name)
 
@@ -129,14 +127,8 @@ class Message:
 
             # Consume value continuation lines..
             while lines and lines[0].startswith((" ", "\t")):
-                # .. which is obsolete here, and no longer done by default
-                if not self.cfg.permit_obsolete_folding:
-                    raise ObsoleteFolding(name)
-                curr = lines.pop(0)
-                header_length += len(curr) + len("\r\n")
-                if header_length > self.limit_request_field_size > 0:
-                    raise LimitRequestHeaders("limit request headers fields size")
-                value.append(curr.strip("\t "))
+                # Obsolete folding is not permitted (RFC 7230)
+                raise ObsoleteFolding(name)
             value = " ".join(value)
 
             if RFC9110_5_5_INVALID_AND_DANGEROUS.search(value):
@@ -426,20 +418,14 @@ class Request(Message):
         # Method: RFC9110 Section 9
         self.method = bits[0]
 
-        # nonstandard restriction, suitable for all IANA registered methods
-        # partially enforced in previous gunicorn versions
-        if not self.cfg.permit_unconventional_http_method:
-            if METHOD_BADCHAR_RE.search(self.method):
-                raise InvalidRequestMethod(self.method)
-            if not 3 <= len(bits[0]) <= 20:
-                raise InvalidRequestMethod(self.method)
-        # standard restriction: RFC9110 token
+        # Enforce IANA-style method restrictions
+        if METHOD_BADCHAR_RE.search(self.method):
+            raise InvalidRequestMethod(self.method)
+        if not 3 <= len(bits[0]) <= 20:
+            raise InvalidRequestMethod(self.method)
+        # Standard restriction: RFC9110 token
         if not TOKEN_RE.fullmatch(self.method):
             raise InvalidRequestMethod(self.method)
-        # nonstandard and dangerous
-        # methods are merely uppercase by convention, no case-insensitive treatment is intended
-        if self.cfg.casefold_http_method:
-            self.method = self.method.upper()
 
         # URI
         self.uri = bits[1]
@@ -469,9 +455,8 @@ class Request(Message):
             raise InvalidHTTPVersion(bits[2])
         self.version = (int(match.group(1)), int(match.group(2)))
         if not (1, 0) <= self.version < (2, 0):
-            # if ever relaxing this, carefully review Content-Encoding processing
-            if not self.cfg.permit_unconventional_http_version:
-                raise InvalidHTTPVersion(self.version)
+            # Only HTTP/1.0 and HTTP/1.1 are supported
+            raise InvalidHTTPVersion(self.version)
 
     def set_body_reader(self):
         super().set_body_reader()
