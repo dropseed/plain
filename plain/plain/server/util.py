@@ -29,8 +29,6 @@ import warnings
 from .errors import AppImportError
 from .workers import SUPPORTED_WORKERS
 
-REDIRECT_TO = getattr(os, "devnull", "/dev/null")
-
 # Server and Date aren't technically hop-by-hop
 # headers, but they are in the purview of the
 # origin server which the WSGI spec says we should
@@ -232,19 +230,6 @@ def close(sock):
         sock.close()
     except OSError:
         pass
-
-
-try:
-    from os import closerange
-except ImportError:
-
-    def closerange(fd_low, fd_high):
-        # Iterate through and close all file descriptors.
-        for fd in range(fd_low, fd_high):
-            try:
-                os.close(fd)
-            except OSError:  # ERROR, fd wasn't open to begin with (ignored)
-                pass
 
 
 def write_chunk(sock, data):

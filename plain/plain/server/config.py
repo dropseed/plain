@@ -15,7 +15,6 @@ import ipaddress
 import os
 import pwd
 import re
-import shlex
 import ssl
 import sys
 import textwrap
@@ -79,11 +78,6 @@ class Config:
         if name not in self.settings:
             raise AttributeError(f"No configuration setting for: {name}")
         self.settings[name].set(value)
-
-    def get_cmd_args_from_env(self):
-        if "GUNICORN_CMD_ARGS" in self.env_orig:
-            return shlex.split(self.env_orig["GUNICORN_CMD_ARGS"])
-        return []
 
     def parser(self):
         kwargs = {"usage": self.usage, "prog": self.prog}
@@ -488,40 +482,12 @@ def validate_chdir(val):
 
     return path
 
-    # As of major release 20, util.parse_address would recognize unix:PORT
-    # as a UDS address, breaking backwards compatibility. We defend against
-    # that regression here (this is also unit-tested).
-    # Feel free to remove in the next major release.
-    unix_hostname_regression = re.match(r"^unix:(\d+)$", val)
-    if unix_hostname_regression:
-        return ("unix", int(unix_hostname_regression.group(1)))
-
-    try:
-        address = util.parse_address(val, default_port="8125")
-    except RuntimeError:
-        raise TypeError("Value must be one of ('host:port', 'unix://PATH')")
-
-    return address
-
 
 def validate_reload_engine(val):
     if val not in reloader_engines:
         raise ConfigError(f"Invalid reload_engine: {val!r}")
 
     return val
-
-
-class WSGIApp(Setting):
-    name = "wsgi_app"
-    section = "Config File"
-    meta = "STRING"
-    validator = validate_string
-    default = None
-    desc = """\
-        A WSGI application path in pattern ``$(MODULE_NAME):$(VARIABLE_NAME)``.
-
-        .. versionadded:: 20.1.0
-        """
 
 
 class Bind(Setting):
