@@ -55,7 +55,7 @@ try:
     from setproctitle import setproctitle
 
     def _setproctitle(title):
-        setproctitle("gunicorn: %s" % title)
+        setproctitle(f"gunicorn: {title}")
 except ImportError:
     def _setproctitle(title):
         pass
@@ -66,7 +66,7 @@ def load_entry_point(distribution, group, name):
     eps = [ep for ep in dist_obj.entry_points
            if ep.group == group and ep.name == name]
     if not eps:
-        raise ImportError("Entry point %r not found" % ((group, name),))
+        raise ImportError(f"Entry point {(group, name)!r} not found")
     return eps[0].load()
 
 
@@ -233,7 +233,7 @@ def parse_address(netloc, default_port='8000'):
         try:
             return int(fd)
         except ValueError:
-            raise RuntimeError("%r is not a valid file descriptor." % fd) from None
+            raise RuntimeError(f"{fd!r} is not a valid file descriptor.") from None
 
     if netloc.startswith("tcp://"):
         netloc = netloc.split("tcp://")[1]
@@ -250,7 +250,7 @@ def parse_address(netloc, default_port='8000'):
     try:
         port = int(port)
     except ValueError:
-        raise RuntimeError("%r is not a valid port number." % port)
+        raise RuntimeError(f"{port!r} is not a valid port number.")
 
     return host.lower(), port
 
@@ -288,7 +288,7 @@ except ImportError:
 def write_chunk(sock, data):
     if isinstance(data, str):
         data = data.encode('utf-8')
-    chunk_size = "%X\r\n" % len(data)
+    chunk_size = f"{len(data):X}\r\n"
     chunk = b"".join([chunk_size.encode('utf-8'), data, b"\r\n"])
     sock.sendall(chunk)
 
@@ -381,7 +381,7 @@ def import_app(module):
         expression = ast.parse(obj, mode="eval").body
     except SyntaxError:
         raise AppImportError(
-            "Failed to parse %r as an attribute name or function call." % obj
+            f"Failed to parse {obj!r} as an attribute name or function call."
         )
 
     if isinstance(expression, ast.Name):
@@ -390,7 +390,7 @@ def import_app(module):
     elif isinstance(expression, ast.Call):
         # Ensure the function name is an attribute name only.
         if not isinstance(expression.func, ast.Name):
-            raise AppImportError("Function reference must be a simple name: %r" % obj)
+            raise AppImportError(f"Function reference must be a simple name: {obj!r}")
 
         name = expression.func.id
 
@@ -402,11 +402,11 @@ def import_app(module):
             # literal_eval gives cryptic error messages, show a generic
             # message with the full expression instead.
             raise AppImportError(
-                "Failed to parse arguments as literal values: %r" % obj
+                f"Failed to parse arguments as literal values: {obj!r}"
             )
     else:
         raise AppImportError(
-            "Failed to parse %r as an attribute name or function call." % obj
+            f"Failed to parse {obj!r} as an attribute name or function call."
         )
 
     is_debug = logging.root.level == logging.DEBUG
@@ -415,7 +415,7 @@ def import_app(module):
     except AttributeError:
         if is_debug:
             traceback.print_exception(*sys.exc_info())
-        raise AppImportError("Failed to find attribute %r in %r." % (name, module))
+        raise AppImportError(f"Failed to find attribute {name!r} in {module!r}.")
 
     # If the expression was a function call, call the retrieved object
     # to get the real application.
@@ -436,7 +436,7 @@ def import_app(module):
             raise
 
     if app is None:
-        raise AppImportError("Failed to find application object: %r" % obj)
+        raise AppImportError(f"Failed to find application object: {obj!r}")
 
     if not callable(app):
         raise AppImportError("Application object must be callable.")
@@ -559,7 +559,7 @@ def seed():
     try:
         random.seed(os.urandom(64))
     except NotImplementedError:
-        random.seed('%s.%s' % (time.time(), os.getpid()))
+        random.seed(f'{time.time()}.{os.getpid()}')
 
 
 def check_is_writable(path):
@@ -567,7 +567,7 @@ def check_is_writable(path):
         with open(path, 'a') as f:
             f.close()
     except OSError as e:
-        raise RuntimeError("Error: '%s' isn't writable [%r]" % (path, e))
+        raise RuntimeError(f"Error: '{path}' isn't writable [{e!r}]")
 
 
 def to_bytestring(value, encoding="utf8"):
@@ -575,7 +575,7 @@ def to_bytestring(value, encoding="utf8"):
     if isinstance(value, bytes):
         return value
     if not isinstance(value, str):
-        raise TypeError('%r is not a string' % value)
+        raise TypeError(f'{value!r} is not a string')
 
     return value.encode(encoding)
 
@@ -599,8 +599,8 @@ def warn(msg):
     lines = msg.splitlines()
     for i, line in enumerate(lines):
         if i == 0:
-            line = "WARNING: %s" % line
-        print("!!! %s" % line, file=sys.stderr)
+            line = f"WARNING: {line}"
+        print(f"!!! {line}", file=sys.stderr)
 
     print("!!!\n", file=sys.stderr)
     sys.stderr.flush()

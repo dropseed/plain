@@ -29,7 +29,7 @@ from plain.server.http.wsgi import base_environ
 from .base_async import AsyncWorker
 from .sock import ssl_context
 
-VERSION = "gevent/%s gunicorn/%s" % (gevent.__version__, plain.server.__version__)
+VERSION = f"gevent/{gevent.__version__} gunicorn/{plain.server.__version__}"
 
 
 class GeventWorker(AsyncWorker):

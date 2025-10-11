@@ -89,7 +89,7 @@ def default_environ(req, sock, cfg):
         "REQUEST_METHOD": req.method,
         "QUERY_STRING": req.query,
         "RAW_URI": req.uri,
-        "SERVER_PROTOCOL": "HTTP/%s" % ".".join([str(v) for v in req.version])
+        "SERVER_PROTOCOL": "HTTP/{}".format(".".join([str(v) for v in req.version]))
     })
     return env
 
@@ -140,7 +140,7 @@ def create(req, sock, client, server, cfg):
         # RFC9110 Section 17.10 discourages ambiguous or incomplete mappings
         key = 'HTTP_' + hdr_name.replace('-', '_')
         if key in environ:
-            hdr_value = "%s,%s" % (environ[key], hdr_value)
+            hdr_value = f"{environ[key]},{hdr_value}"
         environ[key] = hdr_value
 
     # set the url scheme
@@ -187,8 +187,7 @@ def create(req, sock, client, server, cfg):
     if script_name:
         if not path_info.startswith(script_name):
             raise ConfigurationProblem(
-                "Request path %r does not start with SCRIPT_NAME %r" %
-                (path_info, script_name))
+                f"Request path {path_info!r} does not start with SCRIPT_NAME {script_name!r}")
         path_info = path_info[len(script_name):]
     environ['PATH_INFO'] = util.unquote_to_wsgi_str(path_info)
     environ['SCRIPT_NAME'] = script_name
@@ -256,16 +255,16 @@ class Response:
     def process_headers(self, headers):
         for name, value in headers:
             if not isinstance(name, str):
-                raise TypeError('%r is not a string' % name)
+                raise TypeError(f'{name!r} is not a string')
 
             if not TOKEN_RE.fullmatch(name):
-                raise InvalidHeaderName('%r' % name)
+                raise InvalidHeaderName(f'{name!r}')
 
             if not isinstance(value, str):
-                raise TypeError('%r is not a string' % value)
+                raise TypeError(f'{value!r} is not a string')
 
             if not HEADER_VALUE_RE.fullmatch(value):
-                raise InvalidHeader('%r' % value)
+                raise InvalidHeader(f'{value!r}')
 
             # RFC9110 5.5
             value = value.strip(" \t")
@@ -312,11 +311,10 @@ class Response:
             connection = "keep-alive"
 
         headers = [
-            "HTTP/%s.%s %s\r\n" % (self.req.version[0],
-                                   self.req.version[1], self.status),
-            "Server: %s\r\n" % self.version,
-            "Date: %s\r\n" % util.http_date(),
-            "Connection: %s\r\n" % connection
+            f"HTTP/{self.req.version[0]}.{self.req.version[1]} {self.status}\r\n",
+            f"Server: {self.version}\r\n",
+            f"Date: {util.http_date()}\r\n",
+            f"Connection: {connection}\r\n"
         ]
         if self.chunked:
             headers.append("Transfer-Encoding: chunked\r\n")
@@ -326,16 +324,16 @@ class Response:
         if self.headers_sent:
             return
         tosend = self.default_headers()
-        tosend.extend(["%s: %s\r\n" % (k, v) for k, v in self.headers])
+        tosend.extend([f"{k}: {v}\r\n" for k, v in self.headers])
 
-        header_str = "%s\r\n" % "".join(tosend)
+        header_str = "{}\r\n".format("".join(tosend))
         util.write(self.sock, util.to_bytestring(header_str, "latin-1"))
         self.headers_sent = True
 
     def write(self, arg):
         self.send_headers()
         if not isinstance(arg, bytes):
-            raise TypeError('%r is not a byte' % arg)
+            raise TypeError(f'{arg!r} is not a byte')
         arglen = len(arg)
         tosend = arglen
         if self.response_length is not None:
@@ -379,7 +377,7 @@ class Response:
         self.send_headers()
 
         if self.is_chunked():
-            chunk_size = "%X\r\n" % nbytes
+            chunk_size = f"{nbytes:X}\r\n"
             self.sock.sendall(chunk_size.encode('utf-8'))
         if nbytes > 0:
             self.sock.sendfile(respiter.filelike, offset=offset, count=nbytes)

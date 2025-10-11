@@ -38,7 +38,7 @@ from .workertmp import WorkerTmp
 
 class Worker:
 
-    SIGNALS = [getattr(signal, "SIG%s" % x) for x in (
+    SIGNALS = [getattr(signal, f"SIG{x}") for x in (
         "ABRT HUP QUIT INT TERM USR1 USR2 WINCH CHLD".split()
     )]
 
@@ -74,7 +74,7 @@ class Worker:
         self.tmp = WorkerTmp(cfg)
 
     def __str__(self):
-        return "<Worker %s>" % self.pid
+        return f"<Worker {self.pid}>"
 
     def notify(self):
         """\
@@ -215,54 +215,46 @@ class Worker:
     def handle_error(self, req, client, addr, exc):
         request_start = datetime.now()
         addr = addr or ('', -1)  # unix socket case
-        if isinstance(exc, (
-            InvalidRequestLine, InvalidRequestMethod,
-            InvalidHTTPVersion, InvalidHeader, InvalidHeaderName,
-            LimitRequestLine, LimitRequestHeaders,
-            InvalidProxyLine, ForbiddenProxyRequest,
-            InvalidSchemeHeaders, UnsupportedTransferCoding,
-            ConfigurationProblem, ObsoleteFolding,
-            SSLError,
-        )):
+        if isinstance(exc, InvalidRequestLine | InvalidRequestMethod | InvalidHTTPVersion | InvalidHeader | InvalidHeaderName | LimitRequestLine | LimitRequestHeaders | InvalidProxyLine | ForbiddenProxyRequest | InvalidSchemeHeaders | UnsupportedTransferCoding | ConfigurationProblem | ObsoleteFolding | SSLError):
 
             status_int = 400
             reason = "Bad Request"
 
             if isinstance(exc, InvalidRequestLine):
-                mesg = "Invalid Request Line '%s'" % str(exc)
+                mesg = f"Invalid Request Line '{str(exc)}'"
             elif isinstance(exc, InvalidRequestMethod):
-                mesg = "Invalid Method '%s'" % str(exc)
+                mesg = f"Invalid Method '{str(exc)}'"
             elif isinstance(exc, InvalidHTTPVersion):
-                mesg = "Invalid HTTP Version '%s'" % str(exc)
+                mesg = f"Invalid HTTP Version '{str(exc)}'"
             elif isinstance(exc, UnsupportedTransferCoding):
-                mesg = "%s" % str(exc)
+                mesg = f"{str(exc)}"
                 status_int = 501
             elif isinstance(exc, ConfigurationProblem):
-                mesg = "%s" % str(exc)
+                mesg = f"{str(exc)}"
                 status_int = 500
             elif isinstance(exc, ObsoleteFolding):
-                mesg = "%s" % str(exc)
-            elif isinstance(exc, (InvalidHeaderName, InvalidHeader,)):
-                mesg = "%s" % str(exc)
+                mesg = f"{str(exc)}"
+            elif isinstance(exc, InvalidHeaderName | InvalidHeader):
+                mesg = f"{str(exc)}"
                 if not req and hasattr(exc, "req"):
                     req = exc.req  # for access log
             elif isinstance(exc, LimitRequestLine):
-                mesg = "%s" % str(exc)
+                mesg = f"{str(exc)}"
             elif isinstance(exc, LimitRequestHeaders):
                 reason = "Request Header Fields Too Large"
-                mesg = "Error parsing headers: '%s'" % str(exc)
+                mesg = f"Error parsing headers: '{str(exc)}'"
                 status_int = 431
             elif isinstance(exc, InvalidProxyLine):
-                mesg = "'%s'" % str(exc)
+                mesg = f"'{str(exc)}'"
             elif isinstance(exc, ForbiddenProxyRequest):
                 reason = "Forbidden"
                 mesg = "Request forbidden"
                 status_int = 403
             elif isinstance(exc, InvalidSchemeHeaders):
-                mesg = "%s" % str(exc)
+                mesg = f"{str(exc)}"
             elif isinstance(exc, SSLError):
                 reason = "Forbidden"
-                mesg = "'%s'" % str(exc)
+                mesg = f"'{str(exc)}'"
                 status_int = 403
 
             msg = "Invalid request from ip={ip}: {error}"
@@ -282,7 +274,7 @@ class Worker:
             environ['REMOTE_ADDR'] = addr[0]
             environ['REMOTE_PORT'] = str(addr[1])
             resp = Response(req, client, self.cfg)
-            resp.status = "%s %s" % (status_int, reason)
+            resp.status = f"{status_int} {reason}"
             resp.response_length = len(mesg)
             self.log.access(resp, req, environ, request_time)
 

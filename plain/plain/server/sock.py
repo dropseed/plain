@@ -116,11 +116,11 @@ class UnixSocket(BaseSocket):
                 if stat.S_ISSOCK(st.st_mode):
                     os.remove(addr)
                 else:
-                    raise ValueError("%r is not a socket" % addr)
+                    raise ValueError(f"{addr!r} is not a socket")
         super().__init__(addr, conf, log, fd=fd)
 
     def __str__(self):
-        return "unix:%s" % self.cfg_addr
+        return f"unix:{self.cfg_addr}"
 
     def bind(self, sock):
         old_umask = os.umask(self.conf.umask)
@@ -135,10 +135,10 @@ def _sock_type(addr):
             sock_type = TCP6Socket
         else:
             sock_type = TCPSocket
-    elif isinstance(addr, (str, bytes)):
+    elif isinstance(addr, str | bytes):
         sock_type = UnixSocket
     else:
-        raise TypeError("Unable to create socket from: %r" % addr)
+        raise TypeError(f"Unable to create socket from: {addr!r}")
     return sock_type
 
 
@@ -162,10 +162,10 @@ def create_sockets(conf, log, fds=None):
     # check ssl config early to raise the error on startup
     # only the certfile is needed since it can contains the keyfile
     if conf.certfile and not os.path.exists(conf.certfile):
-        raise ValueError('certfile "%s" does not exist' % conf.certfile)
+        raise ValueError(f'certfile "{conf.certfile}" does not exist')
 
     if conf.keyfile and not os.path.exists(conf.keyfile):
-        raise ValueError('keyfile "%s" does not exist' % conf.keyfile)
+        raise ValueError(f'keyfile "{conf.keyfile}" does not exist')
 
     # sockets are already bound
     if fdaddr:

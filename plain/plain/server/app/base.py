@@ -37,7 +37,7 @@ class BaseApplication:
             self.load_default_config()
             self.load_config()
         except Exception as e:
-            print("\nError: %s" % str(e), file=sys.stderr)
+            print(f"\nError: {str(e)}", file=sys.stderr)
             sys.stderr.flush()
             sys.exit(1)
 
@@ -73,7 +73,7 @@ class BaseApplication:
         try:
             Arbiter(self).run()
         except RuntimeError as e:
-            print("\nError: %s\n" % e, file=sys.stderr)
+            print(f"\nError: {e}\n", file=sys.stderr)
             sys.stderr.flush()
             sys.exit(1)
 
@@ -95,7 +95,7 @@ class Application(BaseApplication):
     def get_config_from_filename(self, filename):
 
         if not os.path.exists(filename):
-            raise RuntimeError("%r doesn't exist" % filename)
+            raise RuntimeError(f"{filename!r} doesn't exist")
 
         ext = os.path.splitext(filename)[1]
 
@@ -112,7 +112,7 @@ class Application(BaseApplication):
             sys.modules[module_name] = mod
             spec.loader.exec_module(mod)
         except Exception:
-            print("Failed to read config file: %s" % filename, file=sys.stderr)
+            print(f"Failed to read config file: {filename}", file=sys.stderr)
             traceback.print_exc()
             sys.stderr.flush()
             sys.exit(1)
@@ -145,7 +145,7 @@ class Application(BaseApplication):
             try:
                 self.cfg.set(k.lower(), v)
             except Exception:
-                print("Invalid value for %s: %s\n" % (k, v), file=sys.stderr)
+                print(f"Invalid value for {k}: {v}\n", file=sys.stderr)
                 sys.stderr.flush()
                 raise
 

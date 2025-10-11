@@ -155,7 +155,7 @@ def parse_syslog_address(addr):
     if ":" in addr:
         port = addr.split(':', 1)[1]
         if not port.isdigit():
-            raise RuntimeError("%r is not a valid port number." % port)
+            raise RuntimeError(f"{port!r} is not a valid port number.")
         port = int(port)
     else:
         port = 514
@@ -300,7 +300,7 @@ class Logger:
             'l': '-',
             'u': self._get_user(environ) or '-',
             't': self.now(),
-            'r': "%s %s %s" % (environ['REQUEST_METHOD'],
+            'r': "{} {} {}".format(environ['REQUEST_METHOD'],
                                environ['RAW_URI'],
                                environ["SERVER_PROTOCOL"]),
             's': status,
@@ -316,7 +316,7 @@ class Logger:
             'D': (request_time.seconds * 1000000) + request_time.microseconds,
             'M': (request_time.seconds * 1000) + int(request_time.microseconds / 1000),
             'L': "%d.%06d" % (request_time.seconds, request_time.microseconds),
-            'p': "<%s>" % os.getpid()
+            'p': f"<{os.getpid()}>"
         }
 
         # add request headers
@@ -328,18 +328,18 @@ class Logger:
         if hasattr(req_headers, "items"):
             req_headers = req_headers.items()
 
-        atoms.update({"{%s}i" % k.lower(): v for k, v in req_headers})
+        atoms.update({f"{{{k.lower()}}}i": v for k, v in req_headers})
 
         resp_headers = resp.headers
         if hasattr(resp_headers, "items"):
             resp_headers = resp_headers.items()
 
         # add response headers
-        atoms.update({"{%s}o" % k.lower(): v for k, v in resp_headers})
+        atoms.update({f"{{{k.lower()}}}o": v for k, v in resp_headers})
 
         # add environ variables
         environ_variables = environ.items()
-        atoms.update({"{%s}e" % k.lower(): v for k, v in environ_variables})
+        atoms.update({f"{{{k.lower()}}}e": v for k, v in environ_variables})
 
         return atoms
 
@@ -436,10 +436,10 @@ class Logger:
         # setup format
         prefix = cfg.syslog_prefix or cfg.proc_name.replace(":", ".")
 
-        prefix = "plain.server.%s.%s" % (prefix, name)
+        prefix = f"plain.server.{prefix}.{name}"
 
         # set format
-        fmt = logging.Formatter(r"%s: %s" % (prefix, fmt))
+        fmt = logging.Formatter(rf"{prefix}: {fmt}")
 
         # syslog facility
         try:

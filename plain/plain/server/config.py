@@ -68,7 +68,7 @@ class Config:
 
     def __getattr__(self, name):
         if name not in self.settings:
-            raise AttributeError("No configuration setting for: %s" % name)
+            raise AttributeError(f"No configuration setting for: {name}")
         return self.settings[name].get()
 
     def __setattr__(self, name, value):
@@ -78,7 +78,7 @@ class Config:
 
     def set(self, name, value):
         if name not in self.settings:
-            raise AttributeError("No configuration setting for: %s" % name)
+            raise AttributeError(f"No configuration setting for: {name}")
         self.settings[name].set(value)
 
     def get_cmd_args_from_env(self):
@@ -198,7 +198,7 @@ class Config:
             try:
                 k, v = s.split('=', 1)
             except ValueError:
-                raise RuntimeError("environment setting %r invalid" % s)
+                raise RuntimeError(f"environment setting {s!r} invalid")
 
             env[k] = v
 
@@ -231,7 +231,7 @@ class Config:
             try:
                 k, v = re.split(r'(?<!\\)=', s, 1)
             except ValueError:
-                raise RuntimeError("environment setting %r invalid" % s)
+                raise RuntimeError(f"environment setting {s!r} invalid")
             k = k.replace('\\=', '=')
             v = v.replace('\\=', '=')
             global_conf[k] = v
@@ -284,7 +284,7 @@ class Setting:
             return
         args = tuple(self.cli)
 
-        help_txt = "%s [%s]" % (self.short, self.default)
+        help_txt = f"{self.short} [{self.default}]"
         help_txt = help_txt.replace("%", "%%")
 
         kwargs = {
@@ -317,7 +317,7 @@ class Setting:
 
     def set(self, val):
         if not callable(self.validator):
-            raise TypeError('Invalid validator: %s' % self.name)
+            raise TypeError(f'Invalid validator: {self.name}')
         self.value = self.validator(val)
 
     def __lt__(self, other):
@@ -326,12 +326,7 @@ class Setting:
     __cmp__ = __lt__
 
     def __repr__(self):
-        return "<%s.%s object at %x with value %r>" % (
-            self.__class__.__module__,
-            self.__class__.__name__,
-            id(self),
-            self.value,
-        )
+        return f"<{self.__class__.__module__}.{self.__class__.__name__} object at {id(self):x} with value {self.value!r}>"
 
 
 Setting = SettingMeta('Setting', (Setting,), {})
@@ -344,18 +339,18 @@ def validate_bool(val):
     if isinstance(val, bool):
         return val
     if not isinstance(val, str):
-        raise TypeError("Invalid type for casting: %s" % val)
+        raise TypeError(f"Invalid type for casting: {val}")
     if val.lower().strip() == "true":
         return True
     elif val.lower().strip() == "false":
         return False
     else:
-        raise ValueError("Invalid boolean: %s" % val)
+        raise ValueError(f"Invalid boolean: {val}")
 
 
 def validate_dict(val):
     if not isinstance(val, dict):
-        raise TypeError("Value is not a dictionary: %s " % val)
+        raise TypeError(f"Value is not a dictionary: {val} ")
     return val
 
 
@@ -366,7 +361,7 @@ def validate_pos_int(val):
         # Booleans are ints!
         val = int(val)
     if val < 0:
-        raise ValueError("Value must be positive: %s" % val)
+        raise ValueError(f"Value must be positive: {val}")
     return val
 
 
@@ -380,7 +375,7 @@ def validate_string(val):
     if val is None:
         return None
     if not isinstance(val, str):
-        raise TypeError("Not a string: %s" % val)
+        raise TypeError(f"Not a string: {val}")
     return val.strip()
 
 
@@ -388,7 +383,7 @@ def validate_file_exists(val):
     if val is None:
         return None
     if not os.path.exists(val):
-        raise ValueError("File %s does not exists." % val)
+        raise ValueError(f"File {val} does not exists.")
     return val
 
 
@@ -441,20 +436,19 @@ def validate_callable(arity):
             try:
                 mod_name, obj_name = val.rsplit(".", 1)
             except ValueError:
-                raise TypeError("Value '%s' is not import string. "
-                                "Format: module[.submodules...].object" % val)
+                raise TypeError(f"Value '{val}' is not import string. "
+                                "Format: module[.submodules...].object")
             try:
                 mod = __import__(mod_name, fromlist=[obj_name])
                 val = getattr(mod, obj_name)
             except ImportError as e:
                 raise TypeError(str(e))
             except AttributeError:
-                raise TypeError("Can not load '%s' from '%s'"
-                                "" % (obj_name, mod_name))
+                raise TypeError(f"Can not load '{obj_name}' from '{mod_name}'")
         if not callable(val):
-            raise TypeError("Value is not callable: %s" % val)
+            raise TypeError(f"Value is not callable: {val}")
         if arity != -1 and arity != util.get_arity(val):
-            raise TypeError("Value must have an arity of: %s" % arity)
+            raise TypeError(f"Value must have an arity of: {arity}")
         return val
     return _validate_callable
 
@@ -470,7 +464,7 @@ def validate_user(val):
         try:
             return pwd.getpwnam(val).pw_uid
         except KeyError:
-            raise ConfigError("No such user: '%s'" % val)
+            raise ConfigError(f"No such user: '{val}'")
 
 
 def validate_group(val):
@@ -485,7 +479,7 @@ def validate_group(val):
         try:
             return grp.getgrnam(val).gr_gid
         except KeyError:
-            raise ConfigError("No such group: '%s'" % val)
+            raise ConfigError(f"No such group: '{val}'")
 
 
 def validate_post_request(val):
@@ -511,7 +505,7 @@ def validate_chdir(val):
 
     # test if the path exists
     if not os.path.exists(path):
-        raise ConfigError("can't chdir to %r" % val)
+        raise ConfigError(f"can't chdir to {val!r}")
 
     return path
 
@@ -539,7 +533,7 @@ def validate_statsd_address(val):
 
 def validate_reload_engine(val):
     if val not in reloader_engines:
-        raise ConfigError("Invalid reload_engine: %r" % val)
+        raise ConfigError(f"Invalid reload_engine: {val!r}")
 
     return val
 
@@ -598,7 +592,7 @@ class Bind(Setting):
     validator = validate_list_string
 
     if 'PORT' in os.environ:
-        default = ['0.0.0.0:{0}'.format(os.environ.get('PORT'))]
+        default = ['0.0.0.0:{}'.format(os.environ.get('PORT'))]
     else:
         default = ['127.0.0.1:8000']
 
@@ -2385,7 +2379,7 @@ def validate_header_map_behaviour(val):
         return
 
     if not isinstance(val, str):
-        raise TypeError("Invalid type for casting: %s" % val)
+        raise TypeError(f"Invalid type for casting: {val}")
     if val.lower().strip() == "drop":
         return "drop"
     elif val.lower().strip() == "refuse":
@@ -2393,7 +2387,7 @@ def validate_header_map_behaviour(val):
     elif val.lower().strip() == "dangerous":
         return "dangerous"
     else:
-        raise ValueError("Invalid header map behaviour: %s" % val)
+        raise ValueError(f"Invalid header map behaviour: {val}")
 
 
 class ForwarderHeaders(Setting):

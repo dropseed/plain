@@ -45,12 +45,12 @@ class Arbiter:
 
     # I love dynamic languages
     SIG_QUEUE = []
-    SIGNALS = [getattr(signal, "SIG%s" % x)
+    SIGNALS = [getattr(signal, f"SIG{x}")
                for x in "HUP QUIT INT TERM TTIN TTOU USR1 USR2 WINCH".split()]
-    SIG_NAMES = dict(
-        (getattr(signal, name), name[3:].lower()) for name in dir(signal)
+    SIG_NAMES = {
+        getattr(signal, name): name[3:].lower() for name in dir(signal)
         if name[:3] == "SIG" and name[3] != "_"
-    )
+    }
 
     def __init__(self, app):
         os.environ["SERVER_SOFTWARE"] = SERVER_SOFTWARE
@@ -106,7 +106,7 @@ class Arbiter:
         self.timeout = self.cfg.timeout
         self.proc_name = self.cfg.proc_name
 
-        self.log.debug('Current configuration:\n{0}'.format(
+        self.log.debug('Current configuration:\n{}'.format(
             '\n'.join(
                 f'  {config}: {value.value}'
                 for config, value
@@ -201,7 +201,7 @@ class Arbiter:
     def run(self):
         "Main master loop."
         self.start()
-        util._setproctitle("master [%s]" % self.proc_name)
+        util._setproctitle(f"master [{self.proc_name}]")
 
         try:
             self.manage_workers()
@@ -221,7 +221,7 @@ class Arbiter:
                     continue
 
                 signame = self.SIG_NAMES.get(sig)
-                handler = getattr(self, "handle_%s" % signame, None)
+                handler = getattr(self, f"handle_{signame}", None)
                 if not handler:
                     self.log.error("Unhandled signal: %s", signame)
                     continue
@@ -330,7 +330,7 @@ class Arbiter:
             if self.pidfile is not None:
                 self.pidfile.rename(self.cfg.pidfile)
             # reset proctitle
-            util._setproctitle("master [%s]" % self.proc_name)
+            util._setproctitle(f"master [{self.proc_name}]")
 
     def wakeup(self):
         """\
@@ -482,7 +482,7 @@ class Arbiter:
             self.pidfile.create(self.pid)
 
         # set new proc_name
-        util._setproctitle("master [%s]" % self.proc_name)
+        util._setproctitle(f"master [{self.proc_name}]")
 
         # spawn new workers
         for _ in range(self.cfg.workers):
@@ -607,7 +607,7 @@ class Arbiter:
         # Process Child
         worker.pid = os.getpid()
         try:
-            util._setproctitle("worker [%s]" % self.proc_name)
+            util._setproctitle(f"worker [{self.proc_name}]")
             self.log.info("Booting worker with pid: %s", worker.pid)
             if self.cfg.reuse_port:
                 worker.sockets = sock.create_sockets(self.cfg, self.log)
@@ -619,7 +619,7 @@ class Arbiter:
         except AppImportError as e:
             self.log.debug("Exception while loading the application",
                            exc_info=True)
-            print("%s" % e, file=sys.stderr)
+            print(f"{e}", file=sys.stderr)
             sys.stderr.flush()
             sys.exit(self.APP_LOAD_ERROR)
         except Exception:

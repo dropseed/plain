@@ -33,7 +33,7 @@ DEFAULT_MAX_HEADERFIELD_SIZE = 8190
 
 # verbosely on purpose, avoid backslash ambiguity
 RFC9110_5_6_2_TOKEN_SPECIALS = r"!#$%&'*+-.^_`|~"
-TOKEN_RE = re.compile(r"[%s0-9a-zA-Z]+" % (re.escape(RFC9110_5_6_2_TOKEN_SPECIALS)))
+TOKEN_RE = re.compile(rf"[{re.escape(RFC9110_5_6_2_TOKEN_SPECIALS)}0-9a-zA-Z]+")
 METHOD_BADCHAR_RE = re.compile("[a-z#]")
 # usually 1.0 or 1.1 - RFC9112 permits restricting to single-digit versions
 VERSION_RE = re.compile(r"HTTP/(\d)\.(\d)")
@@ -380,7 +380,7 @@ class Request(Message):
 
         # Validation
         if proto not in ["TCP4", "TCP6"]:
-            raise InvalidProxyLine("protocol '%s' not supported" % proto)
+            raise InvalidProxyLine(f"protocol '{proto}' not supported")
         if proto == "TCP4":
             try:
                 socket.inet_pton(socket.AF_INET, s_addr)
@@ -398,10 +398,10 @@ class Request(Message):
             s_port = int(bits[4])
             d_port = int(bits[5])
         except ValueError:
-            raise InvalidProxyLine("invalid port %s" % line)
+            raise InvalidProxyLine(f"invalid port {line}")
 
         if not ((0 <= s_port <= 65535) and (0 <= d_port <= 65535)):
-            raise InvalidProxyLine("invalid port %s" % line)
+            raise InvalidProxyLine(f"invalid port {line}")
 
         # Set data
         self.proxy_protocol_info = {
