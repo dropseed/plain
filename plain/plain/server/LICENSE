@@ -1,0 +1,35 @@
+Plain HTTP Server - License and Attribution
+============================================
+
+This module is based on gunicorn (https://gunicorn.org), integrated from
+commit 1dc4ce9d59c3458305d701c4c6d63aa6b1d1b309 (gunicorn 23.0.0, October 2024).
+
+The gunicorn code has been integrated into Plain and modified for Plain's
+specific use case. All files should be considered modified from the original.
+
+Original repository: https://github.com/benoitc/gunicorn
+
+--------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2009-2024 Benoît Chesneau <benoitc@gunicorn.org>
+Copyright (c) 2009-2015 Paul J. Davis <paul.joseph.davis@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
