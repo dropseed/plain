@@ -17,7 +17,6 @@ from . import util
 
 
 class BaseSocket:
-
     def __init__(self, address, conf, log, fd=None):
         self.log = log
         self.conf = conf
@@ -34,15 +33,14 @@ class BaseSocket:
         self.sock = self.set_options(sock, bound=bound)
 
     def __str__(self):
-        return "<socket %d>" % self.sock.fileno()
+        return f"<socket {self.sock.fileno()}>"
 
     def __getattr__(self, name):
         return getattr(self.sock, name)
 
     def set_options(self, sock, bound=False):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        if (self.conf.reuse_port
-                and hasattr(socket, 'SO_REUSEPORT')):  # pragma: no cover
+        if self.conf.reuse_port and hasattr(socket, "SO_REUSEPORT"):  # pragma: no cover
             try:
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except OSError as err:
@@ -75,7 +73,6 @@ class BaseSocket:
 
 
 class TCPSocket(BaseSocket):
-
     FAMILY = socket.AF_INET
 
     def __str__(self):
@@ -85,7 +82,7 @@ class TCPSocket(BaseSocket):
             scheme = "http"
 
         addr = self.sock.getsockname()
-        return "%s://%s:%d" % (scheme, addr[0], addr[1])
+        return f"{scheme}://{addr[0]}:{addr[1]}"
 
     def set_options(self, sock, bound=False):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -93,16 +90,14 @@ class TCPSocket(BaseSocket):
 
 
 class TCP6Socket(TCPSocket):
-
     FAMILY = socket.AF_INET6
 
     def __str__(self):
         (host, port, _, _) = self.sock.getsockname()
-        return "http://[%s]:%d" % (host, port)
+        return f"http://[{host}]:{port}"
 
 
 class UnixSocket(BaseSocket):
-
     FAMILY = socket.AF_UNIX
 
     def __init__(self, addr, conf, log, fd=None):
@@ -217,7 +212,9 @@ def close_sockets(listeners, unlink=True):
 
 def ssl_context(conf):
     def default_ssl_context_factory():
-        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH, cafile=conf.ca_certs)
+        context = ssl.create_default_context(
+            ssl.Purpose.CLIENT_AUTH, cafile=conf.ca_certs
+        )
         context.load_cert_chain(certfile=conf.certfile, keyfile=conf.keyfile)
         context.verify_mode = conf.cert_reqs
         if conf.ciphers:
@@ -228,7 +225,9 @@ def ssl_context(conf):
 
 
 def ssl_wrap_socket(sock, conf):
-    return ssl_context(conf).wrap_socket(sock,
-                                         server_side=True,
-                                         suppress_ragged_eofs=conf.suppress_ragged_eofs,
-                                         do_handshake_on_connect=conf.do_handshake_on_connect)
+    return ssl_context(conf).wrap_socket(
+        sock,
+        server_side=True,
+        suppress_ragged_eofs=conf.suppress_ragged_eofs,
+        do_handshake_on_connect=conf.do_handshake_on_connect,
+    )

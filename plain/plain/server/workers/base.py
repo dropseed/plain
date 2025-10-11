@@ -37,10 +37,10 @@ from .workertmp import WorkerTmp
 
 
 class Worker:
-
-    SIGNALS = [getattr(signal, f"SIG{x}") for x in (
-        "ABRT HUP QUIT INT TERM USR1 USR2 WINCH CHLD".split()
-    )]
+    SIGNALS = [
+        getattr(signal, f"SIG{x}")
+        for x in ("ABRT HUP QUIT INT TERM USR1 USR2 WINCH CHLD".split())
+    ]
 
     PIPE = []
 
@@ -104,8 +104,9 @@ class Worker:
             for k, v in self.cfg.env.items():
                 os.environ[k] = v
 
-        util.set_owner_process(self.cfg.uid, self.cfg.gid,
-                               initgroups=self.cfg.initgroups)
+        util.set_owner_process(
+            self.cfg.uid, self.cfg.gid, initgroups=self.cfg.initgroups
+        )
 
         # Reseed the random number generator
         util.seed()
@@ -129,6 +130,7 @@ class Worker:
 
         # start the reloader
         if self.cfg.reload:
+
             def changed(fname):
                 self.log.info("Worker reloading: %s modified", fname)
                 self.alive = False
@@ -138,8 +140,9 @@ class Worker:
                 sys.exit(0)
 
             reloader_cls = reloader_engines[self.cfg.reload_engine]
-            self.reloader = reloader_cls(extra_files=self.cfg.reload_extra_files,
-                                         callback=changed)
+            self.reloader = reloader_cls(
+                extra_files=self.cfg.reload_extra_files, callback=changed
+            )
 
         self.load_wsgi()
         if self.reloader:
@@ -191,7 +194,7 @@ class Worker:
         signal.siginterrupt(signal.SIGTERM, False)
         signal.siginterrupt(signal.SIGUSR1, False)
 
-        if hasattr(signal, 'set_wakeup_fd'):
+        if hasattr(signal, "set_wakeup_fd"):
             signal.set_wakeup_fd(self.PIPE[1])
 
     def handle_usr1(self, sig, frame):
@@ -214,9 +217,24 @@ class Worker:
 
     def handle_error(self, req, client, addr, exc):
         request_start = datetime.now()
-        addr = addr or ('', -1)  # unix socket case
-        if isinstance(exc, InvalidRequestLine | InvalidRequestMethod | InvalidHTTPVersion | InvalidHeader | InvalidHeaderName | LimitRequestLine | LimitRequestHeaders | InvalidProxyLine | ForbiddenProxyRequest | InvalidSchemeHeaders | UnsupportedTransferCoding | ConfigurationProblem | ObsoleteFolding | SSLError):
-
+        addr = addr or ("", -1)  # unix socket case
+        if isinstance(
+            exc,
+            InvalidRequestLine
+            | InvalidRequestMethod
+            | InvalidHTTPVersion
+            | InvalidHeader
+            | InvalidHeaderName
+            | LimitRequestLine
+            | LimitRequestHeaders
+            | InvalidProxyLine
+            | ForbiddenProxyRequest
+            | InvalidSchemeHeaders
+            | UnsupportedTransferCoding
+            | ConfigurationProblem
+            | ObsoleteFolding
+            | SSLError,
+        ):
             status_int = 400
             reason = "Bad Request"
 
@@ -271,8 +289,8 @@ class Worker:
         if req is not None:
             request_time = datetime.now() - request_start
             environ = default_environ(req, client, self.cfg)
-            environ['REMOTE_ADDR'] = addr[0]
-            environ['REMOTE_PORT'] = str(addr[1])
+            environ["REMOTE_ADDR"] = addr[0]
+            environ["REMOTE_PORT"] = str(addr[1])
             resp = Response(req, client, self.cfg)
             resp.status = f"{status_int} {reason}"
             resp.response_length = len(mesg)

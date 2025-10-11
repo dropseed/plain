@@ -52,8 +52,10 @@ class ChunkedReader:
         if done:
             unreader.unread(buf.getvalue()[2:])
             return b""
-        self.req.trailers = self.req.parse_headers(buf.getvalue()[:idx], from_trailer=True)
-        unreader.unread(buf.getvalue()[idx + 4:])
+        self.req.trailers = self.req.parse_headers(
+            buf.getvalue()[:idx], from_trailer=True
+        )
+        unreader.unread(buf.getvalue()[idx + 4 :])
 
     def parse_chunked(self, unreader):
         (size, rest) = self.parse_chunk_size(unreader)
@@ -72,7 +74,7 @@ class ChunkedReader:
                 if not new_data:
                     break
                 rest += new_data
-            if rest[:2] != b'\r\n':
+            if rest[:2] != b"\r\n":
                 raise ChunkMissingTerminator(rest[:2])
             (size, rest) = self.parse_chunk_size(unreader, data=rest[2:])
 
@@ -87,7 +89,7 @@ class ChunkedReader:
             idx = buf.getvalue().find(b"\r\n")
 
         data = buf.getvalue()
-        line, rest_chunk = data[:idx], data[idx + 2:]
+        line, rest_chunk = data[:idx], data[idx + 2 :]
 
         # RFC9112 7.1.1: BWS before chunk-ext - but ONLY then
         chunk_size, *chunk_ext = line.split(b";", 1)
@@ -265,6 +267,6 @@ class Body:
                 ret.append(data)
                 data = b""
             else:
-                line, data = data[:pos + 1], data[pos + 1:]
+                line, data = data[: pos + 1], data[pos + 1 :]
                 ret.append(line)
         return ret

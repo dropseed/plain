@@ -6,10 +6,9 @@
 
 import plain.runtime
 
+from .core import PlainServerApp, run_server
+
 SERVER = "plain"
 SERVER_SOFTWARE = f"{SERVER}/{plain.runtime.__version__}"
-
-# Import public API from core module
-from .core import PlainServerApp, run_server
 
 __all__ = ["run_server", "PlainServerApp", "SERVER_SOFTWARE"]

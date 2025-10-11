@@ -12,14 +12,14 @@ import logging
 import time
 
 logging.Logger.manager.emittedNoHandlerWarning = 1  # noqa
-import os
-import socket
-import sys
-import threading
-import traceback
-from logging.config import dictConfig, fileConfig
+import os  # noqa: E402
+import socket  # noqa: E402
+import sys  # noqa: E402
+import threading  # noqa: E402
+import traceback  # noqa: E402
+from logging.config import dictConfig, fileConfig  # noqa: E402
 
-from . import util
+from . import util  # noqa: E402
 
 # syslog facility codes
 SYSLOG_FACILITIES = {
@@ -43,7 +43,7 @@ SYSLOG_FACILITIES = {
     "local4": 20,
     "local5": 21,
     "local6": 22,
-    "local7": 23
+    "local7": 23,
 }
 
 CONFIG_DEFAULTS = {
@@ -55,47 +55,45 @@ CONFIG_DEFAULTS = {
             "level": "INFO",
             "handlers": ["error_console"],
             "propagate": True,
-            "qualname": "plain.server.error"
+            "qualname": "plain.server.error",
         },
-
         "plain.server.access": {
             "level": "INFO",
             "handlers": ["console"],
             "propagate": True,
-            "qualname": "plain.server.access"
-        }
+            "qualname": "plain.server.access",
+        },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "generic",
-            "stream": "ext://sys.stdout"
+            "stream": "ext://sys.stdout",
         },
         "error_console": {
             "class": "logging.StreamHandler",
             "formatter": "generic",
-            "stream": "ext://sys.stderr"
+            "stream": "ext://sys.stderr",
         },
     },
     "formatters": {
         "generic": {
             "format": "%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
             "datefmt": "[%Y-%m-%d %H:%M:%S %z]",
-            "class": "logging.Formatter"
+            "class": "logging.Formatter",
         }
-    }
+    },
 }
 
 
 def loggers():
-    """ get list of all loggers """
+    """get list of all loggers"""
     root = logging.root
     existing = list(root.manager.loggerDict.keys())
     return [logging.getLogger(name) for name in existing]
 
 
 class SafeAtoms(dict):
-
     def __init__(self, atoms):
         dict.__init__(self)
         for key, value in atoms.items():
@@ -114,11 +112,10 @@ class SafeAtoms(dict):
         if k in self:
             return super().__getitem__(k)
         else:
-            return '-'
+            return "-"
 
 
 def parse_syslog_address(addr):
-
     # unix domain socket type depends on backend
     # SysLogHandler will try both when given None
     if addr.startswith("unix://"):
@@ -142,18 +139,18 @@ def parse_syslog_address(addr):
     else:
         raise RuntimeError("invalid syslog address")
 
-    if '[' in addr and ']' in addr:
-        host = addr.split(']')[0][1:].lower()
-    elif ':' in addr:
-        host = addr.split(':')[0].lower()
+    if "[" in addr and "]" in addr:
+        host = addr.split("]")[0][1:].lower()
+    elif ":" in addr:
+        host = addr.split(":")[0].lower()
     elif addr == "":
         host = "localhost"
     else:
         host = addr.lower()
 
-    addr = addr.split(']')[-1]
+    addr = addr.split("]")[-1]
     if ":" in addr:
-        port = addr.split(':', 1)[1]
+        port = addr.split(":", 1)[1]
         if not port.isdigit():
             raise RuntimeError(f"{port!r} is not a valid port number.")
         port = int(port)
@@ -164,13 +161,12 @@ def parse_syslog_address(addr):
 
 
 class Logger:
-
     LOG_LEVELS = {
         "critical": logging.CRITICAL,
         "error": logging.ERROR,
         "warning": logging.WARNING,
         "info": logging.INFO,
-        "debug": logging.DEBUG
+        "debug": logging.DEBUG,
     }
     loglevel = logging.INFO
 
@@ -204,25 +200,28 @@ class Logger:
             for stream in sys.stdout, sys.stderr:
                 stream.flush()
 
-            self.logfile = open(cfg.errorlog, 'a+')
+            self.logfile = open(cfg.errorlog, "a+")
             os.dup2(self.logfile.fileno(), sys.stdout.fileno())
             os.dup2(self.logfile.fileno(), sys.stderr.fileno())
 
-        self._set_handler(self.error_log, cfg.errorlog,
-                          logging.Formatter(self.error_fmt, self.datefmt))
+        self._set_handler(
+            self.error_log,
+            cfg.errorlog,
+            logging.Formatter(self.error_fmt, self.datefmt),
+        )
 
         # set plain.server.access handler
         if cfg.accesslog is not None:
             self._set_handler(
-                self.access_log, cfg.accesslog,
-                fmt=logging.Formatter(self.access_fmt), stream=sys.stdout
+                self.access_log,
+                cfg.accesslog,
+                fmt=logging.Formatter(self.access_fmt),
+                stream=sys.stdout,
             )
 
         # set syslog handler
         if cfg.syslog:
-            self._set_syslog_handler(
-                self.error_log, cfg, self.syslog_fmt, "error"
-            )
+            self._set_syslog_handler(self.error_log, cfg, self.syslog_fmt, "error")
             if not cfg.disable_redirect_access_to_syslog:
                 self._set_syslog_handler(
                     self.access_log, cfg, self.syslog_fmt, "access"
@@ -233,12 +232,7 @@ class Logger:
             config.update(cfg.logconfig_dict)
             try:
                 dictConfig(config)
-            except (
-                    AttributeError,
-                    ImportError,
-                    ValueError,
-                    TypeError
-            ) as exc:
+            except (AttributeError, ImportError, ValueError, TypeError) as exc:
                 raise RuntimeError(str(exc))
         elif cfg.logconfig_json:
             config = CONFIG_DEFAULTS.copy()
@@ -252,16 +246,17 @@ class Logger:
                     AttributeError,
                     ImportError,
                     ValueError,
-                    TypeError
+                    TypeError,
                 ) as exc:
                     raise RuntimeError(str(exc))
         elif cfg.logconfig:
             if os.path.exists(cfg.logconfig):
                 defaults = CONFIG_DEFAULTS.copy()
-                defaults['__file__'] = cfg.logconfig
-                defaults['here'] = os.path.dirname(cfg.logconfig)
-                fileConfig(cfg.logconfig, defaults=defaults,
-                           disable_existing_loggers=False)
+                defaults["__file__"] = cfg.logconfig
+                defaults["here"] = os.path.dirname(cfg.logconfig)
+                fileConfig(
+                    cfg.logconfig, defaults=defaults, disable_existing_loggers=False
+                )
             else:
                 msg = "Error: log config '%s' not found"
                 raise RuntimeError(msg % cfg.logconfig)
@@ -290,37 +285,38 @@ class Logger:
         self.error_log.log(lvl, msg, *args, **kwargs)
 
     def atoms(self, resp, req, environ, request_time):
-        """ Gets atoms for log formatting.
-        """
+        """Gets atoms for log formatting."""
         status = resp.status
         if isinstance(status, str):
             status = status.split(None, 1)[0]
         atoms = {
-            'h': environ.get('REMOTE_ADDR', '-'),
-            'l': '-',
-            'u': self._get_user(environ) or '-',
-            't': self.now(),
-            'r': "{} {} {}".format(environ['REQUEST_METHOD'],
-                               environ['RAW_URI'],
-                               environ["SERVER_PROTOCOL"]),
-            's': status,
-            'm': environ.get('REQUEST_METHOD'),
-            'U': environ.get('PATH_INFO'),
-            'q': environ.get('QUERY_STRING'),
-            'H': environ.get('SERVER_PROTOCOL'),
-            'b': getattr(resp, 'sent', None) is not None and str(resp.sent) or '-',
-            'B': getattr(resp, 'sent', None),
-            'f': environ.get('HTTP_REFERER', '-'),
-            'a': environ.get('HTTP_USER_AGENT', '-'),
-            'T': request_time.seconds,
-            'D': (request_time.seconds * 1000000) + request_time.microseconds,
-            'M': (request_time.seconds * 1000) + int(request_time.microseconds / 1000),
-            'L': "%d.%06d" % (request_time.seconds, request_time.microseconds),
-            'p': f"<{os.getpid()}>"
+            "h": environ.get("REMOTE_ADDR", "-"),
+            "l": "-",
+            "u": self._get_user(environ) or "-",
+            "t": self.now(),
+            "r": "{} {} {}".format(
+                environ["REQUEST_METHOD"],
+                environ["RAW_URI"],
+                environ["SERVER_PROTOCOL"],
+            ),
+            "s": status,
+            "m": environ.get("REQUEST_METHOD"),
+            "U": environ.get("PATH_INFO"),
+            "q": environ.get("QUERY_STRING"),
+            "H": environ.get("SERVER_PROTOCOL"),
+            "b": getattr(resp, "sent", None) is not None and str(resp.sent) or "-",
+            "B": getattr(resp, "sent", None),
+            "f": environ.get("HTTP_REFERER", "-"),
+            "a": environ.get("HTTP_USER_AGENT", "-"),
+            "T": request_time.seconds,
+            "D": (request_time.seconds * 1000000) + request_time.microseconds,
+            "M": (request_time.seconds * 1000) + int(request_time.microseconds / 1000),
+            "L": f"{request_time.seconds}.{request_time.microseconds:06d}",
+            "p": f"<{os.getpid()}>",
         }
 
         # add request headers
-        if hasattr(req, 'headers'):
+        if hasattr(req, "headers"):
             req_headers = req.headers
         else:
             req_headers = req
@@ -344,13 +340,17 @@ class Logger:
         return atoms
 
     def access(self, resp, req, environ, request_time):
-        """ See http://httpd.apache.org/docs/2.0/logs.html#combined
+        """See http://httpd.apache.org/docs/2.0/logs.html#combined
         for format details
         """
 
-        if not (self.cfg.accesslog or self.cfg.logconfig or
-           self.cfg.logconfig_dict or self.cfg.logconfig_json or
-           (self.cfg.syslog and not self.cfg.disable_redirect_access_to_syslog)):
+        if not (
+            self.cfg.accesslog
+            or self.cfg.logconfig
+            or self.cfg.logconfig_dict
+            or self.cfg.logconfig_json
+            or (self.cfg.syslog and not self.cfg.disable_redirect_access_to_syslog)
+        ):
             return
 
         # wrap atoms:
@@ -366,8 +366,8 @@ class Logger:
             self.error(traceback.format_exc())
 
     def now(self):
-        """ return date in Apache Common Log Format """
-        return time.strftime('[%d/%b/%Y:%H:%M:%S %z]')
+        """return date in Apache Common Log Format"""
+        return time.strftime("[%d/%b/%Y:%H:%M:%S %z]")
 
     def reopen_files(self):
         if self.cfg.capture_output and self.cfg.errorlog != "-":
@@ -377,7 +377,7 @@ class Logger:
             with self.lock:
                 if self.logfile is not None:
                     self.logfile.close()
-                self.logfile = open(self.cfg.errorlog, 'a+')
+                self.logfile = open(self.cfg.errorlog, "a+")
                 os.dup2(self.logfile.fileno(), sys.stdout.fileno())
                 os.dup2(self.logfile.fileno(), sys.stderr.fileno())
 
@@ -451,8 +451,9 @@ class Logger:
         socktype, addr = parse_syslog_address(cfg.syslog_addr)
 
         # finally setup the syslog handler
-        h = logging.handlers.SysLogHandler(address=addr,
-                                           facility=facility, socktype=socktype)
+        h = logging.handlers.SysLogHandler(
+            address=addr, facility=facility, socktype=socktype
+        )
 
         h.setFormatter(fmt)
         h._gunicorn = True
@@ -461,13 +462,13 @@ class Logger:
     def _get_user(self, environ):
         user = None
         http_auth = environ.get("HTTP_AUTHORIZATION")
-        if http_auth and http_auth.lower().startswith('basic'):
+        if http_auth and http_auth.lower().startswith("basic"):
             auth = http_auth.split(" ", 1)
             if len(auth) == 2:
                 try:
                     # b64decode doesn't accept unicode in Python < 3.3
                     # so we need to convert it to a byte string
-                    auth = base64.b64decode(auth[1].strip().encode('utf-8'))
+                    auth = base64.b64decode(auth[1].strip().encode("utf-8"))
                     # b64decode returns a byte string
                     user = auth.split(b":", 1)[0].decode("UTF-8")
                 except (TypeError, binascii.Error, UnicodeDecodeError) as exc:

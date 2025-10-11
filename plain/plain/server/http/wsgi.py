@@ -21,17 +21,16 @@ BLKSIZE = 0x3FFFFFFF
 
 # RFC9110 5.5: field-vchar = VCHAR / obs-text
 # RFC4234 B.1: VCHAR = 0x21-x07E = printable ASCII
-HEADER_VALUE_RE = re.compile(r'[ \t\x21-\x7e\x80-\xff]*')
+HEADER_VALUE_RE = re.compile(r"[ \t\x21-\x7e\x80-\xff]*")
 
 log = logging.getLogger(__name__)
 
 
 class FileWrapper:
-
     def __init__(self, filelike, blksize=8192):
         self.filelike = filelike
         self.blksize = blksize
-        if hasattr(filelike, 'close'):
+        if hasattr(filelike, "close"):
             self.close = filelike.close
 
     def __getitem__(self, key):
@@ -42,7 +41,6 @@ class FileWrapper:
 
 
 class WSGIErrorsWrapper(io.RawIOBase):
-
     def __init__(self, cfg):
         # There is no public __init__ method for RawIOBase so
         # we don't need to call super() in the __init__ method.
@@ -83,14 +81,18 @@ def base_environ(cfg):
 
 def default_environ(req, sock, cfg):
     env = base_environ(cfg)
-    env.update({
-        "wsgi.input": req.body,
-        "plain.server.socket": sock,
-        "REQUEST_METHOD": req.method,
-        "QUERY_STRING": req.query,
-        "RAW_URI": req.uri,
-        "SERVER_PROTOCOL": "HTTP/{}".format(".".join([str(v) for v in req.version]))
-    })
+    env.update(
+        {
+            "wsgi.input": req.body,
+            "plain.server.socket": sock,
+            "REQUEST_METHOD": req.method,
+            "QUERY_STRING": req.query,
+            "RAW_URI": req.uri,
+            "SERVER_PROTOCOL": "HTTP/{}".format(
+                ".".join([str(v) for v in req.version])
+            ),
+        }
+    )
     return env
 
 
@@ -125,38 +127,38 @@ def create(req, sock, client, server, cfg):
             # handle expect
             if hdr_value.lower() == "100-continue":
                 sock.send(b"HTTP/1.1 100 Continue\r\n\r\n")
-        elif hdr_name == 'HOST':
+        elif hdr_name == "HOST":
             host = hdr_value
         elif hdr_name == "SCRIPT_NAME":
             script_name = hdr_value
         elif hdr_name == "CONTENT-TYPE":
-            environ['CONTENT_TYPE'] = hdr_value
+            environ["CONTENT_TYPE"] = hdr_value
             continue
         elif hdr_name == "CONTENT-LENGTH":
-            environ['CONTENT_LENGTH'] = hdr_value
+            environ["CONTENT_LENGTH"] = hdr_value
             continue
 
         # do not change lightly, this is a common source of security problems
         # RFC9110 Section 17.10 discourages ambiguous or incomplete mappings
-        key = 'HTTP_' + hdr_name.replace('-', '_')
+        key = "HTTP_" + hdr_name.replace("-", "_")
         if key in environ:
             hdr_value = f"{environ[key]},{hdr_value}"
         environ[key] = hdr_value
 
     # set the url scheme
-    environ['wsgi.url_scheme'] = req.scheme
+    environ["wsgi.url_scheme"] = req.scheme
 
     # set the REMOTE_* keys in environ
     # authors should be aware that REMOTE_HOST and REMOTE_ADDR
     # may not qualify the remote addr:
     # http://www.ietf.org/rfc/rfc3875
     if isinstance(client, str):
-        environ['REMOTE_ADDR'] = client
+        environ["REMOTE_ADDR"] = client
     elif isinstance(client, bytes):
-        environ['REMOTE_ADDR'] = client.decode()
+        environ["REMOTE_ADDR"] = client.decode()
     else:
-        environ['REMOTE_ADDR'] = client[0]
-        environ['REMOTE_PORT'] = str(client[1])
+        environ["REMOTE_ADDR"] = client[0]
+        environ["REMOTE_PORT"] = str(client[1])
 
     # handle the SERVER_*
     # Normally only the application should use the Host header but since the
@@ -167,30 +169,31 @@ def create(req, sock, client, server, cfg):
         if len(server) == 1:
             # unix socket
             if host:
-                server = host.split(':')
+                server = host.split(":")
                 if len(server) == 1:
                     if req.scheme == "http":
                         server.append(80)
                     elif req.scheme == "https":
                         server.append(443)
                     else:
-                        server.append('')
+                        server.append("")
             else:
                 # no host header given which means that we are not behind a
                 # proxy, so append an empty port.
-                server.append('')
-    environ['SERVER_NAME'] = server[0]
-    environ['SERVER_PORT'] = str(server[1])
+                server.append("")
+    environ["SERVER_NAME"] = server[0]
+    environ["SERVER_PORT"] = str(server[1])
 
     # set the path and script name
     path_info = req.path
     if script_name:
         if not path_info.startswith(script_name):
             raise ConfigurationProblem(
-                f"Request path {path_info!r} does not start with SCRIPT_NAME {script_name!r}")
-        path_info = path_info[len(script_name):]
-    environ['PATH_INFO'] = util.unquote_to_wsgi_str(path_info)
-    environ['SCRIPT_NAME'] = script_name
+                f"Request path {path_info!r} does not start with SCRIPT_NAME {script_name!r}"
+            )
+        path_info = path_info[len(script_name) :]
+    environ["PATH_INFO"] = util.unquote_to_wsgi_str(path_info)
+    environ["SCRIPT_NAME"] = script_name
 
     # override the environ with the correct remote and server address if
     # we are behind a proxy using the proxy protocol.
@@ -199,7 +202,6 @@ def create(req, sock, client, server, cfg):
 
 
 class Response:
-
     def __init__(self, req, sock, cfg):
         self.req = req
         self.sock = sock
@@ -222,7 +224,7 @@ class Response:
             return True
         if self.response_length is not None or self.chunked:
             return False
-        if self.req.method == 'HEAD':
+        if self.req.method == "HEAD":
             return False
         if self.status_code < 200 or self.status_code in (204, 304):
             return False
@@ -255,16 +257,16 @@ class Response:
     def process_headers(self, headers):
         for name, value in headers:
             if not isinstance(name, str):
-                raise TypeError(f'{name!r} is not a string')
+                raise TypeError(f"{name!r} is not a string")
 
             if not TOKEN_RE.fullmatch(name):
-                raise InvalidHeaderName(f'{name!r}')
+                raise InvalidHeaderName(f"{name!r}")
 
             if not isinstance(value, str):
-                raise TypeError(f'{value!r} is not a string')
+                raise TypeError(f"{value!r} is not a string")
 
             if not HEADER_VALUE_RE.fullmatch(value):
-                raise InvalidHeader(f'{value!r}')
+                raise InvalidHeader(f"{value!r}")
 
             # RFC9110 5.5
             value = value.strip(" \t")
@@ -292,7 +294,7 @@ class Response:
             return False
         elif self.req.version <= (1, 0):
             return False
-        elif self.req.method == 'HEAD':
+        elif self.req.method == "HEAD":
             # Responses to a HEAD request MUST NOT contain a response body.
             return False
         elif self.status_code in (204, 304):
@@ -314,7 +316,7 @@ class Response:
             f"HTTP/{self.req.version[0]}.{self.req.version[1]} {self.status}\r\n",
             f"Server: {self.version}\r\n",
             f"Date: {util.http_date()}\r\n",
-            f"Connection: {connection}\r\n"
+            f"Connection: {connection}\r\n",
         ]
         if self.chunked:
             headers.append("Transfer-Encoding: chunked\r\n")
@@ -333,7 +335,7 @@ class Response:
     def write(self, arg):
         self.send_headers()
         if not isinstance(arg, bytes):
-            raise TypeError(f'{arg!r} is not a byte')
+            raise TypeError(f"{arg!r} is not a byte")
         arglen = len(arg)
         tosend = arglen
         if self.response_length is not None:
@@ -378,7 +380,7 @@ class Response:
 
         if self.is_chunked():
             chunk_size = f"{nbytes:X}\r\n"
-            self.sock.sendall(chunk_size.encode('utf-8'))
+            self.sock.sendall(chunk_size.encode("utf-8"))
         if nbytes > 0:
             self.sock.sendfile(respiter.filelike, offset=offset, count=nbytes)
 

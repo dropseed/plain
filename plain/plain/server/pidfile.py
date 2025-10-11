@@ -52,7 +52,7 @@ class Pidfile:
         self.create(self.pid)
 
     def unlink(self):
-        """ delete pidfile"""
+        """delete pidfile"""
         try:
             with open(self.fname) as f:
                 pid1 = int(f.read() or 0)
@@ -63,7 +63,7 @@ class Pidfile:
             pass
 
     def validate(self):
-        """ Validate pidfile and make it stale if needed"""
+        """Validate pidfile and make it stale if needed"""
         if not self.fname:
             return
         try:

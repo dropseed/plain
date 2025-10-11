@@ -10,7 +10,6 @@ from .unreader import IterUnreader, SocketUnreader
 
 
 class Parser:
-
     mesg_class = None
 
     def __init__(self, cfg, source, source_addr):
@@ -41,7 +40,9 @@ class Parser:
 
         # Parse the next request
         self.req_count += 1
-        self.mesg = self.mesg_class(self.cfg, self.unreader, self.source_addr, self.req_count)
+        self.mesg = self.mesg_class(
+            self.cfg, self.unreader, self.source_addr, self.req_count
+        )
         if not self.mesg:
             raise StopIteration()
         return self.mesg
@@ -50,5 +51,4 @@ class Parser:
 
 
 class RequestParser(Parser):
-
     mesg_class = Request

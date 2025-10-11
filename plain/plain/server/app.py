@@ -11,6 +11,7 @@ import os
 import sys
 import traceback
 
+from . import util
 from .arbiter import Arbiter
 from .config import Config, get_default_config_file
 
@@ -20,6 +21,7 @@ class BaseApplication:
     An application interface for configuring and loading
     the various necessities for any given web framework.
     """
+
     def __init__(self, usage=None, prog=None):
         self.usage = usage
         self.cfg = None
@@ -76,7 +78,6 @@ class BaseApplication:
 
 
 class Application(BaseApplication):
-
     # 'init' and 'load' methods are implemented by WSGIApplication.
     # pylint: disable=abstract-method
 
@@ -90,21 +91,22 @@ class Application(BaseApplication):
             sys.path.insert(0, self.cfg.chdir)
 
     def get_config_from_filename(self, filename):
-
         if not os.path.exists(filename):
             raise RuntimeError(f"{filename!r} doesn't exist")
 
         ext = os.path.splitext(filename)[1]
 
         try:
-            module_name = '__config__'
+            module_name = "__config__"
             if ext in [".py", ".pyc"]:
                 spec = importlib.util.spec_from_file_location(module_name, filename)
             else:
                 msg = "configuration file should have a valid Python extension.\n"
                 util.warn(msg)
                 loader_ = importlib.machinery.SourceFileLoader(module_name, filename)
-                spec = importlib.util.spec_from_file_location(module_name, filename, loader=loader_)
+                spec = importlib.util.spec_from_file_location(
+                    module_name, filename, loader=loader_
+                )
             mod = importlib.util.module_from_spec(spec)
             sys.modules[module_name] = mod
             spec.loader.exec_module(mod)
@@ -126,11 +128,11 @@ class Application(BaseApplication):
         """
 
         if location.startswith("python:"):
-            module_name = location[len("python:"):]
+            module_name = location[len("python:") :]
             cfg = self.get_config_from_module_name(module_name)
         else:
             if location.startswith("file:"):
-                filename = location[len("file:"):]
+                filename = location[len("file:") :]
             else:
                 filename = location
             cfg = self.get_config_from_filename(filename)

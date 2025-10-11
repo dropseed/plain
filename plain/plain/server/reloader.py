@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 
-COMPILED_EXT_RE = re.compile(r'py[co]$')
+COMPILED_EXT_RE = re.compile(r"py[co]$")
 
 
 class Reloader(threading.Thread):
@@ -28,9 +28,9 @@ class Reloader(threading.Thread):
 
     def get_files(self):
         fnames = [
-            COMPILED_EXT_RE.sub('py', module.__file__)
+            COMPILED_EXT_RE.sub("py", module.__file__)
             for module in tuple(sys.modules.values())
-            if getattr(module, '__file__', None)
+            if getattr(module, "__file__", None)
         ]
 
         fnames.extend(self._extra_files)
@@ -56,10 +56,11 @@ class Reloader(threading.Thread):
 
 
 has_inotify = False
-if sys.platform.startswith('linux'):
+if sys.platform.startswith("linux"):
     try:
         import inotify.constants
         from inotify.adapters import Inotify
+
         has_inotify = True
     except ImportError:
         pass
@@ -68,10 +69,15 @@ if sys.platform.startswith('linux'):
 if has_inotify:
 
     class InotifyReloader(threading.Thread):
-        event_mask = (inotify.constants.IN_CREATE | inotify.constants.IN_DELETE
-                      | inotify.constants.IN_DELETE_SELF | inotify.constants.IN_MODIFY
-                      | inotify.constants.IN_MOVE_SELF | inotify.constants.IN_MOVED_FROM
-                      | inotify.constants.IN_MOVED_TO)
+        event_mask = (
+            inotify.constants.IN_CREATE
+            | inotify.constants.IN_DELETE
+            | inotify.constants.IN_DELETE_SELF
+            | inotify.constants.IN_MODIFY
+            | inotify.constants.IN_MOVE_SELF
+            | inotify.constants.IN_MOVED_FROM
+            | inotify.constants.IN_MOVED_TO
+        )
 
         def __init__(self, extra_files=None, callback=None):
             super().__init__()
@@ -94,9 +100,11 @@ if has_inotify:
 
         def get_dirs(self):
             fnames = [
-                os.path.dirname(os.path.abspath(COMPILED_EXT_RE.sub('py', module.__file__)))
+                os.path.dirname(
+                    os.path.abspath(COMPILED_EXT_RE.sub("py", module.__file__))
+                )
                 for module in tuple(sys.modules.values())
-                if getattr(module, '__file__', None)
+                if getattr(module, "__file__", None)
             ]
 
             return set(fnames)
@@ -120,14 +128,15 @@ else:
 
     class InotifyReloader:
         def __init__(self, extra_files=None, callback=None):
-            raise ImportError('You must have the inotify module installed to '
-                              'use the inotify reloader')
+            raise ImportError(
+                "You must have the inotify module installed to use the inotify reloader"
+            )
 
 
 preferred_reloader = InotifyReloader if has_inotify else Reloader
 
 reloader_engines = {
-    'auto': preferred_reloader,
-    'poll': Reloader,
-    'inotify': InotifyReloader,
+    "auto": preferred_reloader,
+    "poll": Reloader,
+    "inotify": InotifyReloader,
 }

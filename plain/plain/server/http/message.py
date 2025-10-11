@@ -55,17 +55,19 @@ class Message:
 
         # set headers limits
         self.limit_request_fields = cfg.limit_request_fields
-        if (self.limit_request_fields <= 0
-                or self.limit_request_fields > MAX_HEADERS):
+        if self.limit_request_fields <= 0 or self.limit_request_fields > MAX_HEADERS:
             self.limit_request_fields = MAX_HEADERS
         self.limit_request_field_size = cfg.limit_request_field_size
         if self.limit_request_field_size < 0:
             self.limit_request_field_size = DEFAULT_MAX_HEADERFIELD_SIZE
 
         # set max header buffer size
-        max_header_field_size = self.limit_request_field_size or DEFAULT_MAX_HEADERFIELD_SIZE
-        self.max_buffer_headers = self.limit_request_fields * \
-            (max_header_field_size + 2) + 4
+        max_header_field_size = (
+            self.limit_request_field_size or DEFAULT_MAX_HEADERFIELD_SIZE
+        )
+        self.max_buffer_headers = (
+            self.limit_request_fields * (max_header_field_size + 2) + 4
+        )
 
         unused = self.parse(self.unreader)
         self.unreader.unread(unused)
@@ -92,9 +94,11 @@ class Message:
             # nonsense. either a request is https from the beginning
             #  .. or we are just behind a proxy who does not remove conflicting trailers
             pass
-        elif ('*' in cfg.forwarded_allow_ips or
-              not isinstance(self.peer_addr, tuple)
-              or self.peer_addr[0] in cfg.forwarded_allow_ips):
+        elif (
+            "*" in cfg.forwarded_allow_ips
+            or not isinstance(self.peer_addr, tuple)
+            or self.peer_addr[0] in cfg.forwarded_allow_ips
+        ):
             secure_scheme_headers = cfg.secure_scheme_headers
             forwarder_headers = cfg.forwarder_headers
 
@@ -131,8 +135,7 @@ class Message:
                 curr = lines.pop(0)
                 header_length += len(curr) + len("\r\n")
                 if header_length > self.limit_request_field_size > 0:
-                    raise LimitRequestHeaders("limit request headers "
-                                              "fields size")
+                    raise LimitRequestHeaders("limit request headers fields size")
                 value.append(curr.strip("\t "))
             value = " ".join(value)
 
@@ -180,7 +183,7 @@ class Message:
         chunked = False
         content_length = None
 
-        for (name, value) in self.headers:
+        for name, value in self.headers:
             if name == "CONTENT-LENGTH":
                 if content_length is not None:
                     raise InvalidHeader("CONTENT-LENGTH", req=self)
@@ -188,7 +191,7 @@ class Message:
             elif name == "TRANSFER-ENCODING":
                 # T-E can be a list
                 # https://datatracker.ietf.org/doc/html/rfc9112#name-transfer-encoding
-                vals = [v.strip() for v in value.split(',')]
+                vals = [v.strip() for v in value.split(",")]
                 for val in vals:
                     if val.lower() == "chunked":
                         # DANGER: transfer codings stack, and stacked chunking is never intended
@@ -200,7 +203,7 @@ class Message:
                         # safe option: nuke it, its never needed
                         if chunked:
                             raise InvalidHeader("TRANSFER-ENCODING", req=self)
-                    elif val.lower() in ('compress', 'deflate', 'gzip'):
+                    elif val.lower() in ("compress", "deflate", "gzip"):
                         # chunked should be the last one
                         if chunked:
                             raise InvalidHeader("TRANSFER-ENCODING", req=self)
@@ -239,7 +242,7 @@ class Message:
     def should_close(self):
         if self.must_close:
             return True
-        for (h, v) in self.headers:
+        for h, v in self.headers:
             if h == "CONNECTION":
                 v = v.lower().strip(" \t")
                 if v == "close":
@@ -260,8 +263,7 @@ class Request(Message):
 
         # get max request line size
         self.limit_request_line = cfg.limit_request_line
-        if (self.limit_request_line < 0
-                or self.limit_request_line >= MAX_REQUEST_LINE):
+        if self.limit_request_line < 0 or self.limit_request_line >= MAX_REQUEST_LINE:
             self.limit_request_line = MAX_REQUEST_LINE
 
         self.req_number = req_number
@@ -317,7 +319,7 @@ class Request(Message):
 
         self.headers = self.parse_headers(data[:idx], from_trailer=False)
 
-        ret = data[idx + 4:]
+        ret = data[idx + 4 :]
         buf = None
         return ret
 
@@ -336,8 +338,10 @@ class Request(Message):
             self.get_data(unreader, buf)
             data = buf.getvalue()
 
-        return (data[:idx],  # request line,
-                data[idx + 2:])  # residue in the buffer, skip \r\n
+        return (
+            data[:idx],  # request line,
+            data[idx + 2 :],
+        )  # residue in the buffer, skip \r\n
 
     def proxy_protocol(self, line):
         """\
@@ -362,9 +366,11 @@ class Request(Message):
 
     def proxy_protocol_access_check(self):
         # check in allow list
-        if ("*" not in self.cfg.proxy_allow_ips and
-            isinstance(self.peer_addr, tuple) and
-                self.peer_addr[0] not in self.cfg.proxy_allow_ips):
+        if (
+            "*" not in self.cfg.proxy_allow_ips
+            and isinstance(self.peer_addr, tuple)
+            and self.peer_addr[0] not in self.cfg.proxy_allow_ips
+        ):
             raise ForbiddenProxyRequest(self.peer_addr[0])
 
     def parse_proxy_protocol(self, line):
@@ -409,7 +415,7 @@ class Request(Message):
             "client_addr": s_addr,
             "client_port": s_port,
             "proxy_addr": d_addr,
-            "proxy_port": d_port
+            "proxy_port": d_port,
         }
 
     def parse_request_line(self, line_bytes):

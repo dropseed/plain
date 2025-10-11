@@ -43,13 +43,12 @@ def make_settings(ignore=None):
 
 def auto_int(_, x):
     # for compatible with octal numbers in python3
-    if re.match(r'0(\d)', x, re.IGNORECASE):
-        x = x.replace('0', '0o', 1)
+    if re.match(r"0(\d)", x, re.IGNORECASE):
+        x = x.replace("0", "0o", 1)
     return int(x, 0)
 
 
 class Config:
-
     def __init__(self, usage=None, prog=None):
         self.settings = make_settings()
         self.usage = usage
@@ -82,20 +81,21 @@ class Config:
         self.settings[name].set(value)
 
     def get_cmd_args_from_env(self):
-        if 'GUNICORN_CMD_ARGS' in self.env_orig:
-            return shlex.split(self.env_orig['GUNICORN_CMD_ARGS'])
+        if "GUNICORN_CMD_ARGS" in self.env_orig:
+            return shlex.split(self.env_orig["GUNICORN_CMD_ARGS"])
         return []
 
     def parser(self):
-        kwargs = {
-            "usage": self.usage,
-            "prog": self.prog
-        }
+        kwargs = {"usage": self.usage, "prog": self.prog}
         parser = argparse.ArgumentParser(**kwargs)
-        parser.add_argument("-v", "--version",
-                            action="version", default=argparse.SUPPRESS,
-                            version="%(prog)s (version " + plain.runtime.__version__ + ")\n",
-                            help="show program's version number and exit")
+        parser.add_argument(
+            "-v",
+            "--version",
+            action="version",
+            default=argparse.SUPPRESS,
+            version="%(prog)s (version " + plain.runtime.__version__ + ")\n",
+            help="show program's version number and exit",
+        )
         parser.add_argument("args", nargs="*", help=argparse.SUPPRESS)
 
         keys = sorted(self.settings, key=self.settings.__getitem__)
@@ -106,11 +106,11 @@ class Config:
 
     @property
     def worker_class_str(self):
-        uri = self.settings['worker_class'].get()
+        uri = self.settings["worker_class"].get()
 
         if isinstance(uri, str):
             # are we using a threaded worker?
-            is_sync = uri.endswith('SyncWorker') or uri == 'sync'
+            is_sync = uri.endswith("SyncWorker") or uri == "sync"
             if is_sync and self.threads > 1:
                 return "gthread"
             return uri
@@ -118,10 +118,10 @@ class Config:
 
     @property
     def worker_class(self):
-        uri = self.settings['worker_class'].get()
+        uri = self.settings["worker_class"].get()
 
         # are we using a threaded worker?
-        is_sync = isinstance(uri, str) and (uri.endswith('SyncWorker') or uri == 'sync')
+        is_sync = isinstance(uri, str) and (uri.endswith("SyncWorker") or uri == "sync")
         if is_sync and self.threads > 1:
             uri = "plain.server.workers.gthread.ThreadWorker"
 
@@ -132,37 +132,35 @@ class Config:
 
     @property
     def address(self):
-        s = self.settings['bind'].get()
+        s = self.settings["bind"].get()
         return [util.parse_address(util.bytes_to_str(bind)) for bind in s]
 
     @property
     def uid(self):
-        return self.settings['user'].get()
+        return self.settings["user"].get()
 
     @property
     def gid(self):
-        return self.settings['group'].get()
+        return self.settings["group"].get()
 
     @property
     def proc_name(self):
-        pn = self.settings['proc_name'].get()
+        pn = self.settings["proc_name"].get()
         if pn is not None:
             return pn
         else:
-            return self.settings['default_proc_name'].get()
+            return self.settings["default_proc_name"].get()
 
     @property
     def logger_class(self):
-        uri = self.settings['logger_class'].get()
+        uri = self.settings["logger_class"].get()
         if uri == "simple":
             # support the default
             uri = LoggerClass.default
 
-
         logger_class = util.load_class(
-            uri,
-            default="plain.server.glogging.Logger",
-            section="plain.server.loggers")
+            uri, default="plain.server.glogging.Logger", section="plain.server.loggers"
+        )
 
         if hasattr(logger_class, "install"):
             logger_class.install()
@@ -176,13 +174,13 @@ class Config:
     def ssl_options(self):
         opts = {}
         for name, value in self.settings.items():
-            if value.section == 'SSL':
+            if value.section == "SSL":
                 opts[name] = value.get()
         return opts
 
     @property
     def env(self):
-        raw_env = self.settings['raw_env'].get()
+        raw_env = self.settings["raw_env"].get()
         env = {}
 
         if not raw_env:
@@ -191,7 +189,7 @@ class Config:
         for e in raw_env:
             s = util.bytes_to_str(e)
             try:
-                k, v = s.split('=', 1)
+                k, v = s.split("=", 1)
             except ValueError:
                 raise RuntimeError(f"environment setting {s!r} invalid")
 
@@ -201,18 +199,19 @@ class Config:
 
     @property
     def sendfile(self):
-        if self.settings['sendfile'].get() is not None:
+        if self.settings["sendfile"].get() is not None:
             return False
 
-        if 'SENDFILE' in os.environ:
-            sendfile = os.environ['SENDFILE'].lower()
-            return sendfile in ['y', '1', 'yes', 'true']
+        if "SENDFILE" in os.environ:
+            sendfile = os.environ["SENDFILE"].lower()
+            return sendfile in ["y", "1", "yes", "true"]
 
         return True
 
     @property
     def reuse_port(self):
-        return self.settings['reuse_port'].get()
+        return self.settings["reuse_port"].get()
+
 
 class SettingMeta(type):
     def __new__(cls, name, bases, attrs):
@@ -267,11 +266,11 @@ class Setting:
             "action": self.action or "store",
             "type": self.type or str,
             "default": None,
-            "help": help_txt
+            "help": help_txt,
         }
 
         if self.meta is not None:
-            kwargs['metavar'] = self.meta
+            kwargs["metavar"] = self.meta
 
         if kwargs["action"] != "store":
             kwargs.pop("type")
@@ -292,19 +291,19 @@ class Setting:
 
     def set(self, val):
         if not callable(self.validator):
-            raise TypeError(f'Invalid validator: {self.name}')
+            raise TypeError(f"Invalid validator: {self.name}")
         self.value = self.validator(val)
 
     def __lt__(self, other):
-        return (self.section == other.section and
-                self.order < other.order)
+        return self.section == other.section and self.order < other.order
+
     __cmp__ = __lt__
 
     def __repr__(self):
         return f"<{self.__class__.__module__}.{self.__class__.__name__} object at {id(self):x} with value {self.value!r}>"
 
 
-Setting = SettingMeta('Setting', (Setting,), {})
+Setting = SettingMeta("Setting", (Setting,), {})
 
 
 def validate_bool(val):
@@ -342,7 +341,9 @@ def validate_pos_int(val):
 
 def validate_ssl_version(val):
     if val != SSLVersion.default:
-        sys.stderr.write("Warning: option `ssl_version` is deprecated and it is ignored. Use ssl_context instead.\n")
+        sys.stderr.write(
+            "Warning: option `ssl_version` is deprecated and it is ignored. Use ssl_context instead.\n"
+        )
     return val
 
 
@@ -411,8 +412,10 @@ def validate_callable(arity):
             try:
                 mod_name, obj_name = val.rsplit(".", 1)
             except ValueError:
-                raise TypeError(f"Value '{val}' is not import string. "
-                                "Format: module[.submodules...].object")
+                raise TypeError(
+                    f"Value '{val}' is not import string. "
+                    "Format: module[.submodules...].object"
+                )
             try:
                 mod = __import__(mod_name, fromlist=[obj_name])
                 val = getattr(mod, obj_name)
@@ -425,6 +428,7 @@ def validate_callable(arity):
         if arity != -1 and arity != util.get_arity(val):
             raise TypeError(f"Value must have an arity of: {arity}")
         return val
+
     return _validate_callable
 
 
@@ -484,17 +488,16 @@ def validate_chdir(val):
 
     return path
 
-
     # As of major release 20, util.parse_address would recognize unix:PORT
     # as a UDS address, breaking backwards compatibility. We defend against
     # that regression here (this is also unit-tested).
     # Feel free to remove in the next major release.
-    unix_hostname_regression = re.match(r'^unix:(\d+)$', val)
+    unix_hostname_regression = re.match(r"^unix:(\d+)$", val)
     if unix_hostname_regression:
-        return ('unix', int(unix_hostname_regression.group(1)))
+        return ("unix", int(unix_hostname_regression.group(1)))
 
     try:
-        address = util.parse_address(val, default_port='8125')
+        address = util.parse_address(val, default_port="8125")
     except RuntimeError:
         raise TypeError("Value must be one of ('host:port', 'unix://PATH')")
 
@@ -509,8 +512,7 @@ def validate_reload_engine(val):
 
 
 def get_default_config_file():
-    config_path = os.path.join(os.path.abspath(os.getcwd()),
-                               'plain.server.conf.py')
+    config_path = os.path.join(os.path.abspath(os.getcwd()), "plain.server.conf.py")
     if os.path.exists(config_path):
         return config_path
     return None
@@ -561,10 +563,10 @@ class Bind(Setting):
     meta = "ADDRESS"
     validator = validate_list_string
 
-    if 'PORT' in os.environ:
-        default = ['0.0.0.0:{}'.format(os.environ.get('PORT'))]
+    if "PORT" in os.environ:
+        default = ["0.0.0.0:{}".format(os.environ.get("PORT"))]
     else:
-        default = ['127.0.0.1:8000']
+        default = ["127.0.0.1:8000"]
 
     desc = """\
         The socket to bind.
@@ -870,13 +872,13 @@ class LimitRequestFieldSize(Setting):
 
 class Reload(Setting):
     name = "reload"
-    section = 'Debugging'
-    cli = ['--reload']
+    section = "Debugging"
+    cli = ["--reload"]
     validator = validate_bool
-    action = 'store_true'
+    action = "store_true"
     default = False
 
-    desc = '''\
+    desc = """\
         Restart workers when code changes.
 
         This setting is intended for development. It will cause workers to be
@@ -893,7 +895,7 @@ class Reload(Setting):
         .. note::
            In order to use the inotify reloader, you must have the ``inotify``
            package installed.
-        '''
+        """
 
 
 class ReloadEngine(Setting):
@@ -1147,7 +1149,7 @@ class Initgroups(Setting):
     section = "Server Mechanics"
     cli = ["--initgroups"]
     validator = validate_bool
-    action = 'store_true'
+    action = "store_true"
     default = False
 
     desc = """\
@@ -1183,7 +1185,7 @@ class SecureSchemeHeader(Setting):
     default = {
         "X-FORWARDED-PROTOCOL": "ssl",
         "X-FORWARDED-PROTO": "https",
-        "X-FORWARDED-SSL": "on"
+        "X-FORWARDED-SSL": "on",
     }
     desc = """\
 
@@ -1318,7 +1320,7 @@ class DisableRedirectAccessToSyslog(Setting):
     section = "Logging"
     cli = ["--disable-redirect-access-to-syslog"]
     validator = validate_bool
-    action = 'store_true'
+    action = "store_true"
     default = False
     desc = """\
     Disable redirect access logs to syslog.
@@ -1377,7 +1379,7 @@ class ErrorLog(Setting):
     cli = ["--error-logfile", "--log-file"]
     meta = "FILE"
     validator = validate_string
-    default = '-'
+    default = "-"
     desc = """\
         The Error log file to write to.
 
@@ -1414,7 +1416,7 @@ class CaptureOutput(Setting):
     section = "Logging"
     cli = ["--capture-output"]
     validator = validate_bool
-    action = 'store_true'
+    action = "store_true"
     default = False
     desc = """\
         Redirect stdout/stderr to specified file in :ref:`errorlog`.
@@ -1501,7 +1503,10 @@ class SyslogTo(Setting):
 
     if PLATFORM == "darwin":
         default = "unix:///var/run/syslog"
-    elif PLATFORM in ('freebsd', 'dragonfly', ):
+    elif PLATFORM in (
+        "freebsd",
+        "dragonfly",
+    ):
         default = "unix:///var/run/log"
     elif PLATFORM == "openbsd":
         default = "unix:///dev/log"
@@ -1527,7 +1532,7 @@ class Syslog(Setting):
     section = "Logging"
     cli = ["--log-syslog"]
     validator = validate_bool
-    action = 'store_true'
+    action = "store_true"
     default = False
     desc = """\
     Send *Gunicorn* logs to syslog.
@@ -1634,6 +1639,7 @@ class OnStarting(Setting):
 
     def on_starting(server):
         pass
+
     default = staticmethod(on_starting)
     desc = """\
         Called just before the master process is initialized.
@@ -1650,6 +1656,7 @@ class OnReload(Setting):
 
     def on_reload(server):
         pass
+
     default = staticmethod(on_reload)
     desc = """\
         Called to recycle workers during a reload via SIGHUP.
@@ -1666,6 +1673,7 @@ class WhenReady(Setting):
 
     def when_ready(server):
         pass
+
     default = staticmethod(when_ready)
     desc = """\
         Called just after the server is started.
@@ -1682,6 +1690,7 @@ class Prefork(Setting):
 
     def pre_fork(server, worker):
         pass
+
     default = staticmethod(pre_fork)
     desc = """\
         Called just before a worker is forked.
@@ -1699,6 +1708,7 @@ class Postfork(Setting):
 
     def post_fork(server, worker):
         pass
+
     default = staticmethod(post_fork)
     desc = """\
         Called just after a worker has been forked.
@@ -1772,6 +1782,7 @@ class PreExec(Setting):
 
     def pre_exec(server):
         pass
+
     default = staticmethod(pre_exec)
     desc = """\
         Called just before a new master process is forked.
@@ -1788,6 +1799,7 @@ class PreRequest(Setting):
 
     def pre_request(worker, req):
         worker.log.debug("%s %s", req.method, req.path)
+
     default = staticmethod(pre_request)
     desc = """\
         Called just before a worker processes the request.
@@ -1805,6 +1817,7 @@ class PostRequest(Setting):
 
     def post_request(worker, req, environ, resp):
         pass
+
     default = staticmethod(post_request)
     desc = """\
         Called after a worker processes the request.
@@ -1822,6 +1835,7 @@ class ChildExit(Setting):
 
     def child_exit(server, worker):
         pass
+
     default = staticmethod(child_exit)
     desc = """\
         Called just after a worker has been exited, in the master process.
@@ -1841,6 +1855,7 @@ class WorkerExit(Setting):
 
     def worker_exit(server, worker):
         pass
+
     default = staticmethod(worker_exit)
     desc = """\
         Called just after a worker has been exited, in the worker process.
@@ -1858,6 +1873,7 @@ class NumWorkersChanged(Setting):
 
     def nworkers_changed(server, new_value, old_value):
         pass
+
     default = staticmethod(nworkers_changed)
     desc = """\
         Called just after *num_workers* has been changed.

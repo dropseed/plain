@@ -20,12 +20,12 @@ class HaltServer(BaseException):
         self.exit_status = exit_status
 
     def __str__(self):
-        return "<HaltServer %r %d>" % (self.reason, self.exit_status)
+        return f"<HaltServer {self.reason!r} {self.exit_status}>"
 
 
 class ConfigError(Exception):
-    """ Exception raised on config error """
+    """Exception raised on config error"""
 
 
 class AppImportError(Exception):
-    """ Exception raised when loading an application """
+    """Exception raised when loading an application"""

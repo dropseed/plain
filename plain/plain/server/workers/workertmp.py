@@ -13,11 +13,10 @@ import time
 from .. import util
 
 PLATFORM = platform.system()
-IS_CYGWIN = PLATFORM.startswith('CYGWIN')
+IS_CYGWIN = PLATFORM.startswith("CYGWIN")
 
 
 class WorkerTmp:
-
     def __init__(self, cfg):
         old_umask = os.umask(cfg.umask)
         fdir = cfg.worker_tmp_dir
@@ -37,7 +36,7 @@ class WorkerTmp:
                 util.unlink(name)
             # In Python 3.8, open() emits RuntimeWarning if buffering=1 for binary mode.
             # Because we never write to this file, pass 0 to switch buffering off.
-            self._tmp = os.fdopen(fd, 'w+b', 0)
+            self._tmp = os.fdopen(fd, "w+b", 0)
         except Exception:
             os.close(fd)
             raise

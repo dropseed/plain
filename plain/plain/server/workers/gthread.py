@@ -32,7 +32,6 @@ from . import base
 
 
 class TConn:
-
     def __init__(self, cfg, sock, client, server):
         self.cfg = cfg
         self.sock = sock
@@ -67,7 +66,6 @@ class TConn:
 
 
 class ThreadWorker(base.Worker):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.worker_connections = self.cfg.worker_connections
@@ -85,8 +83,10 @@ class ThreadWorker(base.Worker):
         max_keepalived = cfg.worker_connections - cfg.threads
 
         if max_keepalived <= 0 and cfg.keepalive:
-            log.warning("No keepalived connections can be handled. "
-                        "Check the number of worker connections and threads.")
+            log.warning(
+                "No keepalived connections can be handled. "
+                "Check the number of worker connections and threads."
+            )
 
     def init_process(self):
         self.tpool = self.get_thread_pool()
@@ -126,11 +126,13 @@ class ThreadWorker(base.Worker):
             self.nr_conns += 1
             # wait until socket is readable
             with self._lock:
-                self.poller.register(conn.sock, selectors.EVENT_READ,
-                                     partial(self.on_client_socket_readable, conn))
+                self.poller.register(
+                    conn.sock,
+                    selectors.EVENT_READ,
+                    partial(self.on_client_socket_readable, conn),
+                )
         except OSError as e:
-            if e.errno not in (errno.EAGAIN, errno.ECONNABORTED,
-                               errno.EWOULDBLOCK):
+            if e.errno not in (errno.EAGAIN, errno.ECONNABORTED, errno.EWOULDBLOCK):
                 raise
 
     def on_client_socket_readable(self, conn, client):
@@ -193,13 +195,13 @@ class ThreadWorker(base.Worker):
 
     def run(self):
         # init listeners, add them to the event loop
-        for sock in self.sockets:
-            sock.setblocking(False)
+        for listener in self.sockets:
+            listener.setblocking(False)
             # a race condition during graceful shutdown may make the listener
             # name unavailable in the request handler so capture it once here
-            server = sock.getsockname()
+            server = listener.getsockname()
             acceptor = partial(self.accept, server)
-            self.poller.register(sock, selectors.EVENT_READ, acceptor)
+            self.poller.register(listener, selectors.EVENT_READ, acceptor)
 
         while self.alive:
             # notify the arbiter we are alive
@@ -214,12 +216,14 @@ class ThreadWorker(base.Worker):
                     callback(key.fileobj)
 
                 # check (but do not wait) for finished requests
-                result = futures.wait(self.futures, timeout=0,
-                                      return_when=futures.FIRST_COMPLETED)
+                result = futures.wait(
+                    self.futures, timeout=0, return_when=futures.FIRST_COMPLETED
+                )
             else:
                 # wait for a request to finish
-                result = futures.wait(self.futures, timeout=1.0,
-                                      return_when=futures.FIRST_COMPLETED)
+                result = futures.wait(
+                    self.futures, timeout=1.0, return_when=futures.FIRST_COMPLETED
+                )
 
             # clean up finished requests
             for fut in result.done:
@@ -259,8 +263,11 @@ class ThreadWorker(base.Worker):
                     self._keep.append(conn)
 
                     # add the socket to the event loop
-                    self.poller.register(conn.sock, selectors.EVENT_READ,
-                                         partial(self.on_client_socket_readable, conn))
+                    self.poller.register(
+                        conn.sock,
+                        selectors.EVENT_READ,
+                        partial(self.on_client_socket_readable, conn),
+                    )
             else:
                 self.nr_conns -= 1
                 conn.close()
@@ -316,8 +323,9 @@ class ThreadWorker(base.Worker):
         try:
             self.cfg.pre_request(self, req)
             request_start = datetime.now()
-            resp, environ = wsgi.create(req, conn.sock, conn.client,
-                                        conn.server, self.cfg)
+            resp, environ = wsgi.create(
+                req, conn.sock, conn.client, conn.server, self.cfg
+            )
             environ["wsgi.multithread"] = True
             self.nr += 1
             if self.nr >= self.max_requests:
@@ -333,7 +341,7 @@ class ThreadWorker(base.Worker):
 
             respiter = self.wsgi(environ, resp.start_response)
             try:
-                if isinstance(respiter, environ['wsgi.file_wrapper']):
+                if isinstance(respiter, environ["wsgi.file_wrapper"]):
                     resp.write_file(respiter)
                 else:
                     for item in respiter:
