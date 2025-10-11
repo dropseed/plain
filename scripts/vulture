@@ -1,2 +1,3 @@
 #!/bin/sh -e
-uvx vulture . --exclude .venv --ignore-decorators "@register*,@cli*"
+TARGET_PATH="${1:-.}"
+uvx vulture "$TARGET_PATH" --exclude .venv --ignore-decorators "@register*,@cli*"
