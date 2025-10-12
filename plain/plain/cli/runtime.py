@@ -4,8 +4,13 @@ CLI runtime utilities.
 This module provides decorators and utilities for CLI commands.
 """
 
+from collections.abc import Callable
+from typing import TypeVar
 
-def without_runtime_setup(f):
+F = TypeVar("F", bound=Callable)
+
+
+def without_runtime_setup(f: F) -> F:
     """
     Decorator to mark commands that don't need plain.runtime.setup().
 
@@ -19,5 +24,5 @@ def without_runtime_setup(f):
         def server(**options):
             ...
     """
-    f.without_runtime_setup = True
+    f.without_runtime_setup = True  # type: ignore[attr-defined]  # dynamic attribute for decorator
     return f
