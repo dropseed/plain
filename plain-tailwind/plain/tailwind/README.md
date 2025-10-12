@@ -138,8 +138,6 @@ For production deployments:
 
 The build command automatically installs the Tailwind CLI if it's not present, making deployments seamless.
 
-When using Plain on Heroku, the [Plain buildpack](https://github.com/plainpackages/heroku-buildpack-plain/blob/master/bin/files/post_compile) handles this automatically.
-
 ## Installation
 
 Install the `plain.tailwind` package from [PyPI](https://pypi.org/project/plain.tailwind/):
