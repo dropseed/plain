@@ -35,20 +35,29 @@ plain server --threads 8
 
 Common options:
 
-- `bind` - Address to bind to (default: `127.0.0.1:8000`)
-- `workers` - Number of worker processes (default: 1)
-- `threads` - Number of threads per worker (default: 1)
-- `timeout` - Worker timeout in seconds (default: 30)
-- `keepalive` - Seconds to wait for requests on a Keep-Alive connection (default: 2)
-- `reload` - Enable auto-reload on code changes (default: False)
-- `reload_extra_files` - Additional files to watch for reloading
-- `certfile` - Path to SSL certificate file
-- `keyfile` - Path to SSL key file
-- `loglevel` - Logging level: debug, info, warning, error, critical (default: info)
-- `accesslog` - Access log file path (use `-` for stdout)
-- `errorlog` - Error log file path (use `-` for stderr)
+- `--bind` / `-b` - Address to bind to (default: `127.0.0.1:8000`)
+- `--workers` / `-w` - Number of worker processes (default: 1, or `$WEB_CONCURRENCY` env var)
+- `--threads` - Number of threads per worker (default: 1)
+- `--timeout` / `-t` - Worker timeout in seconds (default: 30)
+- `--reload` - Enable auto-reload on code changes (default: False)
+- `--reload-extra-file` - Additional files to watch for reloading (can be used multiple times)
+- `--certfile` - Path to SSL certificate file
+- `--keyfile` - Path to SSL key file
+- `--log-level` - Logging level: debug, info, warning, error, critical (default: info)
+- `--access-log` - Access log file path (default: `-` for stdout)
+- `--error-log` - Error log file path (default: `-` for stderr)
+- `--log-format` - Log format string for error logs
+- `--access-log-format` - Access log format string for HTTP request details
+- `--max-requests` - Max requests before worker restart (default: 0, disabled)
+- `--pidfile` - PID file path
 
-For a complete list of options, see the configuration in `plain.server.config`.
+### Environment Variables
+
+- `WEB_CONCURRENCY` - Sets the number of worker processes (commonly used by Heroku and other PaaS providers)
+- `SENDFILE` - Enable/disable use of sendfile() syscall (set to `1`, `yes`, `true`, or `y` to enable)
+- `FORWARDED_ALLOW_IPS` - Comma-separated list of trusted proxy IPs for secure headers (default: `127.0.0.1,::1`)
+
+For a complete list of options, run `plain server --help`.
 
 ## WSGI Ejection Point
 
