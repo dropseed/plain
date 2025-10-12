@@ -9,7 +9,6 @@ from __future__ import annotations
 import base64
 import binascii
 import datetime
-import json
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -19,7 +18,6 @@ import os  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402
 import traceback  # noqa: E402
-from logging.config import dictConfig  # noqa: E402
 
 from . import util  # noqa: E402
 
@@ -27,46 +25,6 @@ if TYPE_CHECKING:
     from io import TextIOWrapper
 
     from .config import Config
-
-# syslog facility codes
-CONFIG_DEFAULTS = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "root": {"level": "INFO", "handlers": ["console"]},
-    "loggers": {
-        "plain.server.error": {
-            "level": "INFO",
-            "handlers": ["error_console"],
-            "propagate": True,
-            "qualname": "plain.server.error",
-        },
-        "plain.server.access": {
-            "level": "INFO",
-            "handlers": ["console"],
-            "propagate": True,
-            "qualname": "plain.server.access",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "generic",
-            "stream": "ext://sys.stdout",
-        },
-        "error_console": {
-            "class": "logging.StreamHandler",
-            "formatter": "generic",
-            "stream": "ext://sys.stderr",
-        },
-    },
-    "formatters": {
-        "generic": {
-            "format": "%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
-            "datefmt": "[%Y-%m-%d %H:%M:%S %z]",
-            "class": "logging.Formatter",
-        }
-    },
-}
 
 
 def loggers() -> list[logging.Logger]:
@@ -137,7 +95,7 @@ class Logger:
         self._set_handler(
             self.error_log,
             cfg.errorlog,
-            logging.Formatter(self.error_fmt, self.datefmt),
+            logging.Formatter(cfg.log_format, self.datefmt),
         )
 
         # set plain.server.access handler
@@ -145,26 +103,9 @@ class Logger:
             self._set_handler(
                 self.access_log,
                 cfg.accesslog,
-                fmt=logging.Formatter(self.access_fmt),
+                fmt=logging.Formatter(cfg.log_format, self.datefmt),
                 stream=sys.stdout,
             )
-
-        # Apply logconfig_json if provided
-        if cfg.logconfig_json:
-            config = CONFIG_DEFAULTS.copy()
-            if os.path.exists(cfg.logconfig_json):
-                try:
-                    config_json = json.load(open(cfg.logconfig_json))
-                    config.update(config_json)
-                    dictConfig(config)
-                except (
-                    json.JSONDecodeError,
-                    AttributeError,
-                    ImportError,
-                    ValueError,
-                    TypeError,
-                ) as exc:
-                    raise RuntimeError(str(exc))
 
     def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.critical(msg, *args, **kwargs)
@@ -261,7 +202,7 @@ class Logger:
         for format details
         """
 
-        if not (self.cfg.accesslog or self.cfg.logconfig_json):
+        if not self.cfg.accesslog:
             return None
 
         # wrap atoms:

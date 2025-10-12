@@ -34,8 +34,8 @@ class Config:
     loglevel: str
     accesslog: str
     errorlog: str
+    log_format: str
     access_log_format: str
-    logconfig_json: str | None
 
     @property
     def worker_class_str(self) -> str:
