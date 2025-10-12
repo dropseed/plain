@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.15.3](https://github.com/dropseed/plain/releases/plain-tailwind@0.15.3) (2025-10-12)
+
+### What's changed
+
+- Removed outdated reference to Heroku buildpack in documentation ([ee4710a](https://github.com/dropseed/plain/commit/ee4710af07))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.15.2) (2025-10-06)
 
 ### What's changed
