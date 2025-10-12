@@ -1,5 +1,17 @@
 # plain-dev changelog
 
+## [0.41.0](https://github.com/dropseed/plain/releases/plain-dev@0.41.0) (2025-10-12)
+
+### What's changed
+
+- The `plain dev` command now uses the new `plain server` command instead of `gunicorn` for running the development server ([f9dc2867c7](https://github.com/dropseed/plain/commit/f9dc2867c7))
+- Removed `gunicorn` as a dependency - the development server now uses Plain's built-in HTTP server ([f9dc2867c7](https://github.com/dropseed/plain/commit/f9dc2867c7))
+- Removed gunicorn-specific logging configuration file in favor of simplified log formatting ([fb8a00ca73](https://github.com/dropseed/plain/commit/fb8a00ca73))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.40.0](https://github.com/dropseed/plain/releases/plain-dev@0.40.0) (2025-10-10)
 
 ### What's changed
