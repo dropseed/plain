@@ -1,5 +1,24 @@
 # plain changelog
 
+## [0.76.0](https://github.com/dropseed/plain/releases/plain@0.76.0) (2025-10-12)
+
+### What's changed
+
+- Added new `plain server` command with built-in WSGI server (vendored gunicorn) ([f9dc2867c7](https://github.com/dropseed/plain/commit/f9dc2867c7))
+- The `plain server` command supports `WEB_CONCURRENCY` environment variable for worker processes ([0c3e8c6f32](https://github.com/dropseed/plain/commit/0c3e8c6f32))
+- Simplified server startup logging to use a single consolidated log line ([b1405b71f0](https://github.com/dropseed/plain/commit/b1405b71f0))
+- Removed `gunicorn` as an external dependency - server functionality is now built into plain core ([cb6c2f484d](https://github.com/dropseed/plain/commit/cb6c2f484d))
+- Internal server environment variables renamed from `GUNICORN_*` to `PLAIN_SERVER_*` ([745c073123](https://github.com/dropseed/plain/commit/745c073123))
+- Removed unused server features including hooks, syslog, proxy protocol, user/group dropping, and config file loading ([be0f82d92b](https://github.com/dropseed/plain/commit/be0f82d92b), [10c206875b](https://github.com/dropseed/plain/commit/10c206875b), [ecf327014c](https://github.com/dropseed/plain/commit/ecf327014c), [fb5a10f50b](https://github.com/dropseed/plain/commit/fb5a10f50b))
+
+### Upgrade instructions
+
+- Replace any direct usage of `gunicorn` with the new `plain server` command (ex. `gunicorn plain.wsgi:app --workers 4` becomes `plain server --workers 4`)
+- Update any deployment scripts or Procfiles that use `gunicorn` to use `plain server` instead
+- Remove `gunicorn` from your project dependencies if you added it separately (it's now built into plain)
+- For Heroku deployments, the `$PORT` is not automatically detected - update your Procfile to `web: plain server --bind 0.0.0.0:$PORT`
+- If you were using gunicorn configuration files, migrate the settings to `plain server` command-line options (run `plain server --help` to see available options)
+
 ## [0.75.0](https://github.com/dropseed/plain/releases/plain@0.75.0) (2025-10-10)
 
 ### What's changed
