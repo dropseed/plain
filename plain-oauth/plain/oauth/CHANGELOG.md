@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-oauth@0.31.0) (2025-10-12)
+
+### What's changed
+
+- Preflight provider key check has been moved from the model to a standalone `CheckOAuthProviderKeys` preflight check class ([fdc5aee](https://github.com/dropseed/plain/commit/fdc5aee))
+- Preflight check ID has been renamed from `oauth.provider_in_db_not_in_settings` to `oauth.provider_settings_missing` ([fdc5aee](https://github.com/dropseed/plain/commit/fdc5aee))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-oauth@0.30.0) (2025-10-07)
 
 ### What's changed
