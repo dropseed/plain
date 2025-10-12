@@ -196,7 +196,7 @@ def create_sockets(
 
         return listeners
 
-    # no sockets is bound, first initialization of gunicorn in this env.
+    # no sockets is bound, first initialization of plain server in this env.
     for addr in laddr:
         sock_type = _sock_type(addr)
         sock = None

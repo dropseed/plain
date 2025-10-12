@@ -346,9 +346,9 @@ class Logger:
                     finally:
                         handler.release()
 
-    def _get_gunicorn_handler(self, log: logging.Logger) -> logging.Handler | None:
+    def _get_plain_server_handler(self, log: logging.Logger) -> logging.Handler | None:
         for h in log.handlers:
-            if getattr(h, "_gunicorn", False):
+            if getattr(h, "_plain_server", False):
                 return h
         return None
 
@@ -359,8 +359,8 @@ class Logger:
         fmt: logging.Formatter,
         stream: Any = None,
     ) -> None:
-        # remove previous gunicorn log handler
-        h = self._get_gunicorn_handler(log)
+        # remove previous plain server log handler
+        h = self._get_plain_server_handler(log)
         if h:
             log.handlers.remove(h)
 
@@ -372,7 +372,7 @@ class Logger:
                 h = logging.FileHandler(output)
 
             h.setFormatter(fmt)
-            h._gunicorn = True  # type: ignore[attr-defined]  # custom attribute
+            h._plain_server = True  # type: ignore[attr-defined]  # custom attribute
             log.addHandler(h)
 
     def _get_user(self, environ: dict[str, Any]) -> str | None:

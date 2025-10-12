@@ -420,9 +420,9 @@ class Bind(Setting):
 
         Multiple addresses can be bound. ex.::
 
-            $ gunicorn -b 127.0.0.1:8000 -b [::1]:8000 test:app
+            $ plain server --bind 127.0.0.1:8000 --bind [::1]:8000
 
-        will bind the `test:app` application on localhost both on ipv6
+        will bind the application on localhost both on ipv6
         and ipv4 interfaces.
 
         If the ``PORT`` environment variable is defined, the default
@@ -483,26 +483,15 @@ class WorkerClass(Setting):
         The type of workers to use.
 
         The default class (``sync``) should handle most "normal" types of
-        workloads. You'll want to read :doc:`design` for information on when
-        you might want to choose one of the other worker classes. Required
-        libraries may be installed using setuptools' ``extras_require`` feature.
+        workloads.
 
         A string referring to one of the following bundled classes:
 
-        * ``sync``
-        * ``eventlet`` - Requires eventlet >= 0.24.1 (or install it via
-          ``pip install gunicorn[eventlet]``)
-        * ``gevent``   - Requires gevent >= 1.4 (or install it via
-          ``pip install gunicorn[gevent]``)
-        * ``tornado``  - Requires tornado >= 0.2 (or install it via
-          ``pip install gunicorn[tornado]``)
-        * ``gthread``  - Python 2 requires the futures package to be installed
-          (or install it via ``pip install gunicorn[gthread]``)
+        * ``sync`` - Single-threaded synchronous workers
+        * ``gthread`` - Multi-threaded workers
 
-        Optionally, you can provide your own worker by giving Gunicorn a
+        Optionally, you can provide your own worker by giving Plain a
         Python path to a subclass of ``plain.server.workers.base.Worker``.
-        This alternative syntax will load the gevent class:
-        ``plain.server.workers.ggevent.GeventWorker``.
         """
 
 
@@ -545,7 +534,7 @@ class WorkerConnections(Setting):
     desc = """\
         The maximum number of simultaneous clients.
 
-        This setting only affects the ``gthread``, ``eventlet`` and ``gevent`` worker types.
+        This setting only affects the ``gthread`` worker type.
         """
 
 
@@ -640,7 +629,7 @@ class Keepalive(Setting):
 
         Generally set in the 1-5 seconds range for servers with direct connection
         to the client (e.g. when you don't have separate load balancer). When
-        Gunicorn is deployed behind a load balancer, it often makes sense to
+        Plain server is deployed behind a load balancer, it often makes sense to
         set this to a higher value.
 
         .. note::
@@ -841,7 +830,7 @@ class SecureSchemeHeader(Setting):
         A dictionary containing headers and values that the front-end proxy
         uses to indicate HTTPS requests. If the source IP is permitted by
         :ref:`forwarded-allow-ips` (below), *and* at least one request header matches
-        a key-value pair listed in this dictionary, then Gunicorn will set
+        a key-value pair listed in this dictionary, then Plain server will set
         ``wsgi.url_scheme`` to ``https``, so your application can tell that the
         request is secure.
 
@@ -873,7 +862,7 @@ class ForwardedAllowIPS(Setting):
         Set to ``*`` to disable checking of front-end IPs. This is useful for setups
         where you don't know in advance the IP address of front-end, but
         instead have ensured via other means that only your
-        authorized front-ends can access Gunicorn.
+        authorized front-ends can access Plain server.
 
         By default, the value of the ``FORWARDED_ALLOW_IPS`` environment
         variable. If it is not defined, the default is ``"127.0.0.1,::1"``.
@@ -1018,7 +1007,7 @@ class ErrorLog(Setting):
     desc = """\
         The Error log file to write to.
 
-        Using ``'-'`` for FILE makes gunicorn log to stderr.
+        Using ``'-'`` for FILE makes Plain server log to stderr.
 
         .. versionchanged:: 19.2
            Log to stderr by default.
@@ -1068,12 +1057,12 @@ class LoggerClass(Setting):
     validator = validate_class
     default = "plain.server.glogging.Logger"
     desc = """\
-        The logger you want to use to log events in Gunicorn.
+        The logger you want to use to log events in Plain server.
 
         The default class (``plain.server.glogging.Logger``) handles most
         normal usages in logging. It provides error and access logging.
 
-        You can provide your own logger by giving Gunicorn a Python path to a
+        You can provide your own logger by giving Plain server a Python path to a
         class that quacks like ``plain.server.glogging.Logger``.
         """
 
@@ -1087,7 +1076,7 @@ class LogConfig(Setting):
     default = None
     desc = """\
     The log config file to use.
-    Gunicorn uses the standard Python logging module's Configuration
+    Plain server uses the standard Python logging module's Configuration
     file format.
     """
 
@@ -1140,7 +1129,7 @@ class Procname(Setting):
         A base to use with setproctitle for process naming.
 
         This affects things like ``ps`` and ``top``. If you're going to be
-        running more than one instance of Gunicorn you'll probably want to set a
+        running more than one instance of Plain server you'll probably want to set a
         name to tell them apart. This requires that you install the setproctitle
         module.
 
@@ -1152,7 +1141,7 @@ class DefaultProcName(Setting):
     name = "default_proc_name"
     section = "Process Naming"
     validator = validate_string
-    default = "gunicorn"
+    default = "plain"
     desc = """\
         Internal setting that is adjusted for each type of application.
         """
@@ -1266,7 +1255,7 @@ class HeaderMap(Setting):
         Configure how header field names are mapped into environ
 
         Headers containing underscores are permitted by RFC9110,
-        but gunicorn joining headers of different names into
+        but Plain server joining headers of different names into
         the same environment variable will dangerously confuse applications as to which is which.
 
         The safe default ``drop`` is to silently drop headers that cannot be unambiguously mapped.
@@ -1280,7 +1269,7 @@ class HeaderMap(Setting):
 
         Use with care and only if necessary and after considering if your problem could
         instead be solved by specifically renaming or rewriting only the intended headers
-        on a proxy in front of Gunicorn.
+        on a proxy in front of Plain server.
 
         .. versionadded:: 22.0.0
         """

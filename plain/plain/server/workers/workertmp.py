@@ -23,7 +23,7 @@ IS_CYGWIN = PLATFORM.startswith("CYGWIN")
 
 class WorkerTmp:
     def __init__(self, cfg: Config) -> None:
-        fd, name = tempfile.mkstemp(prefix="wgunicorn-")
+        fd, name = tempfile.mkstemp(prefix="wplain-")
 
         # unlink the file so we don't leak temporary files
         try:

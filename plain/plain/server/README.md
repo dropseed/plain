@@ -48,7 +48,7 @@ Common options:
 - `accesslog` - Access log file path (use `-` for stdout)
 - `errorlog` - Error log file path (use `-` for stderr)
 
-For a complete list of options, see the gunicorn documentation or the configuration in `plain.server.config`.
+For a complete list of options, see the configuration in `plain.server.config`.
 
 ## WSGI Ejection Point
 
@@ -61,6 +61,6 @@ uvicorn plain.wsgi:app --port 8000
 # Using waitress
 waitress-serve --port=8000 plain.wsgi:app
 
-# Using external gunicorn
+# Using gunicorn as an alternative
 gunicorn plain.wsgi:app --workers 4
 ```

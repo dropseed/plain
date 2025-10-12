@@ -103,7 +103,7 @@ class Arbiter:
             self.log = self.cfg.logger_class(app.cfg)
 
         # reopen files
-        if "GUNICORN_PID" in os.environ:
+        if "PLAIN_SERVER_PID" in os.environ:
             self.log.reopen_files()
 
         self.worker_class: type[Worker] = self.cfg.worker_class
@@ -129,8 +129,8 @@ class Arbiter:
         """
         self.log.info("Starting plain server %s", plain.runtime.__version__)
 
-        if "GUNICORN_PID" in os.environ:
-            self.master_pid = int(os.environ.get("GUNICORN_PID"))
+        if "PLAIN_SERVER_PID" in os.environ:
+            self.master_pid = int(os.environ.get("PLAIN_SERVER_PID"))
             self.proc_name = self.proc_name + ".2"
             self.master_name = "Master.2"
 
@@ -149,7 +149,7 @@ class Arbiter:
 
             if self.master_pid:
                 fds = []
-                for fd in os.environ.pop("GUNICORN_FD").split(","):
+                for fd in os.environ.pop("PLAIN_SERVER_FD").split(","):
                     fds.append(int(fd))
 
             if not (self.cfg.reuse_port and hasattr(socket, "SO_REUSEPORT")):
@@ -313,7 +313,7 @@ class Arbiter:
             self.master_name = "Master"
             self.master_pid = 0
             self.proc_name = self.cfg.proc_name
-            del os.environ["GUNICORN_PID"]
+            del os.environ["PLAIN_SERVER_PID"]
             # rename the pidfile
             if self.pidfile is not None:
                 self.pidfile.rename(self.cfg.pidfile)
@@ -401,8 +401,10 @@ class Arbiter:
             return None
 
         environ = self.cfg.env_orig.copy()
-        environ["GUNICORN_PID"] = str(master_pid)
-        environ["GUNICORN_FD"] = ",".join(str(lnr.fileno()) for lnr in self.LISTENERS)
+        environ["PLAIN_SERVER_PID"] = str(master_pid)
+        environ["PLAIN_SERVER_FD"] = ",".join(
+            str(lnr.fileno()) for lnr in self.LISTENERS
+        )
 
         os.chdir(self.START_CTX["cwd"])
 
