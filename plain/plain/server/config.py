@@ -1,12 +1,12 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 # Please remember to run "make -C docs html" after update "desc" attributes.
-
 import argparse
 import copy
 import inspect
@@ -15,6 +15,7 @@ import os
 import re
 import sys
 import textwrap
+from typing import Any
 
 import plain.runtime
 
@@ -26,7 +27,7 @@ KNOWN_SETTINGS = []
 PLATFORM = sys.platform
 
 
-def make_settings(ignore=None):
+def make_settings(ignore: tuple[str, ...] | None = None) -> dict[str, Setting]:
     settings = {}
     ignore = ignore or ()
     for s in KNOWN_SETTINGS:
@@ -37,7 +38,7 @@ def make_settings(ignore=None):
     return settings
 
 
-def auto_int(_, x):
+def auto_int(_: Any, x: str) -> int:
     # for compatible with octal numbers in python3
     if re.match(r"0(\d)", x, re.IGNORECASE):
         x = x.replace("0", "0o", 1)
@@ -45,13 +46,13 @@ def auto_int(_, x):
 
 
 class Config:
-    def __init__(self, usage=None, prog=None):
+    def __init__(self, usage: str | None = None, prog: str | None = None) -> None:
         self.settings = make_settings()
         self.usage = usage
         self.prog = prog or os.path.basename(sys.argv[0])
         self.env_orig = os.environ.copy()
 
-    def __str__(self):
+    def __str__(self) -> str:
         lines = []
         kmax = max(len(k) for k in self.settings)
         for k in sorted(self.settings):
@@ -61,22 +62,22 @@ class Config:
             lines.append("{k:{kmax}} = {v}".format(k=k, v=v, kmax=kmax))
         return "\n".join(lines)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         if name not in self.settings:
             raise AttributeError(f"No configuration setting for: {name}")
         return self.settings[name].get()
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         if name != "settings" and name in self.settings:
             raise AttributeError("Invalid access!")
         super().__setattr__(name, value)
 
-    def set(self, name, value):
+    def set(self, name: str, value: Any) -> None:
         if name not in self.settings:
             raise AttributeError(f"No configuration setting for: {name}")
         self.settings[name].set(value)
 
-    def parser(self):
+    def parser(self) -> argparse.ArgumentParser:
         kwargs = {"usage": self.usage, "prog": self.prog}
         parser = argparse.ArgumentParser(**kwargs)
         parser.add_argument(
@@ -96,7 +97,7 @@ class Config:
         return parser
 
     @property
-    def worker_class_str(self):
+    def worker_class_str(self) -> str:
         uri = self.settings["worker_class"].get()
 
         if isinstance(uri, str):
@@ -108,7 +109,7 @@ class Config:
         return uri.__name__
 
     @property
-    def worker_class(self):
+    def worker_class(self) -> type:
         uri = self.settings["worker_class"].get()
 
         # are we using a threaded worker?
@@ -118,16 +119,16 @@ class Config:
 
         worker_class = util.load_class(uri)
         if hasattr(worker_class, "setup"):
-            worker_class.setup()
+            worker_class.setup()  # type: ignore[call-non-callable]  # hasattr check doesn't narrow type
         return worker_class
 
     @property
-    def address(self):
+    def address(self) -> list[tuple[str, int] | str]:
         s = self.settings["bind"].get()
         return [util.parse_address(util.bytes_to_str(bind)) for bind in s]
 
     @property
-    def proc_name(self):
+    def proc_name(self) -> str:
         pn = self.settings["proc_name"].get()
         if pn is not None:
             return pn
@@ -135,7 +136,7 @@ class Config:
             return self.settings["default_proc_name"].get()
 
     @property
-    def logger_class(self):
+    def logger_class(self) -> type:
         uri = self.settings["logger_class"].get()
         if uri == "simple":
             # support the default
@@ -146,15 +147,15 @@ class Config:
         )
 
         if hasattr(logger_class, "install"):
-            logger_class.install()
+            logger_class.install()  # type: ignore[call-non-callable]  # hasattr check doesn't narrow type
         return logger_class
 
     @property
-    def is_ssl(self):
+    def is_ssl(self) -> bool:
         return self.certfile or self.keyfile
 
     @property
-    def ssl_options(self):
+    def ssl_options(self) -> dict[str, Any]:
         opts = {}
         for name, value in self.settings.items():
             if value.section == "SSL":
@@ -162,7 +163,7 @@ class Config:
         return opts
 
     @property
-    def sendfile(self):
+    def sendfile(self) -> bool:
         if self.settings["sendfile"].get() is not None:
             return False
 
@@ -173,12 +174,12 @@ class Config:
         return True
 
     @property
-    def reuse_port(self):
+    def reuse_port(self) -> bool:
         return self.settings["reuse_port"].get()
 
 
 class SettingMeta(type):
-    def __new__(cls, name, bases, attrs):
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> type:
         super_new = super().__new__
         parents = [b for b in bases if isinstance(b, SettingMeta)]
         if not parents:
@@ -192,7 +193,7 @@ class SettingMeta(type):
         KNOWN_SETTINGS.append(new_class)
         return new_class
 
-    def fmt_desc(cls, desc):
+    def fmt_desc(cls, desc: str) -> None:
         desc = textwrap.dedent(desc).strip()
         setattr(cls, "desc", desc)
         setattr(cls, "short", desc.splitlines()[0])
@@ -213,13 +214,13 @@ class Setting:
     nargs = None
     const = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         if self.default is not None:
             self.set(self.default)
 
-    def add_option(self, parser):
+    def add_option(self, parser: argparse.ArgumentParser) -> None:
         if not self.cli:
-            return
+            return None
         args = tuple(self.cli)
 
         help_txt = f"{self.short} [{self.default}]"
@@ -247,32 +248,32 @@ class Setting:
 
         parser.add_argument(*args, **kwargs)
 
-    def copy(self):
+    def copy(self) -> Setting:
         return copy.copy(self)
 
-    def get(self):
+    def get(self) -> Any:
         return self.value
 
-    def set(self, val):
+    def set(self, val: Any) -> None:
         if not callable(self.validator):
             raise TypeError(f"Invalid validator: {self.name}")
         self.value = self.validator(val)
 
-    def __lt__(self, other):
-        return self.section == other.section and self.order < other.order
+    def __lt__(self, other: Setting) -> bool:
+        return self.section == other.section and self.order < other.order  # type: ignore[attr-defined]  # order is added by metaclass
 
     __cmp__ = __lt__
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__module__}.{self.__class__.__name__} object at {id(self):x} with value {self.value!r}>"
 
 
-Setting = SettingMeta("Setting", (Setting,), {})
+Setting = SettingMeta("Setting", (Setting,), {})  # type: ignore[misc]  # intentional shadowing
 
 
-def validate_bool(val):
+def validate_bool(val: Any) -> bool | None:
     if val is None:
-        return
+        return None
 
     if isinstance(val, bool):
         return val
@@ -286,13 +287,13 @@ def validate_bool(val):
         raise ValueError(f"Invalid boolean: {val}")
 
 
-def validate_dict(val):
+def validate_dict(val: Any) -> dict[str, Any]:
     if not isinstance(val, dict):
         raise TypeError(f"Value is not a dictionary: {val} ")
     return val
 
 
-def validate_pos_int(val):
+def validate_pos_int(val: Any) -> int:
     if not isinstance(val, int):
         val = int(val, 0)
     else:
@@ -303,7 +304,7 @@ def validate_pos_int(val):
     return val
 
 
-def validate_string(val):
+def validate_string(val: Any) -> str | None:
     if val is None:
         return None
     if not isinstance(val, str):
@@ -311,7 +312,7 @@ def validate_string(val):
     return val.strip()
 
 
-def validate_file_exists(val):
+def validate_file_exists(val: Any) -> str | None:
     if val is None:
         return None
     if not os.path.exists(val):
@@ -319,7 +320,7 @@ def validate_file_exists(val):
     return val
 
 
-def validate_list_string(val):
+def validate_list_string(val: Any) -> list[str]:
     if not val:
         return []
 
@@ -330,11 +331,11 @@ def validate_list_string(val):
     return [validate_string(v) for v in val]
 
 
-def validate_list_of_existing_files(val):
+def validate_list_of_existing_files(val: Any) -> list[str | None]:
     return [validate_file_exists(v) for v in validate_list_string(val)]
 
 
-def validate_string_to_addr_list(val):
+def validate_string_to_addr_list(val: Any) -> list[str]:
     val = validate_string_to_list(val)
 
     for addr in val:
@@ -345,7 +346,7 @@ def validate_string_to_addr_list(val):
     return val
 
 
-def validate_string_to_list(val):
+def validate_string_to_list(val: Any) -> list[str]:
     val = validate_string(val)
 
     if not val:
@@ -354,7 +355,7 @@ def validate_string_to_list(val):
     return [v.strip() for v in val.split(",") if v]
 
 
-def validate_class(val):
+def validate_class(val: Any) -> type | str | None:
     if inspect.isfunction(val) or inspect.ismethod(val):
         val = val()
     if inspect.isclass(val):
@@ -362,8 +363,8 @@ def validate_class(val):
     return validate_string(val)
 
 
-def validate_callable(arity):
-    def _validate_callable(val):
+def validate_callable(arity: int) -> Any:
+    def _validate_callable(val: Any) -> Any:
         if isinstance(val, str):
             try:
                 mod_name, obj_name = val.rsplit(".", 1)
@@ -388,7 +389,7 @@ def validate_callable(arity):
     return _validate_callable
 
 
-def validate_reload_engine(val):
+def validate_reload_engine(val: Any) -> str:
     if val not in reloader_engines:
         raise ConfigError(f"Invalid reload_engine: {val!r}")
 
@@ -1163,7 +1164,7 @@ class NewSSLContext(Setting):
     validator = validate_callable(2)
     type = callable
 
-    def ssl_context(config, default_ssl_context_factory):
+    def ssl_context(config: Any, default_ssl_context_factory: Any) -> Any:
         return default_ssl_context_factory()
 
     default = staticmethod(ssl_context)
@@ -1216,11 +1217,11 @@ class CertFile(Setting):
     """
 
 
-def validate_header_map_behaviour(val):
+def validate_header_map_behaviour(val: Any) -> str | None:
     # FIXME: refactor all of this subclassing stdlib argparse
 
     if val is None:
-        return
+        return None
 
     if not isinstance(val, str):
         raise TypeError(f"Invalid type for casting: {val}")

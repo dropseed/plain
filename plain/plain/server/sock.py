@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import errno
 import os
 import socket
@@ -12,12 +13,25 @@ import ssl
 import stat
 import sys
 import time
+from typing import TYPE_CHECKING
 
 from . import util
 
+if TYPE_CHECKING:
+    from .config import Config
+    from .glogging import Logger
+
 
 class BaseSocket:
-    def __init__(self, address, conf, log, fd=None):
+    FAMILY: socket.AddressFamily
+
+    def __init__(
+        self,
+        address: tuple[str, int] | str,
+        conf: Config,
+        log: Logger,
+        fd: int | None = None,
+    ) -> None:
         self.log = log
         self.conf = conf
 
@@ -30,15 +44,18 @@ class BaseSocket:
             os.close(fd)
             bound = True
 
-        self.sock = self.set_options(sock, bound=bound)
+        self.sock: socket.socket | None = self.set_options(sock, bound=bound)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"<socket {self.sock.fileno()}>"
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> object:
         return getattr(self.sock, name)
 
-    def set_options(self, sock, bound=False):
+    def getsockname(self) -> tuple[str, int] | str:
+        return self.sock.getsockname()
+
+    def set_options(self, sock: socket.socket, bound: bool = False) -> socket.socket:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if self.conf.reuse_port and hasattr(socket, "SO_REUSEPORT"):  # pragma: no cover
             try:
@@ -48,7 +65,7 @@ class BaseSocket:
                     raise
         if not bound:
             self.bind(sock)
-        sock.setblocking(0)
+        sock.setblocking(False)
 
         # make sure that the socket can be inherited
         if hasattr(sock, "set_inheritable"):
@@ -57,12 +74,12 @@ class BaseSocket:
         sock.listen(self.conf.backlog)
         return sock
 
-    def bind(self, sock):
+    def bind(self, sock: socket.socket) -> None:
         sock.bind(self.cfg_addr)
 
-    def close(self):
+    def close(self) -> None:
         if self.sock is None:
-            return
+            return None
 
         try:
             self.sock.close()
@@ -70,12 +87,13 @@ class BaseSocket:
             self.log.info("Error while closing socket %s", str(e))
 
         self.sock = None
+        return None
 
 
 class TCPSocket(BaseSocket):
     FAMILY = socket.AF_INET
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.conf.is_ssl:
             scheme = "https"
         else:
@@ -84,7 +102,7 @@ class TCPSocket(BaseSocket):
         addr = self.sock.getsockname()
         return f"{scheme}://{addr[0]}:{addr[1]}"
 
-    def set_options(self, sock, bound=False):
+    def set_options(self, sock: socket.socket, bound: bool = False) -> socket.socket:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         return super().set_options(sock, bound=bound)
 
@@ -92,7 +110,7 @@ class TCPSocket(BaseSocket):
 class TCP6Socket(TCPSocket):
     FAMILY = socket.AF_INET6
 
-    def __str__(self):
+    def __str__(self) -> str:
         (host, port, _, _) = self.sock.getsockname()
         return f"http://[{host}]:{port}"
 
@@ -100,7 +118,13 @@ class TCP6Socket(TCPSocket):
 class UnixSocket(BaseSocket):
     FAMILY = socket.AF_UNIX
 
-    def __init__(self, addr, conf, log, fd=None):
+    def __init__(
+        self,
+        addr: tuple[str, int] | str,
+        conf: Config,
+        log: Logger,
+        fd: int | None = None,
+    ):
         if fd is None:
             try:
                 st = os.stat(addr)
@@ -114,14 +138,14 @@ class UnixSocket(BaseSocket):
                     raise ValueError(f"{addr!r} is not a socket")
         super().__init__(addr, conf, log, fd=fd)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"unix:{self.cfg_addr}"
 
-    def bind(self, sock):
+    def bind(self, sock: socket.socket) -> None:
         sock.bind(self.cfg_addr)
 
 
-def _sock_type(addr):
+def _sock_type(addr: tuple[str, int] | str | bytes) -> type[BaseSocket]:
     if isinstance(addr, tuple):
         if util.is_ipv6(addr[0]):
             sock_type = TCP6Socket
@@ -134,7 +158,9 @@ def _sock_type(addr):
     return sock_type
 
 
-def create_sockets(conf, log, fds=None):
+def create_sockets(
+    conf: Config, log: Logger, fds: list[int] | None = None
+) -> list[BaseSocket]:
     """
     Create a new socket for the configured addresses or file descriptors.
 
@@ -199,7 +225,7 @@ def create_sockets(conf, log, fds=None):
     return listeners
 
 
-def close_sockets(listeners, unlink=True):
+def close_sockets(listeners: list[BaseSocket], unlink: bool = True) -> None:
     for sock in listeners:
         sock_name = sock.getsockname()
         sock.close()
@@ -207,8 +233,8 @@ def close_sockets(listeners, unlink=True):
             os.unlink(sock_name)
 
 
-def ssl_context(conf):
-    def default_ssl_context_factory():
+def ssl_context(conf: Config) -> ssl.SSLContext:
+    def default_ssl_context_factory() -> ssl.SSLContext:
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         context.load_cert_chain(certfile=conf.certfile, keyfile=conf.keyfile)
         return context
@@ -216,5 +242,5 @@ def ssl_context(conf):
     return conf.ssl_context(conf, default_ssl_context_factory)
 
 
-def ssl_wrap_socket(sock, conf):
+def ssl_wrap_socket(sock: socket.socket, conf: Config) -> ssl.SSLSocket:
     return ssl_context(conf).wrap_socket(sock, server_side=True)

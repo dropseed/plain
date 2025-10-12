@@ -5,7 +5,11 @@
 #
 # Vendored and modified for Plain.
 
+from __future__ import annotations
+
+import argparse
 import sys
+from typing import Any
 
 from .arbiter import Arbiter
 from .config import Config
@@ -17,15 +21,15 @@ class BaseApplication:
     the various necessities for any given web framework.
     """
 
-    def __init__(self, usage=None, prog=None):
-        self.usage = usage
-        self.cfg = None
-        self.callable = None
-        self.prog = prog
-        self.logger = None
+    def __init__(self, usage: str | None = None, prog: str | None = None) -> None:
+        self.usage: str | None = usage
+        self.cfg: Config | None = None
+        self.callable: Any = None
+        self.prog: str | None = prog
+        self.logger: Any = None
         self.do_load_config()
 
-    def do_load_config(self):
+    def do_load_config(self) -> None:
         """
         Loads the configuration
         """
@@ -37,17 +41,19 @@ class BaseApplication:
             sys.stderr.flush()
             sys.exit(1)
 
-    def load_default_config(self):
+    def load_default_config(self) -> None:
         # init configuration
         self.cfg = Config(self.usage, prog=self.prog)
 
-    def init(self, parser, opts, args):
+    def init(
+        self, parser: argparse.ArgumentParser, opts: argparse.Namespace, args: list[str]
+    ) -> None:
         raise NotImplementedError
 
-    def load(self):
+    def load(self) -> Any:
         raise NotImplementedError
 
-    def load_config(self):
+    def load_config(self) -> None:
         """
         This method is used to load the configuration from one or several input(s).
         Custom Command line, configuration file.
@@ -55,15 +61,15 @@ class BaseApplication:
         """
         raise NotImplementedError
 
-    def reload(self):
+    def reload(self) -> None:
         self.do_load_config()
 
-    def wsgi(self):
+    def wsgi(self) -> Any:
         if self.callable is None:
             self.callable = self.load()
         return self.callable
 
-    def run(self):
+    def run(self) -> None:
         try:
             Arbiter(self).run()
         except RuntimeError as e:

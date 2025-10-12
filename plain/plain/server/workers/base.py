@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import io
 import os
 import signal
@@ -14,6 +15,7 @@ import traceback
 from datetime import datetime
 from random import randint
 from ssl import SSLError
+from typing import TYPE_CHECKING, Any
 
 from .. import util
 from ..http.errors import (
@@ -33,6 +35,14 @@ from ..http.wsgi import Response, default_environ
 from ..reloader import reloader_engines
 from .workertmp import WorkerTmp
 
+if TYPE_CHECKING:
+    import socket
+
+    from ..app import BaseApplication
+    from ..config import Config
+    from ..glogging import Logger
+    from ..http.message import Request
+
 
 class Worker:
     SIGNALS = [
@@ -42,14 +52,23 @@ class Worker:
 
     PIPE = []
 
-    def __init__(self, age, ppid, sockets, app, timeout, cfg, log):
+    def __init__(
+        self,
+        age: int,
+        ppid: int,
+        sockets: list[socket.socket],
+        app: BaseApplication,
+        timeout: int,
+        cfg: Config,
+        log: Logger,
+    ):
         """\
         This is called pre-fork so it shouldn't do anything to the
         current process. If there's a need to make process wide
         changes you'll want to do that in ``self.init_process()``.
         """
         self.age = age
-        self.pid = "[booting]"
+        self.pid: str | int = "[booting]"
         self.ppid = ppid
         self.sockets = sockets
         self.app = app
@@ -57,7 +76,7 @@ class Worker:
         self.cfg = cfg
         self.booted = False
         self.aborted = False
-        self.reloader = None
+        self.reloader: Any = None
 
         self.nr = 0
 
@@ -71,10 +90,10 @@ class Worker:
         self.log = log
         self.tmp = WorkerTmp(cfg)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"<Worker {self.pid}>"
 
-    def notify(self):
+    def notify(self) -> None:
         """\
         Your worker subclass must arrange to have this method called
         once every ``self.timeout`` seconds. If you fail in accomplishing
@@ -82,7 +101,7 @@ class Worker:
         """
         self.tmp.notify()
 
-    def run(self):
+    def run(self) -> None:
         """\
         This is the mainloop of a worker process. You should override
         this method in a subclass to provide the intended behaviour
@@ -90,7 +109,7 @@ class Worker:
         """
         raise NotImplementedError()
 
-    def init_process(self):
+    def init_process(self) -> None:
         """\
         If you override this method in a subclass, the last statement
         in the function should be to call this method with
@@ -120,7 +139,7 @@ class Worker:
         # start the reloader
         if self.cfg.reload:
 
-            def changed(fname):
+            def changed(fname: str) -> None:
                 self.log.info("Worker reloading: %s modified", fname)
                 self.alive = False
                 os.write(self.PIPE[1], b"1")
@@ -140,7 +159,7 @@ class Worker:
         self.booted = True
         self.run()
 
-    def load_wsgi(self):
+    def load_wsgi(self) -> None:
         try:
             self.wsgi = self.app.wsgi()
         except SyntaxError as e:
@@ -163,7 +182,7 @@ class Worker:
             finally:
                 del exc_tb
 
-    def init_signals(self):
+    def init_signals(self) -> None:
         # reset signaling
         for s in self.SIGNALS:
             signal.signal(s, signal.SIG_DFL)
@@ -183,22 +202,24 @@ class Worker:
         if hasattr(signal, "set_wakeup_fd"):
             signal.set_wakeup_fd(self.PIPE[1])
 
-    def handle_usr1(self, sig, frame):
+    def handle_usr1(self, sig: int, frame: Any) -> None:
         self.log.reopen_files()
 
-    def handle_exit(self, sig, frame):
+    def handle_exit(self, sig: int, frame: Any) -> None:
         self.alive = False
 
-    def handle_quit(self, sig, frame):
+    def handle_quit(self, sig: int, frame: Any) -> None:
         self.alive = False
         time.sleep(0.1)
         sys.exit(0)
 
-    def handle_abort(self, sig, frame):
+    def handle_abort(self, sig: int, frame: Any) -> None:
         self.alive = False
         sys.exit(1)
 
-    def handle_error(self, req, client, addr, exc):
+    def handle_error(
+        self, req: Request | None, client: socket.socket, addr: Any, exc: Exception
+    ) -> None:
         request_start = datetime.now()
         addr = addr or ("", -1)  # unix socket case
         if isinstance(
@@ -236,7 +257,7 @@ class Worker:
             elif isinstance(exc, InvalidHeaderName | InvalidHeader):
                 mesg = f"{str(exc)}"
                 if not req and hasattr(exc, "req"):
-                    req = exc.req  # for access log
+                    req = exc.req  # type: ignore[attr-defined]  # for access log
             elif isinstance(exc, LimitRequestLine):
                 mesg = f"{str(exc)}"
             elif isinstance(exc, LimitRequestHeaders):
@@ -276,6 +297,6 @@ class Worker:
         except Exception:
             self.log.debug("Failed to send error message.")
 
-    def handle_winch(self, sig, fname):
+    def handle_winch(self, sig: int, fname: Any) -> None:
         # Ignore SIGWINCH in worker. Fixes a crash on OpenBSD.
         self.log.debug("worker: SIGWINCH ignored.")

@@ -1,17 +1,20 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import base64
 import binascii
+import datetime
 import json
 import logging
 import time
+from typing import TYPE_CHECKING, Any
 
-logging.Logger.manager.emittedNoHandlerWarning = 1  # noqa
+logging.Logger.manager.emittedNoHandlerWarning = True  # type: ignore[attr-defined]
 import os  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402
@@ -19,6 +22,11 @@ import traceback  # noqa: E402
 from logging.config import dictConfig, fileConfig  # noqa: E402
 
 from . import util  # noqa: E402
+
+if TYPE_CHECKING:
+    from io import TextIOWrapper
+
+    from .config import Config
 
 # syslog facility codes
 CONFIG_DEFAULTS = {
@@ -61,15 +69,15 @@ CONFIG_DEFAULTS = {
 }
 
 
-def loggers():
+def loggers() -> list[logging.Logger]:
     """get list of all loggers"""
     root = logging.root
     existing = list(root.manager.loggerDict.keys())
     return [logging.getLogger(name) for name in existing]
 
 
-class SafeAtoms(dict):
-    def __init__(self, atoms):
+class SafeAtoms(dict[str, Any]):
+    def __init__(self, atoms: dict[str, Any]) -> None:
         dict.__init__(self)
         for key, value in atoms.items():
             if isinstance(value, str):
@@ -77,7 +85,7 @@ class SafeAtoms(dict):
             else:
                 self[key] = value
 
-    def __getitem__(self, k):
+    def __getitem__(self, k: str) -> Any:
         if k.startswith("{"):
             kl = k.lower()
             if kl in self:
@@ -108,19 +116,19 @@ class Logger:
 
     atoms_wrapper_class = SafeAtoms
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Config) -> None:
         self.error_log = logging.getLogger("plain.server.error")
         self.error_log.propagate = False
         self.access_log = logging.getLogger("plain.server.access")
         self.access_log.propagate = False
-        self.error_handlers = []
-        self.access_handlers = []
-        self.logfile = None
+        self.error_handlers: list[logging.Handler] = []
+        self.access_handlers: list[logging.Handler] = []
+        self.logfile: TextIOWrapper | None = None
         self.lock = threading.Lock()
         self.cfg = cfg
         self.setup(cfg)
 
-    def setup(self, cfg):
+    def setup(self, cfg: Config) -> None:
         self.loglevel = self.LOG_LEVELS.get(cfg.loglevel.lower(), logging.INFO)
         self.error_log.setLevel(self.loglevel)
         self.access_log.setLevel(logging.INFO)
@@ -183,30 +191,36 @@ class Logger:
                 msg = "Error: log config '%s' not found"
                 raise RuntimeError(msg % cfg.logconfig)
 
-    def critical(self, msg, *args, **kwargs):
+    def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.critical(msg, *args, **kwargs)
 
-    def error(self, msg, *args, **kwargs):
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.error(msg, *args, **kwargs)
 
-    def warning(self, msg, *args, **kwargs):
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.warning(msg, *args, **kwargs)
 
-    def info(self, msg, *args, **kwargs):
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.info(msg, *args, **kwargs)
 
-    def debug(self, msg, *args, **kwargs):
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.debug(msg, *args, **kwargs)
 
-    def exception(self, msg, *args, **kwargs):
+    def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.exception(msg, *args, **kwargs)
 
-    def log(self, lvl, msg, *args, **kwargs):
+    def log(self, lvl: int | str, msg: str, *args: Any, **kwargs: Any) -> None:
         if isinstance(lvl, str):
             lvl = self.LOG_LEVELS.get(lvl.lower(), logging.INFO)
         self.error_log.log(lvl, msg, *args, **kwargs)
 
-    def atoms(self, resp, req, environ, request_time):
+    def atoms(
+        self,
+        resp: Any,
+        req: Any,
+        environ: dict[str, Any],
+        request_time: datetime.timedelta,
+    ) -> dict[str, Any]:
         """Gets atoms for log formatting."""
         status = resp.status
         if isinstance(status, str):
@@ -261,7 +275,13 @@ class Logger:
 
         return atoms
 
-    def access(self, resp, req, environ, request_time):
+    def access(
+        self,
+        resp: Any,
+        req: Any,
+        environ: dict[str, Any],
+        request_time: datetime.timedelta,
+    ) -> None:
         """See http://httpd.apache.org/docs/2.0/logs.html#combined
         for format details
         """
@@ -272,7 +292,7 @@ class Logger:
             or self.cfg.logconfig_dict
             or self.cfg.logconfig_json
         ):
-            return
+            return None
 
         # wrap atoms:
         # - make sure atoms will be test case insensitively
@@ -286,11 +306,13 @@ class Logger:
         except Exception:
             self.error(traceback.format_exc())
 
-    def now(self):
+        return None
+
+    def now(self) -> str:
         """return date in Apache Common Log Format"""
         return time.strftime("[%d/%b/%Y:%H:%M:%S %z]")
 
-    def reopen_files(self):
+    def reopen_files(self) -> None:
         if self.cfg.capture_output and self.cfg.errorlog != "-":
             for stream in sys.stdout, sys.stderr:
                 stream.flush()
@@ -313,7 +335,7 @@ class Logger:
                     finally:
                         handler.release()
 
-    def close_on_exec(self):
+    def close_on_exec(self) -> None:
         for log in loggers():
             for handler in log.handlers:
                 if isinstance(handler, logging.FileHandler):
@@ -324,12 +346,19 @@ class Logger:
                     finally:
                         handler.release()
 
-    def _get_gunicorn_handler(self, log):
+    def _get_gunicorn_handler(self, log: logging.Logger) -> logging.Handler | None:
         for h in log.handlers:
             if getattr(h, "_gunicorn", False):
                 return h
+        return None
 
-    def _set_handler(self, log, output, fmt, stream=None):
+    def _set_handler(
+        self,
+        log: logging.Logger,
+        output: str | None,
+        fmt: logging.Formatter,
+        stream: Any = None,
+    ) -> None:
         # remove previous gunicorn log handler
         h = self._get_gunicorn_handler(log)
         if h:
@@ -343,10 +372,10 @@ class Logger:
                 h = logging.FileHandler(output)
 
             h.setFormatter(fmt)
-            h._gunicorn = True
+            h._gunicorn = True  # type: ignore[attr-defined]  # custom attribute
             log.addHandler(h)
 
-    def _get_user(self, environ):
+    def _get_user(self, environ: dict[str, Any]) -> str | None:
         user = None
         http_auth = environ.get("HTTP_AUTHORIZATION")
         if http_auth and http_auth.lower().startswith("basic"):

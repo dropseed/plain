@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 # design:
 # A threaded worker accepts connections in the main loop, accepted
 # connections are added to the thread pool as a connection job.
@@ -12,7 +13,6 @@
 # If no event happen after the keep alive timeout, the connection is
 # closed.
 # pylint: disable=no-else-break
-
 import errno
 import os
 import selectors
@@ -25,27 +25,39 @@ from concurrent import futures
 from datetime import datetime
 from functools import partial
 from threading import RLock
+from types import FrameType
+from typing import TYPE_CHECKING, Any
 
 from .. import http, sock, util
 from ..http import wsgi
 from . import base
 
+if TYPE_CHECKING:
+    from ..config import Config
+    from ..glogging import Logger
+
 
 class TConn:
-    def __init__(self, cfg, sock, client, server):
+    def __init__(
+        self,
+        cfg: Config,
+        sock: socket.socket,
+        client: tuple[str, int],
+        server: tuple[str, int],
+    ) -> None:
         self.cfg = cfg
         self.sock = sock
         self.client = client
         self.server = server
 
-        self.timeout = None
-        self.parser = None
-        self.initialized = False
+        self.timeout: float | None = None
+        self.parser: http.RequestParser | None = None
+        self.initialized: bool = False
 
         # set the socket to non blocking
         self.sock.setblocking(False)
 
-    def init(self):
+    def init(self) -> None:
         self.initialized = True
         self.sock.setblocking(True)
 
@@ -57,29 +69,29 @@ class TConn:
             # initialize the parser
             self.parser = http.RequestParser(self.cfg, self.sock, self.client)
 
-    def set_timeout(self):
+    def set_timeout(self) -> None:
         # set the timeout
         self.timeout = time.time() + self.cfg.keepalive
 
-    def close(self):
+    def close(self) -> None:
         util.close(self.sock)
 
 
 class ThreadWorker(base.Worker):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.worker_connections = self.cfg.worker_connections
-        self.max_keepalived = self.cfg.worker_connections - self.cfg.threads
+        self.worker_connections: int = self.cfg.worker_connections
+        self.max_keepalived: int = self.cfg.worker_connections - self.cfg.threads
         # initialise the pool
-        self.tpool = None
-        self.poller = None
-        self._lock = None
-        self.futures = deque()
-        self._keep = deque()
-        self.nr_conns = 0
+        self.tpool: futures.ThreadPoolExecutor | None = None
+        self.poller: selectors.DefaultSelector | None = None
+        self._lock: RLock | None = None
+        self.futures: deque[futures.Future[tuple[bool, TConn]]] = deque()
+        self._keep: deque[TConn] = deque()
+        self.nr_conns: int = 0
 
     @classmethod
-    def check_config(cls, cfg, log):
+    def check_config(cls, cfg: Config, log: Logger) -> None:
         max_keepalived = cfg.worker_connections - cfg.threads
 
         if max_keepalived <= 0 and cfg.keepalive:
@@ -88,34 +100,34 @@ class ThreadWorker(base.Worker):
                 "Check the number of worker connections and threads."
             )
 
-    def init_process(self):
+    def init_process(self) -> None:
         self.tpool = self.get_thread_pool()
         self.poller = selectors.DefaultSelector()
         self._lock = RLock()
         super().init_process()
 
-    def get_thread_pool(self):
+    def get_thread_pool(self) -> futures.ThreadPoolExecutor:
         """Override this method to customize how the thread pool is created"""
         return futures.ThreadPoolExecutor(max_workers=self.cfg.threads)
 
-    def handle_quit(self, sig, frame):
+    def handle_quit(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
         self.tpool.shutdown(False)
         time.sleep(0.1)
         sys.exit(0)
 
-    def _wrap_future(self, fs, conn):
-        fs.conn = conn
+    def _wrap_future(self, fs: futures.Future[tuple[bool, TConn]], conn: TConn) -> None:
+        fs.conn = conn  # type: ignore[attr-defined]
         self.futures.append(fs)
         fs.add_done_callback(self.finish_request)
 
-    def enqueue_req(self, conn):
+    def enqueue_req(self, conn: TConn) -> None:
         conn.init()
         # submit the connection to a worker
         fs = self.tpool.submit(self.handle, conn)
         self._wrap_future(fs, conn)
 
-    def accept(self, server, listener):
+    def accept(self, server: tuple[str, int], listener: socket.socket) -> None:
         try:
             sock, client = listener.accept()
             # initialize the connection object
@@ -133,7 +145,7 @@ class ThreadWorker(base.Worker):
             if e.errno not in (errno.EAGAIN, errno.ECONNABORTED, errno.EWOULDBLOCK):
                 raise
 
-    def on_client_socket_readable(self, conn, client):
+    def on_client_socket_readable(self, conn: TConn, client: socket.socket) -> None:
         with self._lock:
             # unregister the client from the poller
             self.poller.unregister(client)
@@ -149,7 +161,7 @@ class ThreadWorker(base.Worker):
         # submit the connection to a worker
         self.enqueue_req(conn)
 
-    def murder_keepalived(self):
+    def murder_keepalived(self) -> None:
         now = time.time()
         while True:
             with self._lock:
@@ -184,14 +196,14 @@ class ThreadWorker(base.Worker):
                 # close the socket
                 conn.close()
 
-    def is_parent_alive(self):
+    def is_parent_alive(self) -> bool:
         # If our parent changed then we shut down.
         if self.ppid != os.getppid():
             self.log.info("Parent changed, shutting down: %s", self)
             return False
         return True
 
-    def run(self):
+    def run(self) -> None:
         # init listeners, add them to the event loop
         for listener in self.sockets:
             listener.setblocking(False)
@@ -241,10 +253,10 @@ class ThreadWorker(base.Worker):
 
         futures.wait(self.futures, timeout=self.cfg.graceful_timeout)
 
-    def finish_request(self, fs):
+    def finish_request(self, fs: futures.Future[tuple[bool, TConn]]) -> None:
         if fs.cancelled():
             self.nr_conns -= 1
-            fs.conn.close()
+            fs.conn.close()  # type: ignore[attr-defined]
             return
 
         try:
@@ -273,12 +285,14 @@ class ThreadWorker(base.Worker):
             # an exception happened, make sure to close the
             # socket.
             self.nr_conns -= 1
-            fs.conn.close()
+            fs.conn.close()  # type: ignore[attr-defined]
 
-    def handle(self, conn):
+    def handle(self, conn: TConn) -> tuple[bool, TConn]:
         keepalive = False
         req = None
         try:
+            # conn.parser is guaranteed to be initialized by enqueue_req -> conn.init()
+            assert conn.parser is not None
             req = next(conn.parser)
             if not req:
                 return (False, conn)
@@ -315,9 +329,9 @@ class ThreadWorker(base.Worker):
 
         return (False, conn)
 
-    def handle_request(self, req, conn):
-        environ = {}
-        resp = None
+    def handle_request(self, req: Any, conn: TConn) -> bool:
+        environ: dict[str, Any] = {}
+        resp: wsgi.Response | None = None
         try:
             request_start = datetime.now()
             resp, environ = wsgi.create(

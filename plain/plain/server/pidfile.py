@@ -17,15 +17,15 @@ class Pidfile:
     we create a temp file using os.mkstemp.
     """
 
-    def __init__(self, fname):
+    def __init__(self, fname: str) -> None:
         self.fname = fname
-        self.pid = None
+        self.pid: int | None = None
 
-    def create(self, pid):
+    def create(self, pid: int) -> None:
         oldpid = self.validate()
         if oldpid:
             if oldpid == os.getpid():
-                return
+                return None
             msg = "Already running on PID %s (or pid file '%s' is stale)"
             raise RuntimeError(msg % (oldpid, self.fname))
 
@@ -45,13 +45,15 @@ class Pidfile:
 
         # set permissions to -rw-r--r--
         os.chmod(self.fname, 420)
+        return None
 
-    def rename(self, path):
+    def rename(self, path: str) -> None:
         self.unlink()
         self.fname = path
-        self.create(self.pid)
+        self.create(self.pid)  # type: ignore[arg-type]
+        return None
 
-    def unlink(self):
+    def unlink(self) -> None:
         """delete pidfile"""
         try:
             with open(self.fname) as f:
@@ -61,17 +63,18 @@ class Pidfile:
                 os.unlink(self.fname)
         except Exception:
             pass
+        return None
 
-    def validate(self):
+    def validate(self) -> int | None:
         """Validate pidfile and make it stale if needed"""
         if not self.fname:
-            return
+            return None
         try:
             with open(self.fname) as f:
                 try:
                     wpid = int(f.read())
                 except ValueError:
-                    return
+                    return None
 
                 try:
                     os.kill(wpid, 0)
@@ -80,9 +83,9 @@ class Pidfile:
                     if e.args[0] == errno.EPERM:
                         return wpid
                     if e.args[0] == errno.ESRCH:
-                        return
+                        return None
                     raise
         except OSError as e:
             if e.args[0] == errno.ENOENT:
-                return
+                return None
             raise

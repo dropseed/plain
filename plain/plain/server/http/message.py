@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import io
 import re
+from typing import TYPE_CHECKING, Any
 
 from ..util import bytes_to_str, split_request_uri
 from .body import Body, ChunkedReader, EOFReader, LengthReader
@@ -24,6 +26,9 @@ from .errors import (
     UnsupportedTransferCoding,
 )
 
+if TYPE_CHECKING:
+    from ..config import Config
+
 MAX_REQUEST_LINE = 8190
 MAX_HEADERS = 32768
 DEFAULT_MAX_HEADERFIELD_SIZE = 8190
@@ -38,15 +43,15 @@ RFC9110_5_5_INVALID_AND_DANGEROUS = re.compile(r"[\0\r\n]")
 
 
 class Message:
-    def __init__(self, cfg, unreader, peer_addr):
+    def __init__(self, cfg: Config, unreader: Any, peer_addr: tuple[str, int] | Any):
         self.cfg = cfg
         self.unreader = unreader
         self.peer_addr = peer_addr
         self.remote_addr = peer_addr
-        self.version = None
-        self.headers = []
-        self.trailers = []
-        self.body = None
+        self.version: tuple[int, int] | None = None
+        self.headers: list[tuple[str, str]] = []
+        self.trailers: list[tuple[str, str]] = []
+        self.body: Body | None = None
         self.scheme = "https" if cfg.is_ssl else "http"
         self.must_close = False
 
@@ -70,13 +75,15 @@ class Message:
         self.unreader.unread(unused)
         self.set_body_reader()
 
-    def force_close(self):
+    def force_close(self) -> None:
         self.must_close = True
 
-    def parse(self, unreader):
+    def parse(self, unreader: Any) -> bytes:
         raise NotImplementedError()
 
-    def parse_headers(self, data, from_trailer=False):
+    def parse_headers(
+        self, data: bytes, from_trailer: bool = False
+    ) -> list[tuple[str, str]]:
         cfg = self.cfg
         headers = []
 
@@ -168,15 +175,15 @@ class Message:
 
         return headers
 
-    def set_body_reader(self):
+    def set_body_reader(self) -> None:
         chunked = False
-        content_length = None
+        content_length_str: str | None = None
 
         for name, value in self.headers:
             if name == "CONTENT-LENGTH":
-                if content_length is not None:
+                if content_length_str is not None:
                     raise InvalidHeader("CONTENT-LENGTH", req=self)
-                content_length = value
+                content_length_str = value
             elif name == "TRANSFER-ENCODING":
                 # T-E can be a list
                 # https://datatracker.ietf.org/doc/html/rfc9112#name-transfer-encoding
@@ -207,15 +214,16 @@ class Message:
             if self.version < (1, 1):
                 # framing wonky, see RFC 9112 Section 6.1
                 raise InvalidHeader("TRANSFER-ENCODING", req=self)
-            if content_length is not None:
+            if content_length_str is not None:
                 # we cannot be certain the message framing we understood matches proxy intent
                 #  -> whatever happens next, remaining input must not be trusted
                 raise InvalidHeader("CONTENT-LENGTH", req=self)
             self.body = Body(ChunkedReader(self, self.unreader))
-        elif content_length is not None:
+        elif content_length_str is not None:
+            content_length: int
             try:
-                if str(content_length).isnumeric():
-                    content_length = int(content_length)
+                if str(content_length_str).isnumeric():
+                    content_length = int(content_length_str)
                 else:
                     raise InvalidHeader("CONTENT-LENGTH", req=self)
             except ValueError:
@@ -228,7 +236,7 @@ class Message:
         else:
             self.body = Body(EOFReader(self.unreader))
 
-    def should_close(self):
+    def should_close(self) -> bool:
         if self.must_close:
             return True
         for h, v in self.headers:
@@ -239,16 +247,22 @@ class Message:
                 elif v == "keep-alive":
                     return False
                 break
-        return self.version <= (1, 0)
+        return self.version <= (1, 0)  # type: ignore[operator]
 
 
 class Request(Message):
-    def __init__(self, cfg, unreader, peer_addr, req_number=1):
-        self.method = None
-        self.uri = None
-        self.path = None
-        self.query = None
-        self.fragment = None
+    def __init__(
+        self,
+        cfg: Config,
+        unreader: Any,
+        peer_addr: tuple[str, int] | Any,
+        req_number: int = 1,
+    ):
+        self.method: str | None = None
+        self.uri: str | None = None
+        self.path: str | None = None
+        self.query: str | None = None
+        self.fragment: str | None = None
 
         # get max request line size
         self.limit_request_line = cfg.limit_request_line
@@ -258,7 +272,7 @@ class Request(Message):
         self.req_number = req_number
         super().__init__(cfg, unreader, peer_addr)
 
-    def get_data(self, unreader, buf, stop=False):
+    def get_data(self, unreader: Any, buf: io.BytesIO, stop: bool = False) -> None:
         data = unreader.read()
         if not data:
             if stop:
@@ -266,7 +280,7 @@ class Request(Message):
             raise NoMoreData(buf.getvalue())
         buf.write(data)
 
-    def parse(self, unreader):
+    def parse(self, unreader: Any) -> bytes:
         buf = io.BytesIO()
         self.get_data(unreader, buf, stop=True)
 
@@ -304,7 +318,9 @@ class Request(Message):
         buf = None
         return ret
 
-    def read_line(self, unreader, buf, limit=0):
+    def read_line(
+        self, unreader: Any, buf: io.BytesIO, limit: int = 0
+    ) -> tuple[bytes, bytes]:
         data = buf.getvalue()
 
         while True:
@@ -324,7 +340,7 @@ class Request(Message):
             data[idx + 2 :],
         )  # residue in the buffer, skip \r\n
 
-    def parse_request_line(self, line_bytes):
+    def parse_request_line(self, line_bytes: bytes) -> None:
         bits = [bytes_to_str(bit) for bit in line_bytes.split(b" ", 2)]
         if len(bits) != 3:
             raise InvalidRequestLine(bytes_to_str(line_bytes))
@@ -372,7 +388,7 @@ class Request(Message):
             # Only HTTP/1.0 and HTTP/1.1 are supported
             raise InvalidHTTPVersion(self.version)
 
-    def set_body_reader(self):
+    def set_body_reader(self) -> None:
         super().set_body_reader()
-        if isinstance(self.body.reader, EOFReader):
+        if isinstance(self.body.reader, EOFReader):  # type: ignore[union-attr]
             self.body = Body(LengthReader(self.unreader, 0))

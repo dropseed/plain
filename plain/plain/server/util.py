@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import ast
 import email.utils
 import errno
@@ -24,6 +25,8 @@ import time
 import traceback
 import urllib.parse
 import warnings
+from collections.abc import Callable
+from typing import Any
 
 from .errors import AppImportError
 from .workers import SUPPORTED_WORKERS
@@ -46,16 +49,18 @@ hop_headers = set(
 
 
 def load_class(
-    uri, default="plain.server.workers.sync.SyncWorker", section="plain.server.workers"
-):
+    uri: str | type,
+    default: str = "plain.server.workers.sync.SyncWorker",
+    section: str = "plain.server.workers",
+) -> type:
     if inspect.isclass(uri):
-        return uri
+        return uri  # type: ignore[return-value]
 
-    components = uri.split(".")
+    components = uri.split(".")  # type: ignore[union-attr]
     if len(components) == 1:
         # Handle short names like "sync" or "gthread"
-        if uri.startswith("#"):
-            uri = uri[1:]
+        if uri.startswith("#"):  # type: ignore[union-attr]
+            uri = uri[1:]  # type: ignore[union-attr]
 
         if uri in SUPPORTED_WORKERS:
             components = SUPPORTED_WORKERS[uri].split(".")
@@ -80,7 +85,7 @@ positionals = (
 )
 
 
-def get_arity(f):
+def get_arity(f: Callable[..., Any]) -> int:
     sig = inspect.signature(f)
     arity = 0
 
@@ -93,7 +98,9 @@ def get_arity(f):
 
 if sys.platform.startswith("win"):
 
-    def _waitfor(func, pathname, waitall=False):
+    def _waitfor(
+        func: Callable[[str], None], pathname: str, waitall: bool = False
+    ) -> None:
         # Perform the operation
         func(pathname)
         # Now setup the wait loop
@@ -119,7 +126,7 @@ if sys.platform.startswith("win"):
             # dealing with files that are pending deletion.
             L = os.listdir(dirname)
             if not L if waitall else name in L:
-                return
+                return None
             # Increase the timeout and try again
             time.sleep(timeout)
             timeout *= 2
@@ -128,14 +135,16 @@ if sys.platform.startswith("win"):
             RuntimeWarning,
             stacklevel=4,
         )
+        return None
 
-    def _unlink(filename):
+    def _unlink(filename: str) -> None:
         _waitfor(os.unlink, filename)
+        return None
 else:
     _unlink = os.unlink
 
 
-def unlink(filename):
+def unlink(filename: str) -> None:
     try:
         _unlink(filename)
     except OSError as error:
@@ -144,7 +153,7 @@ def unlink(filename):
             raise
 
 
-def is_ipv6(addr):
+def is_ipv6(addr: str) -> bool:
     try:
         socket.inet_pton(socket.AF_INET6, addr)
     except OSError:  # not a valid address
@@ -154,7 +163,9 @@ def is_ipv6(addr):
     return True
 
 
-def parse_address(netloc, default_port="8000"):
+def parse_address(
+    netloc: str, default_port: str = "8000"
+) -> str | int | tuple[str, int]:
     if re.match(r"unix:(//)?", netloc):
         return re.split(r"unix:(//)?", netloc)[-1]
 
@@ -185,25 +196,25 @@ def parse_address(netloc, default_port="8000"):
     return host.lower(), port
 
 
-def close_on_exec(fd):
+def close_on_exec(fd: int) -> None:
     flags = fcntl.fcntl(fd, fcntl.F_GETFD)
     flags |= fcntl.FD_CLOEXEC
     fcntl.fcntl(fd, fcntl.F_SETFD, flags)
 
 
-def set_non_blocking(fd):
+def set_non_blocking(fd: int) -> None:
     flags = fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_NONBLOCK
     fcntl.fcntl(fd, fcntl.F_SETFL, flags)
 
 
-def close(sock):
+def close(sock: socket.socket) -> None:
     try:
         sock.close()
     except OSError:
         pass
 
 
-def write_chunk(sock, data):
+def write_chunk(sock: socket.socket, data: str | bytes) -> None:
     if isinstance(data, str):
         data = data.encode("utf-8")
     chunk_size = f"{len(data):X}\r\n"
@@ -211,25 +222,27 @@ def write_chunk(sock, data):
     sock.sendall(chunk)
 
 
-def write(sock, data, chunked=False):
+def write(sock: socket.socket, data: str | bytes, chunked: bool = False) -> None:
     if chunked:
         return write_chunk(sock, data)
     sock.sendall(data)
 
 
-def write_nonblock(sock, data, chunked=False):
+def write_nonblock(
+    sock: socket.socket, data: str | bytes, chunked: bool = False
+) -> None:
     timeout = sock.gettimeout()
     if timeout != 0.0:
         try:
-            sock.setblocking(0)
+            sock.setblocking(False)
             return write(sock, data, chunked)
         finally:
-            sock.setblocking(1)
+            sock.setblocking(True)
     else:
         return write(sock, data, chunked)
 
 
-def write_error(sock, status_int, reason, mesg):
+def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
     html_error = textwrap.dedent("""\
     <html>
       <head>
@@ -252,7 +265,7 @@ def write_error(sock, status_int, reason, mesg):
     write_nonblock(sock, http.encode("latin1"))
 
 
-def _called_with_wrong_args(f):
+def _called_with_wrong_args(f: Any) -> bool:
     """Check whether calling a function raised a ``TypeError`` because
     the call failed or because something in the function raised the
     error.
@@ -278,7 +291,7 @@ def _called_with_wrong_args(f):
         del tb
 
 
-def import_app(module):
+def import_app(module: str) -> Callable[..., Any]:
     parts = module.split(":", 1)
     if len(parts) == 1:
         obj = "application"
@@ -361,7 +374,7 @@ def import_app(module):
     return app
 
 
-def getcwd():
+def getcwd() -> str:
     # get current path, try to use PWD env first
     try:
         a = os.stat(os.environ["PWD"])
@@ -375,7 +388,7 @@ def getcwd():
     return cwd
 
 
-def http_date(timestamp=None):
+def http_date(timestamp: float | None = None) -> str:
     """Return the current date and time formatted for a message header."""
     if timestamp is None:
         timestamp = time.time()
@@ -383,18 +396,18 @@ def http_date(timestamp=None):
     return s
 
 
-def is_hoppish(header):
+def is_hoppish(header: str) -> bool:
     return header.lower().strip() in hop_headers
 
 
-def seed():
+def seed() -> None:
     try:
         random.seed(os.urandom(64))
     except NotImplementedError:
         random.seed(f"{time.time()}.{os.getpid()}")
 
 
-def check_is_writable(path):
+def check_is_writable(path: str) -> None:
     try:
         with open(path, "a") as f:
             f.close()
@@ -402,7 +415,7 @@ def check_is_writable(path):
         raise RuntimeError(f"Error: '{path}' isn't writable [{e!r}]")
 
 
-def to_bytestring(value, encoding="utf8"):
+def to_bytestring(value: str | bytes, encoding: str = "utf8") -> bytes:
     """Converts a string argument to a byte string"""
     if isinstance(value, bytes):
         return value
@@ -412,7 +425,7 @@ def to_bytestring(value, encoding="utf8"):
     return value.encode(encoding)
 
 
-def has_fileno(obj):
+def has_fileno(obj: Any) -> bool:
     if not hasattr(obj, "fileno"):
         return False
 
@@ -425,7 +438,7 @@ def has_fileno(obj):
     return True
 
 
-def warn(msg):
+def warn(msg: str) -> None:
     print("!!!", file=sys.stderr)
 
     lines = msg.splitlines()
@@ -438,10 +451,10 @@ def warn(msg):
     sys.stderr.flush()
 
 
-def make_fail_app(msg):
+def make_fail_app(msg: str | bytes) -> Callable[..., Any]:
     msg = to_bytestring(msg)
 
-    def app(environ, start_response):
+    def app(environ: Any, start_response: Any) -> list[bytes]:
         start_response(
             "500 Internal Server Error",
             [("Content-Type", "text/plain"), ("Content-Length", str(len(msg)))],
@@ -451,7 +464,7 @@ def make_fail_app(msg):
     return app
 
 
-def split_request_uri(uri):
+def split_request_uri(uri: str) -> urllib.parse.SplitResult:
     if uri.startswith("//"):
         # When the path starts with //, urlsplit considers it as a
         # relative uri while the RFC says we should consider it as abs_path
@@ -464,7 +477,9 @@ def split_request_uri(uri):
 
 
 # From six.reraise
-def reraise(tp, value, tb=None):
+def reraise(
+    tp: type[BaseException], value: BaseException | None, tb: Any = None
+) -> None:
     try:
         if value is None:
             value = tp()
@@ -476,11 +491,11 @@ def reraise(tp, value, tb=None):
         tb = None
 
 
-def bytes_to_str(b):
+def bytes_to_str(b: str | bytes) -> str:
     if isinstance(b, str):
         return b
     return str(b, "latin1")
 
 
-def unquote_to_wsgi_str(string):
+def unquote_to_wsgi_str(string: str) -> str:
     return urllib.parse.unquote_to_bytes(string).decode("latin-1")

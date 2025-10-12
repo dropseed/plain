@@ -1,23 +1,30 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import io
 import sys
+from collections.abc import Generator, Iterator
+from typing import TYPE_CHECKING
 
 from .errors import ChunkMissingTerminator, InvalidChunkSize, NoMoreData
 
+if TYPE_CHECKING:
+    from .message import Request
+    from .unreader import Unreader
+
 
 class ChunkedReader:
-    def __init__(self, req, unreader):
+    def __init__(self, req: Request, unreader: Unreader) -> None:
         self.req = req
-        self.parser = self.parse_chunked(unreader)
+        self.parser: Generator[bytes, None, None] | None = self.parse_chunked(unreader)
         self.buf = io.BytesIO()
 
-    def read(self, size):
+    def read(self, size: int) -> bytes:
         if not isinstance(size, int):
             raise TypeError("size must be an integer type")
         if size < 0:
@@ -39,7 +46,7 @@ class ChunkedReader:
         self.buf.write(rest)
         return ret
 
-    def parse_trailers(self, unreader, data):
+    def parse_trailers(self, unreader: Unreader, data: bytes) -> None:
         buf = io.BytesIO()
         buf.write(data)
 
@@ -51,13 +58,14 @@ class ChunkedReader:
             done = buf.getvalue()[:2] == b"\r\n"
         if done:
             unreader.unread(buf.getvalue()[2:])
-            return b""
+            return None
         self.req.trailers = self.req.parse_headers(
             buf.getvalue()[:idx], from_trailer=True
         )
         unreader.unread(buf.getvalue()[idx + 4 :])
+        return None
 
-    def parse_chunked(self, unreader):
+    def parse_chunked(self, unreader: Unreader) -> Generator[bytes, None, None]:
         (size, rest) = self.parse_chunk_size(unreader)
         while size > 0:
             while size > len(rest):
@@ -78,7 +86,9 @@ class ChunkedReader:
                 raise ChunkMissingTerminator(rest[:2])
             (size, rest) = self.parse_chunk_size(unreader, data=rest[2:])
 
-    def parse_chunk_size(self, unreader, data=None):
+    def parse_chunk_size(
+        self, unreader: Unreader, data: bytes | None = None
+    ) -> tuple[int, bytes]:
         buf = io.BytesIO()
         if data is not None:
             buf.write(data)
@@ -106,22 +116,23 @@ class ChunkedReader:
                 self.parse_trailers(unreader, rest_chunk)
             except NoMoreData:
                 pass
-            return (0, None)
+            return (0, b"")
         return (chunk_size, rest_chunk)
 
-    def get_data(self, unreader, buf):
+    def get_data(self, unreader: Unreader, buf: io.BytesIO) -> None:
         data = unreader.read()
         if not data:
             raise NoMoreData()
         buf.write(data)
+        return None
 
 
 class LengthReader:
-    def __init__(self, unreader, length):
+    def __init__(self, unreader: Unreader, length: int) -> None:
         self.unreader = unreader
         self.length = length
 
-    def read(self, size):
+    def read(self, size: int) -> bytes:
         if not isinstance(size, int):
             raise TypeError("size must be an integral type")
 
@@ -139,20 +150,20 @@ class LengthReader:
                 break
             data = self.unreader.read()
 
-        buf = buf.getvalue()
-        ret, rest = buf[:size], buf[size:]
+        buf_data = buf.getvalue()
+        ret, rest = buf_data[:size], buf_data[size:]
         self.unreader.unread(rest)
         self.length -= size
         return ret
 
 
 class EOFReader:
-    def __init__(self, unreader):
+    def __init__(self, unreader: Unreader) -> None:
         self.unreader = unreader
         self.buf = io.BytesIO()
         self.finished = False
 
-    def read(self, size):
+    def read(self, size: int) -> bytes:
         if not isinstance(size, int):
             raise TypeError("size must be an integral type")
         if size < 0:
@@ -185,14 +196,14 @@ class EOFReader:
 
 
 class Body:
-    def __init__(self, reader):
+    def __init__(self, reader: ChunkedReader | LengthReader | EOFReader) -> None:
         self.reader = reader
         self.buf = io.BytesIO()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[bytes]:
         return self
 
-    def __next__(self):
+    def __next__(self) -> bytes:
         ret = self.readline()
         if not ret:
             raise StopIteration()
@@ -200,7 +211,7 @@ class Body:
 
     next = __next__
 
-    def getsize(self, size):
+    def getsize(self, size: int | None) -> int:
         if size is None:
             return sys.maxsize
         elif not isinstance(size, int):
@@ -209,7 +220,7 @@ class Body:
             return sys.maxsize
         return size
 
-    def read(self, size=None):
+    def read(self, size: int | None = None) -> bytes:
         size = self.getsize(size)
         if size == 0:
             return b""
@@ -233,7 +244,7 @@ class Body:
         self.buf.write(rest)
         return ret
 
-    def readline(self, size=None):
+    def readline(self, size: int | None = None) -> bytes:
         size = self.getsize(size)
         if size == 0:
             return b""
@@ -258,7 +269,7 @@ class Body:
 
         return b"".join(ret)
 
-    def readlines(self, size=None):
+    def readlines(self, size: int | None = None) -> list[bytes]:
         ret = []
         data = self.read()
         while data:

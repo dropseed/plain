@@ -1,19 +1,27 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import io
 import logging
 import os
 import re
+import socket
 import sys
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING, Any, cast
 
 from .. import SERVER_SOFTWARE, util
 from .errors import ConfigurationProblem, InvalidHeader, InvalidHeaderName
 from .message import TOKEN_RE
+
+if TYPE_CHECKING:
+    from ..config import Config
+    from .message import Request
 
 # Send files in at most 1GB blocks as some operating systems can have problems
 # with sending files in blocks over 2GB.
@@ -27,13 +35,13 @@ log = logging.getLogger(__name__)
 
 
 class FileWrapper:
-    def __init__(self, filelike, blksize=8192):
+    def __init__(self, filelike: Any, blksize: int = 8192) -> None:
         self.filelike = filelike
         self.blksize = blksize
         if hasattr(filelike, "close"):
             self.close = filelike.close
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int) -> bytes:
         data = self.filelike.read(self.blksize)
         if data:
             return data
@@ -41,13 +49,13 @@ class FileWrapper:
 
 
 class WSGIErrorsWrapper(io.RawIOBase):
-    def __init__(self, cfg):
+    def __init__(self, cfg: Config) -> None:
         # There is no public __init__ method for RawIOBase so
         # we don't need to call super() in the __init__ method.
         # pylint: disable=super-init-not-called
         errorlog = logging.getLogger("plain.server.error")
         handlers = errorlog.handlers
-        self.streams = []
+        self.streams: list[Any] = []
 
         if cfg.errorlog == "-":
             self.streams.append(sys.stderr)
@@ -57,16 +65,19 @@ class WSGIErrorsWrapper(io.RawIOBase):
             if hasattr(h, "stream"):
                 self.streams.append(h.stream)
 
-    def write(self, data):
+    def write(self, data: str | bytes) -> None:
         for stream in self.streams:
             try:
                 stream.write(data)
             except UnicodeError:
-                stream.write(data.encode("UTF-8"))
+                if isinstance(data, str):
+                    stream.write(data.encode("UTF-8"))
+                else:
+                    stream.write(data)
             stream.flush()
 
 
-def base_environ(cfg):
+def base_environ(cfg: Config) -> dict[str, Any]:
     return {
         "wsgi.errors": WSGIErrorsWrapper(cfg),
         "wsgi.version": (1, 0),
@@ -79,7 +90,7 @@ def base_environ(cfg):
     }
 
 
-def default_environ(req, sock, cfg):
+def default_environ(req: Request, sock: socket.socket, cfg: Config) -> dict[str, Any]:
     env = base_environ(cfg)
     env.update(
         {
@@ -96,7 +107,13 @@ def default_environ(req, sock, cfg):
     return env
 
 
-def create(req, sock, client, server, cfg):
+def create(
+    req: Request,
+    sock: socket.socket,
+    client: str | bytes | tuple[str, int],
+    server: str | tuple[str, int],
+    cfg: Config,
+) -> tuple[Response, dict[str, Any]]:
     resp = Response(req, sock, cfg)
 
     # set initial environ
@@ -149,28 +166,31 @@ def create(req, sock, client, server, cfg):
     # Normally only the application should use the Host header but since the
     # WSGI spec doesn't support unix sockets, we are using it to create
     # viable SERVER_* if possible.
+    server_parts: list[str | int]
     if isinstance(server, str):
-        server = server.split(":")
-        if len(server) == 1:
+        server_parts = cast(list[str | int], server.split(":"))
+        if len(server_parts) == 1:
             # unix socket
             if host:
-                server = host.split(":")
-                if len(server) == 1:
+                server_parts = cast(list[str | int], host.split(":"))
+                if len(server_parts) == 1:
                     if req.scheme == "http":
-                        server.append(80)
+                        server_parts.append(80)
                     elif req.scheme == "https":
-                        server.append(443)
+                        server_parts.append(443)
                     else:
-                        server.append("")
+                        server_parts.append("")
             else:
                 # no host header given which means that we are not behind a
                 # proxy, so append an empty port.
-                server.append("")
-    environ["SERVER_NAME"] = server[0]
-    environ["SERVER_PORT"] = str(server[1])
+                server_parts.append("")
+    else:
+        server_parts = list(server)
+    environ["SERVER_NAME"] = str(server_parts[0])
+    environ["SERVER_PORT"] = str(server_parts[1])
 
     # set the path and script name
-    path_info = req.path
+    path_info: str = req.path or ""
     if script_name:
         if not path_info.startswith(script_name):
             raise ConfigurationProblem(
@@ -184,35 +204,43 @@ def create(req, sock, client, server, cfg):
 
 
 class Response:
-    def __init__(self, req, sock, cfg):
+    def __init__(self, req: Request, sock: socket.socket, cfg: Config) -> None:
         self.req = req
         self.sock = sock
         self.version = "plain"
-        self.status = None
+        self.status: str | None = None
         self.chunked = False
         self.must_close = False
-        self.headers = []
+        self.headers: list[tuple[str, str]] = []
         self.headers_sent = False
-        self.response_length = None
+        self.response_length: int | None = None
         self.sent = 0
         self.upgrade = False
         self.cfg = cfg
+        self.status_code: int | None = None
 
-    def force_close(self):
+    def force_close(self) -> None:
         self.must_close = True
 
-    def should_close(self):
+    def should_close(self) -> bool:
         if self.must_close or self.req.should_close():
             return True
         if self.response_length is not None or self.chunked:
             return False
         if self.req.method == "HEAD":
             return False
-        if self.status_code < 200 or self.status_code in (204, 304):
+        if self.status_code is not None and (
+            self.status_code < 200 or self.status_code in (204, 304)
+        ):
             return False
         return True
 
-    def start_response(self, status, headers, exc_info=None):
+    def start_response(
+        self,
+        status: str,
+        headers: list[tuple[str, str]],
+        exc_info: tuple[type[BaseException], BaseException, Any] | None = None,
+    ) -> Callable[[bytes], None]:
         if exc_info:
             try:
                 if self.status and self.headers_sent:
@@ -236,7 +264,7 @@ class Response:
         self.chunked = self.is_chunked()
         return self.write
 
-    def process_headers(self, headers):
+    def process_headers(self, headers: list[tuple[str, str]]) -> None:
         for name, value in headers:
             if not isinstance(name, str):
                 raise TypeError(f"{name!r} is not a string")
@@ -268,7 +296,7 @@ class Response:
                 continue
             self.headers.append((name, value))
 
-    def is_chunked(self):
+    def is_chunked(self) -> bool:
         # Only use chunked responses when the client is
         # speaking HTTP/1.1 or newer and there was
         # no Content-Length header set.
@@ -279,13 +307,13 @@ class Response:
         elif self.req.method == "HEAD":
             # Responses to a HEAD request MUST NOT contain a response body.
             return False
-        elif self.status_code in (204, 304):
+        elif self.status_code is not None and self.status_code in (204, 304):
             # Do not use chunked responses when the response is guaranteed to
             # not have a response body.
             return False
         return True
 
-    def default_headers(self):
+    def default_headers(self) -> list[str]:
         # set the connection header
         if self.upgrade:
             connection = "upgrade"
@@ -304,17 +332,18 @@ class Response:
             headers.append("Transfer-Encoding: chunked\r\n")
         return headers
 
-    def send_headers(self):
+    def send_headers(self) -> None:
         if self.headers_sent:
-            return
+            return None
         tosend = self.default_headers()
         tosend.extend([f"{k}: {v}\r\n" for k, v in self.headers])
 
         header_str = "{}\r\n".format("".join(tosend))
         util.write(self.sock, util.to_bytestring(header_str, "latin-1"))
         self.headers_sent = True
+        return None
 
-    def write(self, arg):
+    def write(self, arg: bytes) -> None:
         self.send_headers()
         if not isinstance(arg, bytes):
             raise TypeError(f"{arg!r} is not a byte")
@@ -323,7 +352,7 @@ class Response:
         if self.response_length is not None:
             if self.sent >= self.response_length:
                 # Never write more than self.response_length bytes
-                return
+                return None
 
             tosend = min(self.response_length - self.sent, tosend)
             if tosend < arglen:
@@ -332,15 +361,16 @@ class Response:
         # Sending an empty chunk signals the end of the
         # response and prematurely closes the response
         if self.chunked and tosend == 0:
-            return
+            return None
 
         self.sent += tosend
         util.write(self.sock, arg, self.chunked)
+        return None
 
-    def can_sendfile(self):
+    def can_sendfile(self) -> bool:
         return self.cfg.sendfile is not False
 
-    def sendfile(self, respiter):
+    def sendfile(self, respiter: FileWrapper) -> bool:
         if self.cfg.is_ssl or not self.can_sendfile():
             return False
 
@@ -373,12 +403,16 @@ class Response:
 
         return True
 
-    def write_file(self, respiter):
-        if not self.sendfile(respiter):
+    def write_file(self, respiter: FileWrapper | Iterator[bytes]) -> None:
+        if isinstance(respiter, FileWrapper):
+            if not self.sendfile(respiter):
+                for item in respiter:
+                    self.write(item)
+        else:
             for item in respiter:
                 self.write(item)
 
-    def close(self):
+    def close(self) -> None:
         if not self.headers_sent:
             self.send_headers()
         if self.chunked:

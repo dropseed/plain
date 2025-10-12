@@ -1,12 +1,19 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import io
 import os
+import socket
+from collections.abc import Iterable, Iterator
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass
 
 # Classes that can undo reading data from
 # a given type of data source.
@@ -16,10 +23,10 @@ class Unreader:
     def __init__(self):
         self.buf = io.BytesIO()
 
-    def chunk(self):
+    def chunk(self) -> bytes:
         raise NotImplementedError()
 
-    def read(self, size=None):
+    def read(self, size: int | None = None) -> bytes:
         if size is not None and not isinstance(size, int):
             raise TypeError("size parameter must be an int or long.")
 
@@ -51,27 +58,27 @@ class Unreader:
         self.buf.write(data[size:])
         return data[:size]
 
-    def unread(self, data):
+    def unread(self, data: bytes) -> None:
         self.buf.seek(0, os.SEEK_END)
         self.buf.write(data)
 
 
 class SocketUnreader(Unreader):
-    def __init__(self, sock, max_chunk=8192):
+    def __init__(self, sock: socket.socket, max_chunk: int = 8192):
         super().__init__()
         self.sock = sock
         self.mxchunk = max_chunk
 
-    def chunk(self):
+    def chunk(self) -> bytes:
         return self.sock.recv(self.mxchunk)
 
 
 class IterUnreader(Unreader):
-    def __init__(self, iterable):
+    def __init__(self, iterable: Iterable[bytes]):
         super().__init__()
-        self.iter = iter(iterable)
+        self.iter: Iterator[bytes] | None = iter(iterable)
 
-    def chunk(self):
+    def chunk(self) -> bytes:
         if not self.iter:
             return b""
         try:

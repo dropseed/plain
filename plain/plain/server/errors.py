@@ -15,11 +15,11 @@
 # we inherit from BaseException here to make sure to not be caught
 # at application level
 class HaltServer(BaseException):
-    def __init__(self, reason, exit_status=1):
+    def __init__(self, reason: str, exit_status: int = 1) -> None:
         self.reason = reason
         self.exit_status = exit_status
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"<HaltServer {self.reason!r} {self.exit_status}>"
 
 

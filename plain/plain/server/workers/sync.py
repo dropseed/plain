@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
 import errno
 import os
 import select
@@ -12,10 +13,11 @@ import socket
 import ssl
 import sys
 from datetime import datetime
+from typing import Any
 
 from .. import http, sock, util
-from .http import wsgi
-from .workers import base
+from ..http import wsgi
+from . import base
 
 
 class StopWaiting(Exception):
@@ -23,13 +25,13 @@ class StopWaiting(Exception):
 
 
 class SyncWorker(base.Worker):
-    def accept(self, listener):
+    def accept(self, listener: socket.socket) -> None:
         client, addr = listener.accept()
-        client.setblocking(1)
-        util.close_on_exec(client)
+        client.setblocking(True)
+        util.close_on_exec(client.fileno())
         self.handle(listener, client, addr)
 
-    def wait(self, timeout):
+    def wait(self, timeout: float) -> list[Any] | None:
         try:
             self.notify()
             ret = select.select(self.wait_fds, [], [], timeout)
@@ -37,6 +39,7 @@ class SyncWorker(base.Worker):
                 if self.PIPE[0] in ret[0]:
                     os.read(self.PIPE[0], 1)
                 return ret[0]
+            return None
 
         except OSError as e:
             if e.args[0] == errno.EINTR:
@@ -48,14 +51,14 @@ class SyncWorker(base.Worker):
                     raise StopWaiting
             raise
 
-    def is_parent_alive(self):
+    def is_parent_alive(self) -> bool:
         # If our parent changed then we shut down.
         if self.ppid != os.getppid():
             self.log.info("Parent changed, shutting down: %s", self)
             return False
         return True
 
-    def run_for_one(self, timeout):
+    def run_for_one(self, timeout: float) -> None:
         listener = self.sockets[0]
         while self.alive:
             self.notify()
@@ -76,21 +79,21 @@ class SyncWorker(base.Worker):
                     raise
 
             if not self.is_parent_alive():
-                return
+                return None
 
             try:
                 self.wait(timeout)
             except StopWaiting:
-                return
+                return None
 
-    def run_for_multiple(self, timeout):
+    def run_for_multiple(self, timeout: float) -> None:
         while self.alive:
             self.notify()
 
             try:
                 ready = self.wait(timeout)
             except StopWaiting:
-                return
+                return None
 
             if ready is not None:
                 for listener in ready:
@@ -108,9 +111,9 @@ class SyncWorker(base.Worker):
                             raise
 
             if not self.is_parent_alive():
-                return
+                return None
 
-    def run(self):
+    def run(self) -> None:
         # if no timeout is given the worker will never wait and will
         # use the CPU for nothing. This minimal timeout prevent it.
         timeout = self.timeout or 0.5
@@ -118,14 +121,14 @@ class SyncWorker(base.Worker):
         # self.socket appears to lose its blocking status after
         # we fork in the arbiter. Reset it here.
         for s in self.sockets:
-            s.setblocking(0)
+            s.setblocking(False)
 
         if len(self.sockets) > 1:
             self.run_for_multiple(timeout)
         else:
             self.run_for_one(timeout)
 
-    def handle(self, listener, client, addr):
+    def handle(self, listener: socket.socket, client: socket.socket, addr: Any) -> None:
         req = None
         try:
             if self.cfg.is_ssl:
@@ -159,7 +162,9 @@ class SyncWorker(base.Worker):
         finally:
             util.close(client)
 
-    def handle_request(self, listener, req, client, addr):
+    def handle_request(
+        self, listener: socket.socket, req: Any, client: socket.socket, addr: Any
+    ) -> None:
         environ = {}
         resp = None
         try:
