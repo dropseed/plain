@@ -24,6 +24,7 @@ from plain.cli.runtime import without_runtime_setup
     "-w",
     type=int,
     default=1,
+    envvar="WEB_CONCURRENCY",
     help="Number of worker processes",
     show_default=True,
 )
