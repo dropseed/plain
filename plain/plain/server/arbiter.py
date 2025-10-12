@@ -111,8 +111,6 @@ class Arbiter:
         """\
         Initialize the arbiter. Start listening and set pidfile if needed.
         """
-        self.log.info("Starting plain server %s", plain.runtime.__version__)
-
         self.pid: int = os.getpid()
         if self.cfg.pidfile is not None:
             self.pidfile = Pidfile(self.cfg.pidfile)
@@ -124,9 +122,13 @@ class Arbiter:
             self.LISTENERS = sock.create_sockets(self.cfg, self.log)
 
         listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
-        self.log.debug("Arbiter booted")
-        self.log.info("Listening at: %s (%s)", listeners_str, self.pid)
-        self.log.info("Using worker: %s", self.cfg.worker_class_str)
+        self.log.info(
+            "Plain server started address=%s pid=%s worker=%s version=%s",
+            listeners_str,
+            self.pid,
+            self.cfg.worker_class_str,
+            plain.runtime.__version__,
+        )
 
         # check worker class requirements
         if hasattr(self.worker_class, "check_config"):
