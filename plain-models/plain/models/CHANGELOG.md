@@ -1,5 +1,18 @@
 # plain-models changelog
 
+## [0.53.0](https://github.com/dropseed/plain/releases/plain-models@0.53.0) (2025-10-12)
+
+### What's changed
+
+- Added new `plain models prune-migrations` command to identify and remove stale migration records from the database ([998aa49](https://github.com/dropseed/plain/commit/998aa49140))
+- The `--prune` option has been removed from `plain migrate` command in favor of the dedicated `prune-migrations` command ([998aa49](https://github.com/dropseed/plain/commit/998aa49140))
+- Added new preflight check `models.prunable_migrations` that warns about stale migration records in the database ([9b43617](https://github.com/dropseed/plain/commit/9b4361765c))
+- The `show-migrations` command no longer displays prunable migrations in its output ([998aa49](https://github.com/dropseed/plain/commit/998aa49140))
+
+### Upgrade instructions
+
+- Replace any usage of `plain migrate --prune` with the new `plain models prune-migrations` command
+
 ## [0.52.0](https://github.com/dropseed/plain/releases/plain-models@0.52.0) (2025-10-10)
 
 ### What's changed
