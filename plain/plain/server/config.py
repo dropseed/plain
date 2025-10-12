@@ -7,36 +7,35 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from . import util
 
 
 @dataclass
 class Config:
-    """Plain server configuration."""
+    """Plain server configuration.
+
+    All configuration values are required and provided by the CLI.
+    Defaults are defined in the CLI layer, not here.
+    """
 
     # Core settings (from CLI)
-    bind: list[str] = field(default_factory=lambda: ["127.0.0.1:8000"])
-    workers: int = 1
-    threads: int = 1
-    timeout: int = 30
-    max_requests: int = 0
-    reload: bool = False
-    reload_extra_files: list[str] = field(default_factory=list)
-    pidfile: str | None = None
-    certfile: str | None = None
-    keyfile: str | None = None
-    loglevel: str = "info"
-    accesslog: str | None = None
-    errorlog: str = "-"
-    access_log_format: str = (
-        '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
-    )
-    logconfig_json: str | None = None
-
-    # Internal
-    env_orig: dict[str, str] = field(default_factory=lambda: os.environ.copy())
+    bind: list[str]
+    workers: int
+    threads: int
+    timeout: int
+    max_requests: int
+    reload: bool
+    reload_extra_files: list[str]
+    pidfile: str | None
+    certfile: str | None
+    keyfile: str | None
+    loglevel: str
+    accesslog: str
+    errorlog: str
+    access_log_format: str
+    logconfig_json: str | None
 
     @property
     def worker_class_str(self) -> str:

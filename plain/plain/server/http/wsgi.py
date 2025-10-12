@@ -15,7 +15,9 @@ import sys
 from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any, cast
 
-from .. import SERVER_SOFTWARE, util
+import plain.runtime
+
+from .. import util
 from .errors import ConfigurationProblem, InvalidHeader, InvalidHeaderName
 from .message import TOKEN_RE
 
@@ -86,7 +88,7 @@ def base_environ(cfg: Config) -> dict[str, Any]:
         "wsgi.run_once": False,
         "wsgi.file_wrapper": FileWrapper,
         "wsgi.input_terminated": True,
-        "SERVER_SOFTWARE": SERVER_SOFTWARE,
+        "SERVER_SOFTWARE": f"plain/{plain.runtime.__version__}",
     }
 
 

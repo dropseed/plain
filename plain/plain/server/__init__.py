@@ -4,11 +4,6 @@
 #
 # Vendored and modified for Plain.
 
-import plain.runtime
+from .app import ServerApplication
 
-from .core import PlainServerApp, run_server
-
-SERVER = "plain"
-SERVER_SOFTWARE = f"{SERVER}/{plain.runtime.__version__}"
-
-__all__ = ["run_server", "PlainServerApp", "SERVER_SOFTWARE"]
+__all__ = ["ServerApplication"]

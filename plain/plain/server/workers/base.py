@@ -38,7 +38,7 @@ from .workertmp import WorkerTmp
 if TYPE_CHECKING:
     import socket
 
-    from ..app import BaseApplication
+    from ..app import ServerApplication
     from ..config import Config
     from ..glogging import Logger
     from ..http.message import Request
@@ -60,7 +60,7 @@ class Worker:
         age: int,
         ppid: int,
         sockets: list[socket.socket],
-        app: BaseApplication,
+        app: ServerApplication,
         timeout: int,
         cfg: Config,
         log: Logger,

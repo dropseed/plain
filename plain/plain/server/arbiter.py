@@ -25,7 +25,7 @@ from .errors import AppImportError, HaltServer
 from .pidfile import Pidfile
 
 if TYPE_CHECKING:
-    from .app import BaseApplication
+    from .app import ServerApplication
     from .config import Config
     from .glogging import Logger
     from .workers.base import Worker
@@ -64,7 +64,7 @@ class Arbiter:
         if name[:3] == "SIG" and name[3] != "_"
     }
 
-    def __init__(self, app: BaseApplication):
+    def __init__(self, app: ServerApplication):
         os.environ["SERVER_SOFTWARE"] = f"plain/{plain.runtime.__version__}"
 
         self._num_workers: int | None = None
@@ -92,8 +92,8 @@ class Arbiter:
 
     num_workers = property(_get_num_workers, _set_num_workers)
 
-    def setup(self, app: BaseApplication) -> None:
-        self.app: BaseApplication = app
+    def setup(self, app: ServerApplication) -> None:
+        self.app: ServerApplication = app
         assert app.cfg is not None, "Application config must be initialized"
         self.cfg: Config = app.cfg
 
@@ -332,8 +332,6 @@ class Arbiter:
     def reload(self) -> None:
         old_address = self.cfg.address
 
-        # reload conf
-        self.app.reload()
         self.setup(self.app)
 
         # reopen log files
