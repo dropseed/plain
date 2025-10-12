@@ -36,6 +36,12 @@ if TYPE_CHECKING:
     from ..config import Config
     from ..glogging import Logger
 
+# Keep-alive connection timeout in seconds
+KEEPALIVE = 2
+
+# Maximum number of simultaneous client connections
+WORKER_CONNECTIONS = 1000
+
 
 class TConn:
     def __init__(
@@ -71,7 +77,7 @@ class TConn:
 
     def set_timeout(self) -> None:
         # set the timeout
-        self.timeout = time.time() + self.cfg.keepalive
+        self.timeout = time.time() + KEEPALIVE
 
     def close(self) -> None:
         util.close(self.sock)
@@ -80,8 +86,8 @@ class TConn:
 class ThreadWorker(base.Worker):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.worker_connections: int = self.cfg.worker_connections
-        self.max_keepalived: int = self.cfg.worker_connections - self.cfg.threads
+        self.worker_connections: int = WORKER_CONNECTIONS
+        self.max_keepalived: int = WORKER_CONNECTIONS - self.cfg.threads
         # initialise the pool
         self.tpool: futures.ThreadPoolExecutor | None = None
         self.poller: selectors.DefaultSelector | None = None
@@ -92,9 +98,9 @@ class ThreadWorker(base.Worker):
 
     @classmethod
     def check_config(cls, cfg: Config, log: Logger) -> None:
-        max_keepalived = cfg.worker_connections - cfg.threads
+        max_keepalived = WORKER_CONNECTIONS - cfg.threads
 
-        if max_keepalived <= 0 and cfg.keepalive:
+        if max_keepalived <= 0:
             log.warning(
                 "No keepalived connections can be handled. "
                 "Check the number of worker connections and threads."
@@ -345,7 +351,7 @@ class ThreadWorker(base.Worker):
                     self.alive = False
                 resp.force_close()
 
-            if not self.alive or not self.cfg.keepalive:
+            if not self.alive:
                 resp.force_close()
             elif len(self._keep) >= self.max_keepalived:
                 resp.force_close()

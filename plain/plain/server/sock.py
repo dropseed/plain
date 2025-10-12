@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from .config import Config
     from .glogging import Logger
 
+# Maximum number of pending connections in the socket listen queue
+BACKLOG = 2048
+
 
 class BaseSocket:
     FAMILY: socket.AddressFamily
@@ -57,12 +60,6 @@ class BaseSocket:
 
     def set_options(self, sock: socket.socket, bound: bool = False) -> socket.socket:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        if self.conf.reuse_port and hasattr(socket, "SO_REUSEPORT"):  # pragma: no cover
-            try:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            except OSError as err:
-                if err.errno not in (errno.ENOPROTOOPT, errno.EINVAL):
-                    raise
         if not bound:
             self.bind(sock)
         sock.setblocking(False)
@@ -71,7 +68,7 @@ class BaseSocket:
         if hasattr(sock, "set_inheritable"):
             sock.set_inheritable(True)
 
-        sock.listen(self.conf.backlog)
+        sock.listen(BACKLOG)
         return sock
 
     def bind(self, sock: socket.socket) -> None:
@@ -158,24 +155,15 @@ def _sock_type(addr: tuple[str, int] | str | bytes) -> type[BaseSocket]:
     return sock_type
 
 
-def create_sockets(
-    conf: Config, log: Logger, fds: list[int] | None = None
-) -> list[BaseSocket]:
+def create_sockets(conf: Config, log: Logger) -> list[BaseSocket]:
     """
-    Create a new socket for the configured addresses or file descriptors.
+    Create a new socket for the configured addresses.
 
     If a configured address is a tuple then a TCP socket is created.
     If it is a string, a Unix socket is created. Otherwise, a TypeError is
     raised.
     """
     listeners = []
-
-    # get it only once
-    addr = conf.address
-    fdaddr = [bind for bind in addr if isinstance(bind, int)]
-    if fds:
-        fdaddr += list(fds)
-    laddr = [bind for bind in addr if not isinstance(bind, int)]
 
     # check ssl config early to raise the error on startup
     # only the certfile is needed since it can contains the keyfile
@@ -185,19 +173,7 @@ def create_sockets(
     if conf.keyfile and not os.path.exists(conf.keyfile):
         raise ValueError(f'keyfile "{conf.keyfile}" does not exist')
 
-    # sockets are already bound
-    if fdaddr:
-        for fd in fdaddr:
-            sock = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
-            sock_name = sock.getsockname()
-            sock_type = _sock_type(sock_name)
-            listener = sock_type(sock_name, conf, log, fd=fd)
-            listeners.append(listener)
-
-        return listeners
-
-    # no sockets is bound, first initialization of plain server in this env.
-    for addr in laddr:
+    for addr in conf.address:
         sock_type = _sock_type(addr)
         sock = None
         for i in range(5):
@@ -234,12 +210,9 @@ def close_sockets(listeners: list[BaseSocket], unlink: bool = True) -> None:
 
 
 def ssl_context(conf: Config) -> ssl.SSLContext:
-    def default_ssl_context_factory() -> ssl.SSLContext:
-        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        context.load_cert_chain(certfile=conf.certfile, keyfile=conf.keyfile)
-        return context
-
-    return conf.ssl_context(conf, default_ssl_context_factory)
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context.load_cert_chain(certfile=conf.certfile, keyfile=conf.keyfile)
+    return context
 
 
 def ssl_wrap_socket(sock: socket.socket, conf: Config) -> ssl.SSLSocket:

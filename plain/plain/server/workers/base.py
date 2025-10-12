@@ -43,6 +43,9 @@ if TYPE_CHECKING:
     from ..glogging import Logger
     from ..http.message import Request
 
+# Maximum jitter to add to max_requests to stagger worker restarts
+MAX_REQUESTS_JITTER = 50
+
 
 class Worker:
     SIGNALS = [
@@ -81,7 +84,7 @@ class Worker:
         self.nr = 0
 
         if cfg.max_requests > 0:
-            jitter = randint(0, cfg.max_requests_jitter)
+            jitter = randint(0, MAX_REQUESTS_JITTER)
             self.max_requests = cfg.max_requests + jitter
         else:
             self.max_requests = sys.maxsize
@@ -146,7 +149,7 @@ class Worker:
                 time.sleep(0.1)
                 sys.exit(0)
 
-            reloader_cls = reloader_engines[self.cfg.reload_engine]
+            reloader_cls = reloader_engines["auto"]
             self.reloader = reloader_cls(
                 extra_files=self.cfg.reload_extra_files, callback=changed
             )

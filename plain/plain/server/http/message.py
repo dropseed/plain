@@ -33,6 +33,11 @@ MAX_REQUEST_LINE = 8190
 MAX_HEADERS = 32768
 DEFAULT_MAX_HEADERFIELD_SIZE = 8190
 
+# Request size limits for DDoS protection
+LIMIT_REQUEST_LINE = 4094  # Maximum HTTP request line size in bytes
+LIMIT_REQUEST_FIELDS = 100  # Maximum number of HTTP header fields
+LIMIT_REQUEST_FIELD_SIZE = 8190  # Maximum size of an HTTP header field in bytes
+
 # verbosely on purpose, avoid backslash ambiguity
 RFC9110_5_6_2_TOKEN_SPECIALS = r"!#$%&'*+-.^_`|~"
 TOKEN_RE = re.compile(rf"[{re.escape(RFC9110_5_6_2_TOKEN_SPECIALS)}0-9a-zA-Z]+")
@@ -56,10 +61,10 @@ class Message:
         self.must_close = False
 
         # set headers limits
-        self.limit_request_fields = cfg.limit_request_fields
+        self.limit_request_fields = LIMIT_REQUEST_FIELDS
         if self.limit_request_fields <= 0 or self.limit_request_fields > MAX_HEADERS:
             self.limit_request_fields = MAX_HEADERS
-        self.limit_request_field_size = cfg.limit_request_field_size
+        self.limit_request_field_size = LIMIT_REQUEST_FIELD_SIZE
         if self.limit_request_field_size < 0:
             self.limit_request_field_size = DEFAULT_MAX_HEADERFIELD_SIZE
 
@@ -265,7 +270,7 @@ class Request(Message):
         self.fragment: str | None = None
 
         # get max request line size
-        self.limit_request_line = cfg.limit_request_line
+        self.limit_request_line = LIMIT_REQUEST_LINE
         if self.limit_request_line < 0 or self.limit_request_line >= MAX_REQUEST_LINE:
             self.limit_request_line = MAX_REQUEST_LINE
 

@@ -163,18 +163,9 @@ def is_ipv6(addr: str) -> bool:
     return True
 
 
-def parse_address(
-    netloc: str, default_port: str = "8000"
-) -> str | int | tuple[str, int]:
+def parse_address(netloc: str, default_port: str = "8000") -> str | tuple[str, int]:
     if re.match(r"unix:(//)?", netloc):
         return re.split(r"unix:(//)?", netloc)[-1]
-
-    if netloc.startswith("fd://"):
-        fd = netloc[5:]
-        try:
-            return int(fd)
-        except ValueError:
-            raise RuntimeError(f"{fd!r} is not a valid file descriptor.") from None
 
     if netloc.startswith("tcp://"):
         netloc = netloc.split("tcp://")[1]

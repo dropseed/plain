@@ -34,16 +34,11 @@ class BaseApplication:
         Loads the configuration
         """
         try:
-            self.load_default_config()
             self.load_config()
         except Exception as e:
             print(f"\nError: {str(e)}", file=sys.stderr)
             sys.stderr.flush()
             sys.exit(1)
-
-    def load_default_config(self) -> None:
-        # init configuration
-        self.cfg = Config(self.usage, prog=self.prog)
 
     def init(
         self, parser: argparse.ArgumentParser, opts: argparse.Namespace, args: list[str]

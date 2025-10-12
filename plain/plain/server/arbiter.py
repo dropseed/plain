@@ -35,7 +35,7 @@ class Arbiter:
     """
     Arbiter maintain the workers processes alive. It launches or
     kills them if needed. It also manages application reloading
-    via SIGHUP/USR2.
+    via SIGHUP.
     """
 
     # A flag indicating if a worker failed to
@@ -75,9 +75,6 @@ class Arbiter:
 
         self.pidfile: Pidfile | None = None
         self.worker_age: int = 0
-        self.reexec_pid: int = 0
-        self.master_pid: int = 0
-        self.master_name: str = "Master"
 
         cwd = util.getcwd()
 
@@ -97,31 +94,18 @@ class Arbiter:
 
     def setup(self, app: BaseApplication) -> None:
         self.app: BaseApplication = app
+        assert app.cfg is not None, "Application config must be initialized"
         self.cfg: Config = app.cfg
 
         if self.log is None:
-            self.log = self.cfg.logger_class(app.cfg)
+            from .glogging import Logger
 
-        # reopen files
-        if "PLAIN_SERVER_PID" in os.environ:
-            self.log.reopen_files()
+            self.log = Logger(self.cfg)
 
         self.worker_class: type[Worker] = self.cfg.worker_class
         self.address: str = self.cfg.address
         self.num_workers = self.cfg.workers
         self.timeout: int = self.cfg.timeout
-        self.proc_name: str = self.cfg.proc_name
-
-        self.log.debug(
-            "Current configuration:\n{}".format(
-                "\n".join(
-                    f"  {config}: {value.value}"
-                    for config, value in sorted(
-                        self.cfg.settings.items(), key=lambda setting: setting[1]
-                    )
-                )
-            )
-        )
 
     def start(self) -> None:
         """\
@@ -129,31 +113,15 @@ class Arbiter:
         """
         self.log.info("Starting plain server %s", plain.runtime.__version__)
 
-        if "PLAIN_SERVER_PID" in os.environ:
-            self.master_pid = int(os.environ.get("PLAIN_SERVER_PID"))
-            self.proc_name = self.proc_name + ".2"
-            self.master_name = "Master.2"
-
         self.pid: int = os.getpid()
         if self.cfg.pidfile is not None:
-            pidname = self.cfg.pidfile
-            if self.master_pid != 0:
-                pidname += ".2"
-            self.pidfile = Pidfile(pidname)
+            self.pidfile = Pidfile(self.cfg.pidfile)
             self.pidfile.create(self.pid)
 
         self.init_signals()
 
         if not self.LISTENERS:
-            fds = None
-
-            if self.master_pid:
-                fds = []
-                for fd in os.environ.pop("PLAIN_SERVER_FD").split(","):
-                    fds.append(int(fd))
-
-            if not (self.cfg.reuse_port and hasattr(socket, "SO_REUSEPORT")):
-                self.LISTENERS = sock.create_sockets(self.cfg, self.log, fds)
+            self.LISTENERS = sock.create_sockets(self.cfg, self.log)
 
         listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
         self.log.debug("Arbiter booted")
@@ -199,8 +167,6 @@ class Arbiter:
             self.manage_workers()
 
             while True:
-                self.maybe_promote_master()
-
                 sig = self.SIG_QUEUE.pop(0) if self.SIG_QUEUE else None
                 if sig is None:
                     self.sleep()
@@ -245,7 +211,7 @@ class Arbiter:
         - Start the new worker processes with a new configuration
         - Gracefully shutdown the old worker processes
         """
-        self.log.info("Hang up: %s", self.master_name)
+        self.log.info("Hang up: Master")
         self.reload()
 
     def handle_term(self) -> None:
@@ -289,34 +255,15 @@ class Arbiter:
         self.kill_workers(signal.SIGUSR1)
 
     def handle_usr2(self) -> None:
-        """\
-        SIGUSR2 handling.
-        Creates a new arbiter/worker set as a fork of the current
-        arbiter without affecting old workers. Use this to do live
-        deployment with the ability to backout a change.
-        """
-        self.reexec()
+        """SIGUSR2 handling"""
+        # USR2 for graceful restart is not supported
+        self.log.debug("SIGUSR2 ignored")
 
     def handle_winch(self) -> None:
         """SIGWINCH handling"""
         # SIGWINCH is typically used to gracefully stop workers when running as daemon
         # Since we don't support daemon mode, just log that it's ignored
         self.log.debug("SIGWINCH ignored")
-
-    def maybe_promote_master(self) -> None:
-        if self.master_pid == 0:
-            return None
-
-        if self.master_pid != os.getppid():
-            self.log.info("Master has been promoted.")
-            # reset master infos
-            self.master_name = "Master"
-            self.master_pid = 0
-            self.proc_name = self.cfg.proc_name
-            del os.environ["PLAIN_SERVER_PID"]
-            # rename the pidfile
-            if self.pidfile is not None:
-                self.pidfile.rename(self.cfg.pidfile)
 
     def wakeup(self) -> None:
         """\
@@ -333,7 +280,7 @@ class Arbiter:
         self.stop()
 
         log_func = self.log.info if exit_status == 0 else self.log.error
-        log_func("Shutting down: %s", self.master_name)
+        log_func("Shutting down: Master")
         if reason is not None:
             log_func("Reason: %s", reason)
 
@@ -367,8 +314,7 @@ class Arbiter:
         :attr graceful: boolean, If True (the default) workers will be
         killed gracefully  (ie. trying to wait for the current connection)
         """
-        unlink = self.reexec_pid == self.master_pid == 0 and not self.cfg.reuse_port
-        sock.close_sockets(self.LISTENERS, unlink)
+        sock.close_sockets(self.LISTENERS, unlink=True)
 
         self.LISTENERS = []
         sig = signal.SIGTERM
@@ -382,34 +328,6 @@ class Arbiter:
             time.sleep(0.1)
 
         self.kill_workers(signal.SIGKILL)
-
-    def reexec(self) -> None:
-        """\
-        Relaunch the master and workers.
-        """
-        if self.reexec_pid != 0:
-            self.log.warning("USR2 signal ignored. Child exists.")
-            return None
-
-        if self.master_pid != 0:
-            self.log.warning("USR2 signal ignored. Parent exists.")
-            return None
-
-        master_pid = os.getpid()
-        self.reexec_pid = os.fork()
-        if self.reexec_pid != 0:
-            return None
-
-        environ = self.cfg.env_orig.copy()
-        environ["PLAIN_SERVER_PID"] = str(master_pid)
-        environ["PLAIN_SERVER_FD"] = ",".join(
-            str(lnr.fileno()) for lnr in self.LISTENERS
-        )
-
-        os.chdir(self.START_CTX["cwd"])
-
-        # exec the process using the original environment
-        os.execvpe(self.START_CTX[0], self.START_CTX["args"], environ)
 
     def reload(self) -> None:
         old_address = self.cfg.address
@@ -477,49 +395,47 @@ class Arbiter:
                 wpid, status = os.waitpid(-1, os.WNOHANG)
                 if not wpid:
                     break
-                if self.reexec_pid == wpid:
-                    self.reexec_pid = 0
-                else:
-                    # A worker was terminated. If the termination reason was
-                    # that it could not boot, we'll shut it down to avoid
-                    # infinite start/stop cycles.
-                    exitcode = status >> 8
-                    if exitcode != 0:
-                        self.log.error(
-                            "Worker (pid:%s) exited with code %s", wpid, exitcode
-                        )
-                    if exitcode == self.WORKER_BOOT_ERROR:
-                        reason = "Worker failed to boot."
-                        raise HaltServer(reason, self.WORKER_BOOT_ERROR)
-                    if exitcode == self.APP_LOAD_ERROR:
-                        reason = "App failed to load."
-                        raise HaltServer(reason, self.APP_LOAD_ERROR)
 
-                    if exitcode > 0:
-                        # If the exit code of the worker is greater than 0,
-                        # let the user know.
-                        self.log.error(
-                            "Worker (pid:%s) exited with code %s.", wpid, exitcode
-                        )
-                    elif status > 0:
-                        # If the exit code of the worker is 0 and the status
-                        # is greater than 0, then it was most likely killed
-                        # via a signal.
-                        try:
-                            sig_name = signal.Signals(status).name
-                        except ValueError:
-                            sig_name = f"code {status}"
-                        msg = f"Worker (pid:{wpid}) was sent {sig_name}!"
+                # A worker was terminated. If the termination reason was
+                # that it could not boot, we'll shut it down to avoid
+                # infinite start/stop cycles.
+                exitcode = status >> 8
+                if exitcode != 0:
+                    self.log.error(
+                        "Worker (pid:%s) exited with code %s", wpid, exitcode
+                    )
+                if exitcode == self.WORKER_BOOT_ERROR:
+                    reason = "Worker failed to boot."
+                    raise HaltServer(reason, self.WORKER_BOOT_ERROR)
+                if exitcode == self.APP_LOAD_ERROR:
+                    reason = "App failed to load."
+                    raise HaltServer(reason, self.APP_LOAD_ERROR)
 
-                        # Additional hint for SIGKILL
-                        if status == signal.SIGKILL:
-                            msg += " Perhaps out of memory?"
-                        self.log.error(msg)
+                if exitcode > 0:
+                    # If the exit code of the worker is greater than 0,
+                    # let the user know.
+                    self.log.error(
+                        "Worker (pid:%s) exited with code %s.", wpid, exitcode
+                    )
+                elif status > 0:
+                    # If the exit code of the worker is 0 and the status
+                    # is greater than 0, then it was most likely killed
+                    # via a signal.
+                    try:
+                        sig_name = signal.Signals(status).name
+                    except ValueError:
+                        sig_name = f"code {status}"
+                    msg = f"Worker (pid:{wpid}) was sent {sig_name}!"
 
-                    worker = self.WORKERS.pop(wpid, None)
-                    if not worker:
-                        continue
-                    worker.tmp.close()
+                    # Additional hint for SIGKILL
+                    if status == signal.SIGKILL:
+                        msg += " Perhaps out of memory?"
+                    self.log.error(msg)
+
+                worker = self.WORKERS.pop(wpid, None)
+                if not worker:
+                    continue
+                worker.tmp.close()
         except OSError as e:
             if e.errno != errno.ECHILD:
                 raise
@@ -575,8 +491,6 @@ class Arbiter:
         worker.pid = os.getpid()
         try:
             self.log.info("Booting worker with pid: %s", worker.pid)
-            if self.cfg.reuse_port:
-                worker.sockets = sock.create_sockets(self.cfg, self.log)
             worker.init_process()
             sys.exit(0)
         except SystemExit:

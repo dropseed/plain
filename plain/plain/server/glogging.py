@@ -19,7 +19,7 @@ import os  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402
 import traceback  # noqa: E402
-from logging.config import dictConfig, fileConfig  # noqa: E402
+from logging.config import dictConfig  # noqa: E402
 
 from . import util  # noqa: E402
 
@@ -134,14 +134,6 @@ class Logger:
         self.access_log.setLevel(logging.INFO)
 
         # set plain.server.error handler
-        if self.cfg.capture_output and cfg.errorlog != "-":
-            for stream in sys.stdout, sys.stderr:
-                stream.flush()
-
-            self.logfile = open(cfg.errorlog, "a+")
-            os.dup2(self.logfile.fileno(), sys.stdout.fileno())
-            os.dup2(self.logfile.fileno(), sys.stderr.fileno())
-
         self._set_handler(
             self.error_log,
             cfg.errorlog,
@@ -157,14 +149,8 @@ class Logger:
                 stream=sys.stdout,
             )
 
-        if cfg.logconfig_dict:
-            config = CONFIG_DEFAULTS.copy()
-            config.update(cfg.logconfig_dict)
-            try:
-                dictConfig(config)
-            except (AttributeError, ImportError, ValueError, TypeError) as exc:
-                raise RuntimeError(str(exc))
-        elif cfg.logconfig_json:
+        # Apply logconfig_json if provided
+        if cfg.logconfig_json:
             config = CONFIG_DEFAULTS.copy()
             if os.path.exists(cfg.logconfig_json):
                 try:
@@ -179,17 +165,6 @@ class Logger:
                     TypeError,
                 ) as exc:
                     raise RuntimeError(str(exc))
-        elif cfg.logconfig:
-            if os.path.exists(cfg.logconfig):
-                defaults = CONFIG_DEFAULTS.copy()
-                defaults["__file__"] = cfg.logconfig
-                defaults["here"] = os.path.dirname(cfg.logconfig)
-                fileConfig(
-                    cfg.logconfig, defaults=defaults, disable_existing_loggers=False
-                )
-            else:
-                msg = "Error: log config '%s' not found"
-                raise RuntimeError(msg % cfg.logconfig)
 
     def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.critical(msg, *args, **kwargs)
@@ -286,12 +261,7 @@ class Logger:
         for format details
         """
 
-        if not (
-            self.cfg.accesslog
-            or self.cfg.logconfig
-            or self.cfg.logconfig_dict
-            or self.cfg.logconfig_json
-        ):
+        if not (self.cfg.accesslog or self.cfg.logconfig_json):
             return None
 
         # wrap atoms:
@@ -313,17 +283,6 @@ class Logger:
         return time.strftime("[%d/%b/%Y:%H:%M:%S %z]")
 
     def reopen_files(self) -> None:
-        if self.cfg.capture_output and self.cfg.errorlog != "-":
-            for stream in sys.stdout, sys.stderr:
-                stream.flush()
-
-            with self.lock:
-                if self.logfile is not None:
-                    self.logfile.close()
-                self.logfile = open(self.cfg.errorlog, "a+")
-                os.dup2(self.logfile.fileno(), sys.stdout.fileno())
-                os.dup2(self.logfile.fileno(), sys.stderr.fileno())
-
         for log in loggers():
             for handler in log.handlers:
                 if isinstance(handler, logging.FileHandler):
