@@ -4,9 +4,3 @@
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-
-# Supported workers
-SUPPORTED_WORKERS = {
-    "sync": "plain.server.workers.sync.SyncWorker",
-    "thread": "plain.server.workers.thread.ThreadWorker",
-}

@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass
 
 from . import util
+from .workers.sync import SyncWorker
+from .workers.thread import ThreadWorker
 
 
 @dataclass
@@ -48,13 +50,12 @@ class Config:
     def worker_class(self) -> type:
         # Auto-select based on threads
         if self.threads > 1:
-            uri = "plain.server.workers.thread.ThreadWorker"
+            worker_class = ThreadWorker
         else:
-            uri = "plain.server.workers.sync.SyncWorker"
+            worker_class = SyncWorker
 
-        worker_class = util.load_class(uri)
         if hasattr(worker_class, "setup"):
-            worker_class.setup()  # type: ignore[call-non-callable]  # hasattr check doesn't narrow type
+            worker_class.setup()
         return worker_class
 
     @property

@@ -10,7 +10,6 @@ import email.utils
 import errno
 import fcntl
 import html
-import importlib
 import inspect
 import io
 import os
@@ -20,13 +19,10 @@ import socket
 import sys
 import textwrap
 import time
-import traceback
 import urllib.parse
 import warnings
 from collections.abc import Callable
 from typing import Any
-
-from .workers import SUPPORTED_WORKERS
 
 # Server and Date aren't technically hop-by-hop
 # headers, but they are in the purview of the
@@ -43,38 +39,6 @@ hop_headers = set(
     server date
     """.split()
 )
-
-
-def load_class(
-    uri: str | type,
-    default: str = "plain.server.workers.sync.SyncWorker",
-    section: str = "plain.server.workers",
-) -> type:
-    if inspect.isclass(uri):
-        return uri  # type: ignore[return-value]
-
-    components = uri.split(".")  # type: ignore[union-attr]
-    if len(components) == 1:
-        # Handle short names like "sync" or "thread"
-        if uri.startswith("#"):  # type: ignore[union-attr]
-            uri = uri[1:]  # type: ignore[union-attr]
-
-        if uri in SUPPORTED_WORKERS:
-            components = SUPPORTED_WORKERS[uri].split(".")
-        else:
-            exc_msg = f"Worker type {uri!r} not found in SUPPORTED_WORKERS"
-            raise RuntimeError(exc_msg)
-
-    klass = components.pop(-1)
-
-    try:
-        mod = importlib.import_module(".".join(components))
-    except Exception:
-        exc = traceback.format_exc()
-        msg = "class uri %r invalid or not found: \n\n[%s]"
-        raise RuntimeError(msg % (uri, exc))
-    return getattr(mod, klass)
-
 
 positionals = (
     inspect.Parameter.POSITIONAL_ONLY,
