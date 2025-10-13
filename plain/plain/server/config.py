@@ -41,14 +41,14 @@ class Config:
     def worker_class_str(self) -> str:
         # Auto-select based on threads
         if self.threads > 1:
-            return "gthread"
+            return "thread"
         return "sync"
 
     @property
     def worker_class(self) -> type:
         # Auto-select based on threads
         if self.threads > 1:
-            uri = "plain.server.workers.gthread.ThreadWorker"
+            uri = "plain.server.workers.thread.ThreadWorker"
         else:
             uri = "plain.server.workers.sync.SyncWorker"
 

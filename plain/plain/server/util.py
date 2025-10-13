@@ -55,7 +55,7 @@ def load_class(
 
     components = uri.split(".")  # type: ignore[union-attr]
     if len(components) == 1:
-        # Handle short names like "sync" or "gthread"
+        # Handle short names like "sync" or "thread"
         if uri.startswith("#"):  # type: ignore[union-attr]
             uri = uri[1:]  # type: ignore[union-attr]
 

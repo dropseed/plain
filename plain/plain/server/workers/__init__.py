@@ -8,5 +8,5 @@
 # Supported workers
 SUPPORTED_WORKERS = {
     "sync": "plain.server.workers.sync.SyncWorker",
-    "gthread": "plain.server.workers.gthread.ThreadWorker",
+    "thread": "plain.server.workers.thread.ThreadWorker",
 }
