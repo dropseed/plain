@@ -10,7 +10,6 @@ import email.utils
 import errno
 import fcntl
 import html
-import inspect
 import io
 import os
 import random
@@ -39,23 +38,6 @@ hop_headers = set(
     server date
     """.split()
 )
-
-positionals = (
-    inspect.Parameter.POSITIONAL_ONLY,
-    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-)
-
-
-def get_arity(f: Callable[..., Any]) -> int:
-    sig = inspect.signature(f)
-    arity = 0
-
-    for param in sig.parameters.values():
-        if param.kind in positionals:
-            arity += 1
-
-    return arity
-
 
 if sys.platform.startswith("win"):
 
@@ -279,19 +261,6 @@ def has_fileno(obj: Any) -> bool:
         return False
 
     return True
-
-
-def warn(msg: str) -> None:
-    print("!!!", file=sys.stderr)
-
-    lines = msg.splitlines()
-    for i, line in enumerate(lines):
-        if i == 0:
-            line = f"WARNING: {line}"
-        print(f"!!! {line}", file=sys.stderr)
-
-    print("!!!\n", file=sys.stderr)
-    sys.stderr.flush()
 
 
 def make_fail_app(msg: str | bytes) -> Callable[..., Any]:
