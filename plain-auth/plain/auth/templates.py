@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from jinja2 import pass_context
 
+from plain.sessions.exceptions import SessionNotAvailable
 from plain.templates import register_template_global
 
 from .requests import get_request_user
@@ -18,4 +19,8 @@ def get_current_user(context: Context) -> Any | None:
     """Get the authenticated user for the current request."""
     request = context.get("request")
     assert request is not None, "No request in template context"
-    return get_request_user(request)
+    try:
+        return get_request_user(request)
+    except SessionNotAvailable:
+        # Session not available (e.g., during error page rendering before middleware runs)
+        return None
