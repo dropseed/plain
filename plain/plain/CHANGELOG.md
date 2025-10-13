@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.77.0](https://github.com/dropseed/plain/releases/plain@0.77.0) (2025-10-13)
+
+### What's changed
+
+- The `plain server --reload` now uses `watchfiles` for improved cross-platform file watching ([92e95c5032](https://github.com/dropseed/plain/commit/92e95c5032))
+- Server reloader now watches `.env*` files for changes and triggers automatic reload ([92e95c5032](https://github.com/dropseed/plain/commit/92e95c5032))
+- HTML template additions and deletions now trigger automatic server reload when using `--reload` ([f2f31c288b](https://github.com/dropseed/plain/commit/f2f31c288b))
+- Internal server worker type renamed from "gthread" to "thread" for clarity ([6470748e91](https://github.com/dropseed/plain/commit/6470748e91))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.76.0](https://github.com/dropseed/plain/releases/plain@0.76.0) (2025-10-12)
 
 ### What's changed
