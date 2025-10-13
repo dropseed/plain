@@ -99,7 +99,7 @@ def worker(
         signal.signal(signal.SIGINT, signal_shutdown)
 
         # Start file watcher once, outside the loop
-        reloader = Reloader(callback=file_changed)
+        reloader = Reloader(callback=file_changed, watch_html=False)
         reloader.start()
 
         while should_restart["value"]:

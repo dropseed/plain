@@ -150,7 +150,7 @@ class Worker:
                 time.sleep(0.1)
                 sys.exit(0)
 
-            self.reloader = Reloader(callback=changed)
+            self.reloader = Reloader(callback=changed, watch_html=True)
 
         self.load_wsgi()
         if self.reloader:

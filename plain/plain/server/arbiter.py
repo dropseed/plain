@@ -490,7 +490,7 @@ class Arbiter:
         # Process Child
         worker.pid = os.getpid()
         try:
-            self.log.info("Plain server worker started pid=%s", worker.pid)
+            self.log.info("Server worker started pid=%s", worker.pid)
             worker.init_process()
             sys.exit(0)
         except SystemExit:

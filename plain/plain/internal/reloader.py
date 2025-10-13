@@ -15,10 +15,11 @@ COMPILED_EXT_RE = re.compile(r"py[co]$")
 class Reloader(threading.Thread):
     """File change reloader using watchfiles for cross-platform native file watching."""
 
-    def __init__(self, callback: Callable[[str], None]) -> None:
+    def __init__(self, callback: Callable[[str], None], watch_html: bool) -> None:
         super().__init__()
         self.daemon = True
         self._callback = callback
+        self._watch_html = watch_html
 
     def get_watch_paths(self) -> set[str]:
         """Get all directories to watch for changes."""
@@ -41,27 +42,36 @@ class Reloader(threading.Thread):
 
         return paths
 
-    def should_reload(self, file_path: str) -> bool:
-        """Check if a file change should trigger a reload."""
-        filename = os.path.basename(file_path)
-
-        # Watch .py files
-        if file_path.endswith(".py"):
-            return True
-
-        # Watch .env* files
-        if filename.startswith(".env"):
-            return True
-
-        return False
-
     def run(self) -> None:
         """Watch for file changes and trigger callback."""
         watch_paths = self.get_watch_paths()
 
         for changes in watchfiles.watch(*watch_paths, rust_timeout=1000):
             for change_type, file_path in changes:
-                # Only reload on modify and create events
+                should_reload = False
+                filename = os.path.basename(file_path)
+
+                # Python files: reload on modify/add
                 if change_type in (watchfiles.Change.modified, watchfiles.Change.added):
-                    if self.should_reload(file_path):
-                        self._callback(file_path)
+                    if file_path.endswith(".py"):
+                        should_reload = True
+
+                # .env files: reload on modify/add/delete
+                if change_type in (
+                    watchfiles.Change.modified,
+                    watchfiles.Change.added,
+                    watchfiles.Change.deleted,
+                ):
+                    if filename.startswith(".env"):
+                        should_reload = True
+
+                # HTML files: only reload on add/delete (Jinja auto-reloads modifications)
+                if self._watch_html and change_type in (
+                    watchfiles.Change.added,
+                    watchfiles.Change.deleted,
+                ):
+                    if file_path.endswith(".html"):
+                        should_reload = True
+
+                if should_reload:
+                    self._callback(file_path)
