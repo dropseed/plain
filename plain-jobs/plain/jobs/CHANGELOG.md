@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.34.0](https://github.com/dropseed/plain/releases/plain-jobs@0.34.0) (2025-10-13)
+
+### What's changed
+
+- Added `--reload` flag to `plain jobs worker` command for automatic reloading when code changes are detected ([f3db87e9aa](https://github.com/dropseed/plain/commit/f3db87e9aa))
+- Worker reloader now only watches `.py` and `.env*` files, not HTML files ([f2f31c288b](https://github.com/dropseed/plain/commit/f2f31c288b))
+
+### Upgrade instructions
+
+- Custom autoreloaders for development are no longer needed -- use the built-in `--reload` flag instead
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-jobs@0.33.0) (2025-10-10)
 
 ### What's changed
