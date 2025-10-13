@@ -506,7 +506,7 @@ class Arbiter:
                 sys.exit(self.WORKER_BOOT_ERROR)
             sys.exit(-1)
         finally:
-            self.log.info("Worker exiting (pid: %s)", worker.pid)
+            self.log.info("Server worker exiting (pid: %s)", worker.pid)
             try:
                 worker.tmp.close()
             except Exception:

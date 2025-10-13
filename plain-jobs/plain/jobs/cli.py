@@ -62,35 +62,80 @@ def cli() -> None:
     type=int,
     envvar="PLAIN_JOBS_WORKER_STATS_EVERY",
 )
+@click.option(
+    "--reload",
+    is_flag=True,
+    help="Watch files and auto-reload worker on changes",
+)
 def worker(
     queues: tuple[str, ...],
     max_processes: int | None,
     max_jobs_per_process: int | None,
     max_pending_per_process: int,
     stats_every: int,
+    reload: bool,
 ) -> None:
     """Run the job worker."""
     jobs_schedule = load_schedule(settings.JOBS_SCHEDULE)
 
-    worker = Worker(
-        queues=list(queues),
-        jobs_schedule=jobs_schedule,
-        max_processes=max_processes,
-        max_jobs_per_process=max_jobs_per_process,
-        max_pending_per_process=max_pending_per_process,
-        stats_every=stats_every,
-    )
+    if reload:
+        from plain.internal.reloader import Reloader
 
-    def _shutdown(signalnum: int, _: Any) -> None:
-        logger.info("Job worker shutdown signal received signalnum=%s", signalnum)
-        worker.shutdown()
+        # Track whether we should continue restarting
+        should_restart = {"value": True}
+        current_worker = {"instance": None}
 
-    # Allow the worker to be stopped gracefully on SIGTERM
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
+        def file_changed(filename: str) -> None:
+            if current_worker["instance"]:
+                current_worker["instance"].shutdown()
 
-    # Start processing jobs
-    worker.run()
+        def signal_shutdown(signalnum: int, _: Any) -> None:
+            should_restart["value"] = False
+            if current_worker["instance"]:
+                current_worker["instance"].shutdown()
+
+        # Allow the worker to be stopped gracefully on SIGTERM/SIGINT
+        signal.signal(signal.SIGTERM, signal_shutdown)
+        signal.signal(signal.SIGINT, signal_shutdown)
+
+        # Start file watcher once, outside the loop
+        reloader = Reloader(callback=file_changed)
+        reloader.start()
+
+        while should_restart["value"]:
+            worker = Worker(
+                queues=list(queues),
+                jobs_schedule=jobs_schedule,
+                max_processes=max_processes,
+                max_jobs_per_process=max_jobs_per_process,
+                max_pending_per_process=max_pending_per_process,
+                stats_every=stats_every,
+            )
+            current_worker["instance"] = worker
+
+            # Start processing jobs (blocks until shutdown)
+            worker.run()
+
+    else:
+        worker = Worker(
+            queues=list(queues),
+            jobs_schedule=jobs_schedule,
+            max_processes=max_processes,
+            max_jobs_per_process=max_jobs_per_process,
+            max_pending_per_process=max_pending_per_process,
+            stats_every=stats_every,
+        )
+
+        def _shutdown(signalnum: int, _: Any) -> None:
+            logger.info("Job worker shutdown signal received signalnum=%s", signalnum)
+            worker.shutdown()
+
+        # Allow the worker to be stopped gracefully on SIGTERM
+        signal.signal(signal.SIGTERM, _shutdown)
+        signal.signal(signal.SIGINT, _shutdown)
+
+        # Start processing jobs
+        worker.run()
 
 
 @cli.command()

@@ -17,6 +17,8 @@ from random import randint
 from ssl import SSLError
 from typing import TYPE_CHECKING, Any
 
+from plain.internal.reloader import Reloader
+
 from .. import util
 from ..http.errors import (
     ConfigurationProblem,
@@ -32,7 +34,6 @@ from ..http.errors import (
     UnsupportedTransferCoding,
 )
 from ..http.wsgi import Response, default_environ
-from ..reloader import Reloader
 from .workertmp import WorkerTmp
 
 if TYPE_CHECKING:
@@ -143,7 +144,7 @@ class Worker:
         if self.cfg.reload:
 
             def changed(fname: str) -> None:
-                self.log.info("Worker reloading: %s modified", fname)
+                self.log.debug("Server worker reloading: %s modified", fname)
                 self.alive = False
                 os.write(self.PIPE[1], b"1")
                 time.sleep(0.1)

@@ -55,14 +55,16 @@ plain migrate
 
 ## Local development
 
-In development, you will typically want to run the worker alongside your app. With [`plain.dev`](/plain-dev/plain/dev/README.md) you can do this by adding it to the `[tool.plain.dev.run]` section of your `pyproject.toml` file. Currently, you will need to use something like [watchfiles](https://pypi.org/project/watchfiles/) to add auto-reloading to the worker.
+In development, you will typically want to run the worker alongside your app with auto-reloading enabled. With [`plain.dev`](/plain-dev/plain/dev/README.md) you can do this by adding it to the `[tool.plain.dev.run]` section of your `pyproject.toml` file.
 
 ```toml
 # pyproject.toml
 [tool.plain.dev.run]
-worker = {cmd = "watchfiles --filter python \"plain jobs worker --stats-every 0 --max-processes 2\" ."}
-worker-slow = {cmd = "watchfiles --filter python \"plain jobs worker --queue slow --stats-every 0 --max-processes 2\" ."}
+worker = {cmd = "plain jobs worker --reload --stats-every 0 --max-processes 2"}
+worker-slow = {cmd = "plain jobs worker --reload --queue slow --stats-every 0 --max-processes 2"}
 ```
+
+The `--reload` flag will automatically watch `.py` and `.env*` files for changes and restart the worker when changes are detected.
 
 ## Job parameters
 
