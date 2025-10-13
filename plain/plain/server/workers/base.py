@@ -32,7 +32,7 @@ from ..http.errors import (
     UnsupportedTransferCoding,
 )
 from ..http.wsgi import Response, default_environ
-from ..reloader import reloader_engines
+from ..reloader import Reloader
 from .workertmp import WorkerTmp
 
 if TYPE_CHECKING:
@@ -149,10 +149,7 @@ class Worker:
                 time.sleep(0.1)
                 sys.exit(0)
 
-            reloader_cls = reloader_engines["auto"]
-            self.reloader = reloader_cls(
-                extra_files=self.cfg.reload_extra_files, callback=changed
-            )
+            self.reloader = Reloader(callback=changed)
 
         self.load_wsgi()
         if self.reloader:
@@ -177,7 +174,6 @@ class Worker:
             # delete the traceback after use.
             try:
                 _, exc_val, exc_tb = sys.exc_info()
-                self.reloader.add_extra_file(exc_val.filename)
 
                 tb_string = io.StringIO()
                 traceback.print_tb(exc_tb, file=tb_string)

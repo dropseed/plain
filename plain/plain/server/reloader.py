@@ -1,158 +1,67 @@
 from __future__ import annotations
 
-#
-#
-# This file is part of gunicorn released under the MIT license.
-# See the LICENSE for more information.
-#
-# Vendored and modified for Plain.
 import os
 import os.path
 import re
 import sys
 import threading
-import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
+
+import watchfiles
 
 COMPILED_EXT_RE = re.compile(r"py[co]$")
 
 
 class Reloader(threading.Thread):
-    def __init__(
-        self,
-        extra_files: Iterable[str] | None = None,
-        interval: int = 1,
-        callback: Callable[[str], None] | None = None,
-    ) -> None:
+    """File change reloader using watchfiles for cross-platform native file watching."""
+
+    def __init__(self, callback: Callable[[str], None]) -> None:
         super().__init__()
         self.daemon = True
-        self._extra_files: set[str] = set(extra_files or ())
-        self._interval = interval
         self._callback = callback
 
-    def add_extra_file(self, filename: str) -> None:
-        self._extra_files.add(filename)
+    def get_watch_paths(self) -> set[str]:
+        """Get all directories to watch for changes."""
+        paths = set()
 
-    def get_files(self) -> list[str]:
-        fnames = [
-            COMPILED_EXT_RE.sub("py", module.__file__)  # type: ignore[arg-type]
-            for module in tuple(sys.modules.values())
-            if getattr(module, "__file__", None)
-        ]
+        # Get directories from loaded Python modules
+        for module in tuple(sys.modules.values()):
+            if not hasattr(module, "__file__") or not module.__file__:
+                continue
+            # Convert .pyc/.pyo to .py and get directory
+            file_path = COMPILED_EXT_RE.sub("py", module.__file__)
+            dir_path = os.path.dirname(os.path.abspath(file_path))
+            if os.path.isdir(dir_path):
+                paths.add(dir_path)
 
-        fnames.extend(self._extra_files)
+        # Add current working directory for .env files
+        cwd = os.getcwd()
+        if os.path.isdir(cwd):
+            paths.add(cwd)
 
-        return fnames
+        return paths
+
+    def should_reload(self, file_path: str) -> bool:
+        """Check if a file change should trigger a reload."""
+        filename = os.path.basename(file_path)
+
+        # Watch .py files
+        if file_path.endswith(".py"):
+            return True
+
+        # Watch .env* files
+        if filename.startswith(".env"):
+            return True
+
+        return False
 
     def run(self) -> None:
-        mtimes: dict[str, float] = {}
-        while True:
-            for filename in self.get_files():
-                try:
-                    mtime = os.stat(filename).st_mtime
-                except OSError:
-                    continue
-                old_time = mtimes.get(filename)
-                if old_time is None:
-                    mtimes[filename] = mtime
-                    continue
-                elif mtime > old_time:
-                    if self._callback:
-                        self._callback(filename)
-            time.sleep(self._interval)
+        """Watch for file changes and trigger callback."""
+        watch_paths = self.get_watch_paths()
 
-
-has_inotify = False
-if sys.platform.startswith("linux"):
-    try:
-        import inotify.constants
-        from inotify.adapters import Inotify
-
-        has_inotify = True
-    except ImportError:
-        pass
-
-
-if has_inotify:
-
-    class InotifyReloader(threading.Thread):
-        event_mask = (
-            inotify.constants.IN_CREATE
-            | inotify.constants.IN_DELETE
-            | inotify.constants.IN_DELETE_SELF
-            | inotify.constants.IN_MODIFY
-            | inotify.constants.IN_MOVE_SELF
-            | inotify.constants.IN_MOVED_FROM
-            | inotify.constants.IN_MOVED_TO
-        )
-
-        def __init__(
-            self,
-            extra_files: Iterable[str] | None = None,
-            callback: Callable[[str], None] | None = None,
-        ) -> None:
-            super().__init__()
-            self.daemon = True
-            self._callback = callback
-            self._dirs: set[str] = set()
-            self._watcher = Inotify()
-
-            if extra_files:
-                for extra_file in extra_files:
-                    self.add_extra_file(extra_file)
-
-        def add_extra_file(self, filename: str) -> None:
-            dirname = os.path.dirname(filename)
-
-            if dirname in self._dirs:
-                return None
-
-            self._watcher.add_watch(dirname, mask=self.event_mask)
-            self._dirs.add(dirname)
-
-        def get_dirs(self) -> set[str]:
-            fnames = [
-                os.path.dirname(
-                    os.path.abspath(COMPILED_EXT_RE.sub("py", module.__file__))  # type: ignore[arg-type]
-                )
-                for module in tuple(sys.modules.values())
-                if getattr(module, "__file__", None)
-            ]
-
-            return set(fnames)
-
-        def run(self) -> None:
-            self._dirs = self.get_dirs()
-
-            for dirname in self._dirs:
-                if os.path.isdir(dirname):
-                    self._watcher.add_watch(dirname, mask=self.event_mask)
-
-            for event in self._watcher.event_gen():  # type: ignore[attr-defined]
-                if event is None:
-                    continue
-
-                filename = event[3]  # type: ignore[index]
-
-                self._callback(filename)  # type: ignore[misc]
-
-else:
-
-    class InotifyReloader:
-        def __init__(
-            self,
-            extra_files: Iterable[str] | None = None,
-            callback: Callable[[str], None] | None = None,
-        ) -> None:
-            raise ImportError(
-                "You must have the inotify module installed to use the inotify reloader"
-            )
-
-
-preferred_reloader = InotifyReloader if has_inotify else Reloader
-
-reloader_engines = {
-    "auto": preferred_reloader,
-    "poll": Reloader,
-    "inotify": InotifyReloader,
-}
+        for changes in watchfiles.watch(*watch_paths, rust_timeout=1000):
+            for change_type, file_path in changes:
+                # Only reload on modify and create events
+                if change_type in (watchfiles.Change.modified, watchfiles.Change.added):
+                    if self.should_reload(file_path):
+                        self._callback(file_path)

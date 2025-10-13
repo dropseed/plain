@@ -59,12 +59,6 @@ from plain.cli.runtime import without_runtime_setup
     help="Restart workers when code changes (dev only)",
 )
 @click.option(
-    "--reload-extra-file",
-    multiple=True,
-    type=click.Path(exists=True),
-    help="Additional files to watch for reload (can be used multiple times)",
-)
-@click.option(
     "--access-log",
     default="-",
     help="Access log file (use '-' for stdout)",
@@ -109,7 +103,6 @@ def server(
     keyfile: str | None,
     log_level: str,
     reload: bool,
-    reload_extra_file: tuple[str, ...],
     access_log: str,
     error_log: str,
     log_format: str,
@@ -130,7 +123,6 @@ def server(
         timeout=timeout,
         max_requests=max_requests,
         reload=reload,
-        reload_extra_files=list(reload_extra_file) if reload_extra_file else [],
         pidfile=pidfile,
         certfile=certfile,
         keyfile=keyfile,

@@ -39,8 +39,7 @@ Common options:
 - `--workers` / `-w` - Number of worker processes (default: 1, or `$WEB_CONCURRENCY` env var)
 - `--threads` - Number of threads per worker (default: 1)
 - `--timeout` / `-t` - Worker timeout in seconds (default: 30)
-- `--reload` - Enable auto-reload on code changes (default: False)
-- `--reload-extra-file` - Additional files to watch for reloading (can be used multiple times)
+- `--reload` - Enable auto-reload on code changes, including `.env*` files (default: False)
 - `--certfile` - Path to SSL certificate file
 - `--keyfile` - Path to SSL key file
 - `--log-level` - Logging level: debug, info, warning, error, critical (default: info)

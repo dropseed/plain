@@ -273,9 +273,6 @@ class DevProcess(ProcessManager):
 
     def add_server(self) -> None:
         """Add the Plain HTTP server process."""
-        # Build the server command using plain's internal server
-        # Note: We can't use reload here because watchfiles is handled at a higher level
-        # The server command will use gunicorn's built-in reload capability
         server_cmd = [
             sys.executable,
             "-m",
@@ -293,30 +290,12 @@ class DevProcess(ProcessManager):
             "60",
             "--log-level",
             self.log_level or "info",
+            "--log-format",
+            "'[%(levelname)s] %(message)s'",
+            "--access-log-format",
+            "'\"%(r)s\" status=%(s)s length=%(b)s time=%(M)sms'",
             "--reload",  # Enable auto-reload for development
         ]
-
-        # Watch .env files for reload
-        extra_watch_files = []
-        for f in os.listdir(APP_PATH.parent):
-            if f.startswith(".env"):
-                # Needs to be absolute or "./" for inotify to work on Linux...
-                # https://github.com/dropseed/plain/issues/26
-                extra_watch_files.append(str(Path(APP_PATH.parent) / f))
-
-        # Add extra watch files
-        for watch_file in extra_watch_files:
-            server_cmd.extend(["--reload-extra-file", watch_file])
-
-        # Add logging configuration
-        server_cmd.extend(
-            [
-                "--log-format",
-                "'[%(levelname)s] %(message)s'",
-                "--access-log-format",
-                "'\"%(r)s\" status=%(s)s length=%(b)s time=%(M)sms'",
-            ]
-        )
 
         server = " ".join(server_cmd)
         self.poncho.add_process("plain", server, env=self.plain_env)

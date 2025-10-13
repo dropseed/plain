@@ -334,6 +334,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-semantic-conventions" },
+    { name = "watchfiles" },
 ]
 
 [package.dev-dependencies]
@@ -347,6 +348,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.2" },
     { name = "opentelemetry-api", specifier = ">=1.34.1" },
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.55b1" },
+    { name = "watchfiles", specifier = ">=0.18.0" },
 ]
 
 [package.metadata.requires-dev]

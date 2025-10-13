@@ -29,7 +29,6 @@ class Config:
     timeout: int
     max_requests: int
     reload: bool
-    reload_extra_files: list[str]
     pidfile: str | None
     certfile: str | None
     keyfile: str | None
