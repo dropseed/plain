@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.42.0](https://github.com/dropseed/plain/releases/plain-dev@0.42.0) (2025-10-13)
+
+### What's changed
+
+- The development server now uses `watchfiles` for file watching and auto-reloading instead of gunicorn's built-in reloader, providing more reliable and efficient file change detection ([92e95c5032](https://github.com/dropseed/plain/commit/92e95c5032))
+- Removed manual `.env` file watching configuration from `plain dev` as this is now handled automatically by the server's reloader ([92e95c5032](https://github.com/dropseed/plain/commit/92e95c5032))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.0](https://github.com/dropseed/plain/releases/plain-dev@0.41.0) (2025-10-12)
 
 ### What's changed
