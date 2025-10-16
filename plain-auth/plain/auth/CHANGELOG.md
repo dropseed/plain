@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.20.4](https://github.com/dropseed/plain/releases/plain-auth@0.20.4) (2025-10-16)
+
+### What's changed
+
+- The `get_current_user()` template function now catches `SessionNotAvailable` exceptions and returns `None`, preventing errors during error page rendering before middleware runs ([fb889fa](https://github.com/dropseed/plain/commit/fb889fa0e9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.3](https://github.com/dropseed/plain/releases/plain-auth@0.20.3) (2025-10-07)
 
 ### What's changed
