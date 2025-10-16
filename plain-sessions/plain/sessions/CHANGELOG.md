@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.34.1](https://github.com/dropseed/plain/releases/plain-sessions@0.34.1) (2025-10-16)
+
+### What's changed
+
+- The `get_current_session()` template function now catches `SessionNotAvailable` exceptions and returns `None` instead of raising an error, improving error page rendering before middleware runs ([fb889fa](https://github.com/dropseed/plain/commit/fb889fa0e9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-sessions@0.34.0) (2025-10-10)
 
 ### What's changed
