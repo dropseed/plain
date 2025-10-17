@@ -8,7 +8,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "plain<1.0.0",
-    "watchfiles>=1.0.4",
 ]
 
 [project.entry-points."plain.dev"]

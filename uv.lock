@@ -581,14 +581,10 @@ version = "0.6.1"
 source = { editable = "plain-esbuild" }
 dependencies = [
     { name = "plain" },
-    { name = "watchfiles" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "watchfiles", specifier = ">=1.0.4" },
-]
+requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-flags"
