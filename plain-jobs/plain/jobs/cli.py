@@ -195,4 +195,10 @@ def run(job_class_name: str) -> None:
 def list_jobs() -> None:
     """List all registered jobs."""
     for name, job_class in jobs_registry.jobs.items():
-        click.echo(f"{click.style(name, fg='blue')}: {job_class}")
+        click.secho(f"{name}", bold=True, nl=False)
+        # Get description from class docstring
+        description = job_class.__doc__.strip() if job_class.__doc__ else ""
+        if description:
+            click.secho(f": {description}", dim=True)
+        else:
+            click.echo("")

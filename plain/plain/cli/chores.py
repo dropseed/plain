@@ -24,15 +24,21 @@ def list_chores(name: tuple[str, ...]) -> None:
 
     chores_registry.import_modules()
 
-    if name:
-        chores = [chore for chore in chores_registry.get_chores() if chore.name in name]
-    else:
-        chores = chores_registry.get_chores()
+    chore_classes = chores_registry.get_chores()
 
-    for chore in chores:
-        click.secho(f"{chore}", bold=True, nl=False)
-        if chore.description:
-            click.secho(f": {chore.description}", dim=True)
+    if name:
+        chore_classes = [
+            chore_class
+            for chore_class in chore_classes
+            if f"{chore_class.__module__}.{chore_class.__qualname__}" in name
+        ]
+
+    for chore_class in chore_classes:
+        chore_name = f"{chore_class.__module__}.{chore_class.__qualname__}"
+        click.secho(f"{chore_name}", bold=True, nl=False)
+        description = chore_class.__doc__.strip() if chore_class.__doc__ else ""
+        if description:
+            click.secho(f": {description}", dim=True)
         else:
             click.echo("")
 
@@ -52,24 +58,30 @@ def run_chores(name: tuple[str, ...], dry_run: bool) -> None:
 
     chores_registry.import_modules()
 
+    chore_classes = chores_registry.get_chores()
+
     if name:
-        chores = [chore for chore in chores_registry.get_chores() if chore.name in name]
-    else:
-        chores = chores_registry.get_chores()
+        chore_classes = [
+            chore_class
+            for chore_class in chore_classes
+            if f"{chore_class.__module__}.{chore_class.__qualname__}" in name
+        ]
 
     chores_failed = []
 
-    for chore in chores:
-        click.echo(f"{chore.name}:", nl=False)
+    for chore_class in chore_classes:
+        chore_name = f"{chore_class.__module__}.{chore_class.__qualname__}"
+        click.echo(f"{chore_name}:", nl=False)
         if dry_run:
             click.secho(" (dry run)", fg="yellow", nl=False)
         else:
             try:
+                chore = chore_class()
                 result = chore.run()
             except Exception:
                 click.secho(" Failed", fg="red")
-                chores_failed.append(chore)
-                logger.exception(f"Error running chore {chore.name}")
+                chores_failed.append(chore_class)
+                logger.exception(f"Error running chore {chore_name}")
                 continue
 
             if result is None:

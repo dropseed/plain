@@ -7,17 +7,17 @@ from .core import Chore
 
 class ChoresRegistry:
     def __init__(self) -> None:
-        self._chores: dict[str, Chore] = {}
+        self._chores: dict[str, type[Chore]] = {}
 
     def register_chore(self, chore_class: type[Chore]) -> None:
         """
         Register a chore class.
 
         Args:
-            chore_class: A Chore subclass to instantiate and register
+            chore_class: A Chore subclass to register
         """
-        chore_instance = chore_class()
-        self._chores[chore_instance.name] = chore_instance
+        name = f"{chore_class.__module__}.{chore_class.__qualname__}"
+        self._chores[name] = chore_class
 
     def import_modules(self) -> None:
         """
@@ -25,9 +25,9 @@ class ChoresRegistry:
         """
         packages_registry.autodiscover_modules("chores", include_app=True)
 
-    def get_chores(self) -> list[Chore]:
+    def get_chores(self) -> list[type[Chore]]:
         """
-        Get all registered chores.
+        Get all registered chore classes.
         """
         return list(self._chores.values())
 

@@ -216,6 +216,8 @@ class Schedule:
 
 @register_job
 class ScheduledCommand(Job):
+    """Run a shell command on a schedule."""
+
     def __init__(self, command: str) -> None:
         self.command = command
 
