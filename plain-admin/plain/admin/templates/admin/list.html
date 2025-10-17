@@ -12,7 +12,7 @@
 
 <header class="flex items-center justify-between">
     <div class="text-sm text-white/50">
-        {% if table_style == "simple" %}
+        {% if table_style == "preview" %}
             <div class="mb-3">{{ title }}</div>
         {% else %}
             {% if page.has_other_pages() %}
@@ -23,8 +23,8 @@
         {% endif %}
     </div>
     <div class="flex space-x-2">
-        {% if table_style == "simple" %}
-        <a class="text-sm" href="{{ request.get_full_path() }}">View {{ page.paginator.count }} result{{ "s" if page.paginator.count != 1 else "" }}</a>
+        {% if table_style == "preview" %}
+        <a class="text-sm" href="{{ request.path }}{% if search_query %}?search={{ search_query }}{% endif %}">View {{ page.paginator.count }} result{{ "s" if page.paginator.count != 1 else "" }}</a>
         {% else %}
         {% if actions %}
         <form method="POST" data-actions-form>
@@ -73,7 +73,7 @@
     <table class="text-sm table-auto">
         <thead>
             <tr class="bg-white/5 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
-                {% if table_style != "simple" and actions %}
+                {% if table_style != "preview" and actions %}
                 <th class="p-0 pl-1">
                     <input
                         data-action-checkbox-all
@@ -86,7 +86,7 @@
                 {% for field in fields %}
                     {% if order_by_field is defined %}
                     <th>
-                        {% if table_style == "simple" %}
+                        {% if table_style == "preview" %}
                         <div class="font-mono text-xs font-normal">
                             {{ field }}
                         </div>
@@ -121,7 +121,7 @@
 
                 {% set row_url = get_object_url(object) %}
 
-                {% if table_style != "simple" and actions %}
+                {% if table_style != "preview" and actions %}
                 <td class="p-0 pl-1">
                     <input data-action-checkbox class="rounded bg-white/10 border-gray-200/20" type="checkbox" name="{{ get_object_id(object) }}" />
                 </td>
@@ -162,7 +162,7 @@
     </table>
 </div>
 
-{% if table_style != "simple" %}
+{% if table_style != "preview" %}
 <footer class="mt-4">
     <div class="flex items-center justify-between">
         <div class="py-2 text-sm text-white/50">

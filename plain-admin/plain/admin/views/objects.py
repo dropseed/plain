@@ -70,7 +70,7 @@ class AdminListView(HTMXViewMixin, AdminView):
         if self.is_htmx_request():
             htmx_search = "/search/" in self.request.headers.get("HX-Current-Url", "")
             if htmx_search:
-                self._table_style = "simple"
+                self._table_style = "preview"
         else:
             htmx_search = False
 
