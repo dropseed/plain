@@ -12,12 +12,12 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
 )
 
 from plain.http import (
+    Http404,
     JsonResponse,
     Request,
     Response,
     ResponseBase,
     ResponseNotAllowed,
-    ResponseNotFound,
 )
 from plain.utils.decorators import classonlymethod
 
@@ -110,8 +110,7 @@ class View:
             return Response(status_code=value)
 
         if value is None:
-            # TODO raise 404 instead?
-            return ResponseNotFound()
+            raise Http404
 
         status_code = 200
 
