@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import inspect
 import logging
+from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("plain.jobs")
 
 
-class JobType(type):
+class JobType(ABCMeta):
     """
     Metaclass allows us to capture the original args/kwargs
     used to instantiate the job, so we can store them in the database
@@ -48,8 +49,9 @@ class JobType(type):
 
 
 class Job(metaclass=JobType):
+    @abstractmethod
     def run(self) -> None:
-        raise NotImplementedError
+        pass
 
     def run_in_worker(
         self,
