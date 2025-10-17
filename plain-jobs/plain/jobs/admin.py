@@ -109,6 +109,7 @@ class JobRequestViewset(AdminViewset):
         title = "Requests"
         fields = ["id", "job_class", "priority", "created_at", "start_at", "unique_key"]
         actions = ["Delete"]
+        queryset_order = ["priority", "-start_at", "-created_at"]
 
         def perform_action(self, action: str, target_ids: list[int]) -> None:
             if action == "Delete":
