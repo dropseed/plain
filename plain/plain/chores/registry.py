@@ -1,37 +1,23 @@
 from __future__ import annotations
 
-from types import FunctionType
-from typing import Any
-
 from plain.packages import packages_registry
 
-
-class Chore:
-    def __init__(self, *, group: str, func: FunctionType):
-        self.group = group
-        self.func = func
-        self.name = f"{group}.{func.__name__}"
-        self.description = func.__doc__.strip() if func.__doc__ else ""
-
-    def __str__(self) -> str:
-        return self.name
-
-    def run(self) -> Any:
-        """
-        Run the chore.
-        """
-        return self.func()
+from .core import Chore
 
 
 class ChoresRegistry:
-    def __init__(self):
-        self._chores: dict[FunctionType, Chore] = {}
+    def __init__(self) -> None:
+        self._chores: dict[str, Chore] = {}
 
-    def register_chore(self, chore: Chore) -> None:
+    def register_chore(self, chore_class: type[Chore]) -> None:
         """
-        Register a chore with the specified name.
+        Register a chore class.
+
+        Args:
+            chore_class: A Chore subclass to instantiate and register
         """
-        self._chores[chore.func] = chore
+        chore_instance = chore_class()
+        self._chores[chore_instance.name] = chore_instance
 
     def import_modules(self) -> None:
         """
@@ -49,19 +35,15 @@ class ChoresRegistry:
 chores_registry = ChoresRegistry()
 
 
-def register_chore(group: str) -> Any:
+def register_chore(cls: type[Chore]) -> type[Chore]:
     """
-    Register a chore with a given group.
+    Decorator to register a chore class.
 
     Usage:
-        @register_chore("clear_expired")
-        def clear_expired():
-            pass
+        @register_chore
+        class ClearExpired(Chore):
+            def run(self):
+                return "Done!"
     """
-
-    def wrapper(func: FunctionType) -> FunctionType:
-        chore = Chore(group=group, func=func)
-        chores_registry.register_chore(chore)
-        return func
-
-    return wrapper
+    chores_registry.register_chore(cls)
+    return cls

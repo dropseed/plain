@@ -13,11 +13,10 @@ def chores() -> None:
 
 
 @chores.command("list")
-@click.option("--group", default=None, type=str, help="Group to run", multiple=True)
 @click.option(
     "--name", default=None, type=str, help="Name of the chore to run", multiple=True
 )
-def list_chores(group: tuple[str, ...], name: tuple[str, ...]) -> None:
+def list_chores(name: tuple[str, ...]) -> None:
     """
     List all registered chores.
     """
@@ -25,32 +24,27 @@ def list_chores(group: tuple[str, ...], name: tuple[str, ...]) -> None:
 
     chores_registry.import_modules()
 
-    if group or name:
-        chores = [
-            chore
-            for chore in chores_registry.get_chores()
-            if (chore.group in group or not group) and (chore.name in name or not name)
-        ]
+    if name:
+        chores = [chore for chore in chores_registry.get_chores() if chore.name in name]
     else:
         chores = chores_registry.get_chores()
 
     for chore in chores:
         click.secho(f"{chore}", bold=True, nl=False)
         if chore.description:
-            click.echo(f": {chore.description}")
+            click.secho(f": {chore.description}", dim=True)
         else:
             click.echo("")
 
 
 @chores.command("run")
-@click.option("--group", default=None, type=str, help="Group to run", multiple=True)
 @click.option(
     "--name", default=None, type=str, help="Name of the chore to run", multiple=True
 )
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be done without executing"
 )
-def run_chores(group: tuple[str, ...], name: tuple[str, ...], dry_run: bool) -> None:
+def run_chores(name: tuple[str, ...], dry_run: bool) -> None:
     """
     Run the specified chores.
     """
@@ -58,12 +52,8 @@ def run_chores(group: tuple[str, ...], name: tuple[str, ...], dry_run: bool) -> 
 
     chores_registry.import_modules()
 
-    if group or name:
-        chores = [
-            chore
-            for chore in chores_registry.get_chores()
-            if (chore.group in group or not group) and (chore.name in name or not name)
-        ]
+    if name:
+        chores = [chore for chore in chores_registry.get_chores() if chore.name in name]
     else:
         chores = chores_registry.get_chores()
 

@@ -8,7 +8,7 @@
 
 ## Overview
 
-Chores are registered functions that can be run at any time to keep an app in a desirable state.
+Chores are registered classes that can be run at any time to keep an app in a desirable state.
 
 ![](https://assets.plainframework.com/docs/plain-chores-run.png)
 
@@ -16,19 +16,19 @@ A good example is the clearing of expired sessions in [`plain.sessions`](/plain-
 
 ```python
 # plain/sessions/chores.py
-from plain.chores import register_chore
+from plain.chores import Chore, register_chore
 from plain.utils import timezone
 
 from .models import Session
 
 
-@register_chore("sessions")
-def clear_expired():
-    """
-    Delete sessions that have expired.
-    """
-    result = Session.query.filter(expires_at__lt=timezone.now()).delete()
-    return f"{result[0]} expired sessions deleted"
+@register_chore
+class ClearExpired(Chore):
+    """Delete sessions that have expired."""
+
+    def run(self):
+        result = Session.query.filter(expires_at__lt=timezone.now()).delete()
+        return f"{result[0]} expired sessions deleted"
 ```
 
 ## Running chores
@@ -44,27 +44,29 @@ There are several ways you can run chores depending on your needs:
 
 ## Writing chores
 
-A chore is a function decorated with `@register_chore(chore_group_name)`. It can write a description as a docstring, and it can return a value that will be printed when the chore is run.
+A chore is a class that inherits from [`Chore`](./core.py#Chore) and implements the `run()` method. Register the chore using the [`@register_chore`](./registry.py#register_chore) decorator. The chore name is the class's qualified name (`__qualname__`), and the description comes from the class docstring.
 
 ```python
 # app/chores.py
-from plain.chores import register_chore
+from plain.chores import Chore, register_chore
 
 
-@register_chore("app")
-def chore_name():
-    """
-    A chore description can go here
-    """
-    # Do a thing!
-    return "We did it!"
+@register_chore
+class ChoreName(Chore):
+    """A chore description can go here."""
+
+    def run(self):
+        # Do a thing!
+        return "We did it!"
 ```
+
+### Best practices
 
 A good chore is:
 
-- Fast
-- Idempotent
-- Recurring
-- Stateless
+- **Fast** - Should complete quickly, not block for long periods
+- **Idempotent** - Safe to run multiple times without side effects
+- **Recurring** - Designed to run regularly, not just once
+- **Stateless** - Doesn't rely on external state between runs
 
 If chores are written in `app/chores.py` or `{pkg}/chores.py`, then they will be imported automatically and registered.
