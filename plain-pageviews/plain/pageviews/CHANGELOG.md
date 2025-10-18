@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.0) (2025-10-17)
+
+### What's changed
+
+- The pageview cleanup chore has been rewritten as an abstract base class for consistency with the broader Plain framework ([c4466d3](https://github.com/dropseed/plain/commit/c4466d3c6068b270ad3bcd1e5953b8a124a0dbf6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.24.1) (2025-10-10)
 
 ### What's changed
