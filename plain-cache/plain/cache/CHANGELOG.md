@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-cache@0.20.0) (2025-10-17)
+
+### What's changed
+
+- Chores have been rewritten as abstract base classes instead of function-based decorators ([c4466d3](https://github.com/dropseed/plain/commit/c4466d3c60))
+
+### Upgrade instructions
+
+- If you have custom chores defined, update them from function-based decorators to class-based chores that inherit from `Chore` and implement a `run()` method (see [plain.chores documentation](https://github.com/dropseed/plain/tree/master/plain/plain/chores))
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-cache@0.19.0) (2025-10-07)
 
 ### What's changed
