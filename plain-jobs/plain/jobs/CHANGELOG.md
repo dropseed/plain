@@ -1,5 +1,18 @@
 # plain-jobs changelog
 
+## [0.35.1](https://github.com/dropseed/plain/releases/plain-jobs@0.35.1) (2025-10-17)
+
+### What's changed
+
+- The `run_in_worker()` method now returns `None` when a duplicate job is detected instead of attempting to return the list of in-progress jobs ([72f48d21bc](https://github.com/dropseed/plain/commit/72f48d21bc))
+- Fixed type annotations for `run_in_worker()` to properly indicate it can return `JobRequest | None` ([72f48d21bc](https://github.com/dropseed/plain/commit/72f48d21bc))
+- The `retry_job()` method now properly handles explicit `delay=0` parameter to intentionally retry immediately ([72f48d21bc](https://github.com/dropseed/plain/commit/72f48d21bc))
+- Fixed type annotations for `retry_job()` to properly indicate it can return `JobRequest | None` ([72f48d21bc](https://github.com/dropseed/plain/commit/72f48d21bc))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-jobs@0.35.0) (2025-10-17)
 
 ### What's changed
