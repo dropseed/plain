@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-sessions@0.35.0) (2025-10-17)
+
+### What's changed
+
+- The `clear_expired` chore has been refactored to use the new class-based `Chore` API, renamed to `ClearExpired` ([c4466d3](https://github.com/dropseed/plain/commit/c4466d3c60))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.1](https://github.com/dropseed/plain/releases/plain-sessions@0.34.1) (2025-10-16)
 
 ### What's changed
