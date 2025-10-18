@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-pytest@0.13.0) (2025-10-17)
+
+### What's changed
+
+- The `testbrowser` now uses `plain server` instead of `gunicorn` to run the test server process ([51461b99](https://github.com/dropseed/plain/commit/51461b99))
+
+### Upgrade instructions
+
+- Remove `gunicorn` from your project dependencies if it was only being used for the `testbrowser` fixture
+
 ## [0.12.2](https://github.com/dropseed/plain/releases/plain-pytest@0.12.2) (2025-10-06)
 
 ### What's changed
