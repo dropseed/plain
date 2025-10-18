@@ -32,9 +32,9 @@ def test_example(settings):
 
 ### `testbrowser`
 
-A lightweight wrapper around [Playwright](https://playwright.dev/python/) that starts a gunicorn side-process to point the browser at. The [`testbrowser`](./plugin.py#testbrowser) fixture provides access to a [`TestBrowser`](./browser.py#TestBrowser) instance.
+A lightweight wrapper around [Playwright](https://playwright.dev/python/) that starts a plain server side-process to point the browser at. The [`testbrowser`](./plugin.py#testbrowser) fixture provides access to a [`TestBrowser`](./browser.py#TestBrowser) instance.
 
-Note that `playwright`, `pytest-playwright`, and `gunicorn` are not dependencies of this package but are required if you want to use this fixture.
+Note that `playwright` and `pytest-playwright` are not dependencies of this package but are required if you want to use this fixture.
 
 ```python
 def test_example(testbrowser):
@@ -49,7 +49,7 @@ The `testbrowser` includes useful methods:
 - [`logout()`](./browser.py#logout) - Clear all cookies to log out
 - [`discover_urls(urls)`](./browser.py#discover_urls) - Recursively discover all URLs starting from the given URLs
 
-If `plain.models` is installed, then the `testbrowser` will also load the [`isolated_db`](/plain-models/plain/models/test/pytest.py#isolated_db) fixture and pass a `DATABASE_URL` to the gunicorn process.
+If `plain.models` is installed, then the `testbrowser` will also load the [`isolated_db`](/plain-models/plain/models/test/pytest.py#isolated_db) fixture and pass a `DATABASE_URL` to the plain server process.
 
 ## Installation
 

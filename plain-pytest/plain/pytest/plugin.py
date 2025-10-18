@@ -53,7 +53,7 @@ def testbrowser(browser: Any, request: Any) -> Generator[TestBrowser, None, None
         from plain.models import db_connection
         from plain.models.database_url import build_database_url
 
-        # Get a database url for the isolated db that we can have gunicorn connect to also.
+        # Get a database url for the isolated db that we can have the plain server connect to also.
         database_url = build_database_url(db_connection.settings_dict)
     except pytest.FixtureLookupError:
         # isolated_db fixture not available, use empty database_url

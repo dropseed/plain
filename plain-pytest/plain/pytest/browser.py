@@ -27,7 +27,6 @@ class TestBrowser:
         self.browser = browser
 
         self.database_url = database_url
-        self.wsgi = "plain.wsgi:app"
         self.protocol = "https"
         self.host = "localhost"
         self.port = _get_available_port()
@@ -219,12 +218,12 @@ class TestBrowser:
         if self.database_url:
             env["DATABASE_URL"] = self.database_url
 
-        gunicorn = pathlib.Path(sys.executable).with_name("gunicorn")
-
         self.server_process = subprocess.Popen(
             [
-                str(gunicorn),
-                self.wsgi,
+                sys.executable,
+                "-m",
+                "plain",
+                "server",
                 "--bind",
                 f"{self.host}:{self.port}",
                 "--certfile",
