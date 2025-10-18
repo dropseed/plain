@@ -7,7 +7,7 @@ import os
 import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models import transaction
@@ -16,10 +16,42 @@ from plain.signals import request_finished, request_started
 from plain.utils import timezone
 from plain.utils.module_loading import import_string
 
-from .models import JobProcess, JobRequest, JobResult, JobResultStatuses
 from .registry import jobs_registry
 
+if TYPE_CHECKING:
+    from .models import JobResult
+
+# Models are NOT imported at the top of this file!
+# See comment on _worker_process_initializer() for explanation.
+
 logger = logging.getLogger("plain.jobs")
+
+
+def _worker_process_initializer() -> None:
+    """Initialize Plain framework in worker process before processing jobs.
+
+    Why this is needed:
+    - We use multiprocessing with 'spawn' context (not 'fork')
+    - Spawn creates fresh Python processes, not forked copies
+    - When a spawned process starts, it re-imports this module BEFORE the initializer runs
+    - If we imported models at the top of this file, model registration would
+      happen before plain.runtime.setup(), causing PackageRegistryNotReady errors
+
+    Solution:
+    - This initializer runs plain.runtime.setup() FIRST in each worker process
+    - All model imports happen lazily inside functions (after setup completes)
+    - This ensures packages registry is ready before any models are accessed
+
+    Execution order in spawned worker:
+    1. Re-import workers.py (but models NOT imported yet - lazy!)
+    2. Run this initializer → plain.runtime.setup()
+    3. Execute process_job() → NOW it's safe to import models
+    """
+    from plain.runtime import setup
+
+    # Each spawned worker process needs to set up Plain
+    # (spawn context creates fresh processes, not forks)
+    setup()
 
 
 class Worker:
@@ -39,6 +71,7 @@ class Worker:
             max_workers=max_processes,
             max_tasks_per_child=max_jobs_per_process,
             mp_context=multiprocessing.get_context("spawn"),
+            initializer=_worker_process_initializer,
         )
 
         self.queues = queues
@@ -56,6 +89,9 @@ class Worker:
         self._is_shutting_down = False
 
     def run(self) -> None:
+        # Lazy import - see _worker_process_initializer() comment for why
+        from .models import JobRequest
+
         logger.info(
             "⬣ Starting Plain worker\n    Registered jobs: %s\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
             "\n                     ".join(
@@ -211,6 +247,9 @@ class Worker:
             self._jobs_schedule_checked_at = now
 
     def log_stats(self) -> None:
+        # Lazy import - see _worker_process_initializer() comment for why
+        from .models import JobProcess, JobRequest
+
         try:
             num_proccesses = len(self.executor._processes)
         except (AttributeError, TypeError):
@@ -232,12 +271,18 @@ class Worker:
 
     def rescue_job_results(self) -> None:
         """Find any lost or failed jobs on this worker's queues and handle them."""
+        # Lazy import - see _worker_process_initializer() comment for why
+        from .models import JobProcess, JobResult
+
         # TODO return results and log them if there are any?
         JobProcess.query.filter(queue__in=self.queues).mark_lost_jobs()
         JobResult.query.filter(queue__in=self.queues).retry_failed_jobs()
 
 
 def future_finished_callback(job_process_uuid: str, future: Future) -> None:
+    # Lazy import - see _worker_process_initializer() comment for why
+    from .models import JobProcess, JobResultStatuses
+
     if future.cancelled():
         logger.warning("Job cancelled job_process_uuid=%s", job_process_uuid)
         try:
@@ -264,6 +309,9 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
 
 
 def process_job(job_process_uuid: str) -> None:
+    # Lazy import - see _worker_process_initializer() comment for why
+    from .models import JobProcess
+
     try:
         worker_pid = os.getpid()
 
