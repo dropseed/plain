@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import gc
 import logging
 import multiprocessing
 import os
@@ -122,7 +121,7 @@ class Worker:
                 # We don't want to convert too many JobRequests to Jobs,
                 # because anything not started yet will be cancelled on deploy etc.
                 # It's easier to leave them in the JobRequest db queue as long as possible.
-                time.sleep(0.1)
+                time.sleep(0.5)
                 continue
 
             with transaction.atomic():
@@ -157,18 +156,10 @@ class Worker:
 
             job_process_uuid = str(job.uuid)  # Make a str copy
 
-            # Release these now
-            del job_request
-            del job
-
             future = self.executor.submit(process_job, job_process_uuid)
             future.add_done_callback(
                 partial(future_finished_callback, job_process_uuid)
             )
-
-            # Do a quick sleep regardless to see if it
-            # gives processes a chance to start up
-            time.sleep(0.1)
 
     def shutdown(self) -> None:
         if self._is_shutting_down:
@@ -339,9 +330,6 @@ def process_job(job_process_uuid: str) -> None:
 
         job_result = middleware_chain(job_process)
 
-        # Release it now
-        del job_process
-
         duration = job_result.ended_at - job_result.started_at  # type: ignore[unsupported-operator]
         duration = duration.total_seconds()
 
@@ -357,8 +345,6 @@ def process_job(job_process_uuid: str) -> None:
             job_result.queue,
             duration,
         )
-
-        del job_result
     except Exception as e:
         # Raising exceptions inside the worker process doesn't
         # seem to be caught/shown anywhere as configured.
@@ -367,4 +353,3 @@ def process_job(job_process_uuid: str) -> None:
         logger.exception(e)
     finally:
         request_finished.send(sender=None)
-        gc.collect()
