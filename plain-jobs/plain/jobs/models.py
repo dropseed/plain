@@ -412,10 +412,14 @@ class JobResult(models.Model):
         ],
     )
 
-    def retry_job(self, delay: int | None = None) -> JobRequest:
+    def retry_job(self, delay: int | None = None) -> JobRequest | None:
         retry_attempt = self.retry_attempt + 1
         job = jobs_registry.load_job(self.job_class, self.parameters)
-        retry_delay = delay or job.get_retry_delay(retry_attempt)
+
+        if delay is None:
+            retry_delay = job.get_retry_delay(retry_attempt)
+        else:
+            retry_delay = delay
 
         with transaction.atomic():
             result = job.run_in_worker(
@@ -427,12 +431,9 @@ class JobResult(models.Model):
                 retry_attempt=retry_attempt,
                 # Unique key could be passed also?
             )
+            if result:
+                self.retry_job_request_uuid = result.uuid
+                self.save(update_fields=["retry_job_request_uuid"])
+                return result
 
-            # TODO it is actually possible that result is a list
-            # of pending jobs, which would need to be handled...
-            # Right now it will throw an exception which could be caught by retry_failed_jobs.
-
-            self.retry_job_request_uuid = result.uuid  # type: ignore
-            self.save(update_fields=["retry_job_request_uuid"])
-
-        return result  # type: ignore
+        return None

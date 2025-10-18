@@ -62,7 +62,7 @@ class Job(metaclass=JobType):
         retries: int | None = None,
         retry_attempt: int = 0,
         unique_key: str | None = None,
-    ) -> JobRequest | list[JobRequest | JobProcess]:
+    ) -> JobRequest | None:
         from .models import JobRequest
 
         job_class_name = jobs_registry.get_job_class_name(self.__class__)
@@ -170,8 +170,7 @@ class Job(metaclass=JobType):
                 span.set_attribute(ERROR_TYPE, "IntegrityError")
                 span.set_status(trace.Status(trace.StatusCode.ERROR, "Duplicate job"))
                 logger.warning("Job already in progress: %s", e)
-                # Try to return the _in_progress list again
-                return self._in_progress(unique_key)
+                return None
 
     def _in_progress(self, unique_key: str) -> list[JobRequest | JobProcess]:
         """Get all JobRequests and JobProcess that are currently in progress, regardless of queue."""
