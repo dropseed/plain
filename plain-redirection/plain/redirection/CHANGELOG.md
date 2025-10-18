@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-redirection@0.23.0) (2025-10-17)
+
+### What's changed
+
+- Chores have been rewritten as abstract base classes instead of plain functions ([c4466d3c](https://github.com/dropseed/plain/commit/c4466d3c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-redirection@0.22.0) (2025-10-07)
 
 ### What's changed
