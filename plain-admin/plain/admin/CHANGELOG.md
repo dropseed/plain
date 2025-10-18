@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.50.1](https://github.com/dropseed/plain/releases/plain-admin@0.50.1) (2025-10-17)
+
+### What's changed
+
+- Fixed the "View results" link from global search to properly include search query parameters and use the correct path ([99a43ed](https://github.com/dropseed/plain/commit/99a43ed6d9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.50.0](https://github.com/dropseed/plain/releases/plain-admin@0.50.0) (2025-10-07)
 
 ### What's changed
