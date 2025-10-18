@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-jobs@0.36.0) (2025-10-17)
+
+### What's changed
+
+- Removed internal memory optimization attempts including manual garbage collection and object deletion in worker processes ([c7064ba329](https://github.com/dropseed/plain/commit/c7064ba329))
+- Increased worker sleep interval from 0.1s to 0.5s when no jobs are available, reducing CPU usage during idle periods ([c7064ba329](https://github.com/dropseed/plain/commit/c7064ba329))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.35.1](https://github.com/dropseed/plain/releases/plain-jobs@0.35.1) (2025-10-17)
 
 ### What's changed
