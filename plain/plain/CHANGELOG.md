@@ -1,5 +1,38 @@
 # plain changelog
 
+## [0.78.0](https://github.com/dropseed/plain/releases/plain@0.78.0) (2025-10-17)
+
+### What's changed
+
+- Chores have been refactored to use abstract base classes instead of decorated functions ([c4466d3c60](https://github.com/dropseed/plain/commit/c4466d3c60))
+- Added `SHELL_IMPORT` setting to customize what gets automatically imported in `plain shell` ([9055f59c08](https://github.com/dropseed/plain/commit/9055f59c08))
+- Views that return `None` now raise `Http404` instead of returning `ResponseNotFound` ([5bb60016eb](https://github.com/dropseed/plain/commit/5bb60016eb))
+- The `plain chores list` command output formatting now matches the `plain jobs list` format ([4b6881a49e](https://github.com/dropseed/plain/commit/4b6881a49e))
+
+### Upgrade instructions
+
+- Update any chores from decorated functions to class-based chores:
+
+    ```python
+    # Before:
+    @register_chore("group")
+    def chore_name():
+        """Description"""
+        return "Done!"
+
+    # After:
+    from plain.chores import Chore, register_chore
+
+    @register_chore
+    class ChoreName(Chore):
+        """Description"""
+
+        def run(self):
+            return "Done!"
+    ```
+
+- Import `Chore` base class from `plain.chores` when creating new chores
+
 ## [0.77.0](https://github.com/dropseed/plain/releases/plain@0.77.0) (2025-10-13)
 
 ### What's changed
