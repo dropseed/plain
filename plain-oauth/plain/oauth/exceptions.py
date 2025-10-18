@@ -5,7 +5,7 @@ class OAuthError(Exception):
 
 
 class OAuthStateMissingError(OAuthError):
-    message = "The state parameter is missing. Please try again."
+    message = "The OAuth state is missing. Your session may have expired or cookies may be blocked. Please try again."
 
 
 class OAuthStateMismatchError(OAuthError):

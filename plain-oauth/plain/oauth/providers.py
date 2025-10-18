@@ -114,6 +114,8 @@ class OAuthProvider:
             raise OAuthStateMissingError() from e
 
         session = get_request_session(request)
+        if SESSION_STATE_KEY not in session:
+            raise OAuthStateMissingError()
         expected_state = session.pop(SESSION_STATE_KEY)
         session.save()  # Make sure the pop is saved (won't save on an exception)
         if not secrets.compare_digest(state, expected_state):
