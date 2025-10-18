@@ -1,5 +1,15 @@
 # plain-esbuild changelog
 
+## [0.7.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.7.0) (2025-10-17)
+
+### What's changed
+
+- Removed `watchfiles` dependency - file watching functionality has been moved to `plain-dev` ([cd92e30](https://github.com/dropseed/plain/commit/cd92e302cd77afef999639e4533f118114738015))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.6.1](https://github.com/dropseed/plain/releases/plain-esbuild@0.6.1) (2025-10-06)
 
 ### What's changed
