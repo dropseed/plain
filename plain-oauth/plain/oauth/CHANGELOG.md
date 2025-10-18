@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.31.1](https://github.com/dropseed/plain/releases/plain-oauth@0.31.1) (2025-10-17)
+
+### What's changed
+
+- `OAuthStateMissingError` is now raised when OAuth state is not found in the session, providing clearer error messaging ([72898275](https://github.com/dropseed/plain/commit/72898275))
+- Updated error message to indicate possible causes like expired sessions or blocked cookies ([72898275](https://github.com/dropseed/plain/commit/72898275))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-oauth@0.31.0) (2025-10-12)
 
 ### What's changed
