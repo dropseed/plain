@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.78.1](https://github.com/dropseed/plain/releases/plain@0.78.1) (2025-10-17)
+
+### What's changed
+
+- Fixed job worker logging by using `getLogger` instead of directly instantiating `Logger` for the plain logger ([dd675666b9](https://github.com/dropseed/plain/commit/dd675666b9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.78.0](https://github.com/dropseed/plain/releases/plain@0.78.0) (2025-10-17)
 
 ### What's changed
