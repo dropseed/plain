@@ -1,5 +1,19 @@
 # plain-jobs changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-jobs@0.35.0) (2025-10-17)
+
+### What's changed
+
+- The `Job` base class is now an abstract base class requiring implementation of the `run()` method ([e34282bba8](https://github.com/dropseed/plain/commit/e34282bba8))
+- Job worker processes now properly initialize the Plain framework before processing jobs, fixing potential startup issues ([c4551d1b84](https://github.com/dropseed/plain/commit/c4551d1b84))
+- The `plain jobs list` command now displays job descriptions from docstrings in a cleaner format ([4b6881a49e](https://github.com/dropseed/plain/commit/4b6881a49e))
+- Job requests in the admin interface are now ordered by priority, start time, and created time to match worker processing order ([c18f0e3fb6](https://github.com/dropseed/plain/commit/c18f0e3fb6))
+- The `ClearCompleted` chore has been refactored to use the new abstract base class pattern ([c4466d3c60](https://github.com/dropseed/plain/commit/c4466d3c60))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-jobs@0.34.0) (2025-10-13)
 
 ### What's changed
