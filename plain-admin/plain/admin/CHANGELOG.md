@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.50.2](https://github.com/dropseed/plain/releases/plain-admin@0.50.2) (2025-10-20)
+
+### What's changed
+
+- Internal build system update to use dependency-groups.dev format ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.50.1](https://github.com/dropseed/plain/releases/plain-admin@0.50.1) (2025-10-17)
 
 ### What's changed
