@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.36.1](https://github.com/dropseed/plain/releases/plain-jobs@0.36.1) (2025-10-20)
+
+### What's changed
+
+- Fixed `run_in_worker()` to properly return `None` when a duplicate job is detected with a unique key, instead of returning the list of in-progress jobs ([5d7df365d6](https://github.com/dropseed/plain/commit/5d7df365d6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-jobs@0.36.0) (2025-10-17)
 
 ### What's changed
