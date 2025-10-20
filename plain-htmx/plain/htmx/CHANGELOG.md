@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.10.4](https://github.com/dropseed/plain/releases/plain-htmx@0.10.4) (2025-10-20)
+
+### What's changed
+
+- Updated package configuration to use `dependency-groups.dev` instead of `tool.uv.dev-dependencies` ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.3](https://github.com/dropseed/plain/releases/plain-htmx@0.10.3) (2025-10-06)
 
 ### What's changed
