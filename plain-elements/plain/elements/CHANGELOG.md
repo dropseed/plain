@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.10.2](https://github.com/dropseed/plain/releases/plain-elements@0.10.2) (2025-10-20)
+
+### What's changed
+
+- Migrated to PEP 735 dependency groups by switching from `tool.uv.dev-dependencies` to `dependency-groups.dev` in pyproject.toml ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a27229d2abf978d88cf852ea589b440c37))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.1](https://github.com/dropseed/plain/releases/plain-elements@0.10.1) (2025-10-06)
 
 ### What's changed
