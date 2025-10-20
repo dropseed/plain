@@ -88,6 +88,31 @@ def main():
         action="store_true",
         help="Skip running pre-commit checks before releasing",
     )
+
+    # Mutually exclusive group for automatic release type selection
+    release_type_group = parser.add_mutually_exclusive_group()
+    release_type_group.add_argument(
+        "--major",
+        action="store_const",
+        const="major",
+        dest="auto_release_type",
+        help="Automatically mark all packages with changes as major releases",
+    )
+    release_type_group.add_argument(
+        "--minor",
+        action="store_const",
+        const="minor",
+        dest="auto_release_type",
+        help="Automatically mark all packages with changes as minor releases",
+    )
+    release_type_group.add_argument(
+        "--patch",
+        action="store_const",
+        const="patch",
+        dest="auto_release_type",
+        help="Automatically mark all packages with changes as patch releases",
+    )
+
     parser.add_argument("packages", nargs="*", help="Packages to release")
     args = parser.parse_args()
 
@@ -119,13 +144,18 @@ def main():
             print(f"{package}: No changes since last version change. Skipping.")
             continue
 
-        while True:
-            choice = input("\nRelease type (major/minor/patch/skip) [skip]: ").strip()
-            if not choice:
-                choice = "skip"
-            if choice in ["major", "minor", "patch", "skip"]:
-                break
-            print("Invalid choice. Please enter major, minor, patch, or skip.")
+        # Use automatic release type if specified, otherwise prompt
+        if args.auto_release_type:
+            choice = args.auto_release_type
+            print(f"\nAutomatically selecting: {choice}")
+        else:
+            while True:
+                choice = input("\nRelease type (major/minor/patch/skip) [skip]: ").strip()
+                if not choice:
+                    choice = "skip"
+                if choice in ["major", "minor", "patch", "skip"]:
+                    break
+                print("Invalid choice. Please enter major, minor, patch, or skip.")
 
         if choice == "skip":
             continue
