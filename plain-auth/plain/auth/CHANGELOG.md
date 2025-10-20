@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.20.5](https://github.com/dropseed/plain/releases/plain-auth@0.20.5) (2025-10-20)
+
+### What's changed
+
+- Updated `pyproject.toml` to use standard `[dependency-groups]` format instead of uv-specific `[tool.uv]` section for development dependencies ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.4](https://github.com/dropseed/plain/releases/plain-auth@0.20.4) (2025-10-16)
 
 ### What's changed
