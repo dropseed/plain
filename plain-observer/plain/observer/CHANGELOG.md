@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.11.2](https://github.com/dropseed/plain/releases/plain-observer@0.11.2) (2025-10-20)
+
+### What's changed
+
+- Package configuration migrated from `tool.uv.dev-dependencies` to the standard `dependency-groups.dev` format ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.1](https://github.com/dropseed/plain/releases/plain-observer@0.11.1) (2025-10-10)
 
 ### What's changed
