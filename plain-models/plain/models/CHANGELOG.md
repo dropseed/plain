@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.53.1](https://github.com/dropseed/plain/releases/plain-models@0.53.1) (2025-10-20)
+
+### What's changed
+
+- Internal packaging update to use `dependency-groups` standard instead of `tool.uv.dev-dependencies` ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.53.0](https://github.com/dropseed/plain/releases/plain-models@0.53.0) (2025-10-12)
 
 ### What's changed
