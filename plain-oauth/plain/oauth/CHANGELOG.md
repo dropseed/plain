@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.31.2](https://github.com/dropseed/plain/releases/plain-oauth@0.31.2) (2025-10-20)
+
+### What's changed
+
+- Internal packaging improvements for development dependencies ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.1](https://github.com/dropseed/plain/releases/plain-oauth@0.31.1) (2025-10-17)
 
 ### What's changed
