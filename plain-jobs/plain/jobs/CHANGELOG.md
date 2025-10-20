@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.36.2](https://github.com/dropseed/plain/releases/plain-jobs@0.36.2) (2025-10-20)
+
+### What's changed
+
+- Fixed scheduled job detection logic to properly check for `None` instead of checking for list type when determining if a duplicate job was scheduled ([09e45fd96b](https://github.com/dropseed/plain/commit/09e45fd96b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.1](https://github.com/dropseed/plain/releases/plain-jobs@0.36.1) (2025-10-20)
 
 ### What's changed
