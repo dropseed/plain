@@ -119,9 +119,9 @@ class Job(metaclass=JobType):
                 # Only need to look at in progress jobs
                 # if we also have a unique key.
                 # Otherwise it's up to the user to use _in_progress()
-                if running := self._in_progress(unique_key):
+                if self._in_progress(unique_key):
                     span.set_attribute(ERROR_TYPE, "DuplicateJob")
-                    return running
+                    return None
 
             # Is recording is not enough here... because we also record for summaries!
 
