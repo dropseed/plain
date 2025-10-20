@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.35.1](https://github.com/dropseed/plain/releases/plain-sessions@0.35.1) (2025-10-20)
+
+### What's changed
+
+- Internal package configuration updated to use `[dependency-groups]` instead of `[tool.uv]` for dev dependencies ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-sessions@0.35.0) (2025-10-17)
 
 ### What's changed
