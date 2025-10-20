@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.78.2](https://github.com/dropseed/plain/releases/plain@0.78.2) (2025-10-20)
+
+### What's changed
+
+- Updated package metadata to use `[dependency-groups]` instead of `[tool.uv]` for development dependencies, following PEP 735 standard ([1b43a3a272](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.78.1](https://github.com/dropseed/plain/releases/plain@0.78.1) (2025-10-17)
 
 ### What's changed
