@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.16.1](https://github.com/dropseed/plain/releases/plain-api@0.16.1) (2025-10-20)
+
+### What's changed
+
+- Internal packaging configuration updated ([1b43a3a](https://github.com/dropseed/plain/commit/1b43a3a272))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-api@0.16.0) (2025-10-07)
 
 ### What's changed
