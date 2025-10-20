@@ -224,8 +224,8 @@ class Worker:
                     delay=next_start_at,
                     unique_key=schedule_unique_key,
                 )
-                # Results are a list if it found scheduled/running jobs...
-                if not isinstance(result, list):
+                # Result is None if a duplicate job was detected
+                if result:
                     logger.info(
                         'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s" job_unique_key="%s"',
                         result.job_class,
