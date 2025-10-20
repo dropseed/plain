@@ -22,8 +22,8 @@ plain-changelog = "plain.cli.changelog:changelog"
 plain-build = "plain.cli.build:build"
 plain-upgrade = "plain.cli.upgrade:upgrade"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8.0.0",
 ]
 

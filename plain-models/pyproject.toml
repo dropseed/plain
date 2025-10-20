@@ -17,8 +17,8 @@ dependencies = [
 [project.entry-points."pytest11"]
 "plain.models" = "plain.models.test.pytest"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "plain.pytest<1.0.0",
 ]
 

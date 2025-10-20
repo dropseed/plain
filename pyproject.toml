@@ -3,8 +3,8 @@ name = "plain-workspace"
 version = "0.0.0"
 requires-python = ">=3.13"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "plain",
     "plain-admin",
     "plain-api",

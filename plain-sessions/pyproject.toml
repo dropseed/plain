@@ -9,8 +9,8 @@ dependencies = [
     "plain<1.0.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "plain.models<1.0.0",
     "plain.pytest<1.0.0",
 ]

@@ -15,8 +15,8 @@ dependencies = [
 
 
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "plain.pytest<1.0.0",
 ]
 
