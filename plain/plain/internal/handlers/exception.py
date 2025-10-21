@@ -17,7 +17,6 @@ from plain.http import Http404, ResponseServerError
 from plain.http.multipartparser import MultiPartParserError
 from plain.logs.utils import log_response
 from plain.runtime import settings
-from plain.utils.module_loading import import_string
 from plain.views.errors import ErrorView
 
 if TYPE_CHECKING:
@@ -134,7 +133,7 @@ def get_exception_response(
     *, request: Request, status_code: int, exception: Exception | None
 ) -> Response:
     try:
-        view_class = get_error_view(status_code=status_code, exception=exception)
+        view_class = ErrorView.as_view(status_code=status_code, exception=exception)
         return view_class(request)
     except Exception:
         signals.got_request_exception.send(sender=None, request=request)
@@ -145,18 +144,3 @@ def get_exception_response(
 
         # If we can't load the view, return a 500 response
         return ResponseServerError()
-
-
-def get_error_view(
-    *, status_code: int, exception: Exception | None
-) -> Callable[[Request], Response]:
-    views_by_status = settings.HTTP_ERROR_VIEWS
-    if status_code in views_by_status:
-        view = views_by_status[status_code]
-        if isinstance(view, str):
-            # Import the view if it's a string
-            view = import_string(view)
-        return view.as_view()
-
-    # Create a standard view for any other status code
-    return ErrorView.as_view(status_code=status_code, exception=exception)

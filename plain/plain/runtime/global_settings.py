@@ -111,9 +111,6 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 100
 # (i.e. "/tmp" on *nix systems).
 FILE_UPLOAD_TEMP_DIR = None
 
-# User-defined overrides for error views by status code
-HTTP_ERROR_VIEWS: dict[int, type] = {}
-
 # MARK: Middleware
 
 # List of middleware to use. Order is important; in the request phase, these

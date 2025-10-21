@@ -251,27 +251,16 @@ class ExampleView(DetailView):
 
 ## Error views
 
-By default, HTTP errors will be rendered by `templates/<status_code>.html` or `templates/error.html`.
+HTTP errors are automatically rendered using templates. Create a template named `<status_code>.html` in your templates directory to customize the error page for that status code.
 
-You can define your own error views by pointing the `HTTP_ERROR_VIEWS` setting to a dictionary of status codes and view classes.
+For example:
 
-```python
-# app/settings.py
-HTTP_ERROR_VIEWS = {
-    404: "errors.NotFoundView",
-}
-```
+- `templates/404.html` - Page not found
+- `templates/403.html` - Forbidden
+- `templates/500.html` - Server error
+- `templates/error.html` - Generic fallback for all errors
 
-```python
-# app/errors.py
-from plain.views import View
-
-
-class NotFoundView(View):
-    def get(self):
-        # A custom implementation or error view handling
-        pass
-```
+The templates receive a context with `status_code` and `exception` variables.
 
 ## Redirect views
 
