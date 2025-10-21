@@ -327,7 +327,7 @@ def process_job(job_process_uuid: str) -> None:
         for middleware_path in reversed(settings.JOBS_MIDDLEWARE):
             middleware_class = import_string(middleware_path)
             middleware_instance = middleware_class(middleware_chain)
-            middleware_chain = middleware_instance
+            middleware_chain = middleware_instance.process_job
 
         job_result = middleware_chain(job_process)
 
