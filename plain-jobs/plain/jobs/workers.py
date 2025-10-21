@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import logging
 import multiprocessing
 import os
@@ -353,3 +354,4 @@ def process_job(job_process_uuid: str) -> None:
         logger.exception(e)
     finally:
         request_finished.send(sender=None)
+        gc.collect()
