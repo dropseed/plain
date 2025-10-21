@@ -314,26 +314,24 @@ def test_request_factory_naturally_bypasses_csrf():
     )
 
 
-@patch("plain.csrf.middleware.CsrfViewMiddleware.reject")
-def test_middleware_integration_rejected_request(mock_reject):
-    """Rejected requests should return 403 response without calling next."""
+def test_middleware_integration_rejected_request():
+    """Rejected requests should raise PermissionDenied without calling next."""
     from unittest.mock import Mock
 
-    rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    from plain.exceptions import PermissionDenied
 
-    mock_response = Mock()
-    mock_reject.return_value = mock_response
-    csrf_middleware.get_response = Mock()
+    rf = RequestFactory()
+    mock_get_response = Mock()
+    csrf_middleware = CsrfViewMiddleware(mock_get_response)
 
     request = rf.post("/test/", headers={"Origin": "https://attacker.com"})
-    response = csrf_middleware.process_request(request)
+
+    # Should raise PermissionDenied
+    with pytest.raises(PermissionDenied) as exc_info:
+        csrf_middleware.process_request(request)
 
     # Should not call next middleware
-    csrf_middleware.get_response.assert_not_called()
+    mock_get_response.assert_not_called()
 
-    # Should call reject method
-    mock_reject.assert_called_once()
-
-    # Should return the mocked response
-    assert response == mock_response
+    # Exception message should contain the reason
+    assert "Cross-origin request detected" in str(exc_info.value)

@@ -1,21 +1,16 @@
 from __future__ import annotations
 
-import logging
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from plain.exceptions import PermissionDenied
 from plain.http import HttpMiddleware
-from plain.logs.utils import log_response
 from plain.runtime import settings
-
-from .views import CsrfFailureView
 
 if TYPE_CHECKING:
     from plain.http import Request, Response
-
-logger = logging.getLogger("plain.security.csrf")
 
 
 class CsrfViewMiddleware(HttpMiddleware):
@@ -38,10 +33,10 @@ class CsrfViewMiddleware(HttpMiddleware):
     def process_request(self, request: Request) -> Response:
         allowed, reason = self.should_allow_request(request)
 
-        if allowed:
-            return self.get_response(request)
-        else:
-            return self.reject(request, reason)
+        if not allowed:
+            raise PermissionDenied(reason)
+
+        return self.get_response(request)
 
     def should_allow_request(self, request: Request) -> tuple[bool, str]:
         # 1. Allow safe methods (GET, HEAD, OPTIONS)
@@ -127,17 +122,3 @@ class CsrfViewMiddleware(HttpMiddleware):
             False,
             f"Cross-origin request detected - Origin {origin} does not match Host",
         )
-
-    def reject(self, request: Request, reason: str) -> Response:
-        """Reject a request with a 403 Forbidden response."""
-
-        response = CsrfFailureView.as_view()(request, reason=reason)
-        log_response(
-            "Forbidden (%s): %s",
-            reason,
-            request.path,
-            response=response,
-            request=request,
-            logger=logger,
-        )
-        return response
