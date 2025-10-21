@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from .output import style_markdown
+from .runtime import without_runtime_setup
 
 
 def parse_version(version_str: str) -> tuple[int, ...]:
@@ -42,6 +43,7 @@ def compare_versions(v1: str, v2: str) -> int:
         return 0
 
 
+@without_runtime_setup
 @click.command("changelog")
 @click.argument("package_label")
 @click.option("--from", "from_version", help="Show entries from this version onwards")

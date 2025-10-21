@@ -6,10 +6,12 @@ from pathlib import Path
 import click
 
 from .agent.prompt import prompt_agent
+from .runtime import without_runtime_setup
 
 LOCK_FILE = Path("uv.lock")
 
 
+@without_runtime_setup
 @click.command()
 @click.argument("packages", nargs=-1)
 @click.option(
@@ -144,7 +146,7 @@ def build_prompt(before_after: dict[str, tuple[str | None, str | None]]) -> str:
             "## Instructions",
             "",
             "1. **Process each package systematically:**",
-            "   - For each package, run: `uv run plain-changelog {package} --from {before} --to {after}`",
+            "   - For each package, run: `uv run plain changelog {package} --from {before} --to {after}`",
             "   - Read the 'Upgrade instructions' section carefully",
             "   - If it says 'No changes required', skip to the next package",
             "   - Apply any required code changes as specified",

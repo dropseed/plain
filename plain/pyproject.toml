@@ -16,11 +16,6 @@ requires-python = ">=3.13"
 [project.scripts]
 plain = "plain.cli.core:cli"
 
-# Make this directly available without loading Plain,
-# for use in upgrade scripts.
-plain-changelog = "plain.cli.changelog:changelog"
-plain-upgrade = "plain.cli.upgrade:upgrade"
-
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
