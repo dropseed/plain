@@ -592,7 +592,13 @@ def migrate(
                     )
             else:
                 # Auto-detect (atomic_batch is None)
-                if can_rollback_ddl and not non_atomic_migrations:
+                # SQLite is excluded because it requires foreign key constraints to be
+                # disabled before entering a transaction, which conflicts with batch mode
+                if (
+                    can_rollback_ddl
+                    and not non_atomic_migrations
+                    and db_connection.vendor != "sqlite"
+                ):
                     use_atomic_batch = True
                     atomic_batch_message = (
                         f"Running {len(migration_plan)} migrations in atomic batch"
@@ -604,6 +610,8 @@ def migrate(
                             atomic_batch_message = f"Running {len(migration_plan)} migrations separately ({db_connection.vendor} doesn't support batch)"
                         elif non_atomic_migrations:
                             atomic_batch_message = f"Running {len(migration_plan)} migrations separately (some have atomic=False)"
+                        elif db_connection.vendor == "sqlite":
+                            atomic_batch_message = f"Running {len(migration_plan)} migrations separately (SQLite doesn't support batch)"
                         else:
                             atomic_batch_message = (
                                 f"Running {len(migration_plan)} migrations separately"
