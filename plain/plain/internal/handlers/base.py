@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import types
 from typing import TYPE_CHECKING
 
@@ -8,7 +7,6 @@ from opentelemetry import baggage, trace
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
 
 from plain.exceptions import ImproperlyConfigured
-from plain.logs.utils import log_response
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
@@ -20,8 +18,6 @@ if TYPE_CHECKING:
 
     from plain.http import Request, Response, ResponseBase
     from plain.urls import ResolverMatch
-
-logger = logging.getLogger("plain.request")
 
 
 # These middleware classes are always used by Plain.
@@ -117,14 +113,6 @@ class BaseHandler:
                 else trace.StatusCode.ERROR
             )
 
-            if response.status_code >= 400:
-                log_response(
-                    "%s: %s",
-                    response.reason_phrase,
-                    request.path,
-                    response=response,
-                    request=request,
-                )
             return response
 
     def _get_response(self, request: Request) -> ResponseBase:

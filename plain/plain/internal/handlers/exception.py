@@ -15,7 +15,6 @@ from plain.exceptions import (
 )
 from plain.http import Http404, ResponseServerError
 from plain.http.multipartparser import MultiPartParserError
-from plain.logs.utils import log_response
 from plain.runtime import settings
 from plain.views.errors import ErrorView
 
@@ -23,6 +22,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from plain.http import Request, Response
+
+
+request_logger = logging.getLogger("plain.request")
 
 
 def convert_exception_to_response(
@@ -62,37 +64,34 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
         response = get_exception_response(
             request=request, status_code=403, exception=exc
         )
-        log_response(
+        request_logger.warning(
             "Forbidden (Permission denied): %s",
             request.path,
-            response=response,
-            request=request,
-            exception=exc,
+            extra={"status_code": response.status_code, "request": request},
+            exc_info=exc,
         )
 
     elif isinstance(exc, MultiPartParserError):
         response = get_exception_response(
             request=request, status_code=400, exception=None
         )
-        log_response(
+        request_logger.warning(
             "Bad request (Unable to parse request body): %s",
             request.path,
-            response=response,
-            request=request,
-            exception=exc,
+            extra={"status_code": response.status_code, "request": request},
+            exc_info=exc,
         )
 
     elif isinstance(exc, BadRequest):
         response = get_exception_response(
             request=request, status_code=400, exception=exc
         )
-        log_response(
+        request_logger.warning(
             "%s: %s",
             str(exc),
             request.path,
-            response=response,
-            request=request,
-            exception=exc,
+            extra={"status_code": response.status_code, "request": request},
+            exc_info=exc,
         )
     elif isinstance(exc, SuspiciousOperation):
         if isinstance(exc, RequestDataTooBig | TooManyFieldsSent | TooManyFilesSent):
@@ -105,8 +104,8 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
         security_logger = logging.getLogger(f"plain.security.{exc.__class__.__name__}")
         security_logger.error(
             str(exc),
-            exc_info=exc,
             extra={"status_code": 400, "request": request},
+            exc_info=exc,
         )
         response = get_exception_response(
             request=request, status_code=400, exception=None
@@ -117,13 +116,12 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
         response = get_exception_response(
             request=request, status_code=500, exception=None
         )
-        log_response(
+        request_logger.error(
             "%s: %s",
             response.reason_phrase,
             request.path,
-            response=response,
-            request=request,
-            exception=exc,
+            extra={"status_code": response.status_code, "request": request},
+            exc_info=exc,
         )
 
     return response
