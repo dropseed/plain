@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.36.3](https://github.com/dropseed/plain/releases/plain-jobs@0.36.3) (2025-10-20)
+
+### What's changed
+
+- Added garbage collection back to worker processes after job completion to help manage memory usage ([aafe3ace02](https://github.com/dropseed/plain/commit/aafe3ace02))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.2](https://github.com/dropseed/plain/releases/plain-jobs@0.36.2) (2025-10-20)
 
 ### What's changed
