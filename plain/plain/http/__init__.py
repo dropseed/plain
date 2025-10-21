@@ -1,12 +1,13 @@
-from plain.http.cookie import parse_cookie
-from plain.http.request import (
+from .cookie import parse_cookie
+from .middleware import HttpMiddleware
+from .request import (
     QueryDict,
     RawPostDataException,
     Request,
     RequestHeaders,
     UnreadablePostError,
 )
-from plain.http.response import (
+from .response import (
     BadHeaderError,
     FileResponse,
     Http404,
@@ -25,6 +26,7 @@ from plain.http.response import (
 )
 
 __all__ = [
+    "HttpMiddleware",
     "parse_cookie",
     "Request",
     "RequestHeaders",

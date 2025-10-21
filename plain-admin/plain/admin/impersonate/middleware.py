@@ -1,9 +1,8 @@
-from collections.abc import Callable
 from typing import Any
 
 from plain.auth import get_user_model
 from plain.auth.requests import get_request_user, set_request_user
-from plain.http import Request, Response, ResponseForbidden
+from plain.http import HttpMiddleware, Request, Response, ResponseForbidden
 from plain.sessions import get_request_session
 
 from .constants import IMPERSONATE_SESSION_KEY
@@ -20,11 +19,8 @@ def get_user_by_id(id: int) -> Any | None:
         return None
 
 
-class ImpersonateMiddleware:
-    def __init__(self, get_response: Callable[[Request], Response]):
-        self.get_response = get_response
-
-    def __call__(self, request: Request) -> Response:
+class ImpersonateMiddleware(HttpMiddleware):
+    def process_request(self, request: Request) -> Response:
         session = get_request_session(request)
         user = get_request_user(request)
 

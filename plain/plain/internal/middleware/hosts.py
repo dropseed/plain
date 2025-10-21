@@ -4,13 +4,11 @@ import ipaddress
 import logging
 from typing import TYPE_CHECKING
 
-from plain.http import Request, ResponseBadRequest
+from plain.http import HttpMiddleware, Request, ResponseBadRequest
 from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from plain.http import Response
 
 logger = logging.getLogger(__name__)
@@ -20,7 +18,7 @@ host_validation_re = _lazy_re_compile(
 )
 
 
-class HostValidationMiddleware:
+class HostValidationMiddleware(HttpMiddleware):
     """
     Middleware to validate the Host header against ALLOWED_HOSTS.
 
@@ -29,10 +27,7 @@ class HostValidationMiddleware:
     host is not allowed.
     """
 
-    def __init__(self, get_response: Callable[[Request], Response]) -> None:
-        self.get_response = get_response
-
-    def __call__(self, request: Request) -> Response:
+    def process_request(self, request: Request) -> Response:
         if not is_host_valid(request):
             host = request.host
             msg = f"Invalid HTTP_HOST header: {host!r}."

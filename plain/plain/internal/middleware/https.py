@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.http import ResponseRedirect
+from plain.http import HttpMiddleware, ResponseRedirect
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -11,14 +11,14 @@ if TYPE_CHECKING:
     from plain.http import Request, Response
 
 
-class HttpsRedirectMiddleware:
-    def __init__(self, get_response: Callable[[Request], Response]) -> None:
-        self.get_response = get_response
+class HttpsRedirectMiddleware(HttpMiddleware):
+    def __init__(self, get_response: Callable[[Request], Response]):
+        super().__init__(get_response)
 
         # Settings for HTTPS
         self.https_redirect_enabled = settings.HTTPS_REDIRECT_ENABLED
 
-    def __call__(self, request: Request) -> Response:
+    def process_request(self, request: Request) -> Response:
         """
         Perform a blanket HTTP→HTTPS redirect when enabled.
         """

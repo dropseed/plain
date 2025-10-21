@@ -66,7 +66,7 @@ class BaseHandler:
                     f"Middleware factory {middleware_path} returned None."
                 )
 
-            handler = convert_exception_to_response(mw_instance)
+            handler = convert_exception_to_response(mw_instance.process_request)
 
         # We only assign to this when initialization is complete as it is used
         # as a flag for initialization being complete.

@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from plain.http import ResponseRedirect
+from plain.http import HttpMiddleware, ResponseRedirect
 
 if TYPE_CHECKING:
     from plain.http import Request, Response
 
 
-class RedirectionMiddleware:
-    def __init__(self, get_response: Callable[[Request], Response]) -> None:
-        self.get_response = get_response
-
-    def __call__(self, request: Request) -> Response:
+class RedirectionMiddleware(HttpMiddleware):
+    def process_request(self, request: Request) -> Response:
         response = self.get_response(request)
 
         if response.status_code == 404:

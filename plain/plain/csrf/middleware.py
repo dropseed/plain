@@ -6,19 +6,19 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from plain.http import HttpMiddleware
 from plain.logs.utils import log_response
 from plain.runtime import settings
 
 from .views import CsrfFailureView
 
 if TYPE_CHECKING:
-    from plain.http import Response
-    from plain.http.request import Request
+    from plain.http import Request, Response
 
 logger = logging.getLogger("plain.security.csrf")
 
 
-class CsrfViewMiddleware:
+class CsrfViewMiddleware(HttpMiddleware):
     """
     Modern CSRF protection middleware using Sec-Fetch-Site headers and origin validation.
     Based on Filippo Valsorda's 2025 research (https://words.filippo.io/csrf/).
@@ -28,14 +28,14 @@ class CsrfViewMiddleware:
     """
 
     def __init__(self, get_response: Callable[[Request], Response]):
-        self.get_response = get_response
+        super().__init__(get_response)
 
         # Compile CSRF exempt patterns once for performance
         self.csrf_exempt_patterns: list[re.Pattern[str]] = [
             re.compile(r) for r in settings.CSRF_EXEMPT_PATHS
         ]
 
-    def __call__(self, request: Request) -> Response:
+    def process_request(self, request: Request) -> Response:
         allowed, reason = self.should_allow_request(request)
 
         if allowed:

@@ -2,19 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from plain.http import HttpMiddleware
 from plain.runtime import settings
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from plain.http import Request, Response
 
 
-class DefaultHeadersMiddleware:
-    def __init__(self, get_response: Callable[[Request], Response]) -> None:
-        self.get_response = get_response
-
-    def __call__(self, request: Request) -> Response:
+class DefaultHeadersMiddleware(HttpMiddleware):
+    def process_request(self, request: Request) -> Response:
         response = self.get_response(request)
 
         for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():

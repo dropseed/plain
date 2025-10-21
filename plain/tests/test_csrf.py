@@ -327,7 +327,7 @@ def test_middleware_integration_rejected_request(mock_reject):
     csrf_middleware.get_response = Mock()
 
     request = rf.post("/test/", headers={"Origin": "https://attacker.com"})
-    response = csrf_middleware(request)
+    response = csrf_middleware.process_request(request)
 
     # Should not call next middleware
     csrf_middleware.get_response.assert_not_called()

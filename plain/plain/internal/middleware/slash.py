@@ -2,23 +2,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.http import ResponseRedirect
+from plain.http import HttpMiddleware, ResponseRedirect
 from plain.runtime import settings
 from plain.urls import Resolver404, get_resolver
 from plain.utils.http import escape_leading_slashes
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from plain.http import Request, Response
     from plain.urls import ResolverMatch
 
 
-class RedirectSlashMiddleware:
-    def __init__(self, get_response: Callable[[Request], Response]) -> None:
-        self.get_response = get_response
-
-    def __call__(self, request: Request) -> Response:
+class RedirectSlashMiddleware(HttpMiddleware):
+    def process_request(self, request: Request) -> Response:
         """
         Rewrite the URL based on settings.APPEND_SLASH
         """
