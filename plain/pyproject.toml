@@ -19,7 +19,6 @@ plain = "plain.cli.core:cli"
 # Make this directly available without loading Plain,
 # for use in upgrade scripts.
 plain-changelog = "plain.cli.changelog:changelog"
-plain-build = "plain.cli.build:build"
 plain-upgrade = "plain.cli.upgrade:upgrade"
 
 [dependency-groups]
