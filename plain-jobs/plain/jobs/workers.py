@@ -144,7 +144,7 @@ class Worker:
                     time.sleep(1)
                     continue
 
-                logger.info(
+                logger.debug(
                     'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queues="%s"',
                     job_request.job_class,
                     job_request.uuid,
