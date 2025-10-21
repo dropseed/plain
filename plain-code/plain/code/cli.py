@@ -10,12 +10,14 @@ import click
 
 from plain.cli import register_cli
 from plain.cli.print import print_event
+from plain.cli.runtime import without_runtime_setup
 
 from .biome import Biome
 
 DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
 
 
+@without_runtime_setup
 @register_cli("code")
 @click.group()
 def cli() -> None:
@@ -23,6 +25,7 @@ def cli() -> None:
     pass
 
 
+@without_runtime_setup
 @cli.command()
 @click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
@@ -52,6 +55,7 @@ def install(ctx: click.Context, force: bool) -> None:
         click.secho("Biome already installed", fg="green")
 
 
+@without_runtime_setup
 @cli.command()
 def update() -> None:
     """Update the Biome standalone binary to the latest release."""
@@ -67,6 +71,7 @@ def update() -> None:
     click.secho(f"Biome {version} installed", fg="green")
 
 
+@without_runtime_setup
 @cli.command()
 @click.pass_context
 @click.argument("path", default=".")
@@ -100,6 +105,7 @@ def check(ctx: click.Context, path: str) -> None:
             sys.exit(result.returncode)
 
 
+@without_runtime_setup
 @register_cli("fix")
 @cli.command()
 @click.pass_context
