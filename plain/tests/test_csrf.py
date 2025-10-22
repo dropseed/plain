@@ -315,10 +315,10 @@ def test_request_factory_naturally_bypasses_csrf():
 
 
 def test_middleware_integration_rejected_request():
-    """Rejected requests should raise PermissionDenied without calling next."""
+    """Rejected requests should raise SuspiciousOperation without calling next."""
     from unittest.mock import Mock
 
-    from plain.exceptions import PermissionDenied
+    from plain.exceptions import SuspiciousOperation
 
     rf = RequestFactory()
     mock_get_response = Mock()
@@ -326,8 +326,8 @@ def test_middleware_integration_rejected_request():
 
     request = rf.post("/test/", headers={"Origin": "https://attacker.com"})
 
-    # Should raise PermissionDenied
-    with pytest.raises(PermissionDenied) as exc_info:
+    # Should raise SuspiciousOperation
+    with pytest.raises(SuspiciousOperation) as exc_info:
         csrf_middleware.process_request(request)
 
     # Should not call next middleware
