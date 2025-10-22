@@ -23,6 +23,11 @@ from .utils import resolve_url
 if TYPE_CHECKING:
     from plain.http import Request
 
+try:
+    from plain.admin.impersonate import get_request_impersonator
+except ImportError:
+    get_request_impersonator: Any = None
+
 
 class LoginRequired(Exception):
     def __init__(self, login_url: str | None = None, redirect_field_name: str = "next"):
@@ -65,14 +70,17 @@ class AuthViewMixin(SessionViewMixin):
         if self.admin_required:
             # At this point, we know user is authenticated (from check above)
             # Check if impersonation is active
-            if impersonator := getattr(self, "impersonator", None):
-                # Impersonators should be able to view admin pages while impersonating.
-                # There's probably never a case where an impersonator isn't admin, but it can be configured.
-                if not impersonator.is_admin:
-                    raise PermissionDenied(
-                        "You do not have permission to access this page."
-                    )
-            elif not self.user.is_admin:
+            if get_request_impersonator:
+                if impersonator := get_request_impersonator(self.request):
+                    # Impersonators should be able to view admin pages while impersonating.
+                    # There's probably never a case where an impersonator isn't admin, but it can be configured.
+                    if not impersonator.is_admin:
+                        raise PermissionDenied(
+                            "You do not have permission to access this page."
+                        )
+                    return
+
+            if not self.user.is_admin:
                 # Show a 404 so we don't expose admin urls to non-admin users
                 raise Http404()
 

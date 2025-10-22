@@ -21,6 +21,11 @@ try:
 except ImportError:
     get_request_user: Any = None
 
+try:
+    from plain.admin.impersonate import get_request_impersonator
+except ImportError:
+    get_request_impersonator: Any = None
+
 
 class Toolbar:
     def __init__(self, context: Context) -> None:
@@ -32,8 +37,9 @@ class Toolbar:
         if settings.DEBUG:
             return True
 
-        if impersonator := getattr(self.request, "impersonator", None):
-            return getattr(impersonator, "is_admin", False)
+        if get_request_impersonator:
+            if impersonator := get_request_impersonator(self.request):
+                return getattr(impersonator, "is_admin", False)
 
         user = get_request_user(self.request) if get_request_user else None
         if user:

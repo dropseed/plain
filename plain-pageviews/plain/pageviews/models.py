@@ -22,6 +22,11 @@ try:
 except ImportError:
     get_request_session: Any = None
 
+try:
+    from plain.admin.impersonate import get_request_impersonator
+except ImportError:
+    get_request_impersonator: Any = None
+
 
 @models.register_model
 class Pageview(models.Model):
@@ -89,7 +94,7 @@ class Pageview(models.Model):
         Returns:
             Pageview instance or None if user is being impersonated
         """
-        if getattr(request, "impersonator", None):
+        if get_request_impersonator and get_request_impersonator(request):
             return None
 
         if url is None:
