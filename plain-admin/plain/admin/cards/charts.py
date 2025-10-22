@@ -37,7 +37,9 @@ class TrendCard(ChartCard):
 
     def get_description(self) -> str:
         datetime_range = DatetimeRangeAliases.to_range(self.get_current_preset())
-        return f"{datetime_range.start} to {datetime_range.end}"
+        start = datetime_range.start.strftime("%b %d, %Y")
+        end = datetime_range.end.strftime("%b %d, %Y")
+        return f"{start} to {end}"
 
     def get_current_preset(self) -> DatetimeRangeAliases:
         if s := super().get_current_preset():
@@ -81,40 +83,6 @@ class TrendCard(ChartCard):
         trend_labels = list(data.keys())
         trend_data = list(data.values())
 
-        def calculate_trend_line(data: list[int | float]) -> list[int | float]:
-            """
-            Calculate a trend line using basic linear regression.
-            :param data: A list of numeric values representing the y-axis.
-            :return: A list of trend line values (same length as data).
-            """
-            if not data or len(data) < 2:
-                return (
-                    data  # Return the data as-is if not enough points for a trend line
-                )
-
-            n = len(data)
-            x = list(range(n))
-            y = data
-
-            # Calculate the means of x and y
-            x_mean = sum(x) / n
-            y_mean = sum(y) / n
-
-            # Calculate the slope (m) and y-intercept (b) of the line: y = mx + b
-            numerator = sum((x[i] - x_mean) * (y[i] - y_mean) for i in range(n))
-            denominator = sum((x[i] - x_mean) ** 2 for i in range(n))
-            slope = numerator / denominator if denominator != 0 else 0
-            intercept = y_mean - slope * x_mean
-
-            # Calculate the trend line values
-            trend = [slope * xi + intercept for xi in x]
-
-            # if it's all zeros, return nothing
-            if all(v == 0 for v in trend):
-                return []
-
-            return trend
-
         return {
             "type": "bar",
             "data": {
@@ -122,31 +90,27 @@ class TrendCard(ChartCard):
                 "datasets": [
                     {
                         "data": trend_data,
-                    },
-                    {
-                        "data": calculate_trend_line(trend_data),
-                        "type": "line",
-                        "borderColor": "rgba(255, 255, 255, 0.3)",
-                        "borderWidth": 2,
-                        "fill": False,
-                        "pointRadius": 0,  # Optional: Hide points
+                        "backgroundColor": "rgba(255, 255, 255, 0.3)",
                     },
                 ],
             },
-            # Hide the scales
             "options": {
                 "plugins": {"legend": {"display": False}},
                 "scales": {
                     "x": {
                         "display": False,
+                        "grid": {"display": False},
                     },
                     "y": {
-                        "suggestedMin": 0,
+                        "beginAtZero": True,
+                        "display": False,
+                        "grid": {"display": False},
                     },
                 },
                 "maintainAspectRatio": False,
-                "elements": {
-                    "bar": {"borderRadius": "3", "backgroundColor": "#d6d6d6"}
+                "elements": {"bar": {"borderRadius": 3}},
+                "layout": {
+                    "padding": 0,
                 },
             },
         }

@@ -4,7 +4,7 @@
     hx-select="#card-{{ slug }}"
     hx-swap="outerHTML"
     {% if size.value == 1 -%}
-    class="col-span-1">
+    class="col-span-1 h-60">
     {%- elif size.value == 2 -%}
     class="col-span-2">
     {%- elif size.value == 3 -%}
@@ -35,4 +35,5 @@
 
     <div>
     {% block content %}{% endblock %}
+    </div>
 </section>
