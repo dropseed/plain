@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-jobs@0.37.0) (2025-10-22)
+
+### What's changed
+
+- Added `JobMiddleware` abstract base class for creating custom job middleware ([29e5c6df1a](https://github.com/dropseed/plain/commit/29e5c6df1a))
+- Changed "preparing to execute job" log message from `logger.info` to `logger.debug` to reduce log noise ([8e25856639](https://github.com/dropseed/plain/commit/8e25856639))
+
+### Upgrade instructions
+
+- If you have custom job middleware, update them to inherit from `JobMiddleware` and implement the `process_job()` method instead of `__call__()`
+
 ## [0.36.3](https://github.com/dropseed/plain/releases/plain-jobs@0.36.3) (2025-10-20)
 
 ### What's changed
