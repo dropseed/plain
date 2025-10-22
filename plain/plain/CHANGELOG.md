@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.81.0](https://github.com/dropseed/plain/releases/plain@0.81.0) (2025-10-22)
+
+### What's changed
+
+- Removed support for category-specific error template fallbacks like `4xx.html` and `5xx.html` ([9513f7c4fa](https://github.com/dropseed/plain/commit/9513f7c4fa))
+
+### Upgrade instructions
+
+- If you have `4xx.html` or `5xx.html` error templates, rename them to specific status code templates (e.g., `404.html`, `500.html`) or remove them if you prefer the plain HTTP response fallback
+
 ## [0.80.0](https://github.com/dropseed/plain/releases/plain@0.80.0) (2025-10-22)
 
 ### What's changed
