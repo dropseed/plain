@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-code@0.11.0) (2025-10-22)
+
+### What's changed
+
+- All CLI commands now skip runtime setup for faster execution by using the `@without_runtime_setup` decorator ([b7358d7](https://github.com/dropseed/plain/commit/b7358d7))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.2](https://github.com/dropseed/plain/releases/plain-code@0.10.2) (2025-10-06)
 
 ### What's changed
