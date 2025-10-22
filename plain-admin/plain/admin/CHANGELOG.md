@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.51.0](https://github.com/dropseed/plain/releases/plain-admin@0.51.0) (2025-10-22)
+
+### What's changed
+
+- Admin middleware classes now inherit from the new `HttpMiddleware` abstract base class, using the standardized `process_request()` method instead of `__call__()` ([b960eed](https://github.com/dropseed/plain/commit/b960eed6c6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.50.2](https://github.com/dropseed/plain/releases/plain-admin@0.50.2) (2025-10-20)
 
 ### What's changed
