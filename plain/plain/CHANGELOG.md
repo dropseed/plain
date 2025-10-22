@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.80.0](https://github.com/dropseed/plain/releases/plain@0.80.0) (2025-10-22)
+
+### What's changed
+
+- CSRF failures now raise `SuspiciousOperation` (HTTP 400) instead of `PermissionDenied` (HTTP 403) ([ad146bde3e](https://github.com/dropseed/plain/commit/ad146bde3e))
+- Error templates can now use category-specific fallbacks like `4xx.html` or `5xx.html` instead of the generic `error.html` ([716cfa3cfc](https://github.com/dropseed/plain/commit/716cfa3cfc))
+- Updated error template documentation with best practices for self-contained `500.html` templates ([55cea3b522](https://github.com/dropseed/plain/commit/55cea3b522))
+
+### Upgrade instructions
+
+- If you have a `templates/error.html` template, instead create specific error templates for each status code you want to customize (e.g., `400.html`, `403.html`, `404.html`, `500.html`). You can also create category-specific templates like `4xx.html` or `5xx.html` for broader coverage.
+
 ## [0.79.0](https://github.com/dropseed/plain/releases/plain@0.79.0) (2025-10-22)
 
 ### What's changed
