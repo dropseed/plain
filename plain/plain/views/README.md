@@ -258,7 +258,10 @@ For example:
 - `templates/404.html` - Page not found
 - `templates/403.html` - Forbidden
 - `templates/500.html` - Server error
-- `templates/error.html` - Generic fallback for all errors
+- `templates/4xx.html` - Generic fallback for all 4xx errors
+- `templates/5xx.html` - Generic fallback for all 5xx errors
+
+Plain will first look for a specific status code template (e.g., `404.html`), then fall back to the category template (e.g., `4xx.html`). If neither exists, a plain HTTP response is returned.
 
 The templates receive a context with `status_code` and `exception` variables.
 
