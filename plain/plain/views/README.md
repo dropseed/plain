@@ -251,19 +251,17 @@ class ExampleView(DetailView):
 
 ## Error views
 
-HTTP errors are automatically rendered using templates. Create a template named `<status_code>.html` in your templates directory to customize the error page for that status code.
-
-For example:
+HTTP errors are rendered using templates. Create templates for the errors users actually see:
 
 - `templates/404.html` - Page not found
 - `templates/403.html` - Forbidden
 - `templates/500.html` - Server error
-- `templates/4xx.html` - Generic fallback for all 4xx errors
-- `templates/5xx.html` - Generic fallback for all 5xx errors
 
-Plain will first look for a specific status code template (e.g., `404.html`), then fall back to the category template (e.g., `4xx.html`). If neither exists, a plain HTTP response is returned.
+Plain looks for `{status_code}.html`, then `{category}.html` (e.g., `4xx.html`), then returns a plain HTTP response. Most apps only need the three specific templates above.
 
-The templates receive a context with `status_code` and `exception` variables.
+Templates receive `status_code` and `exception` in context.
+
+**Note:** `500.html` should be self-contained - avoid extending base templates or accessing database/session, since server errors can occur during middleware or template rendering. `404.html` and `403.html` can safely extend base templates since they occur during view execution after middleware runs.
 
 ## Redirect views
 
