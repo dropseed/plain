@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.5.3](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.3) (2025-10-22)
+
+### What's changed
+
+- Fixed toolbar visibility check to properly use `get_request_impersonator()` helper instead of accessing the `impersonator` attribute directly ([548a385](https://github.com/dropseed/plain/commit/548a385))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.5.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.2) (2025-10-06)
 
 ### What's changed
