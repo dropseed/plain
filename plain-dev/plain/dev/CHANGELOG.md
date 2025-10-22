@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.43.0](https://github.com/dropseed/plain/releases/plain-dev@0.43.0) (2025-10-22)
+
+### What's changed
+
+- The `plain contrib` command now uses `@without_runtime_setup` decorator to avoid loading the full Plain runtime, improving performance and reliability ([8b8cc2d](https://github.com/dropseed/plain/commit/8b8cc2d6c6))
+- Removed the standalone `plain-contrib` command-line script as it is no longer needed with the runtime setup improvements ([8b8cc2d](https://github.com/dropseed/plain/commit/8b8cc2d6c6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.42.0](https://github.com/dropseed/plain/releases/plain-dev@0.42.0) (2025-10-13)
 
 ### What's changed
