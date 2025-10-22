@@ -6,7 +6,7 @@
 - [Admin viewsets](#admin-viewsets)
 - [Admin cards](#admin-cards)
 - [Admin forms](#admin-forms)
-- [List displays](#list-displays)
+- [List presets](#list-presets)
 - [Toolbar](#toolbar)
 - [Impersonate](#impersonate)
 - [Installation](#installation)
@@ -74,9 +74,9 @@ TODO
 
 TODO
 
-## List displays
+## List presets
 
-On [`AdminListView`](./views/objects.py#AdminListView) and [`AdminModelListView`](./views/models.py#AdminModelListView), you can define different `displays` to build predefined views of your data. The display choices will be shown in the UI, and you can use the current `self.display` in your view logic.
+On [`AdminListView`](./views/objects.py#AdminListView) and [`AdminModelListView`](./views/models.py#AdminModelListView), you can define different `presets` to build predefined views of your data. The preset choices will be shown in the UI, and you can use the current `self.preset` in your view logic.
 
 ```python
 # app/users/admin.py
@@ -94,12 +94,12 @@ class UserAdmin(AdminViewset):
             "email",
             "created_at__date",
         ]
-        displays = ["Users without email"]
+        presets = ["Users without email"]
 
         def get_objects(self):
             objects = super().get_objects()
 
-            if self.display == "Users without email":
+            if self.preset == "Users without email":
                 objects = objects.filter(email="")
 
             return objects

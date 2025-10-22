@@ -26,7 +26,7 @@ class Card:
     text: str = ""
     link: str = ""
     number: int | None = None
-    displays: list[str] | Enum | None = None
+    presets: list[str] | Enum | None = None
 
     # These will be accessible at render time
     view: View
@@ -51,8 +51,8 @@ class Card:
         context["number"] = self.get_number()
         context["text"] = self.get_text()
         context["link"] = self.get_link()
-        context["displays"] = self.get_displays()
-        context["current_display"] = self.get_current_display()
+        context["presets"] = self.get_presets()
+        context["current_preset"] = self.get_current_preset()
 
         return context
 
@@ -75,12 +75,12 @@ class Card:
     def get_link(self) -> str:
         return self.link
 
-    def get_current_display(self) -> str:
-        return self.request.query_params.get(f"{self.get_slug()}.display", "")
+    def get_current_preset(self) -> str:
+        return self.request.query_params.get(f"{self.get_slug()}.preset", "")
 
-    def get_displays(self) -> list[str] | Enum | None:
-        if hasattr(self.displays, "copy"):
+    def get_presets(self) -> list[str] | Enum | None:
+        if hasattr(self.presets, "copy"):
             # Avoid mutating the class attribute
-            return self.displays.copy()
+            return self.presets.copy()
         else:
-            return self.displays
+            return self.presets

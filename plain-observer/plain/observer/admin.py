@@ -53,7 +53,7 @@ class SpanViewset(AdminViewset):
         ]
         queryset_order = ["-id"]
         allow_global_search = False
-        displays = ["Parents only"]
+        presets = ["Parents only"]
         search_fields = ["name", "span_id", "parent_id"]
         actions = ["Delete"]
 
@@ -76,7 +76,7 @@ class SpanViewset(AdminViewset):
 
         def get_initial_queryset(self) -> models.QuerySet:
             queryset = super().get_initial_queryset()
-            if self.display == "Parents only":
+            if self.preset == "Parents only":
                 queryset = queryset.filter(parent_id="")
             return queryset
 

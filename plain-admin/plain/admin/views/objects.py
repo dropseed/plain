@@ -22,20 +22,20 @@ class AdminListView(HTMXViewMixin, AdminView):
     template_name = "admin/list.html"
     fields: list[str]
     actions: list[str] = []
-    displays: list[str] = []
+    presets: list[str] = []
     page_size = 100
     show_search = False
     allow_global_search = False
 
     @cached_property
-    def display(self) -> str:
-        """Get the current display parameter from the request."""
-        return self.request.query_params.get("display", "")
+    def preset(self) -> str:
+        """Get the current preset parameter from the request."""
+        return self.request.query_params.get("preset", "")
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
-        # Make this available to get_displays and stuff
+        # Make this available to get_presets and stuff
         self.objects = self.get_objects()
 
         page_size = self.request.query_params.get("page_size", self.page_size)
@@ -47,9 +47,9 @@ class AdminListView(HTMXViewMixin, AdminView):
         context["objects"] = self._page  # alias
         context["fields"] = self.get_fields()
         context["actions"] = self.get_actions()
-        context["displays"] = self.get_displays()
+        context["presets"] = self.get_presets()
 
-        context["current_display"] = self.display
+        context["current_preset"] = self.preset
 
         # Implement search yourself in get_objects
         context["search_query"] = self.request.query_params.get("search", "")
@@ -115,8 +115,8 @@ class AdminListView(HTMXViewMixin, AdminView):
     def get_actions(self) -> list[str]:
         return self.actions.copy()  # Avoid mutating the class attribute itself
 
-    def get_displays(self) -> list[str]:
-        return self.displays.copy()  # Avoid mutating the class attribute itself
+    def get_presets(self) -> list[str]:
+        return self.presets.copy()  # Avoid mutating the class attribute itself
 
     def get_field_value(self, obj: Any, field: str) -> Any:
         try:

@@ -19,14 +19,14 @@
             {% if description %}<p class="mt-1 text-xs text-white/50">{{ description }}</p>{% endif %}
         </div>
 
-        {% if displays %}
+        {% if presets %}
         <select
             hx-get
-            name="{{ slug }}.display"
+            name="{{ slug }}.preset"
             class="text-xs py-1.5">
             <option value="">(Reset to default)</option>
-            {% for display in displays %}
-            <option {% if display == current_display %}selected{% endif %}>{{ display }}</option>
+            {% for preset in presets %}
+            <option {% if preset == current_preset %}selected{% endif %}>{{ preset }}</option>
             {% endfor %}
         </select>
         {% endif %}
