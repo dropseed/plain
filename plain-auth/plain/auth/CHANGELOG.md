@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.20.6](https://github.com/dropseed/plain/releases/plain-auth@0.20.6) (2025-10-22)
+
+### What's changed
+
+- Fixed impersonation check in `AuthViewMixin` to properly handle optional `plain-admin` dependency using `get_request_impersonator()` function instead of `getattr()` ([548a385](https://github.com/dropseed/plain/commit/548a3859f5))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.5](https://github.com/dropseed/plain/releases/plain-auth@0.20.5) (2025-10-20)
 
 ### What's changed
