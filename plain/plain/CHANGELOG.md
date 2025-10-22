@@ -1,5 +1,44 @@
 # plain changelog
 
+## [0.79.0](https://github.com/dropseed/plain/releases/plain@0.79.0) (2025-10-22)
+
+### What's changed
+
+- Response objects now have an `exception` attribute that stores the exception that caused 5xx errors ([0a243ba89c](https://github.com/dropseed/plain/commit/0a243ba89c))
+- Middleware classes now use an abstract base class `HttpMiddleware` with a `process_request()` method ([b960eed6c6](https://github.com/dropseed/plain/commit/b960eed6c6))
+- CSRF middleware now raises `PermissionDenied` instead of rendering a custom `CsrfFailureView` ([d4b93e59b3](https://github.com/dropseed/plain/commit/d4b93e59b3))
+- The `HTTP_ERROR_VIEWS` setting has been removed ([7a4e3a31f4](https://github.com/dropseed/plain/commit/7a4e3a31f4))
+- Standalone `plain-changelog` and `plain-upgrade` executables have been removed in favor of the built-in commands ([07c3a4c540](https://github.com/dropseed/plain/commit/07c3a4c540))
+- Standalone `plain-build` executable has been removed ([99301ea797](https://github.com/dropseed/plain/commit/99301ea797))
+- Removed automatic logging of all HTTP 400+ status codes for cleaner logs ([c2769d7281](https://github.com/dropseed/plain/commit/c2769d7281))
+
+### Upgrade instructions
+
+- If you have custom middleware, inherit from `HttpMiddleware` and rename your `__call__()` method to `process_request()`:
+
+    ```python
+    # Before:
+    class MyMiddleware:
+        def __init__(self, get_response):
+            self.get_response = get_response
+
+        def __call__(self, request):
+            response = self.get_response(request)
+            return response
+
+    # After:
+    from plain.http import HttpMiddleware
+
+    class MyMiddleware(HttpMiddleware):
+        def process_request(self, request):
+            response = self.get_response(request)
+            return response
+    ```
+
+- Remove any custom `HTTP_ERROR_VIEWS` setting from your configuration - error views are now controlled entirely by exception handlers
+- If you were calling `plain-changelog` or `plain-upgrade` as standalone commands, use `plain changelog` or `plain upgrade` instead
+- If you were calling `plain-build` as a standalone command, use `plain build` instead
+
 ## [0.78.2](https://github.com/dropseed/plain/releases/plain@0.78.2) (2025-10-20)
 
 ### What's changed
