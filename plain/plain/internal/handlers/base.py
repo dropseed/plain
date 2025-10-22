@@ -25,13 +25,15 @@ BUILTIN_BEFORE_MIDDLEWARE = [
     "plain.internal.middleware.hosts.HostValidationMiddleware",  # Validate Host header first
     "plain.internal.middleware.headers.DefaultHeadersMiddleware",  # Runs after response, to set missing headers
     "plain.internal.middleware.https.HttpsRedirectMiddleware",  # Runs before response, to redirect to HTTPS quickly
-    "plain.csrf.middleware.CsrfViewMiddleware",  # Runs before and after get_response...
 ]
 
 BUILTIN_AFTER_MIDDLEWARE = [
     # Want this to run first (when reversed) so the slash middleware
     # can immediately redirect to the slash-appended path if there is one.
     "plain.internal.middleware.slash.RedirectSlashMiddleware",
+    # CSRF runs after user middleware (e.g. SessionMiddleware) so that
+    # error templates and logging have access to request.session/request.user
+    "plain.csrf.middleware.CsrfViewMiddleware",
 ]
 
 

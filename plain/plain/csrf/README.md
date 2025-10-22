@@ -13,7 +13,9 @@ Plain provides modern CSRF protection based on [Filippo Valsorda's 2025 research
 
 ## Usage
 
-The `CsrfViewMiddleware` is [automatically installed](../internal/handlers/base.py#BUILTIN_BEFORE_MIDDLEWARE) and works transparently. **No changes to your forms or templates are needed.**
+The `CsrfViewMiddleware` is [automatically installed](../internal/handlers/base.py#BUILTIN_AFTER_MIDDLEWARE) and works transparently. **No changes to your forms or templates are needed.**
+
+The middleware runs after your user-configured middleware (like `SessionMiddleware`), which means error templates and logging have access to `request.session` and `request.user` when CSRF protection is triggered.
 
 ## CSRF Exempt Paths
 
