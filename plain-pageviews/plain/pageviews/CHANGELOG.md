@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.25.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.1) (2025-10-22)
+
+### What's changed
+
+- Fixed pageview tracking to properly detect impersonation using `get_request_impersonator()` instead of directly accessing request attributes ([548a385](https://github.com/dropseed/plain/commit/548a3859f53c4afb5c67cd6a14b345b2f742f1ae))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.0) (2025-10-17)
 
 ### What's changed
