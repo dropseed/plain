@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.54.0](https://github.com/dropseed/plain/releases/plain-models@0.54.0) (2025-10-22)
+
+### What's changed
+
+- SQLite migrations are now always run separately instead of in atomic batches, fixing issues with foreign key constraint handling ([5082453](https://github.com/dropseed/plain/commit/508245375960f694cfac4e17a6bfbb2301969a5c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.53.1](https://github.com/dropseed/plain/releases/plain-models@0.53.1) (2025-10-20)
 
 ### What's changed
