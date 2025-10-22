@@ -1,5 +1,16 @@
 # plain-sessions changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-sessions@0.36.0) (2025-10-22)
+
+### What's changed
+
+- The `SessionMiddleware` now inherits from the new `HttpMiddleware` abstract base class and uses `process_request()` instead of `__call__()` ([b960eed](https://github.com/dropseed/plain/commit/b960eed6c6))
+- Type annotations have been improved throughout the middleware ([77dfa66](https://github.com/dropseed/plain/commit/77dfa662ba))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.35.1](https://github.com/dropseed/plain/releases/plain-sessions@0.35.1) (2025-10-20)
 
 ### What's changed
