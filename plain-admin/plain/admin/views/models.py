@@ -140,17 +140,19 @@ class AdminModelListView(AdminListView):
             # Check if we got a related manager back and need to get its queryset
             if isinstance(value, BaseRelatedManager):
                 return value.query.all()
+
+            # For Model instances with choice fields, use get_field_display
+            if isinstance(obj, models.Model):
+                try:
+                    field_obj = obj._model_meta.get_field(field)
+                    if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
+                        return obj.get_field_display(field)
+                except Exception:
+                    pass
+
             return value
         except (AttributeError, TypeError):
             return get_model_field(obj, field)
-
-    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
-        templates = super().get_field_value_template(obj, field, value)
-        if hasattr(obj, f"get_{field}_display"):
-            # Insert before the last default template,
-            # so it can still be overriden by the user
-            templates.insert(-1, "admin/values/get_display.html")
-        return templates
 
 
 class AdminModelDetailView(AdminDetailView):
@@ -188,6 +190,16 @@ class AdminModelDetailView(AdminDetailView):
             # Check if we got a related manager back and need to get its queryset
             if isinstance(value, BaseRelatedManager):
                 return value.query.all()
+
+            # For Model instances with choice fields, use get_field_display
+            if isinstance(obj, models.Model):
+                try:
+                    field_obj = obj._model_meta.get_field(field)
+                    if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
+                        return obj.get_field_display(field)
+                except Exception:
+                    pass
+
             return value
         except (AttributeError, TypeError):
             return get_model_field(obj, field)
