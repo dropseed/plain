@@ -257,7 +257,7 @@ HTTP errors are rendered using templates. Create templates for the errors users 
 - `templates/403.html` - Forbidden
 - `templates/500.html` - Server error
 
-Plain looks for `{status_code}.html`, then `{category}.html` (e.g., `4xx.html`), then returns a plain HTTP response. Most apps only need the three specific templates above.
+Plain looks for `{status_code}.html` templates, then returns a plain HTTP response if not found. Most apps only need the three specific templates above.
 
 Templates receive `status_code` and `exception` in context.
 

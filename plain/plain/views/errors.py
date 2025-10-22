@@ -29,10 +29,8 @@ class ErrorView(TemplateView):
         return context
 
     def get_template_names(self) -> list[str]:
-        # Try specific status code first (e.g. "404.html")
-        # Then fall back to category (e.g. "4xx.html" or "5xx.html")
-        category = f"{str(self.status_code)[0]}xx"
-        return [f"{self.status_code}.html", f"{category}.html"]
+        # Try specific status code template (e.g. "404.html")
+        return [f"{self.status_code}.html"]
 
     def get_request_handler(self) -> Callable[[], Any]:
         return self.get  # All methods (post, patch, etc.) will use the get()
