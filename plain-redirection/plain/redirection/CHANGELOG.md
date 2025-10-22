@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-redirection@0.24.0) (2025-10-22)
+
+### What's changed
+
+- Middleware has been refactored to inherit from `HttpMiddleware` abstract base class ([b960eed6c6](https://github.com/dropseed/plain/commit/b960eed6c6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-redirection@0.23.0) (2025-10-17)
 
 ### What's changed
