@@ -42,6 +42,12 @@ def dev(ctx: click.Context) -> None:
     asset_dirs = list(iter_asset_dirs())
 
     class EsbuildFilter(DefaultFilter):
+        ignore_entity_patterns = (
+            *DefaultFilter.ignore_entity_patterns,
+            r"\.tmp\.",
+            r"\.esbuilt\.",
+        )
+
         def __call__(self, change: Change, path: str) -> bool:
             return super().__call__(change, path) and ".esbuild." in path
 
