@@ -148,6 +148,8 @@ class ResponseBase:
             if not 100 <= self.status_code <= 599:
                 raise ValueError("HTTP status code must be an integer from 100 to 599.")
         self._reason_phrase = reason
+        # Exception that caused this response, if any (primarily for 500 errors)
+        self.exception: Exception | None = None
 
     @property
     def reason_phrase(self) -> str:

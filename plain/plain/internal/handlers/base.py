@@ -113,6 +113,9 @@ class BaseHandler:
                 else trace.StatusCode.ERROR
             )
 
+            if response.exception:
+                span.record_exception(response.exception)
+
             return response
 
     def _get_response(self, request: Request) -> ResponseBase:

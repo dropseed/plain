@@ -4,7 +4,6 @@ import logging
 from functools import wraps
 from typing import TYPE_CHECKING
 
-from plain import signals
 from plain.exceptions import (
     BadRequest,
     PermissionDenied,
@@ -112,7 +111,6 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
         )
 
     else:
-        signals.got_request_exception.send(sender=None, request=request)
         response = get_exception_response(
             request=request, status_code=500, exception=None
         )
@@ -132,13 +130,17 @@ def get_exception_response(
 ) -> Response:
     try:
         view_class = ErrorView.as_view(status_code=status_code, exception=exception)
-        return view_class(request)
-    except Exception:
-        signals.got_request_exception.send(sender=None, request=request)
-
+        response = view_class(request)
+        if response.status_code >= 500 and exception is not None:
+            # Attach the exception to the response for logging/observability
+            response.exception = exception
+        return response
+    except Exception as e:
         # In development mode, re-raise the exception to get a full stack trace
         if settings.DEBUG:
             raise
 
         # If we can't load the view, return a 500 response
-        return ResponseServerError()
+        response = ResponseServerError()
+        response.exception = e
+        return response
