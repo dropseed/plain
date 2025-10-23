@@ -204,21 +204,21 @@ class JobResultViewset(AdminViewset):
                     output_field=models.BooleanField(),
                 ),
             )
-            if self.display == "Successful":
+            if self.preset == "Successful":
                 return queryset.successful()
-            if self.display == "Errored":
+            if self.preset == "Errored":
                 return queryset.errored()
-            if self.display == "Cancelled":
+            if self.preset == "Cancelled":
                 return queryset.cancelled()
-            if self.display == "Lost":
+            if self.preset == "Lost":
                 return queryset.lost()
-            if self.display == "Retried":
+            if self.preset == "Retried":
                 return queryset.retried()
             return queryset
 
         def get_fields(self) -> list[str]:
             fields = super().get_fields()
-            if self.display == "Retried":
+            if self.preset == "Retried":
                 fields.append("retries")
                 fields.append("retry_attempt")
             return fields
