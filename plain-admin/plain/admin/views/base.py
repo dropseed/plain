@@ -35,7 +35,7 @@ class AdminView(AuthViewMixin, TemplateView):
     # so you can also use this for pages that can never be bookmarked
     nav_title = ""
     nav_section = ""
-    nav_icon = "app"
+    nav_icon = "dot"
 
     links: dict[str, str] = {}
 
