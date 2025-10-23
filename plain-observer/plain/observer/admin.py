@@ -93,15 +93,14 @@ class LogViewset(AdminViewset):
         fields = [
             "timestamp",
             "level",
-            "logger",
             "message",
             "trace",
             "span",
         ]
         queryset_order = ["-timestamp"]
         allow_global_search = False
-        search_fields = ["logger", "message", "level"]
-        filters = ["level", "logger"]
+        search_fields = ["message", "level"]
+        filters = ["level"]
         actions = ["Delete selected", "Delete all"]
 
         def perform_action(self, action: str, target_ids: Sequence[int]) -> None:
@@ -118,7 +117,6 @@ class LogViewset(AdminViewset):
                 .only(
                     "timestamp",
                     "level",
-                    "logger",
                     "message",
                     "span__span_id",
                     "trace__trace_id",
