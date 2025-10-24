@@ -1,5 +1,18 @@
 # plain-observer changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-observer@0.12.0) (2025-10-24)
+
+### What's changed
+
+- Admin viewsets now use `presets` instead of `displays` for predefined queryset filters ([0ecc60f](https://github.com/dropseed/plain/commit/0ecc60f19e))
+- Removed `logger` field from Log admin interface for simplified display ([ae43138](https://github.com/dropseed/plain/commit/ae43138863))
+- Removed `/admin/.*` from default ignored URL patterns, allowing admin pages to be traced ([daadf1a](https://github.com/dropseed/plain/commit/daadf1a53d))
+
+### Upgrade instructions
+
+- If you have custom admin viewsets using the `displays` attribute, rename it to `presets`
+- If you reference the `display` property in custom admin code (e.g., `self.display`), rename it to `self.preset`
+
 ## [0.11.2](https://github.com/dropseed/plain/releases/plain-observer@0.11.2) (2025-10-20)
 
 ### What's changed
