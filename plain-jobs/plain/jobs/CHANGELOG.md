@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.37.1](https://github.com/dropseed/plain/releases/plain-jobs@0.37.1) (2025-10-24)
+
+### What's changed
+
+- Fixed admin interface filter functionality to correctly use `preset` instead of `display` for filtering job results ([26fde7d562](https://github.com/dropseed/plain/commit/26fde7d562))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.0](https://github.com/dropseed/plain/releases/plain-jobs@0.37.0) (2025-10-22)
 
 ### What's changed
