@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-pages@0.15.0) (2025-10-24)
+
+### What's changed
+
+- Added explicit package label `plainpages` for better package identification and CLI integration ([d1783dd](https://github.com/dropseed/plain/commit/d1783dd564))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.2](https://github.com/dropseed/plain/releases/plain-pages@0.14.2) (2025-10-06)
 
 ### What's changed
