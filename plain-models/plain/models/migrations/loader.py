@@ -77,7 +77,7 @@ class MigrationLoader:
         """
 
         # This package (plain-models) has different code under migrations/
-        if package_label == "models":
+        if package_label == "plainmodels":
             return None, True
 
         app = packages_registry.get_package_config(package_label)
