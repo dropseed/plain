@@ -1,5 +1,6 @@
 from typing import Any
 
+from plain.auth.requests import get_request_user
 from plain.toolbar import ToolbarItem, register_toolbar_item
 
 from .impersonate import get_request_impersonator
@@ -19,4 +20,5 @@ class AdminToolbarItem(ToolbarItem):
             context["object_admin_url"] = registry.get_model_detail_url(obj)
             context["object_class_name"] = obj.__class__.__name__
         context["impersonator"] = get_request_impersonator(self.request)
+        context["user"] = get_request_user(self.request)
         return context
