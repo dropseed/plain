@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.6.0) (2025-10-24)
+
+### What's changed
+
+- Added explicit `package_label = "plaintoolbar"` to the package configuration ([d1783dd](https://github.com/dropseed/plain/commit/d1783dd564))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.5.3](https://github.com/dropseed/plain/releases/plain-toolbar@0.5.3) (2025-10-22)
 
 ### What's changed
