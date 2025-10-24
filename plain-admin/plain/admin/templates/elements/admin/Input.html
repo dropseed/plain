@@ -2,7 +2,6 @@
     id="{{ field.html_id }}"
     type="{{ type|default('text') }}"
     name="{{ field.html_name }}"
-    class="block w-full text-sm border rounded border-white/10 bg-white/5"
     {% if list is defined %}list="{{ list }}"{% endif %}
     {% if field.value() != None %}value="{{ field.value() }}"{% endif %}
     {% if field.field.required %}required{% endif %}

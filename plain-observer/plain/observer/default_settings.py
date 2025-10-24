@@ -1,5 +1,4 @@
 OBSERVER_IGNORE_URL_PATTERNS: list[str] = [
-    "/admin/.*",
     "/assets/.*",
     "/observer/.*",
     "/pageviews/.*",

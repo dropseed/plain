@@ -11,15 +11,11 @@
 {% htmxfragment "list" %}
 
 <header class="flex items-center justify-between">
-    <div class="text-sm text-white/50">
+    <div class="text-xs text-black/50">
         {% if table_style == "preview" %}
             <div class="mb-3">{{ title }}</div>
         {% else %}
-            {% if page.has_other_pages() %}
-            Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
-            {% else %}
-            Showing all {{ page.paginator.count }} results
-            {% endif %}
+            {{ page.paginator.count }} result{{ page.paginator.count|pluralize }}
         {% endif %}
     </div>
     <div class="flex space-x-2">
@@ -28,7 +24,7 @@
         {% else %}
         {% if actions %}
         <form method="POST" data-actions-form>
-            <select name="action_name" class="text-sm border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1 pl-3 pr-8">
+            <select name="action_name" class="text-sm py-1 pl-3 pr-8">
                 <option value="">Actions...</option>
                 {% for action in actions %}
                 <option>{{ action }}</option>
@@ -40,7 +36,7 @@
 
         <form method="GET" class="inline-flex space-x-2">
             {% if presets %}
-            <select data-autosubmit name="preset" class="block text-sm border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1 pl-3 pr-8">
+            <select data-autosubmit name="preset" class="text-sm py-1 pl-3 pr-8">
                 <option value="">Presets...</option>
                 {% for preset in presets %}
                 <option {% if preset == current_preset %}selected{% endif %}>{{ preset }}</option>
@@ -55,12 +51,12 @@
                     type="text"
                     name="search"
                     id="search"
-                    class="block w-full pr-8 pl-8 placeholder:text-white/30 text-sm border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1"
+                    class="text-sm pr-3 pl-8 py-1"
                     placeholder="Search"
                     value="{{ search_query|default('') }}"
                     >
-                <div class="absolute top-1/2 -translate-y-1/2 left-0 flex items-center pl-2.5 pointer-events-none">
-                    <admin.Icon name="search" class="w-3.5 h-3.5 text-gray-400" />
+                <div class="absolute top-1/2 -translate-y-1/2 left-2 flex items-center pointer-events-none">
+                    <admin.Icon name="search" class="w-3.5 h-3.5 text-black/50" />
                 </div>
             </div>
             {% endif %}
@@ -72,12 +68,12 @@
 <div class="w-full overflow-auto mt-2">
     <table class="text-sm table-auto">
         <thead>
-            <tr class="bg-white/5 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
+            <tr class="bg-stone-100 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
                 {% if table_style != "preview" and actions %}
                 <th class="p-0 pl-1">
                     <input
                         data-action-checkbox-all
-                        class="rounded bg-white/10 border-gray-200/20"
+                        class="rounded bg-white border-stone-300"
                         type="checkbox"
                     />
                 </th>
@@ -107,7 +103,7 @@
                         {% endif %}
                     </th>
                     {% else %}
-                    <th class="font-mono text-xs font-normal text-white/60">{{ field }}</th>
+                    <th class="font-mono text-xs font-normal text-black/60">{{ field }}</th>
                     {% endif %}
                 {% endfor %}
 
@@ -123,7 +119,7 @@
 
                 {% if table_style != "preview" and actions %}
                 <td class="p-0 pl-1">
-                    <input data-action-checkbox class="rounded bg-white/10 border-gray-200/20" type="checkbox" name="{{ get_object_id(object) }}" />
+                    <input data-action-checkbox class="rounded bg-white border-stone-300" type="checkbox" name="{{ get_object_id(object) }}" />
                 </td>
                 {% endif %}
 
@@ -140,14 +136,14 @@
                 {% set object_links = get_object_links(object) %}
                 {% if object_links %}
                 <td class="py-0">
-                    <button data-dropdown class="!bg-transparent inline-flex rounded-md border !border-transparent hover:!bg-white/10 hover:!border-white/10 px-3 py-1.5 text-sm font-medium text-white/80 focus:outline-none">
+                    <button data-dropdown class="bg-transparent inline-flex rounded-md border border-transparent hover:bg-stone-100 hover:border-stone-200 px-3 py-1 text-sm font-medium text-black/70 focus:outline-none">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
                             <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
                         </svg>
                         <template>
                             <div class="py-1">
                                 {% for text, url in object_links.items() %}
-                                <a href="{{ url }}" class="block px-4 py-2 text-sm text-white/80 hover:bg-white/10 rounded">
+                                <a href="{{ url }}" class="block px-4 py-2 text-sm text-black/70 hover:bg-stone-100 rounded">
                                     {{ text }}
                                 </a>
                                 {% endfor %}
@@ -163,9 +159,9 @@
 </div>
 
 {% if table_style != "preview" %}
-<footer class="mt-4">
+<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-white/95 backdrop-blur-md border-t border-stone-200 py-2">
     <div class="flex items-center justify-between">
-        <div class="py-2 text-sm text-white/50">
+        <div class="text-xs text-black/50">
             {% if page.has_other_pages() %}
             Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
             {% endif %}
@@ -178,7 +174,7 @@
             <form data-autosubmit method="GET">
                 {% if show_search and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
                 {% if presets and current_preset %}<input type="hidden" name="preset" value="{{ current_preset }}" />{% endif %}
-                <select name="page" class="text-xs border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-0.5 px-2">
+                <select name="page" class="text-xs py-0.5 pl-2 pr-7">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}

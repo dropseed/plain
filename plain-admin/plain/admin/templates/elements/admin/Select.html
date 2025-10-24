@@ -1,7 +1,6 @@
 <select
     id="{{ field.html_id }}"
     name="{{ field.html_name }}"
-    class="block w-full text-sm border rounded border-white/10 bg-white/5"
     {% if field.value() != None %}value="{{ field.value() }}"{% endif %}
     {% if field.field.required %}required{% endif %}
     >

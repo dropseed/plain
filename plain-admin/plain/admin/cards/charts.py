@@ -90,7 +90,7 @@ class TrendCard(ChartCard):
                 "datasets": [
                     {
                         "data": trend_data,
-                        "backgroundColor": "rgba(255, 255, 255, 0.3)",
+                        "backgroundColor": "rgba(120, 113, 108, 0.6)",  # stone-500 with opacity
                     },
                 ],
             },

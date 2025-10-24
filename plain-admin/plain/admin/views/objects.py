@@ -23,7 +23,7 @@ class AdminListView(HTMXViewMixin, AdminView):
     fields: list[str]
     actions: list[str] = []
     presets: list[str] = []
-    page_size = 100
+    page_size = 20
     show_search = False
     allow_global_search = False
 

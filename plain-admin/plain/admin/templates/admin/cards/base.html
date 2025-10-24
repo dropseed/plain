@@ -1,4 +1,4 @@
-<section
+<aside
     id="card-{{ slug }}"
     hx-target="this"
     hx-select="#card-{{ slug }}"
@@ -16,24 +16,26 @@
     <header class="flex justify-between items-center">
         <div>
             <h2 class="text-sm font-semibold">{{ title }}</h2>
-            {% if description %}<p class="mt-1 text-xs text-white/50">{{ description }}</p>{% endif %}
+            {% if description %}<p class="mt-1 text-xs text-black/50">{{ description }}</p>{% endif %}
         </div>
 
         {% if presets %}
-        <select
-            hx-get
-            name="{{ slug }}.preset"
-            class="text-xs py-1.5">
-            <option value="">(Reset to default)</option>
-            {% for preset in presets %}
-            <option {% if preset == current_preset %}selected{% endif %}>{{ preset }}</option>
-            {% endfor %}
-        </select>
+        <div>
+            <select
+                hx-get
+                name="{{ slug }}.preset"
+                class="text-xs py-1.5">
+                <option value="">(Reset to default)</option>
+                {% for preset in presets %}
+                <option {% if preset == current_preset %}selected{% endif %}>{{ preset }}</option>
+                {% endfor %}
+            </select>
+        </div>
         {% endif %}
     </header>
     {% endblock %}
 
-    <div>
+    <div class="card-content">
     {% block content %}{% endblock %}
     </div>
-</section>
+</aside>
