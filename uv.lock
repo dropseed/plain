@@ -356,7 +356,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.51.0"
+version = "0.52.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -577,7 +577,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-esbuild"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "plain-esbuild" }
 dependencies = [
     { name = "plain" },
@@ -630,7 +630,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.37.0"
+version = "0.37.1"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -668,7 +668,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.54.0"
+version = "0.55.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -718,7 +718,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.11.2"
+version = "0.12.0"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
@@ -743,7 +743,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pages"
-version = "0.14.2"
+version = "0.15.0"
 source = { editable = "plain-pages" }
 dependencies = [
     { name = "mistune" },
@@ -881,7 +881,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-toolbar"
-version = "0.5.3"
+version = "0.6.0"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },

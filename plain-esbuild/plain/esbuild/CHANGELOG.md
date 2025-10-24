@@ -1,5 +1,15 @@
 # plain-esbuild changelog
 
+## [0.7.1](https://github.com/dropseed/plain/releases/plain-esbuild@0.7.1) (2025-10-24)
+
+### What's changed
+
+- The esbuild file watcher now ignores `.tmp.` and `.esbuilt.` files to prevent unnecessary rebuilds ([f60d6be](https://github.com/dropseed/plain/commit/f60d6bee3d52ad5af763a84126de1cd40a85d33f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.7.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.7.0) (2025-10-17)
 
 ### What's changed
