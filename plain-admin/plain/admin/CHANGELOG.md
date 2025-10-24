@@ -1,5 +1,25 @@
 # plain-admin changelog
 
+## [0.52.0](https://github.com/dropseed/plain/releases/plain-admin@0.52.0) (2025-10-24)
+
+### What's changed
+
+- Admin list and card "displays" have been renamed to "presets" for better clarity ([0ecc60f](https://github.com/dropseed/plain/commit/0ecc60f19e5cf7db10a7d05e5a799d001725d1fc))
+- Model choice fields now use the newer `get_field_display()` method directly instead of relying on a separate template ([1d78191](https://github.com/dropseed/plain/commit/1d781919be7c4b8f6390faeac9df596934f7e760))
+- Added `is_package_installed()` template function for checking if a package is installed in templates ([4362649](https://github.com/dropseed/plain/commit/43626494a275631ee1ee0d6fa8b4597c7e998fc1))
+- Changed default navigation icon from chevron to dot for a cleaner appearance ([b6a588a](https://github.com/dropseed/plain/commit/b6a588a598f54b818530fed4b736dda1a88f2353))
+- Fixed impersonation toolbar item to properly include user context ([92ba1cf](https://github.com/dropseed/plain/commit/92ba1cfd4ce377be54942d530f2c37f68bf4851a))
+- Fixed CSS ring styling on admin select elements ([80d7243](https://github.com/dropseed/plain/commit/80d7243cede69b290421618e08ffb82f4f6b15cc))
+- Admin interface now includes a lighter, more modern visual design with improved styling and layout ([daadf1a](https://github.com/dropseed/plain/commit/daadf1a53d6f86ea6643d938ccb4d348e124efd8))
+- Chart card styling has been simplified and improved ([88cabeb](https://github.com/dropseed/plain/commit/88cabeb887209a63ef5d2885bc7a7d250ca3b44a))
+
+### Upgrade instructions
+
+- Update any admin list views or cards that use the `displays` attribute to use `presets` instead
+- Update any custom templates that reference the `display` query parameter to use `preset` instead
+- Update any custom templates that reference `get_displays()` method to use `get_presets()` instead
+- Remove the `admin/values/get_display.html` template if you have customized it (choice field display is now handled automatically)
+
 ## [0.51.0](https://github.com/dropseed/plain/releases/plain-admin@0.51.0) (2025-10-22)
 
 ### What's changed
