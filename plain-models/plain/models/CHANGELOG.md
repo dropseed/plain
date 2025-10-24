@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.55.0](https://github.com/dropseed/plain/releases/plain-models@0.55.0) (2025-10-24)
+
+### What's changed
+
+- The plain-models package now uses an explicit `package_label = "plainmodels"` to avoid conflicts with other packages ([d1783dd](https://github.com/dropseed/plain/commit/d1783dd564cb48380e59cb4598722649a7d9574f))
+- Fixed migration loader to correctly check for `plainmodels` package label instead of `models` ([c41d11c](https://github.com/dropseed/plain/commit/c41d11c70d02bab59c6951ef1074b13a392d04a6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.54.0](https://github.com/dropseed/plain/releases/plain-models@0.54.0) (2025-10-22)
 
 ### What's changed
