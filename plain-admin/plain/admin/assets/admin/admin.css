@@ -107,7 +107,7 @@ could unintentionally overwrite those since our CSS is combined.
   select:focus {
     outline: none;
     border-color: rgb(29, 78, 216); /* blue-700 */
-    ring: 1px solid rgb(29, 78, 216); /* blue-700 */
+    box-shadow: 0 0 0 1px rgb(29, 78, 216); /* blue-700 */
   }
 
   input::placeholder,
