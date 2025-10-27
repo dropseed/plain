@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.11.1](https://github.com/dropseed/plain/releases/plain-code@0.11.1) (2025-10-27)
+
+### What's changed
+
+- Improved `plain code check` output with styled command labels and a clearer error message when checks fail ([5e75a0d](https://github.com/dropseed/plain/commit/5e75a0d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-code@0.11.0) (2025-10-22)
 
 ### What's changed
