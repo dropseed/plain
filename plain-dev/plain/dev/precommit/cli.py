@@ -46,29 +46,53 @@ def cli(install: bool) -> None:
             .get("run", {})
         ).items():
             cmd = data["cmd"]
-            print_event(f"Custom: {name} -> {cmd}")
+            print_event(
+                click.style(f"Custom[{name}]:", bold=True)
+                + click.style(f" {cmd}", dim=True),
+                newline=False,
+            )
             result = subprocess.run(cmd, shell=True)
             if result.returncode != 0:
                 sys.exit(result.returncode)
 
     # Run this first since it's probably the most likely to fail
     if find_spec("plain.code"):
-        check_short("Running plain code checks", "plain", "code", "check")
+        check_short(
+            click.style("Code:", bold=True)
+            + click.style(" plain code check", dim=True),
+            "plain",
+            "code",
+            "check",
+        )
 
     if Path("uv.lock").exists():
-        check_short("Checking uv.lock", "uv", "lock", "--check")
+        check_short(
+            click.style("Dependencies:", bold=True)
+            + click.style(" uv lock --check", dim=True),
+            "uv",
+            "lock",
+            "--check",
+        )
 
     if plain_db_connected():
         check_short(
-            "Running preflight checks",
+            click.style("Preflight:", bold=True)
+            + click.style(" plain preflight check", dim=True),
             "plain",
             "preflight",
             "check",
             "--quiet",
         )
-        check_short("Checking Plain migrations", "plain", "migrate", "--check")
         check_short(
-            "Checking for Plain models missing migrations",
+            click.style("Migrate:", bold=True)
+            + click.style(" plain migrate --check", dim=True),
+            "plain",
+            "migrate",
+            "--check",
+        )
+        check_short(
+            click.style("Migrations:", bold=True)
+            + click.style(" plain makemigrations --dry-run --check", dim=True),
             "plain",
             "makemigrations",
             "--dry-run",
@@ -76,7 +100,8 @@ def cli(install: bool) -> None:
         )
     else:
         check_short(
-            "Running Plain checks (without database)",
+            click.style("Preflight:", bold=True)
+            + click.style(" plain preflight check", dim=True),
             "plain",
             "preflight",
             "check",
@@ -84,13 +109,16 @@ def cli(install: bool) -> None:
         )
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
 
-    print_event("Running plain build")
-    result = subprocess.run(["plain", "build"])
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+    check_short(
+        click.style("Build:", bold=True) + click.style(" plain build", dim=True),
+        "plain",
+        "build",
+    )
 
     if find_spec("plain.pytest"):
-        print_event("Running tests")
+        print_event(
+            click.style("Test:", bold=True) + click.style(" plain test", dim=True)
+        )
         result = subprocess.run(["plain", "test"])
         if result.returncode != 0:
             sys.exit(result.returncode)
