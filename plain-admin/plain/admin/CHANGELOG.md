@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.52.2](https://github.com/dropseed/plain/releases/plain-admin@0.52.2) (2025-10-27)
+
+### What's changed
+
+- Action buttons reverted to stone-100 background with stone-300 border for improved visual consistency ([a612370](https://github.com/dropseed/plain/commit/a612370b33))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.52.1](https://github.com/dropseed/plain/releases/plain-admin@0.52.1) (2025-10-27)
 
 ### What's changed
