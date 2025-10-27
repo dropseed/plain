@@ -83,15 +83,27 @@ def check(ctx: click.Context, path: str) -> None:
     for e in config.get("exclude", []):
         ruff_args.extend(["--exclude", e])
 
-    print_event("Ruff check")
-    result = subprocess.run(["ruff", "check", path, *ruff_args])
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+    def maybe_exit(return_code: int) -> None:
+        if return_code != 0:
+            click.secho(
+                "\nCode check failed. Run `plain fix` and/or fix issues manually.",
+                fg="red",
+                err=True,
+            )
+            sys.exit(return_code)
 
-    print_event("Ruff format check")
+    print_event(
+        click.style("Ruff lint:", bold=True) + click.style(" ruff check", dim=True)
+    )
+    result = subprocess.run(["ruff", "check", path, *ruff_args])
+    maybe_exit(result.returncode)
+
+    print_event(
+        click.style("Ruff format:", bold=True)
+        + click.style(" ruff format --check", dim=True)
+    )
     result = subprocess.run(["ruff", "format", path, "--check", *ruff_args])
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+    maybe_exit(result.returncode)
 
     if config.get("biome", {}).get("enabled", True):
         biome = Biome()
@@ -99,10 +111,11 @@ def check(ctx: click.Context, path: str) -> None:
         if biome.needs_update():
             ctx.invoke(install)
 
-        print_event("Biome check")
+        print_event(
+            click.style("Biome:", bold=True) + click.style(" biome check", dim=True)
+        )
         result = biome.invoke("check", path)
-        if result.returncode != 0:
-            sys.exit(result.returncode)
+        maybe_exit(result.returncode)
 
 
 @without_runtime_setup
