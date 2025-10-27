@@ -1,5 +1,21 @@
 # plain-admin changelog
 
+## [0.52.1](https://github.com/dropseed/plain/releases/plain-admin@0.52.1) (2025-10-27)
+
+### What's changed
+
+- Admin sidebar now uses `data-sidebar-collapsed` attribute instead of a CSS class for better compatibility with Tailwind's arbitrary variant syntax ([d6fc253](https://github.com/dropseed/plain/commit/d6fc2537df))
+- Admin layout updated with improved visual design including rounded content area with subtle border, refined spacing, and cleaner background colors ([d6fc253](https://github.com/dropseed/plain/commit/d6fc2537df))
+- Table headers now have a subtle background color (stone-50) for better visual hierarchy ([d6fc253](https://github.com/dropseed/plain/commit/d6fc2537df))
+- Action buttons updated with lighter default styling using white background instead of stone-100 ([d6fc253](https://github.com/dropseed/plain/commit/d6fc2537df))
+- Sidebar preview overlay now uses backdrop blur effect for a more modern appearance ([d6fc253](https://github.com/dropseed/plain/commit/d6fc2537df))
+- Top bar search input now includes subtle inset shadow for better depth perception ([d6fc253](https://github.com/dropseed/plain/commit/d6fc2537df))
+- List view footer now only displays when pagination is needed ([d6fc253](https://github.com/dropseed/plain/commit/d6fc2537df))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.52.0](https://github.com/dropseed/plain/releases/plain-admin@0.52.0) (2025-10-24)
 
 ### What's changed
