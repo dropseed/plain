@@ -158,15 +158,12 @@
     </table>
 </div>
 
-{% if table_style != "preview" %}
-<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-white/95 backdrop-blur-md border-t border-stone-200 py-2">
+{% if table_style != "preview" and page.has_other_pages() %}
+<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-white border-t border-stone-200 py-2">
     <div class="flex items-center justify-between">
         <div class="text-xs text-black/50">
-            {% if page.has_other_pages() %}
             Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
-            {% endif %}
         </div>
-        {% if page.has_other_pages() %}
         <div class="flex items-center justify-center space-x-2">
             {% if page.has_previous() %}
             <a data-merge-params href="?page={{ page.previous_page_number() }}">&lsaquo;</a>
@@ -184,7 +181,6 @@
             <a data-merge-params href="?page={{ page.next_page_number() }}">&rsaquo;</a>
             {% endif %}
         </div>
-        {% endif %}
     </div>
 </footer>
 {% endif %}

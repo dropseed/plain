@@ -7,8 +7,15 @@ jQuery(($) => {
   $(document).on("click", "#sidebar-toggle", (e) => {
     e.preventDefault();
     const $html = $("html");
-    const willBeCollapsed = !$html.hasClass("admin-sidebar-collapsed");
-    $html.toggleClass("admin-sidebar-collapsed");
+    const isCurrentlyCollapsed =
+      $html.attr("data-sidebar-collapsed") === "true";
+    const willBeCollapsed = !isCurrentlyCollapsed;
+
+    if (willBeCollapsed) {
+      $html.attr("data-sidebar-collapsed", "true");
+    } else {
+      $html.removeAttr("data-sidebar-collapsed");
+    }
     localStorage.setItem(STORAGE_KEY, willBeCollapsed);
   });
 
@@ -16,16 +23,16 @@ jQuery(($) => {
   let hoverTimeout;
 
   $(document).on("mouseenter", "#sidebar-toggle", () => {
-    if ($("html").hasClass("admin-sidebar-collapsed")) {
+    if ($("html").attr("data-sidebar-collapsed") === "true") {
       clearTimeout(hoverTimeout);
-      $sidebar.addClass("hover-preview");
+      $sidebar.attr("data-preview", "true");
     }
   });
 
   $(document).on("mouseleave", "#sidebar-toggle", () => {
     hoverTimeout = setTimeout(() => {
       if (!$sidebar.is(":hover")) {
-        $sidebar.removeClass("hover-preview");
+        $sidebar.removeAttr("data-preview");
       }
     }, 100);
   });
@@ -35,8 +42,8 @@ jQuery(($) => {
   });
 
   $(document).on("mouseleave", "#admin-sidebar", () => {
-    if ($("html").hasClass("admin-sidebar-collapsed")) {
-      $sidebar.removeClass("hover-preview");
+    if ($("html").attr("data-sidebar-collapsed") === "true") {
+      $sidebar.removeAttr("data-preview");
     }
   });
 

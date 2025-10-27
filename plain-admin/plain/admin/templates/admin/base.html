@@ -19,7 +19,7 @@
         (function() {
             const isCollapsed = localStorage.getItem('admin-sidebar-collapsed') === 'true';
             if (isCollapsed) {
-                document.documentElement.classList.add('admin-sidebar-collapsed');
+                document.documentElement.dataset.sidebarCollapsed = 'true';
             }
         })();
     </script>
@@ -31,12 +31,12 @@
     {% block header_scripts %}{% endblock %}
 </head>
 <body
-    class="flex flex-col min-h-screen bg-white"
+    class="flex flex-col min-h-screen bg-stone-50"
     {% if is_package_installed('plaintoolbar') %}data-toolbar-installed{% endif %}
     >
 
     <!-- Top bar -->
-    <div class="grid grid-cols-3 items-center py-2 px-4 sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-black/10">
+    <div class="grid grid-cols-3 items-center px-4 sticky top-0 z-50 bg-stone-50/95 backdrop-blur-md h-14">
         <div class="flex items-center space-x-3">
             <button type="button" id="sidebar-toggle" class="text-black/60 hover:text-black/90 cursor-pointer">
                 <admin.Icon name="list" class="w-5 h-5" />
@@ -52,7 +52,7 @@
                     type="text"
                     name="query"
                     id="topbar-search"
-                    class="w-64 pr-3 pl-8 text-sm bg-black/5 py-1 border-none"
+                    class="w-64 pr-3 pl-8 text-sm bg-black/5 inset-shadow-2xs py-1 border-none"
                     placeholder="Search the admin"
                     value="{{ global_search_query|default('') }}"
                     >
@@ -94,7 +94,9 @@
     <div class="mb-10 flex flex-grow relative">
         <nav
             id="admin-sidebar"
-            class="admin-sidebar flex flex-col bg-white z-50 justify-between flex-shrink-0 w-52 overflow-auto border-r border-black/10"
+            class="flex flex-col bg-stone-50 z-40 justify-between flex-shrink-0 w-52 overflow-auto sticky top-14 self-start max-h-[calc(100vh-3.5rem)] pb-20 ml-0
+                   [[data-sidebar-collapsed]_&]:absolute [[data-sidebar-collapsed]_&]:left-0 [[data-sidebar-collapsed]_&]:top-0 [[data-sidebar-collapsed]_&]:bottom-0 [[data-sidebar-collapsed]_&]:-ml-52 [[data-sidebar-collapsed]_&]:z-40
+                   data-[preview]:!ml-0 data-[preview]:bg-stone-50/20 data-[preview]:backdrop-blur-md"
             hx-preserve="true">
             <div class="flex-grow pl-4 pr-2 lg:pl-2 lg:pr-4">
 
@@ -196,8 +198,8 @@
             </div>
         </nav>
 
-        <div id="admin-content" class="admin-content bg-white text-black/90 flex-grow">
-            <div class="flex items-center justify-between px-4 lg:px-8 sticky z-10 top-11 inset-x-0 bg-white/95 backdrop-blur-md py-2 mt-5">
+        <div id="admin-content" class="admin-content bg-white mx-4 mt-2 mb-6 rounded-lg border border-black/5 text-black/90 flex-grow">
+            <header class="flex items-center justify-between px-4 lg:px-8 inset-x-0 py-4 border-b border-black/5">
                 <div class="flex-shrink-0 overflow-hidden">
                 {% block header %}
                     <div class="flex items-center">
@@ -235,7 +237,7 @@
                     <a href="{{ url }}">{{ link }}</a>
                     {% endfor %}
                 </div>
-            </div>
+            </header>
 
             {% if cards %}
             <div class="px-4 mt-4 lg:px-8">

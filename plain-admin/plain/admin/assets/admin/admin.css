@@ -20,6 +20,7 @@ could unintentionally overwrite those since our CSS is combined.
   th {
     text-align: left;
     padding: 0.5rem 0.5rem;
+    background-color: rgb(250, 250, 249); /* stone-50 */
   }
 
   td {
@@ -134,14 +135,14 @@ could unintentionally overwrite those since our CSS is combined.
   .actions button,
   .actions a {
     display: inline-block;
-    padding: 4px 12px;
+    padding: 5px 14px;
     font-size: 13px;
     font-weight: 500;
     color: rgba(0, 0, 0, 0.9); /* black/90 */
     text-align: center;
     text-decoration: none;
-    background-color: rgb(245, 245, 244); /* stone-100 */
-    border: 1px solid rgb(214, 211, 209); /* stone-300 */
+    background-color: rgb(255, 255, 255); /* white */
+    border: 1px solid rgb(231, 229, 228); /* stone-200 */
     border-radius: 6px;
     transition:
       background-color 0.2s,
@@ -156,13 +157,13 @@ could unintentionally overwrite those since our CSS is combined.
     }
 
     &:hover {
-      background-color: rgb(231, 229, 228); /* stone-200 */
+      background-color: rgb(245, 245, 244); /* stone-100 */
       border-color: rgb(168, 162, 158); /* stone-400 */
       transform: translateY(-1px);
     }
 
     &:active {
-      background-color: rgb(214, 211, 209); /* stone-300 */
+      background-color: rgb(231, 229, 228); /* stone-200 */
       border-color: rgb(168, 162, 158); /* stone-400 */
       transform: translateY(0);
     }
@@ -229,38 +230,8 @@ could unintentionally overwrite those since our CSS is combined.
   color: rgba(0, 0, 0, 0.7) !important; /* black/70 */
 }
 
-/* Sidebar collapse/expand styles - no transitions for instant toggle */
-.admin-sidebar {
-  margin-left: 0;
-  position: relative;
-  transition: box-shadow 0.15s ease-in-out;
-}
-
-/* When collapsed, sidebar is hidden off-screen and positioned absolutely for overlay */
-.admin-sidebar-collapsed .admin-sidebar {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  margin-left: -13rem; /* -w-52 */
-  z-index: 100;
-}
-
-/* Show sidebar on hover when collapsed (triggered by JS) */
-.admin-sidebar-collapsed .admin-sidebar.hover-preview {
-  margin-left: 0;
-  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Content area adjustments when sidebar is collapsed */
+/* Content area adjustments */
 .admin-content {
   width: 100%;
   min-width: 0; /* Allow flex child to shrink below content size */
-}
-
-@media (max-width: 1023px) {
-  /* On mobile, hide completely when collapsed */
-  .admin-sidebar-collapsed .admin-sidebar {
-    margin-left: -13rem;
-  }
 }
