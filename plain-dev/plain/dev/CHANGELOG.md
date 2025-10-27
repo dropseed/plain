@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.43.1](https://github.com/dropseed/plain/releases/plain-dev@0.43.1) (2025-10-27)
+
+### What's changed
+
+- The `plain precommit` command output has been redesigned with improved styling and clearer labels for each check that runs ([b45011c](https://github.com/dropseed/plain/commit/b45011cc44))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.43.0](https://github.com/dropseed/plain/releases/plain-dev@0.43.0) (2025-10-22)
 
 ### What's changed
