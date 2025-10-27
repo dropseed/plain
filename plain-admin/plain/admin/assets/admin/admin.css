@@ -141,8 +141,8 @@ could unintentionally overwrite those since our CSS is combined.
     color: rgba(0, 0, 0, 0.9); /* black/90 */
     text-align: center;
     text-decoration: none;
-    background-color: rgb(255, 255, 255); /* white */
-    border: 1px solid rgb(231, 229, 228); /* stone-200 */
+    background-color: rgb(245, 245, 244); /* stone-100 */
+    border: 1px solid rgb(214, 211, 209); /* stone-300 */
     border-radius: 6px;
     transition:
       background-color 0.2s,
@@ -157,13 +157,13 @@ could unintentionally overwrite those since our CSS is combined.
     }
 
     &:hover {
-      background-color: rgb(245, 245, 244); /* stone-100 */
+      background-color: rgb(231, 229, 228); /* stone-200 */
       border-color: rgb(168, 162, 158); /* stone-400 */
       transform: translateY(-1px);
     }
 
     &:active {
-      background-color: rgb(231, 229, 228); /* stone-200 */
+      background-color: rgb(214, 211, 209); /* stone-300 */
       border-color: rgb(168, 162, 158); /* stone-400 */
       transform: translateY(0);
     }
