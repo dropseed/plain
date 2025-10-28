@@ -13,7 +13,7 @@
 Preflight checks help identify issues with your settings or environment before running your application.
 
 ```bash
-plain preflight check
+plain preflight
 ```
 
 ## Development
@@ -22,31 +22,53 @@ If you use [`plain.dev`](/plain-dev/README.md) for local development, the Plain 
 
 ## Deployment
 
-The `plain preflight check` command should often be part of your deployment process. Make sure to add the `--deploy` flag to the command to run checks that are only relevant in a production environment.
+The `plain preflight` command should often be part of your deployment process. Make sure to add the `--deploy` flag to the command to run checks that are only relevant in a production environment.
 
 ```bash
-plain preflight check --deploy
+plain preflight --deploy
 ```
 
 ## Custom preflight checks
 
-Use the `@register_check` decorator to add your own preflight check to the system. Just make sure that particular Python module is somehow imported so the check registration runs.
+Use the `@register_check` decorator to add your own preflight check to the system. Create a class that inherits from `PreflightCheck` and implements a `run()` method that returns a list of `PreflightResult` objects.
 
 ```python
-from plain.preflight import register_check, Error
+from plain.preflight import PreflightCheck, PreflightResult, register_check
 
 
-@register_check
-def custom_check(package_configs, **kwargs):
-    return Error("This is a custom error message.", id="custom.C001")
+@register_check("custom.example")
+class CustomCheck(PreflightCheck):
+    """Description of what this check validates."""
+
+    def run(self) -> list[PreflightResult]:
+        # Your check logic here
+        if some_condition:
+            return [
+                PreflightResult(
+                    fix="This is a custom error message.",
+                    id="custom.example_failed",
+                )
+            ]
+        return []
 ```
 
-For deployment-specific checks, add the `deploy` argument to the decorator.
+For deployment-specific checks, add `deploy=True` to the decorator.
 
 ```python
-@register_check(deploy=True)
-def custom_deploy_check(package_configs, **kwargs):
-    return Error("This is a custom error message for deployment.", id="custom.D001")
+@register_check("custom.deploy_example", deploy=True)
+class CustomDeployCheck(PreflightCheck):
+    """Description of what this deployment check validates."""
+
+    def run(self) -> list[PreflightResult]:
+        # Your deployment check logic here
+        if some_deploy_condition:
+            return [
+                PreflightResult(
+                    fix="This is a custom error message for deployment.",
+                    id="custom.deploy_example_failed",
+                )
+            ]
+        return []
 ```
 
 ## Silencing preflight checks

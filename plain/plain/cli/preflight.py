@@ -5,21 +5,13 @@ import click
 
 from plain import preflight
 from plain.packages import packages_registry
-from plain.preflight.registry import checks_registry
-from plain.runtime import settings
 
 
-@click.group("preflight")
-def preflight_cli() -> None:
-    """Run or manage preflight checks."""
-    pass
-
-
-@preflight_cli.command("check")
+@click.command("preflight")
 @click.option(
     "--deploy",
     is_flag=True,
-    help="Check deployment settings.",
+    help="Include deployment checks.",
 )
 @click.option(
     "--format",
@@ -32,14 +24,13 @@ def preflight_cli() -> None:
     is_flag=True,
     help="Hide progress output and warnings, only show errors.",
 )
-def check_command(deploy: bool, format: str, quiet: bool) -> None:
+def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
     """
-    Use the system check framework to validate entire Plain project.
+    Run preflight checks to validate your Plain project.
     Exit with error code if any errors are found. Warnings do not cause failure.
     """
     # Auto-discover and load preflight checks
     packages_registry.autodiscover_modules("preflight", include_app=True)
-
     if not quiet:
         click.secho("Running preflight checks...", dim=True, italic=True, err=True)
 
@@ -200,48 +191,3 @@ def check_command(deploy: bool, format: str, quiet: bool) -> None:
     # Exit with error if there are any errors (not warnings)
     if has_errors:
         sys.exit(1)
-
-
-@preflight_cli.command("list")
-def list_checks() -> None:
-    """List all available preflight checks."""
-    packages_registry.autodiscover_modules("preflight", include_app=True)
-
-    regular = []
-    deployment = []
-    silenced_checks = settings.PREFLIGHT_SILENCED_CHECKS
-
-    for name, (check_class, deploy) in sorted(checks_registry.checks.items()):
-        # Use class docstring as description
-        description = check_class.__doc__ or "No description"
-        # Get first line of docstring
-        description = description.strip().split("\n")[0]
-
-        is_silenced = name in silenced_checks
-        if deploy:
-            deployment.append((name, description, is_silenced))
-        else:
-            regular.append((name, description, is_silenced))
-
-    if regular:
-        click.echo("Regular checks:")
-        for name, description, is_silenced in regular:
-            silenced_text = (
-                click.style(" (silenced)", fg="red", dim=True) if is_silenced else ""
-            )
-            click.echo(
-                f"  {click.style(name)}: {click.style(description, dim=True)}{silenced_text}"
-            )
-
-    if deployment:
-        click.echo("\nDeployment checks:")
-        for name, description, is_silenced in deployment:
-            silenced_text = (
-                click.style(" (silenced)", fg="red", dim=True) if is_silenced else ""
-            )
-            click.echo(
-                f"  {click.style(name)}: {click.style(description, dim=True)}{silenced_text}"
-            )
-
-    if not regular and not deployment:
-        click.echo("No preflight checks found.")

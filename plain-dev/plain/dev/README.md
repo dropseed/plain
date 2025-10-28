@@ -39,7 +39,7 @@ This will:
 The `plain dev` command does several things:
 
 - Sets `PLAIN_CSRF_TRUSTED_ORIGINS` to localhost by default
-- Runs `plain preflight check` to check for any issues
+- Runs `plain preflight` to check for any issues
 - Executes any pending model migrations
 - Starts `gunicorn` with `--reload`
 - Serves HTTPS on port 8443 by default (uses the next free port if 8443 is taken and no port is specified)
@@ -96,7 +96,7 @@ Runs:
 - Custom commands defined in `pyproject.toml` at `tool.plain.pre-commit.run`
 - `plain code check`, if [`plain.code`](https://plainframework.com/docs/plain-code/plain/code/) is installed
 - `uv lock --locked`, if using uv
-- `plain preflight check`
+- `plain preflight`
 - `plain migrate --check`
 - `plain makemigrations --dry-run --check`
 - `plain build`

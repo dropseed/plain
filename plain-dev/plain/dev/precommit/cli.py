@@ -77,10 +77,9 @@ def cli(install: bool) -> None:
     if plain_db_connected():
         check_short(
             click.style("Preflight:", bold=True)
-            + click.style(" plain preflight check", dim=True),
+            + click.style(" plain preflight", dim=True),
             "plain",
             "preflight",
-            "check",
             "--quiet",
         )
         check_short(
@@ -101,10 +100,9 @@ def cli(install: bool) -> None:
     else:
         check_short(
             click.style("Preflight:", bold=True)
-            + click.style(" plain preflight check", dim=True),
+            + click.style(" plain preflight", dim=True),
             "plain",
             "preflight",
-            "check",
             "--quiet",
         )
         click.secho("--> Skipping migration checks", bold=True, fg="yellow")
