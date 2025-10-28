@@ -5,6 +5,7 @@
 - [Overview](#overview)
 - [Basic usage](#basic-usage)
 - [Session configuration](#session-configuration)
+- [Session expiration](#session-expiration)
 - [Session management](#session-management)
     - [Flushing sessions](#flushing-sessions)
     - [Cycling session keys](#cycling-session-keys)
@@ -84,11 +85,20 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 
 # Whether to save the session data on every request
+# False (default) = save only when modified, True = save on every access
 SESSION_SAVE_EVERY_REQUEST = False
 
 # Whether a user's session cookie expires when the browser is closed
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 ```
+
+## Session expiration
+
+Sessions expire `SESSION_COOKIE_AGE` seconds after they are **last saved** (not last accessed).
+
+By default (`SESSION_SAVE_EVERY_REQUEST = False`), sessions are only saved when modified. For authenticated users, this means the expiration timer resets on login/logout but **not** when just browsing pages. Users will be logged out after `SESSION_COOKIE_AGE` even if actively using the site.
+
+To extend sessions on every page access, set `SESSION_SAVE_EVERY_REQUEST = True`. This creates a sliding window where users stay logged in as long as they visit within `SESSION_COOKIE_AGE`, but increases database writes
 
 ## Session management
 
