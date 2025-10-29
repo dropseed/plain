@@ -4,6 +4,7 @@
 
 - [Overview](#overview)
 - [Content Security Policy (CSP)](#content-security-policy-csp)
+- [Customizing Default Response Headers](#customizing-default-response-headers)
 
 ## Overview
 
@@ -38,29 +39,28 @@ Each request generates a unique cryptographically secure nonce available via [`r
 
 ### Configuring CSP Headers
 
-Set `DEFAULT_RESPONSE_HEADERS` as a callable function to generate dynamic CSP headers with nonces:
+Include CSP in `DEFAULT_RESPONSE_HEADERS` using `{request.csp_nonce}` placeholders for dynamic nonces:
 
 ```python
 # app/settings.py
-def DEFAULT_RESPONSE_HEADERS(request):
-    """
-    Dynamic response headers with CSP nonces.
-    """
-    nonce = request.csp_nonce
-    return {
-        "Content-Security-Policy": (
-            f"default-src 'self'; "
-            f"script-src 'self' 'nonce-{nonce}'; "
-            f"style-src 'self' 'nonce-{nonce}'; "
-            f"img-src 'self' data:; "
-            f"font-src 'self'; "
-            f"connect-src 'self'; "
-            f"frame-ancestors 'self'; "
-            f"base-uri 'self'; "
-            f"form-action 'self'"
-        ),
-    }
+DEFAULT_RESPONSE_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'nonce-{request.csp_nonce}'; "
+        "style-src 'self' 'nonce-{request.csp_nonce}'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    ),
+    # Other default headers...
+    "X-Frame-Options": "DENY",
+}
 ```
+
+The `{request.csp_nonce}` placeholder will be replaced with a unique nonce for each request.
 
 Use tools like [Google's CSP Evaluator](https://csp-evaluator.withgoogle.com/) to analyze your CSP policy and identify potential security issues or misconfigurations.
 
@@ -86,4 +86,57 @@ External scripts and stylesheets loaded from `'self'` don't need nonces:
 <!-- External scripts/styles work with 'self' directive -->
 <script src="/assets/app.js"></script>
 <link rel="stylesheet" href="/assets/app.css">
+```
+
+## Customizing Default Response Headers
+
+Plain applies default response headers to all responses via `DEFAULT_RESPONSE_HEADERS` in settings. Views can customize these headers in several ways:
+
+### Override Default Headers
+
+Set the header to a different value in your view:
+
+```python
+class MyView(View):
+    def get(self):
+        response = Response("content")
+        # Override the default X-Frame-Options: DENY
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        return response
+```
+
+### Remove Default Headers
+
+Set the header to `None` to prevent it from being applied:
+
+```python
+class EmbeddableView(View):
+    def get(self):
+        response = Response("content")
+        # Remove X-Frame-Options entirely to allow embedding
+        response.headers["X-Frame-Options"] = None
+        return response
+```
+
+### Extend Default Headers
+
+Read the default value from settings, modify it, then set it in your view:
+
+```python
+from plain.runtime import settings
+
+class MyView(View):
+    def get(self):
+        response = Response("content")
+
+        # Get the default CSP policy
+        if csp := settings.DEFAULT_RESPONSE_HEADERS.get("Content-Security-Policy"):
+            # Format it with the current request to resolve placeholders
+            csp = csp.format(request=self.request)
+            # Extend with additional sources
+            response.headers["Content-Security-Policy"] = (
+                f"{csp}; script-src https://analytics.example.com"
+            )
+
+        return response
 ```

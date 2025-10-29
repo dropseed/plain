@@ -27,8 +27,12 @@ URLS_ROUTER: str
 ALLOWED_HOSTS: list[str] = []
 
 # Default headers for all responses.
-DEFAULT_RESPONSE_HEADERS = {
-    # "Content-Security-Policy": "default-src 'self'",
+# Header values can include {request.attribute} placeholders for dynamic content.
+# Example: "script-src 'nonce-{request.csp_nonce}'" will use the request's nonce.
+# Views can override, remove, or extend these headers - see plain/http/README.md
+# for customization patterns.
+DEFAULT_RESPONSE_HEADERS: dict = {
+    # "Content-Security-Policy": "default-src 'self'; script-src 'self' 'nonce-{request.csp_nonce}'",
     # https://hstspreload.org/
     # "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Cross-Origin-Opener-Policy": "same-origin",

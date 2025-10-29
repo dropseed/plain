@@ -51,10 +51,10 @@ class SupportIFrameView(SupportFormView):
     def get_response(self) -> Response:
         response = super().get_response()
 
-        # X-Frame-Options are typically in DEFAULT_RESPONSE_HEADERS,
-        # which will know to drop the header completely if an empty string.
-        # We can't del/pop it because DEFAULT_RESPONSE_HEADERS may add it back.
-        response.headers["X-Frame-Options"] = ""
+        # X-Frame-Options are typically in DEFAULT_RESPONSE_HEADERS.
+        # Set to None to signal the middleware to skip applying this default header.
+        # We can't del/pop it because middleware runs after and would add it back.
+        response.headers["X-Frame-Options"] = None
 
         return response
 

@@ -55,15 +55,13 @@ Without this directive, the toolbar panel will fail to load with a CSP error: `"
 Example CSP configuration:
 
 ```python
-def DEFAULT_RESPONSE_HEADERS(request):
-    nonce = request.csp_nonce
-    return {
-        "Content-Security-Policy": (
-            f"default-src 'self'; "
-            f"script-src 'self' 'nonce-{nonce}'; "
-            f"style-src 'self' 'nonce-{nonce}'; "
-            f"frame-ancestors 'self'; "  # Required for Observer toolbar
-            # ... other directives
-        ),
-    }
+DEFAULT_RESPONSE_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'nonce-{request.csp_nonce}'; "
+        "style-src 'self' 'nonce-{request.csp_nonce}'; "
+        "frame-ancestors 'self'; "  # Required for Observer toolbar
+        # ... other directives
+    ),
+}
 ```

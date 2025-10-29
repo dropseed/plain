@@ -28,24 +28,20 @@ INSTALLED_PACKAGES = [
 ]
 
 
-def DEFAULT_RESPONSE_HEADERS(request):
-    """
-    Strict CSP policy for testing CSP nonce support.
-    """
-    nonce = request.csp_nonce
-    return {
-        "Content-Security-Policy": (
-            f"default-src 'self'; "
-            f"script-src 'self' 'nonce-{nonce}'; "
-            f"style-src 'self' 'nonce-{nonce}'; "
-            f"img-src 'self' data: https://www.gravatar.com; "
-            f"font-src 'self'; "
-            f"connect-src 'self'; "
-            f"frame-ancestors 'self'; "
-            f"base-uri 'self'; "
-            f"form-action 'self'"
-        ),
-    }
+DEFAULT_RESPONSE_HEADERS = {
+    # Strict CSP policy for testing CSP nonce support
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'nonce-{request.csp_nonce}'; "
+        "style-src 'self' 'nonce-{request.csp_nonce}'; "
+        "img-src 'self' data: https://www.gravatar.com; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    ),
+}
 
 
 EMAIL_BACKEND = "plain.email.backends.console.EmailBackend"
