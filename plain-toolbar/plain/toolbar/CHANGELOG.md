@@ -1,5 +1,17 @@
 # plain-toolbar changelog
 
+## [0.7.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.7.0) (2025-10-29)
+
+### What's changed
+
+- The toolbar JavaScript now uses CSP-compliant methods by avoiding inline style injection and using CSS classes instead ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd9724c11256cc3aa0a0e15c5c3eae6133c))
+- Exception template uses `data-` attributes and event listeners instead of inline `onclick` handlers for better CSP compliance ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd9724c11256cc3aa0a0e15c5c3eae6133c))
+- Script tags now include `nonce="{{ request.csp_nonce }}"` to work with Content Security Policy ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd9724c11256cc3aa0a0e15c5c3eae6133c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.6.0) (2025-10-24)
 
 ### What's changed
