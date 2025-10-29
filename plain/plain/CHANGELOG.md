@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.83.0](https://github.com/dropseed/plain/releases/plain@0.83.0) (2025-10-29)
+
+### What's changed
+
+- Added comprehensive Content Security Policy (CSP) documentation explaining how to use nonces with inline scripts and styles ([784f3dd972](https://github.com/dropseed/plain/commit/784f3dd972))
+- The `json_script` utility function now accepts an optional `nonce` parameter for CSP-compliant inline JSON scripts ([784f3dd972](https://github.com/dropseed/plain/commit/784f3dd972))
+
+### Upgrade instructions
+
+- Any `|json_script` usages need to make sure the second argument is a nonce, not a custom encoder (which is now third)
+
 ## [0.82.0](https://github.com/dropseed/plain/releases/plain@0.82.0) (2025-10-29)
 
 ### What's changed
