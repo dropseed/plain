@@ -1,5 +1,21 @@
 # plain-observer changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-observer@0.13.0) (2025-10-29)
+
+### What's changed
+
+- Inline JavaScript and CSS extracted to separate asset files for Content Security Policy (CSP) compatibility ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Added CSP nonce support to inline scripts for improved security ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Added comprehensive CSP configuration documentation in README, including required `frame-ancestors 'self'` directive for toolbar panel ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Span and log indentation now uses CSS classes with data attributes instead of inline styles ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Timeline bar positioning now uses CSS custom properties set via JavaScript instead of inline styles ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Copy share URL button now uses data attributes and event delegation instead of inline onclick handlers ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Toolbar iframe now uses HTML attributes instead of inline styles ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-observer@0.12.0) (2025-10-24)
 
 ### What's changed
