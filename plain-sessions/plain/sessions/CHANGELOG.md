@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.36.1](https://github.com/dropseed/plain/releases/plain-sessions@0.36.1) (2025-10-29)
+
+### What's changed
+
+- Documentation has been expanded with a new "Session expiration" section that clarifies how session expiration works and explains the difference between `SESSION_SAVE_EVERY_REQUEST = False` (save only when modified) and `True` (rolling sessions) ([3ccbbe6](https://github.com/dropseed/plain/commit/3ccbbe6cfb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-sessions@0.36.0) (2025-10-22)
 
 ### What's changed
