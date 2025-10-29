@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.82.0](https://github.com/dropseed/plain/releases/plain@0.82.0) (2025-10-29)
+
+### What's changed
+
+- The `DEFAULT_RESPONSE_HEADERS` setting can now be a callable that accepts a request argument, enabling dynamic header generation per request ([cb92905834](https://github.com/dropseed/plain/commit/cb92905834))
+- Added `request.csp_nonce` cached property for generating Content Security Policy nonces ([75071dcc70](https://github.com/dropseed/plain/commit/75071dcc70))
+- Simplified the preflight command by moving `plain preflight check` back to `plain preflight` ([40c2c4560e](https://github.com/dropseed/plain/commit/40c2c4560e))
+
+### Upgrade instructions
+
+- If you use `plain preflight check`, update to `plain preflight` (the `check` subcommand has been removed for simplicity)
+- If you use `plain preflight check --deploy`, update to `plain preflight --deploy`
+
 ## [0.81.0](https://github.com/dropseed/plain/releases/plain@0.81.0) (2025-10-22)
 
 ### What's changed
