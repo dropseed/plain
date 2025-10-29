@@ -27,6 +27,27 @@ INSTALLED_PACKAGES = [
     "app.users",
 ]
 
+
+def DEFAULT_RESPONSE_HEADERS(request):
+    """
+    Strict CSP policy for testing CSP nonce support.
+    """
+    nonce = request.csp_nonce
+    return {
+        "Content-Security-Policy": (
+            f"default-src 'self'; "
+            f"script-src 'self' 'nonce-{nonce}'; "
+            f"style-src 'self' 'nonce-{nonce}'; "
+            f"img-src 'self' data: https://www.gravatar.com; "
+            f"font-src 'self'; "
+            f"connect-src 'self'; "
+            f"frame-ancestors 'self'; "
+            f"base-uri 'self'; "
+            f"form-action 'self'"
+        ),
+    }
+
+
 EMAIL_BACKEND = "plain.email.backends.console.EmailBackend"
 EMAIL_DEFAULT_FROM = "from@example.com"
 SUPPORT_EMAIL = "support@example.com"

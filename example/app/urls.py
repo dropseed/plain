@@ -8,7 +8,7 @@ from plain.views import TemplateView
 
 
 class LoginView(PasswordLoginView):
-    pass
+    template_name = "login.html"
 
 
 class IndexView(TemplateView):

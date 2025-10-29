@@ -1,14 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    {% tailwind_css %}
-</head>
-<body>
-    Hey!
+{% extends "base.html" %}
 
-    {% toolbar %}
-</body>
-</html>
+{% block content %}
+<div class="p-8">
+    Hey!
+</div>
+{% endblock %}

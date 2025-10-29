@@ -34,25 +34,30 @@ _json_script_escapes = {
 def json_script(
     value: Any,
     element_id: str | None = None,
+    nonce: str = "",
     encoder: type[json.JSONEncoder] | None = None,
 ) -> SafeString:
     """
     Escape all the HTML/XML special characters with their unicode escapes, so
     value is safe to be output anywhere except for inside a tag attribute. Wrap
     the escaped JSON in a script tag.
+
+    Args:
+        value: The data to encode as JSON
+        element_id: Optional ID attribute for the script tag
+        nonce: Optional CSP nonce for inline script tags
+        encoder: Optional custom JSON encoder class
     """
     from plain.json import PlainJSONEncoder
 
     json_str = json.dumps(value, cls=encoder or PlainJSONEncoder).translate(
         _json_script_escapes
     )
-    if element_id:
-        template = '<script id="{}" type="application/json">{}</script>'
-        args = (element_id, mark_safe(json_str))
-    else:
-        template = '<script type="application/json">{}</script>'
-        args = (mark_safe(json_str),)
-    return format_html(template, *args)
+    id_attr = f' id="{element_id}"' if element_id else ""
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return mark_safe(
+        f'<script{id_attr}{nonce_attr} type="application/json">{json_str}</script>'
+    )
 
 
 def conditional_escape(text: Any) -> SafeString | str:

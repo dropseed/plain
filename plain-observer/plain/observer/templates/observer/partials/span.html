@@ -2,7 +2,7 @@
 {% set start_percent = (span_start_offset / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 %}
 {% set width_percent = (span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 %}
 
-<div style="padding-left: {{ event.span_level * 1 }}rem;" class="border-l border-white/20">
+<div data-span-level="{{ event.span_level }}" class="border-l border-white/20">
     <details class="rounded bg-white/5 min-w-[600px] ml-px">
         <summary class="cursor-pointer hover:bg-white/10 transition-colors px-2 py-1 list-none [&::-webkit-details-marker]:hidden">
             <div class="flex items-center">
@@ -48,12 +48,16 @@
                                     data-[kind='INTERNAL']:bg-gray-500
                                     bg-white/30"
                             data-kind="{{ span.kind }}"
-                            style="left: {{ start_percent }}%; width: {{ width_percent }}%;"
+                            data-span-id="{{ span.span_id }}"
+                            data-start-percent="{{ start_percent }}"
+                            data-width-percent="{{ width_percent }}"
                             title="{{ span.name }} - {{ span.duration_ms() }}ms">
                         </div>
                         <div
                             class="absolute inset-0 flex items-center justify-start pl-1 text-xs text-white/80 font-medium whitespace-nowrap pointer-events-none"
-                            style="left: {{ start_percent }}%; width: {{ width_percent }}%;">
+                            data-span-id="{{ span.span_id }}-label"
+                            data-start-percent="{{ start_percent }}"
+                            data-width-percent="{{ width_percent }}">
                             {{ "%.2f"|format(span.duration_ms()) }}ms
                         </div>
                     </div>

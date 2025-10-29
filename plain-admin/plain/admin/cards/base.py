@@ -44,6 +44,7 @@ class Card:
     def get_template_context(self) -> dict[str, Any]:
         context = {}
 
+        context["request"] = self.request
         context["size"] = self.size
         context["title"] = self.get_title()
         context["slug"] = self.get_slug()

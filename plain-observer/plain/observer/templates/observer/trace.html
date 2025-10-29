@@ -4,10 +4,11 @@
     <div class="mb-2">
         <div class="flex items-center gap-2 bg-emerald-900/20 border border-emerald-700/50 rounded px-2 py-1">
             <span class="text-xs text-emerald-400 font-mono flex-1 truncate" id="share-url-{{ trace.id }}">
-                {{ request.get_host() }}{{ url('observer:trace_shared', trace.share_id) }}
+                {{ request.host }}{{ url('observer:trace_shared', trace.share_id) }}
             </span>
             <button
-                onclick="copyShareUrl(this, '{{ trace.id }}')"
+                data-copy-share-url
+                data-trace-id="{{ trace.id }}"
                 data-share-url="{{ request.build_absolute_uri(url('observer:trace_shared', trace.share_id)) }}"
                 class="px-2 py-0.5 text-xs bg-emerald-700 text-emerald-100 hover:bg-emerald-600 rounded transition-colors flex-shrink-0"
                 title="Copy shareable URL">
@@ -148,46 +149,3 @@
     {% endfor %}
     </div>
 </div>
-
-
-<style>
-    /* Custom details arrow animation */
-    details[open] summary svg {
-        transform: rotate(90deg);
-    }
-</style>
-
-<script>
-async function copyShareUrl(button, traceId) {
-    try {
-        const shareUrl = button.getAttribute('data-share-url');
-
-        // Copy to clipboard
-        await navigator.clipboard.writeText(shareUrl);
-
-        // Show success feedback on button
-        const originalHTML = button.innerHTML;
-        button.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
-        button.classList.remove('bg-emerald-700', 'hover:bg-emerald-600');
-        button.classList.add('bg-green-600', 'hover:bg-green-700');
-
-        // Also flash the URL text
-        const urlSpan = document.getElementById(`share-url-${traceId}`);
-        if (urlSpan) {
-            urlSpan.classList.add('text-green-400', 'font-bold');
-            setTimeout(() => {
-                urlSpan.classList.remove('text-green-400', 'font-bold');
-            }, 2000);
-        }
-
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.classList.remove('bg-green-600', 'hover:bg-green-700');
-            button.classList.add('bg-emerald-700', 'hover:bg-emerald-600');
-        }, 2000);
-    } catch (error) {
-        console.error('Failed to copy share URL:', error);
-        alert('Failed to copy share URL. See console for details.');
-    }
-}
-</script>

@@ -3,7 +3,7 @@
         <p>Loading spans...</p>
     </div>
 </div>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var container = document.getElementById('observer-traces');
     var loaded = false;
@@ -29,8 +29,8 @@
                 var iframe = document.createElement('iframe');
                 iframe.src = "{{ url('observer:traces') }}";
                 iframe.frameBorder = "0";
-                iframe.style.width = "100%";
-                iframe.style.height = "100%";
+                iframe.width = "100%";
+                iframe.height = "100%";
                 container.innerHTML = '';
                 container.appendChild(iframe);
                 observer.disconnect();

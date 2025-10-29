@@ -4,13 +4,13 @@ requires-python = ">=3.13"
 
 [manifest]
 members = [
+    "example",
     "plain",
     "plain-admin",
     "plain-api",
     "plain-auth",
     "plain-cache",
     "plain-code",
-    "plain-demo-full",
     "plain-dev",
     "plain-elements",
     "plain-email",
@@ -156,6 +156,73 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/53/75/82a14bf047a96a1b13ebb47fb9811c4f73096cfa2e2b17c86879687f9027/cryptography-45.0.4-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:944e9ccf67a9594137f942d5b52c8d238b1b4e46c7a0c2891b7ae6e01e7c80a4", size = 4560964, upload-time = "2025-06-10T00:03:20.06Z" },
     { url = "https://files.pythonhosted.org/packages/cd/37/1a3cba4c5a468ebf9b95523a5ef5651244693dc712001e276682c278fc00/cryptography-45.0.4-cp37-abi3-win32.whl", hash = "sha256:c22fe01e53dc65edd1945a2e6f0015e887f84ced233acecb64b4daadb32f5c97", size = 2924557, upload-time = "2025-06-10T00:03:22.563Z" },
     { url = "https://files.pythonhosted.org/packages/2a/4b/3256759723b7e66380397d958ca07c59cfc3fb5c794fb5516758afd05d41/cryptography-45.0.4-cp37-abi3-win_amd64.whl", hash = "sha256:627ba1bc94f6adf0b0a2e35d87020285ead22d9f648c7e75bb64f367375f3b22", size = 3395508, upload-time = "2025-06-10T00:03:24.586Z" },
+]
+
+[[package]]
+name = "example"
+version = "0.0.0"
+source = { virtual = "example" }
+dependencies = [
+    { name = "plain" },
+    { name = "plain-admin" },
+    { name = "plain-api" },
+    { name = "plain-auth" },
+    { name = "plain-cache" },
+    { name = "plain-code" },
+    { name = "plain-dev" },
+    { name = "plain-elements" },
+    { name = "plain-email" },
+    { name = "plain-esbuild" },
+    { name = "plain-flags" },
+    { name = "plain-htmx" },
+    { name = "plain-jobs" },
+    { name = "plain-loginlink" },
+    { name = "plain-models" },
+    { name = "plain-oauth" },
+    { name = "plain-observer" },
+    { name = "plain-pages" },
+    { name = "plain-pageviews" },
+    { name = "plain-passwords" },
+    { name = "plain-pytest" },
+    { name = "plain-redirection" },
+    { name = "plain-sessions" },
+    { name = "plain-support" },
+    { name = "plain-tailwind" },
+    { name = "plain-toolbar" },
+    { name = "plain-tunnel" },
+    { name = "plain-vendor" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-admin", editable = "plain-admin" },
+    { name = "plain-api", editable = "plain-api" },
+    { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-cache", editable = "plain-cache" },
+    { name = "plain-code", editable = "plain-code" },
+    { name = "plain-dev", editable = "plain-dev" },
+    { name = "plain-elements", editable = "plain-elements" },
+    { name = "plain-email", editable = "plain-email" },
+    { name = "plain-esbuild", editable = "plain-esbuild" },
+    { name = "plain-flags", editable = "plain-flags" },
+    { name = "plain-htmx", editable = "plain-htmx" },
+    { name = "plain-jobs", editable = "plain-jobs" },
+    { name = "plain-loginlink", editable = "plain-loginlink" },
+    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-oauth", editable = "plain-oauth" },
+    { name = "plain-observer", editable = "plain-observer" },
+    { name = "plain-pages", editable = "plain-pages" },
+    { name = "plain-pageviews", editable = "plain-pageviews" },
+    { name = "plain-passwords", editable = "plain-passwords" },
+    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-redirection", editable = "plain-redirection" },
+    { name = "plain-sessions", editable = "plain-sessions" },
+    { name = "plain-support", editable = "plain-support" },
+    { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-toolbar", editable = "plain-toolbar" },
+    { name = "plain-tunnel", editable = "plain-tunnel" },
+    { name = "plain-vendor", editable = "plain-vendor" },
 ]
 
 [[package]]
@@ -453,73 +520,6 @@ requires-dist = [
     { name = "requests", specifier = ">=2.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "tomlkit", specifier = ">=0.11.0" },
-]
-
-[[package]]
-name = "plain-demo-full"
-version = "0.0.0"
-source = { virtual = "example" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-admin" },
-    { name = "plain-api" },
-    { name = "plain-auth" },
-    { name = "plain-cache" },
-    { name = "plain-code" },
-    { name = "plain-dev" },
-    { name = "plain-elements" },
-    { name = "plain-email" },
-    { name = "plain-esbuild" },
-    { name = "plain-flags" },
-    { name = "plain-htmx" },
-    { name = "plain-jobs" },
-    { name = "plain-loginlink" },
-    { name = "plain-models" },
-    { name = "plain-oauth" },
-    { name = "plain-observer" },
-    { name = "plain-pages" },
-    { name = "plain-pageviews" },
-    { name = "plain-passwords" },
-    { name = "plain-pytest" },
-    { name = "plain-redirection" },
-    { name = "plain-sessions" },
-    { name = "plain-support" },
-    { name = "plain-tailwind" },
-    { name = "plain-toolbar" },
-    { name = "plain-tunnel" },
-    { name = "plain-vendor" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-admin", editable = "plain-admin" },
-    { name = "plain-api", editable = "plain-api" },
-    { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-cache", editable = "plain-cache" },
-    { name = "plain-code", editable = "plain-code" },
-    { name = "plain-dev", editable = "plain-dev" },
-    { name = "plain-elements", editable = "plain-elements" },
-    { name = "plain-email", editable = "plain-email" },
-    { name = "plain-esbuild", editable = "plain-esbuild" },
-    { name = "plain-flags", editable = "plain-flags" },
-    { name = "plain-htmx", editable = "plain-htmx" },
-    { name = "plain-jobs", editable = "plain-jobs" },
-    { name = "plain-loginlink", editable = "plain-loginlink" },
-    { name = "plain-models", editable = "plain-models" },
-    { name = "plain-oauth", editable = "plain-oauth" },
-    { name = "plain-observer", editable = "plain-observer" },
-    { name = "plain-pages", editable = "plain-pages" },
-    { name = "plain-pageviews", editable = "plain-pageviews" },
-    { name = "plain-passwords", editable = "plain-passwords" },
-    { name = "plain-pytest", editable = "plain-pytest" },
-    { name = "plain-redirection", editable = "plain-redirection" },
-    { name = "plain-sessions", editable = "plain-sessions" },
-    { name = "plain-support", editable = "plain-support" },
-    { name = "plain-tailwind", editable = "plain-tailwind" },
-    { name = "plain-toolbar", editable = "plain-toolbar" },
-    { name = "plain-tunnel", editable = "plain-tunnel" },
-    { name = "plain-vendor", editable = "plain-vendor" },
 ]
 
 [[package]]

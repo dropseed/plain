@@ -24,6 +24,7 @@ class HTMXJSExtension(InclusionTagExtension):
         return {
             "DEBUG": settings.DEBUG,
             "extensions": kwargs.get("extensions", []),
+            "csp_nonce": context.get("request").csp_nonce,
         }
 
 

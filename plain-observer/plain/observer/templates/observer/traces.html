@@ -6,7 +6,9 @@
     <title>Observer Traces</title>
     {% tailwind_css %}
     {% htmx_js %}
-    <script>
+    <link rel="stylesheet" href="{{ asset('observer/observer.css') }}">
+    <script src="{{ asset('observer/observer.js') }}" defer></script>
+    <script nonce="{{ request.csp_nonce }}">
         if (window.self !== window.top) {
             document.addEventListener('DOMContentLoaded', function() {
                 document.body.setAttribute('data-iframe', 'true');

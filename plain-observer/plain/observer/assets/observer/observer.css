@@ -1,0 +1,72 @@
+/* Custom details arrow animation */
+details[open] summary svg {
+  transform: rotate(90deg);
+}
+
+/* Apply padding based on span level - generated for levels 0-19 */
+[data-span-level="0"] {
+  padding-left: 0rem;
+}
+[data-span-level="1"] {
+  padding-left: 1rem;
+}
+[data-span-level="2"] {
+  padding-left: 2rem;
+}
+[data-span-level="3"] {
+  padding-left: 3rem;
+}
+[data-span-level="4"] {
+  padding-left: 4rem;
+}
+[data-span-level="5"] {
+  padding-left: 5rem;
+}
+[data-span-level="6"] {
+  padding-left: 6rem;
+}
+[data-span-level="7"] {
+  padding-left: 7rem;
+}
+[data-span-level="8"] {
+  padding-left: 8rem;
+}
+[data-span-level="9"] {
+  padding-left: 9rem;
+}
+[data-span-level="10"] {
+  padding-left: 10rem;
+}
+[data-span-level="11"] {
+  padding-left: 11rem;
+}
+[data-span-level="12"] {
+  padding-left: 12rem;
+}
+[data-span-level="13"] {
+  padding-left: 13rem;
+}
+[data-span-level="14"] {
+  padding-left: 14rem;
+}
+[data-span-level="15"] {
+  padding-left: 15rem;
+}
+[data-span-level="16"] {
+  padding-left: 16rem;
+}
+[data-span-level="17"] {
+  padding-left: 17rem;
+}
+[data-span-level="18"] {
+  padding-left: 18rem;
+}
+[data-span-level="19"] {
+  padding-left: 19rem;
+}
+
+/* Apply positioning for timeline bars using CSS custom properties */
+[data-span-id] {
+  left: var(--start, 0%);
+  width: var(--width, 100%);
+}

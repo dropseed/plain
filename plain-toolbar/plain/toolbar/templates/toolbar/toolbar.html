@@ -35,7 +35,7 @@
         <div class="overflow-auto h-[30vh] flex flex-col">
             {% for item in items %}
             {% if item.name and item.panel_template_name %}
-            <div data-toolbar-tab="{{ item.name }}" class="h-full" {% if not loop.first %}style="display: none;"{% endif %}>
+            <div data-toolbar-tab="{{ item.name }}" class="h-full {% if not loop.first %}hidden{% endif %}">
                 {{ item.render_panel() }}
             </div>
             {% endif %}

@@ -1,4 +1,11 @@
 (() => {
+  // Get nonce from our own script tag's data attribute
+  const nonce = document.currentScript?.getAttribute("data-csp-nonce");
+
+  // Configure htmx for CSP compatibility
+  htmx.config.inlineScriptNonce = nonce;
+  htmx.config.inlineStyleNonce = nonce;
+
   htmx.defineExtension("plain-views", {
     init() {
       // Set or append this extension to the body hx-ext automatically

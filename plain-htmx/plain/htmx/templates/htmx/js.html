@@ -15,4 +15,4 @@
 <script src="{{ asset('htmx/vendor/src/ext/' ~ extension ~ '.js') }}" defer></script>
 {%- endfor -%}
 
-<script src="{{ asset('htmx/plainhtmx.js') }}" defer></script>
+<script src="{{ asset('htmx/plainhtmx.js') }}" defer data-csp-nonce="{{ csp_nonce }}"></script>

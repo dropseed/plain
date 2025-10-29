@@ -5,7 +5,7 @@
                 <span class="font-bold">Exception</span>
             </div>
             <div class="flex items-center space-x-3">
-                <button onclick="copyException(this)" class="flex items-center space-x-1 px-2 py-0.5 text-sm rounded bg-amber-500/20 hover:bg-amber-500/30 transition-colors">
+                <button data-copy-exception class="flex items-center space-x-1 px-2 py-0.5 text-sm rounded bg-amber-500/20 hover:bg-amber-500/30 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5 bi bi-clipboard" viewBox="0 0 16 16">
                         <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
                         <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
@@ -23,35 +23,45 @@
     </div>
 </div>
 
-<script>
-function copyException(button) {
-    const container = button.closest('[data-exception-container]');
-    const exceptionText = container.querySelector('[data-exception-message]').textContent.trim();
-    const traceback = container.querySelector('[data-exception-traceback] code').textContent;
-    const fullText = `Exception: ${exceptionText}\n\n${traceback}`;
+<script nonce="{{ request.csp_nonce }}">
+(function() {
+    function copyException(button) {
+        const container = button.closest('[data-exception-container]');
+        const exceptionText = container.querySelector('[data-exception-message]').textContent.trim();
+        const traceback = container.querySelector('[data-exception-traceback] code').textContent;
+        const fullText = `Exception: ${exceptionText}\n\n${traceback}`;
 
-    navigator.clipboard.writeText(fullText).then(() => {
-        // Change icon and text to indicate success
-        button.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5 bi bi-check2" viewBox="0 0 16 16">
-                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-            </svg>
-            <span>Copied!</span>
-        `;
-
-        // Reset after 2 seconds
-        setTimeout(() => {
+        navigator.clipboard.writeText(fullText).then(() => {
+            // Change icon and text to indicate success
             button.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5 bi bi-clipboard" viewBox="0 0 16 16">
-                    <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-                    <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5 bi bi-check2" viewBox="0 0 16 16">
+                    <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
                 </svg>
-                <span>Copy</span>
+                <span>Copied!</span>
             `;
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy exception:', err);
-        alert('Failed to copy exception to clipboard');
-    });
-}
+
+            // Reset after 2 seconds
+            setTimeout(() => {
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5 bi bi-clipboard" viewBox="0 0 16 16">
+                        <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                        <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                    </svg>
+                    <span>Copy</span>
+                `;
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy exception:', err);
+            alert('Failed to copy exception to clipboard');
+        });
+    }
+
+    // Set up event listener
+    const button = document.querySelector('[data-copy-exception]');
+    if (button) {
+        button.addEventListener('click', function() {
+            copyException(this);
+        });
+    }
+})();
 </script>

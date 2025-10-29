@@ -14,7 +14,7 @@
     {% tailwind_css %}
     {% htmx_js %}
     <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
         // Apply sidebar state immediately to prevent flash
         (function() {
             const isCollapsed = localStorage.getItem('admin-sidebar-collapsed') === 'true';
@@ -27,7 +27,8 @@
     <script src="{{ asset('admin/vendor/chart.js') }}" defer></script>
     <script src="{{ asset('admin/admin.js') }}" defer></script>
     <script src="{{ asset('admin/vendor/popper.min.js') }}" defer></script>
-    <script src="{{ asset('admin/vendor/tippy-bundle.umd.min.js') }}" defer></script>
+    <link href="{{ asset('admin/vendor/tippy.css') }}" rel="stylesheet">
+    <script src="{{ asset('admin/vendor/tippy.umd.min.js') }}" defer></script>
     {% block header_scripts %}{% endblock %}
 </head>
 <body

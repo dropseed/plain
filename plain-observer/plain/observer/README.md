@@ -3,6 +3,7 @@
 **On-page telemetry and observability tools for Plain.**
 
 - [Installation](#installation)
+- [Content Security Policy (CSP)](#content-security-policy-csp)
 
 ## Installation
 
@@ -44,3 +45,25 @@ plain migrate
 ```
 
 After installation, Observer will automatically integrate with your application's toolbar (if using `plain.admin`). You can access the web interface at `/observer/traces/` or use the CLI commands to analyze traces.
+
+## Content Security Policy (CSP)
+
+If you're using a Content Security Policy (CSP), the Observer toolbar panel requires `frame-ancestors 'self'` to display trace information in an iframe.
+
+Without this directive, the toolbar panel will fail to load with a CSP error: `"Refused to frame... because an ancestor violates the following Content Security Policy directive: 'frame-ancestors 'none'"`.
+
+Example CSP configuration:
+
+```python
+def DEFAULT_RESPONSE_HEADERS(request):
+    nonce = request.csp_nonce
+    return {
+        "Content-Security-Policy": (
+            f"default-src 'self'; "
+            f"script-src 'self' 'nonce-{nonce}'; "
+            f"style-src 'self' 'nonce-{nonce}'; "
+            f"frame-ancestors 'self'; "  # Required for Observer toolbar
+            # ... other directives
+        ),
+    }
+```

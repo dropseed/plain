@@ -2,13 +2,19 @@
 
 {% block content %}
 <canvas id="card-chart-{{ slug }}"></canvas>
-{{ chart_data|json_script(slug) }}
-<script>
+{{ chart_data|json_script(slug, request.csp_nonce) }}
+<script nonce="{{ request.csp_nonce }}">
   (function() {
     function renderChart() {
       const ctx = document.getElementById('card-chart-{{ slug }}');
+      const dataElement = document.getElementById('{{ slug }}');
 
-      const data = JSON.parse(document.getElementById('{{ slug }}').textContent);
+      // Only render if both elements exist on the page
+      if (!ctx || !dataElement) {
+        return;
+      }
+
+      const data = JSON.parse(dataElement.textContent);
 
       if (ctx._chart) {
         ctx._chart.destroy();

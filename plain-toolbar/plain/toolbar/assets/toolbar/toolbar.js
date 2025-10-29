@@ -1,16 +1,17 @@
 // Make this available to the JS console for the user
 window.plainToolbar = window.plainToolbar || {
-  hide: function () {
-    // Hide by inserting a style so it doesn't flash on page load
-    const style = document.createElement("style");
-    style.innerHTML = "#plaintoolbar { display: none; }";
-    document.getElementsByTagName("head")[0].appendChild(style);
-    this.stylesheet = style;
+  hide: () => {
+    // Hide by setting style directly for CSP compliance
+    const toolbar = document.getElementById("plaintoolbar");
+    if (toolbar) {
+      toolbar.style.display = "none";
+    }
   },
-  show: function () {
+  show: () => {
     localStorage.removeItem("plaintoolbar.hidden_until");
-    if (this.stylesheet) {
-      this.stylesheet.remove();
+    const toolbar = document.getElementById("plaintoolbar");
+    if (toolbar) {
+      toolbar.style.display = "";
     }
   },
   shouldHide: () => {
@@ -63,11 +64,11 @@ window.plainToolbar = window.plainToolbar || {
     for (let i = 0; i < tab.parentNode.children.length; i++) {
       const child = tab.parentNode.children[i];
       if (child !== tab) {
-        child.style.display = "none";
+        child.classList.add("hidden");
       }
     }
 
-    tab.style.display = "block";
+    tab.classList.remove("hidden");
 
     for (const tab of toolbar.querySelectorAll("button[data-toolbar-tab]")) {
       if (tab.dataset.toolbarTab === tabName) {
@@ -80,11 +81,19 @@ window.plainToolbar = window.plainToolbar || {
   },
   resetHeight: () => {
     const content = document.querySelector(
-      "#plaintoolbar-details [data-resizer]",
-    )?.nextElementSibling;
+      "#plaintoolbar-details > div.overflow-auto",
+    );
     if (content) {
       content.style.height = "";
-      localStorage.removeItem("plaintoolbar.height");
+    }
+    localStorage.removeItem("plaintoolbar.height");
+  },
+  setHeight: (height) => {
+    const content = document.querySelector(
+      "#plaintoolbar-details > div.overflow-auto",
+    );
+    if (content) {
+      content.style.height = height;
     }
   },
 };
@@ -107,12 +116,7 @@ window.addEventListener("load", () => {
     // Restore custom height if it was set
     const savedHeight = localStorage.getItem("plaintoolbar.height");
     if (savedHeight) {
-      const content = document.querySelector(
-        "#plaintoolbar-details [data-resizer]",
-      )?.nextElementSibling;
-      if (content) {
-        content.style.height = savedHeight;
-      }
+      window.plainToolbar.setHeight(savedHeight);
     }
   } else if (state === "0") {
     window.plainToolbar.collapse();
@@ -160,17 +164,17 @@ window.addEventListener("load", () => {
     let isDragging = false;
     let startY = 0;
     let startHeight = 0;
+    let currentHeight = null;
     if (handle && content) {
-      // Initial cursor
-      handle.style.cursor = "grab";
       // Start dragging
       handle.addEventListener("mousedown", (e) => {
         isDragging = true;
         startY = e.clientY;
         startHeight = content.offsetHeight;
-        handle.style.cursor = "grabbing";
+        handle.classList.add("cursor-grabbing");
+        handle.classList.remove("cursor-grab");
         // Prevent text selection while dragging
-        document.body.style.userSelect = "none";
+        document.body.classList.add("select-none");
         e.preventDefault();
       });
       // Handle dragging
@@ -183,16 +187,20 @@ window.addEventListener("load", () => {
         const minHeight = 50;
         const maxHeight = window.innerHeight - 100;
         newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
-        content.style.height = `${newHeight}px`;
+        currentHeight = `${newHeight}px`;
+        window.plainToolbar.setHeight(currentHeight);
       });
       // End dragging
       document.addEventListener("mouseup", () => {
         if (isDragging) {
           isDragging = false;
-          handle.style.cursor = "grab";
-          document.body.style.userSelect = "";
+          handle.classList.add("cursor-grab");
+          handle.classList.remove("cursor-grabbing");
+          document.body.classList.remove("select-none");
           // Save the new height to localStorage
-          localStorage.setItem("plaintoolbar.height", content.style.height);
+          if (currentHeight) {
+            localStorage.setItem("plaintoolbar.height", currentHeight);
+          }
         }
       });
     }
