@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.44.0](https://github.com/dropseed/plain/releases/plain-dev@0.44.0) (2025-10-29)
+
+### What's changed
+
+- The `plain preflight check` command has been simplified back to `plain preflight` throughout the development workflow, including pre-commit hooks and the dev server startup ([40c2c45](https://github.com/dropseed/plain/commit/40c2c4560e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.43.1](https://github.com/dropseed/plain/releases/plain-dev@0.43.1) (2025-10-27)
 
 ### What's changed
