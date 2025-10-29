@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-observer@0.14.0) (2025-10-29)
+
+### What's changed
+
+- Updated CSP configuration example in documentation to use the new `DEFAULT_RESPONSE_HEADERS` format with string templates instead of callable functions ([5199383](https://github.com/dropseed/plain/commit/519938312835b73dfd9be8c93abae6e896094fc2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-observer@0.13.0) (2025-10-29)
 
 ### What's changed

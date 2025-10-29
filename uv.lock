@@ -394,7 +394,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.83.0"
+version = "0.84.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -718,7 +718,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.13.0"
+version = "0.14.0"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
@@ -847,7 +847,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.20.0"
+version = "0.21.0"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
