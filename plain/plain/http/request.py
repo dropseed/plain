@@ -3,6 +3,7 @@ from __future__ import annotations
 import codecs
 import copy
 import json
+import secrets
 import uuid
 from collections.abc import Iterator
 from functools import cached_property
@@ -100,6 +101,16 @@ class Request:
     @cached_property
     def headers(self) -> RequestHeaders:
         return RequestHeaders(self.meta)
+
+    @cached_property
+    def csp_nonce(self) -> str:
+        """Generate a cryptographically secure nonce for Content Security Policy.
+
+        The nonce is generated once per request and cached. It can be used in
+        CSP headers and templates to allow specific inline scripts/styles while
+        blocking others.
+        """
+        return secrets.token_urlsafe(16)
 
     @cached_property
     def accepted_types(self) -> list[MediaType]:
