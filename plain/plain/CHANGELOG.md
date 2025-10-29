@@ -1,5 +1,33 @@
 # plain changelog
 
+## [0.84.0](https://github.com/dropseed/plain/releases/plain@0.84.0) (2025-10-29)
+
+### What's changed
+
+- The `DEFAULT_RESPONSE_HEADERS` setting now supports format string placeholders (e.g., `{request.csp_nonce}`) for dynamic header values instead of requiring a callable function ([5199383128](https://github.com/dropseed/plain/commit/5199383128))
+- Views can now set headers to `None` to explicitly remove default response headers ([5199383128](https://github.com/dropseed/plain/commit/5199383128))
+- Added comprehensive documentation for customizing default response headers including override, remove, and extend patterns ([5199383128](https://github.com/dropseed/plain/commit/5199383128))
+
+### Upgrade instructions
+
+- If you have `DEFAULT_RESPONSE_HEADERS` configured as a callable function, convert it to a dictionary with format string placeholders:
+
+    ```python
+    # Before:
+    def DEFAULT_RESPONSE_HEADERS(request):
+        nonce = request.csp_nonce
+        return {
+            "Content-Security-Policy": f"script-src 'self' 'nonce-{nonce}'",
+        }
+
+    # After:
+    DEFAULT_RESPONSE_HEADERS = {
+        "Content-Security-Policy": "script-src 'self' 'nonce-{request.csp_nonce}'",
+    }
+    ```
+
+- If you were overriding default headers to empty strings (`""`) to remove them, change those to `None` instead
+
 ## [0.83.0](https://github.com/dropseed/plain/releases/plain@0.83.0) (2025-10-29)
 
 ### What's changed
