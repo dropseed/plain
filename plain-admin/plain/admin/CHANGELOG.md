@@ -1,5 +1,18 @@
 # plain-admin changelog
 
+## [0.53.0](https://github.com/dropseed/plain/releases/plain-admin@0.53.0) (2025-10-29)
+
+### What's changed
+
+- Admin templates now support Content Security Policy (CSP) nonces by using `request.csp_nonce` on inline script tags ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Tippy.js library has been split into separate CSS and JavaScript files instead of using a bundle, improving CSP compatibility ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Chart rendering now includes null checks to prevent errors when chart elements don't exist on the page ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+- Card template context now includes the request object for accessing request-scoped data like CSP nonces ([784f3dd](https://github.com/dropseed/plain/commit/784f3dd972))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.52.2](https://github.com/dropseed/plain/releases/plain-admin@0.52.2) (2025-10-27)
 
 ### What's changed
