@@ -59,13 +59,14 @@ class Dependency:
         response = requests.get(download_url)
         response.raise_for_status()
 
-        content_type = response.headers.get("content-type")
-        if content_type.lower() not in (
-            "application/javascript; charset=utf-8",
-            "text/javascript; charset=utf-8",
-            "application/json; charset=utf-8",
-            "text/css; charset=utf-8",
-        ):
+        content_type = response.headers.get("content-type", "").lower()
+        allowed_types = (
+            "application/javascript",
+            "text/javascript",
+            "application/json",
+            "text/css",
+        )
+        if not any(content_type.startswith(allowed) for allowed in allowed_types):
             raise UnknownContentTypeError(
                 f"Unknown content type for {self.name}: {content_type}"
             )
