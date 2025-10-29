@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.9.2](https://github.com/dropseed/plain/releases/plain-vendor@0.9.2) (2025-10-29)
+
+### What's changed
+
+- Fixed content type validation to handle responses without charset specifications ([89bb1e1](https://github.com/dropseed/plain/commit/89bb1e1194))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.1](https://github.com/dropseed/plain/releases/plain-vendor@0.9.1) (2025-10-06)
 
 ### What's changed
