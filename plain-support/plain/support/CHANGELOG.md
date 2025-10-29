@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-support@0.21.0) (2025-10-29)
+
+### What's changed
+
+- Updated iframe view to use `None` instead of empty string to remove `X-Frame-Options` header, aligning with new response header handling ([5199383](https://github.com/dropseed/plain/commit/5199383128))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-support@0.20.0) (2025-10-07)
 
 ### What's changed
