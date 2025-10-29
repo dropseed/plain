@@ -13,8 +13,15 @@ class DefaultHeadersMiddleware(HttpMiddleware):
     def process_request(self, request: Request) -> Response:
         response = self.get_response(request)
 
-        for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():
-            # Since we don't have a good way to *remote* default response headers,
+        # Support callable DEFAULT_RESPONSE_HEADERS for dynamic header generation
+        # (e.g., CSP nonces that change per request)
+        if callable(settings.DEFAULT_RESPONSE_HEADERS):
+            default_headers = settings.DEFAULT_RESPONSE_HEADERS(request)
+        else:
+            default_headers = settings.DEFAULT_RESPONSE_HEADERS
+
+        for header, value in default_headers.items():
+            # Since we don't have a good way to *remove* default response headers,
             # use allow users to set them to an empty string to indicate they should be removed.
             if header in response.headers and response.headers[header] == "":
                 del response.headers[header]
