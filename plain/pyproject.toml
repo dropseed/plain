@@ -4,6 +4,7 @@ version = "0.84.0"
 description = "A web framework for building products with Python."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
+license = "BSD-3-Clause"
 dependencies = [
     "jinja2>=3.1.2",
     "click>=8.0.0",
