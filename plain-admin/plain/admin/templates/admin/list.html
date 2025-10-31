@@ -3,7 +3,7 @@
 {% use_elements %}
 
 {% block header_scripts %}
-<script src="{{ asset('admin/list.js') }}" defer></script>
+<script src="{{ asset('admin/list.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
 {% endblock %}
 
 {% block content %}

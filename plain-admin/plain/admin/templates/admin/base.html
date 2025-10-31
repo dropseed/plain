@@ -23,12 +23,12 @@
             }
         })();
     </script>
-    <script src="{{ asset('admin/vendor/jquery-3.7.1.min.js') }}"></script>
-    <script src="{{ asset('admin/vendor/chart.js') }}" defer></script>
-    <script src="{{ asset('admin/admin.js') }}" defer></script>
-    <script src="{{ asset('admin/vendor/popper.min.js') }}" defer></script>
+    <script src="{{ asset('admin/vendor/jquery-3.7.1.min.js') }}" nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/vendor/chart.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/admin.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/vendor/popper.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <link href="{{ asset('admin/vendor/tippy.css') }}" rel="stylesheet">
-    <script src="{{ asset('admin/vendor/tippy.umd.min.js') }}" defer></script>
+    <script src="{{ asset('admin/vendor/tippy.umd.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     {% block header_scripts %}{% endblock %}
 </head>
 <body

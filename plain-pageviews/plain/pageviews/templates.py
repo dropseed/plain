@@ -14,7 +14,8 @@ class PageviewsJSExtension(InclusionTagExtension):
 
     def get_context(
         self, context: dict[str, Any], *args: Any, **kwargs: Any
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         return {
             "pageviews_track_url": reverse("pageviews:track"),
+            "request": context.get("request"),
         }
