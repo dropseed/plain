@@ -143,7 +143,7 @@ class ScanResult:
 
             headers = self.metadata.get("headers")
             if headers:
-                lines.append("\n**Security Headers:**\n")
+                lines.append("\n**Headers:**\n")
                 for header, value in headers.items():
                     lines.append(f"- **{header}:** `{value}`\n")
 

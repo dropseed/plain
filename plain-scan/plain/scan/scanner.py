@@ -99,25 +99,8 @@ class Scanner:
                     {"url": r.url, "status_code": r.status_code}
                     for r in response.history
                 ],
-                "headers": {
-                    "content-security-policy": response.headers.get(
-                        "Content-Security-Policy"
-                    ),
-                    "content-security-policy-report-only": response.headers.get(
-                        "Content-Security-Policy-Report-Only"
-                    ),
-                    "strict-transport-security": response.headers.get(
-                        "Strict-Transport-Security"
-                    ),
-                    "frame-options": response.headers.get("X-Frame-Options"),
-                    "content-type-options": response.headers.get(
-                        "X-Content-Type-Options"
-                    ),
-                    "referrer-policy": response.headers.get("Referrer-Policy"),
-                },
+                "headers": dict(response.headers),
             }
-            # Remove None values from headers
-            metadata["headers"] = {k: v for k, v in metadata["headers"].items() if v}
 
             # Add cookies information if present
             if response.cookies:
@@ -131,15 +114,22 @@ class Scanner:
                                 samesite = cookie._rest[key]
                                 break
 
-                    cookies.append(
-                        {
-                            "name": cookie.name,
-                            "secure": cookie.secure,
-                            "httponly": hasattr(cookie, "_rest")
-                            and "HttpOnly" in cookie._rest,
-                            "samesite": samesite,
-                        }
-                    )
+                    cookie_data = {
+                        "name": cookie.name,
+                        "value": cookie.value,
+                        "domain": cookie.domain,
+                        "path": cookie.path,
+                        "secure": cookie.secure,
+                        "httponly": hasattr(cookie, "_rest")
+                        and "HttpOnly" in cookie._rest,
+                        "samesite": samesite,
+                    }
+
+                    # Add expires if present (may be None)
+                    if cookie.expires:
+                        cookie_data["expires"] = cookie.expires
+
+                    cookies.append(cookie_data)
                 metadata["cookies"] = cookies
 
         # Run each audit

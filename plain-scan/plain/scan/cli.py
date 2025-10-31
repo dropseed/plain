@@ -63,9 +63,9 @@ def format_verbose_metadata(metadata: dict) -> str:
 
     lines.append("")
 
-    # Security headers
+    # Headers
     if metadata.get("headers"):
-        lines.append(click.style("Security Headers:", bold=True))
+        lines.append(click.style("Headers:", bold=True))
         lines.append("")
         for header, value in metadata["headers"].items():
             # Truncate long headers for readability
