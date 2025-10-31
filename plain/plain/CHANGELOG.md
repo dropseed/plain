@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.84.1](https://github.com/dropseed/plain/releases/plain@0.84.1) (2025-10-31)
+
+### What's changed
+
+- Added `license = "BSD-3-Clause"` to package metadata in `pyproject.toml` ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.84.0](https://github.com/dropseed/plain/releases/plain@0.84.0) (2025-10-29)
 
 ### What's changed
