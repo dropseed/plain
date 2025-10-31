@@ -810,17 +810,16 @@ class CSPAudit(Audit):
     def _check_reporting(
         self, directives: dict[str, list[str]], response: requests.Response
     ) -> CheckResult:
-        """Check if CSP reporting is configured with modern standards.
+        """Check if CSP reporting is configured with modern Reporting-Endpoints header.
 
-        Pushes toward Reporting-Endpoints header (90% browser support, Reporting API v1).
-        The report-uri directive and Report-To header are deprecated.
+        Validates that report-to endpoints exist in Reporting-Endpoints header.
+        The report-uri directive and Report-To header are deprecated and should not be used.
         """
         has_report_uri = "report-uri" in directives
         has_report_to = "report-to" in directives
 
-        # Check for reporting headers
-        has_reporting_endpoints = "Reporting-Endpoints" in response.headers
-        has_report_to_header = "Report-To" in response.headers
+        # Check for Reporting-Endpoints header (modern, Reporting API v1)
+        reporting_endpoints_header = response.headers.get("Reporting-Endpoints", "")
 
         # No reporting configured - this is optional
         if not has_report_uri and not has_report_to:
@@ -835,31 +834,44 @@ class CSPAudit(Audit):
             return CheckResult(
                 name="reporting",
                 passed=False,
-                message="CSP uses deprecated report-uri (migrate to report-to with Reporting-Endpoints header)",
+                message="CSP uses deprecated report-uri (migrate to report-to with Reporting-Endpoints)",
             )
 
-        # Using report-to directive - check for required headers
+        # Using report-to directive - validate the endpoint exists in Reporting-Endpoints
         if has_report_to:
-            if has_reporting_endpoints:
+            # Get the endpoint name(s) from the directive
+            report_to_values = directives.get("report-to", [])
+            if not report_to_values:
+                return CheckResult(
+                    name="reporting",
+                    passed=False,
+                    message="CSP report-to directive is empty",
+                )
+
+            endpoint_name = report_to_values[0]  # report-to should have one value
+
+            # Must have Reporting-Endpoints header for report-to to work
+            if not reporting_endpoints_header:
+                return CheckResult(
+                    name="reporting",
+                    passed=False,
+                    message="CSP report-to directive requires Reporting-Endpoints header",
+                )
+
+            # Validate endpoint exists in Reporting-Endpoints header
+            # Format: endpoint-name="url", other="url2"
+            if f'{endpoint_name}="' in reporting_endpoints_header:
                 return CheckResult(
                     name="reporting",
                     passed=True,
                     message="CSP reporting correctly configured with Reporting-Endpoints",
                 )
-
-            if has_report_to_header:
+            else:
                 return CheckResult(
                     name="reporting",
                     passed=False,
-                    message="CSP uses deprecated Report-To header (migrate to Reporting-Endpoints)",
+                    message=f"CSP report-to references '{endpoint_name}' but it's not defined in Reporting-Endpoints header",
                 )
-
-            # Has report-to but no corresponding header
-            return CheckResult(
-                name="reporting",
-                passed=False,
-                message="CSP report-to directive requires Reporting-Endpoints header",
-            )
 
         # Shouldn't reach here, but safety fallback
         return CheckResult(
