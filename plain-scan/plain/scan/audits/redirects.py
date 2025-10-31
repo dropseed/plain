@@ -28,7 +28,6 @@ class RedirectsAudit(Audit):
             # No redirects - but we still run checks on the final URL
             checks = [
                 self._check_final_url_https(scanner.url, response.url),
-                self._check_www_canonicalization(scanner.url, response.url),
                 self._check_trailing_slash_redirect(scanner.url, response),
             ]
 
@@ -47,7 +46,6 @@ class RedirectsAudit(Audit):
             self._check_final_url_https(scanner.url, response.url),
             self._check_cross_origin_redirects(scanner.url, response),
             self._check_status_codes(response),
-            self._check_www_canonicalization(scanner.url, response.url),
             self._check_trailing_slash_redirect(scanner.url, response),
         ]
 
@@ -211,39 +209,6 @@ class RedirectsAudit(Audit):
             name="redirect-status-codes",
             passed=True,
             message=f"All {len(response.history)} redirect(s) use valid status codes",
-        )
-
-    def _check_www_canonicalization(
-        self, original_url: str, final_url: str
-    ) -> CheckResult:
-        """Check for www vs non-www canonicalization."""
-        original_parsed = urlparse(original_url)
-        final_parsed = urlparse(final_url)
-
-        # If domains differ, check if it's just www prefix
-        if original_parsed.netloc != final_parsed.netloc:
-            # Remove www. prefix from both for comparison
-            orig_without_www = original_parsed.netloc.removeprefix("www.")
-            final_without_www = final_parsed.netloc.removeprefix("www.")
-
-            if orig_without_www == final_without_www:
-                # It's a www canonicalization redirect
-                if original_parsed.netloc.startswith("www."):
-                    direction = "www to non-www"
-                else:
-                    direction = "non-www to www"
-
-                return CheckResult(
-                    name="www-canonicalization",
-                    passed=True,
-                    message=f"WWW canonicalization in place ({direction})",
-                )
-
-        # Either no redirect or redirect for other reasons
-        return CheckResult(
-            name="www-canonicalization",
-            passed=True,
-            message="No WWW canonicalization redirect detected",
         )
 
     def _check_trailing_slash_redirect(
