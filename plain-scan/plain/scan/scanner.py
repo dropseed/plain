@@ -6,6 +6,7 @@ import requests
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import SSLError
 
+from . import __version__
 from .audits import (
     ContentTypeOptionsAudit,
     CookiesAudit,
@@ -52,10 +53,14 @@ class Scanner:
         """Fetch the URL and cache the response."""
         if self.response is None:
             try:
+                user_agent = (
+                    f"plain-scan/{__version__} (+https://plainframework.com/scan)"
+                )
                 self.response = requests.get(
                     self.url,
                     allow_redirects=True,
                     timeout=30,
+                    headers={"User-Agent": user_agent},
                 )
             except (
                 SSLError,
