@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.11.2](https://github.com/dropseed/plain/releases/plain-code@0.11.2) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause license identifier to package metadata ([8477355](https://github.com/dropseed/plain/commit/8477355))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.1](https://github.com/dropseed/plain/releases/plain-code@0.11.1) (2025-10-27)
 
 ### What's changed
