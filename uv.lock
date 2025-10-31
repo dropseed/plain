@@ -426,7 +426,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.53.0"
+version = "0.53.1"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -614,7 +614,7 @@ dev = [
 
 [[package]]
 name = "plain-htmx"
-version = "0.11.0"
+version = "0.11.1"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
@@ -765,7 +765,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.25.2"
+version = "0.25.3"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -827,7 +827,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-scan"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "plain-scan" }
 dependencies = [
     { name = "plain" },
@@ -907,7 +907,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-toolbar"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },

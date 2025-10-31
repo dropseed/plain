@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.7.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.7.1) (2025-10-31)
+
+### What's changed
+
+- The main toolbar script now includes `nonce="{{ request.csp_nonce }}"` for better Content Security Policy compliance ([10f642a](https://github.com/dropseed/plain/commit/10f642a097aa487400f2dffd341f595d93218af9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.7.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.7.0) (2025-10-29)
 
 ### What's changed
