@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.53.1](https://github.com/dropseed/plain/releases/plain-admin@0.53.1) (2025-10-31)
+
+### What's changed
+
+- Dependency updates for `plain-auth` (0.20.7) and `plain-htmx` (0.11.0)
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.53.0](https://github.com/dropseed/plain/releases/plain-admin@0.53.0) (2025-10-29)
 
 ### What's changed
