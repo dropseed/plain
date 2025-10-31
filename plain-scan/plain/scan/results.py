@@ -14,18 +14,23 @@ class CheckResult:
     name: str
     passed: bool
     message: str
-    nested_checks: list[CheckResult] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CheckResult:
+        """Reconstruct CheckResult from dictionary."""
+        return cls(
+            name=data["name"],
+            passed=data["passed"],
+            message=data["message"],
+        )
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        result = {
+        return {
             "name": self.name,
             "passed": self.passed,
             "message": self.message,
         }
-        if self.nested_checks:
-            result["nested_checks"] = [check.to_dict() for check in self.nested_checks]
-        return result
 
 
 @dataclass
@@ -49,6 +54,19 @@ class AuditResult:
             # Optional audits pass even when not detected
             return not self.required
         return all(check.passed for check in self.checks)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> AuditResult:
+        """Reconstruct AuditResult from dictionary."""
+        checks = [CheckResult.from_dict(c) for c in data.get("checks", [])]
+        return cls(
+            name=data["name"],
+            detected=data["detected"],
+            checks=checks,
+            required=data.get("required", True),
+            disabled=data.get("disabled", False),
+            description=data.get("description"),
+        )
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -97,6 +115,21 @@ class ScanResult:
     def total_count(self) -> int:
         """Total count of audits (excluding disabled audits)."""
         return sum(1 for audit in self.audits if not audit.disabled)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ScanResult:
+        """Reconstruct ScanResult from dictionary."""
+        from .metadata import ScanMetadata
+
+        audits = [AuditResult.from_dict(a) for a in data.get("audits", [])]
+        metadata = None
+        if "metadata" in data:
+            metadata = ScanMetadata.from_dict(data["metadata"])
+        return cls(
+            url=data["url"],
+            audits=audits,
+            metadata=metadata,
+        )
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""

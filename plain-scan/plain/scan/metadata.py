@@ -21,6 +21,20 @@ class CookieMetadata:
     samesite: str | None
     expires: int | None = None
 
+    @classmethod
+    def from_dict(cls, data: dict) -> CookieMetadata:
+        """Reconstruct CookieMetadata from dictionary."""
+        return cls(
+            name=data["name"],
+            value=data["value"],
+            domain=data["domain"],
+            path=data["path"],
+            secure=data["secure"],
+            httponly=data["httponly"],
+            samesite=data["samesite"],
+            expires=data.get("expires"),
+        )
+
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         result = {
@@ -82,6 +96,17 @@ class ResponseMetadata:
             cookies=cookies,
         )
 
+    @classmethod
+    def from_dict(cls, data: dict) -> ResponseMetadata:
+        """Reconstruct ResponseMetadata from dictionary."""
+        cookies = [CookieMetadata.from_dict(c) for c in data.get("cookies", [])]
+        return cls(
+            url=data["url"],
+            status_code=data["status_code"],
+            headers=data["headers"],
+            cookies=cookies,
+        )
+
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         result = {
@@ -121,6 +146,15 @@ class ScanMetadata:
         responses.append(ResponseMetadata.from_response(response))
 
         return cls(timestamp=timestamp, responses=responses)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ScanMetadata:
+        """Reconstruct ScanMetadata from dictionary."""
+        responses = [ResponseMetadata.from_dict(r) for r in data.get("responses", [])]
+        return cls(
+            timestamp=data["timestamp"],
+            responses=responses,
+        )
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""

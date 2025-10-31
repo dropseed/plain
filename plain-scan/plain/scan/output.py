@@ -21,13 +21,7 @@ def format_check_result(check: CheckResult, indent: int = 0) -> list[str]:
         + ": "
         + click.style(check.message, dim=True)
     )
-    lines = [line]
-
-    # Add nested checks
-    for nested_check in check.nested_checks:
-        lines.extend(format_check_result(nested_check, indent + 1))
-
-    return lines
+    return [line]
 
 
 def format_verbose_metadata(metadata: ScanMetadata | None) -> str:
@@ -282,10 +276,6 @@ def to_markdown(scan_result: ScanResult, verbose: bool = False) -> str:
             for check in audit.checks:
                 check_icon = "✓" if check.passed else "✗"
                 lines.append(f"- {check_icon} **{check.name}:** {check.message}")
-
-                for nested in check.nested_checks:
-                    nested_icon = "✓" if nested.passed else "✗"
-                    lines.append(f"  - {nested_icon} {nested.message}")
         else:
             # Security feature not detected - check if user disabled or just not found
             if audit.disabled:
