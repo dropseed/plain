@@ -71,7 +71,6 @@ class CSPAudit(Audit):
             self._check_ip_source(directives),
             self._check_deprecated_directives(directives),
             self._check_reporting(directives, response),
-            self._check_strict_dynamic(directives),
             self._check_strict_dynamic_not_standalone(directives),
             self._check_trusted_types(directives),
         ]
@@ -878,46 +877,6 @@ class CSPAudit(Audit):
             name="reporting",
             passed=True,
             message="CSP reporting check completed",
-        )
-
-    def _check_strict_dynamic(self, directives: dict[str, list[str]]) -> CheckResult:
-        """Check if allowlist-based CSP should use 'strict-dynamic' (STRICT_CSP severity)."""
-        script_src = directives.get("script-src", directives.get("default-src", []))
-
-        # Check if using nonces or hashes
-        has_nonces = any(val.startswith("'nonce-") for val in script_src)
-        has_hashes = any(val.startswith("'sha") for val in script_src)
-
-        # Check if using allowlists (domains, not keywords)
-        has_allowlist = any(
-            not val.startswith("'") and not val == "https:" and not val == "http:"
-            for val in script_src
-        )
-
-        # Check if strict-dynamic is present
-        has_strict_dynamic = "'strict-dynamic'" in script_src
-
-        # If using nonces/hashes with allowlists but no strict-dynamic, recommend it
-        if (has_nonces or has_hashes) and has_allowlist and not has_strict_dynamic:
-            return CheckResult(
-                name="strict-dynamic",
-                passed=False,
-                message="CSP uses nonces/hashes with allowlists (add 'strict-dynamic' to prevent bypasses)",
-            )
-
-        # If using nonces/hashes with strict-dynamic, that's good
-        if (has_nonces or has_hashes) and has_strict_dynamic:
-            return CheckResult(
-                name="strict-dynamic",
-                passed=True,
-                message="CSP uses 'strict-dynamic' with nonces/hashes (modern best practice)",
-            )
-
-        # Otherwise, check not applicable (no nonces/hashes)
-        return CheckResult(
-            name="strict-dynamic",
-            passed=True,
-            message="CSP does not use nonces/hashes (strict-dynamic not applicable)",
         )
 
     def _check_strict_dynamic_not_standalone(
