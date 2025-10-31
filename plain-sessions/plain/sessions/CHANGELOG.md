@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.36.2](https://github.com/dropseed/plain/releases/plain-sessions@0.36.2) (2025-10-31)
+
+### What's changed
+
+- Internal package configuration updated to include BSD-3-Clause license in `pyproject.toml` ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.1](https://github.com/dropseed/plain/releases/plain-sessions@0.36.1) (2025-10-29)
 
 ### What's changed
