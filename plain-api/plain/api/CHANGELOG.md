@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.16.2](https://github.com/dropseed/plain/releases/plain-api@0.16.2) (2025-10-31)
+
+### What's changed
+
+- Added explicit BSD-3-Clause license metadata to package configuration ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.1](https://github.com/dropseed/plain/releases/plain-api@0.16.1) (2025-10-20)
 
 ### What's changed
