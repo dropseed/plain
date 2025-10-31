@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.55.1](https://github.com/dropseed/plain/releases/plain-models@0.55.1) (2025-10-31)
+
+### What's changed
+
+- Added `license = "BSD-3-Clause"` to package metadata ([8477355](https://github.com/dropseed/plain/commit/8477355e65b62be6e4618bcc814c912e050dc388))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.55.0](https://github.com/dropseed/plain/releases/plain-models@0.55.0) (2025-10-24)
 
 ### What's changed
