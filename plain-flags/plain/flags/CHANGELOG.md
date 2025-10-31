@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.27.2](https://github.com/dropseed/plain/releases/plain-flags@0.27.2) (2025-10-31)
+
+### What's changed
+
+- Package metadata now includes explicit BSD-3-Clause license field ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.1](https://github.com/dropseed/plain/releases/plain-flags@0.27.1) (2025-10-20)
 
 ### What's changed
