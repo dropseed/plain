@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.15.1](https://github.com/dropseed/plain/releases/plain-pages@0.15.1) (2025-10-31)
+
+### What's changed
+
+- Added license metadata to `pyproject.toml` for better package distribution ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-pages@0.15.0) (2025-10-24)
 
 ### What's changed
