@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.37.2](https://github.com/dropseed/plain/releases/plain-jobs@0.37.2) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause license specification to package metadata ([8477355e65](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.1](https://github.com/dropseed/plain/releases/plain-jobs@0.37.1) (2025-10-24)
 
 ### What's changed
