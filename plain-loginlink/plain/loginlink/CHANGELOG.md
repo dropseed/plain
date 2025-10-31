@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.13.2](https://github.com/dropseed/plain/releases/plain-loginlink@0.13.2) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause license to package metadata ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.1](https://github.com/dropseed/plain/releases/plain-loginlink@0.13.1) (2025-10-06)
 
 ### What's changed
