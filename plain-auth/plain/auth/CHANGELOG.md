@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.20.7](https://github.com/dropseed/plain/releases/plain-auth@0.20.7) (2025-10-31)
+
+### What's changed
+
+- Added `license = "BSD-3-Clause"` field to `pyproject.toml` for improved package metadata ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.6](https://github.com/dropseed/plain/releases/plain-auth@0.20.6) (2025-10-22)
 
 ### What's changed
