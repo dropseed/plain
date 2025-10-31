@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.25.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.2) (2025-10-31)
+
+### What's changed
+
+- Added BSD 3-Clause license metadata to `pyproject.toml` and a `LICENSE` file to the package ([8477355](https://github.com/dropseed/plain/commit/8477355e65b62be6e4618bcc814c912e050dc388))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.1) (2025-10-22)
 
 ### What's changed
