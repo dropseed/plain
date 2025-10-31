@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.25.3](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.3) (2025-10-31)
+
+### What's changed
+
+- Added CSP nonce support to the pageviews tracking script for improved Content Security Policy compatibility ([10f642a](https://github.com/dropseed/plain/commit/10f642a097aa487400f2dffd341f595d93218af9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.2) (2025-10-31)
 
 ### What's changed
