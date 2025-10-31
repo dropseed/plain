@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.10.3](https://github.com/dropseed/plain/releases/plain-elements@0.10.3) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause license field to package metadata ([8477355](https://github.com/dropseed/plain/commit/8477355e65b62be6e4618bcc814c912e050dc388))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.2](https://github.com/dropseed/plain/releases/plain-elements@0.10.2) (2025-10-20)
 
 ### What's changed
