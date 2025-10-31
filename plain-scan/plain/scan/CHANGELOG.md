@@ -1,5 +1,17 @@
 # plain-scan changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-scan@0.3.0) (2025-10-31)
+
+### What's changed
+
+- Added `from_dict()` class methods to `ScanResult`, `AuditResult`, `CheckResult`, `ScanMetadata`, `ResponseMetadata`, and `CookieMetadata` to enable reconstruction from JSON/dictionary data ([95372ec](https://github.com/dropseed/plain/commit/95372ec))
+- Removed nested checks feature to simplify the check result structure ([95372ec](https://github.com/dropseed/plain/commit/95372ec))
+- Removed CSP Trusted Types check as it was informational only and not a practical security requirement ([9cc7ac1](https://github.com/dropseed/plain/commit/9cc7ac1))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-scan@0.2.0) (2025-10-31)
 
 ### What's changed
