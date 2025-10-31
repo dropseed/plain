@@ -1,5 +1,16 @@
 # plain-redirection changelog
 
+## [0.24.1](https://github.com/dropseed/plain/releases/plain-redirection@0.24.1) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause LICENSE file to the package ([8477355e65](https://github.com/dropseed/plain/commit/8477355e65))
+- Added explicit `license = "BSD-3-Clause"` field to pyproject.toml for improved package metadata ([8477355e65](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-redirection@0.24.0) (2025-10-22)
 
 ### What's changed
