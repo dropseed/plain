@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.11.1](https://github.com/dropseed/plain/releases/plain-htmx@0.11.1) (2025-10-31)
+
+### What's changed
+
+- Added CSP nonce support to all htmx script tags for improved Content Security Policy compatibility ([10f642a](https://github.com/dropseed/plain/commit/10f642a097))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-htmx@0.11.0) (2025-10-29)
 
 ### What's changed
