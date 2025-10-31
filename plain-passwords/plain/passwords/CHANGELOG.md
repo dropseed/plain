@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.15.1](https://github.com/dropseed/plain/releases/plain-passwords@0.15.1) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause license metadata to package configuration ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-passwords@0.15.0) (2025-10-07)
 
 ### What's changed

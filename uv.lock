@@ -397,7 +397,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.84.0"
+version = "0.84.1"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -453,7 +453,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.16.1"
+version = "0.16.2"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -472,7 +472,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-auth"
-version = "0.20.6"
+version = "0.20.7"
 source = { editable = "plain-auth" }
 dependencies = [
     { name = "plain" },
@@ -497,7 +497,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cache"
-version = "0.20.0"
+version = "0.20.1"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
@@ -508,7 +508,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-code"
-version = "0.11.1"
+version = "0.11.2"
 source = { editable = "plain-code" }
 dependencies = [
     { name = "plain" },
@@ -550,7 +550,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-elements"
-version = "0.10.2"
+version = "0.10.3"
 source = { editable = "plain-elements" }
 dependencies = [
     { name = "plain" },
@@ -591,7 +591,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-flags"
-version = "0.27.1"
+version = "0.27.2"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
@@ -633,7 +633,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.37.1"
+version = "0.37.2"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -656,7 +656,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-loginlink"
-version = "0.13.1"
+version = "0.13.2"
 source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
@@ -671,7 +671,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.55.0"
+version = "0.55.1"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -746,7 +746,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pages"
-version = "0.15.0"
+version = "0.15.1"
 source = { editable = "plain-pages" }
 dependencies = [
     { name = "mistune" },
@@ -765,7 +765,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.25.1"
+version = "0.25.2"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -780,7 +780,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-passwords"
-version = "0.15.0"
+version = "0.15.1"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
@@ -812,7 +812,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.24.0"
+version = "0.24.1"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
@@ -827,7 +827,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-scan"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "plain-scan" }
 dependencies = [
     { name = "plain" },
@@ -850,7 +850,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.36.1"
+version = "0.36.2"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
@@ -873,7 +873,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.21.0"
+version = "0.21.1"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
