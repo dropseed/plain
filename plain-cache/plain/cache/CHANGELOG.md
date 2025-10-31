@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-cache@0.20.1) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause license metadata to package configuration ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-cache@0.20.0) (2025-10-17)
 
 ### What's changed
