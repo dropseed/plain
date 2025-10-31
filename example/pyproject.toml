@@ -25,6 +25,7 @@ dependencies = [
     "plain-passwords",
     "plain-pytest",
     "plain-redirection",
+    "plain-scan",
     "plain-sessions",
     "plain-support",
     "plain-tailwind",

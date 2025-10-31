@@ -42,6 +42,7 @@ FULLY_TYPED_PATHS = [
     "plain-vendor",
     "plain-jobs",
     "plain-models",
+    "plain-scan",
 ]
 
 

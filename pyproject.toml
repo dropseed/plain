@@ -27,6 +27,7 @@ dev = [
     "plain-passwords",
     "plain-pytest",
     "plain-redirection",
+    "plain-scan",
     "plain-sessions",
     "plain-support",
     "plain-tailwind",
@@ -59,6 +60,7 @@ dev = [
 "plain-passwords" = { workspace = true }
 "plain-pytest" = { workspace = true }
 "plain-redirection" = { workspace = true }
+"plain-scan" = { workspace = true }
 "plain-sessions" = { workspace = true }
 "plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
