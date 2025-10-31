@@ -72,7 +72,6 @@ class CSPAudit(Audit):
             self._check_deprecated_directives(directives),
             self._check_reporting(directives, response),
             self._check_strict_dynamic_not_standalone(directives),
-            self._check_trusted_types(directives),
         ]
 
         return AuditResult(
@@ -911,39 +910,6 @@ class CSPAudit(Audit):
             name="strict-dynamic-standalone",
             passed=True,
             message="CSP uses 'strict-dynamic' with nonces/hashes",
-        )
-
-    def _check_trusted_types(self, directives: dict[str, list[str]]) -> CheckResult:
-        """Check for Trusted Types directives (cutting-edge XSS protection)."""
-        has_trusted_types = "trusted-types" in directives
-        has_require_trusted_types = "require-trusted-types-for" in directives
-
-        if has_trusted_types and has_require_trusted_types:
-            return CheckResult(
-                name="trusted-types",
-                passed=True,
-                message="CSP uses Trusted Types for enhanced XSS protection",
-            )
-
-        if has_trusted_types or has_require_trusted_types:
-            # Partial implementation
-            missing = []
-            if not has_trusted_types:
-                missing.append("trusted-types")
-            if not has_require_trusted_types:
-                missing.append("require-trusted-types-for")
-
-            return CheckResult(
-                name="trusted-types",
-                passed=True,
-                message=f"CSP has partial Trusted Types implementation (consider adding: {', '.join(missing)})",
-            )
-
-        # No Trusted Types - this is informational, not a failure
-        return CheckResult(
-            name="trusted-types",
-            passed=True,
-            message="CSP does not use Trusted Types (optional advanced XSS protection)",
         )
 
     def _parse_csp(self, csp_header: str) -> dict[str, list[str]]:
