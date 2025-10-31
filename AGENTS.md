@@ -62,6 +62,10 @@ Example workflow:
 ./scripts/type-coverage plain/plain/assets  # Should show 100%
 ```
 
+## Coding style
+
+- Don't include args and returns in docstrings if they are already type annotated.
+
 ## Verifying changes
 
 Not everything needs a test, but be liberal about using `print()` statements to verify changes and show the before and after effects of your changes. Make sure those print statements are removed before committing your changes.
