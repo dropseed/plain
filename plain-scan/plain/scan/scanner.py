@@ -16,8 +16,10 @@ from .audits import (
     HSTSAudit,
     RedirectsAudit,
     ReferrerPolicyAudit,
+    StatusCodeAudit,
     TLSAudit,
 )
+from .metadata import ScanMetadata
 
 if TYPE_CHECKING:
     from .audits.base import Audit
@@ -37,6 +39,7 @@ class Scanner:
         # Required audits first, then optional ones
         self.audits: list[Audit] = [
             # Required security audits
+            StatusCodeAudit(),  # Check status code first (most fundamental)
             CSPAudit(),
             HSTSAudit(),
             TLSAudit(),
@@ -90,47 +93,7 @@ class Scanner:
             pass
 
         # Collect metadata about the request
-        metadata = {}
-        if response is not None:
-            metadata = {
-                "final_url": response.url,
-                "status_code": response.status_code,
-                "redirect_chain": [
-                    {"url": r.url, "status_code": r.status_code}
-                    for r in response.history
-                ],
-                "headers": dict(response.headers),
-            }
-
-            # Add cookies information if present
-            if response.cookies:
-                cookies = []
-                for cookie in response.cookies:
-                    # Extract SameSite attribute (can be in _rest as "SameSite" or "samesite")
-                    samesite = None
-                    if hasattr(cookie, "_rest") and cookie._rest:
-                        for key in cookie._rest:
-                            if key.lower() == "samesite":
-                                samesite = cookie._rest[key]
-                                break
-
-                    cookie_data = {
-                        "name": cookie.name,
-                        "value": cookie.value,
-                        "domain": cookie.domain,
-                        "path": cookie.path,
-                        "secure": cookie.secure,
-                        "httponly": hasattr(cookie, "_rest")
-                        and "HttpOnly" in cookie._rest,
-                        "samesite": samesite,
-                    }
-
-                    # Add expires if present (may be None)
-                    if cookie.expires:
-                        cookie_data["expires"] = cookie.expires
-
-                    cookies.append(cookie_data)
-                metadata["cookies"] = cookies
+        metadata = ScanMetadata.from_response(response)
 
         # Run each audit
         scan_result = ScanResult(url=self.url, metadata=metadata)

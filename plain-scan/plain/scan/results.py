@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .metadata import ScanMetadata
 
 
 @dataclass
@@ -68,7 +72,7 @@ class ScanResult:
 
     url: str
     audits: list[AuditResult] = field(default_factory=list)
-    metadata: dict = field(default_factory=dict)
+    metadata: ScanMetadata | None = None
 
     @property
     def passed(self) -> bool:
@@ -102,92 +106,5 @@ class ScanResult:
             "audits": [audit.to_dict() for audit in self.audits],
         }
         if self.metadata:
-            result["metadata"] = self.metadata
+            result["metadata"] = self.metadata.to_dict()
         return result
-
-    def to_markdown(self) -> str:
-        """Convert scan results to markdown format."""
-        lines = []
-
-        # Header
-        lines.append("# Plain Scan Results\n")
-        lines.append(f"**URL:** {self.url}\n")
-
-        # Overall status
-        if self.passed:
-            lines.append("✅ **All checks passed**\n")
-        else:
-            failed_count = sum(
-                1 for audit in self.audits if not audit.passed and not audit.disabled
-            )
-            lines.append(
-                f"❌ **{failed_count} check{'s' if failed_count != 1 else ''} failed**\n"
-            )
-
-        # Metadata
-        if self.metadata:
-            lines.append("## Response Details\n")
-            lines.append(f"- **Final URL:** {self.metadata.get('final_url')}\n")
-            lines.append(f"- **Status:** {self.metadata.get('status_code')}\n")
-
-            redirect_chain = self.metadata.get("redirect_chain")
-            if redirect_chain:
-                lines.append("\n**Redirects:**\n")
-                for i, redirect in enumerate(redirect_chain, 1):
-                    lines.append(
-                        f"{i}. {redirect['url']} → {redirect['status_code']}\n"
-                    )
-                lines.append(
-                    f"{len(redirect_chain) + 1}. {self.metadata.get('final_url')} → {self.metadata.get('status_code')}\n"
-                )
-
-            headers = self.metadata.get("headers")
-            if headers:
-                lines.append("\n**Headers:**\n")
-                for header, value in headers.items():
-                    lines.append(f"- **{header}:** `{value}`\n")
-
-            cookies = self.metadata.get("cookies")
-            if cookies:
-                lines.append("\n**Cookies:**\n")
-                for cookie in cookies:
-                    attrs = []
-                    if cookie["secure"]:
-                        attrs.append("Secure")
-                    else:
-                        attrs.append("Not Secure")
-                    if cookie["httponly"]:
-                        attrs.append("HttpOnly")
-                    if cookie["samesite"]:
-                        attrs.append(f"SameSite={cookie['samesite']}")
-                    lines.append(f"- **{cookie['name']}:** {' · '.join(attrs)}\n")
-
-        # Audits
-        lines.append("\n## Security Checks\n")
-        for audit in self.audits:
-            if audit.detected:
-                icon = "✅" if audit.passed else "❌"
-                # Add "required" label only for required audits
-                required_label = " *(required)*" if audit.required else ""
-                lines.append(f"\n### {icon} {audit.name}{required_label}\n")
-
-                for check in audit.checks:
-                    check_icon = "✓" if check.passed else "✗"
-                    lines.append(f"- {check_icon} **{check.name}:** {check.message}\n")
-
-                    for nested in check.nested_checks:
-                        nested_icon = "✓" if nested.passed else "✗"
-                        lines.append(f"  - {nested_icon} {nested.message}\n")
-            else:
-                # Security feature not detected - check if user disabled or just not found
-                if audit.disabled:
-                    lines.append(f"\n### ⚪ {audit.name}\n")
-                    lines.append("*Disabled*\n")
-                elif audit.required:
-                    lines.append(f"\n### ❌ {audit.name}\n")
-                    lines.append("*Required, not detected*\n")
-                else:
-                    lines.append(f"\n### ⚪ {audit.name}\n")
-                    lines.append("*Not detected*\n")
-
-        return "\n".join(lines)
