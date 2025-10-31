@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-support@0.21.1) (2025-10-31)
+
+### What's changed
+
+- Added BSD-3-Clause license file and declaration to package metadata ([8477355](https://github.com/dropseed/plain/commit/8477355e65))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-support@0.21.0) (2025-10-29)
 
 ### What's changed
