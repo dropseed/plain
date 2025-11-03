@@ -136,6 +136,7 @@ class DevProcess(ProcessManager):
         )
 
         self.symlink_plain_src()
+        self.generate_agents_md()
         self.modify_hosts_file()
 
         click.secho("→ Running preflight checks... ", dim=True, nl=False)
@@ -208,6 +209,28 @@ class DevProcess(ProcessManager):
 
         if plain_path.exists() and not symlink_path.exists():
             symlink_path.symlink_to(plain_path)
+
+    def generate_agents_md(self) -> None:
+        """Generate .plain/AGENTS.md from installed packages with AGENTS.md files."""
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "plain", "agent", "md", "--save"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0 and result.stderr:
+                click.secho(
+                    f"Warning: Failed to generate .plain/AGENTS.md: {result.stderr}",
+                    fg="yellow",
+                    err=True,
+                )
+        except Exception as e:
+            click.secho(
+                f"Warning: Failed to generate .plain/AGENTS.md: {e}",
+                fg="yellow",
+                err=True,
+            )
 
     def modify_hosts_file(self) -> None:
         """Modify the hosts file to map the custom domain to 127.0.0.1."""

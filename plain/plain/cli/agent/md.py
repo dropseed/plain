@@ -6,6 +6,8 @@ from pathlib import Path
 
 import click
 
+from plain.runtime import PLAIN_TEMP_PATH
+
 from ..output import iterate_markdown
 
 
@@ -20,11 +22,13 @@ def _get_packages_with_agents() -> dict[str, Path]:
         # Check core plain package (namespace package)
         plain_spec = importlib.util.find_spec("plain")
         if plain_spec and plain_spec.submodule_search_locations:
-            # For namespace packages, use the first search location
-            plain_path = Path(plain_spec.submodule_search_locations[0])
-            agents_path = plain_path / "AGENTS.md"
-            if agents_path.exists():
-                agents_files["plain"] = agents_path
+            # For namespace packages, check all search locations
+            for location in plain_spec.submodule_search_locations:
+                plain_path = Path(location)
+                agents_path = plain_path / "AGENTS.md"
+                if agents_path.exists():
+                    agents_files["plain"] = agents_path
+                    break  # Use the first one found
 
         # Check other plain.* subpackages
         if hasattr(plain, "__path__"):
@@ -49,44 +53,54 @@ def _get_packages_with_agents() -> dict[str, Path]:
 
 
 @click.command("md")
-@click.argument("package", default="", required=False)
 @click.option(
-    "--all",
-    "show_all",
-    is_flag=True,
-    help="Show AGENTS.md for all packages that have them",
+    "--save",
+    default=None,
+    is_flag=False,
+    flag_value="PLAIN_TEMP_PATH",
+    help="Save combined AGENTS.md from all packages to file (default: .plain/AGENTS.md)",
 )
-@click.option(
-    "--list",
-    "show_list",
-    is_flag=True,
-    help="List packages with AGENTS.md files",
-)
-def md(package: str, show_all: bool, show_list: bool) -> None:
-    """Show AGENTS.md for a package"""
+def md(save: str | None) -> None:
+    """AGENTS.md from installed Plain packages"""
 
     agents_files = _get_packages_with_agents()
 
-    if show_list:
-        for pkg in sorted(agents_files.keys()):
-            click.echo(f"- {pkg}")
-
+    if not agents_files:
         return
 
-    if show_all:
+    # Handle --save flag
+    if save:
+        # Use PLAIN_TEMP_PATH if flag was used without value
+        if save == "PLAIN_TEMP_PATH":
+            save_path = PLAIN_TEMP_PATH / "AGENTS.md"
+        else:
+            save_path = Path(save)
+
+        # Check if we need to regenerate
+        if save_path.exists():
+            output_mtime = save_path.stat().st_mtime
+            # Check if any source file is newer
+            needs_regen = any(
+                path.stat().st_mtime > output_mtime for path in agents_files.values()
+            )
+            if not needs_regen:
+                return
+
+        # Ensure parent directory exists
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Generate combined file
+        with save_path.open("w") as f:
+            for pkg_name in sorted(agents_files.keys()):
+                content = agents_files[pkg_name].read_text()
+                f.write(content)
+                if not content.endswith("\n"):
+                    f.write("\n")
+                f.write("\n")
+    else:
+        # Display to console
         for pkg in sorted(agents_files.keys()):
             agents_path = agents_files[pkg]
             for line in iterate_markdown(agents_path.read_text()):
                 click.echo(line, nl=False)
             print()
-
-        return
-
-    if not package:
-        raise click.UsageError(
-            "Package name or --all required. Use --list to see available packages."
-        )
-
-    agents_path = agents_files[package]
-    for line in iterate_markdown(agents_path.read_text()):
-        click.echo(line, nl=False)
