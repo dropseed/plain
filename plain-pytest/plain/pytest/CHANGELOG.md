@@ -1,5 +1,16 @@
 # plain-pytest changelog
 
+## [0.13.1](https://github.com/dropseed/plain/releases/plain-pytest@0.13.1) (2025-11-03)
+
+### What's changed
+
+- The `plain test` command is now marked as a "common command" to show it in the default CLI help output ([73d3a48f](https://github.com/dropseed/plain/commit/73d3a48f))
+- Updated the `plain test` command description to "Test suite with pytest" for clarity ([fdb9e801](https://github.com/dropseed/plain/commit/fdb9e801))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-pytest@0.13.0) (2025-10-17)
 
 ### What's changed
