@@ -397,7 +397,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.84.1"
+version = "0.85.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -453,7 +453,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.16.2"
+version = "0.16.3"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -497,7 +497,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cache"
-version = "0.20.1"
+version = "0.20.2"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
@@ -508,7 +508,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-code"
-version = "0.11.2"
+version = "0.11.3"
 source = { editable = "plain-code" }
 dependencies = [
     { name = "plain" },
@@ -527,7 +527,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-dev"
-version = "0.44.0"
+version = "0.45.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -633,7 +633,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.37.2"
+version = "0.37.3"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -671,7 +671,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.55.1"
+version = "0.56.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -721,7 +721,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
@@ -791,7 +791,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-pytest"
-version = "0.13.0"
+version = "0.13.1"
 source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
@@ -827,7 +827,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-scan"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "plain-scan" }
 dependencies = [
     { name = "plain" },
@@ -890,7 +890,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tailwind"
-version = "0.15.3"
+version = "0.15.4"
 source = { editable = "plain-tailwind" }
 dependencies = [
     { name = "plain" },
@@ -922,7 +922,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tunnel"
-version = "0.8.0"
+version = "0.8.1"
 source = { editable = "plain-tunnel" }
 dependencies = [
     { name = "plain" },
@@ -937,7 +937,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-vendor"
-version = "0.9.2"
+version = "0.9.3"
 source = { editable = "plain-vendor" }
 dependencies = [
     { name = "plain" },

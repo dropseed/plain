@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.8.1](https://github.com/dropseed/plain/releases/plain-tunnel@0.8.1) (2025-11-03)
+
+### What's changed
+
+- Added command description to CLI for improved help text ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e80103))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.8.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.8.0) (2025-10-06)
 
 ### What's changed
