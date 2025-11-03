@@ -9,6 +9,10 @@ This is the only AGENTS.md file in the repo -- you don't need to look for others
 - Lint and format code: `./scripts/fix`
 - Make database migrations: `./scripts/makemigrations`
 
+## Testing changes
+
+The `example` directory contains a demo app with all Plain packages installed. You can `cd` into `example` and use `uv run plain`.
+
 ## READMEs
 
 Inside each top level subdirectory is a `README.md` that is a symlink to the `README.md` in the of the Python package itself. You only need to edit the `README.md` inside of the package itself.
