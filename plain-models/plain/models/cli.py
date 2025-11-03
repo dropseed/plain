@@ -136,7 +136,7 @@ def list_models(package_labels: tuple[str, ...], app_only: bool) -> None:
         click.echo(f"  package: {pkg_name}\n")
 
 
-@register_cli("makemigrations")
+@register_cli("makemigrations", shortcut_for="models")
 @cli.command()
 @click.argument("package_labels", nargs=-1)
 @click.option(
@@ -341,7 +341,7 @@ def makemigrations(
         write_migration_files(changes)
 
 
-@register_cli("migrate")
+@register_cli("migrate", shortcut_for="models")
 @cli.command()
 @click.argument("package_label", required=False)
 @click.argument("migration_name", required=False)

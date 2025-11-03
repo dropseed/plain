@@ -19,7 +19,7 @@ class PlainHelpFormatter(click.HelpFormatter):
     def write_dl(
         self,
         rows: list[tuple[str, str]],
-        col_max: int = 30,
+        col_max: int = 20,
         col_spacing: int = 2,
     ) -> None:
         """Writes a definition list into the buffer.  This is how options
@@ -54,10 +54,15 @@ class PlainHelpFormatter(click.HelpFormatter):
             lines = wrapped_text.splitlines()
 
             if lines:
-                self.write(f"{lines[0]}\n")
+                # Dim the description text
+                first_line_styled = click.style(lines[0], dim=True)
+                self.write(f"{first_line_styled}\n")
 
                 for line in lines[1:]:
-                    self.write(f"{'':>{first_col + self.current_indent}}{line}\n")
+                    line_styled = click.style(line, dim=True)
+                    self.write(
+                        f"{'':>{first_col + self.current_indent}}{line_styled}\n"
+                    )
             else:
                 self.write("\n")
 
@@ -66,6 +71,11 @@ class PlainContext(click.Context):
     formatter_class = PlainHelpFormatter
 
     def __init__(self, *args: Any, **kwargs: Any):
+        # Set a wider max_content_width for help text (default is 80)
+        # This allows descriptions to fit more comfortably on one line
+        if "max_content_width" not in kwargs:
+            kwargs["max_content_width"] = 140
+
         super().__init__(*args, **kwargs)
 
         # Force colors in CI environments

@@ -119,7 +119,7 @@ def check(ctx: click.Context, path: str) -> None:
 
 
 @without_runtime_setup
-@register_cli("fix")
+@register_cli("fix", shortcut_for="code")
 @cli.command()
 @click.pass_context
 @click.argument("path", default=".")

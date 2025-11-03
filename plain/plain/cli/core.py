@@ -140,5 +140,51 @@ class PlainCommandCollection(click.CommandCollection):
         self._ensure_registry_loaded()
         return super().list_commands(ctx)
 
+    def format_commands(self, ctx: Context, formatter: Any) -> None:
+        """Format commands with separate sections for shortcuts and regular commands."""
+        self._ensure_registry_loaded()
+
+        # Get all commands from both sources
+        commands = []
+        for source in self.sources:
+            for name in source.list_commands(ctx):
+                cmd = source.get_command(ctx, name)
+                if cmd is not None:
+                    commands.append((name, cmd))
+
+        if not commands:
+            return
+
+        # Get metadata about shortcuts from the registry
+        shortcuts_metadata = cli_registry.get_shortcuts()
+
+        # Separate shortcuts from regular commands
+        shortcuts = []
+        regular_commands = []
+
+        for name, cmd in commands:
+            if name in shortcuts_metadata:
+                # This is a shortcut
+                help_text = cmd.get_short_help_str(limit=200)
+                shortcut_for = shortcuts_metadata[name].shortcut_for
+                if shortcut_for:
+                    # Add italic styling to the alias information (more concise)
+                    alias_info = click.style(f"(→ {shortcut_for})", italic=True)
+                    help_text = f"{help_text} {alias_info}"
+                shortcuts.append((name, help_text))
+            else:
+                # Regular command or group
+                regular_commands.append((name, cmd.get_short_help_str(limit=200)))
+
+        # Write shortcuts section if any exist
+        if shortcuts:
+            with formatter.section("Shortcuts"):
+                formatter.write_dl(sorted(shortcuts))
+
+        # Write regular commands section
+        if regular_commands:
+            with formatter.section("Commands"):
+                formatter.write_dl(sorted(regular_commands))
+
 
 cli = PlainCommandCollection()

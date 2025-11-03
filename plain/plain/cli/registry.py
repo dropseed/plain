@@ -1,19 +1,33 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from plain.packages import packages_registry
 
 
-class CLIRegistry:
-    def __init__(self):
-        self._commands: dict[str, Any] = {}
+class CommandMetadata(NamedTuple):
+    """Metadata about a registered command."""
 
-    def register_command(self, cmd: Any, name: str) -> None:
+    cmd: Any
+    shortcut_for: str | None = None
+
+
+class CLIRegistry:
+    def __init__(self) -> None:
+        self._commands: dict[str, CommandMetadata] = {}
+
+    def register_command(
+        self, cmd: Any, name: str, shortcut_for: str | None = None
+    ) -> None:
         """
         Register a CLI command or group with the specified name.
+
+        Args:
+            cmd: The click command or group to register
+            name: The name to register the command under
+            shortcut_for: Optional parent command this is a shortcut for (e.g., "models" for migrate)
         """
-        self._commands[name] = cmd
+        self._commands[name] = CommandMetadata(cmd=cmd, shortcut_for=shortcut_for)
 
     def import_modules(self) -> None:
         """
@@ -23,27 +37,66 @@ class CLIRegistry:
 
     def get_commands(self) -> dict[str, Any]:
         """
-        Get all registered commands.
+        Get all registered commands (just the command objects, not metadata).
+        """
+        return {name: metadata.cmd for name, metadata in self._commands.items()}
+
+    def get_commands_with_metadata(self) -> dict[str, CommandMetadata]:
+        """
+        Get all registered commands with their metadata.
         """
         return self._commands
+
+    def get_shortcuts(self) -> dict[str, CommandMetadata]:
+        """
+        Get only commands that are shortcuts.
+        """
+        return {
+            name: metadata
+            for name, metadata in self._commands.items()
+            if metadata.shortcut_for
+        }
+
+    def get_regular_commands(self) -> dict[str, CommandMetadata]:
+        """
+        Get only commands that are not shortcuts.
+        """
+        return {
+            name: metadata
+            for name, metadata in self._commands.items()
+            if not metadata.shortcut_for
+        }
 
 
 cli_registry = CLIRegistry()
 
 
-def register_cli(name: str) -> Any:
+def register_cli(name: str, shortcut_for: str | None = None) -> Any:
     """
     Register a CLI command or group with the given name.
 
+    Args:
+        name: The name to register the command under
+        shortcut_for: Optional parent command this is a shortcut for.
+                     For example, @register_cli("migrate", shortcut_for="models")
+                     indicates that "plain migrate" is a shortcut for "plain models migrate"
+
     Usage:
+        # Register a regular command group
         @register_cli("users")
         @click.group()
         def users_cli():
             pass
+
+        # Register a shortcut command
+        @register_cli("migrate", shortcut_for="models")
+        @click.command()
+        def migrate():
+            pass
     """
 
     def wrapper(cmd: Any) -> Any:
-        cli_registry.register_command(cmd, name)
+        cli_registry.register_command(cmd, name, shortcut_for=shortcut_for)
         return cmd
 
     return wrapper
