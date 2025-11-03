@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.45.1](https://github.com/dropseed/plain/releases/plain-dev@0.45.1) (2025-11-03)
+
+### What's changed
+
+- Fixed the database wait command call in the dev server startup to use the updated `plain db wait` command instead of the deprecated `plain models db-wait` ([b293750](https://github.com/dropseed/plain/commit/b293750f6f))
+- Fixed the pre-commit database connection check to use the updated `plain migrations list` command instead of the deprecated `plain models show-migrations` ([b293750](https://github.com/dropseed/plain/commit/b293750f6f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.45.0](https://github.com/dropseed/plain/releases/plain-dev@0.45.0) (2025-11-03)
 
 ### What's changed
