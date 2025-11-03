@@ -14,8 +14,7 @@ from .openapi.generator import OpenAPISchemaGenerator
 @register_cli("api")
 @click.group()
 def cli() -> None:
-    """API commands."""
-    pass
+    """API commands"""
 
 
 @cli.command()

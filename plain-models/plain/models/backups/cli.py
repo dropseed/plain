@@ -7,12 +7,10 @@ from pathlib import Path
 import click
 
 from plain.cli import register_cli
-from plain.cli.runtime import common_command
 
 from .core import DatabaseBackups
 
 
-@common_command
 @register_cli("backups", shortcut_for="models")
 @click.group("backups")
 def cli() -> None:
@@ -22,6 +20,7 @@ def cli() -> None:
 
 @cli.command("list")
 def list_backups() -> None:
+    """List database backups"""
     backups_handler = DatabaseBackups()
     backups = backups_handler.find_backups()
     if not backups:
@@ -45,6 +44,7 @@ def list_backups() -> None:
 @click.option("--pg-dump", default="pg_dump", envvar="PG_DUMP")
 @click.argument("backup_name", default="")
 def create_backup(backup_name: str, pg_dump: str) -> None:
+    """Create a database backup"""
     backups_handler = DatabaseBackups()
 
     if not backup_name:
@@ -67,6 +67,7 @@ def create_backup(backup_name: str, pg_dump: str) -> None:
 @click.option("--pg-restore", default="pg_restore", envvar="PG_RESTORE")
 @click.argument("backup_name", default="")
 def restore_backup(backup_name: str, latest: bool, pg_restore: str) -> None:
+    """Restore a database backup"""
     backups_handler = DatabaseBackups()
 
     if backup_name and latest:
@@ -94,6 +95,7 @@ def restore_backup(backup_name: str, latest: bool, pg_restore: str) -> None:
 @cli.command("delete")
 @click.argument("backup_name")
 def delete_backup(backup_name: str) -> None:
+    """Delete a database backup"""
     backups_handler = DatabaseBackups()
     try:
         backups_handler.delete(backup_name)
@@ -106,6 +108,7 @@ def delete_backup(backup_name: str) -> None:
 @cli.command("clear")
 @click.confirmation_option(prompt="Are you sure you want to delete all backups?")
 def clear_backups() -> None:
+    """Clear all database backups"""
     backups_handler = DatabaseBackups()
     backups = backups_handler.find_backups()
     for backup in backups:

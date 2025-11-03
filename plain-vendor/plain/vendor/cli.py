@@ -16,8 +16,7 @@ VENDOR_DIR = APP_ASSETS_DIR / "vendor"
 @register_cli("vendor")
 @click.group()
 def cli() -> None:
-    """Vendor CSS/JS from a CDN"""
-    pass
+    """Manage vendored CSS/JS dependencies"""
 
 
 @cli.command()

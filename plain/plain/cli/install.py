@@ -24,7 +24,7 @@ def install(
     agent_command: str | None = None,
     print_only: bool = False,
 ) -> None:
-    """Install Plain packages with the help of an agent."""
+    """Install Plain packages with agent assistance"""
     # Validate all package names
     invalid_packages = [pkg for pkg in packages if not pkg.startswith("plain")]
     if invalid_packages:

@@ -1,9 +1,8 @@
 import click
 
-from plain.cli.runtime import common_command, without_runtime_setup
+from plain.cli.runtime import without_runtime_setup
 
 
-@common_command
 @without_runtime_setup
 @click.command()
 @click.option(
@@ -111,9 +110,7 @@ def server(
     max_requests: int,
     pidfile: str | None,
 ) -> None:
-    """
-    Run a production-ready WSGI server.
-    """
+    """Production-ready WSGI server"""
     from plain.server import ServerApplication
     from plain.server.config import Config
 

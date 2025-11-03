@@ -8,11 +8,12 @@ from .models import CachedItem
 @register_cli("cache")
 @click.group()
 def cli() -> None:
-    pass
+    """Cache management"""
 
 
 @cli.command()
 def clear_expired() -> None:
+    """Clear expired cache entries"""
     click.echo("Clearing expired cache items...")
     result = CachedItem.query.expired().delete()
     click.echo(f"Deleted {result[0]} expired cache items.")
@@ -21,6 +22,7 @@ def clear_expired() -> None:
 @cli.command()
 @click.option("--force", is_flag=True)
 def clear_all(force: bool) -> None:
+    """Clear all cache entries"""
     if not force and not click.confirm(
         "Are you sure you want to delete all cache items?"
     ):
@@ -32,6 +34,7 @@ def clear_all(force: bool) -> None:
 
 @cli.command()
 def stats() -> None:
+    """Show cache statistics"""
     total = CachedItem.query.count()
     expired = CachedItem.query.expired().count()
     unexpired = CachedItem.query.unexpired().count()

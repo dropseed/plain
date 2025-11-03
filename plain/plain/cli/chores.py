@@ -17,9 +17,7 @@ def chores() -> None:
     "--name", default=None, type=str, help="Name of the chore to run", multiple=True
 )
 def list_chores(name: tuple[str, ...]) -> None:
-    """
-    List all registered chores.
-    """
+    """List all registered chores"""
     from plain.chores.registry import chores_registry
 
     chores_registry.import_modules()
@@ -51,9 +49,7 @@ def list_chores(name: tuple[str, ...]) -> None:
     "--dry-run", is_flag=True, help="Show what would be done without executing"
 )
 def run_chores(name: tuple[str, ...], dry_run: bool) -> None:
-    """
-    Run the specified chores.
-    """
+    """Run specified chores"""
     from plain.chores.registry import chores_registry
 
     chores_registry.import_modules()

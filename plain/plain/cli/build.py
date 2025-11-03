@@ -9,10 +9,8 @@ import click
 
 import plain.runtime
 from plain.assets.compile import compile_assets, get_compiled_path
-from plain.cli.runtime import common_command
 
 
-@common_command
 @click.command()
 @click.option(
     "--keep-original/--no-keep-original",
@@ -36,7 +34,7 @@ from plain.cli.runtime import common_command
     help="Compress the assets",
 )
 def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
-    """Pre-deployment build step (compile assets, css, js, etc.)"""
+    """Pre-deployment build step for assets and static files"""
 
     if not keep_original and not fingerprint:
         raise click.UsageError(

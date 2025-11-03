@@ -27,10 +27,7 @@ from plain.packages import packages_registry
     help="Hide progress output and warnings, only show errors.",
 )
 def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
-    """
-    Run preflight checks to validate your Plain project.
-    Exit with error code if any errors are found. Warnings do not cause failure.
-    """
+    """Validation checks before deployment"""
     # Auto-discover and load preflight checks
     packages_registry.autodiscover_modules("preflight", include_app=True)
     if not quiet:

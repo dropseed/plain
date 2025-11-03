@@ -5,7 +5,7 @@ from plain.utils.crypto import get_random_string
 
 @click.group()
 def utils() -> None:
-    pass
+    """Utility commands"""
 
 
 @utils.command()

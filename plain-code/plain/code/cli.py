@@ -30,7 +30,7 @@ def cli() -> None:
 @click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
 def install(ctx: click.Context, force: bool) -> None:
-    """Install or update the Biome standalone per configuration."""
+    """Install or update Biome binary"""
     config = get_code_config()
 
     if not config.get("biome", {}).get("enabled", True):
@@ -58,7 +58,7 @@ def install(ctx: click.Context, force: bool) -> None:
 @without_runtime_setup
 @cli.command()
 def update() -> None:
-    """Update the Biome standalone binary to the latest release."""
+    """Update Biome to latest version"""
     config = get_code_config()
 
     if not config.get("biome", {}).get("enabled", True):
@@ -76,7 +76,7 @@ def update() -> None:
 @click.pass_context
 @click.argument("path", default=".")
 def check(ctx: click.Context, path: str) -> None:
-    """Check the given path for formatting or linting issues."""
+    """Check for formatting and linting issues"""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
 
@@ -127,7 +127,7 @@ def check(ctx: click.Context, path: str) -> None:
 @click.option("--unsafe-fixes", is_flag=True, help="Apply ruff unsafe fixes")
 @click.option("--add-noqa", is_flag=True, help="Add noqa comments to suppress errors")
 def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> None:
-    """Lint and format the given path."""
+    """Fix formatting and linting issues"""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
 

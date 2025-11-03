@@ -18,7 +18,7 @@ from plain.cli.runtime import common_command
 )
 @click.argument("pytest_args", nargs=-1, type=click.UNPROCESSED)
 def cli(pytest_args: tuple[str, ...]) -> None:
-    """Run pytest with .env.test loaded"""
+    """Test suite with pytest"""
 
     if os.path.exists(".env.test"):
         click.secho(

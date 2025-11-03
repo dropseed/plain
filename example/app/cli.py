@@ -17,7 +17,7 @@ def cli():
 @cli.command()
 @click.argument("email")
 def enable_admin_user(email):
-    """Enable admin privileges for a user."""
+    """Enable admin privileges for a user"""
     result = User.query.filter(email=email).update(is_admin=True)
     if result:
         click.echo(f"User {email} is now an admin.")

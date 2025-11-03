@@ -23,10 +23,7 @@ from plain.cli.runtime import common_command
     help="Execute the given command and exit.",
 )
 def shell(interface: str | None, command: str | None) -> None:
-    """
-    Runs a Python interactive interpreter. Tries to use IPython or
-    bpython, if one of them is available.
-    """
+    """Interactive Python shell"""
 
     if command:
         # Execute the command and exit
@@ -68,7 +65,7 @@ def shell(interface: str | None, command: str | None) -> None:
 @click.command()
 @click.argument("script", nargs=1, type=click.Path(exists=True))
 def run(script: str) -> None:
-    """Run a Python script in the context of your app"""
+    """Execute Python scripts with app context"""
     before_script = "import plain.runtime; plain.runtime.setup()"
     command = f"{before_script}; exec(open('{script}').read())"
     result = subprocess.run(["python", "-c", command])

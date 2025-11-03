@@ -63,7 +63,7 @@ def _get_packages_with_agents() -> dict[str, Path]:
     help="List packages with AGENTS.md files",
 )
 def md(package: str, show_all: bool, show_list: bool) -> None:
-    """Show AGENTS.md for a package."""
+    """Show AGENTS.md for a package"""
 
     agents_files = _get_packages_with_agents()
 

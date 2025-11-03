@@ -29,6 +29,7 @@ from .client import TunnelClient
 def cli(
     destination: str, subdomain: str | None, tunnel_host: str, log_level: str | None
 ) -> None:
+    """Create a public tunnel to local server"""
     if not destination.startswith("http://") and not destination.startswith("https://"):
         destination = f"https://{destination}"
 

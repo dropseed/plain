@@ -7,14 +7,13 @@ import click
 
 @click.group()
 def urls() -> None:
-    """URL related commands"""
-    pass
+    """URL configuration commands"""
 
 
 @urls.command("list")
 @click.option("--flat", is_flag=True, help="List all URLs in a flat list")
 def list_urls(flat: bool) -> None:
-    """Print all URL patterns under settings.URLS_ROUTER"""
+    """List all URL patterns"""
     from plain.runtime import settings
     from plain.urls import URLResolver, get_resolver
 

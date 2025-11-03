@@ -129,7 +129,7 @@ def cli(
     start: bool,
     stop: bool,
 ) -> None:
-    """Start local development"""
+    """Local development server"""
     if ctx.invoked_subcommand:
         return
 
@@ -223,7 +223,7 @@ def debug() -> None:
 @click.option("--start", is_flag=True, help="Start in the background")
 @click.option("--stop", is_flag=True, help="Stop the background process")
 def services(start: bool, stop: bool) -> None:
-    """Start additional services defined in pyproject.toml"""
+    """Start additional development services"""
 
     if start and stop:
         raise click.UsageError(
@@ -263,7 +263,7 @@ def services(start: bool, stop: bool) -> None:
 @click.option("--path", is_flag=True, help="Output log file path")
 @click.option("--services", is_flag=True, help="Show logs for services")
 def logs(follow: bool, pid: int | None, path: bool, services: bool) -> None:
-    """Show logs from recent plain dev runs."""
+    """Show recent development logs"""
 
     if services:
         log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "services"
@@ -299,7 +299,7 @@ def logs(follow: bool, pid: int | None, path: bool, services: bool) -> None:
 )
 @click.argument("entrypoint", required=False)
 def entrypoint(show_list: bool, entrypoint: str | None) -> None:
-    """Entrypoints registered under plain.dev"""
+    """Run registered development entrypoints"""
     if not show_list and not entrypoint:
         raise click.UsageError("Please provide an entrypoint name or use --list")
 

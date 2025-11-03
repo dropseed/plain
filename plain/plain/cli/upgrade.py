@@ -34,7 +34,7 @@ def upgrade(
     agent_command: str | None = None,
     print_only: bool = False,
 ) -> None:
-    """Upgrade Plain packages with the help of an agent."""
+    """Upgrade Plain packages with agent assistance"""
     if not packages:
         click.secho("Getting installed packages...", bold=True, err=True)
         packages = tuple(sorted(get_installed_plain_packages()))

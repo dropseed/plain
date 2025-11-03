@@ -51,7 +51,7 @@ def compare_versions(v1: str, v2: str) -> int:
 def changelog(
     package_label: str, from_version: str | None, to_version: str | None
 ) -> None:
-    """Show changelog entries for a package."""
+    """Show changelog for a package"""
     module_name = package_label.replace("-", ".")
     spec = find_spec(module_name)
     if not spec:

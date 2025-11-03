@@ -1,28 +1,25 @@
 from __future__ import annotations
 
 import json
-import sys
-import urllib.request
 from datetime import datetime
-from typing import Any, cast
+from typing import cast
 
 import click
 
 from plain.cli import register_cli
-from plain.cli.agent.prompt import prompt_agent
 from plain.observer.models import Span, Trace
 
 
 @register_cli("observer")
 @click.group("observer")
 def observer_cli() -> None:
-    pass
+    """Observability and tracing tools"""
 
 
 @observer_cli.command()
 @click.option("--force", is_flag=True, help="Skip confirmation prompt.")
 def clear(force: bool) -> None:
-    """Clear all observer data."""
+    """Clear all observer data"""
     query = Trace.query.all()
     trace_count = query.count()
 
@@ -51,7 +48,7 @@ def trace_list(
     session_id: str | None,
     output_json: bool,
 ) -> None:
-    """List recent traces."""
+    """List recent traces"""
     # Build query
     query = Trace.query.all()
 
@@ -147,7 +144,7 @@ def trace_list(
 @click.argument("trace_id")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 def trace_detail(trace_id: str, output_json: bool) -> None:
-    """Display detailed information about a specific trace."""
+    """Show detailed trace information"""
     try:
         trace = Trace.query.get(trace_id=trace_id)
     except Trace.DoesNotExist:
@@ -165,7 +162,7 @@ def trace_detail(trace_id: str, output_json: bool) -> None:
 @click.option("--limit", default=50, help="Number of spans to show (default: 50)")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 def span_list(trace_id: str | None, limit: int, output_json: bool) -> None:
-    """List recent spans."""
+    """List recent spans"""
     # Build query
     query = Span.query.all()
 
@@ -267,7 +264,7 @@ def span_list(trace_id: str | None, limit: int, output_json: bool) -> None:
 @click.argument("span_id")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 def span_detail(span_id: str, output_json: bool) -> None:
-    """Display detailed information about a specific span."""
+    """Show detailed span information"""
     try:
         span = Span.query.select_related("trace").get(span_id=span_id)
     except Span.DoesNotExist:
@@ -493,92 +490,3 @@ def format_trace_output(trace: Trace) -> str:
         output_lines.extend(format_span_tree(root_span, 0))
 
     return "\n".join(output_lines)
-
-
-@observer_cli.command("diagnose")
-@click.argument("trace_id", required=False)
-@click.option("--url", help="Fetch trace from a shareable URL")
-@click.option(
-    "--json", "json_input", help="Provide trace JSON data (use '-' for stdin)"
-)
-@click.option(
-    "--agent-command",
-    envvar="PLAIN_AGENT_COMMAND",
-    help="Run command with generated prompt",
-)
-@click.option(
-    "--print",
-    "print_only",
-    is_flag=True,
-    help="Print the prompt without running the agent",
-)
-def diagnose(
-    trace_id: str | None,
-    url: str | None,
-    json_input: str | None,
-    agent_command: str | None,
-    print_only: bool,
-) -> None:
-    """Generate a diagnostic prompt for analyzing a trace.
-
-    By default, provide a trace ID from the database. Use --url for a shareable
-    trace URL, or --json for raw trace data (--json - reads from stdin).
-    """
-
-    input_count = sum(bool(x) for x in [trace_id, url, json_input])
-    if input_count == 0:
-        raise click.UsageError("Must provide trace ID, --url, or --json")
-    elif input_count > 1:
-        raise click.UsageError("Cannot specify multiple input methods")
-
-    trace_data: Any
-
-    if json_input:
-        if json_input == "-":
-            try:
-                json_data = sys.stdin.read()
-                trace_data = json.loads(json_data)
-            except json.JSONDecodeError as e:
-                raise click.ClickException(f"Error parsing JSON from stdin: {e}")
-            except Exception as e:
-                raise click.ClickException(f"Error reading from stdin: {e}")
-        else:
-            try:
-                trace_data = json.loads(json_input)
-            except json.JSONDecodeError as e:
-                raise click.ClickException(f"Error parsing JSON: {e}")
-    elif url:
-        try:
-            request = urllib.request.Request(
-                url, headers={"Accept": "application/json"}
-            )
-            with urllib.request.urlopen(request) as response:
-                trace_data = json.loads(response.read().decode())
-        except Exception as e:
-            raise click.ClickException(f"Error fetching trace from URL: {e}")
-    else:
-        try:
-            trace = Trace.query.get(trace_id=trace_id)
-            trace_data = trace.as_dict()
-        except Trace.DoesNotExist:
-            raise click.ClickException(f"Trace with ID '{trace_id}' not found")
-
-    prompt_lines: list[str] = [
-        "Below is OpenTelemetry trace data JSON from a Plain application. Analyze it for performance issues or improvements.",
-        "",
-        "Focus on easy and obvious wins first and foremost. You have access to the codebase, so make sure you look at it before suggesting anything! If there is nothing obvious, that's ok -- say that and ask whether there are specific things we should look deeper into.",
-        "",
-        "If potential code changes are found, briefly explain them and ask whether we should implement them.",
-        "",
-        "## Trace Data JSON",
-        "",
-        "```json",
-        json.dumps(trace_data, indent=2),
-        "```",
-    ]
-
-    prompt = "\n".join(prompt_lines)
-
-    success = prompt_agent(prompt, agent_command, print_only)
-    if not success:
-        raise click.Abort()

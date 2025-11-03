@@ -13,14 +13,13 @@ from .core import Tailwind
 @register_cli("tailwind")
 @click.group("tailwind")
 def cli() -> None:
-    """Tailwind CSS"""
-    pass
+    """Tailwind CSS management"""
 
 
 @cli.command()
 @click.pass_context
 def init(ctx: click.Context) -> None:
-    """Install Tailwind and create tailwind.css"""
+    """Install Tailwind CSS"""
     tailwind = Tailwind()
 
     if not tailwind.is_installed():
@@ -37,6 +36,7 @@ def init(ctx: click.Context) -> None:
 @click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
 def install(ctx: click.Context, force: bool) -> None:
+    """Install Tailwind CSS binary"""
     tailwind = Tailwind()
 
     if force or not tailwind.is_installed() or tailwind.needs_update():
@@ -57,7 +57,7 @@ def install(ctx: click.Context, force: bool) -> None:
 
 @cli.command()
 def update() -> None:
-    """Update the Tailwind CSS version"""
+    """Update Tailwind CSS to latest version"""
     tailwind = Tailwind()
     click.secho("Installing Tailwind standalone...", bold=True, nl=True)
     version = tailwind.install()
@@ -69,7 +69,7 @@ def update() -> None:
 @click.option("--minify", is_flag=True)
 @click.pass_context
 def build(ctx: click.Context, watch: bool, minify: bool) -> None:
-    """Compile a Tailwind CSS file"""
+    """Build Tailwind CSS files"""
     tailwind = Tailwind()
 
     ctx.invoke(install)
@@ -99,7 +99,7 @@ def build(ctx: click.Context, watch: bool, minify: bool) -> None:
 
 @cli.command()
 def version() -> None:
-    """Show the installed Tailwind CSS version"""
+    """Show Tailwind CSS version"""
     tailwind = Tailwind()
 
     if not tailwind.is_installed():

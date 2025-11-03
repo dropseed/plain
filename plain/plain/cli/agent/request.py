@@ -49,7 +49,7 @@ def request(
     content_type: str | None,
     headers: tuple[str, ...],
 ) -> None:
-    """Make an HTTP request using the test client against the development database."""
+    """Make an HTTP test request against the dev database"""
 
     try:
         # Only allow in DEBUG mode for security

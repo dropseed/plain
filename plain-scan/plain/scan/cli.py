@@ -61,7 +61,7 @@ def cli(
     verbose: bool,
     disable: tuple[str, ...],
 ) -> None:
-    """Scan a URL for HTTP security configuration issues."""
+    """Scan URL for security issues"""
 
     # Normalize URL (add https:// if no scheme provided)
     url = normalize_url(url)

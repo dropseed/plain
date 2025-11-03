@@ -20,7 +20,7 @@ from plain.cli.runtime import without_runtime_setup
 )
 @click.argument("packages", nargs=-1)
 def cli(packages: tuple[str, ...], repo: str, reset: bool, all_packages: bool) -> None:
-    """Contribute to plain by linking packages locally."""
+    """Link Plain packages for local development"""
 
     if reset:
         click.secho("Undoing any changes to pyproject.toml and uv.lock", bold=True)

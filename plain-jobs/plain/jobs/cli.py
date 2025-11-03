@@ -22,7 +22,7 @@ logger = logging.getLogger("plain.jobs")
 @register_cli("jobs")
 @click.group()
 def cli() -> None:
-    pass
+    """Background job management"""
 
 
 @cli.command()
@@ -75,7 +75,7 @@ def worker(
     stats_every: int,
     reload: bool,
 ) -> None:
-    """Run the job worker."""
+    """Run the job worker"""
     jobs_schedule = load_schedule(settings.JOBS_SCHEDULE)
 
     if reload:
@@ -140,7 +140,7 @@ def worker(
 
 @cli.command()
 def clear() -> None:
-    """Clear all completed job results in all queues."""
+    """Clear completed job results"""
     cutoff = timezone.now() - datetime.timedelta(
         seconds=settings.JOBS_RESULTS_RETENTION
     )
@@ -151,7 +151,7 @@ def clear() -> None:
 
 @cli.command()
 def stats() -> None:
-    """Stats across all queues."""
+    """Show job queue statistics"""
     pending = JobRequest.query.count()
     processing = JobProcess.query.count()
 
@@ -168,7 +168,7 @@ def stats() -> None:
 
 @cli.command()
 def purge() -> None:
-    """Delete all running and pending jobs regardless of queue."""
+    """Delete all pending and running jobs"""
     if not click.confirm(
         "Are you sure you want to clear all running and pending jobs? This will delete all current Jobs and JobRequests"
     ):
@@ -184,7 +184,7 @@ def purge() -> None:
 @cli.command()
 @click.argument("job_class_name", type=str)
 def run(job_class_name: str) -> None:
-    """Run a job class directly (and not using a worker)."""
+    """Run a job directly without a worker"""
     job = jobs_registry.load_job(job_class_name, {"args": [], "kwargs": {}})
     click.secho("Loaded job: ", bold=True, nl=False)
     print(job)
@@ -193,7 +193,7 @@ def run(job_class_name: str) -> None:
 
 @cli.command("list")
 def list_jobs() -> None:
-    """List all registered jobs."""
+    """List all registered jobs"""
     for name, job_class in jobs_registry.jobs.items():
         click.secho(f"{name}", bold=True, nl=False)
         # Get description from class docstring

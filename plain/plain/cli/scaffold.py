@@ -8,12 +8,7 @@ import plain.runtime
 @click.command()
 @click.argument("package_name")
 def create(package_name: str) -> None:
-    """
-    Create a new local package.
-
-    The PACKAGE_NAME is typically a plural noun, like "users" or "posts",
-    where you might create a "User" or "Post" model inside of the package.
-    """
+    """Create a new local package"""
     package_dir = plain.runtime.APP_PATH / package_name
     package_dir.mkdir(exist_ok=True)
 

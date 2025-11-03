@@ -45,7 +45,7 @@ else:
 @register_cli("models")
 @click.group()
 def cli() -> None:
-    pass
+    """Database model management"""
 
 
 cli.add_command(backups_cli)
@@ -54,7 +54,7 @@ cli.add_command(backups_cli)
 @cli.command()
 @click.argument("parameters", nargs=-1)
 def db_shell(parameters: tuple[str, ...]) -> None:
-    """Runs the command-line client for specified database, or the default database if none is provided."""
+    """Open an interactive database shell"""
     try:
         db_connection.client.runshell(list(parameters))
     except FileNotFoundError:
@@ -114,7 +114,7 @@ def db_wait() -> None:
     help="Only show models from packages that start with 'app'.",
 )
 def list_models(package_labels: tuple[str, ...], app_only: bool) -> None:
-    """List installed models."""
+    """List all installed models"""
 
     packages = set(package_labels)
 
@@ -176,7 +176,7 @@ def makemigrations(
     check: bool,
     verbosity: int,
 ) -> None:
-    """Creates new migration(s) for packages."""
+    """Create new database migrations"""
 
     written_files: list[str] = []
     interactive = not no_input
@@ -397,7 +397,7 @@ def migrate(
     atomic_batch: bool | None,
     quiet: bool,
 ) -> None:
-    """Updates database schema. Manages both packages with migrations and those without."""
+    """Apply database migrations"""
 
     def migration_progress_callback(
         action: str,
@@ -713,7 +713,7 @@ def migrate(
 def show_migrations(
     package_labels: tuple[str, ...], format: str, verbosity: int
 ) -> None:
-    """Shows all available migrations for the current project"""
+    """Show all available migrations"""
 
     def _validate_package_names(package_names: tuple[str, ...]) -> None:
         has_bad_names = False
@@ -834,7 +834,7 @@ def show_migrations(
     help="Skip confirmation prompt (for non-interactive use).",
 )
 def prune_migrations(yes: bool) -> None:
-    """Show and optionally remove stale migration records from the database."""
+    """Prune stale migration records"""
     # Load migrations from disk and database
     loader = MigrationLoader(db_connection, ignore_no_migrations=True)
     recorder = MigrationRecorder(db_connection)
@@ -962,9 +962,7 @@ def squash_migrations(
     squashed_name: str | None,
     verbosity: int,
 ) -> None:
-    """
-    Squashes an existing set of migrations (from first until specified) into a single new one.
-    """
+    """Squash multiple migrations into one"""
     interactive = not no_input
 
     def find_migration(
