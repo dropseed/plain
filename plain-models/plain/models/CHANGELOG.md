@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.56.1](https://github.com/dropseed/plain/releases/plain-models@0.56.1) (2025-11-03)
+
+### What's changed
+
+- Fixed preflight checks and README to reference the correct new command names (`plain db shell` and `plain migrations prune`) instead of the old `plain models` commands ([b293750](https://github.com/dropseed/plain/commit/b293750f6f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.56.0](https://github.com/dropseed/plain/releases/plain-models@0.56.0) (2025-11-03)
 
 ### What's changed
