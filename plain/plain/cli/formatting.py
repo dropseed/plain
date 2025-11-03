@@ -13,7 +13,7 @@ class PlainHelpFormatter(click.HelpFormatter):
         self.write(f"{'':>{self.current_indent}}{styled_heading}\n")
 
     def write_usage(self, prog: str, args: str = "", prefix: str = "Usage: ") -> None:
-        prefix_styled = click.style(prefix, italic=True)
+        prefix_styled = click.style(prefix, dim=True)
         super().write_usage(prog, args, prefix=prefix_styled)
 
     def write_dl(
