@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.3.1](https://github.com/dropseed/plain/releases/plain-scan@0.3.1) (2025-11-03)
+
+### What's changed
+
+- Simplified CLI command description for consistency with other Plain commands ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e80))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-scan@0.3.0) (2025-10-31)
 
 ### What's changed
