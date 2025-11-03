@@ -1,5 +1,19 @@
 # plain changelog
 
+## [0.85.0](https://github.com/dropseed/plain/releases/plain@0.85.0) (2025-11-03)
+
+### What's changed
+
+- CLI help output now organizes commands into "Common Commands", "Core Commands", and "Package Commands" sections for better discoverability ([73d3a48](https://github.com/dropseed/plain/commit/73d3a48fca))
+- CLI help output has been customized with improved formatting and shortcut indicators showing which commands are shortcuts (e.g., `migrate → models migrate`) ([db882e6](https://github.com/dropseed/plain/commit/db882e6d47))
+- CSRF exception messages now include more detailed context about what was rejected and why (e.g., port mismatches, host mismatches) ([9a8e09c](https://github.com/dropseed/plain/commit/9a8e09c1dc))
+- The `plain agent md` command now saves a combined `AGENTS.md` file to `.plain/` by default when using `plain dev`, making it easier to provide context to coding agents ([786b7a0](https://github.com/dropseed/plain/commit/786b7a0ca1))
+- CLI help text styling has been refined with dimmed descriptions and usage prefixes for improved readability ([d7f7053](https://github.com/dropseed/plain/commit/d7f705398d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.84.1](https://github.com/dropseed/plain/releases/plain@0.84.1) (2025-10-31)
 
 ### What's changed
