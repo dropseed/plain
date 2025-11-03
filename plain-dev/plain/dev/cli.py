@@ -8,6 +8,7 @@ from typing import Any
 import click
 
 from plain.cli import register_cli
+from plain.cli.runtime import common_command
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .alias import AliasManager
@@ -80,6 +81,7 @@ class DevGroup(click.Group):
             sys.exit(1)
 
 
+@common_command
 @register_cli("dev")
 @click.group(cls=DevGroup, invoke_without_command=True)
 @click.pass_context

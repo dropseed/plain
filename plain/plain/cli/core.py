@@ -141,50 +141,65 @@ class PlainCommandCollection(click.CommandCollection):
         return super().list_commands(ctx)
 
     def format_commands(self, ctx: Context, formatter: Any) -> None:
-        """Format commands with separate sections for shortcuts and regular commands."""
+        """Format commands with separate sections for common, core, and package commands."""
         self._ensure_registry_loaded()
 
-        # Get all commands from both sources
+        # Get all commands from both sources, tracking their source
         commands = []
-        for source in self.sources:
+        for source_index, source in enumerate(self.sources):
             for name in source.list_commands(ctx):
                 cmd = source.get_command(ctx, name)
                 if cmd is not None:
-                    commands.append((name, cmd))
+                    # source_index 0 = plain_cli (core), 1+ = registry (packages)
+                    commands.append((name, cmd, source_index))
 
         if not commands:
             return
 
-        # Get metadata about shortcuts from the registry
+        # Get metadata from the registry (for shortcuts)
         shortcuts_metadata = cli_registry.get_shortcuts()
 
-        # Separate shortcuts from regular commands
-        shortcuts = []
-        regular_commands = []
+        # Separate commands into common, core, and package
+        common_commands = []
+        core_commands = []
+        package_commands = []
 
-        for name, cmd in commands:
-            if name in shortcuts_metadata:
-                # This is a shortcut
-                help_text = cmd.get_short_help_str(limit=200)
-                shortcut_for = shortcuts_metadata[name].shortcut_for
-                if shortcut_for:
-                    # Add italic styling to the alias information (more concise)
-                    alias_info = click.style(f"(→ {shortcut_for})", italic=True)
-                    help_text = f"{help_text} {alias_info}"
-                shortcuts.append((name, help_text))
+        for name, cmd, source_index in commands:
+            help_text = cmd.get_short_help_str(limit=200)
+
+            # Check if command is marked as common via decorator
+            is_common = getattr(cmd, "is_common_command", False)
+
+            if is_common:
+                # This is a common command
+                # Add arrow notation if it's also a shortcut
+                if name in shortcuts_metadata:
+                    shortcut_for = shortcuts_metadata[name].shortcut_for
+                    if shortcut_for:
+                        alias_info = click.style(f"(→ {shortcut_for})", italic=True)
+                        help_text = f"{help_text} {alias_info}"
+                common_commands.append((name, help_text))
+            elif source_index == 0:
+                # Package command (from registry, inserted at index 0)
+                package_commands.append((name, help_text))
             else:
-                # Regular command or group
-                regular_commands.append((name, cmd.get_short_help_str(limit=200)))
+                # Core command (from plain_cli, at index 1)
+                core_commands.append((name, help_text))
 
-        # Write shortcuts section if any exist
-        if shortcuts:
-            with formatter.section("Shortcuts"):
-                formatter.write_dl(sorted(shortcuts))
+        # Write common commands section if any exist
+        if common_commands:
+            with formatter.section("Common Commands"):
+                formatter.write_dl(sorted(common_commands))
 
-        # Write regular commands section
-        if regular_commands:
-            with formatter.section("Commands"):
-                formatter.write_dl(sorted(regular_commands))
+        # Write core commands section if any exist
+        if core_commands:
+            with formatter.section("Core Commands"):
+                formatter.write_dl(sorted(core_commands))
+
+        # Write package commands section if any exist
+        if package_commands:
+            with formatter.section("Package Commands"):
+                formatter.write_dl(sorted(package_commands))
 
 
 cli = PlainCommandCollection()

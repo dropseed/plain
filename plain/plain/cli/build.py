@@ -9,8 +9,10 @@ import click
 
 import plain.runtime
 from plain.assets.compile import compile_assets, get_compiled_path
+from plain.cli.runtime import common_command
 
 
+@common_command
 @click.command()
 @click.option(
     "--keep-original/--no-keep-original",

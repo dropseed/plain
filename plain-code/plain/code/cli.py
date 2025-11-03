@@ -10,7 +10,7 @@ import click
 
 from plain.cli import register_cli
 from plain.cli.print import print_event
-from plain.cli.runtime import without_runtime_setup
+from plain.cli.runtime import common_command, without_runtime_setup
 
 from .biome import Biome
 
@@ -118,6 +118,7 @@ def check(ctx: click.Context, path: str) -> None:
         maybe_exit(result.returncode)
 
 
+@common_command
 @without_runtime_setup
 @register_cli("fix", shortcut_for="code")
 @cli.command()

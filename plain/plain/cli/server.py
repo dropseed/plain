@@ -1,8 +1,9 @@
 import click
 
-from plain.cli.runtime import without_runtime_setup
+from plain.cli.runtime import common_command, without_runtime_setup
 
 
+@common_command
 @without_runtime_setup
 @click.command()
 @click.option(

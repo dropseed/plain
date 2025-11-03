@@ -9,7 +9,7 @@ from click.formatting import iter_rows, measure_table, term_len, wrap_text
 
 class PlainHelpFormatter(click.HelpFormatter):
     def write_heading(self, heading: str) -> None:
-        styled_heading = click.style(heading, underline=True)
+        styled_heading = click.style(heading, dim=True)
         self.write(f"{'':>{self.current_indent}}{styled_heading}\n")
 
     def write_usage(self, prog: str, args: str = "", prefix: str = "Usage: ") -> None:

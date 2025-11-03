@@ -6,7 +6,10 @@ import sys
 
 import click
 
+from plain.cli.runtime import common_command
 
+
+@common_command
 @click.command()
 @click.option(
     "-i",

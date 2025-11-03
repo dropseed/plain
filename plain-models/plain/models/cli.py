@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 import click
 
 from plain.cli import register_cli
+from plain.cli.runtime import common_command
 from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils.text import Truncator
@@ -136,6 +137,7 @@ def list_models(package_labels: tuple[str, ...], app_only: bool) -> None:
         click.echo(f"  package: {pkg_name}\n")
 
 
+@common_command
 @register_cli("makemigrations", shortcut_for="models")
 @cli.command()
 @click.argument("package_labels", nargs=-1)
@@ -341,6 +343,7 @@ def makemigrations(
         write_migration_files(changes)
 
 
+@common_command
 @register_cli("migrate", shortcut_for="models")
 @cli.command()
 @click.argument("package_label", required=False)

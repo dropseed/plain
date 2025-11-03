@@ -7,10 +7,12 @@ from pathlib import Path
 import click
 
 from plain.cli import register_cli
+from plain.cli.runtime import common_command
 
 from .core import DatabaseBackups
 
 
+@common_command
 @register_cli("backups", shortcut_for="models")
 @click.group("backups")
 def cli() -> None:
