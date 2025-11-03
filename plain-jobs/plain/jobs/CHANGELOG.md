@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.37.4](https://github.com/dropseed/plain/releases/plain-jobs@0.37.4) (2025-11-03)
+
+### What's changed
+
+- Fixed migration documentation to reference correct renamed commands: `plain db shell` instead of `plain models db-shell` and `plain migrations prune` instead of `plain migrate --prune` ([b293750f6f](https://github.com/dropseed/plain/commit/b293750f6f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.3](https://github.com/dropseed/plain/releases/plain-jobs@0.37.3) (2025-11-03)
 
 ### What's changed
