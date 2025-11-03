@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.37.3](https://github.com/dropseed/plain/releases/plain-jobs@0.37.3) (2025-11-03)
+
+### What's changed
+
+- No functional changes in this release
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.2](https://github.com/dropseed/plain/releases/plain-jobs@0.37.2) (2025-10-31)
 
 ### What's changed
