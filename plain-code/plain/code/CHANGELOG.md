@@ -1,5 +1,16 @@
 # plain-code changelog
 
+## [0.11.3](https://github.com/dropseed/plain/releases/plain-code@0.11.3) (2025-11-03)
+
+### What's changed
+
+- Improved CLI command descriptions to be more concise and user-friendly ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e80))
+- The `plain fix` command is now marked as a common command and registered as a shortcut for `plain code fix` ([73d3a48](https://github.com/dropseed/plain/commit/73d3a48), [7910a06](https://github.com/dropseed/plain/commit/7910a06))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.2](https://github.com/dropseed/plain/releases/plain-code@0.11.2) (2025-10-31)
 
 ### What's changed
