@@ -2,10 +2,10 @@
 #
 # If upgrading from plain.worker, run this SQL command BEFORE running migrations:
 #
-# plain models db-shell -- -c "INSERT INTO plainmigrations (app, name, applied) SELECT 'plainjobs', name, applied FROM plainmigrations WHERE app = 'plainworker' ON CONFLICT DO NOTHING;"
+# plain db shell -- -c "INSERT INTO plainmigrations (app, name, applied) SELECT 'plainjobs', name, applied FROM plainmigrations WHERE app = 'plainworker' ON CONFLICT DO NOTHING;"
 #
 # Then run: plain migrate
-# Then run: plain migrate --prune (to clean up old plainworker records)
+# Then run: plain migrations prune (to clean up old plainworker records)
 #
 # Step 1: Rename tables from plainworker_* to plainjobs_*
 

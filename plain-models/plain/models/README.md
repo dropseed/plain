@@ -125,7 +125,7 @@ plain makemigrations
 plain migrate
 
 # See migration status
-plain models show-migrations
+plain migrations list
 ```
 
 Migrations are Python files that describe database schema changes. They're stored in your app's `migrations/` directory.

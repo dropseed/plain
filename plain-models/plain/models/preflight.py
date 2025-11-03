@@ -231,7 +231,9 @@ class CheckDatabaseTables(PreflightCheck):
         unknown_tables.discard("plainmigrations")  # Know this could be there
         if unknown_tables:
             table_names = ", ".join(unknown_tables)
-            specific_fix = f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain models db-shell'
+            specific_fix = (
+                f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain db shell'
+            )
             errors.append(
                 PreflightResult(
                     fix=f"Unknown tables in default database: {table_names}. "
@@ -311,9 +313,7 @@ class CheckPrunableMigrations(PreflightCheck):
                 orphaned_list += f" (and {len(prunable_orphaned) - 3} more)"
             message_parts.append(f"From removed packages: {orphaned_list}.")
 
-        message_parts.append(
-            "Run 'plain models prune-migrations' to review and remove them."
-        )
+        message_parts.append("Run 'plain migrations prune' to review and remove them.")
 
         errors.append(
             PreflightResult(

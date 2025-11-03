@@ -126,8 +126,8 @@ def plain_db_connected() -> bool:
     result = subprocess.run(
         [
             "plain",
-            "models",
-            "show-migrations",
+            "migrations",
+            "list",
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

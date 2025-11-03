@@ -151,7 +151,7 @@ class DevProcess(ProcessManager):
         if find_spec("plain.models"):
             click.secho("→ Waiting for database... ", dim=True, nl=False)
             subprocess.run(
-                [sys.executable, "-m", "plain", "models", "db-wait"],
+                [sys.executable, "-m", "plain", "db", "wait"],
                 env=self.plain_env,
                 check=True,
             )
