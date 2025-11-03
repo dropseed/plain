@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.16.3](https://github.com/dropseed/plain/releases/plain-api@0.16.3) (2025-11-03)
+
+### What's changed
+
+- CLI command docstrings updated to match coding style guidelines ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e80103))
+- Internal model configuration updated to use `_meta` descriptor pattern ([c75441e](https://github.com/dropseed/plain/commit/c75441eba7))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.2](https://github.com/dropseed/plain/releases/plain-api@0.16.2) (2025-10-31)
 
 ### What's changed
