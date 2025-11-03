@@ -25,16 +25,13 @@ def list_backups() -> None:
         return
 
     for backup in backups:
+        backup_file = backup.path / "default.backup"
+        size = os.path.getsize(backup_file)
+        click.secho(backup.name, bold=True, nl=False)
         click.secho(
-            f"{backup.name} ({backup.updated_at().strftime('%Y-%m-%d %H:%M:%S')})",
-            bold=True,
+            f" ({size / 1024 / 1024:.2f} MB, {backup.updated_at().strftime('%Y-%m-%d %H:%M:%S')})",
+            dim=True,
         )
-
-        for backup_file in backup.iter_files():
-            size = os.path.getsize(backup_file)
-            click.echo(f"- {backup_file.name} ({size / 1024 / 1024:.2f} MB)")
-
-        click.echo()
 
 
 @cli.command("create")

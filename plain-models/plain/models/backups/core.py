@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import os
-from collections.abc import Generator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -86,30 +85,22 @@ class DatabaseBackup:
 
         return self.path
 
-    def iter_files(self) -> Generator[Path, None, None]:
-        for backup_file in self.path.iterdir():
-            if not backup_file.is_file():
-                continue
-            if not backup_file.name.endswith(".backup"):
-                continue
-            yield backup_file
-
     def restore(self, **restore_kwargs: Any) -> None:
-        for backup_file in self.iter_files():
-            if db_connection.vendor == "postgresql":
-                PostgresBackupClient(db_connection).restore_backup(
-                    backup_file,
-                    pg_restore=restore_kwargs.get("pg_restore", "pg_restore"),
-                )
-            elif db_connection.vendor == "sqlite":
-                SQLiteBackupClient(db_connection).restore_backup(backup_file)
-            else:
-                raise Exception("Unsupported database vendor")
+        backup_file = self.path / "default.backup"
+
+        if db_connection.vendor == "postgresql":
+            PostgresBackupClient(db_connection).restore_backup(
+                backup_file,
+                pg_restore=restore_kwargs.get("pg_restore", "pg_restore"),
+            )
+        elif db_connection.vendor == "sqlite":
+            SQLiteBackupClient(db_connection).restore_backup(backup_file)
+        else:
+            raise Exception("Unsupported database vendor")
 
     def delete(self) -> None:
-        for backup_file in self.iter_files():
-            backup_file.unlink()
-
+        backup_file = self.path / "default.backup"
+        backup_file.unlink()
         self.path.rmdir()
 
     def updated_at(self) -> datetime.datetime:
