@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.20.2](https://github.com/dropseed/plain/releases/plain-cache@0.20.2) (2025-11-03)
+
+### What's changed
+
+- CLI commands now include descriptive docstrings for improved help text ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e80103))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.1](https://github.com/dropseed/plain/releases/plain-cache@0.20.1) (2025-10-31)
 
 ### What's changed
