@@ -6,12 +6,9 @@ from pathlib import Path
 
 import click
 
-from plain.cli import register_cli
-
 from .core import DatabaseBackups
 
 
-@register_cli("backups", shortcut_for="models")
 @click.group("backups")
 def cli() -> None:
     """Local database backups"""
