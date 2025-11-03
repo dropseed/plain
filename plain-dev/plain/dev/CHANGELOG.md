@@ -1,5 +1,17 @@
 # plain-dev changelog
 
+## [0.45.0](https://github.com/dropseed/plain/releases/plain-dev@0.45.0) (2025-11-03)
+
+### What's changed
+
+- The `plain dev` command now automatically generates and persists `.plain/AGENTS.md` during startup, ensuring AI coding assistants have up-to-date package documentation ([786b7a0](https://github.com/dropseed/plain/commit/786b7a0ca1))
+- CLI command descriptions have been updated to be more concise and consistent across all `plain dev` subcommands ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e80103))
+- The `plain dev` command is now marked as a "common command" in the CLI for better discoverability ([73d3a48](https://github.com/dropseed/plain/commit/73d3a48fca))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.44.0](https://github.com/dropseed/plain/releases/plain-dev@0.44.0) (2025-10-29)
 
 ### What's changed
