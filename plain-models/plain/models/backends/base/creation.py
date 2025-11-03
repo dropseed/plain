@@ -37,7 +37,7 @@ class BaseDatabaseCreation:
         If prefix is provided, it will be prepended to the database name
         to isolate it from other test databases.
         """
-        from plain.models.cli import migrate
+        from plain.models.cli.migrations import apply
 
         test_database_name = self._get_test_db_name(prefix)
 
@@ -52,7 +52,7 @@ class BaseDatabaseCreation:
         settings.DATABASE["NAME"] = test_database_name
         self.connection.settings_dict["NAME"] = test_database_name
 
-        migrate.callback(
+        apply.callback(
             package_label=None,
             migration_name=None,
             fake=False,

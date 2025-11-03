@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 import time
 from typing import TYPE_CHECKING, Any, cast
@@ -14,132 +13,41 @@ from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.utils.text import Truncator
 
-from . import migrations
-from .backups.cli import cli as backups_cli
-from .backups.core import DatabaseBackups
-from .db import OperationalError
-from .db import db_connection as _db_connection
-from .migrations.autodetector import MigrationAutodetector
-from .migrations.executor import MigrationExecutor
-from .migrations.loader import AmbiguityError, MigrationLoader
-from .migrations.migration import Migration, SettingsTuple
-from .migrations.optimizer import MigrationOptimizer
-from .migrations.questioner import (
+from .. import migrations
+from ..backups.core import DatabaseBackups
+from ..db import db_connection as _db_connection
+from ..migrations.autodetector import MigrationAutodetector
+from ..migrations.executor import MigrationExecutor
+from ..migrations.loader import AmbiguityError, MigrationLoader
+from ..migrations.migration import Migration, SettingsTuple
+from ..migrations.optimizer import MigrationOptimizer
+from ..migrations.questioner import (
     InteractiveMigrationQuestioner,
     NonInteractiveMigrationQuestioner,
 )
-from .migrations.recorder import MigrationRecorder
-from .migrations.state import ModelState, ProjectState
-from .migrations.writer import MigrationWriter
-from .registry import models_registry
+from ..migrations.recorder import MigrationRecorder
+from ..migrations.state import ModelState, ProjectState
+from ..migrations.writer import MigrationWriter
+from ..registry import models_registry
 
 if TYPE_CHECKING:
-    from .backends.base.base import BaseDatabaseWrapper
-    from .migrations.operations.base import Operation
+    from ..backends.base.base import BaseDatabaseWrapper
+    from ..migrations.operations.base import Operation
 
     db_connection = cast("BaseDatabaseWrapper", _db_connection)
 else:
     db_connection = _db_connection
 
 
-@register_cli("models")
+@register_cli("migrations")
 @click.group()
 def cli() -> None:
-    """Database model management"""
-
-
-cli.add_command(backups_cli)
-
-
-@cli.command()
-@click.argument("parameters", nargs=-1)
-def db_shell(parameters: tuple[str, ...]) -> None:
-    """Open an interactive database shell"""
-    try:
-        db_connection.client.runshell(list(parameters))
-    except FileNotFoundError:
-        # Note that we're assuming the FileNotFoundError relates to the
-        # command missing. It could be raised for some other reason, in
-        # which case this error message would be inaccurate. Still, this
-        # message catches the common case.
-        click.secho(
-            f"You appear not to have the {db_connection.client.executable_name!r} program installed or on your path.",
-            fg="red",
-            err=True,
-        )
-        sys.exit(1)
-    except subprocess.CalledProcessError as e:
-        click.secho(
-            '"{}" returned non-zero exit status {}.'.format(
-                " ".join(e.cmd),
-                e.returncode,
-            ),
-            fg="red",
-            err=True,
-        )
-        sys.exit(e.returncode)
-
-
-@cli.command()
-def db_wait() -> None:
-    """Wait for the database to be ready"""
-    attempts = 0
-    while True:
-        attempts += 1
-        waiting_for = False
-
-        try:
-            db_connection.ensure_connection()
-        except OperationalError:
-            waiting_for = True
-
-        if waiting_for:
-            if attempts > 1:
-                # After the first attempt, start printing them
-                click.secho(
-                    f"Waiting for database (attempt {attempts})",
-                    fg="yellow",
-                )
-            time.sleep(1.5)
-        else:
-            click.secho("✔ Database ready", fg="green")
-            break
-
-
-@cli.command(name="list")
-@click.argument("package_labels", nargs=-1)
-@click.option(
-    "--app-only",
-    is_flag=True,
-    help="Only show models from packages that start with 'app'.",
-)
-def list_models(package_labels: tuple[str, ...], app_only: bool) -> None:
-    """List all installed models"""
-
-    packages = set(package_labels)
-
-    for model in sorted(
-        models_registry.get_models(),
-        key=lambda m: (m.model_options.package_label, m.model_options.model_name),
-    ):
-        pkg = model.model_options.package_label
-        pkg_name = packages_registry.get_package_config(pkg).name
-        if app_only and not pkg_name.startswith("app"):
-            continue
-        if packages and pkg not in packages:
-            continue
-        fields = ", ".join(f.name for f in model._model_meta.get_fields())
-        click.echo(
-            f"{click.style(pkg, fg='cyan')}.{click.style(model.__name__, fg='blue')}"
-        )
-        click.echo(f"  table: {model.model_options.db_table}")
-        click.echo(f"  fields: {fields}")
-        click.echo(f"  package: {pkg_name}\n")
+    """Database migration management"""
 
 
 @common_command
-@register_cli("makemigrations", shortcut_for="models")
-@cli.command()
+@register_cli("makemigrations", shortcut_for="migrations make")
+@cli.command("make")
 @click.argument("package_labels", nargs=-1)
 @click.option(
     "--dry-run",
@@ -167,7 +75,7 @@ def list_models(package_labels: tuple[str, ...], app_only: bool) -> None:
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
-def makemigrations(
+def make(
     package_labels: tuple[str, ...],
     dry_run: bool,
     empty: bool,
@@ -344,8 +252,8 @@ def makemigrations(
 
 
 @common_command
-@register_cli("migrate", shortcut_for="models")
-@cli.command()
+@register_cli("migrate", shortcut_for="migrations apply")
+@cli.command("apply")
 @click.argument("package_label", required=False)
 @click.argument("migration_name", required=False)
 @click.option(
@@ -386,7 +294,7 @@ def makemigrations(
     is_flag=True,
     help="Suppress migration output (used for test database creation).",
 )
-def migrate(
+def apply(
     package_label: str | None,
     migration_name: str | None,
     fake: bool,
@@ -695,7 +603,7 @@ def migrate(
                 )
 
 
-@cli.command()
+@cli.command("list")
 @click.argument("package_labels", nargs=-1)
 @click.option(
     "--format",
@@ -710,10 +618,10 @@ def migrate(
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
-def show_migrations(
+def list_migrations(
     package_labels: tuple[str, ...], format: str, verbosity: int
 ) -> None:
-    """Show all available migrations"""
+    """Show all migrations"""
 
     def _validate_package_names(package_names: tuple[str, ...]) -> None:
         has_bad_names = False
@@ -827,14 +735,14 @@ def show_migrations(
         show_list(db_connection, package_labels)
 
 
-@cli.command()
+@cli.command("prune")
 @click.option(
     "--yes",
     is_flag=True,
     help="Skip confirmation prompt (for non-interactive use).",
 )
-def prune_migrations(yes: bool) -> None:
-    """Prune stale migration records"""
+def prune(yes: bool) -> None:
+    """Remove stale migration records from the database"""
     # Load migrations from disk and database
     loader = MigrationLoader(db_connection, ignore_no_migrations=True)
     recorder = MigrationRecorder(db_connection)
@@ -929,7 +837,7 @@ def prune_migrations(yes: bool) -> None:
     )
 
 
-@cli.command()
+@cli.command("squash")
 @click.argument("package_label")
 @click.argument("start_migration_name", required=False)
 @click.argument("migration_name")
@@ -953,7 +861,7 @@ def prune_migrations(yes: bool) -> None:
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
-def squash_migrations(
+def squash(
     package_label: str,
     start_migration_name: str | None,
     migration_name: str,
@@ -1016,7 +924,7 @@ def squash_migrations(
                 f"The migration '{start_migration}' cannot be found. Maybe it comes after "
                 f"the migration '{migration}'?\n"
                 f"Have a look at:\n"
-                f"  plain models show-migrations {package_label}\n"
+                f"  plain migrations list {package_label}\n"
                 f"to debug this issue."
             )
 
