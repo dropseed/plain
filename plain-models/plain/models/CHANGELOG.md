@@ -1,5 +1,25 @@
 # plain-models changelog
 
+## [0.56.0](https://github.com/dropseed/plain/releases/plain-models@0.56.0) (2025-11-03)
+
+### What's changed
+
+- The CLI has been reorganized into separate `plain db` and `plain migrations` command groups for better organization ([7910a06](https://github.com/dropseed/plain/commit/7910a06e86132ef1fc1720bd960916ee009e27cf))
+- The `plain models` command group has been removed - use `plain db` and `plain migrations` instead ([7910a06](https://github.com/dropseed/plain/commit/7910a06e86132ef1fc1720bd960916ee009e27cf))
+- The `plain backups` command group has been removed - use `plain db backups` instead ([dd87b76](https://github.com/dropseed/plain/commit/dd87b762babb370751cffdc27be3c6a53c6c98b4))
+- Database backup output has been simplified to show file size and timestamp on a single line ([765d118](https://github.com/dropseed/plain/commit/765d1184c6d0bdb1f91a85bf511d049da74a6276))
+
+### Upgrade instructions
+
+- Replace `plain models db-shell` with `plain db shell`
+- Replace `plain models db-wait` with `plain db wait`
+- Replace `plain models list` with `plain db list` (note: this command was moved to the main plain package)
+- Replace `plain models show-migrations` with `plain migrations list`
+- Replace `plain models prune-migrations` with `plain migrations prune`
+- Replace `plain models squash-migrations` with `plain migrations squash`
+- Replace `plain backups` commands with `plain db backups` (e.g., `plain backups list` becomes `plain db backups list`)
+- The shortcuts `plain makemigrations` and `plain migrate` continue to work unchanged
+
 ## [0.55.1](https://github.com/dropseed/plain/releases/plain-models@0.55.1) (2025-10-31)
 
 ### What's changed
