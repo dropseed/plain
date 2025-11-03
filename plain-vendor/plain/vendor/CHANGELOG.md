@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.9.3](https://github.com/dropseed/plain/releases/plain-vendor@0.9.3) (2025-11-03)
+
+### What's changed
+
+- Updated CLI help text to "Manage vendored CSS/JS dependencies" for better clarity ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e80103))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.2](https://github.com/dropseed/plain/releases/plain-vendor@0.9.2) (2025-10-29)
 
 ### What's changed
