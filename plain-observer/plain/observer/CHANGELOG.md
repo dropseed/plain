@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-observer@0.15.0) (2025-11-03)
+
+### What's changed
+
+- The `plain observer diagnose` command has been removed ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e8010386b45e843676119e929a566e3612f4))
+- CLI command descriptions updated for consistency and brevity ([fdb9e80](https://github.com/dropseed/plain/commit/fdb9e8010386b45e843676119e929a566e3612f4))
+- Updated AGENTS.md to reflect removal of diagnose command ([786b7a0](https://github.com/dropseed/plain/commit/786b7a0ca156392b301125b653e88874f3e727b8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-observer@0.14.0) (2025-10-29)
 
 ### What's changed
