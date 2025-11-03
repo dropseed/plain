@@ -27,12 +27,12 @@ def test_safe_methods_allowed(method):
         (
             "cross-site",
             False,
-            "Cross-origin request detected from Sec-Fetch-Site: cross-site",
+            "Cross-origin request from Sec-Fetch-Site: cross-site",
         ),
         (
             "same-site",
             False,
-            "Cross-origin request detected from Sec-Fetch-Site: same-site",
+            "Cross-origin request from Sec-Fetch-Site: same-site",
         ),
     ],
 )
@@ -129,7 +129,7 @@ def test_old_browser_fallback(headers):
             "Same-origin request - Origin https://testserver:443 matches Host testserver",
         ),
         # Various rejection cases
-        ("null", False, "Cross-origin request detected - null Origin header"),
+        ("null", False, "Null Origin header"),
         ("https://attacker.com", False, "does not match Host"),
         ("https://sub.testserver", False, "does not match Host"),
         ("https://example.com:8080", False, "does not match Host"),
@@ -170,7 +170,7 @@ def test_invalid_origin_url():
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is False
-    assert "does not match Host" in reason
+    assert "could not be validated against Host" in reason
 
 
 def test_sec_fetch_site_priority_over_origin_check():
@@ -334,4 +334,4 @@ def test_middleware_integration_rejected_request():
     mock_get_response.assert_not_called()
 
     # Exception message should contain the reason
-    assert "Cross-origin request detected" in str(exc_info.value)
+    assert "does not match Host" in str(exc_info.value)
