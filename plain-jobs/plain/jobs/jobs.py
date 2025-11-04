@@ -117,7 +117,6 @@ class Job(metaclass=JobType):
 
             if unique_key and self._in_progress(unique_key):
                 span.set_attribute(ERROR_TYPE, "DuplicateJob")
-                logger.info("Job already in progress with unique_key=%s", unique_key)
                 return None
 
             # Capture current trace context
