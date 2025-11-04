@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.37.6](https://github.com/dropseed/plain/releases/plain-jobs@0.37.6) (2025-11-04)
+
+### What's changed
+
+- Removed info-level logging when a duplicate job is detected with a unique key to reduce log noise ([b6ad845180](https://github.com/dropseed/plain/commit/b6ad845180))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.5](https://github.com/dropseed/plain/releases/plain-jobs@0.37.5) (2025-11-04)
 
 ### What's changed
