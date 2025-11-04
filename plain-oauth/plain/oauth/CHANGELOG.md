@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-oauth@0.32.0) (2025-11-03)
+
+### What's changed
+
+- OAuth errors are now logged as warnings instead of exceptions, reducing log noise while still capturing error messages ([30b5705](https://github.com/dropseed/plain/commit/30b5705))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.2](https://github.com/dropseed/plain/releases/plain-oauth@0.31.2) (2025-10-20)
 
 ### What's changed

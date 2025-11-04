@@ -1,6 +1,6 @@
 [project]
 name = "plain.oauth"
-version = "0.31.2"
+version = "0.32.0"
 description = "Let users log in with OAuth providers."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
