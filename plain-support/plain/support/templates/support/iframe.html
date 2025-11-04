@@ -1,7 +1,7 @@
 <html>
     <head>
         {% tailwind_css %}
-        <script src="{{ asset('support/iframe.js') }}"></script>
+        <script src="{{ asset('support/iframe.js') }}" nonce="{{ request.csp_nonce }}"></script>
     </head>
     <body>
         {% if success %}
