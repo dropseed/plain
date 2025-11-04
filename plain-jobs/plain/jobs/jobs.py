@@ -115,15 +115,10 @@ class Job(metaclass=JobType):
             if unique_key is None:
                 unique_key = self.get_unique_key()
 
-            if unique_key:
-                # Only need to look at in progress jobs
-                # if we also have a unique key.
-                # Otherwise it's up to the user to use _in_progress()
-                if self._in_progress(unique_key):
-                    span.set_attribute(ERROR_TYPE, "DuplicateJob")
-                    return None
-
-            # Is recording is not enough here... because we also record for summaries!
+            if unique_key and self._in_progress(unique_key):
+                span.set_attribute(ERROR_TYPE, "DuplicateJob")
+                logger.info("Job already in progress with unique_key=%s", unique_key)
+                return None
 
             # Capture current trace context
             current_span = trace.get_current_span()
