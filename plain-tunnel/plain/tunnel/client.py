@@ -27,6 +27,7 @@ class TunnelClient:
         # Set up logging
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(getattr(logging, log_level.upper()))
+        self.logger.propagate = False  # Prevent propagation to root logger
         ch = logging.StreamHandler()
         ch.setLevel(getattr(logging, log_level.upper()))
         formatter = logging.Formatter("%(message)s")
