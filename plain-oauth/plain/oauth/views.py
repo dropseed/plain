@@ -37,7 +37,7 @@ class OAuthCallbackView(TemplateView):
         try:
             return provider_instance.handle_callback_request(request=self.request)
         except OAuthError as e:
-            logger.exception("OAuth error")
+            logger.warning("OAuth error: %s", e.message)
             self.oauth_error = e
 
             response = super().get()
