@@ -70,6 +70,7 @@ Example workflow:
 
 - Don't include args and returns in docstrings if they are already type annotated.
 - CLI command docstrings should be concise, informative, no punctuation at the end.
+- Don't use overloaded terms. Where possible, prefer unique, specific, and greppable names.
 
 ## Verifying changes
 
