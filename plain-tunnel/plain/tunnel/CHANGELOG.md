@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.8.2](https://github.com/dropseed/plain/releases/plain-tunnel@0.8.2) (2025-11-08)
+
+### What's changed
+
+- Fixed logger configuration to prevent propagation to root logger, avoiding duplicate log messages ([c714606](https://github.com/dropseed/plain/commit/c714606c85))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.8.1](https://github.com/dropseed/plain/releases/plain-tunnel@0.8.1) (2025-11-03)
 
 ### What's changed

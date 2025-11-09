@@ -633,7 +633,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.37.6"
+version = "0.38.0"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -922,7 +922,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tunnel"
-version = "0.8.1"
+version = "0.8.2"
 source = { editable = "plain-tunnel" }
 dependencies = [
     { name = "plain" },
