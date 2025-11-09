@@ -227,9 +227,9 @@ class ScheduledCommand(Job):
     def run(self) -> None:
         subprocess.run(self.command, shell=True, check=True)
 
-    def get_unique_key(self) -> str:
+    def default_concurrency_key(self) -> str:
         # The ScheduledCommand can be used for different commands,
-        # so we need the unique_key to separate them in the scheduling uniqueness logic
+        # so we need the concurrency_key to separate them for uniqueness
         return self.command
 
 

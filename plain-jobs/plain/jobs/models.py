@@ -4,7 +4,7 @@ import datetime
 import logging
 import traceback
 import uuid
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.code_attributes import (
@@ -27,7 +27,11 @@ from plain.models import transaction
 from plain.runtime import settings
 from plain.utils import timezone
 
+from .exceptions import DeferError, DeferJob
 from .registry import jobs_registry
+
+if TYPE_CHECKING:
+    from .jobs import Job
 
 logger = logging.getLogger("plain.jobs")
 tracer = trace.get_tracer("plain.jobs")
@@ -44,14 +48,14 @@ class JobRequest(models.Model):
 
     job_class = models.CharField(max_length=255)
     parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.IntegerField(default=0)
+    priority = models.SmallIntegerField(default=0)
     source = models.TextField(required=False)
     queue = models.CharField(default="default", max_length=255)
 
-    retries = models.IntegerField(default=0)
-    retry_attempt = models.IntegerField(default=0)
+    retries = models.SmallIntegerField(default=0)
+    retry_attempt = models.SmallIntegerField(default=0)
 
-    unique_key = models.CharField(max_length=255, required=False)
+    concurrency_key = models.CharField(max_length=255, required=False)
 
     start_at = models.DateTimeField(required=False, allow_null=True)
 
@@ -68,22 +72,17 @@ class JobRequest(models.Model):
             models.Index(fields=["created_at"]),
             models.Index(fields=["queue"]),
             models.Index(fields=["start_at"]),
-            models.Index(fields=["unique_key"]),
+            models.Index(fields=["concurrency_key"]),
             models.Index(fields=["job_class"]),
             models.Index(fields=["trace_id"]),
-            # Used to dedupe unique in-process jobs
+            models.Index(fields=["uuid"]),
+            # Used for job grouping queries
             models.Index(
-                name="job_request_class_unique_key", fields=["job_class", "unique_key"]
+                name="job_request_concurrency_key",
+                fields=["job_class", "concurrency_key"],
             ),
         ],
-        # The job_class and unique_key should be unique at the db-level,
-        # but only if unique_key is not ""
         constraints=[
-            models.UniqueConstraint(
-                fields=["job_class", "unique_key"],
-                condition=models.Q(unique_key__gt="", retry_attempt=0),
-                name="plainjobs_jobrequest_unique_job_class_key",
-            ),
             models.UniqueConstraint(
                 fields=["uuid"], name="plainjobs_jobrequest_unique_uuid"
             ),
@@ -108,7 +107,7 @@ class JobRequest(models.Model):
                 queue=self.queue,
                 retries=self.retries,
                 retry_attempt=self.retry_attempt,
-                unique_key=self.unique_key,
+                concurrency_key=self.concurrency_key,
                 trace_id=self.trace_id,
                 span_id=self.span_id,
             )
@@ -157,12 +156,12 @@ class JobProcess(models.Model):
     job_request_uuid = models.UUIDField()
     job_class = models.CharField(max_length=255)
     parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.IntegerField(default=0)
+    priority = models.SmallIntegerField(default=0)
     source = models.TextField(required=False)
     queue = models.CharField(default="default", max_length=255)
-    retries = models.IntegerField(default=0)
-    retry_attempt = models.IntegerField(default=0)
-    unique_key = models.CharField(max_length=255, required=False)
+    retries = models.SmallIntegerField(default=0)
+    retry_attempt = models.SmallIntegerField(default=0)
+    concurrency_key = models.CharField(max_length=255, required=False)
 
     # OpenTelemetry trace context
     trace_id = models.CharField(max_length=34, required=False, allow_null=True)
@@ -175,14 +174,16 @@ class JobProcess(models.Model):
         indexes=[
             models.Index(fields=["created_at"]),
             models.Index(fields=["queue"]),
-            models.Index(fields=["unique_key"]),
+            models.Index(fields=["concurrency_key"]),
             models.Index(fields=["started_at"]),
             models.Index(fields=["job_class"]),
             models.Index(fields=["job_request_uuid"]),
             models.Index(fields=["trace_id"]),
-            # Used to dedupe unique in-process jobs
+            models.Index(fields=["uuid"]),
+            # Used for job grouping queries
             models.Index(
-                name="job_class_unique_key", fields=["job_class", "unique_key"]
+                name="job_concurrency_key",
+                fields=["job_class", "concurrency_key"],
             ),
         ],
         constraints=[
@@ -228,19 +229,103 @@ class JobProcess(models.Model):
 
             try:
                 job = jobs_registry.load_job(self.job_class, self.parameters)
-                job.run()
-                status = JobResultStatuses.SUCCESSFUL
-                error = ""
+                job.job_process = self
+
+                try:
+                    job.run()
+                except DeferJob as e:
+                    # Job deferred - not an error, log at INFO level
+                    logger.info(
+                        "Job deferred for %s seconds (increment_retries=%s): job_class=%s job_process_uuid=%s",
+                        e.delay,
+                        e.increment_retries,
+                        self.job_class,
+                        self.uuid,
+                    )
+                    span.set_attribute(ERROR_TYPE, "DeferJob")
+                    span.set_status(trace.StatusCode.OK)  # Not an error
+                    return self.defer(job=job, defer_exception=e)
+
+                # Success case (only reached if no DeferJob was raised)
                 span.set_status(trace.StatusCode.OK)
+                return self.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
+
             except Exception as e:
-                status = JobResultStatuses.ERRORED
-                error = "".join(traceback.format_tb(e.__traceback__))
                 logger.exception(e)
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                 span.set_attribute(ERROR_TYPE, type(e).__name__)
+                return self.convert_to_result(
+                    status=JobResultStatuses.ERRORED,
+                    error="".join(traceback.format_tb(e.__traceback__)),
+                )
 
-            return self.convert_to_result(status=status, error=error)
+    def defer(self, *, job: Job, defer_exception: DeferJob) -> JobResult:
+        """Defer this job by re-enqueueing it for later execution.
+
+        Atomically deletes the JobProcess, re-enqueues the job, and creates
+        a JobResult linking to the new request. This ensures the concurrency
+        slot is released before attempting to re-enqueue.
+
+        Raises:
+            DeferError: If the job cannot be re-enqueued (e.g., due to concurrency limits).
+                       The transaction will be rolled back and the JobProcess will remain.
+        """
+        # Calculate new retry_attempt based on increment_retries
+        retry_attempt = (
+            self.retry_attempt + 1
+            if defer_exception.increment_retries
+            else self.retry_attempt
+        )
+
+        with transaction.atomic():
+            # 1. Save JobProcess UUID and delete (releases concurrency slot)
+            job_process_uuid = self.uuid
+            job_request_uuid = self.job_request_uuid
+            started_at = self.started_at
+            self.delete()
+
+            # 2. Re-enqueue job (concurrency check can now pass)
+            new_job_request = job.run_in_worker(
+                queue=self.queue,
+                delay=defer_exception.delay,
+                priority=self.priority,
+                retries=self.retries,
+                retry_attempt=retry_attempt,
+                concurrency_key=self.concurrency_key,
+            )
+
+            # Check if re-enqueue failed
+            if new_job_request is None:
+                raise DeferError(
+                    f"Failed to re-enqueue deferred job {self.job_class}: "
+                    f"concurrency limit reached for key '{self.concurrency_key}'"
+                )
+
+            # 3. Create JobResult linking to new request
+            result = JobResult.query.create(
+                ended_at=timezone.now(),
+                error=f"Deferred for {defer_exception.delay} seconds",
+                status=JobResultStatuses.DEFERRED,
+                retry_job_request_uuid=new_job_request.uuid,
+                # From the JobProcess
+                job_process_uuid=job_process_uuid,
+                started_at=started_at,
+                # From the JobRequest
+                job_request_uuid=job_request_uuid,
+                job_class=self.job_class,
+                parameters=self.parameters,
+                priority=self.priority,
+                source=self.source,
+                queue=self.queue,
+                retries=self.retries,
+                retry_attempt=self.retry_attempt,
+                concurrency_key=self.concurrency_key,
+                trace_id=self.trace_id,
+                span_id=self.span_id,
+            )
+
+            return result
 
     def convert_to_result(self, *, status: str, error: str = "") -> JobResult:
         """
@@ -263,7 +348,7 @@ class JobProcess(models.Model):
                 queue=self.queue,
                 retries=self.retries,
                 retry_attempt=self.retry_attempt,
-                unique_key=self.unique_key,
+                concurrency_key=self.concurrency_key,
                 trace_id=self.trace_id,
                 span_id=self.span_id,
             )
@@ -287,7 +372,7 @@ class JobProcess(models.Model):
             "queue": self.queue,
             "retries": self.retries,
             "retry_attempt": self.retry_attempt,
-            "unique_key": self.unique_key,
+            "concurrency_key": self.concurrency_key,
             "trace_id": self.trace_id,
             "span_id": self.span_id,
         }
@@ -346,7 +431,8 @@ class JobResultQuerySet(models.QuerySet["JobResult"]):
 class JobResultStatuses(models.TextChoices):
     SUCCESSFUL = "SUCCESSFUL", "Successful"
     ERRORED = "ERRORED", "Errored"  # Threw an error
-    CANCELLED = "CANCELLED", "Cancelled"  # Cancelled (probably by deploy)
+    CANCELLED = "CANCELLED", "Cancelled"  # Interrupted by shutdown/deploy
+    DEFERRED = "DEFERRED", "Deferred"  # Intentionally rescheduled (will run again)
     LOST = (
         "LOST",
         "Lost",
@@ -376,12 +462,12 @@ class JobResult(models.Model):
     job_request_uuid = models.UUIDField()
     job_class = models.CharField(max_length=255)
     parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.IntegerField(default=0)
+    priority = models.SmallIntegerField(default=0)
     source = models.TextField(required=False)
     queue = models.CharField(default="default", max_length=255)
-    retries = models.IntegerField(default=0)
-    retry_attempt = models.IntegerField(default=0)
-    unique_key = models.CharField(max_length=255, required=False)
+    retries = models.SmallIntegerField(default=0)
+    retry_attempt = models.SmallIntegerField(default=0)
+    concurrency_key = models.CharField(max_length=255, required=False)
 
     # Retries
     retry_job_request_uuid = models.UUIDField(required=False, allow_null=True)
@@ -404,6 +490,7 @@ class JobResult(models.Model):
             models.Index(fields=["job_class"]),
             models.Index(fields=["queue"]),
             models.Index(fields=["trace_id"]),
+            models.Index(fields=["uuid"]),
         ],
         constraints=[
             models.UniqueConstraint(
@@ -417,7 +504,7 @@ class JobResult(models.Model):
         job = jobs_registry.load_job(self.job_class, self.parameters)
 
         if delay is None:
-            retry_delay = job.get_retry_delay(retry_attempt)
+            retry_delay = job.calculate_retry_delay(retry_attempt)
         else:
             retry_delay = delay
 
@@ -429,7 +516,7 @@ class JobResult(models.Model):
                 priority=self.priority,
                 retries=self.retries,
                 retry_attempt=retry_attempt,
-                # Unique key could be passed also?
+                concurrency_key=self.concurrency_key,
             )
             if result:
                 self.retry_job_request_uuid = result.uuid

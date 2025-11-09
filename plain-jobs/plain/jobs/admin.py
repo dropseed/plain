@@ -107,7 +107,14 @@ class JobRequestViewset(AdminViewset):
         nav_icon = "gear"
         model = JobRequest
         title = "Requests"
-        fields = ["id", "job_class", "priority", "created_at", "start_at", "unique_key"]
+        fields = [
+            "id",
+            "job_class",
+            "priority",
+            "created_at",
+            "start_at",
+            "concurrency_key",
+        ]
         actions = ["Delete"]
         queryset_order = ["priority", "-start_at", "-created_at"]
 
@@ -133,7 +140,7 @@ class JobProcessViewset(AdminViewset):
             "priority",
             "created_at",
             "started_at",
-            "unique_key",
+            "concurrency_key",
         ]
         actions = ["Delete"]
         cards = [

@@ -77,7 +77,9 @@ class Worker:
         self.queues = queues
 
         # Filter the jobs schedule to those that are in the same queue as this worker
-        self.jobs_schedule = [x for x in jobs_schedule if x[0].get_queue() in queues]
+        self.jobs_schedule = [
+            x for x in jobs_schedule if x[0].default_queue() in queues
+        ]
 
         # How often to log the stats (in seconds)
         self.stats_every = stats_every
@@ -212,28 +214,24 @@ class Worker:
             for job, schedule in self.jobs_schedule:
                 next_start_at = schedule.next()
 
-                # Leverage the unique_key to prevent duplicate scheduled
-                # jobs with the same start time (also works if unique_key == "")
-                schedule_unique_key = (
-                    f"{job.get_unique_key()}:scheduled:{int(next_start_at.timestamp())}"
-                )
+                # Leverage the concurrency_key to group scheduled jobs
+                # with the same start time
+                schedule_concurrency_key = f"{job.default_concurrency_key()}:scheduled:{int(next_start_at.timestamp())}"
 
-                # Drawback here is if scheduled job is running, and detected by unique_key
-                # so it doesn't schedule the next one? Maybe an ok downside... prevents
-                # overlapping executions...?
+                # Job's should_enqueue hook can control scheduling behavior
                 result = job.run_in_worker(
                     delay=next_start_at,
-                    unique_key=schedule_unique_key,
+                    concurrency_key=schedule_concurrency_key,
                 )
-                # Result is None if a duplicate job was detected
+                # Result is None if should_enqueue returned False
                 if result:
                     logger.info(
-                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s" job_unique_key="%s"',
+                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s" concurrency_key="%s"',
                         result.job_class,
                         result.queue,
                         result.start_at,
                         schedule,
-                        result.unique_key,
+                        result.concurrency_key,
                     )
 
             self._jobs_schedule_checked_at = now

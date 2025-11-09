@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import datetime
 import inspect
-import logging
 from abc import ABCMeta, abstractmethod
+from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
@@ -22,15 +22,18 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
-from plain.models import IntegrityError
+from plain import models
+from plain.models import transaction
+from plain.models.db import db_connection
 from plain.utils import timezone
 
+from .locks import postgres_advisory_lock
 from .registry import JobParameters, jobs_registry
 
 if TYPE_CHECKING:
     from .models import JobProcess, JobRequest
 
-logger = logging.getLogger(__name__)
+
 tracer = trace.get_tracer("plain.jobs")
 
 
@@ -49,6 +52,10 @@ class JobType(ABCMeta):
 
 
 class Job(metaclass=JobType):
+    # Set by JobProcess when the job is executed
+    # Useful for jobs that need to query and exclude themselves
+    job_process: JobProcess | None = None
+
     @abstractmethod
     def run(self) -> None:
         pass
@@ -61,14 +68,14 @@ class Job(metaclass=JobType):
         priority: int | None = None,
         retries: int | None = None,
         retry_attempt: int = 0,
-        unique_key: str | None = None,
+        concurrency_key: str | None = None,
     ) -> JobRequest | None:
         from .models import JobRequest
 
         job_class_name = jobs_registry.get_job_class_name(self.__class__)
 
         if queue is None:
-            queue = self.get_queue()
+            queue = self.default_queue()
 
         with tracer.start_as_current_span(
             f"run_in_worker {job_class_name}",
@@ -96,10 +103,10 @@ class Job(metaclass=JobType):
             parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
 
             if priority is None:
-                priority = self.get_priority()
+                priority = self.default_priority()
 
             if retries is None:
-                retries = self.get_retries()
+                retries = self.default_retries()
 
             if delay is None:
                 start_at = None
@@ -112,12 +119,8 @@ class Job(metaclass=JobType):
             else:
                 raise ValueError(f"Invalid delay: {delay}")
 
-            if unique_key is None:
-                unique_key = self.get_unique_key()
-
-            if unique_key and self._in_progress(unique_key):
-                span.set_attribute(ERROR_TYPE, "DuplicateJob")
-                return None
+            if concurrency_key is None:
+                concurrency_key = self.default_concurrency_key()
 
             # Capture current trace context
             current_span = trace.get_current_span()
@@ -132,75 +135,171 @@ class Job(metaclass=JobType):
                 trace_id = None
                 span_id = None
 
-            try:
-                job_request = JobRequest(
-                    job_class=job_class_name,
-                    parameters=parameters,
-                    start_at=start_at,
-                    source=source,
-                    queue=queue,
-                    priority=priority,
-                    retries=retries,
-                    retry_attempt=retry_attempt,
-                    unique_key=unique_key,
-                    trace_id=trace_id,
-                    span_id=span_id,
-                )
-                job_request.save(
-                    clean_and_validate=False
-                )  # So IntegrityError is raised on unique instead of potentially confusing ValidationError...
+            # Use transaction with optional locking for race-free enqueue
+            with transaction.atomic():
+                # Acquire lock via context manager (or nullcontext if None)
+                with self.get_enqueue_lock(concurrency_key) or nullcontext():
+                    # Check with lock held (if using locks)
+                    if not self.should_enqueue(concurrency_key):
+                        span.set_attribute(ERROR_TYPE, "ShouldNotEnqueue")
+                        return None
 
-                span.set_attribute(
-                    MESSAGING_MESSAGE_ID,
-                    str(job_request.uuid),
-                )
+                    # Create job with lock held
+                    job_request = JobRequest(
+                        job_class=job_class_name,
+                        parameters=parameters,
+                        start_at=start_at,
+                        source=source,
+                        queue=queue,
+                        priority=priority,
+                        retries=retries,
+                        retry_attempt=retry_attempt,
+                        concurrency_key=concurrency_key,
+                        trace_id=trace_id,
+                        span_id=span_id,
+                    )
+                    job_request.save()
 
-                # Add job UUID to current span for bidirectional linking
-                span.set_attribute("job.uuid", str(job_request.uuid))
-                span.set_status(trace.StatusCode.OK)
+                    span.set_attribute(
+                        MESSAGING_MESSAGE_ID,
+                        str(job_request.uuid),
+                    )
 
-                return job_request
-            except IntegrityError as e:
-                span.set_attribute(ERROR_TYPE, "IntegrityError")
-                span.set_status(trace.Status(trace.StatusCode.ERROR, "Duplicate job"))
-                logger.warning("Job already in progress: %s", e)
-                return None
+                    # Add job UUID to current span for bidirectional linking
+                    span.set_attribute("job.uuid", str(job_request.uuid))
+                    span.set_status(trace.StatusCode.OK)
 
-    def _in_progress(self, unique_key: str) -> list[JobRequest | JobProcess]:
-        """Get all JobRequests and JobProcess that are currently in progress, regardless of queue."""
-        from .models import JobProcess, JobRequest
+                    return job_request
+
+    def get_requested_jobs(
+        self, *, concurrency_key: str | None = None, include_retries: bool = False
+    ) -> models.QuerySet:
+        """
+        Get pending jobs (JobRequest) for this job class.
+
+        Args:
+            concurrency_key: Optional concurrency_key to filter by. If None, uses self.job_process.concurrency_key (if available) or self.default_concurrency_key()
+            include_retries: If False (default), exclude retry attempts from results
+        """
+        from .models import JobRequest
 
         job_class_name = jobs_registry.get_job_class_name(self.__class__)
 
-        job_requests = JobRequest.query.filter(
-            job_class=job_class_name,
-            unique_key=unique_key,
-        )
+        if concurrency_key is None:
+            if self.job_process:
+                concurrency_key = self.job_process.concurrency_key
+            else:
+                concurrency_key = self.default_concurrency_key()
 
-        jobs = JobProcess.query.filter(
-            job_class=job_class_name,
-            unique_key=unique_key,
-        )
+        filters = {"job_class": job_class_name}
+        if concurrency_key:
+            filters["concurrency_key"] = concurrency_key
 
-        return list(job_requests) + list(jobs)
+        qs = JobRequest.query.filter(**filters)
 
-    def get_unique_key(self) -> str:
+        if not include_retries:
+            qs = qs.filter(retry_attempt=0)
+
+        return qs
+
+    def get_processing_jobs(
+        self,
+        *,
+        concurrency_key: str | None = None,
+        include_retries: bool = False,
+        include_self: bool = False,
+    ) -> models.QuerySet:
         """
-        A unique key to prevent duplicate jobs from being queued.
-        Enabled by returning a non-empty string.
+        Get currently processing jobs (JobProcess) for this job class.
 
-        Note that this is not a "once and only once" guarantee, but rather
-        an "at least once" guarantee. Jobs should still be idempotent in case
-        multiple instances are queued in a race condition.
+        Args:
+            concurrency_key: Optional concurrency_key to filter by. If None, uses self.job_process.concurrency_key (if available) or self.default_concurrency_key()
+            include_retries: If False (default), exclude retry attempts from results
+        """
+        from .models import JobProcess
+
+        job_class_name = jobs_registry.get_job_class_name(self.__class__)
+
+        if concurrency_key is None:
+            if self.job_process:
+                concurrency_key = self.job_process.concurrency_key
+            else:
+                concurrency_key = self.default_concurrency_key()
+
+        filters = {"job_class": job_class_name}
+        if concurrency_key:
+            filters["concurrency_key"] = concurrency_key
+
+        qs = JobProcess.query.filter(**filters)
+
+        if not include_retries:
+            qs = qs.filter(retry_attempt=0)
+
+        if not include_self and self.job_process:
+            qs = qs.exclude(id=self.job_process.id)
+
+        return qs
+
+    def should_enqueue(self, concurrency_key: str) -> bool:
+        """
+        Called before enqueueing job. Return False to skip.
+
+        Args:
+            concurrency_key: The resolved concurrency_key (from default_concurrency_key() or override)
+
+        Default behavior:
+        - If concurrency_key is empty: no restrictions (always enqueue)
+        - If concurrency_key is set: enforce uniqueness (only one job with this key can be pending or processing)
+
+        Override to implement custom concurrency control:
+        - Concurrency limits
+        - Rate limits
+        - Custom business logic
+
+        Example:
+            def should_enqueue(self, concurrency_key):
+                # Max 3 processing, 1 pending per concurrency_key
+                processing = self.get_processing_jobs(concurrency_key).count()
+                pending = self.get_requested_jobs(concurrency_key).count()
+                return processing < 3 and pending < 1
+        """
+        if not concurrency_key:
+            # No key = no uniqueness check
+            return True
+
+        # Key set = enforce uniqueness (include retries for strong guarantee)
+        return (
+            self.get_processing_jobs(
+                concurrency_key=concurrency_key, include_retries=True
+            ).count()
+            == 0
+            and self.get_requested_jobs(
+                concurrency_key=concurrency_key, include_retries=True
+            ).count()
+            == 0
+        )
+
+    def default_concurrency_key(self) -> str:
+        """
+        Default identifier for this job.
+
+        Use for:
+        - Deduplication
+        - Grouping related jobs
+        - Concurrency control
+
+        Return empty string (default) for no grouping.
+        Can be overridden per-call via concurrency_key parameter in run_in_worker().
         """
         return ""
 
-    def get_queue(self) -> str:
+    def default_queue(self) -> str:
+        """Default queue for this job. Can be overridden in run_in_worker()."""
         return "default"
 
-    def get_priority(self) -> int:
+    def default_priority(self) -> int:
         """
-        Return the default priority for this job.
+        Default priority for this job. Can be overridden in run_in_worker().
 
         Higher numbers run first: 10 > 5 > 0 > -5 > -10
         - Use positive numbers for high priority jobs
@@ -209,13 +308,57 @@ class Job(metaclass=JobType):
         """
         return 0
 
-    def get_retries(self) -> int:
+    def default_retries(self) -> int:
+        """Default number of retry attempts. Can be overridden in run_in_worker()."""
         return 0
 
-    def get_retry_delay(self, attempt: int) -> int:
+    def calculate_retry_delay(self, attempt: int) -> int:
         """
         Calculate a delay in seconds before the next retry attempt.
 
         On the first retry, attempt will be 1.
         """
         return 0
+
+    def get_enqueue_lock(
+        self, concurrency_key: str
+    ) -> AbstractContextManager[None] | None:
+        """
+        Return a context manager for the enqueue lock, or None for no locking.
+
+        Default: PostgreSQL advisory lock (None on SQLite/MySQL or empty concurrency_key).
+        Override to provide custom locking (Redis, etcd, etc.).
+
+        The returned context manager is used to wrap the should_enqueue() check
+        and job creation, ensuring atomicity.
+
+        Example with Redis:
+            def get_enqueue_lock(self, concurrency_key):
+                import redis
+                return redis_client.lock(f"job:{concurrency_key}", timeout=5)
+
+        Example with custom implementation:
+            from contextlib import contextmanager
+
+            @contextmanager
+            def get_enqueue_lock(self, concurrency_key):
+                my_lock.acquire(concurrency_key)
+                try:
+                    yield
+                finally:
+                    my_lock.release(concurrency_key)
+
+        To disable locking:
+            def get_enqueue_lock(self, concurrency_key):
+                return None
+        """
+        # No locking if no concurrency_key
+        if not concurrency_key:
+            return None
+
+        # PostgreSQL: use advisory locks
+        if db_connection.vendor == "postgresql":
+            return postgres_advisory_lock(self, concurrency_key)
+
+        # Other databases: no locking
+        return None

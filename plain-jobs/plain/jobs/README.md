@@ -76,7 +76,7 @@ job.run_in_worker(
     delay=60,  # Delay in seconds (or timedelta/datetime)
     priority=10,  # Higher numbers run first (default: 0, use negatives for lower priority)
     retries=3,  # Number of retry attempts (default: 0)
-    unique_key="user-123-welcome",  # Prevent duplicate jobs
+    concurrency_key="user-123-welcome",  # Identifier for grouping/deduplication
 )
 ```
 
@@ -92,27 +92,31 @@ class MyJob(Job):
         # Required: The main job logic
         pass
 
-    def get_queue(self) -> str:
-        # Specify the default queue for this job type
+    # Defaults (can be overridden in run_in_worker)
+    def default_queue(self) -> str:
         return "default"
 
-    def get_priority(self) -> int:
-        # Set the default priority
+    def default_priority(self) -> int:
         # Higher numbers run first: 10 > 5 > 0 > -5 > -10
-        # Use positive numbers for high priority, negative for low priority
         return 0
 
-    def get_retries(self) -> int:
-        # Number of retry attempts on failure
+    def default_retries(self) -> int:
         return 0
 
-    def get_retry_delay(self, attempt: int) -> int:
+    def default_concurrency_key(self) -> str:
+        # Identifier for grouping/deduplication
+        return ""
+
+    # Computed values
+    def calculate_retry_delay(self, attempt: int) -> int:
         # Delay in seconds before retry (attempt starts at 1)
         return 0
 
-    def get_unique_key(self) -> str:
-        # Return a key to prevent duplicate jobs
-        return ""
+    # Hooks
+    def should_enqueue(self, concurrency_key: str) -> bool:
+        # Called before enqueueing - return False to skip
+        # Use for concurrency limits, rate limits, etc.
+        return True
 ```
 
 ## Scheduled jobs
@@ -195,18 +199,59 @@ Jobs can be linked to the originating trace context, allowing you to track jobs 
 
 ## FAQs
 
-#### How do I ensure a job only runs once?
+#### How do I ensure only one job runs at a time?
 
-Return a unique key from the `get_unique_key()` method:
+Set a `concurrency_key` to automatically enforce uniqueness - only one job with the same key can be pending or processing:
+
+```python
+from plain.jobs import Job, register_job
+
+@register_job
+class ProcessUserJob(Job):
+    def __init__(self, user_id):
+        self.user_id = user_id
+
+    def default_concurrency_key(self):
+        return f"user-{self.user_id}"
+
+    def run(self):
+        process_user(self.user_id)
+
+# Usage
+ProcessUserJob(123).run_in_worker()  # Enqueued
+ProcessUserJob(123).run_in_worker()  # Returns None (blocked - job already pending/processing)
+```
+
+Alternatively, pass `concurrency_key` as a parameter to `run_in_worker()` instead of overriding the method.
+
+#### How do I implement custom concurrency limits?
+
+Use the `should_enqueue()` hook to implement custom concurrency control:
 
 ```python
 class ProcessUserDataJob(Job):
     def __init__(self, user_id):
         self.user_id = user_id
 
-    def get_unique_key(self):
-        return f"process-user-{self.user_id}"
+    def default_concurrency_key(self):
+        return f"user-{self.user_id}"
+
+    def should_enqueue(self, concurrency_key):
+        # Only allow 1 job per user at a time
+        processing = self.get_processing_jobs(concurrency_key).count()
+        pending = self.get_requested_jobs(concurrency_key).count()
+        return processing == 0 and pending == 0
 ```
+
+For more patterns like rate limiting and global limits, see [`should_enqueue()`](./jobs.py#should_enqueue) in the source code.
+
+#### How are race conditions prevented?
+
+On **PostgreSQL**, plain-jobs uses [advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS) to ensure `should_enqueue()` checks are atomic with job creation. The lock is acquired during the transaction and automatically released when the transaction completes. This eliminates race conditions where multiple threads might simultaneously pass the `should_enqueue()` check.
+
+On **SQLite and MySQL**, advisory locks are not available, so a small race condition window exists between checking and creating jobs. For production deployments requiring strict concurrency guarantees, **we recommend PostgreSQL**.
+
+For custom locking behavior (Redis, etc.), override [`get_enqueue_lock()`](./locks.py#get_enqueue_lock).
 
 #### Can I run multiple workers?
 
@@ -228,10 +273,10 @@ Set the number of retries and implement retry delays:
 
 ```python
 class MyJob(Job):
-    def get_retries(self):
+    def default_retries(self):
         return 3
 
-    def get_retry_delay(self, attempt):
+    def calculate_retry_delay(self, attempt):
         # Exponential backoff: 1s, 2s, 4s
         return 2 ** (attempt - 1)
 ```
