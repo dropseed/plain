@@ -1,5 +1,26 @@
 # plain-jobs changelog
 
+## [0.38.0](https://github.com/dropseed/plain/releases/plain-jobs@0.38.0) (2025-11-09)
+
+### What's changed
+
+- Renamed `unique_key` to `concurrency_key` throughout the API for better clarity about its purpose as a grouping identifier ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Added `should_enqueue()` hook for implementing custom concurrency limits and rate limiting ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Added PostgreSQL advisory lock support to prevent race conditions when checking concurrency limits ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Added `DeferJob` exception for signaling jobs should be re-tried later without counting as errors ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Added helper methods `get_requested_jobs()` and `get_processing_jobs()` for querying jobs by concurrency key ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Renamed job configuration methods from `get_*()` to `default_*()` (e.g., `get_queue()` → `default_queue()`) to better indicate they provide defaults that can be overridden ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Renamed `get_retry_delay()` to `calculate_retry_delay()` for better semantic clarity ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Changed field types for `priority`, `retries`, and `retry_attempt` from `IntegerField` to `SmallIntegerField` for better database efficiency ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+- Added `DEFERRED` status to job results for jobs that were deferred and will be retried ([01b6986d79](https://github.com/dropseed/plain/commit/01b6986d79))
+
+### Upgrade instructions
+
+- Rename `unique_key` parameter to `concurrency_key` in all `run_in_worker()` calls
+- Rename job method `get_unique_key()` to `default_concurrency_key()` if you've overridden it
+- Rename job methods: `get_queue()` → `default_queue()`, `get_priority()` → `default_priority()`, `get_retries()` → `default_retries()`
+- Rename `get_retry_delay()` to `calculate_retry_delay()` if you've overridden it
+
 ## [0.37.6](https://github.com/dropseed/plain/releases/plain-jobs@0.37.6) (2025-11-04)
 
 ### What's changed
