@@ -67,6 +67,7 @@ def setup() -> None:
         plain_log_level=settings.FRAMEWORK_LOG_LEVEL,
         app_log_level=settings.LOG_LEVEL,
         app_log_format=settings.LOG_FORMAT,
+        log_stream=settings.LOG_STREAM,
     )
 
     packages_registry.populate(settings.INSTALLED_PACKAGES)

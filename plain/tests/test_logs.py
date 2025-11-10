@@ -5,9 +5,9 @@ from io import StringIO
 import pytest
 
 from plain.logs import app_logger
+from plain.logs.app import AppLogger
 from plain.logs.configure import configure_logging
 from plain.logs.formatters import JSONFormatter, KeyValueFormatter
-from plain.logs.loggers import AppLogger
 
 
 class TestLoggingConfiguration:

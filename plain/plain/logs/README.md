@@ -137,3 +137,40 @@ app_logger.debug("This might not appear")
 with app_logger.force_debug():
     app_logger.debug("This will definitely appear", extra_data="debug_info")
 ```
+
+## Advanced usage
+
+### Output streams
+
+By default, Plain splits log output by severity level to ensure proper log classification on cloud platforms:
+
+- **DEBUG, INFO** → `stdout` (standard output)
+- **WARNING, ERROR, CRITICAL** → `stderr` (error output)
+
+This behavior ensures that platforms which automatically detect log severity based on output streams correctly classify logs as informational vs errors.
+
+You can customize this behavior using the `PLAIN_LOG_STREAM` environment variable:
+
+```bash
+# Default: split by level (INFO to stdout, WARNING+ to stderr)
+export PLAIN_LOG_STREAM=split
+
+# Send all logs to stdout (simple, predictable)
+export PLAIN_LOG_STREAM=stdout
+
+# Send all logs to stderr (legacy Python behavior)
+export PLAIN_LOG_STREAM=stderr
+```
+
+## Logging settings
+
+All logging settings can be configured via environment variables:
+
+| Setting               | Environment Variable        | Default      | Description                                              |
+| --------------------- | --------------------------- | ------------ | -------------------------------------------------------- |
+| `FRAMEWORK_LOG_LEVEL` | `PLAIN_FRAMEWORK_LOG_LEVEL` | `"INFO"`     | Log level for the `plain` logger                         |
+| `LOG_LEVEL`           | `PLAIN_LOG_LEVEL`           | `"INFO"`     | Log level for the `app` logger                           |
+| `LOG_FORMAT`          | `PLAIN_LOG_FORMAT`          | `"keyvalue"` | Output format: `"json"`, `"keyvalue"`, or `"standard"`   |
+| `LOG_STREAM`          | `PLAIN_LOG_STREAM`          | `"split"`    | Output stream mode: `"split"`, `"stdout"`, or `"stderr"` |
+
+**Log levels:** `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`

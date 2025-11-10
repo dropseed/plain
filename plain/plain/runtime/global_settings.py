@@ -138,6 +138,7 @@ CSRF_EXEMPT_PATHS: list[str] = []
 FRAMEWORK_LOG_LEVEL: str = "INFO"
 LOG_LEVEL: str = "INFO"
 LOG_FORMAT: str = "keyvalue"
+LOG_STREAM: str = "split"  # "split", "stdout", or "stderr"
 
 # MARK: Assets
 
