@@ -28,10 +28,16 @@ from plain.packages import packages_registry
 )
 def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
     """Validation checks before deployment"""
+    # Use stderr for progress messages only in JSON mode (keeps stdout clean for parsing)
+    # In text mode, send all output to stdout (so success doesn't appear in error logs)
+    use_stderr = format == "json"
+
     # Auto-discover and load preflight checks
     packages_registry.autodiscover_modules("preflight", include_app=True)
     if not quiet:
-        click.secho("Running preflight checks...", dim=True, italic=True, err=True)
+        click.secho(
+            "Running preflight checks...", dim=True, italic=True, err=use_stderr
+        )
 
     total_checks = 0
     passed_checks = 0
@@ -50,23 +56,23 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
         if format == "text":
             if not quiet:
                 # Print check name without newline
-                click.echo("Check:", nl=False, err=True)
-                click.secho(f"{check_name} ", bold=True, nl=False, err=True)
+                click.echo("Check:", nl=False, err=use_stderr)
+                click.secho(f"{check_name} ", bold=True, nl=False, err=use_stderr)
 
             # Determine status icon based on issue severity
             if not visible_issues:
                 # No issues - passed
                 if not quiet:
-                    click.secho("✔", fg="green", err=True)
+                    click.secho("✔", fg="green", err=use_stderr)
                 passed_checks += 1
             else:
                 # Has issues - determine icon based on highest severity
                 has_errors = any(not issue.warning for issue in visible_issues)
                 if not quiet:
                     if has_errors:
-                        click.secho("✗", fg="red", err=True)
+                        click.secho("✗", fg="red", err=use_stderr)
                     else:
-                        click.secho("⚠", fg="yellow", err=True)
+                        click.secho("⚠", fg="yellow", err=use_stderr)
 
                 # Print issues with simple indentation
                 issues_to_show = (
@@ -81,26 +87,26 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
                     if quiet:
                         # In quiet mode, show check name once, then issues
                         if i == 0:
-                            click.secho(f"{check_name}:", err=True)
+                            click.secho(f"{check_name}:", err=use_stderr)
                         # Show ID and fix on separate lines with same indentation
                         click.secho(
                             f"  [{issue_type}] {issue.id}:",
                             fg=issue_color,
                             bold=True,
-                            err=True,
+                            err=use_stderr,
                             nl=False,
                         )
-                        click.secho(f" {issue.fix}", err=True, dim=True)
+                        click.secho(f" {issue.fix}", err=use_stderr, dim=True)
                     else:
                         # Show ID and fix on separate lines with same indentation
                         click.secho(
                             f"    [{issue_type}] {issue.id}: ",
                             fg=issue_color,
                             bold=True,
-                            err=True,
+                            err=use_stderr,
                             nl=False,
                         )
-                        click.secho(f"{issue.fix}", err=True, dim=True)
+                        click.secho(f"{issue.fix}", err=use_stderr, dim=True)
         else:
             # For JSON format, just count passed checks
             if not visible_issues:
@@ -185,7 +191,7 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
 
         summary_text = ", ".join(summary_parts) if summary_parts else "no issues"
 
-        click.secho(f"{icon}{summary_text}", fg=summary_color, err=True)
+        click.secho(f"{icon}{summary_text}", fg=summary_color, err=use_stderr)
 
     # Exit with error if there are any errors (not warnings)
     if has_errors:
