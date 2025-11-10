@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.86.0](https://github.com/dropseed/plain/releases/plain@0.86.0) (2025-11-10)
+
+### What's changed
+
+- Log output is now split by severity level: INFO and below go to stdout, WARNING and above go to stderr for proper cloud platform log classification ([52403b15ba](https://github.com/dropseed/plain/commit/52403b15ba))
+- Added `LOG_STREAM` setting to customize log output behavior with options: `"split"` (default), `"stdout"`, or `"stderr"` ([52403b15ba](https://github.com/dropseed/plain/commit/52403b15ba))
+- Log configuration documentation expanded with detailed guidance on output streams and environment variable settings ([52403b15ba](https://github.com/dropseed/plain/commit/52403b15ba))
+
+### Upgrade instructions
+
+- No changes required (default behavior splits logs to stdout/stderr automatically, but this can be customized via `PLAIN_LOG_STREAM` environment variable if needed)
+
 ## [0.85.0](https://github.com/dropseed/plain/releases/plain@0.85.0) (2025-11-03)
 
 ### What's changed
