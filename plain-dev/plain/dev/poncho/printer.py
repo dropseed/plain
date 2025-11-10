@@ -1,9 +1,15 @@
 import re
-from collections import namedtuple
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
-Message = namedtuple("Message", "type data time name color")
+
+class Message(NamedTuple):
+    type: str
+    data: bytes | dict[str, Any] | str
+    time: Any
+    name: str | None
+    color: str | None
+    stream: str = "stdout"
 
 
 class Printer:
@@ -55,9 +61,25 @@ class Printer:
             prefix = ""
             if self.prefix:
                 time_formatted = message.time.strftime(self.time_format)
-                prefix = f"{time_formatted} {name}| "
+                prefix_base = f"{time_formatted} {name}"
+
+                # Color the timestamp and name with process color
                 if self.color and message.color:
-                    prefix = _color_string(message.color, prefix)
+                    prefix_base = _color_string(message.color, prefix_base)
+
+                # Use fat red pipe for stderr, dim pipe for stdout
+                if message.stream == "stderr" and self.color:
+                    pipe = _color_string("31", "┃")
+                elif self.color:
+                    pipe = _color_string("2", "|")
+                else:
+                    pipe = "|"
+
+                prefix = prefix_base + pipe + " "
+
+            # Dim the line content for system messages (color="2")
+            if self.color and message.color == "2":
+                line = _color_string("2", line)
 
             formatted = prefix + line
 

@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-ANSI_COLOURS = ["grey", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
+ANSI_COLOURS = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
 
 for i, name in enumerate(ANSI_COLOURS):
     globals()[name] = str(30 + i)
@@ -13,13 +13,11 @@ def get_colors() -> Iterator[str]:
         "yellow",
         "green",
         "magenta",
-        "red",
         "blue",
         "intense_cyan",
         "intense_yellow",
         "intense_green",
         "intense_magenta",
-        "intense_red",
         "intense_blue",
     ]
     cs = [globals()[c] for c in cs]

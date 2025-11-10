@@ -217,6 +217,7 @@ class Manager:
                 data=data,
                 time=self._clock.now(),
                 name=SYSTEM_PRINTER_NAME,
-                color=None,
+                color="2",  # Dim prefix
+                stream="stdout",
             )
         )
