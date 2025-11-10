@@ -39,6 +39,7 @@ class ServicesProcess(ProcessManager):
                 env = {
                     **os.environ,
                     "PYTHONUNBUFFERED": "true",
+                    "FORCE_COLOR": "1",
                     **data.get("env", {}),
                 }
                 self.poncho.add_process(name, data["cmd"], env=env)

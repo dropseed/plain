@@ -68,6 +68,7 @@ class DevProcess(ProcessManager):
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
             "PLAIN_DEV": "true",
+            "FORCE_COLOR": "1",
             **os.environ,
         }
 
