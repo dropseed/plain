@@ -75,3 +75,36 @@ Example workflow:
 ## Verifying changes
 
 Not everything needs a test, but be liberal about using `print()` statements to verify changes and show the before and after effects of your changes. Make sure those print statements are removed before committing your changes.
+
+## Documentation
+
+When writing documentation (READMEs, docstrings, etc.), follow the principles from [What Makes Documentation Good](https://github.com/openai/openai-cookbook/blob/main/articles/what_makes_documentation_good.md):
+
+- Make docs easy to skim
+    - Split content into sections with titles.
+    - Prefer titles with informative sentences over abstract nouns.
+    - Include a table of contents.
+    - Keep paragraphs short.
+    - Begin paragraphs and sections with short topic sentences that give a standalone preview.
+    - Put topic words at the beginning of topic sentences.
+    - Put the takeaways up front.
+    - Use bullets and tables.
+    - Bold important text.
+- Write well
+    - Keep sentences simple.
+    - Write sentences that can be parsed unambiguously.
+    - Avoid left-branching sentences.
+    - Avoid demonstrative pronouns (e.g., "this"), especially across sentences.
+    - Be consistent.
+    - Don't tell readers what they think or what to do.
+- Be broadly helpful
+    - Write simply.
+    - Avoid abbreviations.
+    - Offer solutions to potential problems.
+    - Prefer terminology that is specific and accurate.
+    - Keep code examples general and exportable.
+    - Prioritize topics by value.
+    - Don't teach bad habits.
+    - Introduce topics with a broad opening.
+- Break these rules when you have a good reason
+    - "Documentation is an exercise in empathy."
