@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.46.0](https://github.com/dropseed/plain/releases/plain-dev@0.46.0) (2025-11-10)
+
+### What's changed
+
+- The `plain dev` command now separates stdout and stderr output with distinct visual indicators - stderr uses a red pipe (`┃`) while stdout uses a dimmed pipe (`|`) to make error messages more visible ([ea78a6d](https://github.com/dropseed/plain/commit/ea78a6d359))
+- The `FORCE_COLOR` environment variable is now automatically set in the development server and services to ensure consistent color output across all processes ([2a63270](https://github.com/dropseed/plain/commit/2a63270179))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.45.1](https://github.com/dropseed/plain/releases/plain-dev@0.45.1) (2025-11-03)
 
 ### What's changed
