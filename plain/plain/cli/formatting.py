@@ -78,9 +78,13 @@ class PlainContext(click.Context):
 
         super().__init__(*args, **kwargs)
 
-        # Force colors in CI environments
-        if any(
-            os.getenv(var)
-            for var in ["CI", "FORCE_COLOR", "GITHUB_ACTIONS", "GITLAB_CI"]
-        ) and not any(os.getenv(var) for var in ["NO_COLOR", "PYTEST_CURRENT_TEST"]):
+        # Follow CLICOLOR standard (http://bixense.com/clicolors/)
+        # Priority: NO_COLOR > CLICOLOR_FORCE/FORCE_COLOR > CLICOLOR > isatty
+        if os.getenv("NO_COLOR") or os.getenv("PYTEST_CURRENT_TEST"):
+            self.color = False
+        elif os.getenv("CLICOLOR_FORCE") or os.getenv("FORCE_COLOR"):
             self.color = True
+        elif os.getenv("CLICOLOR"):
+            # CLICOLOR=1 means use colors only if TTY (Click's default behavior)
+            pass  # Let Click handle it with isatty check
+        # Otherwise use Click's default behavior (isatty check)
