@@ -41,3 +41,11 @@ def test_mixin_fields_inherited(db):
     assert instance.created_at is not None
     assert instance.updated_at is not None
     assert instance.name == "test"
+
+
+def test_cannot_set_id_in_init(db):
+    """Test that setting id in __init__ raises ValueError."""
+    with pytest.raises(
+        ValueError, match=r"Cannot set primary key 'id'.*Car\.query\.get\(\)"
+    ):
+        Car(id=1, make="Toyota", model="Tundra")

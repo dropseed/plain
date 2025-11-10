@@ -151,6 +151,14 @@ class Model(metaclass=ModelBase):
                 continue
             if kwargs:
                 if isinstance(field.remote_field, ForeignObjectRel):
+                    # Check if trying to set primary key via kwargs
+                    if (
+                        field.name in kwargs or field.attname in kwargs
+                    ) and field.primary_key:
+                        raise ValueError(
+                            f"Cannot set primary key '{field.name}' during initialization. "
+                            f"Use {cls.__name__}.query.get() to retrieve existing objects."
+                        )
                     try:
                         # Assume object instance was passed in.
                         rel_obj = kwargs.pop(field.name)
@@ -162,6 +170,12 @@ class Model(metaclass=ModelBase):
                         except KeyError:
                             val = field.get_default()
                 else:
+                    # Check if trying to set primary key via kwargs
+                    if field.attname in kwargs and field.primary_key:
+                        raise ValueError(
+                            f"Cannot set primary key '{field.name}' during initialization. "
+                            f"Use {cls.__name__}.query.get() to retrieve existing objects."
+                        )
                     try:
                         val = kwargs.pop(field.attname)
                     except KeyError:
@@ -195,7 +209,13 @@ class Model(metaclass=ModelBase):
                         _setattr(self, prop, value)
                 else:
                     try:
-                        meta.get_field(prop)
+                        field_obj = meta.get_field(prop)
+                        # Check if trying to set primary key
+                        if field_obj.primary_key:
+                            raise ValueError(
+                                f"Cannot set primary key '{prop}' during initialization. "
+                                f"Use {cls.__name__}.query.get() to retrieve existing objects."
+                            )
                     except FieldDoesNotExist:
                         unexpected += (prop,)
                     else:
