@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.86.1](https://github.com/dropseed/plain/releases/plain@0.86.1) (2025-11-10)
+
+### What's changed
+
+- The `plain preflight` command now outputs to stderr only when using `--format json`, keeping stdout clean for JSON parsing while avoiding success messages appearing in error logs for text format ([72ebee7729](https://github.com/dropseed/plain/commit/72ebee7729))
+- CLI color handling now follows the CLICOLOR standard with proper priority: `NO_COLOR` > `CLICOLOR_FORCE`/`FORCE_COLOR` > `CLICOLOR` > `isatty` ([c7fea406c5](https://github.com/dropseed/plain/commit/c7fea406c5))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.86.0](https://github.com/dropseed/plain/releases/plain@0.86.0) (2025-11-10)
 
 ### What's changed
