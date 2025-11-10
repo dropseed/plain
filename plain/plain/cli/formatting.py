@@ -79,10 +79,14 @@ class PlainContext(click.Context):
         super().__init__(*args, **kwargs)
 
         # Follow CLICOLOR standard (http://bixense.com/clicolors/)
-        # Priority: NO_COLOR > CLICOLOR_FORCE/FORCE_COLOR > CLICOLOR > isatty
+        # Priority: NO_COLOR > CLICOLOR_FORCE/FORCE_COLOR > CI detection > CLICOLOR > isatty
         if os.getenv("NO_COLOR") or os.getenv("PYTEST_CURRENT_TEST"):
             self.color = False
         elif os.getenv("CLICOLOR_FORCE") or os.getenv("FORCE_COLOR"):
+            self.color = True
+        elif os.getenv("CI"):
+            # Enable colors in CI/deployment environments even without TTY
+            # This matches behavior of modern tools like uv (via Rust's anstyle)
             self.color = True
         elif os.getenv("CLICOLOR"):
             # CLICOLOR=1 means use colors only if TTY (Click's default behavior)
