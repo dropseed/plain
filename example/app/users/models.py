@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from plain import models
-from plain.passwords.models import PasswordField
+from plain.passwords import PasswordField
 
 
 @models.register_model
