@@ -11,13 +11,13 @@ import warnings
 from base64 import b64decode, b64encode
 from collections.abc import Callable, Sequence
 from functools import cached_property, total_ordering
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import db_connection
 from plain.models.enums import ChoicesMeta
-from plain.models.query_utils import DeferredAttribute, RegisterLookupMixin
+from plain.models.query_utils import RegisterLookupMixin
 from plain.preflight import PreflightResult
 from plain.utils import timezone
 from plain.utils.datastructures import DictWrapper
@@ -111,8 +111,12 @@ def return_None() -> None:
     return None
 
 
+# TypeVar for Field's generic type parameter
+T = TypeVar("T")
+
+
 @total_ordering
-class Field(RegisterLookupMixin):
+class Field(RegisterLookupMixin, Generic[T]):
     """Base class for all field types"""
 
     # Designates whether empty strings fundamentally are allowed at the
@@ -155,8 +159,6 @@ class Field(RegisterLookupMixin):
     many_to_one = None
     one_to_many = None
     related_model = None
-
-    descriptor_class = DeferredAttribute
 
     # Generic field type description, usually overridden by subclasses
     def _description(self) -> str:
@@ -518,25 +520,37 @@ class Field(RegisterLookupMixin):
     def __lt__(self, other: object) -> bool:
         # This is needed because bisect does not take a comparison function.
         # Order by creation_counter first for backward compatibility.
-        if isinstance(other, Field):
-            if (
-                self.creation_counter != other.creation_counter
-                or not hasattr(self, "model")
-                and not hasattr(other, "model")
-            ):
-                return self.creation_counter < other.creation_counter
-            elif hasattr(self, "model") != hasattr(other, "model"):
-                return not hasattr(self, "model")  # Order no-model fields first
-            else:
-                # creation_counter's are equal, compare only models.
+        if not isinstance(other, Field):
+            return NotImplemented
+
+        # Type narrowing: other is now known to be a Field
+        other_field: Field[Any] = other
+
+        if (
+            self.creation_counter != other_field.creation_counter
+            or not hasattr(self, "model")
+            and not hasattr(other_field, "model")
+        ):
+            return self.creation_counter < other_field.creation_counter
+        elif hasattr(self, "model") != hasattr(other_field, "model"):
+            return not hasattr(self, "model")  # Order no-model fields first
+        else:
+            # creation_counter's are equal, compare only models.
+            # Use getattr with defaults to satisfy type checker
+            self_pkg = getattr(getattr(self, "model", None), "model_options", None)
+            other_pkg = getattr(
+                getattr(other_field, "model", None), "model_options", None
+            )
+            if self_pkg is not None and other_pkg is not None:
                 return (
-                    self.model.model_options.package_label,
-                    self.model.model_options.model_name,
+                    self_pkg.package_label,
+                    self_pkg.model_name,
                 ) < (
-                    other.model.model_options.package_label,
-                    other.model.model_options.model_name,
+                    other_pkg.package_label,
+                    other_pkg.model_name,
                 )
-        return NotImplemented
+            # Fallback if model_options not available
+            return self.creation_counter < other_field.creation_counter
 
     def __hash__(self) -> int:
         return hash(self.creation_counter)
@@ -783,12 +797,88 @@ class Field(RegisterLookupMixin):
     def contribute_to_class(self, cls: Any, name: str) -> None:
         """
         Register the field with the model class it belongs to.
+
+        Field now acts as its own descriptor - it stays on the class and handles
+        __get__/__set__/__delete__ directly.
         """
         self.set_attributes_from_name(name)
         self.model = cls
         cls._model_meta.add_field(self)
+
+        # Field is now a descriptor itself - ensure it's set on the class
+        # This is important for inherited fields that get deepcopied in Meta.__get__
         if self.column:
-            setattr(cls, self.attname, self.descriptor_class(self))
+            setattr(cls, self.attname, self)
+
+    # Descriptor protocol implementation
+    @overload
+    def __get__(self, instance: None, owner: type) -> Field[T]: ...
+
+    @overload
+    def __get__(self, instance: Any, owner: type) -> T: ...
+
+    def __get__(self, instance: Any | None, owner: type) -> Field[T] | T:
+        """
+        Descriptor __get__ for attribute access.
+
+        Class access (User.email) returns the Field descriptor itself.
+        Instance access (user.email) returns the field value from instance.__dict__,
+        with lazy loading support if the value is not yet loaded.
+        """
+        # Class access - return the Field descriptor
+        if instance is None:
+            return self
+
+        # If field hasn't been contributed to a class yet (e.g., used standalone
+        # as an output_field in aggregates), just return self
+        if not hasattr(self, "attname"):
+            return self
+
+        # Instance access - get value from instance dict
+        data = instance.__dict__
+        field_name = self.attname
+
+        # If value not in dict, lazy load from database
+        if field_name not in data:
+            # Deferred field - load it from the database
+            instance.refresh_from_db(fields=[field_name])
+
+        return data.get(field_name)
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        """
+        Descriptor __set__ for attribute assignment.
+
+        Validates and converts the value using to_python(), then stores it
+        in instance.__dict__[attname].
+        """
+        # Safety check: ensure field has been properly initialized
+        if not hasattr(self, "attname"):
+            raise AttributeError(
+                f"Field {self.__class__.__name__} has not been initialized properly. "
+                f"The field's contribute_to_class() has not been called yet. "
+                f"This usually means the field is being used before it was added to a model class."
+            )
+
+        # Convert/validate the value
+        if value is not None:
+            value = self.to_python(value)
+
+        # Store in instance dict
+        instance.__dict__[self.attname] = value
+
+    def __delete__(self, instance: Any) -> None:
+        """
+        Descriptor __delete__ for attribute deletion.
+
+        Removes the value from instance.__dict__.
+        """
+        try:
+            del instance.__dict__[self.attname]
+        except KeyError:
+            raise AttributeError(
+                f"{instance.__class__.__name__!r} object has no attribute {self.attname!r}"
+            )
 
     def get_attname(self) -> str:
         return self.name
@@ -911,11 +1001,11 @@ class Field(RegisterLookupMixin):
         return getattr(obj, self.attname)
 
 
-class BooleanField(Field):
+class BooleanField(Field[bool]):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value must be either True or False.",
-        "invalid_nullable": "“%(value)s” value must be either True, False, or None.",
+        "invalid": '"%(value)s" value must be either True or False.',
+        "invalid_nullable": '"%(value)s" value must be either True, False, or None.',
     }
     description = "Boolean (Either True or False)"
 
@@ -945,7 +1035,7 @@ class BooleanField(Field):
         return self.to_python(value)
 
 
-class CharField(Field):
+class CharField(Field[str]):
     def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
         super().__init__(**kwargs)
         self.db_collation = db_collation
@@ -1129,11 +1219,11 @@ class DateTimeCheckMixin:
         return []
 
 
-class DateField(DateTimeCheckMixin, Field):
+class DateField(DateTimeCheckMixin, Field[datetime.date]):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value has an invalid date format. It must be in YYYY-MM-DD format.",
-        "invalid_date": "“%(value)s” value has the correct format (YYYY-MM-DD) but it is an invalid date.",
+        "invalid": '"%(value)s" value has an invalid date format. It must be in YYYY-MM-DD format.',
+        "invalid_date": '"%(value)s" value has the correct format (YYYY-MM-DD) but it is an invalid date.',
     }
     description = "Date (without time)"
 
@@ -1235,9 +1325,9 @@ class DateField(DateTimeCheckMixin, Field):
 class DateTimeField(DateField):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value has an invalid format. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format.",
-        "invalid_date": "“%(value)s” value has the correct format (YYYY-MM-DD) but it is an invalid date.",
-        "invalid_datetime": "“%(value)s” value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) but it is an invalid date/time.",
+        "invalid": '"%(value)s" value has an invalid format. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format.',
+        "invalid_date": '"%(value)s" value has the correct format (YYYY-MM-DD) but it is an invalid date.',
+        "invalid_datetime": '"%(value)s" value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) but it is an invalid date/time.',
     }
     description = "Date (with time)"
 
@@ -1351,10 +1441,10 @@ class DateTimeField(DateField):
         return "" if val is None else val.isoformat()
 
 
-class DecimalField(Field):
+class DecimalField(Field[decimal.Decimal]):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value must be a decimal number.",
+        "invalid": '"%(value)s" value must be a decimal number.',
     }
     description = "Decimal number"
 
@@ -1499,7 +1589,7 @@ class DecimalField(Field):
         return self.to_python(value)
 
 
-class DurationField(Field):
+class DurationField(Field[datetime.timedelta]):
     """
     Store timedelta objects.
 
@@ -1509,7 +1599,7 @@ class DurationField(Field):
 
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value has an invalid format. It must be in [DD] [[HH:]MM:]ss[.uuuuuu] format.",
+        "invalid": '"%(value)s" value has an invalid format. It must be in [DD] [[HH:]MM:]ss[.uuuuuu] format.',
     }
     description = "Duration"
 
@@ -1573,10 +1663,10 @@ class EmailField(CharField):
         return name, path, args, kwargs
 
 
-class FloatField(Field):
+class FloatField(Field[float]):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value must be a float.",
+        "invalid": '"%(value)s" value must be a float.',
     }
     description = "Floating point number"
 
@@ -1607,10 +1697,10 @@ class FloatField(Field):
             )
 
 
-class IntegerField(Field):
+class IntegerField(Field[int]):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value must be an integer.",
+        "invalid": '"%(value)s" value must be an integer.',
     }
     description = "Integer"
 
@@ -1714,7 +1804,7 @@ class SmallIntegerField(IntegerField):
         return "SmallIntegerField"
 
 
-class GenericIPAddressField(Field):
+class GenericIPAddressField(Field[str]):
     empty_strings_allowed = False
     description = "IP address"
     default_error_messages = {}
@@ -1849,7 +1939,7 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
         return "PositiveSmallIntegerField"
 
 
-class TextField(Field):
+class TextField(Field[str]):
     description = "Text"
 
     def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
@@ -1904,11 +1994,11 @@ class TextField(Field):
         return name, path, args, kwargs
 
 
-class TimeField(DateTimeCheckMixin, Field):
+class TimeField(DateTimeCheckMixin, Field[datetime.time]):
     empty_strings_allowed = False
     default_error_messages = {
-        "invalid": "“%(value)s” value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] format.",
-        "invalid_time": "“%(value)s” value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an invalid time.",
+        "invalid": '"%(value)s" value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] format.',
+        "invalid_time": '"%(value)s" value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an invalid time.',
     }
     description = "Time"
 
@@ -2023,7 +2113,7 @@ class URLField(CharField):
         return name, path, args, kwargs
 
 
-class BinaryField(Field):
+class BinaryField(Field[bytes | memoryview]):
     description = "Raw binary data"
     empty_values = [None, b""]
 
@@ -2082,9 +2172,9 @@ class BinaryField(Field):
         return value
 
 
-class UUIDField(Field):
+class UUIDField(Field[uuid.UUID]):
     default_error_messages = {
-        "invalid": "“%(value)s” is not a valid UUID.",
+        "invalid": '"%(value)s" is not a valid UUID.',
     }
     description = "Universally unique identifier"
     empty_strings_allowed = False

@@ -16,7 +16,6 @@ from ..registry import models_registry
 from . import Field
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
-    ForeignKeyDeferredAttribute,
     ForwardManyToManyDescriptor,
     ForwardManyToOneDescriptor,
     ReverseManyToManyDescriptor,
@@ -444,7 +443,6 @@ class ForeignKey(RelatedField):
     ForeignKey targets the primary key (id) of the remote model.
     """
 
-    descriptor_class = ForeignKeyDeferredAttribute
     related_accessor_class = ReverseManyToOneDescriptor
     forward_related_accessor_class = ForwardManyToOneDescriptor
     rel_class = ManyToOneRel
@@ -505,6 +503,23 @@ class ForeignKey(RelatedField):
         obj.__dict__.pop("path_infos", None)
         obj.__dict__.pop("reverse_path_infos", None)
         return obj
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        """
+        Override Field's __set__ to clear cached related object when FK value changes.
+
+        This ensures that when you change obj.user_id, the cached obj.user is invalidated.
+        """
+        # Check if value is changing and clear cache if needed
+        if (
+            hasattr(self, "attname")
+            and instance.__dict__.get(self.attname) != value
+            and self.is_cached(instance)
+        ):
+            self.delete_cached_value(instance)
+
+        # Call parent's __set__ to do the actual assignment
+        super().__set__(instance, value)
 
     @cached_property
     def related_fields(self) -> list[tuple[Field, Field]]:

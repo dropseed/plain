@@ -52,7 +52,6 @@ from functools import cached_property
 from typing import Any
 
 from plain.models.query import QuerySet
-from plain.models.query_utils import DeferredAttribute
 from plain.utils.functional import LazyObject
 
 from .related_managers import (
@@ -60,15 +59,6 @@ from .related_managers import (
     ReverseManyToManyManager,
     ReverseManyToOneManager,
 )
-
-
-class ForeignKeyDeferredAttribute(DeferredAttribute):
-    def __set__(self, instance: Any, value: Any) -> None:
-        if instance.__dict__.get(self.field.attname) != value and self.field.is_cached(
-            instance
-        ):
-            self.field.delete_cached_value(instance)
-        instance.__dict__[self.field.attname] = value
 
 
 class ForwardManyToOneDescriptor:

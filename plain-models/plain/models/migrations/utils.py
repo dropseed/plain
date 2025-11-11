@@ -90,7 +90,7 @@ def field_references(
             references_to = (remote_field, ["id"])
     through = getattr(remote_field, "through", None)
     if through and resolve_relation(through, *model_tuple) == reference_model_tuple:
-        through_fields = remote_field.through_fields
+        through_fields = getattr(remote_field, "through_fields", None)
         if (
             reference_field_name is None
             or

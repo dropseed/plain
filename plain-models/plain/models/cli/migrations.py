@@ -327,8 +327,9 @@ def apply(
         elif action == "apply_success":
             pass  # Already shown via operations
         elif action == "operation_start":
-            click.echo(f"  {operation.describe()}", nl=False)
-            click.secho("... ", dim=True, nl=False)
+            if operation is not None:
+                click.echo(f"  {operation.describe()}", nl=False)
+                click.secho("... ", dim=True, nl=False)
         elif action == "operation_success":
             # Show SQL statements (no OK needed, SQL implies success)
             if sql_statements:

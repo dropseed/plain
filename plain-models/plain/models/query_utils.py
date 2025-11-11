@@ -176,29 +176,6 @@ class Q(tree.Node):
         return path, args, kwargs
 
 
-class DeferredAttribute:
-    """
-    A wrapper for a deferred-loading field. When the value is read from this
-    object the first time, the query is executed.
-    """
-
-    def __init__(self, field: Any) -> None:
-        self.field = field
-
-    def __get__(self, instance: Any, cls: type | None = None) -> Any:
-        """
-        Retrieve and caches the value from the datastore on the first lookup.
-        Return the cached value.
-        """
-        if instance is None:
-            return self
-        data = instance.__dict__
-        field_name = self.field.attname
-        if field_name not in data:
-            instance.refresh_from_db(fields=[field_name])
-        return data[field_name]
-
-
 class class_or_instance_method:
     """
     Hook used in RegisterLookupMixin to return partial functions depending on
