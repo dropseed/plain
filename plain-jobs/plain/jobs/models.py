@@ -24,6 +24,7 @@ from opentelemetry.trace import Link, SpanContext, SpanKind
 
 from plain import models
 from plain.models import transaction
+from plain.models.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -410,7 +411,7 @@ class JobResultQuerySet(models.QuerySet["JobResult"]):
         return self.failed().filter(
             retry_job_request_uuid__isnull=True,
             retries__gt=0,
-            retry_attempt__lt=models.F("retries"),
+            retry_attempt__lt=F("retries"),
         )
 
     def retry_failed_jobs(self) -> None:

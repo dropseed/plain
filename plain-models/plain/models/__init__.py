@@ -1,56 +1,14 @@
+from .registry import models_registry, register_model  # noqa  Create the registry first
 from . import (
-    preflight,  # noqa
+    preflight,  # noqa  Imported for side effects (registers preflight checks)
 )
-from .aggregates import (
-    Aggregate,
-    Avg,
-    Count,
-    Max,
-    Min,
-    StdDev,
-    Sum,
-    Variance,
-)
-from .constraints import (
-    BaseConstraint,
-    CheckConstraint,
-    Deferrable,
-    UniqueConstraint,
-)
-from .db import (
-    DatabaseError,
-    DataError,
-    Error,
-    IntegrityError,
-    InterfaceError,
-    InternalError,
-    NotSupportedError,
-    OperationalError,
-    ProgrammingError,
-    db_connection,
-)
-from .deletion import (
-    CASCADE,
-    DO_NOTHING,
-    PROTECT,
-    RESTRICT,
-    SET,
-    SET_DEFAULT,
-    SET_NULL,
-    ProtectedError,
-    RestrictedError,
-)
-from .enums import Choices, IntegerChoices, TextChoices
-from .expressions import (
-    Case,
-    Exists,
-    F,
-    OuterRef,
-    Subquery,
-    Value,
-    When,
-    Window,
-)
+
+# Imports that would create circular imports if sorted
+from .base import Model
+from .constraints import CheckConstraint, UniqueConstraint
+from .db import IntegrityError, db_connection
+from .deletion import CASCADE, DO_NOTHING, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
+from .enums import IntegerChoices, TextChoices
 from .fields import (
     BigIntegerField,
     BinaryField,
@@ -75,37 +33,24 @@ from .fields import (
     UUIDField,
 )
 from .fields.json import JSONField
-from .indexes import Index
-from .query import Prefetch, QuerySet, prefetch_related_objects
-from .query_utils import FilteredRelation, Q
-from .registry import models_registry, register_model
-
-# Imports that would create circular imports if sorted
-from .base import Model  # isort:skip
-from .options import Options  # isort:skip
-from .fields.related import (  # isort:skip
+from .fields.related import (
     ForeignKey,
     ManyToManyField,
 )
+from .indexes import Index
+from .options import Options
+from .query import QuerySet
+from .query_utils import Q
 
-
+# This module exports the user-facing API for defining model classes,
+# with a secondary focus on the most common query utilities like Q.
+# Advanced query-time features (aggregates, expressions, etc.) should be
+# imported from their specific modules (e.g., plain.models.aggregates).
 __all__ = [
-    # From aggregates
-    "Aggregate",
-    "Avg",
-    "Count",
-    "Max",
-    "Min",
-    "StdDev",
-    "Sum",
-    "Variance",
     # From constraints
-    "BaseConstraint",
     "CheckConstraint",
-    "Deferrable",
     "UniqueConstraint",
     # From enums
-    "Choices",
     "IntegerChoices",
     "TextChoices",
     # From fields
@@ -130,6 +75,8 @@ __all__ = [
     "TimeField",
     "URLField",
     "UUIDField",
+    # From fields.json
+    "JSONField",
     # From indexes
     "Index",
     # From deletion
@@ -140,27 +87,11 @@ __all__ = [
     "SET",
     "SET_DEFAULT",
     "SET_NULL",
-    "ProtectedError",
-    "RestrictedError",
-    # From expressions
-    "Case",
-    "Exists",
-    "F",
-    "OuterRef",
-    "Subquery",
-    "Value",
-    "When",
-    "Window",
-    # From fields.json
-    "JSONField",
     # From options
     "Options",
     # From query
-    "Prefetch",
     "QuerySet",
-    "prefetch_related_objects",
     # From query_utils
-    "FilteredRelation",
     "Q",
     # From base
     "Model",
@@ -169,15 +100,7 @@ __all__ = [
     "ManyToManyField",
     # From db
     "db_connection",
-    "DatabaseError",
     "IntegrityError",
-    "InternalError",
-    "ProgrammingError",
-    "DataError",
-    "NotSupportedError",
-    "Error",
-    "InterfaceError",
-    "OperationalError",
     # From registry
     "register_model",
     "models_registry",

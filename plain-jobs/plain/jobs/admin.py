@@ -12,6 +12,7 @@ from plain.admin.views import (
     register_viewset,
 )
 from plain.http import ResponseRedirect
+from plain.models.expressions import Case, When
 from plain.runtime import settings
 
 from .models import JobProcess, JobRequest, JobResult
@@ -200,13 +201,13 @@ class JobResultViewset(AdminViewset):
         def get_initial_queryset(self) -> Any:
             queryset = super().get_initial_queryset()
             queryset = queryset.annotate(
-                retried=models.Case(
-                    models.When(retry_job_request_uuid__isnull=False, then=True),
+                retried=Case(
+                    When(retry_job_request_uuid__isnull=False, then=True),
                     default=False,
                     output_field=models.BooleanField(),
                 ),
-                is_retry=models.Case(
-                    models.When(retry_attempt__gt=0, then=True),
+                is_retry=Case(
+                    When(retry_attempt__gt=0, then=True),
                     default=False,
                     output_field=models.BooleanField(),
                 ),
