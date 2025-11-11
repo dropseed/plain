@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.27.3](https://github.com/dropseed/plain/releases/plain-flags@0.27.3) (2025-11-11)
+
+### What's changed
+
+- Internal import path updated for database exceptions to use `plain.models.db` ([e9edf61](https://github.com/dropseed/plain/commit/e9edf61c6b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.2](https://github.com/dropseed/plain/releases/plain-flags@0.27.2) (2025-10-31)
 
 ### What's changed
