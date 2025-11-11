@@ -5,7 +5,13 @@ import re
 from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any
 
-from plain import models
+from plain.models.fields import (
+    NOT_PROVIDED,
+    DateField,
+    DateTimeField,
+    Field,
+    TimeField,
+)
 from plain.models.migrations import operations
 from plain.models.migrations.migration import Migration, SettingsTuple
 from plain.models.migrations.operations.models import AlterModelOptions
@@ -19,7 +25,6 @@ from plain.models.migrations.utils import (
 from plain.runtime import settings
 
 if TYPE_CHECKING:
-    from plain.models.fields import Field
     from plain.models.migrations.graph import MigrationGraph
     from plain.models.migrations.operations.base import Operation
     from plain.models.migrations.state import ProjectState
@@ -93,7 +98,7 @@ class MigrationAutodetector:
             return obj
         elif hasattr(obj, "deconstruct"):
             deconstructed = obj.deconstruct()
-            if isinstance(obj, models.Field):
+            if isinstance(obj, Field):
                 # we have a field which also returns a name
                 deconstructed = deconstructed[1:]
             path, args, kwargs = deconstructed
@@ -880,7 +885,7 @@ class MigrationAutodetector:
             )
         # You can't just add NOT NULL fields with no default or fields
         # which don't allow empty strings as default.
-        time_fields = (models.DateField, models.DateTimeField, models.TimeField)
+        time_fields = (DateField, DateTimeField, TimeField)
         preserve_default = (
             field.allow_null
             or field.has_default()
@@ -900,7 +905,7 @@ class MigrationAutodetector:
                 )
         if (
             field.primary_key
-            and field.default is not models.NOT_PROVIDED
+            and field.default is not NOT_PROVIDED
             and callable(field.default)
         ):
             self.questioner.ask_unique_callable_default_addition(field_name, model_name)
@@ -1009,7 +1014,7 @@ class MigrationAutodetector:
                         new_default = self.questioner.ask_not_null_alteration(
                             field_name, model_name
                         )
-                        if new_default is not models.NOT_PROVIDED:
+                        if new_default is not NOT_PROVIDED:
                             field.default = new_default
                             preserve_default = False
                     else:

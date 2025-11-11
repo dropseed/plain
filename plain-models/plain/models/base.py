@@ -1188,7 +1188,7 @@ class Model(metaclass=ModelBase):
     def _check_local_fields(
         cls, fields: Iterable[str], option: str
     ) -> list[PreflightResult]:
-        from plain import models
+        from plain.models.fields.reverse_related import ManyToManyRel
 
         # In order to avoid hitting the relation tree prematurely, we use our
         # own fields_map instead of using get_field()
@@ -1211,7 +1211,7 @@ class Model(metaclass=ModelBase):
                     )
                 )
             else:
-                if isinstance(field.remote_field, models.ManyToManyRel):
+                if isinstance(field.remote_field, ManyToManyRel):
                     errors.append(
                         PreflightResult(
                             fix=f"'{option}' refers to a ManyToManyField '{field_name}', but "

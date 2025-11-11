@@ -14,7 +14,9 @@ import types
 import uuid
 from typing import Any
 
-from plain import models
+from plain.models.base import Model
+from plain.models.enums import Choices
+from plain.models.fields import Field
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
 from plain.runtime import SettingsReference
@@ -292,7 +294,7 @@ class TupleSerializer(BaseSequenceSerializer):
 class TypeSerializer(BaseSerializer):
     def serialize(self) -> tuple[str, set[str]]:
         special_cases = [
-            (models.Model, "models.Model", ["from plain import models"]),
+            (Model, "models.Model", ["from plain import models"]),
             (types.NoneType, "types.NoneType", ["import types"]),
         ]
         for case, string, imports in special_cases:
@@ -320,7 +322,7 @@ class Serializer:
         set: SetSerializer,
         tuple: TupleSerializer,
         dict: DictionarySerializer,
-        models.Choices: ChoicesSerializer,
+        Choices: ChoicesSerializer,
         enum.Enum: EnumSerializer,
         datetime.datetime: DatetimeDatetimeSerializer,
         (datetime.date, datetime.timedelta, datetime.time): DateTimeSerializer,
@@ -358,7 +360,7 @@ def serializer_factory(value: Any) -> BaseSerializer:
         # tuple.
         value = value.__reduce__()[1][0]
 
-    if isinstance(value, models.Field):
+    if isinstance(value, Field):
         return ModelFieldSerializer(value)
     if isinstance(value, Operation):
         return OperationSerializer(value)

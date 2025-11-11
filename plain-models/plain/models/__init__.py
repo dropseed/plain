@@ -18,7 +18,6 @@ from .constraints import (
     UniqueConstraint,
 )
 from .db import (
-    PLAIN_VERSION_PICKLE_KEY,
     DatabaseError,
     DataError,
     Error,
@@ -28,9 +27,7 @@ from .db import (
     NotSupportedError,
     OperationalError,
     ProgrammingError,
-    close_old_connections,
     db_connection,
-    reset_queries,
 )
 from .deletion import (
     CASCADE,
@@ -47,24 +44,14 @@ from .enums import Choices, IntegerChoices, TextChoices
 from .expressions import (
     Case,
     Exists,
-    Expression,
-    ExpressionList,
-    ExpressionWrapper,
     F,
-    Func,
-    OrderBy,
     OuterRef,
-    RowRange,
     Subquery,
     Value,
-    ValueRange,
     When,
     Window,
-    WindowFrame,
 )
 from .fields import (
-    BLANK_CHOICE_DASH,
-    NOT_PROVIDED,
     BigIntegerField,
     BinaryField,
     BooleanField,
@@ -74,8 +61,6 @@ from .fields import (
     DecimalField,
     DurationField,
     EmailField,
-    Empty,
-    Field,
     FloatField,
     GenericIPAddressField,
     IntegerField,
@@ -91,22 +76,16 @@ from .fields import (
 )
 from .fields.json import JSONField
 from .indexes import Index
-from .lookups import Lookup, Transform
 from .query import Prefetch, QuerySet, prefetch_related_objects
 from .query_utils import FilteredRelation, Q
 from .registry import models_registry, register_model
 
 # Imports that would create circular imports if sorted
-from .base import DEFERRED, Model  # isort:skip
+from .base import Model  # isort:skip
 from .options import Options  # isort:skip
 from .fields.related import (  # isort:skip
     ForeignKey,
     ManyToManyField,
-)
-from .fields.reverse_related import (  # isort:skip
-    ForeignObjectRel,
-    ManyToOneRel,
-    ManyToManyRel,
 )
 
 
@@ -130,7 +109,6 @@ __all__ = [
     "IntegerChoices",
     "TextChoices",
     # From fields
-    "BLANK_CHOICE_DASH",
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
@@ -140,12 +118,9 @@ __all__ = [
     "DecimalField",
     "DurationField",
     "EmailField",
-    "Empty",
-    "Field",
     "FloatField",
     "GenericIPAddressField",
     "IntegerField",
-    "NOT_PROVIDED",
     "PositiveBigIntegerField",
     "PositiveIntegerField",
     "PositiveSmallIntegerField",
@@ -170,25 +145,14 @@ __all__ = [
     # From expressions
     "Case",
     "Exists",
-    "Expression",
-    "ExpressionList",
-    "ExpressionWrapper",
     "F",
-    "Func",
-    "OrderBy",
     "OuterRef",
-    "RowRange",
     "Subquery",
     "Value",
-    "ValueRange",
     "When",
     "Window",
-    "WindowFrame",
     # From fields.json
     "JSONField",
-    # From lookups
-    "Lookup",
-    "Transform",
     # From options
     "Options",
     # From query
@@ -199,19 +163,12 @@ __all__ = [
     "FilteredRelation",
     "Q",
     # From base
-    "DEFERRED",
     "Model",
     # From fields.related
     "ForeignKey",
     "ManyToManyField",
-    # From fields.reverse_related
-    "ForeignObjectRel",
-    "ManyToOneRel",
-    "ManyToManyRel",
     # From db
     "db_connection",
-    "reset_queries",
-    "close_old_connections",
     "DatabaseError",
     "IntegrityError",
     "InternalError",
@@ -221,7 +178,6 @@ __all__ = [
     "Error",
     "InterfaceError",
     "OperationalError",
-    "PLAIN_VERSION_PICKLE_KEY",
     # From registry
     "register_model",
     "models_registry",
