@@ -8,8 +8,8 @@ __pycache__
 # Test apps
 plain*/tests/.plain
 
-# Ottobot
-.aider*
+# Agent scratch files
+/scratch
 
 # Plain temp dirs
 .plain
