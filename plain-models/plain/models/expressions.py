@@ -11,6 +11,7 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from plain.models import fields
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import (
     DatabaseError,
@@ -18,20 +19,6 @@ from plain.models.db import (
     db_connection,
 )
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
-from plain.models.fields.core import (
-    BinaryField,
-    BooleanField,
-    CharField,
-    DateField,
-    DateTimeField,
-    DecimalField,
-    DurationField,
-    Field,
-    FloatField,
-    IntegerField,
-    TimeField,
-    UUIDField,
-)
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable
@@ -330,7 +317,7 @@ class BaseExpression:
 
     @property
     def conditional(self) -> bool:
-        return isinstance(self.output_field, BooleanField)  # type: ignore[attr-defined]
+        return isinstance(self.output_field, fields.BooleanField)  # type: ignore[attr-defined]
 
     @property
     def field(self) -> Field:
@@ -531,7 +518,7 @@ class Expression(BaseExpression, Combinable):
         arguments = signature.arguments.items()
         identity: list[Any] = [self.__class__]
         for arg, value in arguments:
-            if isinstance(value, Field):
+            if isinstance(value, fields.Field):
                 if value.name and value.model:
                     value = (value.model.model_options.label, value.name)
                 else:
@@ -561,9 +548,9 @@ _connector_combinations = [
     # Numeric operations - operands of same type.
     {
         connector: [
-            (IntegerField, IntegerField, IntegerField),
-            (FloatField, FloatField, FloatField),
-            (DecimalField, DecimalField, DecimalField),
+            (fields.IntegerField, fields.IntegerField, fields.IntegerField),
+            (fields.FloatField, fields.FloatField, fields.FloatField),
+            (fields.DecimalField, fields.DecimalField, fields.DecimalField),
         ]
         for connector in (
             Combinable.ADD,
@@ -579,10 +566,10 @@ _connector_combinations = [
     # Numeric operations - operands of different type.
     {
         connector: [
-            (IntegerField, DecimalField, DecimalField),
-            (DecimalField, IntegerField, DecimalField),
-            (IntegerField, FloatField, FloatField),
-            (FloatField, IntegerField, FloatField),
+            (fields.IntegerField, fields.DecimalField, fields.DecimalField),
+            (fields.DecimalField, fields.IntegerField, fields.DecimalField),
+            (fields.IntegerField, fields.FloatField, fields.FloatField),
+            (fields.FloatField, fields.IntegerField, fields.FloatField),
         ]
         for connector in (
             Combinable.ADD,
@@ -595,7 +582,7 @@ _connector_combinations = [
     # Bitwise operators.
     {
         connector: [
-            (IntegerField, IntegerField, IntegerField),
+            (fields.IntegerField, fields.IntegerField, fields.IntegerField),
         ]
         for connector in (
             Combinable.BITAND,
@@ -619,37 +606,37 @@ _connector_combinations = [
             Combinable.MOD,
             Combinable.POW,
         )
-        for field_type in (IntegerField, DecimalField, FloatField)
+        for field_type in (fields.IntegerField, fields.DecimalField, fields.FloatField)
     },
     # Date/DateTimeField/DurationField/TimeField.
     {
         Combinable.ADD: [
             # Date/DateTimeField.
-            (DateField, DurationField, DateTimeField),
-            (DateTimeField, DurationField, DateTimeField),
-            (DurationField, DateField, DateTimeField),
-            (DurationField, DateTimeField, DateTimeField),
+            (fields.DateField, fields.DurationField, fields.DateTimeField),
+            (fields.DateTimeField, fields.DurationField, fields.DateTimeField),
+            (fields.DurationField, fields.DateField, fields.DateTimeField),
+            (fields.DurationField, fields.DateTimeField, fields.DateTimeField),
             # DurationField.
-            (DurationField, DurationField, DurationField),
+            (fields.DurationField, fields.DurationField, fields.DurationField),
             # TimeField.
-            (TimeField, DurationField, TimeField),
-            (DurationField, TimeField, TimeField),
+            (fields.TimeField, fields.DurationField, fields.TimeField),
+            (fields.DurationField, fields.TimeField, fields.TimeField),
         ],
     },
     {
         Combinable.SUB: [
             # Date/DateTimeField.
-            (DateField, DurationField, DateTimeField),
-            (DateTimeField, DurationField, DateTimeField),
-            (DateField, DateField, DurationField),
-            (DateField, DateTimeField, DurationField),
-            (DateTimeField, DateField, DurationField),
-            (DateTimeField, DateTimeField, DurationField),
+            (fields.DateField, fields.DurationField, fields.DateTimeField),
+            (fields.DateTimeField, fields.DurationField, fields.DateTimeField),
+            (fields.DateField, fields.DateField, fields.DurationField),
+            (fields.DateField, fields.DateTimeField, fields.DurationField),
+            (fields.DateTimeField, fields.DateField, fields.DurationField),
+            (fields.DateTimeField, fields.DateTimeField, fields.DurationField),
             # DurationField.
-            (DurationField, DurationField, DurationField),
+            (fields.DurationField, fields.DurationField, fields.DurationField),
             # TimeField.
-            (TimeField, DurationField, TimeField),
-            (TimeField, TimeField, DurationField),
+            (fields.TimeField, fields.DurationField, fields.TimeField),
+            (fields.TimeField, fields.TimeField, fields.DurationField),
         ],
     },
 ]
@@ -858,7 +845,7 @@ class DurationExpression(CombinedExpression):
 
 
 class TemporalSubtraction(CombinedExpression):
-    output_field = DurationField()
+    output_field = fields.DurationField()
 
     def __init__(self, lhs: Any, rhs: Any):
         super().__init__(lhs, self.SUB, rhs)
@@ -1135,27 +1122,27 @@ class Value(SQLiteNumericMixin, Expression):
 
     def _resolve_output_field(self) -> Field | None:
         if isinstance(self.value, str):
-            return CharField()
+            return fields.CharField()
         if isinstance(self.value, bool):
-            return BooleanField()
+            return fields.BooleanField()
         if isinstance(self.value, int):
-            return IntegerField()
+            return fields.IntegerField()
         if isinstance(self.value, float):
-            return FloatField()
+            return fields.FloatField()
         if isinstance(self.value, datetime.datetime):
-            return DateTimeField()
+            return fields.DateTimeField()
         if isinstance(self.value, datetime.date):
-            return DateField()
+            return fields.DateField()
         if isinstance(self.value, datetime.time):
-            return TimeField()
+            return fields.TimeField()
         if isinstance(self.value, datetime.timedelta):
-            return DurationField()
+            return fields.DurationField()
         if isinstance(self.value, Decimal):
-            return DecimalField()
+            return fields.DecimalField()
         if isinstance(self.value, bytes):
-            return BinaryField()
+            return fields.BinaryField()
         if isinstance(self.value, UUID):
-            return UUIDField()
+            return fields.UUIDField()
 
     @property
     def empty_result_set_value(self) -> Any:
@@ -1167,7 +1154,7 @@ class RawSQL(Expression):
         self, sql: str, params: Sequence[Any], output_field: Field | None = None
     ):
         if output_field is None:
-            output_field = Field()
+            output_field = fields.Field()
         self.sql, self.params = sql, params
         super().__init__(output_field=output_field)
 
@@ -1378,7 +1365,7 @@ class NegatedExpression(ExpressionWrapper):
     """The logical negation of a conditional expression."""
 
     def __init__(self, expression: Any):
-        super().__init__(expression, output_field=BooleanField())
+        super().__init__(expression, output_field=fields.BooleanField())
 
     def __invert__(self) -> Any:
         return self.expression.copy()
@@ -1714,7 +1701,7 @@ class Subquery(BaseExpression, Combinable):
 
 class Exists(Subquery):
     template = "EXISTS(%(subquery)s)"
-    output_field = BooleanField()
+    output_field = fields.BooleanField()
     empty_result_set_value = False
 
     def __init__(self, query: QuerySet[Any] | Query, **kwargs: Any):
@@ -1912,11 +1899,11 @@ class Window(SQLiteNumericMixin, Expression):
     def as_sqlite(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
-        if isinstance(self.output_field, DecimalField):
+        if isinstance(self.output_field, fields.DecimalField):
             # Casting to numeric must be outside of the window expression.
             copy = self.copy()
             source_expressions = copy.get_source_expressions()
-            source_expressions[0].output_field = FloatField()
+            source_expressions[0].output_field = fields.FloatField()
             copy.set_source_expressions(source_expressions)
             return super(Window, copy).as_sqlite(compiler, connection)
         return self.as_sql(compiler, connection)

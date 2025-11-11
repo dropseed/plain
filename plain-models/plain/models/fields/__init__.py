@@ -46,7 +46,22 @@ from .core import (
     URLField,
     UUIDField,
 )
-from .related import ForeignKey, ManyToManyField
+
+# Note: ForeignKey, ManyToManyField are NOT imported eagerly to avoid circular imports.
+# They are available via lazy import through __getattr__ below.
+
+
+def __getattr__(name: str):
+    """Lazy import for related fields to avoid circular imports."""
+    if name in ("ForeignKey", "ManyToManyField"):
+        from .related import ForeignKey, ManyToManyField
+
+        if name == "ForeignKey":
+            return ForeignKey
+        else:
+            return ManyToManyField
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Core field types
@@ -78,7 +93,7 @@ __all__ = [
     "UUIDField",
     # JSON field
     "JSONField",
-    # Related fields (lazy loaded)
+    # Related fields (available via lazy __getattr__)
     "ForeignKey",
     "ManyToManyField",
 ]

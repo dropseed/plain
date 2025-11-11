@@ -42,7 +42,7 @@ if TYPE_CHECKING:
         UUIDField,
     )
 else:
-    # Import real field classes at runtime
+    # Import real field classes at runtime - these will be the actual descriptor classes
     from .fields import (
         BigIntegerField,
         BinaryField,
@@ -54,8 +54,11 @@ else:
         DurationField,
         EmailField,
         FloatField,
+        ForeignKey,
         GenericIPAddressField,
         IntegerField,
+        JSONField,
+        ManyToManyField,
         PositiveBigIntegerField,
         PositiveIntegerField,
         PositiveSmallIntegerField,
@@ -65,11 +68,6 @@ else:
         TimeField,
         URLField,
         UUIDField,
-    )
-    from .fields.json import JSONField
-    from .fields.related import (
-        ForeignKey,
-        ManyToManyField,
     )
 
 from .indexes import Index
