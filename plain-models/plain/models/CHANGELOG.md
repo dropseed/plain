@@ -1,5 +1,23 @@
 # plain-models changelog
 
+## [0.57.0](https://github.com/dropseed/plain/releases/plain-models@0.57.0) (2025-11-11)
+
+### What's changed
+
+- The `plain.models` import namespace has been cleaned up to only include the most commonly used APIs for defining models ([e9edf61](https://github.com/dropseed/plain/commit/e9edf61c6b), [22b798c](https://github.com/dropseed/plain/commit/22b798cf57), [d5a2167](https://github.com/dropseed/plain/commit/d5a2167d14))
+- Field classes are now descriptors themselves, eliminating the need for a separate descriptor class ([93f8bd7](https://github.com/dropseed/plain/commit/93f8bd72e9))
+- Model initialization no longer accepts positional arguments - all field values must be passed as keyword arguments ([685f99a](https://github.com/dropseed/plain/commit/685f99a33a))
+- Attempting to set a primary key during model initialization now raises a clear `ValueError` instead of silently accepting the value ([ecf490c](https://github.com/dropseed/plain/commit/ecf490cb2a))
+
+### Upgrade instructions
+
+- Import advanced query features from their specific modules instead of `plain.models`:
+    - Aggregates: `from plain.models.aggregates import Avg, Count, Max, Min, Sum`
+    - Expressions: `from plain.models.expressions import Case, Exists, Expression, ExpressionWrapper, F, Func, OuterRef, Subquery, Value, When, Window`
+    - Query utilities: `from plain.models.query import Prefetch, prefetch_related_objects`
+    - Lookups: `from plain.models.lookups import Lookup, Transform`
+- Remove any positional arguments in model instantiation and use keyword arguments instead (e.g., `User("John", "Doe")` becomes `User(first_name="John", last_name="Doe")`)
+
 ## [0.56.1](https://github.com/dropseed/plain/releases/plain-models@0.56.1) (2025-11-03)
 
 ### What's changed
