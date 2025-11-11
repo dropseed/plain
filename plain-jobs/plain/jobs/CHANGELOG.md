@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.38.1](https://github.com/dropseed/plain/releases/plain-jobs@0.38.1) (2025-11-11)
+
+### What's changed
+
+- Updated imports to use explicit `plain.models.expressions` instead of accessing `Case`, `When`, and `F` through `plain.models` namespace ([e9edf61c6b](https://github.com/dropseed/plain/commit/e9edf61c6b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.38.0](https://github.com/dropseed/plain/releases/plain-jobs@0.38.0) (2025-11-09)
 
 ### What's changed

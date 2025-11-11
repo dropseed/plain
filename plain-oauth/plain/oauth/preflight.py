@@ -1,4 +1,4 @@
-from plain.models import OperationalError, ProgrammingError
+from plain.models.db import OperationalError, ProgrammingError
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 
 

@@ -9,6 +9,10 @@ This is the only AGENTS.md file in the repo -- you don't need to look for others
 - Lint and format code: `./scripts/fix`
 - Make database migrations: `./scripts/makemigrations`
 
+## Scratch directory
+
+Use the `scratch` directory for one-off scripts, temporary files, and experimentation. This directory is gitignored. Write temporary files here instead of `/tmp`.
+
 ## Testing changes
 
 The `example` directory contains a demo app with all Plain packages installed. You can `cd` into `example` and use `uv run plain`.

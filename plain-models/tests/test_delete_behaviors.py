@@ -8,10 +8,7 @@ from app.examples.models import (  # type: ignore[import-untyped]
     DeleteParent,
 )
 
-from plain.models import (
-    ProtectedError,
-    RestrictedError,
-)
+from plain.models.deletion import ProtectedError, RestrictedError
 
 
 def _create_parents():

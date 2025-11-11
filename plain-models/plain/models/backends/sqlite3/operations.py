@@ -8,6 +8,7 @@ from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any
 
 from plain import models
+from plain.models.aggregates import Aggregate, Avg, StdDev, Sum, Variance
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.constants import OnConflict
 from plain.models.db import DatabaseError, NotSupportedError
@@ -48,7 +49,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def check_expression_support(self, expression: Any) -> None:
         bad_fields = (models.DateField, models.DateTimeField, models.TimeField)
-        bad_aggregates = (models.Sum, models.Avg, models.Variance, models.StdDev)
+        bad_aggregates = (Sum, Avg, Variance, StdDev)
         if isinstance(expression, bad_aggregates):
             for expr in expression.get_source_expressions():
                 try:
@@ -65,7 +66,7 @@ class DatabaseOperations(BaseDatabaseOperations):
                             "since date/time is saved as text."
                         )
         if (
-            isinstance(expression, models.Aggregate)
+            isinstance(expression, Aggregate)
             and expression.distinct
             and len(expression.source_expressions) > 1
         ):

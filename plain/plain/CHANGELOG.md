@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.86.2](https://github.com/dropseed/plain/releases/plain@0.86.2) (2025-11-11)
+
+### What's changed
+
+- CLI color output is now enabled in CI environments by checking the `CI` environment variable, matching the behavior of modern tools like uv ([a1500f15ed](https://github.com/dropseed/plain/commit/a1500f15ed))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.86.1](https://github.com/dropseed/plain/releases/plain@0.86.1) (2025-11-10)
 
 ### What's changed

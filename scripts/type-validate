@@ -45,6 +45,11 @@ FULLY_TYPED_PATHS = [
     "plain-scan",
 ]
 
+# Paths that should pass type checking but don't require 100% coverage
+TYPE_CHECK_ONLY_PATHS = [
+    "example/app",
+]
+
 
 def check_type_coverage(path: str) -> tuple[float, int, int]:
     """Check type coverage for a file or directory."""
@@ -114,7 +119,29 @@ def main():
         if not type_check_passed:
             failed_items.append((path, "type check failed"))
 
+    print()
+    print("Validating type checking for type-check-only paths...")
+    print()
+
+    for path in TYPE_CHECK_ONLY_PATHS:
+        path_obj = Path(path)
+        if not path_obj.exists():
+            print(f"⚠️  {path} does not exist, skipping")
+            continue
+
+        # Run type checker only
+        type_check_passed = run_type_check(path)
+        type_check_status = "✓" if type_check_passed else "✗"
+
+        # Print single line
+        print(f"{type_check_status} {path}")
+
+        # Track failures
+        if not type_check_passed:
+            failed_items.append((path, "type check failed"))
+
     if failed_items:
+        print()
         print("❌ Type validation failed for the following paths:")
         for path, reason in failed_items:
             print(f"  - {path}: {reason}")
@@ -126,6 +153,7 @@ def main():
         print("  4. Format: ./scripts/fix")
         sys.exit(1)
 
+    print()
     print("✓ All paths passed type validation")
     sys.exit(0)
 

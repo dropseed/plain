@@ -5,7 +5,7 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.models import Count
+from plain.models.aggregates import Count
 
 from .models import OAuthConnection
 
