@@ -100,7 +100,7 @@ class Model(metaclass=ModelBase):
     DoesNotExist = DoesNotExistDescriptor()
     MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(self, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
         meta = cls._model_meta
@@ -110,82 +110,32 @@ class Model(metaclass=ModelBase):
         # Set up the storage for instance state
         self._state = ModelState()
 
-        # There is a rather weird disparity here; if kwargs, it's set, then args
-        # overrides it. It should be one or the other; don't duplicate the work
-        # The reason for the kwargs check is that standard iterator passes in by
-        # args, and instantiation for iteration is 33% faster.
-        if len(args) > len(meta.concrete_fields):
-            # Daft, but matches old exception sans the err msg.
-            raise IndexError("Number of args exceeds number of fields")
-
-        if not kwargs:
-            fields_iter = iter(meta.concrete_fields)
-            # The ordering of the zip calls matter - zip throws StopIteration
-            # when an iter throws it. So if the first iter throws it, the second
-            # is *not* consumed. We rely on this, so don't change the order
-            # without changing the logic.
-            for val, field in zip(args, fields_iter):
-                if val is _DEFERRED:
-                    continue
-                _setattr(self, field.attname, val)
-        else:
-            # Slower, kwargs-ready version.
-            fields_iter = iter(meta.fields)
-            for val, field in zip(args, fields_iter):
-                if val is _DEFERRED:
-                    continue
-                _setattr(self, field.attname, val)
-                if kwargs.pop(field.name, NOT_PROVIDED) is not NOT_PROVIDED:
-                    raise TypeError(
-                        f"{cls.__qualname__}() got both positional and "
-                        f"keyword arguments for field '{field.name}'."
-                    )
-
-        # Now we're left with the unprocessed fields that *must* come from
-        # keywords, or default.
-
-        for field in fields_iter:
+        # Process all fields from kwargs or use defaults
+        for field in meta.fields:
             is_related_object = False
             # Virtual field
             if field.attname not in kwargs and field.column is None:
                 continue
-            if kwargs:
-                if isinstance(field.remote_field, ForeignObjectRel):
-                    # Check if trying to set primary key via kwargs
-                    if (
-                        field.name in kwargs or field.attname in kwargs
-                    ) and field.primary_key:
-                        raise ValueError(
-                            f"Cannot set primary key '{field.name}' during initialization. "
-                            f"Use {cls.__name__}.query.get() to retrieve existing objects."
-                        )
+            if isinstance(field.remote_field, ForeignObjectRel):
+                try:
+                    # Assume object instance was passed in.
+                    rel_obj = kwargs.pop(field.name)
+                    is_related_object = True
+                except KeyError:
                     try:
-                        # Assume object instance was passed in.
-                        rel_obj = kwargs.pop(field.name)
-                        is_related_object = True
-                    except KeyError:
-                        try:
-                            # Object instance wasn't passed in -- must be an ID.
-                            val = kwargs.pop(field.attname)
-                        except KeyError:
-                            val = field.get_default()
-                else:
-                    # Check if trying to set primary key via kwargs
-                    if field.attname in kwargs and field.primary_key:
-                        raise ValueError(
-                            f"Cannot set primary key '{field.name}' during initialization. "
-                            f"Use {cls.__name__}.query.get() to retrieve existing objects."
-                        )
-                    try:
+                        # Object instance wasn't passed in -- must be an ID.
                         val = kwargs.pop(field.attname)
                     except KeyError:
-                        # This is done with an exception rather than the
-                        # default argument on pop because we don't want
-                        # get_default() to be evaluated, and then not used.
-                        # Refs #12057.
                         val = field.get_default()
             else:
-                val = field.get_default()
+                try:
+                    val = kwargs.pop(field.attname)
+                except KeyError:
+                    # This is done with an exception rather than the
+                    # default argument on pop because we don't want
+                    # get_default() to be evaluated, and then not used.
+                    # Refs #12057.
+                    val = field.get_default()
 
             if is_related_object:
                 # If we are passed a related instance, set it using the
@@ -198,35 +148,29 @@ class Model(metaclass=ModelBase):
                 if val is not _DEFERRED:
                     _setattr(self, field.attname, val)
 
-        if kwargs:
-            property_names = meta._property_names
-            unexpected = ()
-            for prop, value in kwargs.items():
-                # Any remaining kwargs must correspond to properties or virtual
-                # fields.
-                if prop in property_names:
+        # Handle any remaining kwargs (properties or virtual fields)
+        property_names = meta._property_names
+        unexpected = ()
+        for prop, value in kwargs.items():
+            # Any remaining kwargs must correspond to properties or virtual
+            # fields.
+            if prop in property_names:
+                if value is not _DEFERRED:
+                    _setattr(self, prop, value)
+            else:
+                try:
+                    meta.get_field(prop)
+                except FieldDoesNotExist:
+                    unexpected += (prop,)
+                else:
                     if value is not _DEFERRED:
                         _setattr(self, prop, value)
-                else:
-                    try:
-                        field_obj = meta.get_field(prop)
-                        # Check if trying to set primary key
-                        if field_obj.primary_key:
-                            raise ValueError(
-                                f"Cannot set primary key '{prop}' during initialization. "
-                                f"Use {cls.__name__}.query.get() to retrieve existing objects."
-                            )
-                    except FieldDoesNotExist:
-                        unexpected += (prop,)
-                    else:
-                        if value is not _DEFERRED:
-                            _setattr(self, prop, value)
-            if unexpected:
-                unexpected_names = ", ".join(repr(n) for n in unexpected)
-                raise TypeError(
-                    f"{cls.__name__}() got unexpected keyword arguments: "
-                    f"{unexpected_names}"
-                )
+        if unexpected:
+            unexpected_names = ", ".join(repr(n) for n in unexpected)
+            raise TypeError(
+                f"{cls.__name__}() got unexpected keyword arguments: {unexpected_names}"
+            )
+
         super().__init__()
 
     @classmethod
@@ -237,7 +181,11 @@ class Model(metaclass=ModelBase):
                 next(values_iter) if f.attname in field_names else DEFERRED
                 for f in cls._model_meta.concrete_fields
             ]
-        new = cls(*values)
+        # Build kwargs dict from field names and values
+        field_dict = dict(
+            zip((f.attname for f in cls._model_meta.concrete_fields), values)
+        )
+        new = cls(**field_dict)
         new._state.adding = False
         return new
 
