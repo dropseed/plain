@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.32.1](https://github.com/dropseed/plain/releases/plain-oauth@0.32.1) (2025-11-11)
+
+### What's changed
+
+- Internal import paths updated to use more specific module imports (e.g., `plain.models.aggregates.Count` and `plain.models.db.OperationalError`) for better code organization ([e9edf61](https://github.com/dropseed/plain/commit/e9edf61))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.32.0](https://github.com/dropseed/plain/releases/plain-oauth@0.32.0) (2025-11-03)
 
 ### What's changed
