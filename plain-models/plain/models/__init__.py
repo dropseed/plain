@@ -1,10 +1,22 @@
 from . import (
     preflight,  # noqa
 )
-from .aggregates import *  # NOQA
-from .aggregates import __all__ as aggregates_all
-from .constraints import *  # NOQA
-from .constraints import __all__ as constraints_all
+from .aggregates import (
+    Aggregate,
+    Avg,
+    Count,
+    Max,
+    Min,
+    StdDev,
+    Sum,
+    Variance,
+)
+from .constraints import (
+    BaseConstraint,
+    CheckConstraint,
+    Deferrable,
+    UniqueConstraint,
+)
 from .db import (
     PLAIN_VERSION_PICKLE_KEY,
     DatabaseError,
@@ -31,8 +43,7 @@ from .deletion import (
     ProtectedError,
     RestrictedError,
 )
-from .enums import *  # NOQA
-from .enums import __all__ as enums_all
+from .enums import Choices, IntegerChoices, TextChoices
 from .expressions import (
     Case,
     Exists,
@@ -51,11 +62,35 @@ from .expressions import (
     Window,
     WindowFrame,
 )
-from .fields import *  # NOQA
-from .fields import __all__ as fields_all
+from .fields import (
+    BLANK_CHOICE_DASH,
+    NOT_PROVIDED,
+    BigIntegerField,
+    BinaryField,
+    BooleanField,
+    CharField,
+    DateField,
+    DateTimeField,
+    DecimalField,
+    DurationField,
+    EmailField,
+    Empty,
+    Field,
+    FloatField,
+    GenericIPAddressField,
+    IntegerField,
+    PositiveBigIntegerField,
+    PositiveIntegerField,
+    PositiveSmallIntegerField,
+    PrimaryKeyField,
+    SmallIntegerField,
+    TextField,
+    TimeField,
+    URLField,
+    UUIDField,
+)
 from .fields.json import JSONField
-from .indexes import *  # NOQA
-from .indexes import __all__ as indexes_all
+from .indexes import Index
 from .lookups import Lookup, Transform
 from .query import Prefetch, QuerySet, prefetch_related_objects
 from .query_utils import FilteredRelation, Q
@@ -75,8 +110,54 @@ from .fields.reverse_related import (  # isort:skip
 )
 
 
-__all__ = aggregates_all + constraints_all + enums_all + fields_all + indexes_all
-__all__ += [
+__all__ = [
+    # From aggregates
+    "Aggregate",
+    "Avg",
+    "Count",
+    "Max",
+    "Min",
+    "StdDev",
+    "Sum",
+    "Variance",
+    # From constraints
+    "BaseConstraint",
+    "CheckConstraint",
+    "Deferrable",
+    "UniqueConstraint",
+    # From enums
+    "Choices",
+    "IntegerChoices",
+    "TextChoices",
+    # From fields
+    "BLANK_CHOICE_DASH",
+    "BigIntegerField",
+    "BinaryField",
+    "BooleanField",
+    "CharField",
+    "DateField",
+    "DateTimeField",
+    "DecimalField",
+    "DurationField",
+    "EmailField",
+    "Empty",
+    "Field",
+    "FloatField",
+    "GenericIPAddressField",
+    "IntegerField",
+    "NOT_PROVIDED",
+    "PositiveBigIntegerField",
+    "PositiveIntegerField",
+    "PositiveSmallIntegerField",
+    "PrimaryKeyField",
+    "SmallIntegerField",
+    "TextField",
+    "TimeField",
+    "URLField",
+    "UUIDField",
+    # From indexes
+    "Index",
+    # From deletion
     "CASCADE",
     "DO_NOTHING",
     "PROTECT",
@@ -86,6 +167,7 @@ __all__ += [
     "SET_NULL",
     "ProtectedError",
     "RestrictedError",
+    # From expressions
     "Case",
     "Exists",
     "Expression",
@@ -102,26 +184,31 @@ __all__ += [
     "When",
     "Window",
     "WindowFrame",
+    # From fields.json
     "JSONField",
+    # From lookups
     "Lookup",
     "Transform",
+    # From options
     "Options",
+    # From query
     "Prefetch",
-    "Q",
     "QuerySet",
     "prefetch_related_objects",
+    # From query_utils
+    "FilteredRelation",
+    "Q",
+    # From base
     "DEFERRED",
     "Model",
-    "FilteredRelation",
+    # From fields.related
     "ForeignKey",
     "ManyToManyField",
+    # From fields.reverse_related
     "ForeignObjectRel",
     "ManyToOneRel",
     "ManyToManyRel",
-]
-
-# DB-related exports
-__all__ += [
+    # From db
     "db_connection",
     "reset_queries",
     "close_old_connections",
@@ -135,7 +222,7 @@ __all__ += [
     "InterfaceError",
     "OperationalError",
     "PLAIN_VERSION_PICKLE_KEY",
+    # From registry
+    "register_model",
+    "models_registry",
 ]
-
-# Registry exports
-__all__ += ["register_model", "models_registry"]
