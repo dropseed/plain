@@ -17,7 +17,7 @@ from plain.models.meta import Meta
 from plain.models.query import QuerySet
 
 if TYPE_CHECKING:
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 
 class ProtectedError(IntegrityError):

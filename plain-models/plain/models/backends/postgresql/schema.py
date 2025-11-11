@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from plain.models.base import Model
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
     from plain.models.indexes import Index
 
 

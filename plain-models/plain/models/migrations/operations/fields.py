@@ -3,14 +3,14 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.models.fields import NOT_PROVIDED
+from plain.models.fields.core import NOT_PROVIDED
 from plain.models.migrations.utils import field_references
 
 from .base import Operation
 
 if TYPE_CHECKING:
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
     from plain.models.migrations.state import ProjectState
 
 

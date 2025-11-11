@@ -6,7 +6,7 @@ from plain.models.backends.base.validation import BaseDatabaseValidation
 from plain.preflight import PreflightResult
 
 if TYPE_CHECKING:
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 
 class DatabaseValidation(BaseDatabaseValidation):

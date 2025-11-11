@@ -13,7 +13,7 @@ from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameFie
 
 if TYPE_CHECKING:
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
     from plain.models.migrations.state import ProjectState
 
 

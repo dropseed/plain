@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from plain.models.expressions import Func
-from plain.models.fields import Field, FloatField, IntegerField
+from plain.models.fields.core import Field, FloatField, IntegerField
 
 __all__ = [
     "CumeDist",

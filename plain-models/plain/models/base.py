@@ -27,7 +27,7 @@ from plain.models.exceptions import (
     MultipleObjectsReturnedDescriptor,
 )
 from plain.models.expressions import RawSQL, Value
-from plain.models.fields import NOT_PROVIDED, Field, PrimaryKeyField
+from plain.models.fields.core import NOT_PROVIDED, Field, PrimaryKeyField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options

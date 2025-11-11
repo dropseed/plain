@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 
 class BaseDatabaseValidation:

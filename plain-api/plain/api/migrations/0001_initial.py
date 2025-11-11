@@ -3,8 +3,7 @@
 import uuid
 
 import plain.api.models
-from plain import models
-from plain.models import fields, migrations
+from plain.models import migrations
 
 
 class Migration(migrations.Migration):
@@ -16,31 +15,37 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="APIKey",
             fields=[
-                ("id", fields.PrimaryKeyField()),
-                ("uuid", fields.UUIDField(default=uuid.uuid4)),
-                ("created_at", fields.DateTimeField(auto_now_add=True)),
-                ("updated_at", fields.DateTimeField(auto_now=True)),
-                ("expires_at", fields.DateTimeField(allow_null=True, required=False)),
-                ("last_used_at", fields.DateTimeField(allow_null=True, required=False)),
-                ("name", fields.CharField(max_length=255, required=False)),
+                ("id", migrations.PrimaryKeyField()),
+                ("uuid", migrations.UUIDField(default=uuid.uuid4)),
+                ("created_at", migrations.DateTimeField(auto_now_add=True)),
+                ("updated_at", migrations.DateTimeField(auto_now=True)),
+                (
+                    "expires_at",
+                    migrations.DateTimeField(allow_null=True, required=False),
+                ),
+                (
+                    "last_used_at",
+                    migrations.DateTimeField(allow_null=True, required=False),
+                ),
+                ("name", migrations.CharField(max_length=255, required=False)),
                 (
                     "token",
-                    fields.CharField(
+                    migrations.CharField(
                         default=plain.api.models.generate_token, max_length=40
                     ),
                 ),
-                ("api_version", fields.CharField(max_length=255, required=False)),
+                ("api_version", migrations.CharField(max_length=255, required=False)),
             ],
         ),
         migrations.AddConstraint(
             model_name="apikey",
-            constraint=models.UniqueConstraint(
+            constraint=migrations.UniqueConstraint(
                 fields=("uuid",), name="plainapi_apikey_unique_uuid"
             ),
         ),
         migrations.AddConstraint(
             model_name="apikey",
-            constraint=models.UniqueConstraint(
+            constraint=migrations.UniqueConstraint(
                 fields=("token",), name="plainapi_apikey_unique_token"
             ),
         ),

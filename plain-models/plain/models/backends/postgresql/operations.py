@@ -16,7 +16,7 @@ from plain.models.constants import OnConflict
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 
 @lru_cache

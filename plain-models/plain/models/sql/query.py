@@ -35,7 +35,7 @@ from plain.models.expressions import (
     ResolvedOuterRef,
     Value,
 )
-from plain.models.fields import Field
+from plain.models.fields.core import Field
 from plain.models.fields.related_lookups import MultiColSource
 from plain.models.lookups import Lookup
 from plain.models.query_utils import (

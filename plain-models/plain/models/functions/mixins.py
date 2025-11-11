@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from plain.models.fields import DecimalField, FloatField, IntegerField
+from plain.models.fields.core import DecimalField, FloatField, IntegerField
 from plain.models.functions import Cast
 
 if TYPE_CHECKING:

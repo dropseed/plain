@@ -6,14 +6,14 @@ from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import UniqueConstraint
 from plain.models.expressions import F
-from plain.models.fields import NOT_PROVIDED
+from plain.models.fields.core import NOT_PROVIDED
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
     from plain.models.indexes import Index
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func, Value
-from plain.models.fields import CharField, IntegerField, TextField
+from plain.models.fields.core import CharField, IntegerField, TextField
 from plain.models.functions import Cast, Coalesce
 from plain.models.lookups import Transform
 

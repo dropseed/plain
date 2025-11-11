@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.db import NotSupportedError
 from plain.models.expressions import Func, Value
-from plain.models.fields import Field, TextField
+from plain.models.fields.core import Field, TextField
 from plain.models.fields.json import JSONField
 from plain.utils.regex_helper import _lazy_re_compile
 

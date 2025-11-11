@@ -16,7 +16,7 @@ from typing import Any
 
 from plain.models.base import Model
 from plain.models.enums import Choices
-from plain.models.fields import Field
+from plain.models.fields.core import Field
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
 from plain.runtime import SettingsReference
@@ -103,10 +103,9 @@ class DeconstructableSerializer(BaseSerializer):
     def _serialize_path(path: str) -> tuple[str, set[str]]:
         module, name = path.rsplit(".", 1)
         if module == "plain.models":
-            # Import from plain.models.fields to bypass typing stubs
-            # This ensures type checkers see real Field classes, not value types
-            imports: set[str] = {"from plain.models import fields"}
-            name = f"fields.{name}"
+            # Import from migrations namespace which has all field classes
+            imports: set[str] = {"from plain.models import migrations"}
+            name = f"migrations.{name}"
         else:
             imports = {f"import {module}"}
             name = path
@@ -179,6 +178,11 @@ class FunctionTypeSerializer(BaseSerializer):
         module_name = self.value.__module__
 
         if "<" not in self.value.__qualname__:  # Qualname can include <locals>
+            # Use migrations namespace for deletion behaviors
+            if module_name == "plain.models.deletion":
+                return f"migrations.{self.value.__qualname__}", {
+                    "from plain.models import migrations"
+                }
             return f"{module_name}.{self.value.__qualname__}", {
                 f"import {self.value.__module__}"
             }
@@ -296,7 +300,7 @@ class TupleSerializer(BaseSequenceSerializer):
 class TypeSerializer(BaseSerializer):
     def serialize(self) -> tuple[str, set[str]]:
         special_cases = [
-            (Model, "models.Model", ["from plain import models"]),
+            (Model, "migrations.Model", ["from plain import models"]),
             (types.NoneType, "types.NoneType", ["import types"]),
         ]
         for case, string, imports in special_cases:

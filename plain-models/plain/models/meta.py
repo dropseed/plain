@@ -14,7 +14,7 @@ from plain.utils.datastructures import ImmutableList
 
 if TYPE_CHECKING:
     from plain.models.base import Model
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 EMPTY_RELATION_TREE = ()
 

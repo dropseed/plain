@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from types import ModuleType
 
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 
 class BaseDatabaseOperations:

@@ -12,7 +12,7 @@ from plain.models.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
     from plain.models.sql.compiler import SQLCompiler
 
 

@@ -1,6 +1,6 @@
 import uuid
 
-from plain.models import fields, migrations
+from plain.models import migrations
 
 
 def set_uuids(models, schema_editor):
@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="car",
             name="uuid",
-            field=fields.UUIDField(allow_null=True),
+            field=migrations.UUIDField(allow_null=True),
         ),
         migrations.RunPython(set_uuids),
         migrations.RemoveField(

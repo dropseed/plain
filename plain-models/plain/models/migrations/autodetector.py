@@ -5,7 +5,7 @@ import re
 from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any
 
-from plain.models.fields import (
+from plain.models.fields.core import (
     NOT_PROVIDED,
     DateField,
     DateTimeField,

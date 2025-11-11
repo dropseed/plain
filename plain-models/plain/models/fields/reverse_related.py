@@ -17,7 +17,7 @@ from typing import Any
 from plain.models.exceptions import FieldDoesNotExist, FieldError
 from plain.utils.hashable import make_hashable
 
-from . import BLANK_CHOICE_DASH
+from .core import BLANK_CHOICE_DASH
 from .mixins import FieldCacheMixin
 
 

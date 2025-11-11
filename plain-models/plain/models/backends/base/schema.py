@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
     from plain.models.fields.related import ForeignKey, ManyToManyField
     from plain.models.fields.reverse_related import ManyToManyRel
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func, Value
-from plain.models.fields import Field, FloatField, IntegerField
+from plain.models.fields.core import Field, FloatField, IntegerField
 from plain.models.functions import Cast
 from plain.models.functions.mixins import (
     FixDecimalInputMixin,

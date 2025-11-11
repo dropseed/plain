@@ -2,9 +2,7 @@
 
 import uuid
 
-import plain.models.deletion
-from plain import models
-from plain.models import fields, migrations
+from plain.models import migrations
 from plain.runtime import settings
 
 
@@ -19,18 +17,18 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="SupportFormEntry",
             fields=[
-                ("id", fields.PrimaryKeyField()),
-                ("uuid", fields.UUIDField(default=uuid.uuid4)),
-                ("name", fields.CharField(max_length=255)),
-                ("email", fields.EmailField(max_length=254)),
-                ("message", fields.TextField()),
-                ("created_at", fields.DateTimeField(auto_now_add=True)),
-                ("form_slug", fields.CharField(max_length=255)),
+                ("id", migrations.PrimaryKeyField()),
+                ("uuid", migrations.UUIDField(default=uuid.uuid4)),
+                ("name", migrations.CharField(max_length=255)),
+                ("email", migrations.EmailField(max_length=254)),
+                ("message", migrations.TextField()),
+                ("created_at", migrations.DateTimeField(auto_now_add=True)),
+                ("form_slug", migrations.CharField(max_length=255)),
                 (
                     "user",
-                    fields.ForeignKey(
+                    migrations.ForeignKey(
                         allow_null=True,
-                        on_delete=plain.models.deletion.SET_NULL,
+                        on_delete=migrations.SET_NULL,
                         related_name="support_form_entries",
                         required=False,
                         to="users.user",
@@ -43,13 +41,13 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="supportformentry",
-            index=models.Index(
+            index=migrations.Index(
                 fields=["created_at"], name="plainsuppor_created_bda60d_idx"
             ),
         ),
         migrations.AddConstraint(
             model_name="supportformentry",
-            constraint=models.UniqueConstraint(
+            constraint=migrations.UniqueConstraint(
                 fields=("uuid",), name="plainsupport_supportformentry_unique_uuid"
             ),
         ),

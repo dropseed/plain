@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 
 if TYPE_CHECKING:
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 FieldReference = namedtuple("FieldReference", "to through")
 

@@ -19,7 +19,7 @@ from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.models.exceptions import FieldError
 
 if TYPE_CHECKING:
-    from plain.models.fields import Field as ModelField
+    from plain.models.fields.core import Field as ModelField
 
 __all__ = (
     "ModelForm",
@@ -697,13 +697,32 @@ def modelfield_to_formfield(
         return form_class(**defaults)
 
     # Avoid a circular import
-    from plain.models import fields as model_fields
+    from plain.models.fields.core import (
+        BooleanField as ModelBooleanField,
+    )
+    from plain.models.fields.core import (
+        CharField as ModelCharField,
+    )
+    from plain.models.fields.core import (
+        DecimalField as ModelDecimalField,
+    )
+    from plain.models.fields.core import (
+        JSONField as ModelJSONField,
+    )
+    from plain.models.fields.core import (
+        PositiveIntegerRelDbTypeMixin,
+        PrimaryKeyField,
+    )
+    from plain.models.fields.core import (
+        TextField as ModelTextField,
+    )
+    from plain.models.fields.related import ForeignKey as ModelForeignKey
 
     # Primary key fields aren't rendered by default
-    if isinstance(modelfield, model_fields.PrimaryKeyField):
+    if isinstance(modelfield, PrimaryKeyField):
         return None
 
-    if isinstance(modelfield, model_fields.BooleanField):
+    if isinstance(modelfield, ModelBooleanField):
         form_class = (
             fields.NullBooleanField if modelfield.allow_null else fields.BooleanField
         )
@@ -713,23 +732,23 @@ def modelfield_to_formfield(
         defaults["required"] = False
         return form_class(**defaults)
 
-    if isinstance(modelfield, model_fields.DecimalField):
+    if isinstance(modelfield, ModelDecimalField):
         return fields.DecimalField(
             max_digits=modelfield.max_digits,
             decimal_places=modelfield.decimal_places,
             **defaults,
         )
 
-    if issubclass(modelfield.__class__, model_fields.PositiveIntegerRelDbTypeMixin):  # type: ignore[attr-defined]
+    if issubclass(modelfield.__class__, PositiveIntegerRelDbTypeMixin):  # type: ignore[attr-defined]
         return fields.IntegerField(min_value=0, **defaults)
 
-    if isinstance(modelfield, model_fields.TextField):
+    if isinstance(modelfield, ModelTextField):
         # Passing max_length to fields.CharField means that the value's length
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
         return fields.CharField(max_length=modelfield.max_length, **defaults)
 
-    if isinstance(modelfield, model_fields.CharField):
+    if isinstance(modelfield, ModelCharField):
         # Passing max_length to forms.CharField means that the value's length
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
@@ -740,12 +759,12 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    if isinstance(modelfield, model_fields.JSONField):
+    if isinstance(modelfield, ModelJSONField):
         return fields.JSONField(
             encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
         )
 
-    if isinstance(modelfield, model_fields.ForeignKey):
+    if isinstance(modelfield, ModelForeignKey):
         return ModelChoiceField(
             queryset=modelfield.remote_field.model.query,  # type: ignore[attr-defined]
             **defaults,

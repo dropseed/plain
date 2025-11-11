@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from .registry import models_registry, register_model  # isort:skip  Create the registry first
 from . import (
     preflight,  # noqa  Imported for side effects (registers preflight checks)
 )
@@ -10,7 +11,6 @@ from .constraints import CheckConstraint, UniqueConstraint
 from .db import IntegrityError, db_connection
 from .deletion import CASCADE, DO_NOTHING, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
 from .enums import IntegerChoices, TextChoices
-from .registry import models_registry, register_model  # noqa  Create the registry first
 
 # Field imports: use type stubs during type checking, real classes at runtime
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     )
 else:
     # Import real field classes at runtime - these will be the actual descriptor classes
-    from .fields import (
+    from .fields.core import (
         BigIntegerField,
         BinaryField,
         BooleanField,
@@ -54,11 +54,9 @@ else:
         DurationField,
         EmailField,
         FloatField,
-        ForeignKey,
         GenericIPAddressField,
         IntegerField,
         JSONField,
-        ManyToManyField,
         PositiveBigIntegerField,
         PositiveIntegerField,
         PositiveSmallIntegerField,
@@ -69,6 +67,7 @@ else:
         URLField,
         UUIDField,
     )
+    from .fields.related import ForeignKey, ManyToManyField
 
 from .indexes import Index
 from .options import Options

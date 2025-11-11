@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models.exceptions import FieldDoesNotExist
-from plain.models.fields import NOT_PROVIDED
+from plain.models.fields.core import NOT_PROVIDED
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 from plain.models.meta import Meta
 from plain.models.migrations.utils import field_is_referenced, get_references
@@ -22,7 +22,7 @@ from .utils import resolve_relation
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 
 def _get_package_label_and_model_name(

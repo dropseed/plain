@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
-from plain.models.fields import NOT_PROVIDED
+from plain.models.fields.core import NOT_PROVIDED
 from plain.packages import packages_registry
 from plain.utils import timezone
 
 from .loader import MigrationLoader
 
 if TYPE_CHECKING:
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
 
 
 class MigrationQuestioner:

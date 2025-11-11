@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func
-from plain.models.fields import (
+from plain.models.fields.core import (
     DateField,
     DateTimeField,
     DurationField,

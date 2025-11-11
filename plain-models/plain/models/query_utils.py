@@ -23,7 +23,7 @@ from plain.utils import tree
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
-    from plain.models.fields import Field
+    from plain.models.fields.core import Field
     from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler
 
@@ -140,7 +140,7 @@ class Q(tree.Node):
         """
         # Avoid circular imports.
         from plain.models.expressions import Value
-        from plain.models.fields import BooleanField
+        from plain.models.fields.core import BooleanField
         from plain.models.functions import Coalesce
         from plain.models.sql import Query
         from plain.models.sql.constants import SINGLE

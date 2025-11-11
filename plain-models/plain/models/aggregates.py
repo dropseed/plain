@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import FieldError, FullResultSet
 from plain.models.expressions import Case, Func, Star, Value, When
-from plain.models.fields import IntegerField
+from plain.models.fields.core import IntegerField
 from plain.models.functions.comparison import Coalesce
 from plain.models.functions.mixins import (
     FixDurationInputMixin,

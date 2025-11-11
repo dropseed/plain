@@ -2,8 +2,7 @@
 
 import uuid
 
-from plain import models
-from plain.models import fields, migrations
+from plain.models import migrations
 
 
 class Migration(migrations.Migration):
@@ -15,14 +14,14 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Pageview",
             fields=[
-                ("id", fields.PrimaryKeyField()),
-                ("uuid", fields.UUIDField(default=uuid.uuid4)),
-                ("url", fields.URLField(max_length=768)),
-                ("timestamp", fields.DateTimeField(auto_now_add=True)),
-                ("title", fields.CharField(max_length=512, required=False)),
-                ("referrer", fields.CharField(max_length=1024, required=False)),
-                ("user_id", fields.CharField(max_length=255, required=False)),
-                ("session_key", fields.CharField(max_length=255, required=False)),
+                ("id", migrations.PrimaryKeyField()),
+                ("uuid", migrations.UUIDField(default=uuid.uuid4)),
+                ("url", migrations.URLField(max_length=768)),
+                ("timestamp", migrations.DateTimeField(auto_now_add=True)),
+                ("title", migrations.CharField(max_length=512, required=False)),
+                ("referrer", migrations.CharField(max_length=1024, required=False)),
+                ("user_id", migrations.CharField(max_length=255, required=False)),
+                ("session_key", migrations.CharField(max_length=255, required=False)),
             ],
             options={
                 "ordering": ["-timestamp"],
@@ -30,29 +29,29 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="pageview",
-            index=models.Index(
+            index=migrations.Index(
                 fields=["timestamp"], name="plainpagevi_timesta_da4eb2_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="pageview",
-            index=models.Index(
+            index=migrations.Index(
                 fields=["user_id"], name="plainpagevi_user_id_b40ca5_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="pageview",
-            index=models.Index(
+            index=migrations.Index(
                 fields=["session_key"], name="plainpagevi_session_5545cf_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="pageview",
-            index=models.Index(fields=["url"], name="plainpagevi_url_d3e821_idx"),
+            index=migrations.Index(fields=["url"], name="plainpagevi_url_d3e821_idx"),
         ),
         migrations.AddConstraint(
             model_name="pageview",
-            constraint=models.UniqueConstraint(
+            constraint=migrations.UniqueConstraint(
                 fields=("uuid",), name="plainpageviews_pageview_unique_uuid"
             ),
         ),
