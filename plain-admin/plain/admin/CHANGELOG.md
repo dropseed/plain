@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.53.2](https://github.com/dropseed/plain/releases/plain-admin@0.53.2) (2025-11-11)
+
+### What's changed
+
+- Internal import path updated to use `plain.models.aggregates.Count` instead of importing from `plain.models` directly ([e9edf61](https://github.com/dropseed/plain/commit/e9edf61c6b))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.53.1](https://github.com/dropseed/plain/releases/plain-admin@0.53.1) (2025-10-31)
 
 ### What's changed
