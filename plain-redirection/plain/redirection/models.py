@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import re
 from typing import TYPE_CHECKING
 
@@ -18,16 +19,16 @@ def _get_client_ip(request: Request) -> str | None:
 
 @models.register_model
 class Redirect(models.Model):
-    from_pattern = models.CharField(max_length=255)
-    to_pattern = models.CharField(max_length=255)
-    http_status = models.PositiveSmallIntegerField(
+    from_pattern: str = models.CharField(max_length=255)
+    to_pattern: str = models.CharField(max_length=255)
+    http_status: int = models.PositiveSmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    order = models.PositiveSmallIntegerField(default=0)
-    enabled = models.BooleanField(default=True)
-    is_regex = models.BooleanField(default=False)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
+    order: int = models.PositiveSmallIntegerField(default=0)
+    enabled: bool = models.BooleanField(default=True)
+    is_regex: bool = models.BooleanField(default=False)
 
     # query params?
     # logged in or not? auth not required necessarily...
@@ -83,19 +84,19 @@ class Redirect(models.Model):
 
 @models.register_model
 class RedirectLog(models.Model):
-    redirect = models.ForeignKey(Redirect, on_delete=models.CASCADE)
+    redirect: Redirect = models.ForeignKey(Redirect, on_delete=models.CASCADE)
 
     # The actuals that were used to redirect
-    from_url = models.URLField(max_length=512)
-    to_url = models.URLField(max_length=512)
-    http_status = models.PositiveSmallIntegerField(default=301)
+    from_url: str = models.URLField(max_length=512)
+    to_url: str = models.URLField(max_length=512)
+    http_status: int = models.PositiveSmallIntegerField(default=301)
 
     # Request metadata
-    ip_address = models.GenericIPAddressField()
-    user_agent = models.CharField(required=False, max_length=512)
-    referrer = models.CharField(required=False, max_length=512)
+    ip_address: str = models.GenericIPAddressField()
+    user_agent: str = models.CharField(required=False, max_length=512)
+    referrer: str = models.CharField(required=False, max_length=512)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
 
     model_options = models.Options(
         ordering=["-created_at"],
@@ -128,14 +129,14 @@ class RedirectLog(models.Model):
 
 @models.register_model
 class NotFoundLog(models.Model):
-    url = models.URLField(max_length=512)
+    url: str = models.URLField(max_length=512)
 
     # Request metadata
-    ip_address = models.GenericIPAddressField()
-    user_agent = models.CharField(required=False, max_length=512)
-    referrer = models.CharField(required=False, max_length=512)
+    ip_address: str = models.GenericIPAddressField()
+    user_agent: str = models.CharField(required=False, max_length=512)
+    referrer: str = models.CharField(required=False, max_length=512)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
 
     model_options = models.Options(
         ordering=["-created_at"],

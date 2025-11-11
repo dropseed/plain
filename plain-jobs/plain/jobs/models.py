@@ -3,8 +3,8 @@ from __future__ import annotations
 import datetime
 import logging
 import traceback
-import uuid
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
+from uuid import UUID, uuid4
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.code_attributes import (
@@ -43,25 +43,33 @@ class JobRequest(models.Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    uuid = models.UUIDField(default=uuid.uuid4)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    uuid: UUID = models.UUIDField(default=uuid4)
 
-    job_class = models.CharField(max_length=255)
-    parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.SmallIntegerField(default=0)
-    source = models.TextField(required=False)
-    queue = models.CharField(default="default", max_length=255)
+    job_class: str = models.CharField(max_length=255)
+    parameters: dict[str, Any] | None = models.JSONField(
+        required=False, allow_null=True
+    )
+    priority: int = models.SmallIntegerField(default=0)
+    source: str = models.TextField(required=False)
+    queue: str = models.CharField(default="default", max_length=255)
 
-    retries = models.SmallIntegerField(default=0)
-    retry_attempt = models.SmallIntegerField(default=0)
+    retries: int = models.SmallIntegerField(default=0)
+    retry_attempt: int = models.SmallIntegerField(default=0)
 
-    concurrency_key = models.CharField(max_length=255, required=False)
+    concurrency_key: str = models.CharField(max_length=255, required=False)
 
-    start_at = models.DateTimeField(required=False, allow_null=True)
+    start_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
 
     # OpenTelemetry trace context
-    trace_id = models.CharField(max_length=34, required=False, allow_null=True)
-    span_id = models.CharField(max_length=18, required=False, allow_null=True)
+    trace_id: str | None = models.CharField(
+        max_length=34, required=False, allow_null=True
+    )
+    span_id: str | None = models.CharField(
+        max_length=18, required=False, allow_null=True
+    )
 
     # expires_at = models.DateTimeField(required=False, allow_null=True)
 
@@ -148,24 +156,32 @@ class JobProcess(models.Model):
     All active jobs are stored in this table.
     """
 
-    uuid = models.UUIDField(default=uuid.uuid4)
-    created_at = models.DateTimeField(auto_now_add=True)
-    started_at = models.DateTimeField(required=False, allow_null=True)
+    uuid: UUID = models.UUIDField(default=uuid4)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    started_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
 
     # From the JobRequest
-    job_request_uuid = models.UUIDField()
-    job_class = models.CharField(max_length=255)
-    parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.SmallIntegerField(default=0)
-    source = models.TextField(required=False)
-    queue = models.CharField(default="default", max_length=255)
-    retries = models.SmallIntegerField(default=0)
-    retry_attempt = models.SmallIntegerField(default=0)
-    concurrency_key = models.CharField(max_length=255, required=False)
+    job_request_uuid: UUID = models.UUIDField()
+    job_class: str = models.CharField(max_length=255)
+    parameters: dict[str, Any] | None = models.JSONField(
+        required=False, allow_null=True
+    )
+    priority: int = models.SmallIntegerField(default=0)
+    source: str = models.TextField(required=False)
+    queue: str = models.CharField(default="default", max_length=255)
+    retries: int = models.SmallIntegerField(default=0)
+    retry_attempt: int = models.SmallIntegerField(default=0)
+    concurrency_key: str = models.CharField(max_length=255, required=False)
 
     # OpenTelemetry trace context
-    trace_id = models.CharField(max_length=34, required=False, allow_null=True)
-    span_id = models.CharField(max_length=18, required=False, allow_null=True)
+    trace_id: str | None = models.CharField(
+        max_length=34, required=False, allow_null=True
+    )
+    span_id: str | None = models.CharField(
+        max_length=18, required=False, allow_null=True
+    )
 
     query = JobQuerySet()
 
@@ -445,36 +461,48 @@ class JobResult(models.Model):
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid = models.UUIDField(default=uuid.uuid4)
-    created_at = models.DateTimeField(auto_now_add=True)
+    uuid: UUID = models.UUIDField(default=uuid4)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
 
     # From the Job
-    job_process_uuid = models.UUIDField()
-    started_at = models.DateTimeField(required=False, allow_null=True)
-    ended_at = models.DateTimeField(required=False, allow_null=True)
-    error = models.TextField(required=False)
-    status = models.CharField(
+    job_process_uuid: UUID = models.UUIDField()
+    started_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
+    ended_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
+    error: str = models.TextField(required=False)
+    status: str = models.CharField(
         max_length=20,
         choices=JobResultStatuses.choices,
     )
 
     # From the JobRequest
-    job_request_uuid = models.UUIDField()
-    job_class = models.CharField(max_length=255)
-    parameters = models.JSONField(required=False, allow_null=True)
-    priority = models.SmallIntegerField(default=0)
-    source = models.TextField(required=False)
-    queue = models.CharField(default="default", max_length=255)
-    retries = models.SmallIntegerField(default=0)
-    retry_attempt = models.SmallIntegerField(default=0)
-    concurrency_key = models.CharField(max_length=255, required=False)
+    job_request_uuid: UUID = models.UUIDField()
+    job_class: str = models.CharField(max_length=255)
+    parameters: dict[str, Any] | None = models.JSONField(
+        required=False, allow_null=True
+    )
+    priority: int = models.SmallIntegerField(default=0)
+    source: str = models.TextField(required=False)
+    queue: str = models.CharField(default="default", max_length=255)
+    retries: int = models.SmallIntegerField(default=0)
+    retry_attempt: int = models.SmallIntegerField(default=0)
+    concurrency_key: str = models.CharField(max_length=255, required=False)
 
     # Retries
-    retry_job_request_uuid = models.UUIDField(required=False, allow_null=True)
+    retry_job_request_uuid: UUID | None = models.UUIDField(
+        required=False, allow_null=True
+    )
 
     # OpenTelemetry trace context
-    trace_id = models.CharField(max_length=34, required=False, allow_null=True)
-    span_id = models.CharField(max_length=18, required=False, allow_null=True)
+    trace_id: str | None = models.CharField(
+        max_length=34, required=False, allow_null=True
+    )
+    span_id: str | None = models.CharField(
+        max_length=18, required=False, allow_null=True
+    )
 
     query = JobResultQuerySet()
 

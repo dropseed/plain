@@ -101,8 +101,10 @@ class DeconstructableSerializer(BaseSerializer):
     def _serialize_path(path: str) -> tuple[str, set[str]]:
         module, name = path.rsplit(".", 1)
         if module == "plain.models":
-            imports: set[str] = {"from plain import models"}
-            name = f"models.{name}"
+            # Import from plain.models.fields to bypass typing stubs
+            # This ensures type checkers see real Field classes, not value types
+            imports: set[str] = {"from plain.models import fields"}
+            name = f"fields.{name}"
         else:
             imports = {f"import {module}"}
             name = path

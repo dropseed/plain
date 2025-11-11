@@ -2,7 +2,7 @@
 
 import plain.models.deletion
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -14,22 +14,22 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Trace",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("trace_id", models.CharField(max_length=255)),
-                ("start_time", models.DateTimeField()),
-                ("end_time", models.DateTimeField()),
-                ("root_span_name", models.TextField(default="", required=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("trace_id", fields.CharField(max_length=255)),
+                ("start_time", fields.DateTimeField()),
+                ("end_time", fields.DateTimeField()),
+                ("root_span_name", fields.TextField(default="", required=False)),
                 (
                     "request_id",
-                    models.CharField(default="", max_length=255, required=False),
+                    fields.CharField(default="", max_length=255, required=False),
                 ),
                 (
                     "session_id",
-                    models.CharField(default="", max_length=255, required=False),
+                    fields.CharField(default="", max_length=255, required=False),
                 ),
                 (
                     "user_id",
-                    models.CharField(default="", max_length=255, required=False),
+                    fields.CharField(default="", max_length=255, required=False),
                 ),
             ],
             options={
@@ -39,18 +39,18 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Span",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("span_id", models.CharField(max_length=255)),
-                ("name", models.CharField(max_length=255)),
-                ("kind", models.CharField(max_length=50)),
+                ("id", fields.PrimaryKeyField()),
+                ("span_id", fields.CharField(max_length=255)),
+                ("name", fields.CharField(max_length=255)),
+                ("kind", fields.CharField(max_length=50)),
                 (
                     "parent_id",
-                    models.CharField(default="", max_length=255, required=False),
+                    fields.CharField(default="", max_length=255, required=False),
                 ),
-                ("start_time", models.DateTimeField()),
-                ("end_time", models.DateTimeField()),
-                ("status", models.CharField(default="", max_length=50, required=False)),
-                ("span_data", models.JSONField(default=dict, required=False)),
+                ("start_time", fields.DateTimeField()),
+                ("end_time", fields.DateTimeField()),
+                ("status", fields.CharField(default="", max_length=50, required=False)),
+                ("span_data", fields.JSONField(default=dict, required=False)),
             ],
             options={
                 "ordering": ["-start_time"],
@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="span",
             name="trace",
-            field=models.ForeignKey(
+            field=fields.ForeignKey(
                 on_delete=plain.models.deletion.CASCADE,
                 related_name="spans",
                 to="plainobserver.trace",

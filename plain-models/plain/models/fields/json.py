@@ -1,142 +1,31 @@
+"""JSON-specific field transforms and lookups.
+
+This module contains KeyTransform classes and lookup registrations for JSONField.
+It's imported from plain.models.__init__ after all other modules are loaded
+to avoid circular import dependencies.
+"""
+
 from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any, cast
 
-from plain import exceptions, preflight
-from plain.models import expressions, lookups
+from plain.models import lookups
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import NotSupportedError, db_connection
-from plain.models.fields import TextField
+from plain.models.db import NotSupportedError
 from plain.models.lookups import (
     FieldGetDbPrepValueMixin,
     PostgresOperatorLookup,
     Transform,
 )
 
-from . import Field
-from .mixins import CheckFieldDefaultMixin
+from .core import JSONField, TextField
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.backends.mysql.base import MySQLDatabaseWrapper
     from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
-    from plain.preflight.results import PreflightResult
-
-__all__ = ["JSONField"]
-
-
-class JSONField(CheckFieldDefaultMixin, Field):
-    empty_strings_allowed = False
-    description = "A JSON object"
-    default_error_messages = {
-        "invalid": "Value must be valid JSON.",
-    }
-    _default_fix = ("dict", "{}")
-
-    def __init__(
-        self,
-        *,
-        encoder: type[json.JSONEncoder] | None = None,
-        decoder: type[json.JSONDecoder] | None = None,
-        **kwargs: Any,
-    ):
-        if encoder and not callable(encoder):
-            raise ValueError("The encoder parameter must be a callable object.")
-        if decoder and not callable(decoder):
-            raise ValueError("The decoder parameter must be a callable object.")
-        self.encoder = encoder
-        self.decoder = decoder
-        super().__init__(**kwargs)
-
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        errors = super().preflight(**kwargs)
-        errors.extend(self._check_supported())
-        return errors
-
-    def _check_supported(self) -> list[PreflightResult]:
-        errors = []
-
-        if (
-            self.model.model_options.required_db_vendor
-            and self.model.model_options.required_db_vendor != db_connection.vendor
-        ):
-            return errors
-
-        if not (
-            "supports_json_field" in self.model.model_options.required_db_features
-            or db_connection.features.supports_json_field
-        ):
-            errors.append(
-                preflight.PreflightResult(
-                    fix=f"{db_connection.display_name} does not support JSONFields. Consider using a TextField with JSON serialization or upgrade to a database that supports JSON fields.",
-                    obj=self.model,
-                    id="fields.json_field_unsupported",
-                )
-            )
-        return errors
-
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.encoder is not None:
-            kwargs["encoder"] = self.encoder
-        if self.decoder is not None:
-            kwargs["decoder"] = self.decoder
-        return name, path, args, kwargs
-
-    def from_db_value(
-        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
-    ) -> Any:
-        if value is None:
-            return value
-        # Some backends (SQLite at least) extract non-string values in their
-        # SQL datatypes.
-        if isinstance(expression, KeyTransform) and not isinstance(value, str):
-            return value
-        try:
-            return json.loads(value, cls=self.decoder)
-        except json.JSONDecodeError:
-            return value
-
-    def get_internal_type(self) -> str:
-        return "JSONField"
-
-    def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
-    ) -> Any:
-        if isinstance(value, expressions.Value) and isinstance(
-            value.output_field, JSONField
-        ):
-            value = value.value
-        elif hasattr(value, "as_sql"):
-            return value
-        return connection.ops.adapt_json_value(value, self.encoder)
-
-    def get_db_prep_save(self, value: Any, connection: BaseDatabaseWrapper) -> Any:
-        if value is None:
-            return value
-        return self.get_db_prep_value(value, connection)
-
-    def get_transform(self, name: str) -> KeyTransformFactory | type[Transform]:
-        transform = super().get_transform(name)
-        if transform:
-            return transform
-        return KeyTransformFactory(name)
-
-    def validate(self, value: Any, model_instance: Any) -> None:
-        super().validate(value, model_instance)
-        try:
-            json.dumps(value, cls=self.encoder)
-        except TypeError:
-            raise exceptions.ValidationError(
-                self.error_messages["invalid"],
-                code="invalid",
-                params={"value": value},
-            )
-
-    def value_to_string(self, obj: Any) -> Any:
-        return self.value_from_object(obj)
 
 
 def compile_json_path(key_transforms: list[Any], include_root: bool = True) -> str:

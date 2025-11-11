@@ -31,7 +31,7 @@ from plain.models.exceptions import (
     ObjectDoesNotExist,
 )
 from plain.models.expressions import Case, F, Value, When
-from plain.models.fields import (
+from plain.models.fields.core import (
     DateField,
     DateTimeField,
     Field,

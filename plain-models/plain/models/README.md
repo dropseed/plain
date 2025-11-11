@@ -12,6 +12,7 @@
 - [Custom QuerySets](#custom-querysets)
 - [Forms](#forms)
 - [Sharing fields across models](#sharing-fields-across-models)
+- [Type annotations](#type-annotations)
 - [Installation](#installation)
 
 ## Overview
@@ -308,6 +309,50 @@ class Note(TimestampedMixin, models.Model):
     content = models.TextField(max_length=1024)
     liked = models.BooleanField(default=False)
 ```
+
+## Type annotations
+
+You can write model fields with natural Python type annotations:
+
+```python
+class User(models.Model):
+    email: str = models.EmailField()
+    age: int = models.IntegerField()
+    is_active: bool = models.BooleanField(default=True)
+    created_at: datetime = models.DateTimeField(auto_now_add=True)
+```
+
+This provides IDE autocomplete and type checker support. Your IDE will know that `user.email` is a `str`, `user.age` is an `int`, etc.
+
+Behind the scenes, Plain uses [type stubs](./fields/typing.pyi) to make field constructors appear to return their value types during type checking, while at runtime they return Field instances as expected. This dual behavior enables the natural syntax without affecting how Plain works internally.
+
+Type annotations are optional but recommended for better IDE support.
+
+### Working with Field types directly
+
+When you need to work with the actual Field types (not the value types), import `fields` directly from `plain.models`:
+
+```python
+from plain.models import fields
+
+# Migrations - use fields.CharField() to get Field instances
+class Migration(migrations.Migration):
+    operations = [
+        migrations.AddField(
+            model_name="user",
+            name="username",
+            field=fields.CharField(max_length=150),
+        ),
+    ]
+
+# Custom field types - inherit from fields.CharField
+class UpperCaseField(fields.CharField):
+    def pre_save(self, model_instance, add):
+        value = super().pre_save(model_instance, add)
+        return value.upper() if value else value
+```
+
+This ensures you're working with Field instances rather than the type-checking stubs. This pattern is automatically used by Plain's migration generator.
 
 ## Installation
 

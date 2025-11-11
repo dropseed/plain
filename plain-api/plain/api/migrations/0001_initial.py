@@ -4,7 +4,7 @@ import uuid
 
 import plain.api.models
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -16,20 +16,20 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="APIKey",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("expires_at", models.DateTimeField(allow_null=True, required=False)),
-                ("last_used_at", models.DateTimeField(allow_null=True, required=False)),
-                ("name", models.CharField(max_length=255, required=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("updated_at", fields.DateTimeField(auto_now=True)),
+                ("expires_at", fields.DateTimeField(allow_null=True, required=False)),
+                ("last_used_at", fields.DateTimeField(allow_null=True, required=False)),
+                ("name", fields.CharField(max_length=255, required=False)),
                 (
                     "token",
-                    models.CharField(
+                    fields.CharField(
                         default=plain.api.models.generate_token, max_length=40
                     ),
                 ),
-                ("api_version", models.CharField(max_length=255, required=False)),
+                ("api_version", fields.CharField(max_length=255, required=False)),
             ],
         ),
         migrations.AddConstraint(

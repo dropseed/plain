@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import binascii
+import datetime
 import os
-import uuid
+from uuid import UUID, uuid4
 
 from plain import models
 
@@ -11,17 +14,21 @@ def generate_token() -> str:
 
 @models.register_model
 class APIKey(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    expires_at = models.DateTimeField(required=False, allow_null=True)
-    last_used_at = models.DateTimeField(required=False, allow_null=True)
+    uuid: UUID = models.UUIDField(default=uuid4)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
+    expires_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
+    last_used_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
 
-    name = models.CharField(max_length=255, required=False)
+    name: str = models.CharField(max_length=255, required=False)
 
-    token = models.CharField(max_length=40, default=generate_token)
+    token: str = models.CharField(max_length=40, default=generate_token)
 
-    api_version = models.CharField(max_length=255, required=False)
+    api_version: str = models.CharField(max_length=255, required=False)
 
     model_options = models.Options(
         constraints=[

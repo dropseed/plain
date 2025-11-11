@@ -4,7 +4,7 @@ import app.examples.models  # type: ignore[import-untyped]
 
 import plain.models.deletion
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -16,17 +16,17 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="DefaultQuerySetModel",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("name", models.CharField(max_length=100)),
+                ("id", fields.PrimaryKeyField()),
+                ("name", fields.CharField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
             name="MixinTestModel",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("name", models.CharField(max_length=100)),
+                ("id", fields.PrimaryKeyField()),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("updated_at", fields.DateTimeField(auto_now=True)),
+                ("name", fields.CharField(max_length=100)),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -36,21 +36,21 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="CustomQuerySetModel",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("name", models.CharField(max_length=100)),
+                ("id", fields.PrimaryKeyField()),
+                ("name", fields.CharField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
             name="CustomSpecialQuerySetModel",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("name", models.CharField(max_length=100)),
+                ("id", fields.PrimaryKeyField()),
+                ("name", fields.CharField(max_length=100)),
             ],
         ),
         migrations.AlterField(
             model_name="childcascade",
             name="parent",
-            field=models.ForeignKey(
+            field=fields.ForeignKey(
                 on_delete=plain.models.deletion.CASCADE,
                 related_name="childcascade_set",
                 to="examples.deleteparent",
@@ -59,7 +59,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="childsetdefault",
             name="parent",
-            field=models.ForeignKey(
+            field=fields.ForeignKey(
                 default=app.examples.models.ChildSetDefault.default_parent_id,
                 on_delete=plain.models.deletion.SET_DEFAULT,
                 to="examples.deleteparent",

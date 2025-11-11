@@ -3,7 +3,7 @@
 import uuid
 
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -15,19 +15,19 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Job",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("started_at", models.DateTimeField(allow_null=True, required=False)),
-                ("job_request_uuid", models.UUIDField()),
-                ("job_class", models.CharField(max_length=255)),
-                ("parameters", models.JSONField(allow_null=True, required=False)),
-                ("priority", models.IntegerField(default=0)),
-                ("source", models.TextField(required=False)),
-                ("queue", models.CharField(default="default", max_length=255)),
-                ("retries", models.IntegerField(default=0)),
-                ("retry_attempt", models.IntegerField(default=0)),
-                ("unique_key", models.CharField(max_length=255, required=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("started_at", fields.DateTimeField(allow_null=True, required=False)),
+                ("job_request_uuid", fields.UUIDField()),
+                ("job_class", fields.CharField(max_length=255)),
+                ("parameters", fields.JSONField(allow_null=True, required=False)),
+                ("priority", fields.IntegerField(default=0)),
+                ("source", fields.TextField(required=False)),
+                ("queue", fields.CharField(default="default", max_length=255)),
+                ("retries", fields.IntegerField(default=0)),
+                ("retry_attempt", fields.IntegerField(default=0)),
+                ("unique_key", fields.CharField(max_length=255, required=False)),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -36,18 +36,18 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="JobRequest",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("job_class", models.CharField(max_length=255)),
-                ("parameters", models.JSONField(allow_null=True, required=False)),
-                ("priority", models.IntegerField(default=0)),
-                ("source", models.TextField(required=False)),
-                ("queue", models.CharField(default="default", max_length=255)),
-                ("retries", models.IntegerField(default=0)),
-                ("retry_attempt", models.IntegerField(default=0)),
-                ("unique_key", models.CharField(max_length=255, required=False)),
-                ("start_at", models.DateTimeField(allow_null=True, required=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("job_class", fields.CharField(max_length=255)),
+                ("parameters", fields.JSONField(allow_null=True, required=False)),
+                ("priority", fields.IntegerField(default=0)),
+                ("source", fields.TextField(required=False)),
+                ("queue", fields.CharField(default="default", max_length=255)),
+                ("retries", fields.IntegerField(default=0)),
+                ("retry_attempt", fields.IntegerField(default=0)),
+                ("unique_key", fields.CharField(max_length=255, required=False)),
+                ("start_at", fields.DateTimeField(allow_null=True, required=False)),
             ],
             options={
                 "ordering": ["priority", "-created_at"],
@@ -56,16 +56,16 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="JobResult",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("job_uuid", models.UUIDField()),
-                ("started_at", models.DateTimeField(allow_null=True, required=False)),
-                ("ended_at", models.DateTimeField(allow_null=True, required=False)),
-                ("error", models.TextField(required=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("job_uuid", fields.UUIDField()),
+                ("started_at", fields.DateTimeField(allow_null=True, required=False)),
+                ("ended_at", fields.DateTimeField(allow_null=True, required=False)),
+                ("error", fields.TextField(required=False)),
                 (
                     "status",
-                    models.CharField(
+                    fields.CharField(
                         choices=[
                             ("SUCCESSFUL", "Successful"),
                             ("ERRORED", "Errored"),
@@ -75,18 +75,18 @@ class Migration(migrations.Migration):
                         max_length=20,
                     ),
                 ),
-                ("job_request_uuid", models.UUIDField()),
-                ("job_class", models.CharField(max_length=255)),
-                ("parameters", models.JSONField(allow_null=True, required=False)),
-                ("priority", models.IntegerField(default=0)),
-                ("source", models.TextField(required=False)),
-                ("queue", models.CharField(default="default", max_length=255)),
-                ("retries", models.IntegerField(default=0)),
-                ("retry_attempt", models.IntegerField(default=0)),
-                ("unique_key", models.CharField(max_length=255, required=False)),
+                ("job_request_uuid", fields.UUIDField()),
+                ("job_class", fields.CharField(max_length=255)),
+                ("parameters", fields.JSONField(allow_null=True, required=False)),
+                ("priority", fields.IntegerField(default=0)),
+                ("source", fields.TextField(required=False)),
+                ("queue", fields.CharField(default="default", max_length=255)),
+                ("retries", fields.IntegerField(default=0)),
+                ("retry_attempt", fields.IntegerField(default=0)),
+                ("unique_key", fields.CharField(max_length=255, required=False)),
                 (
                     "retry_job_request_uuid",
-                    models.UUIDField(allow_null=True, required=False),
+                    fields.UUIDField(allow_null=True, required=False),
                 ),
             ],
             options={

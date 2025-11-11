@@ -2,7 +2,7 @@
 
 import plain.models.deletion
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 from plain.runtime import settings
 
 
@@ -17,24 +17,24 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="OAuthConnection",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("provider_key", models.CharField(max_length=100)),
-                ("provider_user_id", models.CharField(max_length=100)),
-                ("access_token", models.CharField(max_length=2000)),
-                ("refresh_token", models.CharField(max_length=2000, required=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("updated_at", fields.DateTimeField(auto_now=True)),
+                ("provider_key", fields.CharField(max_length=100)),
+                ("provider_user_id", fields.CharField(max_length=100)),
+                ("access_token", fields.CharField(max_length=2000)),
+                ("refresh_token", fields.CharField(max_length=2000, required=False)),
                 (
                     "access_token_expires_at",
-                    models.DateTimeField(allow_null=True, required=False),
+                    fields.DateTimeField(allow_null=True, required=False),
                 ),
                 (
                     "refresh_token_expires_at",
-                    models.DateTimeField(allow_null=True, required=False),
+                    fields.DateTimeField(allow_null=True, required=False),
                 ),
                 (
                     "user",
-                    models.ForeignKey(
+                    fields.ForeignKey(
                         on_delete=plain.models.deletion.CASCADE,
                         related_name="oauth_connections",
                         to="users.user",

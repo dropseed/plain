@@ -3,7 +3,7 @@
 from typing import Any
 
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 def extract_tracking_params_migration(url: str) -> tuple[str, str, str]:
@@ -93,17 +93,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="pageview",
             name="campaign",
-            field=models.CharField(max_length=200, required=False),
+            field=fields.CharField(max_length=200, required=False),
         ),
         migrations.AddField(
             model_name="pageview",
             name="medium",
-            field=models.CharField(max_length=200, required=False),
+            field=fields.CharField(max_length=200, required=False),
         ),
         migrations.AddField(
             model_name="pageview",
             name="source",
-            field=models.CharField(max_length=200, required=False),
+            field=fields.CharField(max_length=200, required=False),
         ),
         migrations.AddIndex(
             model_name="pageview",

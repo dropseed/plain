@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Expression, Func, Value
-from plain.models.fields import (
+from plain.models.fields.core import (
     BooleanField,
     CharField,
     DateTimeField,

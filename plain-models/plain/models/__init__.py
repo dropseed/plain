@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from . import (
     preflight,  # noqa
 )
@@ -51,9 +53,73 @@ from .expressions import (
     Window,
     WindowFrame,
 )
-from .fields import *  # NOQA
-from .fields import __all__ as fields_all
-from .fields.json import JSONField
+
+# Always import Field and NOT_PROVIDED as they're needed for isinstance checks
+# and type annotations, regardless of TYPE_CHECKING
+from .fields import NOT_PROVIDED, Field  # noqa: F401
+
+# Field imports: use type stubs during type checking, real classes at runtime
+if TYPE_CHECKING:
+    # Import type stub overrides that make fields appear to return value types
+    # Import non-field items from real implementation
+    from .fields import BLANK_CHOICE_DASH, Empty
+    from .fields.typing import (
+        BigIntegerField,
+        BinaryField,
+        BooleanField,
+        CharField,
+        DateField,
+        DateTimeField,
+        DecimalField,
+        DurationField,
+        EmailField,
+        FloatField,
+        ForeignKey,
+        GenericIPAddressField,
+        IntegerField,
+        JSONField,
+        ManyToManyField,
+        PositiveBigIntegerField,
+        PositiveIntegerField,
+        PositiveSmallIntegerField,
+        PrimaryKeyField,
+        SmallIntegerField,
+        TextField,
+        TimeField,
+        URLField,
+        UUIDField,
+    )
+else:
+    # Import real field classes at runtime
+    from .fields import (
+        BLANK_CHOICE_DASH,
+        BigIntegerField,
+        BinaryField,
+        BooleanField,
+        CharField,
+        DateField,
+        DateTimeField,
+        DecimalField,
+        DurationField,
+        EmailField,
+        Empty,
+        FloatField,
+        ForeignKey,
+        GenericIPAddressField,
+        IntegerField,
+        JSONField,
+        ManyToManyField,
+        PositiveBigIntegerField,
+        PositiveIntegerField,
+        PositiveSmallIntegerField,
+        PrimaryKeyField,
+        SmallIntegerField,
+        TextField,
+        TimeField,
+        URLField,
+        UUIDField,
+    )
+
 from .indexes import *  # NOQA
 from .indexes import __all__ as indexes_all
 from .lookups import Lookup, Transform
@@ -64,19 +130,46 @@ from .registry import models_registry, register_model
 # Imports that would create circular imports if sorted
 from .base import DEFERRED, Model  # isort:skip
 from .options import Options  # isort:skip
-from .fields.related import (  # isort:skip
-    ForeignKey,
-    ManyToManyField,
-)
 from .fields.reverse_related import (  # isort:skip
     ForeignObjectRel,
     ManyToOneRel,
     ManyToManyRel,
 )
 
+# Register the json field lookup transforms
+from .fields import json  # isort:skip, # noqa: F401
 
-__all__ = aggregates_all + constraints_all + enums_all + fields_all + indexes_all
+
+__all__ = aggregates_all + constraints_all + enums_all + indexes_all
 __all__ += [
+    # Field base classes and sentinels
+    "Field",
+    "NOT_PROVIDED",
+    # Field constructors (explicitly imported for runtime/TYPE_CHECKING handling)
+    "BLANK_CHOICE_DASH",
+    "BigIntegerField",
+    "BinaryField",
+    "BooleanField",
+    "CharField",
+    "DateField",
+    "DateTimeField",
+    "DecimalField",
+    "DurationField",
+    "EmailField",
+    "Empty",
+    "FloatField",
+    "GenericIPAddressField",
+    "IntegerField",
+    "PositiveBigIntegerField",
+    "PositiveIntegerField",
+    "PositiveSmallIntegerField",
+    "PrimaryKeyField",
+    "SmallIntegerField",
+    "TextField",
+    "TimeField",
+    "URLField",
+    "UUIDField",
+    # Deletion behaviors
     "CASCADE",
     "DO_NOTHING",
     "PROTECT",
@@ -86,6 +179,7 @@ __all__ += [
     "SET_NULL",
     "ProtectedError",
     "RestrictedError",
+    # Expressions and lookups
     "Case",
     "Exists",
     "Expression",
@@ -105,6 +199,7 @@ __all__ += [
     "JSONField",
     "Lookup",
     "Transform",
+    # Model and query utilities
     "Options",
     "Prefetch",
     "Q",
@@ -113,6 +208,7 @@ __all__ += [
     "DEFERRED",
     "Model",
     "FilteredRelation",
+    # Related fields
     "ForeignKey",
     "ManyToManyField",
     "ForeignObjectRel",

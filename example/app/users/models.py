@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from plain import models
 from plain.passwords.models import PasswordField
 
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField()
-    password = PasswordField()
-    is_admin = models.BooleanField(default=False)
+    email: str = models.EmailField()
+    password: str = PasswordField()
+    is_admin: bool = models.BooleanField(default=False)

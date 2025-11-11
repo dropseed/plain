@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from plain import models
+from plain.models import fields
 
 from . import validators
 from .hashers import (
@@ -11,7 +12,7 @@ from .hashers import (
 )
 
 
-class PasswordField(models.CharField):
+class PasswordField(fields.CharField):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["max_length"] = 128
         kwargs.setdefault(

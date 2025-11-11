@@ -49,10 +49,12 @@ reverse many-to-one relation.
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from plain.models.query import QuerySet
 from plain.utils.functional import LazyObject
+
+if TYPE_CHECKING:
+    from plain.models.query import QuerySet
 
 from .related_managers import (
     ForwardManyToManyManager,

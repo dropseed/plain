@@ -5,7 +5,7 @@ import uuid
 import plain.flags.models
 import plain.models.deletion
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -17,31 +17,31 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Flag",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("id", fields.PrimaryKeyField()),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("updated_at", fields.DateTimeField(auto_now=True)),
                 (
                     "name",
-                    models.CharField(
+                    fields.CharField(
                         max_length=255,
                         validators=[plain.flags.models.validate_flag_name],
                     ),
                 ),
-                ("description", models.TextField(required=False)),
-                ("enabled", models.BooleanField(default=True)),
-                ("used_at", models.DateTimeField(allow_null=True, required=False)),
+                ("description", fields.TextField(required=False)),
+                ("enabled", fields.BooleanField(default=True)),
+                ("used_at", fields.DateTimeField(allow_null=True, required=False)),
             ],
         ),
         migrations.CreateModel(
             name="FlagResult",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("key", models.CharField(max_length=255)),
-                ("value", models.JSONField()),
+                ("id", fields.PrimaryKeyField()),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("updated_at", fields.DateTimeField(auto_now=True)),
+                ("key", fields.CharField(max_length=255)),
+                ("value", fields.JSONField()),
             ],
         ),
         migrations.AddConstraint(
@@ -59,7 +59,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="flagresult",
             name="flag",
-            field=models.ForeignKey(
+            field=fields.ForeignKey(
                 on_delete=plain.models.deletion.CASCADE, to="plainflags.flag"
             ),
         ),

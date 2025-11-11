@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import datetime
 from typing import TYPE_CHECKING, Any
 
 from plain import models
@@ -16,26 +19,30 @@ if TYPE_CHECKING:
 
 @models.register_model
 class OAuthConnection(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
 
-    user = models.ForeignKey(
+    user: Any = models.ForeignKey(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.CASCADE,
         related_name="oauth_connections",
     )
 
     # The key used to refer to this provider type (in settings)
-    provider_key = models.CharField(max_length=100)
+    provider_key: str = models.CharField(max_length=100)
 
     # The unique ID of the user on the provider's system
-    provider_user_id = models.CharField(max_length=100)
+    provider_user_id: str = models.CharField(max_length=100)
 
     # Token data
-    access_token = models.CharField(max_length=2000)
-    refresh_token = models.CharField(max_length=2000, required=False)
-    access_token_expires_at = models.DateTimeField(required=False, allow_null=True)
-    refresh_token_expires_at = models.DateTimeField(required=False, allow_null=True)
+    access_token: str = models.CharField(max_length=2000)
+    refresh_token: str = models.CharField(max_length=2000, required=False)
+    access_token_expires_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
+    refresh_token_expires_at: datetime.datetime | None = models.DateTimeField(
+        required=False, allow_null=True
+    )
 
     model_options = models.Options(
         constraints=[
@@ -66,13 +73,13 @@ class OAuthConnection(models.Model):
         self.set_token_fields(refreshed_oauth_token)
         self.save()
 
-    def set_token_fields(self, oauth_token: "OAuthToken") -> None:
+    def set_token_fields(self, oauth_token: OAuthToken) -> None:
         self.access_token = oauth_token.access_token
         self.refresh_token = oauth_token.refresh_token
         self.access_token_expires_at = oauth_token.access_token_expires_at
         self.refresh_token_expires_at = oauth_token.refresh_token_expires_at
 
-    def set_user_fields(self, oauth_user: "OAuthUser") -> None:
+    def set_user_fields(self, oauth_user: OAuthUser) -> None:
         self.provider_user_id = oauth_user.provider_id
 
     def access_token_expired(self) -> bool:
@@ -89,8 +96,8 @@ class OAuthConnection(models.Model):
 
     @classmethod
     def get_or_create_user(
-        cls, *, provider_key: str, oauth_token: "OAuthToken", oauth_user: "OAuthUser"
-    ) -> "OAuthConnection":
+        cls, *, provider_key: str, oauth_token: OAuthToken, oauth_user: OAuthUser
+    ) -> OAuthConnection:
         try:
             connection = cls.query.get(
                 provider_key=provider_key,
@@ -124,9 +131,9 @@ class OAuthConnection(models.Model):
         *,
         user: Any,
         provider_key: str,
-        oauth_token: "OAuthToken",
-        oauth_user: "OAuthUser",
-    ) -> "OAuthConnection":
+        oauth_token: OAuthToken,
+        oauth_user: OAuthUser,
+    ) -> OAuthConnection:
         """
         Connect will either create a new connection or update an existing connection
         """

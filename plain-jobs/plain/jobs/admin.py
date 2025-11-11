@@ -12,6 +12,7 @@ from plain.admin.views import (
     register_viewset,
 )
 from plain.http import ResponseRedirect
+from plain.models import fields
 from plain.runtime import settings
 
 from .models import JobProcess, JobRequest, JobResult
@@ -203,12 +204,12 @@ class JobResultViewset(AdminViewset):
                 retried=models.Case(
                     models.When(retry_job_request_uuid__isnull=False, then=True),
                     default=False,
-                    output_field=models.BooleanField(),
+                    output_field=fields.BooleanField(),
                 ),
                 is_retry=models.Case(
                     models.When(retry_attempt__gt=0, then=True),
                     default=False,
-                    output_field=models.BooleanField(),
+                    output_field=fields.BooleanField(),
                 ),
             )
             if self.preset == "Successful":

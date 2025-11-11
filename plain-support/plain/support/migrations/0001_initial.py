@@ -4,7 +4,7 @@ import uuid
 
 import plain.models.deletion
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 from plain.runtime import settings
 
 
@@ -19,16 +19,16 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="SupportFormEntry",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("name", models.CharField(max_length=255)),
-                ("email", models.EmailField(max_length=254)),
-                ("message", models.TextField()),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("form_slug", models.CharField(max_length=255)),
+                ("id", fields.PrimaryKeyField()),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("name", fields.CharField(max_length=255)),
+                ("email", fields.EmailField(max_length=254)),
+                ("message", fields.TextField()),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("form_slug", fields.CharField(max_length=255)),
                 (
                     "user",
-                    models.ForeignKey(
+                    fields.ForeignKey(
                         allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
                         related_name="support_form_entries",

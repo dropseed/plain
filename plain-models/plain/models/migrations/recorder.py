@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from typing import TYPE_CHECKING, Any
 
 from plain import models
@@ -42,9 +43,9 @@ class MigrationRecorder:
             _models_registry.ready = True
 
             class Migration(models.Model):
-                app = models.CharField(max_length=255)
-                name = models.CharField(max_length=255)
-                applied = models.DateTimeField(default=now)
+                app: str = models.CharField(max_length=255)
+                name: str = models.CharField(max_length=255)
+                applied: datetime.datetime = models.DateTimeField(default=now)
 
                 # Use isolated models registry for migrations
                 _model_meta = Meta(models_registry=_models_registry)

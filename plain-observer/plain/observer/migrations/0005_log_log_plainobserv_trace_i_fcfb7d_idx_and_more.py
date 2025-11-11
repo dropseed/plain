@@ -2,7 +2,7 @@
 
 import plain.models.deletion
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -14,14 +14,14 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Log",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("timestamp", models.DateTimeField()),
-                ("level", models.CharField(max_length=20)),
-                ("logger", models.CharField(max_length=255)),
-                ("message", models.TextField()),
+                ("id", fields.PrimaryKeyField()),
+                ("timestamp", fields.DateTimeField()),
+                ("level", fields.CharField(max_length=20)),
+                ("logger", fields.CharField(max_length=255)),
+                ("message", fields.TextField()),
                 (
                     "span",
-                    models.ForeignKey(
+                    fields.ForeignKey(
                         allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
                         related_name="logs",
@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "trace",
-                    models.ForeignKey(
+                    fields.ForeignKey(
                         on_delete=plain.models.deletion.CASCADE,
                         related_name="logs",
                         to="plainobserver.trace",

@@ -3,7 +3,7 @@
 import uuid
 
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -15,14 +15,14 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Pageview",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("url", models.URLField(max_length=768)),
-                ("timestamp", models.DateTimeField(auto_now_add=True)),
-                ("title", models.CharField(max_length=512, required=False)),
-                ("referrer", models.CharField(max_length=1024, required=False)),
-                ("user_id", models.CharField(max_length=255, required=False)),
-                ("session_key", models.CharField(max_length=255, required=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("uuid", fields.UUIDField(default=uuid.uuid4)),
+                ("url", fields.URLField(max_length=768)),
+                ("timestamp", fields.DateTimeField(auto_now_add=True)),
+                ("title", fields.CharField(max_length=512, required=False)),
+                ("referrer", fields.CharField(max_length=1024, required=False)),
+                ("user_id", fields.CharField(max_length=255, required=False)),
+                ("session_key", fields.CharField(max_length=255, required=False)),
             ],
             options={
                 "ordering": ["-timestamp"],

@@ -2,7 +2,7 @@
 
 import plain.models.deletion
 from plain import models
-from plain.models import migrations
+from plain.models import fields, migrations
 
 
 class Migration(migrations.Migration):
@@ -14,15 +14,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Redirect",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("from_pattern", models.CharField(max_length=255)),
-                ("to_pattern", models.CharField(max_length=255)),
-                ("http_status", models.PositiveSmallIntegerField(default=301)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("order", models.PositiveSmallIntegerField(default=0)),
-                ("enabled", models.BooleanField(default=True)),
-                ("is_regex", models.BooleanField(default=False)),
+                ("id", fields.PrimaryKeyField()),
+                ("from_pattern", fields.CharField(max_length=255)),
+                ("to_pattern", fields.CharField(max_length=255)),
+                ("http_status", fields.PositiveSmallIntegerField(default=301)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
+                ("updated_at", fields.DateTimeField(auto_now=True)),
+                ("order", fields.PositiveSmallIntegerField(default=0)),
+                ("enabled", fields.BooleanField(default=True)),
+                ("is_regex", fields.BooleanField(default=False)),
             ],
             options={
                 "ordering": ["order", "-created_at"],
@@ -31,14 +31,14 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RedirectLog",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("from_url", models.URLField(max_length=512)),
-                ("to_url", models.URLField(max_length=512)),
-                ("http_status", models.PositiveSmallIntegerField(default=301)),
-                ("ip_address", models.GenericIPAddressField()),
-                ("user_agent", models.CharField(max_length=512, required=False)),
-                ("referrer", models.CharField(max_length=512, required=False)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("id", fields.PrimaryKeyField()),
+                ("from_url", fields.URLField(max_length=512)),
+                ("to_url", fields.URLField(max_length=512)),
+                ("http_status", fields.PositiveSmallIntegerField(default=301)),
+                ("ip_address", fields.GenericIPAddressField()),
+                ("user_agent", fields.CharField(max_length=512, required=False)),
+                ("referrer", fields.CharField(max_length=512, required=False)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -47,12 +47,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="NotFoundLog",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("url", models.URLField(max_length=512)),
-                ("ip_address", models.GenericIPAddressField()),
-                ("user_agent", models.CharField(max_length=512, required=False)),
-                ("referrer", models.CharField(max_length=512, required=False)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("id", fields.PrimaryKeyField()),
+                ("url", fields.URLField(max_length=512)),
+                ("ip_address", fields.GenericIPAddressField()),
+                ("user_agent", fields.CharField(max_length=512, required=False)),
+                ("referrer", fields.CharField(max_length=512, required=False)),
+                ("created_at", fields.DateTimeField(auto_now_add=True)),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -78,7 +78,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="redirectlog",
             name="redirect",
-            field=models.ForeignKey(
+            field=fields.ForeignKey(
                 on_delete=plain.models.deletion.CASCADE, to="plainredirection.redirect"
             ),
         ),

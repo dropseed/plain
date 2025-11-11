@@ -40,14 +40,14 @@ def construct_instance(
     Construct and return a model instance from the bound ``form``'s
     ``cleaned_data``, but do not save the returned instance to the database.
     """
-    from plain import models
+    from plain.models.fields.core import PrimaryKeyField
 
     meta = instance._model_meta
 
     cleaned_data = form.cleaned_data
     file_field_list = []
     for f in meta.fields:
-        if isinstance(f, models.PrimaryKeyField) or f.name not in cleaned_data:
+        if isinstance(f, PrimaryKeyField) or f.name not in cleaned_data:
             continue
         if fields is not None and f.name not in fields:
             continue
@@ -697,13 +697,13 @@ def modelfield_to_formfield(
         return form_class(**defaults)
 
     # Avoid a circular import
-    from plain import models
+    from plain.models import fields as model_fields
 
     # Primary key fields aren't rendered by default
-    if isinstance(modelfield, models.PrimaryKeyField):
+    if isinstance(modelfield, model_fields.PrimaryKeyField):
         return None
 
-    if isinstance(modelfield, models.BooleanField):
+    if isinstance(modelfield, model_fields.BooleanField):
         form_class = (
             fields.NullBooleanField if modelfield.allow_null else fields.BooleanField
         )
@@ -713,23 +713,23 @@ def modelfield_to_formfield(
         defaults["required"] = False
         return form_class(**defaults)
 
-    if isinstance(modelfield, models.DecimalField):
+    if isinstance(modelfield, model_fields.DecimalField):
         return fields.DecimalField(
             max_digits=modelfield.max_digits,
             decimal_places=modelfield.decimal_places,
             **defaults,
         )
 
-    if issubclass(modelfield.__class__, models.fields.PositiveIntegerRelDbTypeMixin):  # type: ignore[attr-defined]
+    if issubclass(modelfield.__class__, model_fields.PositiveIntegerRelDbTypeMixin):  # type: ignore[attr-defined]
         return fields.IntegerField(min_value=0, **defaults)
 
-    if isinstance(modelfield, models.TextField):
+    if isinstance(modelfield, model_fields.TextField):
         # Passing max_length to fields.CharField means that the value's length
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
         return fields.CharField(max_length=modelfield.max_length, **defaults)
 
-    if isinstance(modelfield, models.CharField):
+    if isinstance(modelfield, model_fields.CharField):
         # Passing max_length to forms.CharField means that the value's length
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
@@ -740,12 +740,12 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    if isinstance(modelfield, models.JSONField):
+    if isinstance(modelfield, model_fields.JSONField):
         return fields.JSONField(
             encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
         )
 
-    if isinstance(modelfield, models.ForeignKey):
+    if isinstance(modelfield, model_fields.ForeignKey):
         return ModelChoiceField(
             queryset=modelfield.remote_field.model.query,  # type: ignore[attr-defined]
             **defaults,
