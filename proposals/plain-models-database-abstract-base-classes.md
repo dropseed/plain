@@ -5,6 +5,7 @@
 ## Problem
 
 Backend base classes use `raise NotImplementedError(...)` for required methods, which means:
+
 - Errors only discovered at runtime when method called
 - No type checker support (Mypy/Pyright can't verify completeness)
 - Unclear which methods are required vs optional
@@ -12,6 +13,7 @@ Backend base classes use `raise NotImplementedError(...)` for required methods, 
 ## Solution
 
 Convert to ABC pattern with `@abstractmethod`:
+
 - Errors caught at class definition/import time
 - Type checkers verify all abstract methods implemented
 - Self-documenting - clearly shows required interface
@@ -21,12 +23,15 @@ Convert to ABC pattern with `@abstractmethod`:
 ### Strong Candidates
 
 **BaseDatabaseClient** (1 abstract method)
+
 - `settings_to_cmd_args_env()`
 
 **BaseDatabaseIntrospection** (5 abstract methods)
+
 - `get_table_list()`, `get_table_description()`, `get_sequences()`, `get_relations()`, `get_constraints()`
 
 **BaseDatabaseWrapper** (6 abstract methods)
+
 - `get_database_version()`, `get_connection_params()`, `get_new_connection()`, `create_cursor()`, `_set_autocommit()`, `is_usable()`
 
 ### Do NOT Convert
@@ -40,6 +45,7 @@ Convert to ABC pattern with `@abstractmethod`:
 ## Implementation
 
 For each class:
+
 1. Add `from abc import ABC, abstractmethod`
 2. Inherit from `ABC`
 3. Replace `raise NotImplementedError(...)` with `@abstractmethod` and `...`
