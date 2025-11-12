@@ -9,7 +9,19 @@ it stays at 100% to prevent backwards regressions.
 import sys
 import subprocess
 import json
+import re
+import argparse
 from pathlib import Path
+
+# ANSI color codes
+class Colors:
+    GREEN = "\033[32m"
+    RED = "\033[31m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    DIM = "\033[2m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
 
 # Paths (files or directories) that must maintain 100% type annotation coverage
 FULLY_TYPED_PATHS = [
@@ -72,91 +84,164 @@ def check_type_coverage(path: str) -> tuple[float, int, int]:
     )
 
 
-def run_type_check(path: str) -> bool:
-    """Run type checker on a file or directory."""
+def run_type_check(path: str, verbose: bool = False) -> tuple[bool, int]:
+    """Run type checker on a file or directory.
+
+    Returns:
+        Tuple of (passed, error_count)
+    """
     result = subprocess.run(
         ["./scripts/type-check", path],
         capture_output=True,
         text=True,
     )
 
-    if result.returncode != 0:
-        print(f"Type check failed for {path}:", file=sys.stderr)
-        print(result.stdout, file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
-        return False
+    # Count diagnostics from output
+    # ty check outputs "Found X diagnostics" at the end, or individual "error[...]:" lines
+    error_count = 0
+    output = result.stdout + result.stderr
 
-    return True
+    # First try to find the summary line "Found X diagnostics"
+    if match := re.search(r'Found (\d+) diagnostics?', output):
+        error_count = int(match.group(1))
+    else:
+        # Fall back to counting individual error lines
+        # ty check formats errors as "error[error-type]: message"
+        for line in output.split('\n'):
+            if re.match(r'^\s*error\[', line):
+                error_count += 1
+
+    passed = result.returncode == 0
+
+    # Print verbose output if requested and there are any diagnostics
+    if verbose and error_count > 0:
+        print(f"\n{Colors.DIM}{'─' * 80}")
+        print(f"Type check output for {path}:")
+        print(f"{'─' * 80}{Colors.RESET}")
+        print(output)
+        print(f"{Colors.DIM}{'─' * 80}{Colors.RESET}\n")
+
+    return passed, error_count
 
 
-def main():
+def main(details: bool = False):
     """Main entry point."""
-    print("Validating type annotations for fully typed paths...")
+    print(f"{Colors.BOLD}Validating type annotations for fully typed paths...{Colors.RESET}")
     print()
 
     failed_items = []
+    total_errors = 0
+    passed_count = 0
+    failed_count = 0
 
     for path in FULLY_TYPED_PATHS:
         path_obj = Path(path)
         if not path_obj.exists():
-            print(f"⚠️  {path} does not exist, skipping")
+            print(f"{Colors.YELLOW}⚠️  {path} does not exist, skipping{Colors.RESET}")
             continue
 
         # Check coverage
         coverage, typed, total = check_type_coverage(path)
-        coverage_status = "✓" if coverage == 100.0 else "✗"
+        coverage_color = Colors.GREEN if coverage == 100.0 else Colors.RED
+        coverage_status = f"{coverage_color}✓{Colors.RESET}" if coverage == 100.0 else f"{Colors.RED}✗{Colors.RESET}"
 
         # Run type checker
-        type_check_passed = run_type_check(path)
-        type_check_status = "✓" if type_check_passed else "✗"
+        type_check_passed, error_count = run_type_check(path, verbose=details)
+        type_check_color = Colors.GREEN if type_check_passed else Colors.RED
+        type_check_status = f"{type_check_color}✓{Colors.RESET}" if type_check_passed else f"{Colors.RED}✗{Colors.RESET}"
+        total_errors += error_count
 
-        # Print single line
-        print(f"{coverage_status} {type_check_status} {path} - Coverage: {coverage:.1f}% ({typed}/{total})")
+        # Track pass/fail
+        if coverage == 100.0 and type_check_passed:
+            passed_count += 1
+        else:
+            failed_count += 1
+
+        # Print all paths in both modes (verbose adds ty check output)
+        error_info = f" {Colors.DIM}({error_count} errors){Colors.RESET}" if error_count > 0 else ""
+        coverage_info = f"{Colors.DIM}Coverage: {coverage:.1f}% ({typed}/{total}){Colors.RESET}"
+        print(f"{coverage_status} {type_check_status} {path} - {coverage_info}{error_info}")
 
         # Track failures
         if coverage < 100.0:
             failed_items.append((path, f"coverage {coverage:.1f}%"))
         if not type_check_passed:
-            failed_items.append((path, "type check failed"))
+            failed_items.append((path, f"type check failed ({error_count} errors)"))
 
+    # Type-check-only paths
+    if TYPE_CHECK_ONLY_PATHS:
+        print()
+        print(f"{Colors.BOLD}Validating type checking for type-check-only paths...{Colors.RESET}")
+        print()
+
+        for path in TYPE_CHECK_ONLY_PATHS:
+            path_obj = Path(path)
+            if not path_obj.exists():
+                print(f"{Colors.YELLOW}⚠️  {path} does not exist, skipping{Colors.RESET}")
+                continue
+
+            # Run type checker only
+            type_check_passed, error_count = run_type_check(path, verbose=details)
+            type_check_color = Colors.GREEN if type_check_passed else Colors.RED
+            type_check_status = f"{type_check_color}✓{Colors.RESET}" if type_check_passed else f"{Colors.RED}✗{Colors.RESET}"
+            total_errors += error_count
+
+            # Track pass/fail
+            if type_check_passed:
+                passed_count += 1
+            else:
+                failed_count += 1
+
+            # Print all paths (verbose adds ty check output)
+            error_info = f" {Colors.DIM}({error_count} errors){Colors.RESET}" if error_count > 0 else ""
+            print(f"{type_check_status} {path}{error_info}")
+
+            # Track failures
+            if not type_check_passed:
+                failed_items.append((path, f"type check failed ({error_count} errors)"))
+
+    # Print summary
+    total_count = passed_count + failed_count
     print()
-    print("Validating type checking for type-check-only paths...")
-    print()
-
-    for path in TYPE_CHECK_ONLY_PATHS:
-        path_obj = Path(path)
-        if not path_obj.exists():
-            print(f"⚠️  {path} does not exist, skipping")
-            continue
-
-        # Run type checker only
-        type_check_passed = run_type_check(path)
-        type_check_status = "✓" if type_check_passed else "✗"
-
-        # Print single line
-        print(f"{type_check_status} {path}")
-
-        # Track failures
-        if not type_check_passed:
-            failed_items.append((path, "type check failed"))
+    print(f"{Colors.BOLD}Type Validation Summary{Colors.RESET}")
+    print(f"  {Colors.GREEN}Passed:{Colors.RESET} {passed_count}/{total_count}")
+    if failed_count > 0:
+        print(f"  {Colors.RED}Failed:{Colors.RESET} {failed_count}/{total_count}")
 
     if failed_items:
         print()
-        print("❌ Type validation failed for the following paths:")
-        for path, reason in failed_items:
-            print(f"  - {path}: {reason}")
+        print(f"{Colors.RED}{Colors.BOLD}❌ Type validation failed{Colors.RESET}")
         print()
-        print("To fix:")
-        print("  1. Check coverage: ./scripts/type-coverage <path> --details --missing")
-        print("  2. Add missing annotations")
-        print("  3. Run type check: ./scripts/type-check <path>")
-        print("  4. Format: ./scripts/fix")
+        for path, reason in failed_items:
+            print(f"  {Colors.RED}•{Colors.RESET} {path}: {Colors.DIM}{reason}{Colors.RESET}")
+        print()
+        print(f"{Colors.BOLD}Total diagnostics/errors: {Colors.RED}{total_errors}{Colors.RESET}")
+        print()
+        print(f"{Colors.DIM}To fix:{Colors.RESET}")
+        print(f"{Colors.DIM}  1. Check coverage: ./scripts/type-coverage <path> --details --missing{Colors.RESET}")
+        print(f"{Colors.DIM}  2. Add missing annotations{Colors.RESET}")
+        print(f"{Colors.DIM}  3. Run type check: ./scripts/type-check <path>{Colors.RESET}")
+        print(f"{Colors.DIM}  4. Format: ./scripts/fix{Colors.RESET}")
         sys.exit(1)
 
     print()
-    print("✓ All paths passed type validation")
+    if total_errors > 0:
+        print(f"{Colors.YELLOW}⚠️  All paths passed validation, but found {total_errors} total diagnostics/errors{Colors.RESET}")
+    else:
+        print(f"{Colors.GREEN}{Colors.BOLD}✓ All paths passed type validation with no errors{Colors.RESET}")
     sys.exit(0)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Validate type annotations for fully typed paths"
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Show all paths and detailed type check output (default: only show failures and summary)",
+    )
+    args = parser.parse_args()
+
+    main(details=args.verbose)
