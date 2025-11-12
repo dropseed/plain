@@ -27,7 +27,7 @@ from plain.models.exceptions import (
     MultipleObjectsReturnedDescriptor,
 )
 from plain.models.expressions import RawSQL, Value
-from plain.models.fields.core import NOT_PROVIDED, Field, PrimaryKeyField
+from plain.models.fields.core import NOT_PROVIDED, BaseField, PrimaryKeyField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options
@@ -51,7 +51,7 @@ DEFERRED = Deferred()
 @dataclass_transform(
     eq_default=True,
     kw_only_default=True,
-    field_specifiers=(Field,),
+    field_specifiers=(BaseField,),
 )
 class ModelBase(type):
     """Metaclass for all models.

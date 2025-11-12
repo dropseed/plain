@@ -16,7 +16,7 @@ from plain.models.transaction import atomic
 if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.fields.related import ManyToManyField
     from plain.models.fields.reverse_related import ManyToManyRel
 
@@ -134,8 +134,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def alter_field(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         strict: bool = False,
     ) -> None:
         if not self._field_should_be_altered(old_field, new_field):
@@ -190,9 +190,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _remake_table(
         self,
         model: type[Model],
-        create_field: Field | None = None,
-        delete_field: Field | None = None,
-        alter_fields: list[tuple[Field, Field]] | None = None,
+        create_field: BaseField | None = None,
+        delete_field: BaseField | None = None,
+        alter_fields: list[tuple[BaseField, BaseField]] | None = None,
     ) -> None:
         """
         Shortcut to transform a model from old_model into new_model
@@ -213,7 +213,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Self-referential fields must be recreated rather than copied from
         # the old model to ensure their remote_field.field_name doesn't refer
         # to an altered field.
-        def is_self_referential(f: Field) -> bool:
+        def is_self_referential(f: BaseField) -> bool:
             return f.is_relation and f.remote_field.model is model  # type: ignore[attr-defined]
 
         # Work out the new fields dict / mapping
@@ -368,7 +368,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 ):
                     self.deferred_sql.remove(sql)
 
-    def add_field(self, model: type[Model], field: Field) -> None:
+    def add_field(self, model: type[Model], field: BaseField) -> None:
         """Create a field on a model."""
         if (
             # Primary keys are not supported in ALTER TABLE
@@ -385,7 +385,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         else:
             super().add_field(model, field)
 
-    def remove_field(self, model: type[Model], field: Field) -> None:
+    def remove_field(self, model: type[Model], field: BaseField) -> None:
         """
         Remove a field from a model. Usually involves deleting a column,
         but for M2Ms may involve deleting a table.
@@ -413,8 +413,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _alter_field(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         old_type: str,
         new_type: str,
         old_db_params: dict[str, Any],

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import models
+from plain.models import CharField, DateTimeField, Field, Model, Options
 from plain.models.connections import DatabaseConnection
 from plain.models.db import DatabaseError
 from plain.models.meta import Meta
@@ -30,10 +30,10 @@ class MigrationRecorder:
     a row in the table always means a migration is applied.
     """
 
-    _migration_class: type[models.Model] | None = None
+    _migration_class: type[Model] | None = None
 
     @classproperty
-    def Migration(cls) -> type[models.Model]:  # type: ignore[misc]
+    def Migration(cls) -> type[Model]:  # type: ignore[misc]
         """
         Lazy load to avoid PackageRegistryNotReady if installed packages import
         MigrationRecorder.
@@ -42,15 +42,15 @@ class MigrationRecorder:
             _models_registry = ModelsRegistry()
             _models_registry.ready = True
 
-            class Migration(models.Model):
-                app: str = models.CharField(max_length=255)
-                name: str = models.CharField(max_length=255)
-                applied: datetime.datetime = models.DateTimeField(default=now)
+            class Migration(Model):
+                app: Field[str, CharField(max_length=255)]
+                name: Field[str, CharField(max_length=255)]
+                applied: Field[datetime | None, DateTimeField(default=now)] = None
 
                 # Use isolated models registry for migrations
                 _model_meta = Meta(models_registry=_models_registry)
 
-                model_options = models.Options(
+                model_options = Options(
                     package_label="migrations",
                     db_table="plainmigrations",
                 )

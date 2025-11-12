@@ -14,6 +14,7 @@ from plain.http import (
     ResponseRedirect,
     StreamingResponse,
 )
+from plain.http.response import ResponseHeaders
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import View
@@ -37,7 +38,7 @@ class AssetView(View):
     def get_url_path(self) -> str:
         return self.asset_path or self.url_kwargs["path"]
 
-    def get(self) -> Response | FileResponse:
+    def get(self) -> Response | FileResponse | StreamingResponse:
         url_path = self.get_url_path()
 
         # Make a trailing slash work, but we don't expect it
@@ -53,6 +54,8 @@ class AssetView(View):
                     return redirect_response
 
         self.check_asset_path(absolute_path)
+        # After check_asset_path, absolute_path is guaranteed to be a valid str
+        assert absolute_path is not None
 
         if encoded_path := self.get_encoded_path(absolute_path):
             absolute_path = encoded_path
@@ -127,7 +130,9 @@ class AssetView(View):
     def get_size(self, path: str) -> int:
         return os.path.getsize(path)
 
-    def update_headers(self, headers: dict, path: str) -> dict:
+    def update_headers(
+        self, headers: dict | ResponseHeaders, path: str
+    ) -> dict | ResponseHeaders:
         headers.setdefault("Access-Control-Allow-Origin", "*")
 
         # Always vary on Accept-Encoding

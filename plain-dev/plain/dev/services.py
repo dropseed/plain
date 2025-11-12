@@ -34,6 +34,7 @@ class ServicesProcess(ProcessManager):
         self.init_poncho(print)
 
         try:
+            assert self.poncho is not None, "poncho should be initialized"
             services = self.get_services(APP_PATH.parent)
             for name, data in services.items():
                 env = {

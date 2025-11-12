@@ -328,6 +328,34 @@ Behind the scenes, Plain uses [type stubs](./fields/typing.pyi) to make field co
 
 Type annotations are optional but recommended for better IDE support.
 
+### Optional fields with defaults
+
+Fields with defaults (like `default=`, `auto_now_add=True`, or `required=False`) should include `| None` in their type annotation and use `= None` as a sentinel value. This tells type checkers that these fields are optional in `__init__`:
+
+```python
+from typing import Annotated
+from datetime import datetime
+from uuid import UUID
+
+Field = Annotated
+
+class Article(models.Model):
+    # Required field - no | None, no = None
+    title: Field[str, models.CharField(max_length=200)]
+
+    # Fields with defaults - use | None and = None
+    created_at: Field[datetime | None, models.DateTimeField(auto_now_add=True)] = None
+    uuid: Field[UUID | None, models.UUIDField(default=uuid4)] = None
+    status: Field[str | None, models.CharField(default="draft", max_length=20)] = None
+
+    # Optional/nullable fields - use | None and = None
+    published_at: Field[datetime | None, models.DateTimeField(required=False, allow_null=True)] = None
+```
+
+The `= None` is a sentinel value that signals to type checkers that the field has a default and doesn't need to be provided in `__init__`. At runtime, the field instance replaces this `None` value. The `| None` in the type reflects that the field value can be None (either from a default, auto-generation, or nullability).
+
+**Note**: The `| None` is primarily a type-checker hint. It doesn't change runtime behavior - fields will still use their configured defaults and validation rules.
+
 ### Working with Field types directly
 
 When you need to work with the actual Field types (not the value types), import `fields` directly from `plain.models`:

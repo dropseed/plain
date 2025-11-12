@@ -96,7 +96,7 @@ class PasswordResetView(AuthViewMixin, FormView):
     def get(self) -> Response:
         if self.user:
             # Redirect if the user is already logged in
-            return ResponseRedirect(self.success_url)
+            return ResponseRedirect(str(self.success_url))
 
         # Tokens are initially passed as GET parameters and we
         # immediately store them in the session and remove it from the URL.

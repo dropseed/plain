@@ -3,11 +3,22 @@ from __future__ import annotations
 import datetime
 from typing import Any, Self
 
-from plain import models
+from plain.models import (
+    CharField,
+    DateTimeField,
+    Field,
+    Index,
+    JSONField,
+    Model,
+    Options,
+    QuerySet,
+    UniqueConstraint,
+    register_model,
+)
 from plain.utils import timezone
 
 
-class CachedItemQuerySet(models.QuerySet["CachedItem"]):
+class CachedItemQuerySet(QuerySet["CachedItem"]):
     def expired(self) -> Self:
         return self.filter(expires_at__lt=timezone.now())
 
@@ -18,26 +29,22 @@ class CachedItemQuerySet(models.QuerySet["CachedItem"]):
         return self.filter(expires_at=None)
 
 
-@models.register_model
-class CachedItem(models.Model):
-    key: str = models.CharField(max_length=255)
-    value: Any | None = models.JSONField(required=False, allow_null=True)
-    expires_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
-    )
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
+@register_model
+class CachedItem(Model):
+    key: Field[str, CharField(max_length=255)]
+    value: Field[Any | None, JSONField(allow_null=True)] = None
+    expires_at: Field[datetime.datetime | None, DateTimeField(allow_null=True)] = None
+    created_at: Field[datetime.datetime | None, DateTimeField(auto_now_add=True)] = None
+    updated_at: Field[datetime.datetime | None, DateTimeField(auto_now=True)] = None
 
     query = CachedItemQuerySet()
 
-    model_options = models.Options(
+    model_options = Options(
         indexes=[
-            models.Index(fields=["expires_at"]),
+            Index(fields=["expires_at"]),
         ],
         constraints=[
-            models.UniqueConstraint(
-                fields=["key"], name="plaincache_cacheditem_unique_key"
-            ),
+            UniqueConstraint(fields=["key"], name="plaincache_cacheditem_unique_key"),
         ],
     )
 

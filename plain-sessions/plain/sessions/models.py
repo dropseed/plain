@@ -1,24 +1,34 @@
 from __future__ import annotations
 
-import datetime
+from datetime import datetime
 from typing import Any
 
-from plain import models
+from plain.models import (
+    CharField,
+    DateTimeField,
+    Field,
+    Index,
+    JSONField,
+    Model,
+    Options,
+    UniqueConstraint,
+    register_model,
+)
 
 
-@models.register_model
-class Session(models.Model):
-    session_key: str = models.CharField(max_length=40)
-    session_data: dict[str, Any] = models.JSONField(default=dict, required=False)
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    expires_at: datetime.datetime | None = models.DateTimeField(allow_null=True)
+@register_model
+class Session(Model):
+    session_key: Field[str, CharField(max_length=40)]
+    session_data: Field[dict[str, Any], JSONField(default=dict)]
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    expires_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
 
-    model_options = models.Options(
+    model_options = Options(
         indexes=[
-            models.Index(fields=["expires_at"]),
+            Index(fields=["expires_at"]),
         ],
         constraints=[
-            models.UniqueConstraint(fields=["session_key"], name="unique_session_key")
+            UniqueConstraint(fields=["session_key"], name="unique_session_key")
         ],
     )
 

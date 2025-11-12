@@ -13,7 +13,7 @@ from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameFie
 
 if TYPE_CHECKING:
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.migrations.state import ProjectState
 
 
@@ -57,7 +57,7 @@ class CreateModel(ModelOperation):
     def __init__(
         self,
         name: str,
-        fields: list[tuple[str, Field]],
+        fields: list[tuple[str, BaseField]],
         options: dict[str, Any] | None = None,
         bases: tuple[Any, ...] | None = None,
     ) -> None:

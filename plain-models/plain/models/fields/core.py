@@ -54,7 +54,7 @@ __all__ = [
     "DurationField",
     "EmailField",
     "Empty",
-    "Field",
+    "BaseField",
     "FloatField",
     "GenericIPAddressField",
     "IntegerField",
@@ -84,7 +84,7 @@ class NOT_PROVIDED:
 BLANK_CHOICE_DASH = [("", "---------")]
 
 
-def _load_field(package_label: str, model_name: str, field_name: str) -> Field:
+def _load_field(package_label: str, model_name: str, field_name: str) -> BaseField:
     return models_registry.get_model(package_label, model_name)._model_meta.get_field(
         field_name
     )
@@ -119,7 +119,7 @@ T = TypeVar("T")
 
 
 @total_ordering
-class Field(RegisterLookupMixin, Generic[T]):
+class BaseField(RegisterLookupMixin, Generic[T]):
     """Base class for all field types"""
 
     # Designates whether empty strings fundamentally are allowed at the
@@ -203,8 +203,8 @@ class Field(RegisterLookupMixin, Generic[T]):
         self.auto_created = False
 
         # Adjust the appropriate creation counter, and save our local copy.
-        self.creation_counter = Field.creation_counter
-        Field.creation_counter += 1
+        self.creation_counter = BaseField.creation_counter
+        BaseField.creation_counter += 1
 
         self._validators = list(validators)  # Store for deconstruction later
 
@@ -404,7 +404,7 @@ class Field(RegisterLookupMixin, Generic[T]):
                 )
         return errors
 
-    def get_col(self, alias: str, output_field: Field | None = None) -> Any:
+    def get_col(self, alias: str, output_field: BaseField | None = None) -> Any:
         if alias == self.model.model_options.db_table and (
             output_field is None or output_field == self
         ):
@@ -504,7 +504,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         # Return basic info - other fields should override this.
         return (self.name, path, [], keywords)
 
-    def clone(self) -> Field:
+    def clone(self) -> BaseField:
         """
         Uses deconstruct() to clone a new copy of this Field.
         Will not preserve any class attachments/attribute names.
@@ -514,7 +514,7 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     def __eq__(self, other: object) -> bool:
         # Needed for @total_ordering
-        if isinstance(other, Field):
+        if isinstance(other, BaseField):
             return self.creation_counter == other.creation_counter and getattr(
                 self, "model", None
             ) == getattr(other, "model", None)
@@ -523,11 +523,11 @@ class Field(RegisterLookupMixin, Generic[T]):
     def __lt__(self, other: object) -> bool:
         # This is needed because bisect does not take a comparison function.
         # Order by creation_counter first for backward compatibility.
-        if not isinstance(other, Field):
+        if not isinstance(other, BaseField):
             return NotImplemented
 
         # Type narrowing: other is now known to be a Field
-        other_field: Field[Any] = other
+        other_field: BaseField[Any] = other
 
         if (
             self.creation_counter != other_field.creation_counter
@@ -558,7 +558,7 @@ class Field(RegisterLookupMixin, Generic[T]):
     def __hash__(self) -> int:
         return hash(self.creation_counter)
 
-    def __deepcopy__(self, memodict: dict[int, Any]) -> Field:
+    def __deepcopy__(self, memodict: dict[int, Any]) -> BaseField:
         # We don't have to deepcopy very much here, since most things are not
         # intended to be altered after initial creation.
         obj = copy.copy(self)
@@ -569,7 +569,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         memodict[id(self)] = obj
         return obj
 
-    def __copy__(self) -> Field:
+    def __copy__(self) -> BaseField:
         # We need to avoid hitting __reduce__, so define this
         # slightly weird copy construct.
         obj = Empty()
@@ -581,7 +581,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         self,
     ) -> (
         tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]
-        | tuple[Callable[..., Field], tuple[str, str, str]]
+        | tuple[Callable[..., BaseField], tuple[str, str, str]]
     ):
         """
         Pickling should return the model._model_meta.fields instance of the field,
@@ -815,12 +815,12 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     # Descriptor protocol implementation
     @overload
-    def __get__(self, instance: None, owner: type) -> Field[T]: ...
+    def __get__(self, instance: None, owner: type) -> BaseField[T]: ...
 
     @overload
     def __get__(self, instance: Any, owner: type) -> T: ...
 
-    def __get__(self, instance: Any | None, owner: type) -> Field[T] | T:
+    def __get__(self, instance: Any | None, owner: type) -> BaseField[T] | T:
         """
         Descriptor __get__ for attribute access.
 
@@ -1004,7 +1004,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         return getattr(obj, self.attname)
 
 
-class BooleanField(Field[bool]):
+class BooleanField(BaseField[bool]):
     empty_strings_allowed = False
     default_error_messages = {
         "invalid": '"%(value)s" value must be either True or False.',
@@ -1038,7 +1038,7 @@ class BooleanField(Field[bool]):
         return self.to_python(value)
 
 
-class CharField(Field[str]):
+class CharField(BaseField[str]):
     def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
         super().__init__(**kwargs)
         self.db_collation = db_collation
@@ -1222,7 +1222,7 @@ class DateTimeCheckMixin:
         return []
 
 
-class DateField(DateTimeCheckMixin, Field[datetime.date]):
+class DateField(DateTimeCheckMixin, BaseField[datetime.date]):
     empty_strings_allowed = False
     default_error_messages = {
         "invalid": '"%(value)s" value has an invalid date format. It must be in YYYY-MM-DD format.',
@@ -1444,7 +1444,7 @@ class DateTimeField(DateField):
         return "" if val is None else val.isoformat()
 
 
-class DecimalField(Field[decimal.Decimal]):
+class DecimalField(BaseField[decimal.Decimal]):
     empty_strings_allowed = False
     default_error_messages = {
         "invalid": '"%(value)s" value must be a decimal number.',
@@ -1592,7 +1592,7 @@ class DecimalField(Field[decimal.Decimal]):
         return self.to_python(value)
 
 
-class DurationField(Field[datetime.timedelta]):
+class DurationField(BaseField[datetime.timedelta]):
     """
     Store timedelta objects.
 
@@ -1666,7 +1666,7 @@ class EmailField(CharField):
         return name, path, args, kwargs
 
 
-class FloatField(Field[float]):
+class FloatField(BaseField[float]):
     empty_strings_allowed = False
     default_error_messages = {
         "invalid": '"%(value)s" value must be a float.',
@@ -1700,7 +1700,7 @@ class FloatField(Field[float]):
             )
 
 
-class IntegerField(Field[int]):
+class IntegerField(BaseField[int]):
     empty_strings_allowed = False
     default_error_messages = {
         "invalid": '"%(value)s" value must be an integer.',
@@ -1807,7 +1807,7 @@ class SmallIntegerField(IntegerField):
         return "SmallIntegerField"
 
 
-class GenericIPAddressField(Field[str]):
+class GenericIPAddressField(BaseField[str]):
     empty_strings_allowed = False
     description = "IP address"
     default_error_messages = {}
@@ -1942,7 +1942,7 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
         return "PositiveSmallIntegerField"
 
 
-class TextField(Field[str]):
+class TextField(BaseField[str]):
     description = "Text"
 
     def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
@@ -1997,7 +1997,7 @@ class TextField(Field[str]):
         return name, path, args, kwargs
 
 
-class TimeField(DateTimeCheckMixin, Field[datetime.time]):
+class TimeField(DateTimeCheckMixin, BaseField[datetime.time]):
     empty_strings_allowed = False
     default_error_messages = {
         "invalid": '"%(value)s" value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] format.',
@@ -2116,7 +2116,7 @@ class URLField(CharField):
         return name, path, args, kwargs
 
 
-class BinaryField(Field[bytes | memoryview]):
+class BinaryField(BaseField[bytes | memoryview]):
     description = "Raw binary data"
     empty_values = [None, b""]
 
@@ -2175,7 +2175,7 @@ class BinaryField(Field[bytes | memoryview]):
         return value
 
 
-class UUIDField(Field[uuid.UUID]):
+class UUIDField(BaseField[uuid.UUID]):
     default_error_messages = {
         "invalid": '"%(value)s" is not a valid UUID.',
     }
@@ -2233,9 +2233,9 @@ class PrimaryKeyField(BigIntegerField):
         self.auto_created = True
         # Adjust creation counter for auto-created fields
         # We need to undo the counter increment from Field.__init__ and use the auto counter
-        Field.creation_counter -= 1  # Undo the increment
-        self.creation_counter = Field.auto_creation_counter
-        Field.auto_creation_counter -= 1
+        BaseField.creation_counter -= 1  # Undo the increment
+        self.creation_counter = BaseField.auto_creation_counter
+        BaseField.auto_creation_counter -= 1
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
@@ -2265,7 +2265,7 @@ class PrimaryKeyField(BigIntegerField):
         return BigIntegerField().db_type(connection=connection)
 
 
-class JSONField(CheckFieldDefaultMixin, Field):
+class JSONField(CheckFieldDefaultMixin, BaseField):
     empty_strings_allowed = False
     description = "A JSON object"
     default_error_messages = {

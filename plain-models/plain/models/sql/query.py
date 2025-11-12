@@ -35,7 +35,7 @@ from plain.models.expressions import (
     ResolvedOuterRef,
     Value,
 )
-from plain.models.fields.core import Field
+from plain.models.fields.core import BaseField
 from plain.models.fields.related_lookups import MultiColSource
 from plain.models.lookups import Lookup
 from plain.models.query_utils import (
@@ -269,7 +269,7 @@ class Query(BaseExpression):
         self._filtered_relations = {}
 
     @property
-    def output_field(self) -> Field | None:  # type: ignore[return]
+    def output_field(self) -> BaseField | None:  # type: ignore[return]
         if len(self.select) == 1:
             select = self.select[0]
             return getattr(select, "target", None) or select.field
@@ -383,7 +383,7 @@ class Query(BaseExpression):
         clone.change_aliases(change_map)
         return clone
 
-    def _get_col(self, target: Any, field: Field, alias: str | None) -> Col:
+    def _get_col(self, target: Any, field: BaseField, alias: str | None) -> Col:
         if not self.alias_cols:
             alias = None
         return target.get_col(alias, field)
@@ -1205,7 +1205,7 @@ class Query(BaseExpression):
             )
         return lookup_parts, field_parts, False  # type: ignore[return-value]
 
-    def check_query_object_type(self, value: Any, meta: Meta, field: Field) -> None:
+    def check_query_object_type(self, value: Any, meta: Meta, field: BaseField) -> None:
         """
         Check whether the object passed while querying is of the correct type.
         If not, raise a ValueError specifying the wrong object.
@@ -1216,7 +1216,7 @@ class Query(BaseExpression):
                     f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
                 )
 
-    def check_related_objects(self, field: Field, value: Any, meta: Meta) -> None:
+    def check_related_objects(self, field: BaseField, value: Any, meta: Meta) -> None:
         """Check the type of object passed to query relations."""
         if field.is_relation:
             # Check that the field and the queryset use the same model in a
@@ -1611,7 +1611,7 @@ class Query(BaseExpression):
         meta: Meta,
         allow_many: bool = True,
         fail_on_missing: bool = False,
-    ) -> tuple[list[Any], Field, tuple[Field, ...], list[str]]:
+    ) -> tuple[list[Any], BaseField, tuple[BaseField, ...], list[str]]:
         """
         Walk the list of names and turns them into PathInfo tuples. A single
         name in 'names' can generate multiple PathInfos (m2m, for example).
@@ -1756,7 +1756,7 @@ class Query(BaseExpression):
         # directly, compute transforms here and create a partial that converts
         # fields to the appropriate wrapped version.
 
-        def final_transformer(field: Field, alias: str | None) -> Col:
+        def final_transformer(field: BaseField, alias: str | None) -> Col:
             if not self.alias_cols:
                 alias = None
             return field.get_col(alias)  # type: ignore[arg-type]
@@ -1787,14 +1787,14 @@ class Query(BaseExpression):
         for name in transforms:
 
             def transform(
-                field: Field, alias: str | None, *, name: str, previous: Any
+                field: BaseField, alias: str | None, *, name: str, previous: Any
             ) -> BaseExpression:
                 try:
                     wrapped = previous(field, alias)
                     return self.try_transform(wrapped, name)
                 except FieldError:
                     # FieldError is raised if the transform doesn't exist.
-                    if isinstance(final_field, Field) and last_field_exception:
+                    if isinstance(final_field, BaseField) and last_field_exception:
                         raise last_field_exception
                     else:
                         raise
@@ -1839,8 +1839,8 @@ class Query(BaseExpression):
         return JoinInfo(final_field, targets, meta, joins, path, final_transformer)
 
     def trim_joins(
-        self, targets: tuple[Field, ...], joins: list[str], path: list[Any]
-    ) -> tuple[tuple[Field, ...], str, list[str]]:
+        self, targets: tuple[BaseField, ...], joins: list[str], path: list[Any]
+    ) -> tuple[tuple[BaseField, ...], str, list[str]]:
         """
         The 'target' parameter is the final field being joined to, 'joins'
         is the full list of join aliases. The 'path' contain the PathInfos
@@ -2551,7 +2551,7 @@ class Query(BaseExpression):
         self.set_select([f.get_col(select_alias) for f in select_fields])
         return trimmed_prefix, contains_louter
 
-    def is_nullable(self, field: Field) -> bool:
+    def is_nullable(self, field: BaseField) -> bool:
         """Check if the given field should be treated as nullable."""
         # QuerySet does not have knowledge of which connection is going to be
         # used. For the single-database setup we always reference the default

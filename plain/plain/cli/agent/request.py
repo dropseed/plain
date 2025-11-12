@@ -98,7 +98,7 @@ def request(
 
         # Make the request
         method = method.upper()
-        kwargs: dict[str, object] = {
+        kwargs: dict[str, Any] = {
             "follow": follow,
         }
         if header_dict:

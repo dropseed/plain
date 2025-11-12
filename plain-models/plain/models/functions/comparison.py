@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.db import NotSupportedError
 from plain.models.expressions import Func, Value
-from plain.models.fields.core import Field, TextField
+from plain.models.fields.core import BaseField, TextField
 from plain.models.fields.json import JSONField
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -21,7 +21,7 @@ class Cast(Func):
     function = "CAST"
     template = "%(function)s(%(expressions)s AS %(db_type)s)"
 
-    def __init__(self, expression: Any, output_field: Field) -> None:
+    def __init__(self, expression: Any, output_field: BaseField) -> None:
         super().__init__(expression, output_field=output_field)
 
     def as_sql(

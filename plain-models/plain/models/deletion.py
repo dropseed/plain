@@ -17,7 +17,7 @@ from plain.models.meta import Meta
 from plain.models.query import QuerySet
 
 if TYPE_CHECKING:
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
 
 
 class ProtectedError(IntegrityError):
@@ -32,7 +32,7 @@ class RestrictedError(IntegrityError):
         super().__init__(msg, restricted_objects)
 
 
-def CASCADE(collector: Collector, field: Field, sub_objs: Any) -> None:
+def CASCADE(collector: Collector, field: BaseField, sub_objs: Any) -> None:
     collector.collect(
         sub_objs,
         source=field.remote_field.model,  # type: ignore[attr-defined]
@@ -43,7 +43,7 @@ def CASCADE(collector: Collector, field: Field, sub_objs: Any) -> None:
         collector.add_field_update(field, None, sub_objs)
 
 
-def PROTECT(collector: Collector, field: Field, sub_objs: Any) -> None:
+def PROTECT(collector: Collector, field: BaseField, sub_objs: Any) -> None:
     raise ProtectedError(
         f"Cannot delete some instances of model '{field.remote_field.model.__name__}' because they are "  # type: ignore[attr-defined]
         f"referenced through a protected foreign key: '{sub_objs[0].__class__.__name__}.{field.name}'",
@@ -51,20 +51,24 @@ def PROTECT(collector: Collector, field: Field, sub_objs: Any) -> None:
     )
 
 
-def RESTRICT(collector: Collector, field: Field, sub_objs: Any) -> None:
+def RESTRICT(collector: Collector, field: BaseField, sub_objs: Any) -> None:
     collector.add_restricted_objects(field, sub_objs)
     collector.add_dependency(field.remote_field.model, field.model)  # type: ignore[attr-defined]
 
 
-def SET(value: Any) -> Callable[[Collector, Field, Any], None]:
+def SET(value: Any) -> Callable[[Collector, BaseField, Any], None]:
     if callable(value):
 
-        def set_on_delete(collector: Collector, field: Field, sub_objs: Any) -> None:
+        def set_on_delete(
+            collector: Collector, field: BaseField, sub_objs: Any
+        ) -> None:
             collector.add_field_update(field, value(), sub_objs)
 
     else:
 
-        def set_on_delete(collector: Collector, field: Field, sub_objs: Any) -> None:
+        def set_on_delete(
+            collector: Collector, field: BaseField, sub_objs: Any
+        ) -> None:
             collector.add_field_update(field, value, sub_objs)
 
     set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})  # type: ignore[attr-defined]
@@ -72,21 +76,21 @@ def SET(value: Any) -> Callable[[Collector, Field, Any], None]:
     return set_on_delete
 
 
-def SET_NULL(collector: Collector, field: Field, sub_objs: Any) -> None:
+def SET_NULL(collector: Collector, field: BaseField, sub_objs: Any) -> None:
     collector.add_field_update(field, None, sub_objs)
 
 
 SET_NULL.lazy_sub_objs = True  # type: ignore[attr-defined]
 
 
-def SET_DEFAULT(collector: Collector, field: Field, sub_objs: Any) -> None:
+def SET_DEFAULT(collector: Collector, field: BaseField, sub_objs: Any) -> None:
     collector.add_field_update(field, field.get_default(), sub_objs)
 
 
 SET_DEFAULT.lazy_sub_objs = True  # type: ignore[attr-defined]
 
 
-def DO_NOTHING(collector: Collector, field: Field, sub_objs: Any) -> None:
+def DO_NOTHING(collector: Collector, field: BaseField, sub_objs: Any) -> None:
     pass
 
 
@@ -107,7 +111,7 @@ class Collector:
         # Initially, {model: {instances}}, later values become lists.
         self.data: defaultdict[Any, Any] = defaultdict(set)
         # {(field, value): [instances, …]}
-        self.field_updates: defaultdict[tuple[Field, Any], list[Any]] = defaultdict(
+        self.field_updates: defaultdict[tuple[BaseField, Any], list[Any]] = defaultdict(
             list
         )
         # {model: {field: {instances}}}
@@ -164,14 +168,16 @@ class Collector:
         self.dependencies[model].add(dependency)
         self.data.setdefault(dependency, self.data.default_factory())
 
-    def add_field_update(self, field: Field, value: Any, objs: Iterable[Any]) -> None:
+    def add_field_update(
+        self, field: BaseField, value: Any, objs: Iterable[Any]
+    ) -> None:
         """
         Schedule a field update. 'objs' must be a homogeneous iterable
         collection of model instances (e.g. a QuerySet).
         """
         self.field_updates[field, value].append(objs)
 
-    def add_restricted_objects(self, field: Field, objs: Iterable[Any]) -> None:
+    def add_restricted_objects(self, field: BaseField, objs: Iterable[Any]) -> None:
         if objs:
             model = objs[0].__class__
             self.restricted_objects[model][field].update(objs)
@@ -227,7 +233,9 @@ class Collector:
             )
         )
 
-    def get_del_batches(self, objs: list[Any], fields: list[Field]) -> list[list[Any]]:
+    def get_del_batches(
+        self, objs: list[Any], fields: list[BaseField]
+    ) -> list[list[Any]]:
         """
         Return the objs in suitably sized batches for the used db_connection.
         """
@@ -365,7 +373,7 @@ class Collector:
                     )
 
     def related_objects(
-        self, related_model: Any, related_fields: list[Field], objs: Iterable[Any]
+        self, related_model: Any, related_fields: list[BaseField], objs: Iterable[Any]
     ) -> QuerySet:
         """
         Get a QuerySet of the related model to objs via related fields.

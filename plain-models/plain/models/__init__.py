@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import Annotated
 
 from .registry import models_registry, register_model  # isort:skip  Create the registry first
 from . import (
@@ -11,74 +11,46 @@ from .constraints import CheckConstraint, UniqueConstraint
 from .db import IntegrityError, db_connection
 from .deletion import CASCADE, DO_NOTHING, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
 from .enums import IntegerChoices, TextChoices
-
-# Field imports: use type stubs during type checking, real classes at runtime
-if TYPE_CHECKING:
-    # Import type stub overrides that make fields appear to return value types
-    from .fields.typing import (
-        BigIntegerField,
-        BinaryField,
-        BooleanField,
-        CharField,
-        DateField,
-        DateTimeField,
-        DecimalField,
-        DurationField,
-        EmailField,
-        FloatField,
-        ForeignKey,
-        GenericIPAddressField,
-        IntegerField,
-        JSONField,
-        ManyToManyField,
-        PositiveBigIntegerField,
-        PositiveIntegerField,
-        PositiveSmallIntegerField,
-        PrimaryKeyField,
-        SmallIntegerField,
-        TextField,
-        TimeField,
-        URLField,
-        UUIDField,
-    )
-else:
-    # Import real field classes at runtime - these will be the actual descriptor classes
-    from .fields.core import (
-        BigIntegerField,
-        BinaryField,
-        BooleanField,
-        CharField,
-        DateField,
-        DateTimeField,
-        DecimalField,
-        DurationField,
-        EmailField,
-        FloatField,
-        GenericIPAddressField,
-        IntegerField,
-        JSONField,
-        PositiveBigIntegerField,
-        PositiveIntegerField,
-        PositiveSmallIntegerField,
-        PrimaryKeyField,
-        SmallIntegerField,
-        TextField,
-        TimeField,
-        URLField,
-        UUIDField,
-    )
-    from .fields.related import ForeignKey, ManyToManyField
-
+from .fields.core import (
+    BigIntegerField,
+    BinaryField,
+    BooleanField,
+    CharField,
+    DateField,
+    DateTimeField,
+    DecimalField,
+    DurationField,
+    EmailField,
+    FloatField,
+    GenericIPAddressField,
+    IntegerField,
+    JSONField,
+    PositiveBigIntegerField,
+    PositiveIntegerField,
+    PositiveSmallIntegerField,
+    PrimaryKeyField,
+    SmallIntegerField,
+    TextField,
+    TimeField,
+    URLField,
+    UUIDField,
+)
+from .fields.related import ForeignKey, ManyToManyField
 from .indexes import Index
 from .options import Options
 from .query import QuerySet
 from .query_utils import Q
+
+# Field alias for Annotated - enables Field[Type, FieldInstance] syntax
+Field = Annotated
 
 # This module exports the user-facing API for defining model classes,
 # with a secondary focus on the most common query utilities like Q.
 # Advanced query-time features (aggregates, expressions, etc.) should be
 # imported from their specific modules (e.g., plain.models.aggregates).
 __all__ = [
+    # Typing
+    "Field",
     # From constraints
     "CheckConstraint",
     "UniqueConstraint",

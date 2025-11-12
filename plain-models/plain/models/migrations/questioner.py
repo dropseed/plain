@@ -16,7 +16,7 @@ from plain.utils import timezone
 from .loader import MigrationLoader
 
 if TYPE_CHECKING:
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
 
 
 class MigrationQuestioner:
@@ -79,7 +79,7 @@ class MigrationQuestioner:
         return None
 
     def ask_rename(
-        self, model_name: str, old_name: str, new_name: str, field_instance: Field
+        self, model_name: str, old_name: str, new_name: str, field_instance: BaseField
     ) -> bool:
         """Was this field really renamed?"""
         return self.defaults.get("ask_rename", False)
@@ -217,7 +217,7 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
         return None
 
     def ask_rename(
-        self, model_name: str, old_name: str, new_name: str, field_instance: Field
+        self, model_name: str, old_name: str, new_name: str, field_instance: BaseField
     ) -> bool:
         """Was this field really renamed?"""
         msg = "Was %s.%s renamed to %s.%s (a %s)?"

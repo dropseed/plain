@@ -19,6 +19,7 @@ from plain.models.db import (
 )
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.fields.core import (
+    BaseField,
     BinaryField,
     BooleanField,
     CharField,
@@ -26,7 +27,6 @@ from plain.models.fields.core import (
     DateTimeField,
     DecimalField,
     DurationField,
-    Field,
     FloatField,
     IntegerField,
     TimeField,
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.query import QuerySet
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.query import Query
@@ -213,7 +213,7 @@ class BaseExpression:
     # Can the expression can be used as a source expression in Window?
     window_compatible = False
 
-    def __init__(self, output_field: Field | None = None):
+    def __init__(self, output_field: BaseField | None = None):
         if output_field is not None:
             self.output_field = output_field
 
@@ -333,11 +333,11 @@ class BaseExpression:
         return isinstance(self.output_field, BooleanField)  # type: ignore[attr-defined]
 
     @property
-    def field(self) -> Field:
+    def field(self) -> BaseField:
         return self.output_field  # type: ignore[attr-defined]
 
     @cached_property
-    def output_field(self) -> Field:
+    def output_field(self) -> BaseField:
         """Return the output type of this expressions."""
         output_field = self._resolve_output_field()
         if output_field is None:
@@ -346,7 +346,7 @@ class BaseExpression:
         return output_field
 
     @cached_property
-    def _output_field_or_none(self) -> Field | None:
+    def _output_field_or_none(self) -> BaseField | None:
         """
         Return the output field of this expression, or None if
         _resolve_output_field() didn't return an output type.
@@ -358,7 +358,7 @@ class BaseExpression:
                 raise
             return None
 
-    def _resolve_output_field(self) -> Field | None:
+    def _resolve_output_field(self) -> BaseField | None:
         """
         Attempt to infer the output type of the expression.
 
@@ -480,7 +480,7 @@ class BaseExpression:
             cols.extend(source.get_group_by_cols())
         return cols
 
-    def get_source_fields(self) -> list[Field | None]:
+    def get_source_fields(self) -> list[BaseField | None]:
         """Return the underlying field types used by this aggregate."""
         return [e._output_field_or_none for e in self.get_source_expressions()]
 
@@ -531,7 +531,7 @@ class Expression(BaseExpression, Combinable):
         arguments = signature.arguments.items()
         identity: list[Any] = [self.__class__]
         for arg, value in arguments:
-            if isinstance(value, Field):
+            if isinstance(value, BaseField):
                 if value.name and value.model:
                     value = (value.model.model_options.label, value.name)
                 else:
@@ -658,7 +658,7 @@ _connector_combinators = defaultdict(list)
 
 
 def register_combinable_fields(
-    lhs: type[Field], connector: str, rhs: type[Field], result: type[Field]
+    lhs: type[BaseField], connector: str, rhs: type[BaseField], result: type[BaseField]
 ) -> None:
     """
     Register combinable types:
@@ -679,8 +679,8 @@ for d in _connector_combinations:
 
 @functools.lru_cache(maxsize=128)
 def _resolve_combined_type(
-    connector: str, lhs_type: type[Field], rhs_type: type[Field]
-) -> type[Field] | None:
+    connector: str, lhs_type: type[BaseField], rhs_type: type[BaseField]
+) -> type[BaseField] | None:
     combinators = _connector_combinators.get(connector, ())
     for combinator_lhs_type, combinator_rhs_type, combined_type in combinators:
         if issubclass(lhs_type, combinator_lhs_type) and issubclass(
@@ -692,7 +692,7 @@ def _resolve_combined_type(
 
 class CombinedExpression(SQLiteNumericMixin, Expression):
     def __init__(
-        self, lhs: Any, connector: str, rhs: Any, output_field: Field | None = None
+        self, lhs: Any, connector: str, rhs: Any, output_field: BaseField | None = None
     ):
         super().__init__(output_field=output_field)
         self.connector = connector
@@ -711,7 +711,7 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
     def set_source_expressions(self, exprs: Sequence[Any]) -> None:
         self.lhs, self.rhs = exprs
 
-    def _resolve_output_field(self) -> Field | None:
+    def _resolve_output_field(self) -> BaseField | None:
         # We avoid using super() here for reasons given in
         # Expression._resolve_output_field()
         combined_type = _resolve_combined_type(
@@ -978,7 +978,7 @@ class Func(SQLiteNumericMixin, Expression):
     arity = None  # The number of arguments the function accepts.
 
     def __init__(
-        self, *expressions: Any, output_field: Field | None = None, **extra: Any
+        self, *expressions: Any, output_field: BaseField | None = None, **extra: Any
     ):
         if self.arity is not None and len(expressions) != self.arity:
             raise TypeError(
@@ -1083,7 +1083,7 @@ class Value(SQLiteNumericMixin, Expression):
     # instances to be compiled until a decision is taken in #25425.
     for_save = False
 
-    def __init__(self, value: Any, output_field: Field | None = None):
+    def __init__(self, value: Any, output_field: BaseField | None = None):
         """
         Arguments:
          * value: the value this expression represents. The value will be
@@ -1133,7 +1133,7 @@ class Value(SQLiteNumericMixin, Expression):
     def get_group_by_cols(self) -> list[Any]:
         return []
 
-    def _resolve_output_field(self) -> Field | None:
+    def _resolve_output_field(self) -> BaseField | None:
         if isinstance(self.value, str):
             return CharField()
         if isinstance(self.value, bool):
@@ -1164,10 +1164,10 @@ class Value(SQLiteNumericMixin, Expression):
 
 class RawSQL(Expression):
     def __init__(
-        self, sql: str, params: Sequence[Any], output_field: Field | None = None
+        self, sql: str, params: Sequence[Any], output_field: BaseField | None = None
     ):
         if output_field is None:
-            output_field = Field()
+            output_field = BaseField()
         self.sql, self.params = sql, params
         super().__init__(output_field=output_field)
 
@@ -1198,7 +1198,7 @@ class Col(Expression):
     possibly_multivalued = False
 
     def __init__(
-        self, alias: str | None, target: Any, output_field: Field | None = None
+        self, alias: str | None, target: Any, output_field: BaseField | None = None
     ):
         if output_field is None:
             output_field = target
@@ -1346,7 +1346,7 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
     extra context to the inner expression, such as the output_field.
     """
 
-    def __init__(self, expression: Any, output_field: Field):
+    def __init__(self, expression: Any, output_field: BaseField):
         super().__init__(output_field=output_field)
         self.expression = expression
 
@@ -1474,7 +1474,7 @@ class When(Expression):
     def set_source_expressions(self, exprs: Sequence[Any]) -> None:
         self.condition, self.result = exprs
 
-    def get_source_fields(self) -> list[Field | None]:
+    def get_source_fields(self) -> list[BaseField | None]:
         # We're only interested in the fields of the result expressions.
         return [self.result._output_field_or_none]
 
@@ -1547,7 +1547,7 @@ class Case(SQLiteNumericMixin, Expression):
         self,
         *cases: When,
         default: Any = None,
-        output_field: Field | None = None,
+        output_field: BaseField | None = None,
         **extra: Any,
     ):
         if not all(isinstance(case, When) for case in cases):
@@ -1653,7 +1653,7 @@ class Subquery(BaseExpression, Combinable):
     def __init__(
         self,
         query: QuerySet[Any] | Query,
-        output_field: Field | None = None,
+        output_field: BaseField | None = None,
         **extra: Any,
     ):
         # Import here to avoid circular import
@@ -1677,7 +1677,7 @@ class Subquery(BaseExpression, Combinable):
     def set_source_expressions(self, exprs: Sequence[Any]) -> None:
         self.query = exprs[0]
 
-    def _resolve_output_field(self) -> Field | None:
+    def _resolve_output_field(self) -> BaseField | None:
         return self.query.output_field
 
     def copy(self) -> Subquery:
@@ -1833,7 +1833,7 @@ class Window(SQLiteNumericMixin, Expression):
         partition_by: Any = None,
         order_by: Any = None,
         frame: Any = None,
-        output_field: Field | None = None,
+        output_field: BaseField | None = None,
     ):
         self.partition_by = partition_by
         self.order_by = order_by
@@ -1862,7 +1862,7 @@ class Window(SQLiteNumericMixin, Expression):
         super().__init__(output_field=output_field)
         self.source_expression = self._parse_expressions(expression)[0]
 
-    def _resolve_output_field(self) -> Field | None:
+    def _resolve_output_field(self) -> BaseField | None:
         return self.source_expression.output_field
 
     def get_source_expressions(self) -> list[Any]:

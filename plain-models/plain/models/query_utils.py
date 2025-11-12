@@ -23,7 +23,7 @@ from plain.utils import tree
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler
 
@@ -362,7 +362,7 @@ def refs_expression(
 
 
 def check_rel_lookup_compatibility(
-    model: type[Model], target_meta: Meta, field: Field
+    model: type[Model], target_meta: Meta, field: BaseField
 ) -> bool:
     """
     Check that model is compatible with target_meta. Compatibility

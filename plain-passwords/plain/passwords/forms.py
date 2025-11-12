@@ -75,7 +75,7 @@ class PasswordResetForm(forms.Form):
                 template_name=email_template_name,
                 context=context,
                 from_email=from_email,
-                to_email=user.email,
+                to_email=user.email,  # type: ignore[attr-defined]
             )
 
 
@@ -104,10 +104,11 @@ class PasswordSetForm(forms.Form):
         # Clean it as if it were being put into the model directly
         self.user._model_meta.get_field("password").clean(password2, self.user)
 
+        assert password2 is not None  # Validated above
         return password2
 
     def save(self, commit: bool = True) -> Model:
-        self.user.password = self.cleaned_data["new_password1"]
+        self.user.password = self.cleaned_data["new_password1"]  # type: ignore[attr-defined]
         if commit:
             self.user.save()
         return self.user

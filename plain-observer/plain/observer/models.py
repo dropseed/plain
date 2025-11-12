@@ -31,33 +31,46 @@ from opentelemetry.semconv.attributes.code_attributes import (
 )
 from opentelemetry.trace import format_trace_id
 
-from plain import models
+from plain.models import (
+    CASCADE,
+    SET_NULL,
+    CharField,
+    DateTimeField,
+    Field,
+    ForeignKey,
+    Index,
+    JSONField,
+    Model,
+    Options,
+    QuerySet,
+    TextField,
+    UniqueConstraint,
+    register_model,
+)
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.utils import timezone
 
 
-@models.register_model
-class Trace(models.Model):
-    trace_id: str = models.CharField(max_length=255)
-    start_time: datetime = models.DateTimeField()
-    end_time: datetime = models.DateTimeField()
+@register_model
+class Trace(Model):
+    trace_id: Field[str, CharField(max_length=255)]
+    start_time: Field[datetime, DateTimeField()]
+    end_time: Field[datetime, DateTimeField()]
 
-    root_span_name: str = models.TextField(default="", required=False)
-    summary: str = models.CharField(max_length=255, default="", required=False)
+    root_span_name: Field[str, TextField()] = ""
+    summary: Field[str, CharField(max_length=255)] = ""
 
     # Plain fields
-    request_id: str = models.CharField(max_length=255, default="", required=False)
-    session_id: str = models.CharField(max_length=255, default="", required=False)
-    user_id: str = models.CharField(max_length=255, default="", required=False)
-    app_name: str = models.CharField(max_length=255, default="", required=False)
-    app_version: str = models.CharField(max_length=255, default="", required=False)
+    request_id: Field[str, CharField(max_length=255)] = ""
+    session_id: Field[str, CharField(max_length=255)] = ""
+    user_id: Field[str, CharField(max_length=255)] = ""
+    app_name: Field[str, CharField(max_length=255)] = ""
+    app_version: Field[str, CharField(max_length=255)] = ""
 
     # Shareable URL fields
-    share_id: str = models.CharField(max_length=32, default="", required=False)
-    share_created_at: datetime | None = models.DateTimeField(
-        allow_null=True, required=False
-    )
+    share_id: Field[str, CharField(max_length=32)] = ""
+    share_created_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
 
     if TYPE_CHECKING:
         from plain.models.fields.related_managers import BaseRelatedManager
@@ -65,20 +78,20 @@ class Trace(models.Model):
         spans: BaseRelatedManager
         logs: BaseRelatedManager
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["-start_time"],
         constraints=[
-            models.UniqueConstraint(
+            UniqueConstraint(
                 fields=["trace_id"],
                 name="observer_unique_trace_id",
             )
         ],
         indexes=[
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["start_time"]),
-            models.Index(fields=["request_id"]),
-            models.Index(fields=["share_id"]),
-            models.Index(fields=["session_id"]),
+            Index(fields=["trace_id"]),
+            Index(fields=["start_time"]),
+            Index(fields=["request_id"]),
+            Index(fields=["share_id"]),
+            Index(fields=["session_id"]),
         ],
     )
 
@@ -235,7 +248,7 @@ class Trace(models.Model):
         """Get chronological list of spans and logs for unified timeline display."""
         events: list[dict[str, Any]] = []
 
-        for span in self.spans.query.all().annotate_spans():
+        for span in self.spans.query.all().annotate_spans():  # type: ignore[attr-defined]
             events.append(
                 {
                     "type": "span",
@@ -271,7 +284,7 @@ class Trace(models.Model):
         return sorted(events, key=lambda x: x["timestamp"])
 
 
-class SpanQuerySet(models.QuerySet["Span"]):
+class SpanQuerySet(QuerySet["Span"]):
     def annotate_spans(self) -> list[Span]:
         """Annotate spans with nesting levels and duplicate query warnings."""
         spans: list[Span] = list(self.order_by("start_time"))
@@ -318,37 +331,35 @@ class SpanQuerySet(models.QuerySet["Span"]):
         return spans
 
 
-@models.register_model
-class Span(models.Model):
-    trace: Trace = models.ForeignKey(
-        Trace, on_delete=models.CASCADE, related_name="spans"
-    )
+@register_model
+class Span(Model):
+    trace: Field[Trace, ForeignKey(Trace, on_delete=CASCADE, related_name="spans")]
 
-    span_id: str = models.CharField(max_length=255)
+    span_id: Field[str, CharField(max_length=255)]
 
-    name: str = models.CharField(max_length=255)
-    kind: str = models.CharField(max_length=50)
-    parent_id: str = models.CharField(max_length=255, default="", required=False)
-    start_time: datetime = models.DateTimeField()
-    end_time: datetime = models.DateTimeField()
-    status: str = models.CharField(max_length=50, default="", required=False)
-    span_data: dict[str, Any] = models.JSONField(default=dict, required=False)
+    name: Field[str, CharField(max_length=255)]
+    kind: Field[str, CharField(max_length=50)]
+    parent_id: Field[str, CharField(max_length=255)] = ""
+    start_time: Field[datetime, DateTimeField()]
+    end_time: Field[datetime, DateTimeField()]
+    status: Field[str, CharField(max_length=50)] = ""
+    span_data: Field[dict[str, Any], JSONField(default=dict)]
 
-    query = SpanQuerySet()
+    query: SpanQuerySet = SpanQuerySet()
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["-start_time"],
         constraints=[
-            models.UniqueConstraint(
+            UniqueConstraint(
                 fields=["trace", "span_id"],
                 name="observer_unique_span_id",
             )
         ],
         indexes=[
-            models.Index(fields=["span_id"]),
-            models.Index(fields=["trace", "span_id"]),
-            models.Index(fields=["trace"]),
-            models.Index(fields=["start_time"]),
+            Index(fields=["span_id"]),
+            Index(fields=["trace", "span_id"]),
+            Index(fields=["trace"]),
+            Index(fields=["start_time"]),
         ],
     )
 
@@ -505,29 +516,28 @@ class Span(models.Model):
         return None
 
 
-@models.register_model
-class Log(models.Model):
-    trace: Trace = models.ForeignKey(
-        Trace, on_delete=models.CASCADE, related_name="logs"
-    )
-    span: Span | None = models.ForeignKey(
-        Span,
-        on_delete=models.SET_NULL,
-        allow_null=True,
-        required=False,
-        related_name="logs",
-    )
+@register_model
+class Log(Model):
+    trace: Field[Trace, ForeignKey(Trace, on_delete=CASCADE, related_name="logs")]
+    span: Field[
+        Span | None,
+        ForeignKey(
+            Span,
+            on_delete=SET_NULL,
+            related_name="logs",
+        ),
+    ] = None
 
-    timestamp: datetime = models.DateTimeField()
-    level: str = models.CharField(max_length=20)
-    message: str = models.TextField()
+    timestamp: Field[datetime, DateTimeField()]
+    level: Field[str, CharField(max_length=20)]
+    message: Field[str, TextField()]
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["timestamp"],
         indexes=[
-            models.Index(fields=["trace", "timestamp"]),
-            models.Index(fields=["trace", "span"]),
-            models.Index(fields=["timestamp"]),
-            models.Index(fields=["trace"]),
+            Index(fields=["trace", "timestamp"]),
+            Index(fields=["trace", "span"]),
+            Index(fields=["timestamp"]),
+            Index(fields=["trace"]),
         ],
     )

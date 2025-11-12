@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthViewMixin
@@ -16,6 +16,9 @@ from .links import (
     LoginLinkInvalid,
     get_link_token_user,
 )
+
+if TYPE_CHECKING:
+    from plain.forms import BaseForm
 
 
 class LoginLinkFormView(AuthViewMixin, FormView):
@@ -34,7 +37,7 @@ class LoginLinkFormView(AuthViewMixin, FormView):
         form.maybe_send_link(self.request)
         return super().form_valid(form)
 
-    def get_success_url(self, form: LoginLinkForm) -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if next_url := form.cleaned_data.get("next"):
             # Keep the next URL in the query string so the sent
             # view can redirect to it if reloaded and logged in already.

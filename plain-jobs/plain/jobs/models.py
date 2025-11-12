@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import datetime
 import logging
 import traceback
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID, uuid4
 
@@ -22,8 +22,24 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind
 
-from plain import models
-from plain.models import transaction
+from plain.models import (
+    CharField,
+    DateTimeField,
+    Field,
+    Index,
+    JSONField,
+    Model,
+    Options,
+    Q,
+    QuerySet,
+    SmallIntegerField,
+    TextChoices,
+    TextField,
+    UniqueConstraint,
+    UUIDField,
+    register_model,
+    transaction,
+)
 from plain.models.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
@@ -38,63 +54,53 @@ logger = logging.getLogger("plain.jobs")
 tracer = trace.get_tracer("plain.jobs")
 
 
-@models.register_model
-class JobRequest(models.Model):
+@register_model
+class JobRequest(Model):
     """
     Keep all pending job requests in a single table.
     """
 
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    uuid: UUID = models.UUIDField(default=uuid4)
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    uuid: Field[UUID | None, UUIDField(default=uuid4)] = None
 
-    job_class: str = models.CharField(max_length=255)
-    parameters: dict[str, Any] | None = models.JSONField(
-        required=False, allow_null=True
-    )
-    priority: int = models.SmallIntegerField(default=0)
-    source: str = models.TextField(required=False)
-    queue: str = models.CharField(default="default", max_length=255)
+    job_class: Field[str, CharField(max_length=255)]
+    parameters: Field[dict[str, Any] | None, JSONField(allow_null=True)] = None
+    priority: Field[int, SmallIntegerField()] = 0
+    source: Field[str, TextField()] = ""
+    queue: Field[str, CharField(max_length=255)] = "default"
 
-    retries: int = models.SmallIntegerField(default=0)
-    retry_attempt: int = models.SmallIntegerField(default=0)
+    retries: Field[int, SmallIntegerField()] = 0
+    retry_attempt: Field[int, SmallIntegerField()] = 0
 
-    concurrency_key: str = models.CharField(max_length=255, required=False)
+    concurrency_key: Field[str, CharField(max_length=255)] = ""
 
-    start_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
-    )
+    start_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
 
     # OpenTelemetry trace context
-    trace_id: str | None = models.CharField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = models.CharField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id: Field[str | None, CharField(max_length=34, allow_null=True)] = None
+    span_id: Field[str | None, CharField(max_length=18, allow_null=True)] = None
 
     # expires_at = models.DateTimeField(required=False, allow_null=True)
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["priority", "-created_at"],
         indexes=[
-            models.Index(fields=["priority"]),
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["queue"]),
-            models.Index(fields=["start_at"]),
-            models.Index(fields=["concurrency_key"]),
-            models.Index(fields=["job_class"]),
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["uuid"]),
+            Index(fields=["priority"]),
+            Index(fields=["created_at"]),
+            Index(fields=["queue"]),
+            Index(fields=["start_at"]),
+            Index(fields=["concurrency_key"]),
+            Index(fields=["job_class"]),
+            Index(fields=["trace_id"]),
+            Index(fields=["uuid"]),
             # Used for job grouping queries
-            models.Index(
+            Index(
                 name="job_request_concurrency_key",
                 fields=["job_class", "concurrency_key"],
             ),
         ],
         constraints=[
-            models.UniqueConstraint(
-                fields=["uuid"], name="plainjobs_jobrequest_unique_uuid"
-            ),
+            UniqueConstraint(fields=["uuid"], name="plainjobs_jobrequest_unique_uuid"),
         ],
     )
 
@@ -127,7 +133,7 @@ class JobRequest(models.Model):
         return result
 
 
-class JobQuerySet(models.QuerySet["JobProcess"]):
+class JobQuerySet(QuerySet["JobProcess"]):
     def running(self) -> Self:
         return self.filter(started_at__isnull=False)
 
@@ -140,7 +146,7 @@ class JobQuerySet(models.QuerySet["JobProcess"]):
         # In theory we could save a timeout per-job and mark them timed-out more quickly,
         # but if they're still running, we can't actually send a signal to cancel it...
         now = timezone.now()
-        cutoff = now - datetime.timedelta(seconds=settings.JOBS_TIMEOUT)
+        cutoff = now - timedelta(seconds=settings.JOBS_TIMEOUT)
         lost_jobs = self.filter(
             created_at__lt=cutoff
         )  # Doesn't matter whether it started or not -- it shouldn't take this long.
@@ -151,60 +157,52 @@ class JobQuerySet(models.QuerySet["JobProcess"]):
             job.convert_to_result(status=JobResultStatuses.LOST)
 
 
-@models.register_model
-class JobProcess(models.Model):
+@register_model
+class JobProcess(Model):
     """
     All active jobs are stored in this table.
     """
 
-    uuid: UUID = models.UUIDField(default=uuid4)
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    started_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
-    )
+    uuid: Field[UUID | None, UUIDField(default=uuid4)] = None
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    started_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
 
     # From the JobRequest
-    job_request_uuid: UUID = models.UUIDField()
-    job_class: str = models.CharField(max_length=255)
-    parameters: dict[str, Any] | None = models.JSONField(
-        required=False, allow_null=True
-    )
-    priority: int = models.SmallIntegerField(default=0)
-    source: str = models.TextField(required=False)
-    queue: str = models.CharField(default="default", max_length=255)
-    retries: int = models.SmallIntegerField(default=0)
-    retry_attempt: int = models.SmallIntegerField(default=0)
-    concurrency_key: str = models.CharField(max_length=255, required=False)
+    job_request_uuid: Field[UUID, UUIDField()]
+    job_class: Field[str, CharField(max_length=255)]
+    parameters: Field[dict[str, Any] | None, JSONField(allow_null=True)] = None
+    priority: Field[int, SmallIntegerField()] = 0
+    source: Field[str, TextField()] = ""
+    queue: Field[str, CharField(max_length=255)] = "default"
+    retries: Field[int, SmallIntegerField()] = 0
+    retry_attempt: Field[int, SmallIntegerField()] = 0
+    concurrency_key: Field[str, CharField(max_length=255)] = ""
 
     # OpenTelemetry trace context
-    trace_id: str | None = models.CharField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = models.CharField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id: Field[str | None, CharField(max_length=34, allow_null=True)] = None
+    span_id: Field[str | None, CharField(max_length=18, allow_null=True)] = None
 
-    query = JobQuerySet()
+    query: JobQuerySet = JobQuerySet()
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["queue"]),
-            models.Index(fields=["concurrency_key"]),
-            models.Index(fields=["started_at"]),
-            models.Index(fields=["job_class"]),
-            models.Index(fields=["job_request_uuid"]),
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["uuid"]),
+            Index(fields=["created_at"]),
+            Index(fields=["queue"]),
+            Index(fields=["concurrency_key"]),
+            Index(fields=["started_at"]),
+            Index(fields=["job_class"]),
+            Index(fields=["job_request_uuid"]),
+            Index(fields=["trace_id"]),
+            Index(fields=["uuid"]),
             # Used for job grouping queries
-            models.Index(
+            Index(
                 name="job_concurrency_key",
                 fields=["job_class", "concurrency_key"],
             ),
         ],
         constraints=[
-            models.UniqueConstraint(fields=["uuid"], name="plainjobs_job_unique_uuid"),
+            UniqueConstraint(fields=["uuid"], name="plainjobs_job_unique_uuid"),
         ],
     )
 
@@ -245,6 +243,7 @@ class JobProcess(models.Model):
             self.save(update_fields=["started_at"])
 
             try:
+                assert self.parameters is not None
                 job = jobs_registry.load_job(self.job_class, self.parameters)
                 job.job_process = self
 
@@ -377,6 +376,7 @@ class JobProcess(models.Model):
 
     def as_json(self) -> dict[str, str | int | dict | None]:
         """A JSON-compatible representation to make it easier to reference in Sentry or logging"""
+        assert self.created_at is not None
         return {
             "uuid": str(self.uuid),
             "created_at": self.created_at.isoformat(),
@@ -395,7 +395,7 @@ class JobProcess(models.Model):
         }
 
 
-class JobResultQuerySet(models.QuerySet["JobResult"]):
+class JobResultQuerySet(QuerySet["JobResult"]):
     def successful(self) -> Self:
         return self.filter(status=JobResultStatuses.SUCCESSFUL)
 
@@ -410,8 +410,7 @@ class JobResultQuerySet(models.QuerySet["JobResult"]):
 
     def retried(self) -> Self:
         return self.filter(
-            models.Q(retry_job_request_uuid__isnull=False)
-            | models.Q(retry_attempt__gt=0)
+            Q(retry_job_request_uuid__isnull=False) | Q(retry_attempt__gt=0)
         )
 
     def failed(self) -> Self:
@@ -445,7 +444,7 @@ class JobResultQuerySet(models.QuerySet["JobResult"]):
                 result.save(update_fields=["retry_attempt"])
 
 
-class JobResultStatuses(models.TextChoices):
+class JobResultStatuses(TextChoices):
     SUCCESSFUL = "SUCCESSFUL", "Successful"
     ERRORED = "ERRORED", "Errored"  # Threw an error
     CANCELLED = "CANCELLED", "Cancelled"  # Interrupted by shutdown/deploy
@@ -456,80 +455,70 @@ class JobResultStatuses(models.TextChoices):
     )  # Either process lost, lost in transit, or otherwise never finished
 
 
-@models.register_model
-class JobResult(models.Model):
+@register_model
+class JobResult(Model):
     """
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid: UUID = models.UUIDField(default=uuid4)
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    uuid: Field[UUID | None, UUIDField(default=uuid4)] = None
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
 
     # From the Job
-    job_process_uuid: UUID = models.UUIDField()
-    started_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
-    )
-    ended_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
-    )
-    error: str = models.TextField(required=False)
-    status: str = models.CharField(
-        max_length=20,
-        choices=JobResultStatuses.choices,
-    )
+    job_process_uuid: Field[UUID, UUIDField()]
+    started_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    ended_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    error: Field[str, TextField()] = ""
+    status: Field[
+        str,
+        CharField(
+            max_length=20,
+            choices=JobResultStatuses.choices,
+        ),
+    ]
 
     # From the JobRequest
-    job_request_uuid: UUID = models.UUIDField()
-    job_class: str = models.CharField(max_length=255)
-    parameters: dict[str, Any] | None = models.JSONField(
-        required=False, allow_null=True
-    )
-    priority: int = models.SmallIntegerField(default=0)
-    source: str = models.TextField(required=False)
-    queue: str = models.CharField(default="default", max_length=255)
-    retries: int = models.SmallIntegerField(default=0)
-    retry_attempt: int = models.SmallIntegerField(default=0)
-    concurrency_key: str = models.CharField(max_length=255, required=False)
+    job_request_uuid: Field[UUID, UUIDField()]
+    job_class: Field[str, CharField(max_length=255)]
+    parameters: Field[dict[str, Any] | None, JSONField(allow_null=True)] = None
+    priority: Field[int, SmallIntegerField()] = 0
+    source: Field[str, TextField()] = ""
+    queue: Field[str, CharField(max_length=255)] = "default"
+    retries: Field[int, SmallIntegerField()] = 0
+    retry_attempt: Field[int, SmallIntegerField()] = 0
+    concurrency_key: Field[str, CharField(max_length=255)] = ""
 
     # Retries
-    retry_job_request_uuid: UUID | None = models.UUIDField(
-        required=False, allow_null=True
-    )
+    retry_job_request_uuid: Field[UUID | None, UUIDField(allow_null=True)] = None
 
     # OpenTelemetry trace context
-    trace_id: str | None = models.CharField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = models.CharField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id: Field[str | None, CharField(max_length=34, allow_null=True)] = None
+    span_id: Field[str | None, CharField(max_length=18, allow_null=True)] = None
 
-    query = JobResultQuerySet()
+    query: JobResultQuerySet = JobResultQuerySet()
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["job_process_uuid"]),
-            models.Index(fields=["started_at"]),
-            models.Index(fields=["ended_at"]),
-            models.Index(fields=["status"]),
-            models.Index(fields=["job_request_uuid"]),
-            models.Index(fields=["job_class"]),
-            models.Index(fields=["queue"]),
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["uuid"]),
+            Index(fields=["created_at"]),
+            Index(fields=["job_process_uuid"]),
+            Index(fields=["started_at"]),
+            Index(fields=["ended_at"]),
+            Index(fields=["status"]),
+            Index(fields=["job_request_uuid"]),
+            Index(fields=["job_class"]),
+            Index(fields=["queue"]),
+            Index(fields=["trace_id"]),
+            Index(fields=["uuid"]),
         ],
         constraints=[
-            models.UniqueConstraint(
-                fields=["uuid"], name="plainjobs_jobresult_unique_uuid"
-            ),
+            UniqueConstraint(fields=["uuid"], name="plainjobs_jobresult_unique_uuid"),
         ],
     )
 
     def retry_job(self, delay: int | None = None) -> JobRequest | None:
         retry_attempt = self.retry_attempt + 1
+        assert self.parameters is not None
         job = jobs_registry.load_job(self.job_class, self.parameters)
 
         if delay is None:

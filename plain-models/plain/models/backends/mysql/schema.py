@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.indexes import Index
 
 
@@ -80,19 +80,19 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             quoted = quoted.decode()
         return quoted
 
-    def _is_limited_data_type(self, field: Field) -> bool:
+    def _is_limited_data_type(self, field: BaseField) -> bool:
         db_type = field.db_type(self.connection)
         return (
             db_type is not None
             and db_type.lower() in self.connection._limited_data_types
         )
 
-    def skip_default(self, field: Field) -> bool:
+    def skip_default(self, field: BaseField) -> bool:
         if not self._supports_limited_data_type_defaults:
             return self._is_limited_data_type(field)
         return False
 
-    def skip_default_on_alter(self, field: Field) -> bool:
+    def skip_default_on_alter(self, field: BaseField) -> bool:
         if self._is_limited_data_type(field) and not self.connection.mysql_is_mariadb:
             # MySQL doesn't support defaults for BLOB and TEXT in the
             # ALTER COLUMN statement.
@@ -106,7 +106,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return True
         return self.connection.mysql_version >= (8, 0, 13)
 
-    def _column_default_sql(self, field: Field) -> str:
+    def _column_default_sql(self, field: BaseField) -> str:
         if (
             not self.connection.mysql_is_mariadb
             and self._supports_limited_data_type_defaults
@@ -117,7 +117,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return "(%s)"
         return super()._column_default_sql(field)
 
-    def add_field(self, model: type[Model], field: Field) -> None:
+    def add_field(self, model: type[Model], field: BaseField) -> None:
         super().add_field(model, field)
 
         # Simulate the effect of a one-off default.
@@ -149,7 +149,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         super().remove_index(model, index)
 
-    def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
+    def _field_should_be_indexed(self, model: type[Model], field: BaseField) -> bool:
         if not super()._field_should_be_indexed(model, field):
             return False
 
@@ -217,7 +217,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     self._create_index_sql(model, fields=[first_field], suffix="")
                 )
 
-    def _set_field_new_type_null_status(self, field: Field, new_type: str) -> str:
+    def _set_field_new_type_null_status(self, field: BaseField, new_type: str) -> str:
         """
         Keep the null property of the old field. If it has changed, it will be
         handled separately.
@@ -231,8 +231,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _alter_column_type_sql(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         new_type: str,
         old_collation: str,
         new_collation: str,
@@ -243,7 +243,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
 
     def _field_db_check(
-        self, field: Field, field_db_params: dict[str, Any]
+        self, field: BaseField, field_db_params: dict[str, Any]
     ) -> str | None:
         if self.connection.mysql_is_mariadb and self.connection.mysql_version >= (
             10,
@@ -258,13 +258,17 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return field_db_params["check"]
 
     def _rename_field_sql(
-        self, table: str, old_field: Field, new_field: Field, new_type: str
+        self, table: str, old_field: BaseField, new_field: BaseField, new_type: str
     ) -> str:
         new_type = self._set_field_new_type_null_status(old_field, new_type)
         return super()._rename_field_sql(table, old_field, new_field, new_type)
 
     def _alter_column_comment_sql(
-        self, model: type[Model], new_field: Field, new_type: str, new_db_comment: str
+        self,
+        model: type[Model],
+        new_field: BaseField,
+        new_type: str,
+        new_db_comment: str,
     ) -> tuple[str, list[Any]]:
         # Comment is alter when altering the column type.
         return "", []

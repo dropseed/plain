@@ -1,10 +1,25 @@
 from __future__ import annotations
 
-import datetime
 import re
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from plain import models
+from plain.models import (
+    CASCADE,
+    BooleanField,
+    CharField,
+    DateTimeField,
+    Field,
+    ForeignKey,
+    GenericIPAddressField,
+    Index,
+    Model,
+    Options,
+    PositiveSmallIntegerField,
+    UniqueConstraint,
+    URLField,
+    register_model,
+)
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -17,31 +32,31 @@ def _get_client_ip(request: Request) -> str | None:
         return request.meta.get("REMOTE_ADDR")
 
 
-@models.register_model
-class Redirect(models.Model):
-    from_pattern: str = models.CharField(max_length=255)
-    to_pattern: str = models.CharField(max_length=255)
-    http_status: int = models.PositiveSmallIntegerField(
-        default=301
-    )  # Default to permanent - could be choices?
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
-    order: int = models.PositiveSmallIntegerField(default=0)
-    enabled: bool = models.BooleanField(default=True)
-    is_regex: bool = models.BooleanField(default=False)
+@register_model
+class Redirect(Model):
+    from_pattern: Field[str, CharField(max_length=255)]
+    to_pattern: Field[str, CharField(max_length=255)]
+    http_status: Field[int, PositiveSmallIntegerField()] = (
+        301  # Default to permanent - could be choices?
+    )
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
+    order: Field[int, PositiveSmallIntegerField()] = 0
+    enabled: Field[bool, BooleanField()] = True
+    is_regex: Field[bool, BooleanField()] = False
 
     # query params?
     # logged in or not? auth not required necessarily...
     # headers?
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["order", "-created_at"],
         indexes=[
-            models.Index(fields=["order"]),
-            models.Index(fields=["created_at"]),
+            Index(fields=["order"]),
+            Index(fields=["created_at"]),
         ],
         constraints=[
-            models.UniqueConstraint(
+            UniqueConstraint(
                 fields=["from_pattern"],
                 name="plainredirects_redirect_unique_from_pattern",
             ),
@@ -82,26 +97,26 @@ class Redirect(models.Model):
         return re.sub(self.from_pattern, self.to_pattern, url)
 
 
-@models.register_model
-class RedirectLog(models.Model):
-    redirect: Redirect = models.ForeignKey(Redirect, on_delete=models.CASCADE)
+@register_model
+class RedirectLog(Model):
+    redirect: Field[Redirect, ForeignKey(Redirect, on_delete=CASCADE)]
 
     # The actuals that were used to redirect
-    from_url: str = models.URLField(max_length=512)
-    to_url: str = models.URLField(max_length=512)
-    http_status: int = models.PositiveSmallIntegerField(default=301)
+    from_url: Field[str, URLField(max_length=512)]
+    to_url: Field[str, URLField(max_length=512)]
+    http_status: Field[int, PositiveSmallIntegerField()] = 301
 
     # Request metadata
-    ip_address: str = models.GenericIPAddressField()
-    user_agent: str = models.CharField(required=False, max_length=512)
-    referrer: str = models.CharField(required=False, max_length=512)
+    ip_address: Field[str, GenericIPAddressField()]
+    user_agent: Field[str, CharField(max_length=512)] = ""
+    referrer: Field[str, CharField(max_length=512)] = ""
 
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
+            Index(fields=["created_at"]),
         ],
     )
 
@@ -127,21 +142,21 @@ class RedirectLog(models.Model):
         )
 
 
-@models.register_model
-class NotFoundLog(models.Model):
-    url: str = models.URLField(max_length=512)
+@register_model
+class NotFoundLog(Model):
+    url: Field[str, URLField(max_length=512)]
 
     # Request metadata
-    ip_address: str = models.GenericIPAddressField()
-    user_agent: str = models.CharField(required=False, max_length=512)
-    referrer: str = models.CharField(required=False, max_length=512)
+    ip_address: Field[str, GenericIPAddressField()]
+    user_agent: Field[str | None, CharField(max_length=512)] = None
+    referrer: Field[str | None, CharField(max_length=512)] = None
 
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
+            Index(fields=["created_at"]),
         ],
     )
 

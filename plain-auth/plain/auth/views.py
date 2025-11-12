@@ -110,7 +110,7 @@ class AuthViewMixin(SessionViewMixin):
             else:
                 raise PermissionDenied("Login required")
 
-        response = super().get_response()
+        response = super().get_response()  # type: ignore[misc]
 
         if self.user:
             # Make sure it at least has private as a default

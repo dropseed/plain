@@ -10,12 +10,14 @@ from .base import Operation
 
 if TYPE_CHECKING:
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.migrations.state import ProjectState
 
 
 class FieldOperation(Operation):
-    def __init__(self, model_name: str, name: str, field: Field | None = None) -> None:
+    def __init__(
+        self, model_name: str, name: str, field: BaseField | None = None
+    ) -> None:
         self.model_name = model_name
         self.name = name
         self.field = field
@@ -81,7 +83,11 @@ class AddField(FieldOperation):
     """Add a field to a model."""
 
     def __init__(
-        self, model_name: str, name: str, field: Field, preserve_default: bool = True
+        self,
+        model_name: str,
+        name: str,
+        field: BaseField,
+        preserve_default: bool = True,
     ) -> None:
         self.preserve_default = preserve_default
         super().__init__(model_name, name, field)
@@ -217,7 +223,11 @@ class AlterField(FieldOperation):
     """
 
     def __init__(
-        self, model_name: str, name: str, field: Field, preserve_default: bool = True
+        self,
+        model_name: str,
+        name: str,
+        field: BaseField,
+        preserve_default: bool = True,
     ) -> None:
         self.preserve_default = preserve_default
         super().__init__(model_name, name, field)

@@ -16,7 +16,7 @@ from typing import Any
 
 from plain.models.base import Model
 from plain.models.enums import Choices
-from plain.models.fields.core import Field
+from plain.models.fields.core import BaseField
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
 from plain.runtime import SettingsReference
@@ -366,7 +366,7 @@ def serializer_factory(value: Any) -> BaseSerializer:
         # tuple.
         value = value.__reduce__()[1][0]
 
-    if isinstance(value, Field):
+    if isinstance(value, BaseField):
         return ModelFieldSerializer(value)
     if isinstance(value, Operation):
         return OperationSerializer(value)

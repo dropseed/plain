@@ -3,9 +3,18 @@ from __future__ import annotations
 import bisect
 import copy
 import inspect
+import types
 from collections import defaultdict
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet
@@ -14,7 +23,7 @@ from plain.utils.datastructures import ImmutableList
 
 if TYPE_CHECKING:
     from plain.models.base import Model
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
 
 EMPTY_RELATION_TREE = ()
 
@@ -52,8 +61,8 @@ class Meta:
     model: type[Model]
     models_registry: Any
     _get_fields_cache: dict[Any, Any]
-    local_fields: list[Field]
-    local_many_to_many: list[Field]
+    local_fields: list[BaseField]
+    local_many_to_many: list[BaseField]
     related_fkey_lookups: list[Any]
 
     def __init__(self, models_registry: Any | None = None):
@@ -151,7 +160,7 @@ class Meta:
         """
         return QuerySet.from_model(self.model)
 
-    def add_field(self, field: Field) -> None:
+    def add_field(self, field: BaseField) -> None:
         # Insert the given field in the order in which it was created, using
         # the "creation_counter" attribute of the field.
         # Move many-to-many related fields from self.fields into

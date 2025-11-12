@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any
 from plain.models.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Expression, Func, Value
 from plain.models.fields.core import (
+    BaseField,
     BooleanField,
     CharField,
     DateTimeField,
-    Field,
     IntegerField,
     UUIDField,
 )
@@ -352,7 +352,7 @@ class PostgresOperatorLookup(Lookup):
         return f"{lhs} {self.postgres_operator} {rhs}", params
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
     lookup_name: str = "exact"
 
@@ -390,7 +390,7 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
         return super().as_sql(compiler, connection)  # type: ignore[misc]
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class IExact(BuiltinLookup):
     lookup_name: str = "iexact"
     prepare_rhs: bool = False
@@ -404,22 +404,22 @@ class IExact(BuiltinLookup):
         return rhs, params
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class GreaterThan(FieldGetDbPrepValueMixin, BuiltinLookup):
     lookup_name: str = "gt"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class GreaterThanOrEqual(FieldGetDbPrepValueMixin, BuiltinLookup):
     lookup_name: str = "gte"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class LessThan(FieldGetDbPrepValueMixin, BuiltinLookup):
     lookup_name: str = "lt"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class LessThanOrEqual(FieldGetDbPrepValueMixin, BuiltinLookup):
     lookup_name: str = "lte"
 
@@ -487,7 +487,7 @@ class IntegerLessThanOrEqual(IntegerFieldOverflow, LessThanOrEqual):
     overflow_exception = FullResultSet
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     lookup_name: str = "in"
 
@@ -596,39 +596,39 @@ class PatternLookup(BuiltinLookup):
         return rhs, params
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class Contains(PatternLookup):
     lookup_name: str = "contains"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class IContains(Contains):
     lookup_name: str = "icontains"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class StartsWith(PatternLookup):
     lookup_name: str = "startswith"
     param_pattern: str = "%s%%"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class IStartsWith(StartsWith):
     lookup_name: str = "istartswith"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class EndsWith(PatternLookup):
     lookup_name: str = "endswith"
     param_pattern: str = "%%%s"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class IEndsWith(EndsWith):
     lookup_name: str = "iendswith"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class Range(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     lookup_name: str = "range"
 
@@ -636,7 +636,7 @@ class Range(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
         return f"BETWEEN {rhs[0]} AND {rhs[1]}"
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class IsNull(BuiltinLookup):
     lookup_name: str = "isnull"
     prepare_rhs: bool = False
@@ -655,7 +655,7 @@ class IsNull(BuiltinLookup):
             return f"{sql} IS NOT NULL", params
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class Regex(BuiltinLookup):
     lookup_name: str = "regex"
     prepare_rhs: bool = False
@@ -672,7 +672,7 @@ class Regex(BuiltinLookup):
             return sql_template % (lhs, rhs), lhs_params + rhs_params
 
 
-@Field.register_lookup
+@BaseField.register_lookup
 class IRegex(Regex):
     lookup_name: str = "iregex"
 

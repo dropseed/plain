@@ -12,7 +12,7 @@ from plain.preflight import PreflightResult
 from plain.runtime import SettingsReference
 
 from ..registry import models_registry
-from .core import Field
+from .core import BaseField
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardManyToManyDescriptor,
@@ -90,7 +90,7 @@ def lazy_related_operation(
     )
 
 
-class RelatedField(FieldCacheMixin, Field):
+class RelatedField(FieldCacheMixin, BaseField):
     """Base class that all relational fields inherit from."""
 
     # Field flags
@@ -417,7 +417,7 @@ class RelatedField(FieldCacheMixin, Field):
         )
 
     @property
-    def target_field(self) -> Field:
+    def target_field(self) -> BaseField:
         """
         When filtering against this relation, return the field on the remote
         model against which the filtering should happen.
@@ -521,19 +521,19 @@ class ForeignKey(RelatedField):
         super().__set__(instance, value)
 
     @cached_property
-    def related_fields(self) -> list[tuple[Field, Field]]:
+    def related_fields(self) -> list[tuple[BaseField, BaseField]]:
         return self.resolve_related_fields()
 
     @cached_property
-    def reverse_related_fields(self) -> list[tuple[Field, Field]]:
+    def reverse_related_fields(self) -> list[tuple[BaseField, BaseField]]:
         return [(rhs_field, lhs_field) for lhs_field, rhs_field in self.related_fields]
 
     @cached_property
-    def local_related_fields(self) -> tuple[Field, ...]:
+    def local_related_fields(self) -> tuple[BaseField, ...]:
         return tuple(lhs_field for lhs_field, rhs_field in self.related_fields)
 
     @cached_property
-    def foreign_related_fields(self) -> tuple[Field, ...]:
+    def foreign_related_fields(self) -> tuple[BaseField, ...]:
         return tuple(
             rhs_field for lhs_field, rhs_field in self.related_fields if rhs_field
         )
@@ -700,7 +700,7 @@ class ForeignKey(RelatedField):
         return self.target_field.to_python(value)  # type: ignore[attr-defined]
 
     @property
-    def target_field(self) -> Field:
+    def target_field(self) -> BaseField:
         return self.foreign_related_fields[0]
 
     def validate(self, value: Any, model_instance: Model) -> None:
@@ -724,14 +724,14 @@ class ForeignKey(RelatedField):
                 },
             )
 
-    def resolve_related_fields(self) -> list[tuple[ForeignKey, Field]]:
+    def resolve_related_fields(self) -> list[tuple[ForeignKey, BaseField]]:
         if isinstance(self.remote_field.model, str):  # type: ignore[attr-defined]
             raise ValueError(
                 f"Related model {self.remote_field.model!r} cannot be resolved"  # type: ignore[attr-defined]
             )
         from_field = self
         to_field = self.remote_field.model._model_meta.get_field("id")
-        related_fields: list[tuple[ForeignKey, Field]] = [(from_field, to_field)]
+        related_fields: list[tuple[ForeignKey, BaseField]] = [(from_field, to_field)]
 
         for from_field, to_field in related_fields:
             if to_field and to_field.model != self.remote_field.model:  # type: ignore[attr-defined]
@@ -789,7 +789,7 @@ class ForeignKey(RelatedField):
             "collation": target_db_parameters.get("collation"),
         }
 
-    def get_col(self, alias: str, output_field: Field | None = None) -> Any:
+    def get_col(self, alias: str, output_field: BaseField | None = None) -> Any:
         if output_field is None:
             output_field = self.target_field
             while isinstance(output_field, ForeignKey):

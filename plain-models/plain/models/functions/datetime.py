@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func
 from plain.models.fields.core import (
+    BaseField,
     DateField,
     DateTimeField,
     DurationField,
-    Field,
     IntegerField,
     TimeField,
 )
@@ -273,7 +273,7 @@ class TruncBase(TimezoneMixin, Transform):
     def __init__(
         self,
         expression: Any,
-        output_field: Field | None = None,
+        output_field: BaseField | None = None,
         tzinfo: Any = None,
         **extra: Any,
     ) -> None:
@@ -334,7 +334,7 @@ class TruncBase(TimezoneMixin, Transform):
         # likely a mistake.
         class_output_field = (
             self.__class__.output_field
-            if isinstance(self.__class__.output_field, Field)
+            if isinstance(self.__class__.output_field, BaseField)
             else None
         )
         output_field = class_output_field or copy.output_field
@@ -394,7 +394,7 @@ class Trunc(TruncBase):
         self,
         expression: Any,
         kind: str,
-        output_field: Field | None = None,
+        output_field: BaseField | None = None,
         tzinfo: Any = None,
         **extra: Any,
     ) -> None:

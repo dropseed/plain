@@ -32,9 +32,9 @@ from plain.models.exceptions import (
 )
 from plain.models.expressions import Case, F, Value, When
 from plain.models.fields.core import (
+    BaseField,
     DateField,
     DateTimeField,
-    Field,
     PrimaryKeyField,
 )
 from plain.models.functions import Cast, Trunc
@@ -659,8 +659,8 @@ class QuerySet(Generic[T]):
     def _check_bulk_create_options(
         self,
         update_conflicts: bool,
-        update_fields: list[Field] | None,
-        unique_fields: list[Field] | None,
+        update_fields: list[BaseField] | None,
+        unique_fields: list[BaseField] | None,
     ) -> OnConflict | None:
         db_features = db_connection.features
         if update_conflicts:
@@ -919,7 +919,8 @@ class QuerySet(Generic[T]):
                 # update_fields list.
                 for field in self.model._model_meta.local_concrete_fields:
                     if not (
-                        field.primary_key or field.__class__.pre_save is Field.pre_save
+                        field.primary_key
+                        or field.__class__.pre_save is BaseField.pre_save
                     ):
                         update_fields.add(field.name)
                         if field.name != field.attname:
@@ -1097,7 +1098,7 @@ class QuerySet(Generic[T]):
         self._result_cache = None
         return rows
 
-    def _update(self, values: list[tuple[Field, Any, Any]]) -> int:
+    def _update(self, values: list[tuple[BaseField, Any, Any]]) -> int:
         """
         A version of update() that accepts field objects instead of field names.
         Used primarily for model saving and not intended for use by general
@@ -1660,12 +1661,12 @@ class QuerySet(Generic[T]):
     def _insert(
         self,
         objs: list[T],
-        fields: list[Field],
-        returning_fields: list[Field] | None = None,
+        fields: list[BaseField],
+        returning_fields: list[BaseField] | None = None,
         raw: bool = False,
         on_conflict: OnConflict | None = None,
-        update_fields: list[Field] | None = None,
-        unique_fields: list[Field] | None = None,
+        update_fields: list[BaseField] | None = None,
+        unique_fields: list[BaseField] | None = None,
     ) -> list[tuple[Any, ...]] | None:
         """
         Insert a new record for the given model. This provides an interface to
@@ -1684,11 +1685,11 @@ class QuerySet(Generic[T]):
     def _batched_insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: list[BaseField],
         batch_size: int,
         on_conflict: OnConflict | None = None,
-        update_fields: list[Field] | None = None,
-        unique_fields: list[Field] | None = None,
+        update_fields: list[BaseField] | None = None,
+        unique_fields: list[BaseField] | None = None,
     ) -> list[tuple[Any, ...]]:
         """
         Helper method for bulk_create() to insert objs one batch at a time.
@@ -1956,7 +1957,7 @@ class RawQuerySet:
         return columns
 
     @cached_property
-    def model_fields(self) -> dict[str, Field]:
+    def model_fields(self) -> dict[str, BaseField]:
         """A dict mapping column names to model field names."""
         converter = db_connection.introspection.identifier_converter
         model_fields = {}

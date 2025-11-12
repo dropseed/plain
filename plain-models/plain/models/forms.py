@@ -19,7 +19,7 @@ from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.models.exceptions import FieldError
 
 if TYPE_CHECKING:
-    from plain.models.fields.core import Field as ModelField
+    from plain.models.fields.core import BaseField as ModelField
 
 __all__ = (
     "ModelForm",

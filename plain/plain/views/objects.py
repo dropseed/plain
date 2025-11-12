@@ -8,7 +8,7 @@ try:
 except ImportError:
     ObjectDoesNotExist = None  # type: ignore[assignment]
 
-from plain.forms import Form
+from plain.forms import BaseForm, Form
 from plain.http import Http404
 
 from .forms import FormView
@@ -21,7 +21,7 @@ class CreateView(FormView):
     """
 
     # TODO? would rather you have to specify this...
-    def get_success_url(self, form: Form) -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
             url = self.success_url.format(**self.object.__dict__)
@@ -35,7 +35,7 @@ class CreateView(FormView):
                 )
         return url
 
-    def form_valid(self, form: Form) -> Any:
+    def form_valid(self, form: BaseForm) -> Any:
         """If the form is valid, save the associated model."""
         self.object = form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)

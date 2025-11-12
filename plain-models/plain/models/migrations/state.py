@@ -22,7 +22,7 @@ from .utils import resolve_relation
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
 
 
 def _get_package_label_and_model_name(
@@ -110,13 +110,13 @@ class ProjectState:
         self.is_delayed = False
         # {remote_model_key: {model_key: {field_name: field}}}
         self._relations: (
-            dict[tuple[str, str], dict[tuple[str, str], dict[str, Field]]] | None
+            dict[tuple[str, str], dict[tuple[str, str], dict[str, BaseField]]] | None
         ) = None
 
     @property
     def relations(
         self,
-    ) -> dict[tuple[str, str], dict[tuple[str, str], dict[str, Field]]]:
+    ) -> dict[tuple[str, str], dict[tuple[str, str], dict[str, BaseField]]]:
         if self._relations is None:
             self.resolve_fields_and_relations()
         return self._relations  # type: ignore[return-value]
@@ -261,7 +261,7 @@ class ProjectState:
         package_label: str,
         model_name: str,
         name: str,
-        field: Field,
+        field: BaseField,
         preserve_default: bool,
     ) -> None:
         # If preserve default is off, don't use the default for future state.
@@ -293,7 +293,7 @@ class ProjectState:
         package_label: str,
         model_name: str,
         name: str,
-        field: Field,
+        field: BaseField,
         preserve_default: bool,
     ) -> None:
         if not preserve_default:
@@ -449,7 +449,7 @@ class ProjectState:
         model: str | type[models.Model],
         model_key: tuple[str, str],
         field_name: str,
-        field: Field,
+        field: BaseField,
         concretes: dict[tuple[str, str], tuple[str, str]],
     ) -> None:
         remote_model_key = resolve_relation(model, *model_key)
@@ -474,7 +474,7 @@ class ProjectState:
         self,
         model_key: tuple[str, str],
         field_name: str,
-        field: Field,
+        field: BaseField,
         concretes: dict[tuple[str, str], tuple[str, str]] | None = None,
     ) -> None:
         remote_field = field.remote_field  # type: ignore[attr-defined]
@@ -671,13 +671,13 @@ class ModelState:
         self,
         package_label: str,
         name: str,
-        fields: Iterable[tuple[str, Field]],
+        fields: Iterable[tuple[str, BaseField]],
         options: dict[str, Any] | None = None,
         bases: tuple[str | type[models.Model], ...] | None = None,
     ):
         self.package_label = package_label
         self.name = name
-        self.fields: dict[str, Field] = dict(fields)
+        self.fields: dict[str, BaseField] = dict(fields)
         self.options = options or {}
         self.options.setdefault("indexes", [])
         self.options.setdefault("constraints", [])
@@ -713,7 +713,7 @@ class ModelState:
     def name_lower(self) -> str:
         return self.name.lower()
 
-    def get_field(self, field_name: str) -> Field:
+    def get_field(self, field_name: str) -> BaseField:
         return self.fields[field_name]
 
     @classmethod

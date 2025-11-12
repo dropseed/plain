@@ -27,14 +27,14 @@ if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.fields.related import ForeignKey, ManyToManyField
     from plain.models.fields.reverse_related import ManyToManyRel
 
 logger = logging.getLogger("plain.models.backends.schema")
 
 
-def _is_relevant_relation(relation: Any, altered_field: Field) -> bool:
+def _is_relevant_relation(relation: Any, altered_field: BaseField) -> bool:
     """
     When altering the given field, must constraints on its model from the given
     relation be temporarily dropped?
@@ -63,7 +63,7 @@ def _all_related_fields(model: type[Model]) -> list[Any]:
 
 
 def _related_non_m2m_objects(
-    old_field: Field, new_field: Field
+    old_field: BaseField, new_field: BaseField
 ) -> Generator[tuple[Any, Any], None, None]:
     # Filter out m2m objects from reverse relations.
     # Return (old_relation, new_relation) tuples.
@@ -282,7 +282,7 @@ class BaseDatabaseSchemaEditor:
         column_db_type: str,
         params: list[Any],
         model: type[Model],
-        field: Field,
+        field: BaseField,
         field_db_params: dict[str, Any],
         include_default: bool,
     ) -> Generator[str, None, None]:
@@ -325,7 +325,7 @@ class BaseDatabaseSchemaEditor:
             yield "PRIMARY KEY"
 
     def column_sql(
-        self, model: type[Model], field: Field, include_default: bool = False
+        self, model: type[Model], field: BaseField, include_default: bool = False
     ) -> tuple[str | None, list[Any] | None]:
         """
         Return the column definition for a field. The field must already have
@@ -353,14 +353,14 @@ class BaseDatabaseSchemaEditor:
             params,
         )
 
-    def skip_default(self, field: Field) -> bool:
+    def skip_default(self, field: BaseField) -> bool:
         """
         Some backends don't accept default values for certain columns types
         (i.e. MySQL longtext and longblob).
         """
         return False
 
-    def skip_default_on_alter(self, field: Field) -> bool:
+    def skip_default_on_alter(self, field: BaseField) -> bool:
         """
         Some backends don't accept default values for certain columns types
         (i.e. MySQL longtext and longblob) in the ALTER COLUMN statement.
@@ -376,7 +376,7 @@ class BaseDatabaseSchemaEditor:
             "requires_literal_defaults must provide a prepare_default() method"
         )
 
-    def _column_default_sql(self, field: Field) -> str:
+    def _column_default_sql(self, field: BaseField) -> str:
         """
         Return the SQL to use in a DEFAULT clause. The resulting string should
         contain a '%s' placeholder for a default value.
@@ -384,7 +384,7 @@ class BaseDatabaseSchemaEditor:
         return "%s"
 
     @staticmethod
-    def _effective_default(field: Field) -> Any:
+    def _effective_default(field: BaseField) -> Any:
         # This method allows testing its logic without a connection.
         if field.has_default():
             default = field.get_default()
@@ -409,7 +409,7 @@ class BaseDatabaseSchemaEditor:
             default = None
         return default
 
-    def effective_default(self, field: Field) -> Any:
+    def effective_default(self, field: BaseField) -> Any:
         """Return a field's effective database default value."""
         return field.get_db_prep_save(self._effective_default(field), self.connection)
 
@@ -555,7 +555,7 @@ class BaseDatabaseSchemaEditor:
             }
         )
 
-    def add_field(self, model: type[Model], field: Field) -> None:
+    def add_field(self, model: type[Model], field: BaseField) -> None:
         """
         Create a field on a model. Usually involves adding a column, but may
         involve adding a table instead (for M2M fields).
@@ -636,7 +636,7 @@ class BaseDatabaseSchemaEditor:
         if self.connection.features.connection_persists_old_columns:
             self.connection.close()
 
-    def remove_field(self, model: type[Model], field: Field) -> None:
+    def remove_field(self, model: type[Model], field: BaseField) -> None:
         """
         Remove a field from a model. Usually involves deleting a column,
         but for M2Ms may involve deleting a table.
@@ -668,8 +668,8 @@ class BaseDatabaseSchemaEditor:
     def alter_field(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         strict: bool = False,
     ) -> None:
         """
@@ -719,7 +719,7 @@ class BaseDatabaseSchemaEditor:
         )
 
     def _field_db_check(
-        self, field: Field, field_db_params: dict[str, Any]
+        self, field: BaseField, field_db_params: dict[str, Any]
     ) -> str | None:
         # Always check constraints with the same mocked column name to avoid
         # recreating constrains when the column is renamed.
@@ -734,8 +734,8 @@ class BaseDatabaseSchemaEditor:
     def _alter_field(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         old_type: str,
         new_type: str,
         old_db_params: dict[str, Any],
@@ -1069,7 +1069,7 @@ class BaseDatabaseSchemaEditor:
             self.connection.close()
 
     def _alter_column_null_sql(
-        self, model: type[Model], old_field: Field, new_field: Field
+        self, model: type[Model], old_field: BaseField, new_field: BaseField
     ) -> tuple[str, list[Any]]:
         """
         Hook to specialize column null alteration.
@@ -1095,8 +1095,8 @@ class BaseDatabaseSchemaEditor:
     def _alter_column_default_sql(
         self,
         model: type[Model],
-        old_field: Field | None,
-        new_field: Field,
+        old_field: BaseField | None,
+        new_field: BaseField,
         drop: bool = False,
     ) -> tuple[str, list[Any]]:
         """
@@ -1139,8 +1139,8 @@ class BaseDatabaseSchemaEditor:
     def _alter_column_type_sql(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         new_type: str,
         old_collation: str | None,
         new_collation: str | None,
@@ -1191,7 +1191,7 @@ class BaseDatabaseSchemaEditor:
     def _alter_column_comment_sql(
         self,
         model: type[Model],
-        new_field: Field,
+        new_field: BaseField,
         new_type: str,
         new_db_comment: str | None,
     ) -> tuple[str, list[Any]]:
@@ -1304,7 +1304,7 @@ class BaseDatabaseSchemaEditor:
         self,
         model: type[Model],
         *,
-        fields: list[Field] | None = None,
+        fields: list[BaseField] | None = None,
         name: str | None = None,
         suffix: str = "",
         using: str = "",
@@ -1392,7 +1392,9 @@ class BaseDatabaseSchemaEditor:
                 output.append(index.create_sql(model, self))
         return output
 
-    def _field_indexes_sql(self, model: type[Model], field: Field) -> list[Statement]:
+    def _field_indexes_sql(
+        self, model: type[Model], field: BaseField
+    ) -> list[Statement]:
         """
         Return a list of all index SQL statements for the specified field.
         """
@@ -1402,7 +1404,7 @@ class BaseDatabaseSchemaEditor:
         return output
 
     def _field_should_be_altered(
-        self, old_field: Field, new_field: Field, ignore: set[str] | None = None
+        self, old_field: BaseField, new_field: BaseField, ignore: set[str] | None = None
     ) -> bool:
         ignore = ignore or set()
         _, old_path, old_args, old_kwargs = old_field.deconstruct()
@@ -1420,14 +1422,16 @@ class BaseDatabaseSchemaEditor:
             new_field.column
         ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
 
-    def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
+    def _field_should_be_indexed(self, model: type[Model], field: BaseField) -> bool:
         return (field.remote_field and field.db_index) and not field.primary_key  # type: ignore[attr-defined]
 
-    def _field_became_primary_key(self, old_field: Field, new_field: Field) -> bool:
+    def _field_became_primary_key(
+        self, old_field: BaseField, new_field: BaseField
+    ) -> bool:
         return not old_field.primary_key and new_field.primary_key
 
     def _rename_field_sql(
-        self, table: str, old_field: Field, new_field: Field, new_type: str
+        self, table: str, old_field: BaseField, new_field: BaseField, new_type: str
     ) -> str:
         return self.sql_rename_column % {
             "table": self.quote_name(table),
@@ -1491,7 +1495,7 @@ class BaseDatabaseSchemaEditor:
     def _unique_sql(
         self,
         model: type[Model],
-        fields: Iterable[Field],
+        fields: Iterable[BaseField],
         name: str,
         condition: str | None = None,
         deferrable: Deferrable | None = None,
@@ -1531,7 +1535,7 @@ class BaseDatabaseSchemaEditor:
     def _create_unique_sql(
         self,
         model: type[Model],
-        fields: Iterable[Field],
+        fields: Iterable[BaseField],
         name: str | None = None,
         condition: str | None = None,
         deferrable: Deferrable | None = None,
@@ -1706,7 +1710,9 @@ class BaseDatabaseSchemaEditor:
         for constraint_name in constraint_names:
             self.execute(self._delete_primary_key_sql(model, constraint_name))
 
-    def _create_primary_key_sql(self, model: type[Model], field: Field) -> Statement:
+    def _create_primary_key_sql(
+        self, model: type[Model], field: BaseField
+    ) -> Statement:
         return Statement(
             self.sql_create_pk,
             table=Table(model.model_options.db_table, self.quote_name),

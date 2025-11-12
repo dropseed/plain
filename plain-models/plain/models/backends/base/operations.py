@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from types import ModuleType
 
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
 
 
 class BaseDatabaseOperations:
@@ -74,7 +74,7 @@ class BaseDatabaseOperations:
         """
         return None
 
-    def bulk_batch_size(self, fields: list[Field], objs: list[Any]) -> int:
+    def bulk_batch_size(self, fields: list[BaseField], objs: list[Any]) -> int:
         """
         Return the maximum allowed batch size for the backend. The fields
         are the fields going to be inserted in the batch, the objs contains
@@ -88,7 +88,7 @@ class BaseDatabaseOperations:
             "format_for_duration_arithmetic() method."
         )
 
-    def unification_cast_sql(self, output_field: Field) -> str:
+    def unification_cast_sql(self, output_field: BaseField) -> str:
         """
         Given a field instance, return the SQL that casts the result of a union
         to that type. The resulting string should contain a '%s' placeholder
@@ -389,7 +389,7 @@ class BaseDatabaseOperations:
         ]
 
     def return_insert_columns(
-        self, fields: list[Field]
+        self, fields: list[BaseField]
     ) -> tuple[str, list[Any]] | None:
         """
         For backends that support returning columns as part of an insert query,
@@ -778,9 +778,9 @@ class BaseDatabaseOperations:
 
     def on_conflict_suffix_sql(
         self,
-        fields: list[Field],
+        fields: list[BaseField],
         on_conflict: Any,
-        update_fields: list[Field],
-        unique_fields: list[Field],
+        update_fields: list[BaseField],
+        unique_fields: list[BaseField],
     ) -> str:
         return ""

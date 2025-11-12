@@ -1,11 +1,24 @@
 from __future__ import annotations
 
-import datetime
 import re
+from datetime import datetime
 from typing import Any
 
-from plain import models
 from plain.exceptions import ValidationError
+from plain.models import (
+    CASCADE,
+    BooleanField,
+    CharField,
+    DateTimeField,
+    Field,
+    ForeignKey,
+    JSONField,
+    Model,
+    Options,
+    TextField,
+    UniqueConstraint,
+    register_model,
+)
 
 
 def validate_flag_name(value: str) -> None:
@@ -13,17 +26,43 @@ def validate_flag_name(value: str) -> None:
         raise ValidationError(f"{value} is not a valid Python identifier name")
 
 
-@models.register_model
-class FlagResult(models.Model):
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
-    flag: Flag = models.ForeignKey("Flag", on_delete=models.CASCADE)
-    key: str = models.CharField(max_length=255)
-    value: Any = models.JSONField()
+@register_model
+class Flag(Model):
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
+    name: Field[str, CharField(max_length=255, validators=[validate_flag_name])]
 
-    model_options = models.Options(
+    # Optional description that can be filled in after the flag is used/created
+    description: Field[str, TextField()] = ""
+
+    # To manually disable a flag before completing deleting
+    # (good to disable first to make sure the code doesn't use the flag anymore)
+    enabled: Field[bool, BooleanField()] = True
+
+    # To provide an easier way to see if a flag is still being used
+    used_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+
+    model_options = Options(
         constraints=[
-            models.UniqueConstraint(
+            UniqueConstraint(fields=["name"], name="plainflags_flag_unique_name"),
+        ],
+    )
+
+    def __str__(self) -> str:
+        return self.name
+
+
+@register_model
+class FlagResult(Model):
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
+    flag: Field[Flag, ForeignKey(Flag, on_delete=CASCADE)]
+    key: Field[str, CharField(max_length=255)]
+    value: Field[Any, JSONField()]
+
+    model_options = Options(
+        constraints=[
+            UniqueConstraint(
                 fields=["flag", "key"], name="plainflags_flagresult_unique_key"
             ),
         ],
@@ -31,33 +70,3 @@ class FlagResult(models.Model):
 
     def __str__(self) -> str:
         return self.key
-
-
-@models.register_model
-class Flag(models.Model):
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
-    name: str = models.CharField(max_length=255, validators=[validate_flag_name])
-
-    # Optional description that can be filled in after the flag is used/created
-    description: str = models.TextField(required=False)
-
-    # To manually disable a flag before completing deleting
-    # (good to disable first to make sure the code doesn't use the flag anymore)
-    enabled: bool = models.BooleanField(default=True)
-
-    # To provide an easier way to see if a flag is still being used
-    used_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
-    )
-
-    model_options = models.Options(
-        constraints=[
-            models.UniqueConstraint(
-                fields=["name"], name="plainflags_flag_unique_name"
-            ),
-        ],
-    )
-
-    def __str__(self) -> str:
-        return self.name

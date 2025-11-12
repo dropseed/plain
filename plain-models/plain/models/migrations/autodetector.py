@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.fields.core import (
     NOT_PROVIDED,
+    BaseField,
     DateField,
     DateTimeField,
-    Field,
     TimeField,
 )
 from plain.models.migrations import operations
@@ -98,7 +98,7 @@ class MigrationAutodetector:
             return obj
         elif hasattr(obj, "deconstruct"):
             deconstructed = obj.deconstruct()
-            if isinstance(obj, Field):
+            if isinstance(obj, BaseField):
                 # we have a field which also returns a name
                 deconstructed = deconstructed[1:]
             path, args, kwargs = deconstructed
@@ -110,7 +110,7 @@ class MigrationAutodetector:
         else:
             return obj
 
-    def only_relation_agnostic_fields(self, fields: dict[str, Field]) -> list[Any]:
+    def only_relation_agnostic_fields(self, fields: dict[str, BaseField]) -> list[Any]:
         """
         Return a definition of the fields that ignores field names and
         what related fields actually relate to. Used for detecting renames (as
@@ -1180,7 +1180,10 @@ class MigrationAutodetector:
 
     @staticmethod
     def _get_dependencies_for_foreign_key(
-        package_label: str, model_name: str, field: Field, project_state: ProjectState
+        package_label: str,
+        model_name: str,
+        field: BaseField,
+        project_state: ProjectState,
     ) -> list[tuple[str, str, None, bool]]:
         remote_field_model = None
         if hasattr(field.remote_field, "model"):

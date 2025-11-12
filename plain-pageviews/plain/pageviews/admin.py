@@ -39,7 +39,7 @@ class UserPageviewsCard(Card):
         context = super().get_template_context()
 
         context["pageviews"] = Pageview.query.filter(
-            user_id=self.view.object.id
+            user_id=self.view.object.id  # type: ignore[attr-defined]
         ).order_by("-timestamp")[:50]
 
         return context

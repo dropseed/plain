@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from plain.models.base import Model
-    from plain.models.fields.core import Field
+    from plain.models.fields.core import BaseField
     from plain.models.indexes import Index
 
 
@@ -73,14 +73,16 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             value = value.replace("%", "%%")
         return sql.quote(value, self.connection.connection)
 
-    def _field_indexes_sql(self, model: type[Model], field: Field) -> list[Statement]:
+    def _field_indexes_sql(
+        self, model: type[Model], field: BaseField
+    ) -> list[Statement]:
         output = super()._field_indexes_sql(model, field)
         like_index_statement = self._create_like_index_sql(model, field)
         if like_index_statement is not None:
             output.append(like_index_statement)
         return output
 
-    def _field_data_type(self, field: Field) -> str | None:
+    def _field_data_type(self, field: BaseField) -> str | None:
         if field.is_relation:
             return field.rel_db_type(self.connection)
         return self.connection.data_types.get(
@@ -88,7 +90,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             field.db_type(self.connection),
         )
 
-    def _field_base_data_types(self, field: Field) -> Generator[str | None, None, None]:
+    def _field_base_data_types(
+        self, field: BaseField
+    ) -> Generator[str | None, None, None]:
         # Yield base data types for array fields.
         if field.base_field.get_internal_type() == "ArrayField":  # type: ignore[attr-defined]
             yield from self._field_base_data_types(field.base_field)  # type: ignore[attr-defined]
@@ -96,7 +100,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             yield self._field_data_type(field.base_field)  # type: ignore[attr-defined]
 
     def _create_like_index_sql(
-        self, model: type[Model], field: Field
+        self, model: type[Model], field: BaseField
     ) -> Statement | None:
         """
         Return the statement to create an index with varchar operator pattern
@@ -133,7 +137,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 )
         return None
 
-    def _using_sql(self, new_field: Field, old_field: Field) -> str:
+    def _using_sql(self, new_field: BaseField, old_field: BaseField) -> str:
         using_sql = " USING %(column)s::%(type)s"
         new_internal_type = new_field.get_internal_type()
         old_internal_type = old_field.get_internal_type()
@@ -157,8 +161,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _alter_column_type_sql(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         new_type: str,
         old_collation: str | None,
         new_collation: str | None,
@@ -270,8 +274,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _alter_field(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: BaseField,
+        new_field: BaseField,
         old_type: str,
         new_type: str,
         old_db_params: dict[str, Any],
@@ -357,7 +361,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         self,
         model: type[Model],
         *,
-        fields: list[Field] | None = None,
+        fields: list[BaseField] | None = None,
         name: str | None = None,
         suffix: str = "",
         using: str = "",

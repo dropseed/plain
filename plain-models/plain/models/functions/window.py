@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from plain.models.expressions import Func
-from plain.models.fields.core import Field, FloatField, IntegerField
+from plain.models.fields.core import BaseField, FloatField, IntegerField
 
 __all__ = [
     "CumeDist",
@@ -57,7 +57,7 @@ class LagLeadFunction(Func):
             args += (default,)
         super().__init__(*args, **extra)
 
-    def _resolve_output_field(self) -> Field:
+    def _resolve_output_field(self) -> BaseField:
         sources = self.get_source_expressions()
         return sources[0].output_field
 
@@ -91,7 +91,7 @@ class NthValue(Func):
             )
         super().__init__(expression, nth, **extra)
 
-    def _resolve_output_field(self) -> Field:
+    def _resolve_output_field(self) -> BaseField:
         sources = self.get_source_expressions()
         return sources[0].output_field
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func, Value
-from plain.models.fields.core import Field, FloatField, IntegerField
+from plain.models.fields.core import BaseField, FloatField, IntegerField
 from plain.models.functions import Cast
 from plain.models.functions.mixins import (
     FixDecimalInputMixin,
@@ -184,7 +184,7 @@ class Round(FixDecimalInputMixin, Transform):
             raise ValueError("SQLite does not support negative precision.")
         return super().as_sqlite(compiler, connection, **extra_context)
 
-    def _resolve_output_field(self) -> Field:
+    def _resolve_output_field(self) -> BaseField:
         source = self.get_source_expressions()[0]
         return source.output_field
 

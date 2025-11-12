@@ -1,12 +1,22 @@
 from __future__ import annotations
 
-import datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
-from plain.models import transaction
+from plain.models import (
+    CASCADE,
+    CharField,
+    DateTimeField,
+    Field,
+    ForeignKey,
+    Model,
+    Options,
+    UniqueConstraint,
+    register_model,
+    transaction,
+)
 from plain.models.db import IntegrityError
 from plain.runtime import SettingsReference
 from plain.utils import timezone
@@ -17,36 +27,39 @@ if TYPE_CHECKING:
     from .providers import OAuthToken, OAuthUser
 
 
-@models.register_model
-class OAuthConnection(models.Model):
-    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
-    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
+@register_model
+class OAuthConnection(Model):
+    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
 
-    user: Any = models.ForeignKey(
-        SettingsReference("AUTH_USER_MODEL"),
-        on_delete=models.CASCADE,
-        related_name="oauth_connections",
-    )
+    user: Field[
+        Any,
+        ForeignKey(
+            SettingsReference("AUTH_USER_MODEL"),
+            on_delete=CASCADE,
+            related_name="oauth_connections",
+        ),
+    ]
 
     # The key used to refer to this provider type (in settings)
-    provider_key: str = models.CharField(max_length=100)
+    provider_key: Field[str, CharField(max_length=100)]
 
     # The unique ID of the user on the provider's system
-    provider_user_id: str = models.CharField(max_length=100)
+    provider_user_id: Field[str, CharField(max_length=100)]
 
     # Token data
-    access_token: str = models.CharField(max_length=2000)
-    refresh_token: str = models.CharField(max_length=2000, required=False)
-    access_token_expires_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
+    access_token: Field[str, CharField(max_length=2000)]
+    refresh_token: Field[str, CharField(max_length=2000)] = ""
+    access_token_expires_at: Field[datetime | None, DateTimeField(allow_null=True)] = (
+        None
     )
-    refresh_token_expires_at: datetime.datetime | None = models.DateTimeField(
-        required=False, allow_null=True
+    refresh_token_expires_at: Field[datetime | None, DateTimeField(allow_null=True)] = (
+        None
     )
 
-    model_options = models.Options(
+    model_options = Options(
         constraints=[
-            models.UniqueConstraint(
+            UniqueConstraint(
                 fields=["provider_key", "provider_user_id"],
                 name="plainoauth_oauthconnection_unique_provider_key_user_id",
             )

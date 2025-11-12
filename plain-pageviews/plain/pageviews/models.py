@@ -3,7 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import models
+from plain.models import (
+    CharField,
+    DateTimeField,
+    Field,
+    Index,
+    Model,
+    Options,
+    URLField,
+    register_model,
+)
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -28,38 +37,38 @@ except ImportError:
     get_request_impersonator: Any = None
 
 
-@models.register_model
-class Pageview(models.Model):
+@register_model
+class Pageview(Model):
     # A full URL can be thousands of characters, but MySQL has a 3072-byte limit
     # on indexed columns (when using the default ``utf8mb4`` character set that
     # stores up to 4 bytes per character). The ``url`` field is indexed below,
     # so we keep the length at 768 characters (768 × 4 = 3072 bytes) to ensure
     # the index can be created on all supported database backends.
-    url: str = models.URLField(max_length=768)
-    timestamp: datetime = models.DateTimeField(auto_now_add=True)
+    url: Field[str, URLField(max_length=768)]
+    timestamp: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
 
-    title: str = models.CharField(max_length=512, required=False)
+    title: Field[str, CharField(max_length=512)] = ""
     # Referrers may not always be valid URLs (e.g. `android-app://...`).
     # Use a plain CharField so we don't validate the scheme or format.
-    referrer: str = models.CharField(max_length=1024, required=False)
+    referrer: Field[str, CharField(max_length=1024)] = ""
 
-    user_id: str = models.CharField(max_length=255, required=False)
-    session_id: str = models.CharField(max_length=255, required=False)
+    user_id: Field[str, CharField(max_length=255)] = ""
+    session_id: Field[str, CharField(max_length=255)] = ""
 
     # Attribution tracking
-    source: str = models.CharField(max_length=200, required=False)
-    medium: str = models.CharField(max_length=200, required=False)
-    campaign: str = models.CharField(max_length=200, required=False)
+    source: Field[str, CharField(max_length=200)] = ""
+    medium: Field[str, CharField(max_length=200)] = ""
+    campaign: Field[str, CharField(max_length=200)] = ""
 
-    model_options = models.Options(
+    model_options = Options(
         ordering=["-timestamp"],
         indexes=[
-            models.Index(fields=["timestamp"]),
-            models.Index(fields=["user_id"]),
-            models.Index(fields=["session_id"]),
-            models.Index(fields=["url"]),
-            models.Index(fields=["source"]),
-            models.Index(fields=["medium"]),
+            Index(fields=["timestamp"]),
+            Index(fields=["user_id"]),
+            Index(fields=["session_id"]),
+            Index(fields=["url"]),
+            Index(fields=["source"]),
+            Index(fields=["medium"]),
         ],
     )
 
