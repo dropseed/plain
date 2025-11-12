@@ -11,3 +11,17 @@ There will be a number of things that we don't want to officially maintain and s
 If you want to develop your own package that works with Plain, you should use the `plainx` community namespace. Like `plain`, the `plainx` prefix intended to be a [PEP 420 "implicit namespace"](https://peps.python.org/pep-0420/) — this just means that you can put your code in `plainx/{custom}` and it can be imported as `plainx.{custom}`. For this to work, the only thing you really need to know is that you should _not_ have a `plainx/__init__.py` file in your source.
 
 There are also plenty of things that don't warrant an entire package! Copy and paste is encouraged. If you have a single-file solution to a common problem and want to share it, email support@plainframework.com about ways we can help.
+
+## Development Setup
+
+### Database client dependencies
+
+The easiest and best development experience involves installing the database client libraries.
+
+**MySQL**: The `mysqlclient` package requires system dependencies to compile:
+
+```bash
+brew install mysql pkg-config
+```
+
+**PostgreSQL**: Already included via `psycopg[binary]` in the dev dependencies.

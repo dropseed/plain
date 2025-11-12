@@ -229,7 +229,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return name  # Quoting once is enough.
         return f'"{name}"'
 
-    def compose_sql(self, sql: str, params: Any) -> bytes:
+    def compose_sql(self, sql: str, params: Any) -> str:
         return ClientCursor(self.connection.connection).mogrify(sql, params)
 
     def set_time_zone_sql(self) -> str:
@@ -260,7 +260,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return ["DISTINCT"], []
 
-    def last_executed_query(self, cursor: Any, sql: str, params: Any) -> bytes | None:
+    def last_executed_query(self, cursor: Any, sql: str, params: Any) -> str | None:
         try:
             return self.compose_sql(sql, params)
         except errors.DataError:

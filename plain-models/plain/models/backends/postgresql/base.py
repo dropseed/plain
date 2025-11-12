@@ -68,7 +68,7 @@ class PlainRangeDumper(RangeDumper):
 
 
 @lru_cache
-def get_adapters_template(timezone: datetime.tzinfo | None) -> adapters.AdaptersMap:
+def get_adapters_template(timezone: datetime.tzinfo | None) -> adapt.AdaptersMap:
     ctx = adapt.AdaptersMap(adapters)
     # No-op JSON loader to avoid psycopg3 round trips
     ctx.register_loader("jsonb", TextLoader)
