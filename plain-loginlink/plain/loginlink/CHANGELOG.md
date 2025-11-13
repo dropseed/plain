@@ -1,5 +1,17 @@
 # plain-loginlink changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.14.0) (2025-11-13)
+
+### What's changed
+
+- The `expires_in` parameter in `dumps()` and `sign_object()` is now keyword-only and required ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa92))
+- The `key` parameter in `loads()` is now keyword-only ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa92))
+
+### Upgrade instructions
+
+- Update any direct calls to `dumps()` to pass `expires_in` as a keyword argument (e.g., `dumps(obj, expires_in=3600)` instead of `dumps(obj, 3600)`)
+- Update any direct calls to `loads()` to pass `key` as a keyword argument if specified (e.g., `loads(s, key="mykey")` instead of `loads(s, "mykey")`)
+
 ## [0.13.2](https://github.com/dropseed/plain/releases/plain-loginlink@0.13.2) (2025-10-31)
 
 ### What's changed
