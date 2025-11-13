@@ -8,6 +8,7 @@ import threading
 import time
 import warnings
 import zoneinfo
+from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -38,7 +39,7 @@ RAN_DB_VERSION_CHECK = False
 logger = logging.getLogger("plain.models.backends.base")
 
 
-class BaseDatabaseWrapper:
+class BaseDatabaseWrapper(ABC):
     """Represent a database connection."""
 
     # Mapping of Field objects to their column types.
@@ -189,12 +190,10 @@ class BaseDatabaseWrapper:
             )
         return list(self.queries_log)
 
+    @abstractmethod
     def get_database_version(self) -> tuple[int, ...]:
         """Return a tuple of the database's version."""
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseWrapper may require a get_database_version() "
-            "method."
-        )
+        ...
 
     def check_database_version_supported(self) -> None:
         """
@@ -214,19 +213,15 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific methods for creating connections and cursors #####
 
+    @abstractmethod
     def get_connection_params(self) -> dict[str, Any]:
         """Return a dict of parameters suitable for get_new_connection."""
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseWrapper may require a get_connection_params() "
-            "method"
-        )
+        ...
 
+    @abstractmethod
     def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
         """Open a connection to the database."""
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseWrapper may require a get_new_connection() "
-            "method"
-        )
+        ...
 
     def init_connection_state(self) -> None:
         """Initialize the database connection settings."""
@@ -235,11 +230,10 @@ class BaseDatabaseWrapper:
             self.check_database_version_supported()
             RAN_DB_VERSION_CHECK = True
 
+    @abstractmethod
     def create_cursor(self, name: str | None = None) -> Any:
         """Create a cursor. Assume that a connection is established."""
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseWrapper may require a create_cursor() method"
-        )
+        ...
 
     # ##### Backend-specific methods for creating connections #####
 
@@ -425,13 +419,12 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific transaction management methods #####
 
+    @abstractmethod
     def _set_autocommit(self, autocommit: bool) -> None:
         """
         Backend-specific implementation to enable or disable autocommit.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseWrapper may require a _set_autocommit() method"
-        )
+        ...
 
     # ##### Generic transaction management methods #####
 
@@ -538,6 +531,7 @@ class BaseDatabaseWrapper:
 
     # ##### Connection termination handling #####
 
+    @abstractmethod
     def is_usable(self) -> bool:
         """
         Test if the database connection is usable.
@@ -547,9 +541,7 @@ class BaseDatabaseWrapper:
         Actual implementations should take care not to raise exceptions
         as that may prevent Plain from recycling unusable connections.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseWrapper may require an is_usable() method"
-        )
+        ...
 
     def close_if_health_check_failed(self) -> None:
         """Close existing connection if it fails a health check."""
