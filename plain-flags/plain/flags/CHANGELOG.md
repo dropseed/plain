@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-flags@0.28.0) (2025-11-12)
+
+### What's changed
+
+- The `Flag` class is now an abstract base class with `get_key()` and `get_value()` marked as abstract methods ([24fe1f3](https://github.com/dropseed/plain/commit/24fe1f3270))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.3](https://github.com/dropseed/plain/releases/plain-flags@0.27.3) (2025-11-11)
 
 ### What's changed
