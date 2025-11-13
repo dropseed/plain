@@ -63,8 +63,13 @@ TYPE_CHECK_ONLY_PATHS = [
 ]
 
 
-def check_type_coverage(path: str) -> tuple[float, int, int]:
-    """Check type coverage for a file or directory."""
+def check_type_coverage(path: str) -> tuple[float, int, int, int, int, int]:
+    """Check type coverage for a file or directory.
+
+    Returns:
+        Tuple of (coverage_percentage, fully_typed_functions, total_functions,
+                  ignore_comments, cast_calls, assert_statements)
+    """
     result = subprocess.run(
         ["./scripts/type-coverage", path, "--json"],
         capture_output=True,
@@ -74,13 +79,16 @@ def check_type_coverage(path: str) -> tuple[float, int, int]:
     if result.returncode != 0:
         print(f"Error checking coverage for {path}:", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
-        return 0.0, 0, 0
+        return 0.0, 0, 0, 0, 0, 0
 
     data = json.loads(result.stdout)
     return (
         data["overall_coverage"],
         data["fully_typed_functions"],
         data["total_functions"],
+        data.get("total_ignores", 0),
+        data.get("total_casts", 0),
+        data.get("total_asserts", 0),
     )
 
 
@@ -131,6 +139,9 @@ def main(details: bool = False):
 
     failed_items = []
     total_errors = 0
+    total_ignores = 0
+    total_casts = 0
+    total_asserts = 0
     passed_count = 0
     failed_count = 0
 
@@ -141,7 +152,10 @@ def main(details: bool = False):
             continue
 
         # Check coverage
-        coverage, typed, total = check_type_coverage(path)
+        coverage, typed, total, ignores, casts, asserts = check_type_coverage(path)
+        total_ignores += ignores
+        total_casts += casts
+        total_asserts += asserts
         coverage_color = Colors.GREEN if coverage == 100.0 else Colors.RED
         coverage_status = f"{coverage_color}✓{Colors.RESET}" if coverage == 100.0 else f"{Colors.RED}✗{Colors.RESET}"
 
@@ -159,8 +173,16 @@ def main(details: bool = False):
 
         # Print all paths in both modes (verbose adds ty check output)
         error_info = f" {Colors.DIM}({error_count} errors){Colors.RESET}" if error_count > 0 else ""
+        smell_parts = []
+        if ignores > 0:
+            smell_parts.append(f"{ignores} ignores")
+        if casts > 0:
+            smell_parts.append(f"{casts} casts")
+        if asserts > 0:
+            smell_parts.append(f"{asserts} asserts")
+        smell_info = f" {Colors.DIM}({', '.join(smell_parts)}){Colors.RESET}" if smell_parts else ""
         coverage_info = f"{Colors.DIM}Coverage: {coverage:.1f}% ({typed}/{total}){Colors.RESET}"
-        print(f"{coverage_status} {type_check_status} {path} - {coverage_info}{error_info}")
+        print(f"{coverage_status} {type_check_status} {path} - {coverage_info}{error_info}{smell_info}")
 
         # Track failures
         if coverage < 100.0:
@@ -207,6 +229,12 @@ def main(details: bool = False):
     print(f"  {Colors.GREEN}Passed:{Colors.RESET} {passed_count}/{total_count}")
     if failed_count > 0:
         print(f"  {Colors.RED}Failed:{Colors.RESET} {failed_count}/{total_count}")
+    if total_ignores > 0:
+        print(f"  {Colors.YELLOW}Type ignores:{Colors.RESET} {total_ignores}")
+    if total_casts > 0:
+        print(f"  {Colors.YELLOW}cast() calls:{Colors.RESET} {total_casts}")
+    if total_asserts > 0:
+        print(f"  {Colors.YELLOW}assert statements:{Colors.RESET} {total_asserts}")
 
     if failed_items:
         print()
