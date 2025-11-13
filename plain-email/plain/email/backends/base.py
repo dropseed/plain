@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
     from ..message import EmailMessage
 
 
-class BaseEmailBackend:
+class BaseEmailBackend(ABC):
     """
     Base class for email backend implementations.
 
@@ -66,11 +67,10 @@ class BaseEmailBackend:
     ) -> None:
         self.close()
 
+    @abstractmethod
     def send_messages(self, email_messages: list[EmailMessage]) -> int:
         """
         Send one or more EmailMessage objects and return the number of email
         messages sent.
         """
-        raise NotImplementedError(
-            "subclasses of BaseEmailBackend must override send_messages() method"
-        )
+        ...
