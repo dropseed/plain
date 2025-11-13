@@ -12,6 +12,7 @@ from .db import IntegrityError, db_connection
 from .deletion import CASCADE, DO_NOTHING, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
 from .enums import IntegerChoices, TextChoices
 from .fields.core import (
+    NOT_PROVIDED,
     BigIntegerField,
     BinaryField,
     BooleanField,
@@ -51,6 +52,7 @@ Field = Annotated
 __all__ = [
     # Typing
     "Field",
+    "NOT_PROVIDED",
     # From constraints
     "CheckConstraint",
     "UniqueConstraint",
