@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Any
 
@@ -41,7 +42,7 @@ class CreateView(FormView):
         return super().form_valid(form)
 
 
-class ObjectTemplateViewMixin:
+class ObjectTemplateViewMixin(ABC):
     context_object_name = ""
 
     @cached_property
@@ -61,10 +62,8 @@ class ObjectTemplateViewMixin:
 
         return obj
 
-    def get_object(self) -> Any:
-        raise NotImplementedError(
-            f"get_object() is not implemented on {self.__class__.__name__}"
-        )
+    @abstractmethod
+    def get_object(self) -> Any: ...
 
     def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
