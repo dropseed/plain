@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from enum import Enum
 from types import NoneType
 from typing import TYPE_CHECKING, Any
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 
 
-class BaseConstraint:
+class BaseConstraint(ABC):
     default_violation_error_message = 'Constraint "%(name)s" is violated.'
     violation_error_code: str | None = None
     violation_error_message: str | None = None
@@ -45,25 +46,25 @@ class BaseConstraint:
     def contains_expressions(self) -> bool:
         return False
 
+    @abstractmethod
     def constraint_sql(
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
-    ) -> str | None:
-        raise NotImplementedError("This method must be implemented by a subclass.")
+    ) -> str | None: ...
 
+    @abstractmethod
     def create_sql(
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
-    ) -> str | Statement | None:
-        raise NotImplementedError("This method must be implemented by a subclass.")
+    ) -> str | Statement | None: ...
 
+    @abstractmethod
     def remove_sql(
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
-    ) -> str | Statement | None:
-        raise NotImplementedError("This method must be implemented by a subclass.")
+    ) -> str | Statement | None: ...
 
+    @abstractmethod
     def validate(
         self, model: type[Model], instance: Model, exclude: set[str] | None = None
-    ) -> None:
-        raise NotImplementedError("This method must be implemented by a subclass.")
+    ) -> None: ...
 
     def get_violation_error_message(self) -> str:
         return self.violation_error_message % {"name": self.name}  # type: ignore[operator]

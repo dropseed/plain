@@ -24,11 +24,6 @@ Convert to ABC pattern with `@abstractmethod`:
 
 ### High Priority (Core interfaces, multiple methods)
 
-**BaseConstraint** (4 abstract methods)
-
-- Location: `plain-models/plain/models/constraints.py:18`
-- Methods: `constraint_sql()`, `create_sql()`, `remove_sql()`, `validate()`
-
 **BasePasswordHasher** (4 abstract methods)
 
 - Location: `plain-passwords/plain/passwords/hashers.py:161`
@@ -104,6 +99,11 @@ Good examples to follow!
 - Converted 2 abstract methods: `receive_data_chunk()`, `file_complete()`
 - All tests passing, type checking passes
 
+**BaseConstraint** - `plain-models/plain/models/constraints.py:25` ✅
+
+- Converted 4 abstract methods: `constraint_sql()`, `create_sql()`, `remove_sql()`, `validate()`
+- All tests passing, type checking passes
+
 ## Implementation
 
 For each class:
@@ -117,8 +117,8 @@ For each class:
 
 ## Statistics
 
-- **14 strong candidates**
-- **36+ abstract methods** total
+- **13 strong candidates**
+- **32+ abstract methods** total
 - **8 packages** affected: plain-models, plain-oauth, plain-email, plain-passwords, plain-admin, plain-flags, plain, plain-scan
 
 ## Benefits
