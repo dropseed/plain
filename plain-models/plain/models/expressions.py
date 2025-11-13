@@ -169,7 +169,7 @@ class Combinable:
         return NegatedExpression(self)
 
 
-class BaseExpression(ABC):
+class BaseExpression:
     """Base class for all query expressions."""
 
     empty_result_set_value = NotImplemented
@@ -213,7 +213,6 @@ class BaseExpression(ABC):
             for arg in expressions
         ]
 
-    @abstractmethod
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
@@ -242,7 +241,7 @@ class BaseExpression(ABC):
           Where `sql` is a string containing ordered sql parameters to be
           replaced with the elements of the list `params`.
         """
-        ...
+        raise NotImplementedError("Subclasses must implement as_sql()")
 
     @cached_property
     def contains_aggregate(self) -> bool:
