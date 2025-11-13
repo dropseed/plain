@@ -7,6 +7,7 @@ through foreign key and many-to-many relationships.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import Any
 
 from plain.models import transaction
@@ -41,7 +42,7 @@ def _filter_prefetch_queryset(
     return queryset.filter(predicate)
 
 
-class BaseRelatedManager:
+class BaseRelatedManager(ABC):
     """
     Base class for all related object managers.
 
@@ -53,9 +54,10 @@ class BaseRelatedManager:
         """Access the QuerySet for this relationship."""
         return self.get_queryset()
 
+    @abstractmethod
     def get_queryset(self) -> QuerySet:
         """Return the QuerySet for this relationship."""
-        raise NotImplementedError("Subclasses must implement get_queryset()")
+        ...
 
 
 class ReverseManyToOneManager(BaseRelatedManager):
