@@ -1,4 +1,5 @@
 import logging
+from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Any
 
@@ -21,7 +22,8 @@ logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("plain.flags")
 
 
-class Flag:
+class Flag(ABC):
+    @abstractmethod
     def get_key(self) -> Any:
         """
         Determine a unique key for this instance of the flag.
@@ -32,8 +34,9 @@ class Flag:
 
         Return a falsy value if you don't want to store the flag result.
         """
-        raise NotImplementedError
+        ...
 
+    @abstractmethod
     def get_value(self) -> Any:
         """
         Compute the resulting value of the flag.
@@ -43,7 +46,7 @@ class Flag:
         If get_key() returns a value, this will only be called once per key
         and then subsequent calls will return the saved value from the DB.
         """
-        raise NotImplementedError
+        ...
 
     def get_db_name(self) -> str:
         """
