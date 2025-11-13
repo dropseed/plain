@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.26.0) (2025-11-12)
+
+### What's changed
+
+- Improved type annotations in admin card implementation to suppress false positive type warnings ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa929058be517cb1d4ab35bd73a89f26b8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.3](https://github.com/dropseed/plain/releases/plain-pageviews@0.25.3) (2025-10-31)
 
 ### What's changed
