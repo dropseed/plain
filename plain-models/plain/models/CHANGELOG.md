@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.58.0](https://github.com/dropseed/plain/releases/plain-models@0.58.0) (2025-11-12)
+
+### What's changed
+
+- Internal base classes have been converted to use Python's ABC (Abstract Base Class) module with `@abstractmethod` decorators, improving type checking and making the codebase more maintainable ([b1f40759](https://github.com/dropseed/plain/commit/b1f40759eb), [7146cabc](https://github.com/dropseed/plain/commit/7146cabc42), [74f9a171](https://github.com/dropseed/plain/commit/74f9a1717a), [b647d156](https://github.com/dropseed/plain/commit/b647d156ce), [6f3e35d9](https://github.com/dropseed/plain/commit/6f3e35d9b0), [95620673](https://github.com/dropseed/plain/commit/95620673d9), [7ff5e98c](https://github.com/dropseed/plain/commit/7ff5e98c6f), [78323300](https://github.com/dropseed/plain/commit/78323300df), [df82434d](https://github.com/dropseed/plain/commit/df82434d50), [16350d98](https://github.com/dropseed/plain/commit/16350d98b1), [066eaa4b](https://github.com/dropseed/plain/commit/066eaa4bd7), [60fabefa](https://github.com/dropseed/plain/commit/60fabefa77), [9f822ccc](https://github.com/dropseed/plain/commit/9f822cccc8), [6b31752c](https://github.com/dropseed/plain/commit/6b31752c95))
+- Type annotations have been improved across database backends, query compilers, and migrations for better IDE support ([f4dbcefa](https://github.com/dropseed/plain/commit/f4dbcefa92), [dc182c2e](https://github.com/dropseed/plain/commit/dc182c2e51))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.57.0](https://github.com/dropseed/plain/releases/plain-models@0.57.0) (2025-11-11)
 
 ### What's changed
