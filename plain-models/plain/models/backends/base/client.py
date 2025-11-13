@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import os
 import subprocess
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
 
 
-class BaseDatabaseClient:
+class BaseDatabaseClient(ABC):
     """Encapsulate backend-specific methods for opening a client shell."""
 
     # This should be a string representing the name of the executable
@@ -20,13 +21,10 @@ class BaseDatabaseClient:
         self.connection = connection
 
     @classmethod
+    @abstractmethod
     def settings_to_cmd_args_env(
         cls, settings_dict: dict[str, Any], parameters: list[str]
-    ) -> tuple[list[str], dict[str, str] | None]:
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseClient must provide a "
-            "settings_to_cmd_args_env() method or override a runshell()."
-        )
+    ) -> tuple[list[str], dict[str, str] | None]: ...
 
     def runshell(self, parameters: list[str]) -> None:
         args, env = self.settings_to_cmd_args_env(
